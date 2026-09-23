@@ -1,0 +1,60 @@
+@layer components {
+  .chip {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--material-line);
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--text-text2);
+    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    white-space: nowrap;
+    min-width: 0;
+    flex: none;
+    transition: border-color var(--motion-duration-state) var(--motion-easing-mech);
+  }
+
+  button.chip {
+    cursor: pointer;
+  }
+
+  /* Hover changes an edge, never a position (system §6). */
+  button.chip:hover {
+    border-color: var(--material-line2);
+  }
+
+  button.chip:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .label {
+    font-weight: 600;
+    color: var(--text-text);
+  }
+
+  .word {
+    color: var(--text-text2);
+  }
+
+  .attention {
+    border-color: var(--role-amber-text);
+  }
+
+  .attention .label,
+  .attention .word {
+    color: var(--role-amber-text);
+  }
+
+  .error {
+    border-color: var(--role-red-text);
+  }
+
+  .error .label,
+  .error .word {
+    color: var(--role-red-text);
+  }
+}

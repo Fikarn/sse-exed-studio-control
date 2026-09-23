@@ -50,7 +50,7 @@ const KIND_UNIT: Record<LightingPaletteKind, string> = {
 };
 
 function formatPaletteValue(palette: LightingPaletteSnapshot) {
-  return `${Math.round(palette.value)}${KIND_UNIT[palette.kind]}`;
+  return `${Math.round(palette.value)} ${KIND_UNIT[palette.kind]}`;
 }
 
 function defaultDraft(kind: LightingPaletteKind): PaletteDraft {

@@ -228,6 +228,7 @@ export function SceneTile({
     <div
       ref={setNodeRef}
       className={stateClass}
+      data-lit={isSelected ? "" : undefined}
       style={tileStyle}
       onClick={() => {
         // Click cancels any pending hover preview (the timer is owned by the
@@ -284,7 +285,7 @@ export function SceneTile({
           ) : null}
         </span>
         <span className={styles.tileSub}>{subLine}</span>
-        {lastRecalledLabel ? <span className={styles.tileSub}>last {lastRecalledLabel}</span> : null}
+        {lastRecalledLabel ? <span className={styles.tileSub}>recalled {lastRecalledLabel}</span> : null}
       </span>
       {onPin ? (
         <span

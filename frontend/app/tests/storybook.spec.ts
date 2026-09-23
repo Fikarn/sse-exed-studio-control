@@ -1,7 +1,9 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { liveAudioMasks } from "./helpers/liveAudioMasks";
 
 // plan PR 5 / workstream D5: Storybook visual integration. The
 // storybook-static build (produced by `npm run frontend:storybook:build`,
@@ -45,34 +47,24 @@ const stories: StoryEntry[] = Object.values(index.entries).map((entry) => ({
   title: entry.title,
 }));
 
-// Live JS-driven surfaces that drift between captures — same as
-// visual-review.spec.ts. The mask is a no-op for component stories that
-// don't render these elements.
-function liveAudioMasks(page: Page): Locator[] {
-  return [
-    page.locator('[data-meter-component="stereo"]'),
-    page.locator('[data-testid="audio-meter-canvas"]'),
-    page.locator('[data-testid="audio-signal-canvas"]'),
-  ];
-}
-
 function shouldFreezeClock(storyId: string) {
-  // Planning stories render relative time labels ("in 5 minutes"). Freeze
+  // Planning stories render relative time labels ("in 5 minutes"), and every
+  // shell story prints the header clock (visual overhaul A, Slice 2). Freeze
   // the clock so the captures are stable.
-  return storyId.includes("planning");
+  return storyId.includes("planning") || storyId.includes("operatorshell");
 }
 
 function shouldAwaitAudioHydration(storyId: string) {
   // GLO-09: the monitor-strip solo chip derives from the audio snapshot,
   // which hydrates on its own refresh machine after bootstrap — wait for the
   // shell's hydration marker so ready-frame captures are deterministic.
-  // Pre-ready and setup-modal stories never mount the strip.
+  // Pre-ready stories never mount the strip; Setup does since visual
+  // overhaul A, Slice 2 (one shell on every surface), so it waits too.
   return (
     storyId.includes("operatorshell") &&
     !storyId.includes("bootstrap") &&
     !storyId.includes("protocol") &&
-    !storyId.includes("startup") &&
-    !storyId.includes("setup")
+    !storyId.includes("startup")
   );
 }
 

@@ -1,0 +1,260 @@
+/* Visual overhaul A, Slice 6: Planning's cluster. Every value is a token; the
+   geometry is the mock's — the state display first and fixed, the running
+   timers under it, the view switch and the day, the projects, what the timers
+   put on the day, and the standing actions at the foot. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow-y: auto;
+}
+
+.section {
+  flex: none;
+  min-width: 0;
+}
+
+/* ---- the running timers ------------------------------------------------- */
+
+.timer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-key);
+}
+
+.timer + .timer {
+  margin-top: 6px;
+}
+
+.timerName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.timerTitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timerMeta {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-mono);
+  color: var(--display-text2);
+}
+
+.timerElapsed {
+  color: var(--role-green-text);
+}
+
+.timer > :last-child {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+/* ---- the view switch and the day ---------------------------------------- */
+
+.viewSwitch {
+  flex: none;
+}
+
+.viewSwitch > * {
+  flex: 1;
+}
+
+.day {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  gap: 8px;
+  flex: none;
+}
+
+.dayKey {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dayLong,
+.dayShort {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dayShort {
+  display: none;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .dayLong {
+  display: none;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .dayShort {
+  display: inline;
+}
+
+/* ---- the projects ------------------------------------------------------- */
+
+.projects {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: linear-gradient(180deg, var(--material-key-top), var(--material-key));
+  color: var(--text-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.project[data-selected="true"] {
+  border-color: var(--material-line2);
+  background: var(--material-key-top);
+}
+
+.projectName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+}
+
+.projectMeta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.projectStatus {
+  flex: none;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.projectStatus[data-status="in-progress"] {
+  color: var(--role-amber-text);
+}
+
+.projectStatus[data-status="blocked"] {
+  color: var(--role-red-text);
+}
+
+.projectStatus[data-status="done"] {
+  color: var(--role-green-text);
+}
+
+/* ---- the project composer ----------------------------------------------- */
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.composerInput {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-ctl);
+  background: var(--material-well);
+  color: var(--display-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.composerInput::placeholder {
+  color: var(--display-text2);
+}
+
+.composerKeys {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---- what the timers put on the day ------------------------------------- */
+
+.tracked {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  margin: 0;
+}
+
+.trackedRow {
+  display: contents;
+}
+
+.trackedRow dt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.trackedRow dd {
+  margin: 0;
+  text-align: right;
+  font: 500 var(--font-size-label) / 1.4 var(--font-family-mono);
+  color: var(--text-text);
+}
+
+.trackedRow[data-total] dt,
+.trackedRow[data-total] dd {
+  padding-top: 4px;
+  border-top: 1px solid var(--material-line);
+  color: var(--text-text);
+  font-weight: 600;
+}
+
+/* ---- the standing actions ----------------------------------------------- */
+
+.actions {
+  margin-top: auto;
+  flex: none;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Below the studio surface the cluster spends less air; nothing is dropped. */
+:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
+  gap: 12px;
+  padding: 12px;
+}

@@ -1,4 +1,4 @@
-use crate::bootstrap::RuntimeContext;
+use crate::bootstrap::{RuntimeContext, EXPORTS_DIR_NAME};
 use crate::planning_settings::{
     DASHBOARD_VIEW_KEY, DECK_MODE_KEY, MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX,
     SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, TIMELINE_END_HOUR_KEY,
@@ -153,6 +153,7 @@ pub fn build_app_snapshot(
                 "logFilePath": runtime.log_file_path.display().to_string(),
                 "dbPath": runtime.db_path.display().to_string(),
                 "backupDir": runtime.backups_dir.display().to_string(),
+                "exportsDir": runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                 "updateRepositoryPath": runtime
                     .update_repository_path
                     .as_ref()
@@ -310,6 +311,17 @@ pub fn parse_commissioning_update(params: &Value) -> Result<Vec<(&'static str, S
     Ok(updates)
 }
 
+/// `overrideProbes` on `commissioning.update` (2026-09 audit Slice 8): the
+/// operator's explicit decision to publish while a probe is not passed.
+/// Absent or null means no override.
+pub fn parse_commissioning_override(params: &Value) -> Result<bool, String> {
+    match params.get("overrideProbes") {
+        None | Some(Value::Null) => Ok(false),
+        Some(Value::Bool(value)) => Ok(*value),
+        Some(_) => Err(String::from("overrideProbes must be a boolean")),
+    }
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value {
         "true" => Some(true),
@@ -457,6 +469,7 @@ mod tests {
                 journal_mode: String::from("wal"),
                 integrity_check: String::from("ok"),
             },
+            control_surface_token: String::from("bridge-token-for-tests"),
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 available: true,
                 status: String::from("ready"),

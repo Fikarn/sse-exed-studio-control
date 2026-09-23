@@ -10,9 +10,151 @@ pub fn update_audio_channel(
     db_path: &Path,
     request: &AudioChannelUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
 
+    // Gate first: anything that can reach TotalMix needs a verified console
+    // link, exactly like sync, recall and the Stream Deck path. A rename is
+    // app-local and stays allowed while the probe is pending.
+    if channel_request_touches_console(request) {
+        ensure_audio_action_allowed(db_path, &snapshot)?;
+    }
+
+    // Every field is validated BEFORE anything goes on the wire, so a request
+    // carrying one unsupported field can never half-apply to the console.
+    let mut channel_state = read_channel_state_map(&app_settings);
+    let mut next_state = snapshot
+        .channels
+        .iter()
+        .find(|entry| entry.id == request.channel_id)
+        .map(stored_channel_state_from_snapshot)
+        .ok_or_else(|| {
+            AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NOT_FOUND",
+                format!(
+                    "Channel '{}' is not part of this console.",
+                    request.channel_id
+                ),
+            )
+        })?;
+
+    if let Some(name) = &request.name {
+        let trimmed = name.trim();
+        if trimmed.is_empty() || trimmed.len() > 50 {
+            let message = String::from("Audio channel names must be 1-50 characters.");
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_NAME_INVALID", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_NAME_INVALID",
+                message,
+            ));
+        }
+        next_state.name = Some(String::from(trimmed));
+    }
+    if let Some(gain) = request.gain {
+        if !channel_supports_gain_from_role(&snapshot, &request.channel_id) {
+            let message = format!(
+                "Channel '{}' has no preamp gain — only the front preamp inputs do.",
+                request.channel_id
+            );
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.gain = gain;
+    }
+    if let Some(fader) = request.fader {
+        let mix_target_id = request
+            .mix_target_id
+            .clone()
+            .unwrap_or_else(|| String::from("audio-mix-main"));
+        if !snapshot
+            .mix_targets
+            .iter()
+            .any(|entry| entry.id == mix_target_id)
+        {
+            let message = format!("Output '{}' is not part of this console.", mix_target_id);
+            record_audio_action_failure(db_path, "AUDIO_MIX_TARGET_NOT_FOUND", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_MIX_TARGET_NOT_FOUND",
+                message,
+            ));
+        }
+        next_state.fader = fader;
+        next_state.mix_levels.insert(mix_target_id, fader);
+    }
+    if let Some(mute) = request.mute {
+        next_state.mute = mute;
+    }
+    if let Some(solo) = request.solo {
+        next_state.solo = solo;
+    }
+    if let Some(phantom) = request.phantom {
+        if !channel_supports_phantom_from_role(&snapshot, &request.channel_id) {
+            let message = format!(
+                "Channel '{}' has no 48V switch — only the front preamp inputs do.",
+                request.channel_id
+            );
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.phantom = phantom;
+    }
+    if let Some(phase) = request.phase {
+        if !channel_supports_phase_from_role(&snapshot, &request.channel_id) {
+            let message = format!("Channel '{}' has no polarity switch.", request.channel_id);
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.phase = phase;
+    }
+    if let Some(pad) = request.pad {
+        if !channel_supports_pad_from_role(&snapshot, &request.channel_id) {
+            let message = format!("Channel '{}' has no pad switch.", request.channel_id);
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.pad = pad;
+    }
+    if let Some(instrument) = request.instrument {
+        if !channel_supports_instrument_from_role(&snapshot, &request.channel_id) {
+            let message = format!(
+                "Channel '{}' has no instrument (Hi-Z) switch.",
+                request.channel_id
+            );
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.instrument = instrument;
+    }
+    if let Some(auto_set) = request.auto_set {
+        if !channel_supports_auto_set_from_role(&snapshot, &request.channel_id) {
+            let message = format!(
+                "Channel '{}' has no AutoSet — only the front preamp inputs do.",
+                request.channel_id
+            );
+            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
+            return Err(AudioCommandError::Rejected(
+                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
+                message,
+            ));
+        }
+        next_state.auto_set = auto_set;
+    }
     let config = resolve_audio_config(&app_settings);
     let outcome = update_default_audio_channel(
         &config,
@@ -36,159 +178,17 @@ pub fn update_audio_channel(
         AudioCommandError::Rejected(code, message)
     })?;
 
-    let mut channel_state = read_channel_state_map(&app_settings);
-    let mut next_state = snapshot
-        .channels
-        .iter()
-        .find(|entry| entry.id == request.channel_id)
-        .map(stored_channel_state_from_snapshot)
-        .ok_or_else(|| {
-            AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_NOT_FOUND",
-                format!(
-                    "Audio channel '{}' is not exposed by the engine.",
-                    request.channel_id
-                ),
-            )
-        })?;
-
-    if let Some(name) = &request.name {
-        let trimmed = name.trim();
-        if trimmed.is_empty() || trimmed.len() > 50 {
-            let message = String::from("Audio channel names must be 1-50 characters.");
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_NAME_INVALID", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_NAME_INVALID",
-                message,
-            ));
-        }
-        next_state.name = Some(String::from(trimmed));
-    }
-    if let Some(gain) = request.gain {
-        if !channel_supports_gain_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose gain in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.gain = gain;
-    }
-    if let Some(fader) = request.fader {
-        let mix_target_id = request
-            .mix_target_id
-            .clone()
-            .unwrap_or_else(|| String::from("audio-mix-main"));
-        if !snapshot
-            .mix_targets
-            .iter()
-            .any(|entry| entry.id == mix_target_id)
-        {
-            let message = format!(
-                "Audio mix target '{}' is not exposed by the engine.",
-                mix_target_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_MIX_TARGET_NOT_FOUND", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_MIX_TARGET_NOT_FOUND",
-                message,
-            ));
-        }
-        next_state.fader = fader;
-        next_state.mix_levels.insert(mix_target_id, fader);
-    }
-    if let Some(mute) = request.mute {
-        next_state.mute = mute;
-    }
-    if let Some(solo) = request.solo {
-        next_state.solo = solo;
-    }
-    if let Some(phantom) = request.phantom {
-        if !channel_supports_phantom_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose phantom power in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.phantom = phantom;
-    }
-    if let Some(phase) = request.phase {
-        if !channel_supports_phase_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose phase inversion in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.phase = phase;
-    }
-    if let Some(pad) = request.pad {
-        if !channel_supports_pad_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose pad in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.pad = pad;
-    }
-    if let Some(instrument) = request.instrument {
-        if !channel_supports_instrument_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose instrument mode in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.instrument = instrument;
-    }
-    if let Some(auto_set) = request.auto_set {
-        if !channel_supports_auto_set_from_role(&snapshot, &request.channel_id) {
-            let message = format!(
-                "Audio channel '{}' does not expose AutoSet in the native engine.",
-                request.channel_id
-            );
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_FIELD_UNSUPPORTED", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_FIELD_UNSUPPORTED",
-                message,
-            ));
-        }
-        next_state.auto_set = auto_set;
-    }
     channel_state.insert(request.channel_id.clone(), next_state);
 
+    // Console-state confidence is deliberately NOT written here: a UDP send
+    // is not a confirmation. Only a completed pull, a fully confirmed push, or
+    // the console-link echo tracker may move it (2026-09 audit remediation).
     persist_audio_state(
         db_path,
         &[
             (
                 String::from(AUDIO_CHANNEL_STATE_KEY),
                 serialize_json_state(&channel_state)?,
-            ),
-            (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
             ),
             (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),
@@ -208,19 +208,37 @@ pub fn update_audio_channel(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
         })
 }
 
+fn channel_request_touches_console(request: &AudioChannelUpdateRequest) -> bool {
+    request.gain.is_some()
+        || request.fader.is_some()
+        || request.mute.is_some()
+        || request.solo.is_some()
+        || request.phantom.is_some()
+        || request.phase.is_some()
+        || request.pad.is_some()
+        || request.instrument.is_some()
+        || request.auto_set.is_some()
+}
+
 pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     let config = resolve_audio_config(&app_settings);
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut cleared_count = 0usize;
+
+    // Clearing a solo is a console write; the idempotent no-op stays allowed.
+    if snapshot.channels.iter().any(|entry| entry.solo) {
+        ensure_audio_action_allowed(db_path, &snapshot)?;
+    }
 
     for channel in snapshot.channels.iter().filter(|entry| entry.solo) {
         let request = AudioChannelUpdateRequest {
@@ -273,10 +291,6 @@ pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioComman
                 serialize_json_state(&channel_state)?,
             ),
             (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
-            ),
-            (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),
                 String::from("succeeded"),
             ),
@@ -292,16 +306,12 @@ pub fn update_audio_channel_eq(
     db_path: &Path,
     request: &AudioEqUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
-    if !snapshot.capabilities.can_edit_processing {
-        let message = String::from("Audio EQ editing is unavailable while OSC is disabled.");
-        record_audio_action_failure(db_path, "AUDIO_PROCESSING_UNAVAILABLE", &message)?;
-        return Err(AudioCommandError::Rejected(
-            "AUDIO_PROCESSING_UNAVAILABLE",
-            message,
-        ));
-    }
+    // EQ / low-cut edits reach TotalMix over the classic page-2 path, so they
+    // pass the same console gate as faders and mutes.
+    ensure_audio_action_allowed(db_path, &snapshot)?;
 
     let mut channel_state = read_channel_state_map(&app_settings);
     let mut next_state = snapshot
@@ -313,7 +323,7 @@ pub fn update_audio_channel_eq(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
@@ -359,7 +369,7 @@ pub fn update_audio_channel_eq(
             .ok_or_else(|| {
                 AudioCommandError::Rejected(
                     "AUDIO_EQ_BAND_NOT_FOUND",
-                    format!("Audio EQ band '{band_id}' is not exposed by the engine."),
+                    format!("EQ band '{band_id}' does not exist on this channel."),
                 )
             })?;
         if let Some(enabled) = request.band_enabled {
@@ -435,7 +445,7 @@ pub fn update_audio_channel_eq(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
@@ -467,7 +477,7 @@ pub fn update_audio_channel_dynamics(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
@@ -524,7 +534,7 @@ pub fn update_audio_channel_dynamics(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
@@ -553,7 +563,7 @@ pub fn update_audio_channel_send_mode(
         return Err(AudioCommandError::Rejected(
             "AUDIO_MIX_TARGET_NOT_FOUND",
             format!(
-                "Audio mix target '{}' is not exposed by the engine.",
+                "Output '{}' is not part of this console.",
                 request.mix_target_id
             ),
         ));
@@ -569,7 +579,7 @@ pub fn update_audio_channel_send_mode(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )
@@ -620,7 +630,7 @@ pub fn update_audio_channel_send_mode(
             AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
                 format!(
-                    "Audio channel '{}' is not exposed by the engine.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 ),
             )

@@ -1,37 +1,58 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Calendar, Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
 
+import { formatShortcut } from "./shared/shortcutGlyphs";
 import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 import { OPERATOR_UI_SCALES } from "./operatorLayout";
-import { buildMonitorItems, isEditableTarget } from "./shellData";
+import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone, isEditableTarget } from "./shellData";
+import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
-import { SetupSupportPilot } from "./setup/SetupSupportPilot";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
-import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "./shellCommands";
+import {
+  confirmShellClose,
+  enterStudioFullscreen,
+  onShellCloseRequested,
+  resetWindowLayout,
+  switchToWindowedLayout,
+} from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
-import { AudioWorkspace } from "./audio/AudioWorkspace";
-import { LightingWorkspaceSurface } from "./lighting/LightingWorkspace";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
-import { PlanningWorkspaceSurface } from "./planning/PlanningWorkspace";
+import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
 import { PaletteProvider, usePalette } from "./shared/paletteContext";
-import { PreReadyFrame } from "./shared/PreReadyFrame";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
 import { useLiveCallback } from "./shared/useLiveCallback";
 import { RecoverySurface } from "./startup/RecoverySurface";
+import { reportUiFailure } from "./startup/reportUiFailure";
 import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
+import { WorkspaceCrashProbe } from "./startup/WorkspaceCrashProbe";
+import { WorkspaceErrorBoundary } from "./startup/WorkspaceErrorBoundary";
+import { WorkspaceLoadingSurface } from "./startup/WorkspaceLoadingSurface";
+import { preloadWorkspace, whenIdle, workspaceChunks, WORKSPACE_IDS } from "./workspaceChunks";
 
-type ConfirmIntent = "restart-engine" | null;
+type ConfirmIntent = "restart-engine" | "close-window" | null;
 
-export function OperatorShell() {
+declare global {
+  interface Window {
+    /** Browser / fixture stand-in for the native close request (Playwright). */
+    __SSE_TEST_REQUEST_CLOSE__?: () => void;
+  }
+}
+
+const CLOSE_DIALOG_BODY =
+  "Closing ends Studio Control's link to the desk, the rig and the deck. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
+
+export type ShellEnvironment = ReturnType<typeof createShellEnvironment>;
+
+export function OperatorShell({ environment }: { environment?: ShellEnvironment }) {
   // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
   // command palette. Both mount once at the shell root so every workspace
   // (and any startup/recovery surface) inherits the same stacks.
@@ -39,23 +60,29 @@ export function OperatorShell() {
     <ToastProvider>
       <PaletteProvider>
         <OperatorLayoutProvider>
-          <OperatorShellInner />
+          <OperatorShellInner environment={environment} />
         </OperatorLayoutProvider>
       </PaletteProvider>
     </ToastProvider>
   );
 }
 
-function OperatorShellInner() {
-  const environment = useMemo(() => createShellEnvironment(), []);
+function OperatorShellInner({ environment: providedEnvironment }: { environment?: ShellEnvironment }) {
+  // 2026-09 production readiness, Slice 5: `main.tsx` creates the environment
+  // so it can forward uncaught window errors to the store; tests and stories
+  // render the shell without one.
+  const environment = useMemo(() => providedEnvironment ?? createShellEnvironment(), [providedEnvironment]);
   const palette = usePalette();
-  const { reviewSurface, setReviewSurface, setUiScale } = useOperatorLayout();
+  const { reviewSurface, setReviewSurface, setTheme, setUiScale } = useOperatorLayout();
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
   const setupModalActive = activeWorkspace === "setup";
   const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>(null);
   const [showShortcutGuide, setShowShortcutGuide] = useState(false);
+  // Slice 9 (F10): advanced by "Reload this area"; with the area's name it is
+  // the workspace boundary's key.
+  const [areaReloads, setAreaReloads] = useState(0);
   const deferredLightingDmxMonitorSnapshot = useDeferredValue(shellState.lightingDmxMonitorSnapshot);
   const deferredLightingFixtureCatalogSnapshot = useDeferredValue(shellState.lightingFixtureCatalogSnapshot);
   const deferredLightingSnapshot = useDeferredValue(shellState.lightingSnapshot);
@@ -85,6 +112,26 @@ function OperatorShellInner() {
     return () => document.documentElement.removeAttribute("data-audio-hydrated");
   }, [shellState.audioSnapshot]);
 
+  // Visual overhaul A, Slice 2: the header clock (HH:MM, the studio's local
+  // time), and the workspace states the lamps mirror (plan D1, finding C3).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const clock = useMemo(
+    () => new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false }).format(now),
+    [now]
+  );
+  const audioStatus = useMemo(() => describeAudioStatus(shellState.audioSnapshot), [shellState.audioSnapshot]);
+  const workspaceTones = useMemo(
+    () => ({
+      audio: shellState.audioSnapshot ? { tone: audioStatus.tone, word: audioStatus.label.toLowerCase() } : null,
+      lighting: deriveLightingWorkspaceTone(shellState.lightingSnapshot, lightingSceneDrift),
+    }),
+    [audioStatus, lightingSceneDrift, shellState.audioSnapshot, shellState.lightingSnapshot]
+  );
+
   const requestRestart = useLiveCallback(() => {
     setConfirmIntent("restart-engine");
   });
@@ -97,6 +144,31 @@ function OperatorShellInner() {
     setConfirmIntent(null);
     await environment.store.restart();
   });
+
+  // 2026-09 audit Slice 11: closing the window asks first. The native shell
+  // prevents the close and raises shell://close-requested; the lighting
+  // unsaved-scene guard runs before the close dialog, exactly like a
+  // workspace switch. Confirming hands back to the shell, which stops the
+  // engine gracefully and closes the window.
+  const requestClose = useLiveCallback(async () => {
+    const allowed = await attemptLeaveCurrentWorkspace();
+    if (!allowed) return;
+    setConfirmIntent("close-window");
+  });
+
+  const performClose = useLiveCallback(async () => {
+    setConfirmIntent(null);
+    await confirmShellClose();
+  });
+
+  useEffect(() => {
+    const unlisten = onShellCloseRequested(() => void requestClose());
+    window.__SSE_TEST_REQUEST_CLOSE__ = () => void requestClose();
+    return () => {
+      unlisten();
+      delete window.__SSE_TEST_REQUEST_CLOSE__;
+    };
+  }, [requestClose]);
 
   const tryNavigateWorkspace = useLiveCallback(async (target: ShellState["activeWorkspace"]) => {
     // Same-target clicks shouldn't trigger the prompt.
@@ -121,7 +193,7 @@ function OperatorShellInner() {
   useEffect(() => {
     const uiScaleActions = OPERATOR_UI_SCALES.map((scale) => ({
       id: `system:ui-scale:${scale}`,
-      label: `Set UI scale to ${scale}%`,
+      label: `Set UI scale to ${scale} %`,
       group: "System",
       keywords: ["ui", "scale", "density", "compact", String(scale)],
       action: () => setUiScale(scale),
@@ -133,7 +205,7 @@ function OperatorShellInner() {
         label: "Switch to Setup / Support",
         group: "Workspace",
         keywords: ["setup", "support", "pilot"],
-        shortcut: "⇧S",
+        shortcut: formatShortcut(["shift", "S"]),
         action: () => void tryNavigateWorkspace("setup"),
       },
       {
@@ -141,7 +213,7 @@ function OperatorShellInner() {
         label: "Switch to Lighting",
         group: "Workspace",
         keywords: ["lighting", "lights", "rig"],
-        shortcut: "⌘1",
+        shortcut: formatShortcut(["mod", "2"]),
         action: () => void tryNavigateWorkspace("lighting"),
       },
       {
@@ -157,17 +229,27 @@ function OperatorShellInner() {
         label: "Switch to Planning",
         group: "Workspace",
         keywords: ["planning", "tasks", "projects"],
-        shortcut: "⌘4",
+        shortcut: formatShortcut(["mod", "4"]),
         action: () => void tryNavigateWorkspace("planning"),
       },
       {
         id: "system:restart-engine",
-        label: "Restart engine bridge",
+        label: "Restart the hardware link",
         group: "System",
         keywords: ["restart", "reset", "bridge", "recover"],
-        shortcut: "⌘⇧R",
+        shortcut: formatShortcut(["mod", "shift", "R"]),
         action: () => setConfirmIntent("restart-engine"),
       },
+      // Visual overhaul A, Slice 4 (plan D5, D12): the Console's private theme
+      // switch is gone; the theme is the program's, set from the palette and
+      // from Support › Workstation.
+      ...(["studio", "graphite", "bone"] as const).map((themeId) => ({
+        id: `system:theme:${themeId}`,
+        label: `Switch to the ${themeId[0]!.toUpperCase()}${themeId.slice(1)} theme`,
+        group: "System",
+        keywords: ["theme", "studio", "graphite", "bone", "light", "dark", themeId],
+        action: () => setTheme(themeId),
+      })),
       {
         id: "system:show-shortcuts",
         label: "Show keyboard shortcuts",
@@ -178,28 +260,28 @@ function OperatorShellInner() {
       },
       {
         id: "system:enter-studio-fullscreen",
-        label: "Enter Studio Fullscreen",
+        label: "Enter studio fullscreen",
         group: "Window",
         keywords: ["studio", "fullscreen", "monitor", "window"],
         action: () => void enterStudioFullscreen(),
       },
       {
         id: "system:use-windowed-layout",
-        label: "Use Windowed Layout",
+        label: "Use the windowed layout",
         group: "Window",
         keywords: ["windowed", "layout", "resize", "monitor"],
         action: () => void switchToWindowedLayout(),
       },
       {
         id: "system:reset-window-layout",
-        label: "Reset Window Layout",
+        label: "Reset the window layout",
         group: "Window",
         keywords: ["reset", "window", "layout", "monitor"],
         action: () => void resetWindowLayout(),
       },
       {
         id: "system:enter-studio-preview",
-        label: "Studio Preview: Enter 2560x1440 Review",
+        label: "Enter Studio Preview at 2560 × 1440",
         group: "Window",
         keywords: ["studio", "preview", "scaled", "review", "2560", "1440", "layout"],
         when: () => reviewSurface !== "studioPreview",
@@ -207,7 +289,7 @@ function OperatorShellInner() {
       },
       {
         id: "system:exit-studio-preview",
-        label: "Studio Preview: Exit Review",
+        label: "Exit Studio Preview",
         group: "Window",
         keywords: ["studio", "preview", "scaled", "review", "native", "layout"],
         when: () => reviewSurface === "studioPreview",
@@ -215,15 +297,33 @@ function OperatorShellInner() {
       },
       ...uiScaleActions,
     ]);
-  }, [palette, reviewSurface, setReviewSurface, setUiScale, tryNavigateWorkspace]);
+  }, [palette, reviewSurface, setReviewSurface, setTheme, setUiScale, tryNavigateWorkspace]);
 
   const workspaces = useMemo(
     () =>
       [
-        { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
-        { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
-        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
-        { id: "planning", label: "Planning", meta: "secondary", icon: <Calendar size={16} /> },
+        {
+          id: "setup",
+          label: "Setup / Support",
+          meta: "pilot",
+          icon: <Sliders size={16} />,
+          hint: formatShortcut(["mod", "1"]),
+        },
+        {
+          id: "lighting",
+          label: "Lighting",
+          meta: "primary",
+          icon: <Sun size={16} />,
+          hint: formatShortcut(["mod", "2"]),
+        },
+        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} />, hint: formatShortcut(["mod", "3"]) },
+        {
+          id: "planning",
+          label: "Planning",
+          meta: "secondary",
+          icon: <Calendar size={16} />,
+          hint: formatShortcut(["mod", "4"]),
+        },
       ] as const,
     []
   );
@@ -327,6 +427,23 @@ function OperatorShellInner() {
 
   const shellExperience = deriveShellExperience(shellState);
 
+  // Slice 14 (F26): the workspaces are chunks of their own. This effect runs
+  // after the shell has drawn, so the startup surface is on screen before any
+  // workspace's code is fetched; the hardware link takes longer to start than
+  // a chunk takes to arrive, so the active workspace is in hand at `ready`.
+  useEffect(() => {
+    void preloadWorkspace(activeWorkspace);
+  }, [activeWorkspace]);
+  // The other three follow once the shell is ready and idle: a workspace whose
+  // chunk is in hand mounts in the commit that asks for it, with no loading
+  // surface in between.
+  useEffect(() => {
+    if (shellExperience !== "ready") return undefined;
+    return whenIdle(() => {
+      for (const workspaceId of WORKSPACE_IDS) void preloadWorkspace(workspaceId);
+    });
+  }, [shellExperience]);
+
   // CHROME-08: pre-ready surfaces (startup / recovery / setup-recovery) have no
   // bottom footer, so the toast portal (mounted at document.body) should dock at
   // the true edge rather than reserve the health-bar offset. The toast lives
@@ -337,171 +454,167 @@ function OperatorShellInner() {
     return () => document.documentElement.removeAttribute("data-pre-ready");
   }, [shellExperience]);
 
+  // Rendered next to the restart dialog in every shell state (startup,
+  // recovery, operator) so a close request is never swallowed.
+  const closeDialog =
+    confirmIntent === "close-window" ? (
+      <ShellDialog
+        body={CLOSE_DIALOG_BODY}
+        confirmLabel="Close Studio Control"
+        onCancel={() => setConfirmIntent(null)}
+        onConfirm={() => void performClose()}
+        title="Close Studio Control?"
+      />
+    ) : null;
+
+  const restartDialog =
+    confirmIntent === "restart-engine" ? (
+      shellExperience === "recovery" ? (
+        <ShellDialog
+          body="Retry startup with the paths Studio Control is set to use. If it fails again, export diagnostics before you change any saved data or connection settings."
+          confirmLabel="Retry startup"
+          onCancel={() => setConfirmIntent(null)}
+          onConfirm={() => void performRestart()}
+          title="Retry startup?"
+        />
+      ) : (
+        <ShellDialog
+          body="Restarting reconnects Studio Control to the desk, the rig and the deck. The hardware link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
+          confirmLabel="Restart the hardware link"
+          onCancel={() => setConfirmIntent(null)}
+          onConfirm={() => void performRestart()}
+          title="Restart the hardware link?"
+        />
+      )
+    ) : null;
+
+  // Visual overhaul A, Slice 2 (plan D1): one shell on every surface. Before
+  // the engine is ready there is nowhere to go, so every tab is locked; once
+  // ready, the operator workspaces stay locked until commissioning has
+  // published (the engine's startup target says "dashboard"), and Setup is
+  // a workspace with the same header, lamps and latches as the others.
+  const operatorModeUnlocked =
+    String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
+  const tabsDisabled = shellExperience !== "ready";
+  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "planning"] : [];
+  const monitorItems = buildMonitorItems(
+    shellState.healthSnapshot,
+    { lightingSceneDrift, audioSolo },
+    shellExperience === "ready" ? workspaceTones : undefined
+  );
+
+  // Visual overhaul A: a workspace fills the shell's cluster, plate and
+  // footer regions once it has moved onto the cluster rule. The Console did in
+  // Slice 4, Lighting in Slice 5, Planning in Slice 6 and Setup in Slice 7.
+  // The pre-ready surfaces render their own frame (they are not workspaces).
+  const workspaceRegions =
+    shellExperience === "ready" &&
+    (activeWorkspace === "audio" ||
+      activeWorkspace === "lighting" ||
+      activeWorkspace === "planning" ||
+      activeWorkspace === "setup")
+      ? ("slot" as const)
+      : undefined;
+
+  // What the workspace boundary calls the area it wraps (Slice 9).
+  const areaLabel =
+    shellExperience === "ready"
+      ? (workspaces.find((workspace) => workspace.id === activeWorkspace)?.label ?? "This area")
+      : shellExperience === "recovery"
+        ? "Recovery"
+        : "Startup";
+
+  const SetupSurface = workspaceChunks.setup.Surface;
+  const LightingSurface = workspaceChunks.lighting.Surface;
+  const AudioSurface = workspaceChunks.audio.Surface;
+  const PlanningSurface = workspaceChunks.planning.Surface;
+
+  let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupStartupSurface
-            appSnapshot={shellState.appSnapshot}
-            lifecycle={shellState.lifecycle}
-            onShowShortcuts={showShortcuts}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting the engine bridge clears the current shell session and repeats the startup handshake."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-      </>
+    surface = (
+      <SetupStartupSurface
+        appSnapshot={shellState.appSnapshot}
+        lifecycle={shellState.lifecycle}
+        onShowShortcuts={showShortcuts}
+      />
     );
-  }
-
-  if (shellExperience === "startup") {
-    return (
-      <>
-        <PreReadyFrame>
-          <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting the engine bridge clears the current shell session and repeats the startup handshake."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-      </>
+  } else if (shellExperience === "startup") {
+    surface = <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />;
+  } else if (setupModalActive && shellExperience === "ready") {
+    surface = (
+      <SetupSurface
+        appSnapshot={shellState.appSnapshot}
+        commissioningSnapshot={shellState.commissioningSnapshot}
+        controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
+        healthSnapshot={shellState.healthSnapshot}
+        lightOutputsArmed={shellState.lightingSnapshot ? shellState.lightingSnapshot.outputArmed !== false : null}
+        liveTransportRequested={environment.liveTransportRequested}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
     );
-  }
-
-  if (setupModalActive && shellExperience === "ready") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupSupportPilot
-            appSnapshot={shellState.appSnapshot}
-            commissioningSnapshot={shellState.commissioningSnapshot}
-            controlSurfaceSnapshot={shellState.controlSurfaceSnapshot}
-            healthSnapshot={shellState.healthSnapshot}
-            liveTransportRequested={environment.liveTransportRequested}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-            store={environment.store}
-            supportSnapshot={deferredSupportSnapshot}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Restarting the engine bridge closes the current shell session, re-runs protocol negotiation, and reloads commissioning/support state."
-            confirmLabel="Restart bridge"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Restart engine bridge?"
-          />
-        ) : null}
-      </>
+  } else if (setupModalActive && shellExperience === "recovery") {
+    surface = (
+      <SetupRecoverySurface
+        appSnapshot={shellState.appSnapshot}
+        failure={shellState.startupFailure}
+        healthSnapshot={shellState.healthSnapshot}
+        liveTransportRequested={environment.liveTransportRequested}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+        store={environment.store}
+        supportSnapshot={deferredSupportSnapshot}
+      />
     );
-  }
-
-  if (setupModalActive && shellExperience === "recovery") {
-    return (
-      <>
-        <PreReadyFrame>
-          <SetupRecoverySurface
-            appSnapshot={shellState.appSnapshot}
-            failure={shellState.startupFailure}
-            healthSnapshot={shellState.healthSnapshot}
-            liveTransportRequested={environment.liveTransportRequested}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-            store={environment.store}
-            supportSnapshot={deferredSupportSnapshot}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
-            confirmLabel="Retry startup"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Retry startup?"
-          />
-        ) : null}
-      </>
+  } else if (shellExperience === "recovery") {
+    surface = (
+      <RecoverySurface
+        failure={shellState.startupFailure}
+        healthSnapshot={shellState.healthSnapshot}
+        onRequestRestart={requestRestart}
+        onShowShortcuts={showShortcuts}
+      />
     );
-  }
-
-  if (shellExperience === "recovery") {
-    return (
-      <>
-        <PreReadyFrame>
-          <RecoverySurface
-            failure={shellState.startupFailure}
-            healthSnapshot={shellState.healthSnapshot}
-            onRequestRestart={requestRestart}
-            onShowShortcuts={showShortcuts}
-          />
-        </PreReadyFrame>
-        {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-        {confirmIntent === "restart-engine" ? (
-          <ShellDialog
-            body="Retry startup with the current runtime paths. If the failure persists, capture diagnostics before changing persistence or protocol state."
-            confirmLabel="Retry startup"
-            onCancel={() => setConfirmIntent(null)}
-            onConfirm={() => void performRestart()}
-            title="Retry startup?"
-          />
-        ) : null}
-      </>
-    );
-  }
-
-  if (activeWorkspace === "setup") {
-    // Unreachable: every shellExperience (startup/ready/recovery) early-returns
-    // for the setup workspace above. The guard narrows the union so the frame
-    // below models only the three real workspaces (GLO-07 close-out).
-    return null;
-  }
-
-  const monitorItems = buildMonitorItems(shellState.healthSnapshot, { lightingSceneDrift, audioSolo });
-
-  const body =
-    activeWorkspace === "lighting" ? (
-      <LightingWorkspaceSurface
+  } else if (activeWorkspace === "lighting") {
+    surface = (
+      <LightingSurface
         appSnapshot={shellState.appSnapshot}
         lightingFixtureCatalogSnapshot={deferredLightingFixtureCatalogSnapshot}
         lightingDmxMonitorSnapshot={deferredLightingDmxMonitorSnapshot}
         lightingSnapshot={deferredLightingSnapshot}
         store={environment.store}
       />
-    ) : activeWorkspace === "audio" ? (
-      <AudioWorkspace
+    );
+  } else if (activeWorkspace === "audio") {
+    surface = (
+      <AudioSurface
         appSnapshot={shellState.appSnapshot}
         audioSnapshot={deferredAudioSnapshot}
         store={environment.store}
       />
-    ) : (
-      <PlanningWorkspaceSurface
+    );
+  } else {
+    surface = (
+      <PlanningSurface
         appSnapshot={shellState.appSnapshot}
         planningSnapshot={deferredPlanningSnapshot}
         store={environment.store}
       />
     );
+  }
 
   return (
     <>
       <AppShellFrame
         activeWorkspace={activeWorkspace}
+        clock={clock}
+        cluster={workspaceRegions}
+        footer={workspaceRegions}
+        disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
+        tabsDisabled={tabsDisabled}
         workspaces={workspaces}
         onMonitorItemClick={(item) => {
           // Health chips open Setup / Support; latched chips jump to the
@@ -514,18 +627,30 @@ function OperatorShellInner() {
           void tryNavigateWorkspace(workspaceId as ShellState["activeWorkspace"]);
         }}
       >
-        <div className={styles.workspaceStack}>{body}</div>
+        <div className={styles.workspaceStack}>
+          {/* Slice 9 (F10). The band is absent while nothing has failed, and the
+              boundary adds no element of its own, so the surface is still the
+              stack's only child on every board. The pre-ready surfaces sit
+              inside the same boundary: a recovery surface that fails to draw
+              must not take the header, the restart dialog and the close dialog
+              with it. */}
+          {shellExperience === "ready" ? <BackgroundFailureBand failures={shellState.backgroundFailures} /> : null}
+          <WorkspaceErrorBoundary
+            key={`${shellExperience}:${activeWorkspace}:${areaReloads}`}
+            area={areaLabel}
+            onError={(error) => reportUiFailure(environment.store, error, `${areaLabel} stopped drawing`)}
+            onReset={() => setAreaReloads((count) => count + 1)}
+          >
+            {shellExperience === "ready" && environment.crashWorkspace === activeWorkspace ? (
+              <WorkspaceCrashProbe area={areaLabel} />
+            ) : null}
+            <Suspense fallback={<WorkspaceLoadingSurface area={areaLabel} />}>{surface}</Suspense>
+          </WorkspaceErrorBoundary>
+        </div>
       </AppShellFrame>
       {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
-      {confirmIntent === "restart-engine" ? (
-        <ShellDialog
-          body="Restarting the engine bridge closes the current shell session, re-runs protocol negotiation, and reloads commissioning/support state."
-          confirmLabel="Restart bridge"
-          onCancel={() => setConfirmIntent(null)}
-          onConfirm={() => void performRestart()}
-          title="Restart engine bridge?"
-        />
-      ) : null}
+      {restartDialog}
+      {closeDialog}
     </>
   );
 }

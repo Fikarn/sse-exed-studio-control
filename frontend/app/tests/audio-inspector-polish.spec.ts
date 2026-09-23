@@ -32,21 +32,22 @@ test("tier bank pill renders the tier description on bank 1 and is testid-addres
   await expect(pill).toContainText(/ch/);
 });
 
-test("health bar drops OSC, Endpoint and Metering rows", async ({ page }) => {
+test("the footer carries the console link, the metering source, the last sync and the bank", async ({ page }) => {
+  // Visual overhaul A, Slice 4 (system §2): the Console's footer is the
+  // shell's, and it carries the telemetry the retired top bar's stat cluster
+  // held. Old: "health bar drops OSC, Endpoint and Metering rows" — the
+  // footer kept only Clock / Last sync and the top bar carried the rest.
   await openFixture(page, "audio-populated");
-  const healthBar = page.getByTestId("audio-health-bar");
-  await expect(healthBar).toBeVisible();
-  await expect(healthBar).not.toContainText("OSC");
-  await expect(healthBar).not.toContainText("Endpoint");
-  await expect(healthBar).not.toContainText("Metering");
-  await expect(healthBar).toContainText("Clock");
-  await expect(healthBar).toContainText("Last sync");
-  // 2026-05-27 redesign: the AudioTopBar stat cluster is now the canonical
-  // surface for OSC / Console / Metering facts. The cluster has no testid
-  // yet — assert via text inside the topbar header.
-  const topbar = page.getByTestId("audio-topbar");
-  await expect(topbar).toContainText("OSC");
-  await expect(topbar).toContainText("Metering");
+  const footer = page.getByTestId("audio-health-bar");
+  await expect(footer).toBeVisible();
+  // Slice 8 (system §9): the footer names what the row reports (OSC control),
+  // not this surface. "Console" is the workspace, the desk is the hardware.
+  await expect(footer).toContainText("OSC control");
+  await expect(footer).toContainText("Metering");
+  await expect(footer).toContainText("Last sync");
+  await expect(footer).toContainText("Bank");
+  await expect(footer).not.toContainText("Endpoint");
+  await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
 });
 
 test("snapshot diff shows '+N more' when more than two channels changed", async ({ page }) => {
@@ -69,9 +70,12 @@ test("snapshot diff shows '+N more' when more than two channels changed", async 
 
 test("EQ Band 2 locks the band-type selector via the capability flag", async ({ page }) => {
   await openFixture(page, "audio-selected-channel");
-  const eqTab = page.getByRole("tab", { name: "EQ" });
-  await expect(eqTab).toBeVisible();
-  await eqTab.click();
+  // Visual overhaul A, Slice 4c. Old: click the EQ tab. New: the equaliser is a
+  // section of the plate, always present; bring it into view. Reason: the plate
+  // has no tab row.
+  const eqSection = page.locator('[data-plate-section="eq"]');
+  await expect(eqSection).toBeAttached();
+  await eqSection.scrollIntoViewIfNeeded();
 
   const band2 = page.getByTestId("audio-eq-point-2");
   await band2.click();

@@ -1,3 +1,4 @@
+mod action_log;
 mod app;
 mod app_state;
 mod audio;
@@ -6,18 +7,27 @@ mod audio_meter_fixture;
 mod bootstrap;
 mod commissioning;
 mod control_surface;
+mod control_surface_audio;
+mod control_surface_http;
 mod diagnostics;
+mod engine_events;
 mod exports;
+mod exports_audio;
+mod health;
 mod legacy_import;
 mod lighting;
 mod lighting_backend;
+mod lighting_sacn_output;
+#[cfg(feature = "dev-fixtures")]
 mod parity_fixtures;
 mod planning;
 mod planning_settings;
 mod protocol;
+mod rme_console_link;
 mod rme_totalmix_osc;
 mod shell_settings;
 mod storage;
+mod storage_backups;
 mod support;
 
 use crate::app::EngineApp;
@@ -26,11 +36,17 @@ use crate::audio::{
     refresh_audio_snapshot_metering, AudioChannelSnapshot, AudioMixTargetSnapshot, AudioSnapshot,
 };
 use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
-use crate::bootstrap::{resolve_runtime_paths, validate_protocol_version};
+use crate::bootstrap::{
+    resolve_runtime_paths, startup_failure_code, validate_protocol_version, EXPORTS_DIR_NAME,
+    STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+};
+use crate::diagnostics::{append_log, init_log, log_event, LogLevel};
+use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BACKUPS};
 use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use crate::storage::list_settings_by_prefix;
+use crate::storage_backups::{snapshot_database, SnapshotReason};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
@@ -48,6 +64,11 @@ const CONSOLE_METER_POINT_PLAYBACK: &str = "playback";
 const CONSOLE_METER_POINT_POST_FADER: &str = "post-fader";
 const CONSOLE_PEAK_WARNING_DBFS: f64 = -3.0;
 const CONSOLE_OVER_DBFS: f64 = 0.0;
+/// Database backups the engine writes on its own (2026-09 production
+/// readiness, Slice 3 — F02): the first daily copy five minutes after start,
+/// then one every 24 h, plus one at every graceful shutdown.
+const DATABASE_BACKUP_INITIAL_DELAY: Duration = Duration::from_secs(5 * 60);
+const DATABASE_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn meter_point_for_channel(channel: &AudioChannelSnapshot) -> &'static str {
     if channel.role == "playback-pair" {
@@ -70,7 +91,10 @@ fn spawn_output_writer(receiver: Receiver<Value>) {
         let mut writer = stdout.lock();
         for message in receiver {
             if let Err(error) = write_json(&mut writer, &message) {
-                eprintln!("Engine output writer failed: {error}");
+                log_event(
+                    LogLevel::Error,
+                    &format!("Engine output writer failed: {error}"),
+                );
                 break;
             }
         }
@@ -288,6 +312,86 @@ impl SimulatedAudioMeterCache {
     }
 }
 
+/// The request loop: one JSON request per line on stdin until the shell
+/// closes it, each answered through the output writer.
+fn serve_requests(
+    app: &EngineApp,
+    reader: &mut impl BufRead,
+    output_sender: &Sender<Value>,
+) -> io::Result<()> {
+    let mut line = String::new();
+    loop {
+        line.clear();
+        if reader.read_line(&mut line)? == 0 {
+            return Ok(());
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let request = match serde_json::from_str::<RequestEnvelope>(trimmed) {
+            Ok(value) => value,
+            Err(error) => {
+                log_event(LogLevel::Warn, &format!("Malformed request: {error}"));
+                continue;
+            }
+        };
+
+        let reply = app.handle_request(request);
+        send_output(
+            output_sender,
+            serde_json::to_value(&reply.response)
+                .map_err(|error| io::Error::other(error.to_string()))?,
+        )?;
+        for event in reply.events {
+            send_output(output_sender, event)?;
+        }
+    }
+}
+
+fn write_database_backup(
+    db_path: &Path,
+    backups_dir: &Path,
+    log_file_path: &Path,
+    reason: SnapshotReason,
+) {
+    match snapshot_database(db_path, backups_dir, reason) {
+        Ok(path) => {
+            let message = format!(
+                "Database backup ({}) written: {}",
+                reason.as_str(),
+                path.display()
+            );
+            let _ = append_log(log_file_path, "INFO", &message);
+            report_health(SUBSYSTEM_BACKUPS, SubsystemState::Ok, message);
+        }
+        Err(error) => {
+            let message = format!("Database backup ({}) failed: {error}", reason.as_str());
+            let _ = append_log(log_file_path, "WARN", &message);
+            report_health(SUBSYSTEM_BACKUPS, SubsystemState::Warning, message);
+        }
+    }
+}
+
+fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
+    let _ = thread::Builder::new()
+        .name(String::from("database-backup"))
+        .spawn(move || {
+            thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
+            loop {
+                write_database_backup(
+                    &db_path,
+                    &backups_dir,
+                    &log_file_path,
+                    SnapshotReason::Daily,
+                );
+                thread::sleep(DATABASE_BACKUP_INTERVAL);
+            }
+        });
+}
+
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
     thread::spawn(move || {
         let mut cache = SimulatedAudioMeterCache::new();
@@ -313,7 +417,37 @@ fn main() -> io::Result<()> {
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = stdout.lock();
-    let planned_paths = resolve_runtime_paths();
+    // The app-data directory defaults to the platform's durable location
+    // (2026-09 production readiness, Slice 1 — finding F22); a host with no
+    // APPDATA / HOME cannot start without SSE_APP_DATA_DIR.
+    let planned_paths = match resolve_runtime_paths() {
+        Ok(paths) => paths,
+        Err(message) => {
+            let startup_failure = event_message(
+                EVENT_ENGINE_STARTUP_FAILED,
+                json!({
+                    "stage": "bootstrap",
+                    "code": "BOOTSTRAP_FAILED",
+                    "message": message,
+                }),
+            );
+            let _ = write_json(&mut writer, &startup_failure);
+            // No runtime paths means no log file to write to: this is one of
+            // the two stderr sites the readiness ledger documents
+            // (Slice 8 — F16); the shell keeps engine stderr in shell.log.
+            eprintln!("Engine bootstrap failed: {message}");
+            return Err(io::Error::other(message));
+        }
+    };
+
+    // The engine log is open from here on (Slice 8 — F16): one writer for
+    // every thread, rotating at 5 MiB, at the level SSE_ENGINE_LOG_LEVEL
+    // names. Everything below logs through it, the recovery mode included.
+    let (log_level, log_level_warning) = LogLevel::from_env();
+    init_log(&planned_paths.log_file_path, log_level);
+    if let Some(warning) = log_level_warning {
+        log_event(LogLevel::Warn, &warning);
+    }
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {
         let startup_failure = event_message(
@@ -330,6 +464,7 @@ fn main() -> io::Result<()> {
                     "logFilePath": planned_paths.log_file_path.display().to_string(),
                     "dbPath": planned_paths.db_path.display().to_string(),
                     "backupDir": planned_paths.backups_dir.display().to_string(),
+                    "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                     "updateRepositoryPath": planned_paths
                         .update_repository_path
                         .as_ref()
@@ -338,18 +473,24 @@ fn main() -> io::Result<()> {
             }),
         );
         let _ = write_json(&mut writer, &startup_failure);
-        eprintln!("Engine protocol mismatch: {message}");
+        log_event(
+            LogLevel::Error,
+            &format!("Engine protocol mismatch: {message}"),
+        );
         return Err(io::Error::other(message));
     }
 
     let app = match EngineApp::bootstrap() {
         Ok(app) => app,
         Err(error) => {
+            // A typed failure (a corrupt or un-upgradable database, Slice 3)
+            // keeps its own code; everything else is BOOTSTRAP_FAILED.
+            let code = startup_failure_code(error.as_ref());
             let startup_failure = event_message(
                 EVENT_ENGINE_STARTUP_FAILED,
                 json!({
                     "stage": "bootstrap",
-                    "code": "BOOTSTRAP_FAILED",
+                    "code": code,
                     "message": error.to_string(),
                     "paths": {
                         "appDataDir": planned_paths.app_data_dir.display().to_string(),
@@ -357,6 +498,7 @@ fn main() -> io::Result<()> {
                         "logFilePath": planned_paths.log_file_path.display().to_string(),
                         "dbPath": planned_paths.db_path.display().to_string(),
                         "backupDir": planned_paths.backups_dir.display().to_string(),
+                        "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
                         "updateRepositoryPath": planned_paths
                             .update_repository_path
                             .as_ref()
@@ -365,54 +507,76 @@ fn main() -> io::Result<()> {
                 }),
             );
             let _ = write_json(&mut writer, &startup_failure);
-            eprintln!("Engine bootstrap failed: {error}");
+            log_event(
+                LogLevel::Error,
+                &format!("Engine bootstrap failed: {error}"),
+            );
+            if code == STARTUP_CODE_STORAGE_CORRUPT || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
+            {
+                // Recovery mode (Slice 7 — F20): the saved data needs a
+                // backup restored, and the Support surface does that through
+                // this process — so it stays up, answering only the backup
+                // requests, until the shell restarts it into the restored
+                // database.
+                drop(writer);
+                let app = EngineApp::recovery(&planned_paths);
+                let (output_sender, output_receiver) = mpsc::channel::<Value>();
+                spawn_output_writer(output_receiver);
+                serve_requests(&app, &mut reader, &output_sender)?;
+                return Ok(());
+            }
             return Err(io::Error::other(error));
         }
     };
 
     drop(writer);
 
+    let db_path = planned_paths.db_path.clone();
+    let backups_dir = planned_paths.backups_dir.clone();
+    let log_file_path = planned_paths.log_file_path.clone();
+
     let (output_sender, output_receiver) = mpsc::channel::<Value>();
     spawn_output_writer(output_receiver);
+    control_surface::register_control_surface_event_sender(output_sender.clone());
     send_output(&output_sender, app.ready_event())?;
+    lighting_sacn_output::spawn_lighting_sacn_output(
+        planned_paths.db_path.clone(),
+        planned_paths.log_file_path.clone(),
+    );
     if app.should_emit_simulated_audio_meter_ticks() {
         spawn_simulated_audio_meter_ticks(output_sender.clone(), planned_paths.db_path);
     } else if app.should_emit_rme_totalmix_audio_metering() {
         rme_totalmix_osc::spawn_rme_totalmix_audio_metering(
             output_sender.clone(),
             planned_paths.db_path,
+            log_file_path.clone(),
         );
     }
+    spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());
 
-    let mut line = String::new();
-    loop {
-        line.clear();
-        if reader.read_line(&mut line)? == 0 {
-            break;
-        }
+    serve_requests(&app, &mut reader, &output_sender)?;
 
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        let request = match serde_json::from_str::<RequestEnvelope>(trimmed) {
-            Ok(value) => value,
-            Err(error) => {
-                eprintln!("Malformed request: {error}");
-                continue;
-            }
-        };
-
-        let reply = app.handle_request(request);
-        send_output(
-            &output_sender,
-            serde_json::to_value(&reply.response)
-                .map_err(|error| io::Error::other(error.to_string()))?,
-        )?;
-        for event in reply.events {
-            send_output(&output_sender, event)?;
-        }
+    // stdin closed: the shell is going away. Release talkback holds before we
+    // do (2026-09 audit, Slice 6) — a hard kill cannot, and that is documented.
+    app.shutdown();
+    // A verified copy of the database on every graceful stop (2026-09
+    // production readiness, Slice 3 — F02); a failure is logged, never fatal.
+    write_database_backup(
+        &db_path,
+        &backups_dir,
+        &log_file_path,
+        SnapshotReason::Shutdown,
+    );
+    // The sACN, metering and bridge threads keep a read connection each and
+    // are still alive here, so closing the last connection no longer folds
+    // the write-ahead log into the file by itself (Slice 10): ask for it, so
+    // a graceful stop leaves the database file complete on its own.
+    if let Err(error) = storage::checkpoint_database(&db_path) {
+        let _ = append_log(
+            &log_file_path,
+            "WARN",
+            &format!("The database was not checkpointed on shutdown: {error}"),
+        );
     }
 
     Ok(())

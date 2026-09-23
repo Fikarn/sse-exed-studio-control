@@ -1,0 +1,39 @@
+/* Visual overhaul A, Slice 7: the pre-ready surfaces on the bay's material,
+   with the state display first and fixed. The column is the width the state
+   display wants at the studio surface; whatever the surface has to show
+   follows it and scrolls if it is an unbounded list. */
+
+.shell {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  padding: 16px;
+  background: var(--material-bay);
+  box-shadow: var(--elevation-bay);
+  overflow-y: auto;
+}
+
+/* The surface fills the bay, as every workspace does: nothing on this program
+   is a centred card. */
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.display {
+  flex: none;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+:global([data-operator-layout-root][data-chrome="compact"]) .shell {
+  padding: 10px;
+}

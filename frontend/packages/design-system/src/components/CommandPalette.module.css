@@ -1,12 +1,12 @@
-/* CommandPalette — ⌘K floating palette. Mounted via portal at document.body
-   so per-workspace overflow + transform doesn't clip it. Backdrop covers the
-   full viewport; the panel is centered slightly above middle (Linear / VS
-   Code convention places the palette in the upper third for readability). */
+/* CommandPalette — ⌘K floating palette, a level +3 plate (visual overhaul A,
+   Slice 3). Mounted via portal at document.body so per-workspace overflow +
+   transform doesn't clip it. Backdrop covers the full viewport; the panel sits
+   in the upper third. Selection is the neutral keyline (plan D5). */
 
 .backdrop {
   position: fixed;
   inset: 0;
-  background: var(--color-scrim);
+  background: color-mix(in srgb, var(--material-well) 60%, transparent);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -17,11 +17,11 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .backdrop {
-    animation: ssePaletteBackdropIn 120ms var(--motion-easing-standard);
+    animation: aPaletteBackdropIn var(--motion-duration-exit) var(--motion-easing-out);
   }
 }
 
-@keyframes ssePaletteBackdropIn {
+@keyframes aPaletteBackdropIn {
   from {
     opacity: 0;
   }
@@ -33,10 +33,11 @@
 .panel {
   width: min(640px, calc(100vw - 48px));
   max-height: 60vh;
-  background: var(--color-bg-canvas);
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-md);
-  box-shadow: var(--shadow-lg);
+  background: var(--elevation-plate-fill);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-screen);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -44,43 +45,38 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .panel {
-    animation: ssePalettePanelIn 140ms var(--motion-easing-standard);
+    animation: aPalettePanelIn var(--motion-duration-enter) var(--motion-easing-out);
   }
 }
 
-@keyframes ssePalettePanelIn {
+@keyframes aPalettePanelIn {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .input {
   appearance: none;
   border: none;
-  border-bottom: 1px solid var(--color-bg-stroke);
+  border-bottom: 1px solid var(--material-line);
   outline: none;
   padding: 14px 18px;
-  font-family: var(--font-family-ui);
-  font-size: 15px;
+  font: 500 var(--font-size-name) / 1.3 var(--font-family-ui);
   background: transparent;
-  color: var(--color-brand-text-primary);
+  color: var(--text-text);
 }
 
 .input::placeholder {
-  color: var(--color-brand-text-muted);
+  color: var(--text-text2);
 }
 
-/* GLO-10: the input is auto-focused on open (⌘K) but killed its focus ring with
-   `outline: none`. Restore a keyboard-only focus indicator so the active field
-   reads as focused without a mouse-click ring. */
 .input:focus-visible {
-  border-bottom-color: var(--color-primary-500);
-  box-shadow: inset 0 -2px 0 var(--color-primary-500);
+  border-bottom: 2px solid var(--accent);
 }
 
 .list {
@@ -94,9 +90,8 @@
 .empty {
   padding: 24px 18px;
   text-align: center;
-  color: var(--color-brand-text-muted);
-  font-family: var(--font-family-ui);
-  font-size: 12px;
+  color: var(--text-text2);
+  font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
 }
 
 .group {
@@ -107,11 +102,10 @@
 
 .groupHeader {
   padding: 8px 18px 4px;
-  font-family: var(--font-family-mono);
-  font-size: 10px;
-  letter-spacing: 0;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-eyebrow);
   text-transform: uppercase;
-  color: var(--color-brand-text-muted);
+  color: var(--text-text2);
 }
 
 .groupList {
@@ -125,19 +119,18 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
-  border-radius: var(--radius-tight-sm);
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--radius-key);
+  border: 1px solid transparent;
   cursor: pointer;
-  font-family: var(--font-family-ui);
-  font-size: 13px;
-  color: var(--color-brand-text-primary);
+  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+  color: var(--text-text);
 }
 
 .itemFocused {
-  /* GLO-03: the active (aria-activedescendant) row was a bare tint; add an inset
-     keyline so it reads as a focus affordance, not just another green state. */
-  background: var(--color-brand-green-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-green) 55%, transparent);
+  background: var(--elevation-key-fill);
+  border-color: var(--accent);
 }
 
 .label {
@@ -149,8 +142,10 @@
 
 .shortcut {
   flex-shrink: 0;
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  color: var(--color-brand-text-muted);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-ctl);
+  padding: 3px 5px;
   font-variant-numeric: tabular-nums;
 }

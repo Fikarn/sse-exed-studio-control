@@ -117,6 +117,13 @@ export interface AudioWorkspaceViewModel {
   viewMode: "submix" | "master";
 }
 
+// Slice 8 (system §9): the footer names the hardware the meters come
+// from. Only the one id the program knows is translated; anything else is
+// printed exactly as the engine reported it.
+function meteringSourceLabel(source: unknown) {
+  return String(source ?? "unknown").toLowerCase() === "rme-totalmix-osc" ? "TotalMix" : String(source ?? "unknown");
+}
+
 export function buildAudioPaletteRegistrationSignature(
   viewModel: AudioWorkspaceViewModel,
   selectableChannels: readonly AudioChannelEntry[]
@@ -297,6 +304,26 @@ export function isChannelFeedingMixTarget(channel: AudioChannelEntry, mixTargetI
   return selectedChannelSendLevel(channel, mixTargetId) >= 0.01;
 }
 
+/**
+ * Strips per bank for each density (2026-09 audit Slice 9, operator decision 6).
+ * desktop (operator root ≥ 2200 px): 4 inputs, 6 playback pairs, 12 strips;
+ * compact (< 2200 px — the 1920×1080 fallback): 4 / 4 / 8, so the three tiers
+ * fit their columns without a horizontal scroll; touch (legacy toolbar mode):
+ * 8 / 4 / 8. `fadersPerBank` (engine setting) caps the input and strip counts.
+ */
+export function audioBankSizes(density: AudioDensityMode, fadersPerBank: number) {
+  const table = {
+    compact: { inputs: 4, playback: 4, strips: 8 },
+    desktop: { inputs: 4, playback: 6, strips: 12 },
+    touch: { inputs: 8, playback: 4, strips: 8 },
+  }[density];
+  return {
+    hardwareInputBankSize: Math.min(table.inputs, fadersPerBank),
+    softwarePlaybackBankSize: table.playback,
+    visibleStripCount: Math.min(table.strips, fadersPerBank),
+  };
+}
+
 function bankChannels(channels: AudioChannelEntry[], bankIndex: number, visibleStripCount: number) {
   const bankStart = bankIndex * visibleStripCount;
   return channels.slice(bankStart, bankStart + visibleStripCount);
@@ -332,10 +359,12 @@ function activeGroupsForTier(
 function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities"] {
   return (
     snapshot.capabilities ?? {
-      canEditMixerState: snapshot.oscEnabled === true,
-      canSync: snapshot.oscEnabled === true,
+      // Mirrors the engine's `audio_capabilities`: console writes need OSC on
+      // AND a passed audio probe; app-local actions only need OSC on.
+      canEditMixerState: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
+      canSync: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canRecallConsoleSnapshot: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
-      canEditProcessing: snapshot.oscEnabled === true,
+      canEditProcessing: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canClearClips: snapshot.oscEnabled === true,
       canCaptureSnapshot: snapshot.oscEnabled === true,
       canUseMasterView: snapshot.oscEnabled === true,
@@ -375,9 +404,7 @@ export function buildAudioViewModel({
     1,
     Math.min(24, typeof audioSnapshot.fadersPerBank === "number" ? audioSnapshot.fadersPerBank : 12)
   );
-  const visibleStripCount = Math.min(density === "desktop" ? 12 : 8, fadersPerBank);
-  const hardwareInputBankSize = Math.min(density === "desktop" ? 4 : 8, fadersPerBank);
-  const softwarePlaybackBankSize = density === "desktop" ? 6 : 4;
+  const { hardwareInputBankSize, softwarePlaybackBankSize, visibleStripCount } = audioBankSizes(density, fadersPerBank);
   const hardwareSourceChannels = channels.filter((entry) => entry.role !== "playback-pair");
   const softwarePlaybackSourceChannels = channels.filter((entry) => entry.role === "playback-pair");
   const hardwareInputGroups = orderedGroupsForChannels(hardwareSourceChannels);
@@ -502,7 +529,7 @@ export function buildAudioViewModel({
       lastSync: audioSnapshot.lastConsoleSyncAt ?? "not yet",
       metering: meterSimulationActive
         ? meterSimulationDetail
-        : `${String(audioSnapshot.meteringSource ?? "unknown")} · ${String(audioSnapshot.meteringState ?? "unknown")}`,
+        : `${meteringSourceLabel(audioSnapshot.meteringSource)} · ${String(audioSnapshot.meteringState ?? "unknown")}`,
       osc: audioSnapshot.oscEnabled ? "enabled" : "disabled",
     },
     hardwareInputs,

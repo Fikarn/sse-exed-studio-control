@@ -23,28 +23,49 @@ import {
 // pure number → number / number → string conversions. Moving them here lets
 // the Playwright suite focus on the actual UI surfaces.
 
-describe("normalizedToFaderDb / faderDbToNormalized", () => {
-  it("maps the unity fader (0.8) to 0 dB", () => {
+// 2026-09 audit remediation, Slice 5: the fader law is RME's published curve
+// (unity at step 836 of 1023). The anchors are the same table the engine pins
+// in audio/fader_curve.rs and the deck LCD test in control_surface_audio.rs;
+// the previous table here (0.7 = -10 dB, 0.8 = 0 dB) encoded a prototype law
+// TotalMix never used.
+describe("normalizedToFaderDb / faderDbToNormalized (RME fader curve)", () => {
+  it("maps unity (step 836 of 1023, 0.8172) to 0 dB", () => {
+    expect(AUDIO_FADER_UNITY).toBeCloseTo(836 / 1023, 9);
     expect(normalizedToFaderDb(AUDIO_FADER_UNITY)).toBeCloseTo(0, 6);
-    expect(faderDbToNormalized(0)).toBeCloseTo(AUDIO_FADER_UNITY, 6);
+    expect(faderDbToNormalized(0)).toBe(AUDIO_FADER_UNITY);
   });
 
-  it("maps the full-up fader (1.0) to +6 dB", () => {
-    expect(normalizedToFaderDb(1)).toBe(6);
-    expect(faderDbToNormalized(6)).toBeCloseTo(1, 6);
+  it("matches RME's published anchors", () => {
+    const anchors: Array<[number, number]> = [
+      [0.02, -61.974],
+      [0.35, -23.008],
+      [0.5, -12.125],
+      [649 / 1023, -6],
+      [0.7, -3.847],
+      [0.75, -2.206],
+      [0.8, -0.565],
+      [0.9, 2.718],
+      [1, 6],
+    ];
+    for (const [position, db] of anchors) {
+      expect(normalizedToFaderDb(position)).toBeCloseTo(db, 2);
+    }
   });
 
-  it("returns -Infinity at the fader bottom", () => {
+  it("returns -Infinity at the bottom and treats -65 dB and below as off", () => {
     expect(normalizedToFaderDb(0)).toBe(Number.NEGATIVE_INFINITY);
-    // -60 dB is the lowest finite value the curve reaches.
-    expect(faderDbToNormalized(-60)).toBeCloseTo(0, 6);
+    expect(faderDbToNormalized(-65)).toBe(0);
+    expect(faderDbToNormalized(Number.NEGATIVE_INFINITY)).toBe(0);
+    // -60 dB is a real position on this curve (about 3.3 % of the throw).
+    expect(faderDbToNormalized(-60)).toBeCloseTo(0.0333, 3);
   });
 
-  it("survives a round-trip across the documented breakpoints", () => {
-    for (const value of [0.05, 0.35, 0.7, 0.75, 0.8, 0.9, 1]) {
-      const db = normalizedToFaderDb(value);
-      const round = faderDbToNormalized(db);
-      expect(round).toBeCloseTo(value, 6);
+  it("survives a round-trip across the throw", () => {
+    for (const value of [0.02, 0.35, 0.5, 649 / 1023, 0.7, AUDIO_FADER_UNITY, 0.9, 1]) {
+      expect(faderDbToNormalized(normalizedToFaderDb(value))).toBeCloseTo(value, 6);
+    }
+    for (const db of [-60, -30, -12, -6, -3, 0, 3, 6]) {
+      expect(normalizedToFaderDb(faderDbToNormalized(db))).toBeCloseTo(db, 6);
     }
   });
 
@@ -111,7 +132,9 @@ describe("formatAudioDb / formatMeterDb", () => {
   });
 
   it("formats negative values without a leading +", () => {
-    // Half-fader is roughly -14 dB on this curve.
+    // Half-fader is -12.1 dB on RME's curve, and the old 0.80 unity reads true.
+    expect(formatAudioDb(0.5)).toBe("-12.1 dB");
+    expect(formatAudioDb(0.8)).toBe("-0.6 dB");
     const formatted = formatAudioDb(0.5);
     expect(formatted).toMatch(/^-\d+\.\d dB$/);
   });

@@ -22,6 +22,8 @@ const AUDIO_EXPECTED_COMPATIBILITY_MODE_KEY: &str = "app.audio.expected_compatib
 const AUDIO_FADERS_PER_BANK_KEY: &str = "app.audio.faders_per_bank";
 const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
 const AUDIO_METERING_SOURCE_KEY: &str = "app.audio.metering_source";
+const AUDIO_LAST_CONSOLE_PULL_AT_KEY: &str = "app.audio.last_console_pull_at";
+const AUDIO_LAST_CONSOLE_PULL_VALUES_KEY: &str = "app.audio.last_console_pull_values";
 const AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX: &str = "audio-snapshot-custom-";
 
 const DEFAULT_AUDIO_OSC_ENABLED: bool = true;
@@ -33,24 +35,42 @@ const DEFAULT_AUDIO_METERING_SOURCE: &str = crate::rme_totalmix_osc::RME_TOTALMI
 
 mod channels;
 mod clips;
+mod console_link;
+pub mod fader_curve;
 mod helpers;
 mod mix_targets;
 mod parse;
+mod recall;
 mod settings;
 mod snapshot;
 mod snapshots;
 mod sync;
+mod talkback;
 mod types;
 
 pub use channels::*;
 pub use clips::*;
+pub use console_link::*;
+pub(crate) use helpers::{audio_metering_is_simulated, ensure_audio_action_allowed};
+// Re-exported for the dev parity fixtures only (2026-09 production readiness,
+// Slice 1 — finding F04); inside this module the writers use `helpers::`.
+#[cfg(feature = "dev-fixtures")]
+pub(crate) use helpers::{confidence_setting, ConsoleConfidence};
 pub use mix_targets::*;
 pub use parse::*;
+pub use recall::PushTiming;
 pub use settings::*;
 pub use snapshot::*;
 pub use snapshots::*;
 pub use sync::*;
+#[cfg(test)]
+pub(crate) use talkback::talkback_hold_deadline;
+pub use talkback::*;
 pub use types::*;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_console_link;
+#[cfg(test)]
+mod tests_console_ordering;

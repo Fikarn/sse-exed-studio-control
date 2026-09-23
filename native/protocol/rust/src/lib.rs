@@ -7,6 +7,10 @@ pub const EVENT_APP_CHANGED: &str = "app.changed";
 pub const EVENT_AUDIO_CHANGED: &str = "audio.changed";
 pub const EVENT_AUDIO_METERS: &str = "audio.meters";
 pub const EVENT_COMMISSIONING_CHANGED: &str = "commissioning.changed";
+/// The shell reports that the engine process is gone (2026-09 production
+/// readiness, Slice 5 - finding F09). Payload: `status` (exit code or
+/// null), `graceful` (the shell asked it to stop), `generation`, `pid`.
+pub const EVENT_ENGINE_EXITED: &str = "engine.exited";
 pub const EVENT_ENGINE_READY: &str = "engine.ready";
 pub const EVENT_ENGINE_STARTUP_FAILED: &str = "engine.startupFailed";
 pub const EVENT_LIGHTING_CHANGED: &str = "lighting.changed";
@@ -19,6 +23,7 @@ pub const EVENT_NAMES: &[&str] = &[
     EVENT_AUDIO_CHANGED,
     EVENT_AUDIO_METERS,
     EVENT_COMMISSIONING_CHANGED,
+    EVENT_ENGINE_EXITED,
     EVENT_ENGINE_READY,
     EVENT_ENGINE_STARTUP_FAILED,
     EVENT_LIGHTING_CHANGED,

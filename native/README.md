@@ -59,7 +59,8 @@ cargo check
 
 Notes:
 
-- `SSE_APP_DATA_DIR` and `SSE_LOG_DIR` are respected by the shell runtime, which makes sandboxed smoke tests and isolated local runs deterministic
+- `SSE_APP_DATA_DIR` and `SSE_LOG_DIR` are respected by the shell runtime, which makes sandboxed smoke tests and isolated local runs deterministic; an engine started with neither uses the platform app-data directory (`ExEd Studio Control Native` under `%APPDATA%`, `~/Library/Application Support` or `$XDG_DATA_HOME`), never a path relative to its working directory
 - shell settings now persist through the Rust engine, including workspace plus window size/maximized state
-- when native planning tables are empty, the engine will auto-import a legacy `db.json` from `SSE_LEGACY_DB_PATH` or, in repo-local development, from `data/db.json`
+- when native planning tables are empty, the engine will auto-import a legacy `db.json` from `SSE_LEGACY_DB_PATH` or from `<app-data>/import/db.json`; the working directory is never scanned
+- `dev.parityFixture.load` exists only in engines built with the `dev-fixtures` cargo feature (`npm run native:engine:build:dev-fixtures`); release engines answer `METHOD_UNAVAILABLE`
 - set `SSE_DISABLE_AUTO_IMPORT=1` to disable startup auto-import

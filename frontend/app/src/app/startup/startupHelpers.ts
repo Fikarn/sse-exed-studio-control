@@ -41,30 +41,31 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
   ] as const;
   const currentIndex = stages.indexOf(lifecycle as (typeof stages)[number]);
   // STA-08: reserve the success-green tone for the fully-ready lifecycle.
-  // Mid-boot, reached steps read as neutral "connected", not "healthy" green,
-  // so an in-progress boot no longer paints predominantly green.
-  const reachedTone: StatusTone = lifecycle === "ready" ? "healthy" : "connected";
+  // Mid-boot, reached steps read as neutral, not healthy green, so an
+  // in-progress boot no longer paints predominantly green. Slice 11: the
+  // shared vocabulary, so the surfaces no longer translate at the call site.
+  const reachedTone: StatusTone = lifecycle === "ready" ? "ok" : "info";
 
   return [
     {
-      description: "Start the isolated Rust engine process.",
-      label: "Launch engine",
-      tone: currentIndex >= 0 ? reachedTone : "idle",
+      description: "Start the part of Studio Control that talks to the desk, the rig and the deck.",
+      label: "Start up",
+      tone: currentIndex >= 0 ? reachedTone : "neutral",
     },
     {
-      description: "Wait for the engine to confirm protocol compatibility.",
-      label: "Ready event",
-      tone: currentIndex >= 1 ? reachedTone : "idle",
+      description: "Wait for Studio Control to confirm both halves of this install are the same version.",
+      label: "Handshake",
+      tone: currentIndex >= 1 ? reachedTone : "neutral",
     },
     {
-      description: "Load health, diagnostics, and degraded-state posture.",
-      label: "Health snapshot",
-      tone: currentIndex >= 2 ? reachedTone : "idle",
+      description: "Load what the desk, the rig and the deck report about themselves.",
+      label: "Health",
+      tone: currentIndex >= 2 ? reachedTone : "neutral",
     },
     {
-      description: "Load shell routing and commissioning state.",
-      label: "App snapshot",
-      tone: currentIndex >= 3 ? reachedTone : "idle",
+      description: "Load where you were and whether commissioning has published.",
+      label: "Workspaces",
+      tone: currentIndex >= 3 ? reachedTone : "neutral",
     },
   ];
 }
@@ -72,7 +73,7 @@ export function buildStartupSteps(lifecycle: ShellState["lifecycle"]): StartupSt
 // Human label for a startup-step tone (STA-09) — the raw StatusTone enum
 // ("connected"/"idle") must not surface as operator-facing badge text.
 export function stepStatusLabel(tone: StatusTone): string {
-  return tone === "idle" ? "Pending" : "Done";
+  return tone === "neutral" ? "Pending" : "Done";
 }
 
 // Short, human-readable failure-code label for the recovery badges (COPY-04),
@@ -86,10 +87,56 @@ export function formatFailureCode(failure: StartupFailure | null): string {
   if (code === "PROTOCOL_MISMATCH") {
     return "Protocol mismatch";
   }
+  // Slice 8 (system §9): the two codes Studio Control raises about itself
+  // humanize to "Engine …", a word operator copy does not use.
+  if (code === "ENGINE_STARTUP_FAILED") {
+    return "Startup failed";
+  }
+  if (code === "ENGINE_READY_TIMEOUT") {
+    return "Startup timed out";
+  }
+  // 2026-09 production readiness, Slice 3 (F02, F13): the saved-data codes
+  // name the data, not the start-up; the engine's sentence says which file
+  // and which backup.
+  if (code === "STORAGE_CORRUPT") {
+    return "Saved data check failed";
+  }
+  if (code === "STORAGE_MIGRATION_FAILED") {
+    return "Saved data upgrade failed";
+  }
+  // 2026-09 production readiness, Slice 5 (F09, F19): the link that stopped
+  // during a session, and the second copy of the app that was refused.
+  if (code === "ENGINE_EXITED") {
+    return "Hardware link stopped";
+  }
+  if (code === "ENGINE_ALREADY_RUNNING") {
+    return "Already open";
+  }
   return code
     .replace(/[_-]+/g, " ")
     .toLowerCase()
     .replace(/^./, (character) => character.toUpperCase());
+}
+
+// Visual overhaul A, Slice 8 (system §9): the stage the engine reports is a
+// token ("frontend-bootstrap", "ready-event", "protocol-negotiation"); the
+// recovery display names the step in the operator's words and never invents
+// one the engine did not report.
+export function formatFailureStage(stage: string): string {
+  switch (stage) {
+    case "bootstrap":
+    case "frontend-bootstrap":
+      return "start-up";
+    case "ready-event":
+      return "ready";
+    case "protocol-negotiation":
+      return "version check";
+    // Slice 5: the engine was up and stopped during the session.
+    case "runtime":
+      return "running";
+    default:
+      return stage.replace(/[_-]+/g, " ");
+  }
 }
 
 export function getFailureTitle(startupFailure: StartupFailure | null) {
@@ -97,16 +144,35 @@ export function getFailureTitle(startupFailure: StartupFailure | null) {
     return "Protocol mismatch";
   }
 
-  if (startupFailure?.stage === "bootstrap") {
-    return "Engine bootstrap failed";
+  // 2026-09 production readiness, Slice 3: a database that failed its
+  // integrity check, or one a migration could not upgrade, is the operator's
+  // data asking for attention — restore a backup from Setup / Support.
+  if (startupFailure?.code === "STORAGE_CORRUPT" || startupFailure?.code === "STORAGE_MIGRATION_FAILED") {
+    return "Saved data needs attention";
   }
 
-  return "Startup recovery required";
+  // 2026-09 production readiness, Slice 5 (F09): the hardware link stopped
+  // during the session; the sentence says whether Studio Control restarts
+  // it on its own or is waiting for the operator.
+  if (startupFailure?.code === "ENGINE_EXITED") {
+    return "The hardware link stopped";
+  }
+
+  // Slice 5 (F19): a second copy of the app was refused; the first one is
+  // the one to use.
+  if (startupFailure?.code === "ENGINE_ALREADY_RUNNING") {
+    return "Studio Control is already open";
+  }
+
+  // Slice 8 gave every non-protocol failure the same word, so the stage no
+  // longer branches: what failed is the start-up, whichever step it stopped
+  // at, and the display's meta line names the step.
+  return "Startup failed";
 }
 
 export function formatFileSize(sizeBytes: number) {
   if (sizeBytes <= 0) {
-    return "fixture";
+    return "size not reported";
   }
 
   if (sizeBytes < 1024) {
@@ -133,20 +199,23 @@ export function formatPathLabel(key: string) {
     case "logsDir":
       return "Logs";
     case "updateRepositoryPath":
-      return "Update repo";
+      return "Update folder";
     default:
-      return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase());
+      return key
+        .replace(/([A-Z])/g, " $1")
+        .toLowerCase()
+        .replace(/^./, (value) => value.toUpperCase());
   }
 }
 
 export function feedbackBadgeTone(tone: FeedbackTone): StatusTone {
   if (tone === "ok") {
-    return "healthy";
+    return "ok";
   }
 
   if (tone === "error") {
     return "error";
   }
 
-  return "idle";
+  return "neutral";
 }

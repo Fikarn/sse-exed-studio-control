@@ -1,0 +1,1154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Gold standard · State vocabulary, type scale and primitives in three themes</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Specimen of docs/redesign/gold-standard-brief-2026-09.md v1.1: §4 (material and physics), §5 (type), §6 (colour roles), §7 (states), §8 (arming), §12 (canon). Rendered three times, once per theme, from the same markup. */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --display: "Fraunces", Georgia, serif;
+        --t-tick: 10px;
+        --t-caption: 11px;
+        --t-dense: 12px;
+        --t-body: 13px;
+        --t-emph: 14px;
+        --t-title: 16px;
+        --t-display: 20px;
+        --t-hero: 28px;
+        --r-ctl: 4px;
+        --r-card: 8px;
+        --r-float: 12px;
+        --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      [data-theme="studio"] {
+        --chassis: #0d0f0d;
+        --panel: #151815;
+        --well: #090b09;
+        --float: #1b1f1b;
+        --sheen: rgba(250, 246, 230, 0.08);
+        --shade: rgba(0, 0, 0, 0.55);
+        --shade-edge: rgba(0, 0, 0, 0.6);
+        --shade-deep: rgba(0, 0, 0, 0.7);
+        --border: #2a2f28;
+        --border-strong: #3a4038;
+        --text: #faf6e6;
+        --text-2: #d4cdb3;
+        --muted: #9a9480;
+        --accent: #99ba92;
+        --accent-soft: rgba(153, 186, 146, 0.12);
+        --accent-ink: #0b120c;
+        --focus: #b6d8ad;
+        --engaged: #d8a95a;
+        --engaged-ink: #1a1408;
+        --attention: #d8a95a;
+        --attention-soft: rgba(216, 169, 90, 0.14);
+        --error: #d56a65;
+        --error-soft: rgba(213, 106, 101, 0.14);
+        --error-ink: #1f0a08;
+        --live: #36ce71;
+        --live-ink: #06200f;
+        --info: #69a9d1;
+        --info-soft: rgba(105, 169, 209, 0.14);
+        --meter-bg: #050608;
+        --meter-lo: #36ce71;
+        --meter-mid: #f4c443;
+        --meter-hot: #f59f2a;
+        --meter-over: #ff3b30;
+        --grain-opacity: 0.04;
+      }
+      [data-theme="graphite"] {
+        --chassis: #0c0f12;
+        --panel: #141a1f;
+        --well: #080b0e;
+        --float: #1b2229;
+        --sheen: rgba(232, 237, 240, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --shade-edge: rgba(0, 0, 0, 0.65);
+        --shade-deep: rgba(0, 0, 0, 0.75);
+        --border: #2a333b;
+        --border-strong: #3a454e;
+        --text: #e6f4f3;
+        --text-2: #bcccce;
+        --muted: #93a0a2;
+        --accent: #6fd6ce;
+        --accent-soft: rgba(111, 214, 206, 0.12);
+        --accent-ink: #06201e;
+        --focus: #9ce7df;
+        --engaged: #e0b463;
+        --engaged-ink: #1a1408;
+        --attention: #e0b463;
+        --attention-soft: rgba(224, 180, 99, 0.14);
+        --error: #e5736e;
+        --error-soft: rgba(229, 115, 110, 0.14);
+        --error-ink: #1f0a08;
+        --live: #4de08a;
+        --live-ink: #06200f;
+        --info: #7fc0e8;
+        --info-soft: rgba(127, 192, 232, 0.14);
+        --meter-bg: #04070a;
+        --meter-lo: #36ce71;
+        --meter-mid: #f4c443;
+        --meter-hot: #f59f2a;
+        --meter-over: #ff3b30;
+        --grain-opacity: 0.035;
+      }
+      [data-theme="bone"] {
+        --chassis: #e2ddd2;
+        --panel: #ebe7dd;
+        --well: #d7d1c4;
+        --float: #f4f1ea;
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(110, 100, 80, 0.32);
+        --shade-edge: rgba(110, 100, 80, 0.28);
+        --shade-deep: rgba(60, 50, 40, 0.3);
+        --border: #cfc8b8;
+        --border-strong: #b7b0a0;
+        --text: #262017;
+        --text-2: #4a4636;
+        --muted: #524e3e;
+        --accent: #36603a;
+        --accent-soft: rgba(54, 96, 58, 0.12);
+        --accent-ink: #f7f4ed;
+        --focus: #2d4f2f;
+        --engaged: #6f4a0a;
+        --engaged-ink: #fbf9f3;
+        --attention: #6f4a0a;
+        --attention-soft: rgba(111, 74, 10, 0.12);
+        --error: #9c2f26;
+        --error-soft: rgba(156, 47, 38, 0.12);
+        --error-ink: #fff4f2;
+        --live: #1f7a3e;
+        --live-ink: #f7f4ed;
+        --info: #215586;
+        --info-soft: rgba(33, 85, 134, 0.12);
+        --meter-bg: #1a1814;
+        --meter-lo: #2fa85c;
+        --meter-mid: #c99a1e;
+        --meter-hot: #c97a12;
+        --meter-over: #c8271c;
+        --grain-opacity: 0.05;
+      }
+      [data-theme] {
+        --elev-well: inset 2px 2px 4px var(--shade), inset -1px -1px 1px var(--sheen);
+        --elev-panel: inset 1px 1px 0 var(--sheen), 0 0 0 1px var(--shade-edge), 2px 2px 6px var(--shade);
+        --elev-key: inset 1px 1px 0 var(--sheen), inset -1px -1px 0 var(--shade-edge), 1px 1px 3px var(--shade);
+        --elev-key-down: inset 2px 2px 4px var(--shade), inset -1px -1px 1px var(--sheen);
+        --elev-float: 0 12px 32px var(--shade-deep), 0 0 0 1px var(--shade-edge), inset 1px 1px 0 var(--sheen);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #0a0b0a;
+        font-family: var(--ui);
+      }
+      body {
+        padding: 16px;
+      }
+      .intro {
+        color: #aaa;
+        font: 400 12px/1.5 var(--ui);
+        max-width: 1400px;
+        margin: 0 0 12px;
+      }
+      .themes {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .sheet {
+        position: relative;
+        background: var(--chassis);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 20px;
+        font: 400 var(--t-body)/1.35 var(--ui);
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow: hidden;
+      }
+      .sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image: var(--grain);
+        opacity: var(--grain-opacity);
+        mix-blend-mode: soft-light;
+      }
+      .sheet h2 {
+        margin: 0;
+        font: 500 var(--t-display)/1 var(--display);
+      }
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sec > .lbl {
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-bottom: 1px solid var(--shade-edge);
+        box-shadow: 0 1px 0 var(--sheen);
+        padding-bottom: 6px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .note {
+        font: 400 var(--t-dense)/1.4 var(--ui);
+        color: var(--muted);
+      }
+      /* elevation specimen */
+      .levels {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+      .lv {
+        height: 84px;
+        border-radius: var(--r-card);
+        display: grid;
+        place-items: center;
+        text-align: center;
+        font: 600 var(--t-caption)/1.3 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .lv small {
+        display: block;
+        font: 400 var(--t-tick)/1.3 var(--ui);
+        text-transform: none;
+        letter-spacing: 0;
+        margin-top: 4px;
+      }
+      .lv.well {
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .lv.chassis {
+        background: var(--chassis);
+        box-shadow: 0 0 0 1px var(--shade-edge);
+      }
+      .lv.panel {
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+      }
+      .lv.float {
+        background: var(--float);
+        box-shadow: var(--elev-float);
+      }
+      /* badges / dots / chips / bands */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 12px 0 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .badge i {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 6px currentColor;
+      }
+      .badge.ok {
+        color: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+        background: var(--accent-soft);
+      }
+      .badge.attn {
+        color: var(--attention);
+        border-color: color-mix(in srgb, var(--attention) 45%, transparent);
+        background: var(--attention-soft);
+      }
+      .badge.err {
+        color: var(--error);
+        border-color: color-mix(in srgb, var(--error) 45%, transparent);
+        background: var(--error-soft);
+      }
+      .badge.info {
+        color: var(--info);
+        border-color: color-mix(in srgb, var(--info) 45%, transparent);
+        background: var(--info-soft);
+      }
+      .badge.neutral {
+        color: var(--muted);
+        border-color: var(--border);
+        background: var(--panel);
+      }
+      .badge.neutral i {
+        background: var(--well);
+        box-shadow: inset 1px 1px 1px var(--shade);
+      }
+      .groove {
+        display: inline-flex;
+        gap: 6px;
+        padding: 5px 6px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: var(--r-ctl);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        font: 500 var(--t-caption)/1 var(--ui);
+        color: var(--text-2);
+      }
+      .chip i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 65%, transparent);
+      }
+      .chip i.attn {
+        background: var(--attention);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--attention) 65%, transparent);
+      }
+      .chip i.err {
+        background: var(--error);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--error) 65%, transparent);
+      }
+      .chip i.off {
+        background: var(--well);
+        box-shadow:
+          inset 1px 1px 1px var(--shade),
+          inset -1px -1px 0 var(--sheen);
+      }
+      .chip .w {
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+      .band {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        min-height: 44px;
+        padding: 0 14px;
+        border-radius: var(--r-card);
+        box-shadow: var(--elev-panel);
+      }
+      .band .w {
+        font: 600 var(--t-caption) var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .band .m {
+        font: 400 var(--t-body) var(--ui);
+        color: var(--text);
+      }
+      .band.attn {
+        background: color-mix(in srgb, var(--attention) 14%, var(--panel));
+      }
+      .band.attn .w {
+        color: var(--attention);
+      }
+      .band.err {
+        background: color-mix(in srgb, var(--error) 14%, var(--panel));
+      }
+      .band.err .w {
+        color: var(--error);
+      }
+      .band.info {
+        background: color-mix(in srgb, var(--info) 14%, var(--panel));
+      }
+      .band.info .w {
+        color: var(--info);
+      }
+      /* keys and buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 32px;
+        padding: 0 14px;
+        border-radius: var(--r-ctl);
+        border: 0;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text);
+        font: 500 var(--t-body)/1 var(--ui);
+        white-space: nowrap;
+        position: relative;
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          transform 100ms var(--ease-mech),
+          background 60ms linear;
+      }
+      .btn.compact {
+        height: 28px;
+        padding: 0 12px;
+        font-size: var(--t-dense);
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+        box-shadow: none;
+        color: var(--text-2);
+      }
+      .btn.danger {
+        color: var(--error);
+        box-shadow:
+          var(--elev-key),
+          inset 0 0 0 1px color-mix(in srgb, var(--error) 45%, transparent);
+      }
+      .btn.key {
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        height: 36px;
+      }
+      .btn.down {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+      }
+      .btn.engaged {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--engaged);
+        color: var(--engaged-ink);
+      }
+      .btn.live {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--live);
+        color: var(--live-ink);
+      }
+      .btn.hazard {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--error);
+        color: var(--error-ink);
+      }
+      .btn.disabled {
+        box-shadow: none;
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn.hover {
+        box-shadow:
+          inset 1px 1px 0 var(--sheen),
+          inset -1px -1px 0 var(--shade),
+          1px 1px 3px var(--shade);
+      }
+      .btn.focus {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+      .btn.selected {
+        box-shadow:
+          var(--elev-key),
+          inset 0 0 0 2px var(--accent);
+        background: var(--accent-soft);
+      }
+      .btn kbd {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .btn.primary kbd,
+      .btn.engaged kbd,
+      .btn.live kbd,
+      .btn.hazard kbd {
+        color: inherit;
+        border-color: color-mix(in srgb, currentColor 45%, transparent);
+      }
+      .arm {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 36px;
+        padding: 0 14px 0 10px;
+        border-radius: var(--r-ctl);
+        background: var(--attention-soft);
+        box-shadow:
+          var(--elev-key-down),
+          0 0 0 2px var(--attention);
+        transform: translateY(1px);
+        color: var(--attention);
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .ring {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: conic-gradient(var(--attention) 0 75%, color-mix(in srgb, var(--attention) 25%, transparent) 75%);
+        mask: radial-gradient(circle, transparent 5px, #000 6px);
+        -webkit-mask: radial-gradient(circle, transparent 5px, #000 6px);
+      }
+      .tip {
+        position: absolute;
+        left: 0;
+        top: calc(100% + 6px);
+        background: var(--float);
+        box-shadow: var(--elev-float);
+        border-radius: var(--r-ctl);
+        padding: 6px 9px;
+        font: 400 var(--t-caption)/1.4 var(--ui);
+        color: var(--text);
+        white-space: nowrap;
+      }
+      /* fader specimen */
+      .faders {
+        display: flex;
+        gap: 22px;
+        align-items: flex-end;
+      }
+      .fader {
+        display: grid;
+        grid-template-columns: 22px 1fr 22px;
+        gap: 4px;
+        height: 150px;
+        width: 84px;
+      }
+      .ticks {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+        text-align: right;
+      }
+      .track {
+        position: relative;
+      }
+      .track::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        margin-left: -3px;
+        border-radius: 3px;
+        background: var(--well);
+        box-shadow:
+          inset 1px 1px 2px var(--shade),
+          inset -1px -1px 0 var(--sheen);
+      }
+      .cap {
+        position: absolute;
+        left: 50%;
+        width: 22px;
+        height: 44px;
+        margin-left: -11px;
+        border-radius: 4px;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+      }
+      .cap::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        top: 50%;
+        height: 2px;
+        background: var(--text-2);
+      }
+      .cap.assumed {
+        box-shadow:
+          var(--elev-key),
+          0 0 0 2px var(--attention);
+        outline: 2px dashed var(--attention);
+        outline-offset: -2px;
+      }
+      .meter {
+        background: var(--meter-bg);
+        border-radius: 3px;
+        box-shadow: var(--elev-well);
+        position: relative;
+        overflow: hidden;
+      }
+      .meter i {
+        position: absolute;
+        left: 2px;
+        right: 2px;
+        bottom: 2px;
+        border-radius: 1px;
+        background: linear-gradient(
+          0deg,
+          var(--meter-lo) 0 62%,
+          var(--meter-mid) 62% 82%,
+          var(--meter-hot) 82% 94%,
+          var(--meter-over) 94%
+        );
+      }
+      .fl {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        text-align: center;
+        margin-top: 4px;
+      }
+      /* type + radii */
+      .type div {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 12px;
+        align-items: baseline;
+        padding: 4px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .type .k {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+      }
+      .radii {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .radii div {
+        width: 56px;
+        height: 40px;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        display: grid;
+        place-items: center;
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+      }
+      /* skeleton / empty */
+      .skel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px;
+        border-radius: var(--r-card);
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+      }
+      .skel i {
+        display: block;
+        height: 12px;
+        border-radius: 4px;
+        background: var(--float);
+      }
+      .empty {
+        padding: 14px;
+        border: 1px dashed var(--border-strong);
+        border-radius: var(--r-card);
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 200px;
+      }
+      .empty b {
+        font: 600 var(--t-emph) var(--ui);
+        color: var(--text);
+      }
+      .empty span {
+        font: 400 var(--t-dense)/1.4 var(--ui);
+        color: var(--muted);
+      }
+      /* dialog + toast */
+      .dlg {
+        background: var(--float);
+        border-radius: var(--r-float);
+        padding: 20px;
+        box-shadow: var(--elev-float);
+        max-width: 420px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .dlg h3 {
+        margin: 0;
+        font: 500 var(--t-display)/1.15 var(--display);
+      }
+      .dlg p {
+        margin: 0;
+        font: 400 var(--t-body)/1.5 var(--ui);
+        color: var(--text-2);
+      }
+      .toast {
+        background: var(--float);
+        border-radius: var(--r-card);
+        padding: 10px 12px;
+        box-shadow: var(--elev-float);
+        max-width: 420px;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+      }
+      .toast i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        box-shadow: 0 0 6px currentColor;
+      }
+      .toast b {
+        font: 600 var(--t-body) var(--ui);
+        display: block;
+      }
+      .toast span {
+        font: 400 var(--t-dense) var(--ui);
+        color: var(--muted);
+      }
+      /* mini footer */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        height: 40px;
+        padding: 0 16px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+      }
+      .footer .f {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .footer .f i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 65%, transparent);
+      }
+      .footer .f b {
+        font-weight: 500;
+        color: var(--text);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: var(--t-dense);
+      }
+      .footer kbd {
+        margin-left: auto;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        color: var(--text-2);
+        text-transform: none;
+      }
+    </style>
+  </head>
+  <body>
+    <p class="intro">
+      State vocabulary and primitives per the gold-standard brief (§5–§8, §12), rendered from one markup in Studio,
+      Graphite and Bone. Rule of the sheet: hue names the family, form names the meaning —
+      <b style="color: #ddd">accent</b> = selected / focus / ready (keyline, ring, dot);
+      <b style="color: #ddd">amber solid</b> = engaged (you switched it on);
+      <b style="color: #ddd">amber outline / dot / dash</b> = attention (look here); <b style="color: #ddd">red</b> =
+      error and hazard; <b style="color: #ddd">green solid</b> = live momentary hold; <b style="color: #ddd">blue</b> =
+      informational / offline edit. Nothing is colour alone.
+    </p>
+    <div class="themes" id="themes"></div>
+    <template id="sheet">
+      <div class="sheet">
+        <h2 data-title></h2>
+        <div class="sec">
+          <div class="lbl">Material and physics · one light from the top-left, five levels</div>
+          <div class="levels">
+            <div class="lv well">Well<small>−1 · inputs, meters, grooves, screens</small></div>
+            <div class="lv chassis">Chassis<small>0 · the floor, header, top bar</small></div>
+            <div class="lv panel">Panel<small>+1 · mounted cards, tiers, tiles</small></div>
+            <div class="lv float">Floating<small>+3 · dialogs, menus, drawers, toasts</small></div>
+          </div>
+          <div class="row" style="margin-top: 4px">
+            <span class="btn key">Dim −20</span>
+            <span class="btn key down">Dim −20</span>
+            <span class="btn key engaged">Dim −20</span>
+            <span class="btn key live">Talk</span>
+            <span class="btn key hazard">48 V</span>
+            <span class="btn key disabled">Mono</span>
+            <span class="note" style="max-width: 300px"
+              >Keys (+2): at rest · pressed for 100 ms · engaged stays down and lit · live for exactly the hold · hazard
+              · disabled has no travel. A key cap is stamped like the deck's.</span
+            >
+          </div>
+          <div class="row">
+            <span class="groove"
+              ><span class="chip"><i></i>Lighting <span class="w">ready</span></span
+              ><span class="chip"><i class="attn"></i>Audio <span class="w">assumed</span></span
+              ><span class="chip"><i class="off"></i>Surface <span class="w">off</span></span></span
+            >
+            <span class="note" style="max-width: 360px"
+              >Lamps: 8 px LEDs in a recessed groove; lit = solid + bloom, unlit = a dark well. A lamp switches in ≤ 60
+              ms and never breathes.</span
+            >
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="lbl">Material and physics · one light from the top-left, five levels</div>
+          <div class="levels">
+            <div class="lv well">Well<small>−1 · inputs, meters, grooves, screens</small></div>
+            <div class="lv chassis">Chassis<small>0 · the floor, header, top bar</small></div>
+            <div class="lv panel">Panel<small>+1 · mounted cards, tiers, tiles</small></div>
+            <div class="lv float">Floating<small>+3 · dialogs, menus, drawers, toasts</small></div>
+          </div>
+          <div class="row" style="margin-top: 4px">
+            <span class="btn key">Dim −20</span>
+            <span class="btn key down">Dim −20</span>
+            <span class="btn key engaged">Dim −20</span>
+            <span class="btn key live">Talk</span>
+            <span class="btn key hazard">48 V</span>
+            <span class="btn key disabled">Mono</span>
+            <span class="note" style="max-width: 300px"
+              >Keys (+2): at rest · pressed for 100 ms · engaged stays down and lit · live for exactly the hold · hazard
+              · disabled has no travel. A key cap is stamped like the deck's.</span
+            >
+          </div>
+          <div class="row">
+            <span class="groove"
+              ><span class="chip"><i></i>Lighting <span class="w">ready</span></span
+              ><span class="chip"><i class="attn"></i>Audio <span class="w">assumed</span></span
+              ><span class="chip"><i class="off"></i>Surface <span class="w">off</span></span></span
+            >
+            <span class="note" style="max-width: 360px"
+              >Lamps: 8 px LEDs in a recessed groove; lit = solid + bloom, unlit = a dark well. A lamp switches in ≤ 60
+              ms and never breathes.</span
+            >
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="lbl">Material and physics · one light from the top-left, five levels</div>
+          <div class="levels">
+            <div class="lv well">Well<small>−1 · inputs, meters, grooves, screens</small></div>
+            <div class="lv chassis">Chassis<small>0 · the floor, header, top bar</small></div>
+            <div class="lv panel">Panel<small>+1 · mounted cards, tiers, tiles</small></div>
+            <div class="lv float">Floating<small>+3 · dialogs, menus, drawers, toasts</small></div>
+          </div>
+          <div class="row" style="margin-top: 4px">
+            <span class="btn key">Dim −20</span>
+            <span class="btn key down">Dim −20</span>
+            <span class="btn key engaged">Dim −20</span>
+            <span class="btn key live">Talk</span>
+            <span class="btn key hazard">48 V</span>
+            <span class="btn key disabled">Mono</span>
+            <span class="note" style="max-width: 300px"
+              >Keys (+2): at rest · pressed for 100 ms · engaged stays down and lit · live for exactly the hold · hazard
+              · disabled has no travel. A key cap is stamped like the deck's.</span
+            >
+          </div>
+          <div class="row">
+            <span class="groove"
+              ><span class="chip"><i></i>Lighting <span class="w">ready</span></span
+              ><span class="chip"><i class="attn"></i>Audio <span class="w">assumed</span></span
+              ><span class="chip"><i class="off"></i>Surface <span class="w">off</span></span></span
+            >
+            <span class="note" style="max-width: 360px"
+              >Lamps: 8 px LEDs in a recessed groove; lit = solid + bloom, unlit = a dark well. A lamp switches in ≤ 60
+              ms and never breathes.</span
+            >
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="lbl">Material and physics · one light from the top-left, five levels</div>
+          <div class="levels">
+            <div class="lv well">Well<small>−1 · inputs, meters, grooves, screens</small></div>
+            <div class="lv chassis">Chassis<small>0 · the floor, header, top bar</small></div>
+            <div class="lv panel">Panel<small>+1 · mounted cards, tiers, tiles</small></div>
+            <div class="lv float">Floating<small>+3 · dialogs, menus, drawers, toasts</small></div>
+          </div>
+          <div class="row" style="margin-top: 4px">
+            <span class="btn key">Dim −20</span>
+            <span class="btn key down">Dim −20</span>
+            <span class="btn key engaged">Dim −20</span>
+            <span class="btn key live">Talk</span>
+            <span class="btn key hazard">48 V</span>
+            <span class="btn key disabled">Mono</span>
+            <span class="note" style="max-width: 300px"
+              >Keys (+2): at rest · pressed for 100 ms · engaged stays down and lit · live for exactly the hold · hazard
+              · disabled has no travel. A key cap is stamped like the deck's.</span
+            >
+          </div>
+          <div class="row">
+            <span class="groove"
+              ><span class="chip"><i></i>Lighting <span class="w">ready</span></span
+              ><span class="chip"><i class="attn"></i>Audio <span class="w">assumed</span></span
+              ><span class="chip"><i class="off"></i>Surface <span class="w">off</span></span></span
+            >
+            <span class="note" style="max-width: 360px"
+              >Lamps: 8 px LEDs in a recessed groove; lit = solid + bloom, unlit = a dark well. A lamp switches in ≤ 60
+              ms and never breathes.</span
+            >
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="lbl">Type scale · Inter / JetBrains Mono / Fraunces</div>
+          <div class="type">
+            <div>
+              <span class="k">tick 10 / 12</span
+              ><span style="font: 500 var(--t-tick)/12px var(--mono)"
+                >−18 dBFS · 1 k · 5600 K — axis ticks, meter scales, legends only</span
+              >
+            </div>
+            <div>
+              <span class="k">caption 11 / 14</span
+              ><span style="font: 500 var(--t-caption)/14px var(--ui)"
+                >Secondary labels, kbd hints, chip text ·
+                <span style="font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.04em"
+                  >Not verified</span
+                ></span
+              >
+            </div>
+            <div>
+              <span class="k">dense 12 / 16</span
+              ><span style="font: 400 var(--t-dense)/16px var(--ui)">Table and list rows, strip names, tile meta</span>
+            </div>
+            <div>
+              <span class="k">body 13 / 18</span
+              ><span style="font: 400 var(--t-body)/18px var(--ui)"
+                >Default. Control labels, inspector rows, dialog body, toasts</span
+              >
+            </div>
+            <div>
+              <span class="k">emphasis 14 / 18</span
+              ><span style="font: 500 var(--t-emph)/18px var(--mono)"
+                >−18.0 dB · +2.1 dB · 192.168.1.80 · U1 · 001–002</span
+              >
+            </div>
+            <div>
+              <span class="k">title 16 / 20</span
+              ><span style="font: 600 var(--t-title)/20px var(--ui)"
+                >Section titles, nav labels, inspector heading</span
+              >
+            </div>
+            <div>
+              <span class="k">display 20 / 24</span
+              ><span style="font: 500 var(--t-display)/24px var(--display)">Lighting · Close Studio Control?</span>
+            </div>
+            <div>
+              <span class="k">hero 28 / 30</span
+              ><span style="font: 500 var(--t-hero)/30px var(--mono); font-variant-numeric: tabular-nums"
+                >−1.2 dB · 09:11</span
+              >
+            </div>
+          </div>
+          <div class="radii">
+            <div style="border-radius: 4px">4</div>
+            <div style="border-radius: 8px">8</div>
+            <div style="border-radius: 12px">12</div>
+            <div style="border-radius: 999px">pill</div>
+            <span class="note">Four radii: controls · cards · floating · badges</span>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">State words · badge (top-bar slot) and dot + word (chips, footer)</div>
+          <div class="row">
+            <span class="badge ok"><i></i>Ready</span><span class="badge attn"><i></i>Stale</span
+            ><span class="badge attn"><i></i>Not verified</span><span class="badge attn"><i></i>Assumed</span
+            ><span class="badge err"><i></i>Offline</span><span class="badge err"><i></i>Disconnected</span
+            ><span class="badge info"><i></i>Preview</span><span class="badge neutral"><i></i>Loading</span>
+          </div>
+          <div class="row">
+            <span class="chip"><i></i>Lighting <span class="w">ready</span></span
+            ><span class="chip"><i class="attn"></i>Audio <span class="w">not verified</span></span
+            ><span class="chip"><i class="err"></i>Surface <span class="w">unreachable</span></span
+            ><span class="chip"><i class="attn"></i>Solo <span class="w">2</span></span
+            ><span class="chip"><i class="attn"></i>Scene <span class="w">unsaved</span></span>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Bands · the only banner: word · one sentence · one action</div>
+          <div class="band attn">
+            <span class="w">Not verified</span
+            ><span class="m">Console controls stay locked until the audio probe passes.</span
+            ><span class="btn compact primary">Run audio probe</span>
+          </div>
+          <div class="band err">
+            <span class="w">Bridge unreachable</span
+            ><span class="m">Lighting commands will not reach the rig until the bridge at 192.168.1.80 answers.</span
+            ><span class="btn compact">Run bridge probe</span>
+          </div>
+          <div class="band info">
+            <span class="w">Preview</span
+            ><span class="m">Editing offline. The rig is unchanged until you save or discard.</span
+            ><span class="btn compact primary">Save scene</span>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Controls · sentence case, 32 / 28 px, one hue per role</div>
+          <div class="row">
+            <span class="btn primary">Save scene</span><span class="btn">Sync</span
+            ><span class="btn ghost">Discard</span><span class="btn danger">Delete fixture…</span
+            ><span class="btn hover">Hover</span><span class="btn focus">Focus</span
+            ><span class="btn selected">Selected</span>
+          </div>
+          <div class="row">
+            <span class="btn engaged">Dim −20</span><span class="btn engaged">→ Main Out</span
+            ><span class="btn">Mono</span><span class="btn live">Talkback <kbd>hold T</kbd></span
+            ><span class="btn hazard">48 V</span
+            ><span class="btn disabled">Mute <span class="tip">Locked until the audio probe passes</span></span>
+          </div>
+          <div class="row" style="margin-top: 22px">
+            <span class="arm"><span class="ring"></span>Armed · 3.9 s</span
+            ><span class="note"
+              >Arm-then-apply: first press arms the control (keyline, word, countdown ring); a second press on the same
+              control ≥ 350 ms later applies; Esc, timeout or anything else disarms. Nothing else on the screen
+              moves.</span
+            >
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Values · confirmed, assumed, selected, disabled</div>
+          <div class="faders">
+            <div>
+              <div class="fader">
+                <div class="ticks"><span>0</span><span>−12</span><span>−24</span><span>−60</span></div>
+                <div class="track"><div class="cap" style="top: 38%"></div></div>
+                <div class="meter"><i style="height: 62%"></i></div>
+              </div>
+              <div class="fl">confirmed</div>
+            </div>
+            <div>
+              <div class="fader">
+                <div class="ticks"><span>0</span><span>−12</span><span>−24</span><span>−60</span></div>
+                <div class="track"><div class="cap assumed" style="top: 38%"></div></div>
+                <div class="meter"><i style="height: 62%"></i></div>
+              </div>
+              <div class="fl" style="color: var(--attention)">assumed</div>
+            </div>
+            <div
+              style="padding: 6px; border: 2px solid var(--accent); border-radius: 6px; background: var(--accent-soft)"
+            >
+              <div class="fader">
+                <div class="ticks"><span>0</span><span>−12</span><span>−24</span><span>−60</span></div>
+                <div class="track"><div class="cap" style="top: 38%"></div></div>
+                <div class="meter"><i style="height: 62%"></i></div>
+              </div>
+              <div class="fl">selected</div>
+            </div>
+            <div style="opacity: 0.45">
+              <div class="fader">
+                <div class="ticks"><span>0</span><span>−12</span><span>−24</span><span>−60</span></div>
+                <div class="track"><div class="cap" style="top: 38%"></div></div>
+                <div class="meter"><i style="height: 0%"></i></div>
+              </div>
+              <div class="fl">disabled</div>
+            </div>
+            <div class="note" style="max-width: 200px">
+              The doubt mark sits on the value itself, in addition to the ASSUMED badge and band. Disabled is 45 % plus
+              the reason within reach.
+            </div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Loading and empty · in place, at the host's geometry</div>
+          <div class="row" style="align-items: flex-start">
+            <div class="skel" style="width: 200px">
+              <i style="width: 60%"></i><i></i><i style="width: 80%"></i><i style="width: 40%"></i>
+            </div>
+            <div class="empty">
+              <b>No scenes saved yet</b><span>Set the rig, then save it as a scene to recall later.</span
+              ><span class="btn compact primary" style="align-self: flex-start">Save first scene</span>
+            </div>
+            <div class="note" style="max-width: 220px">
+              Under 320 px the empty state stacks: title, one sentence, one action. It never splits copy from its
+              button.
+            </div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Dialog and toast</div>
+          <div class="row" style="align-items: flex-start">
+            <div class="dlg">
+              <h3>Close Studio Control?</h3>
+              <p>
+                Closing ends the console link. TotalMix keeps its state, the lights hold their last levels and the
+                Stream Deck goes idle.
+              </p>
+              <div class="row" style="justify-content: flex-end">
+                <span class="btn focus">Cancel</span><span class="btn danger">Close Studio Control</span>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <div class="toast">
+                <i style="background: var(--accent)"></i>
+                <div><b>Sync complete</b><span>42 values pulled from TotalMix · nothing moved on the desk</span></div>
+                <span class="btn compact ghost">Dismiss</span>
+              </div>
+              <div class="toast">
+                <i style="background: var(--attention)"></i>
+                <div>
+                  <b>Host fader adjusted by the desk</b><span>TotalMix kept −6.0 dB, the app asked for −4.5 dB</span>
+                </div>
+                <span class="btn compact ghost">Dismiss</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="lbl">Footer · one row, everywhere</div>
+          <div class="footer">
+            <span class="f"><i></i>Bridge <b>192.168.1.80 · U1</b></span
+            ><span class="f"><i style="background: var(--attention)"></i>Fixtures <b>3 / 4 patched</b></span
+            ><span class="f">Session <b>0 m</b></span
+            ><kbd>Ctrl K</kbd><span>Palette</span><kbd style="margin-left: 0">?</kbd><span>Shortcuts</span>
+          </div>
+        </div>
+      </div>
+    </template>
+    <script>
+      const host = document.getElementById("themes");
+      for (const [t, name] of [
+        ["studio", "Studio (default)"],
+        ["graphite", "Graphite"],
+        ["bone", "Bone"],
+      ]) {
+        const n = document.getElementById("sheet").content.cloneNode(true);
+        const s = n.querySelector(".sheet");
+        s.dataset.theme = t;
+        n.querySelector("[data-title]").textContent = name;
+        host.appendChild(n);
+      }
+    </script>
+  </body>
+</html>

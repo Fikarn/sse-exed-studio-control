@@ -1,4 +1,7 @@
 {
   "extends": "../../../tsconfig.base.json",
-  "include": ["src", "style-dictionary.config.mjs"]
+  "include": ["src", "style-dictionary.config.mjs", "vitest.config.ts"],
+  "compilerOptions": {
+    "types": ["node"]
+  }
 }

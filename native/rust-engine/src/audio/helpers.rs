@@ -265,13 +265,13 @@ pub(super) fn resolve_audio_config(settings: &HashMap<String, String>) -> AudioB
     }
 }
 
-pub(super) fn ensure_audio_action_allowed(
+pub(crate) fn ensure_audio_action_allowed(
     db_path: &Path,
     snapshot: &AudioSnapshot,
 ) -> Result<(), AudioCommandError> {
     if !snapshot.osc_enabled {
         let message = String::from(
-            "Audio OSC transport is disabled in native audio settings. Re-enable it before sending native audio commands.",
+            "Audio control is switched off in Setup. Turn OSC back on before changing console settings.",
         );
         record_audio_action_failure(db_path, "AUDIO_DISABLED", &message)?;
         return Err(AudioCommandError::Rejected("AUDIO_DISABLED", message));
@@ -282,19 +282,19 @@ pub(super) fn ensure_audio_action_allowed(
         "attention" => Some((
             "AUDIO_PROBE_FAILED",
             String::from(
-                "Audio transport is in attention state. Fix the OSC configuration and rerun the commissioning audio probe before sending native commands.",
+                "The console link failed its last probe. Check that TotalMix is running with remote 4 in Global OSC mode, then run the audio probe again.",
             ),
         )),
         "not-verified" => Some((
             "AUDIO_NOT_VERIFIED",
             String::from(
-                "Run the commissioning audio probe before syncing the console or recalling snapshots from the native engine.",
+                "Audio is not verified yet. Run the audio probe before changing console settings.",
             ),
         )),
         _ => Some((
             "AUDIO_TRANSPORT_UNAVAILABLE",
             String::from(
-                "Audio transport is unavailable. Configure OSC settings before sending native audio commands.",
+                "The audio console link is not configured. Set the OSC ports in Setup before changing console settings.",
             ),
         )),
     };
@@ -307,12 +307,79 @@ pub(super) fn ensure_audio_action_allowed(
     Ok(())
 }
 
+/// True when the resolved metering source is the simulated input mode
+/// (`SSE_AUDIO_SIMULATED_INPUT_MODE` or the persisted setting). Commissioning
+/// uses this to let the audio probe pass on hosts without TotalMix while the
+/// UI keeps labelling the console "test simulation".
+pub(crate) fn audio_metering_is_simulated(settings: &HashMap<String, String>) -> bool {
+    resolve_audio_config(settings).metering_source
+        == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE
+}
+
 pub(super) fn persist_audio_state(
     db_path: &Path,
     updates: &[(String, String)],
 ) -> Result<(), AudioCommandError> {
     set_settings_owned(db_path, updates)
         .map_err(|error| AudioCommandError::Storage(error.to_string()))
+}
+
+/// `persist_audio_state` with action-log rows in the same transaction: the
+/// console flush runs on the metering thread, where a second wait for the
+/// disk would show in the meters (Slice 11 — F30).
+pub(super) fn persist_audio_state_with_actions(
+    db_path: &Path,
+    updates: &[(String, String)],
+    actions: &[crate::action_log::ActionRecord],
+) -> Result<(), AudioCommandError> {
+    crate::storage::set_settings_owned_and(db_path, updates, |transaction| {
+        crate::action_log::insert_actions(transaction, actions)
+    })
+    .map_err(|error| AudioCommandError::Storage(error.to_string()))
+}
+
+/// Serialises every read-modify-write of the two JSON state blobs
+/// (`channels_state`, `mix_targets_state`). SQLite already serialises the
+/// writes themselves; this protects the read → modify → write window against
+/// the console-link flush on the metering thread. Lock order everywhere:
+/// `AUDIO_STATE_LOCK` first, then the shared console link.
+static AUDIO_STATE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub(super) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
+    AUDIO_STATE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The only vocabulary for console-state confidence. `Aligned` is written
+/// solely after a complete console pull or a fully confirmed push; `Assumed`
+/// when a push starts or a send goes unconfirmed; `Unknown` when the
+/// transport changes, the console reports disconnected, or a pull fails.
+/// Ordinary edits never write confidence at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ConsoleConfidence {
+    Aligned,
+    Assumed,
+    Unknown,
+}
+
+impl ConsoleConfidence {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Aligned => "aligned",
+            Self::Assumed => "assumed",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// The single producer of the confidence setting write; every persist batch
+/// that moves confidence goes through here (see the source-scan test).
+pub(crate) fn confidence_setting(value: ConsoleConfidence) -> (String, String) {
+    (
+        String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
+        String::from(value.as_str()),
+    )
 }
 
 pub(super) fn record_audio_action_failure(
@@ -440,11 +507,16 @@ pub(super) fn audio_view_mode(settings: &HashMap<String, String>) -> String {
 }
 
 pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabilitySnapshot {
+    // Hardware-facing capabilities follow the same gate as the engine commands
+    // (`ensure_audio_action_allowed`): OSC must be on AND the audio probe must
+    // have passed. App-local capabilities (clip latches, snapshot capture, the
+    // master view) only need OSC on, because they never reach TotalMix.
+    let console_ready = osc_enabled && status == "ready";
     AudioCapabilitySnapshot {
-        can_edit_mixer_state: osc_enabled,
-        can_sync: osc_enabled,
-        can_recall_console_snapshot: osc_enabled && status == "ready",
-        can_edit_processing: osc_enabled,
+        can_edit_mixer_state: console_ready,
+        can_sync: console_ready,
+        can_recall_console_snapshot: console_ready,
+        can_edit_processing: console_ready,
         can_clear_clips: osc_enabled,
         can_capture_snapshot: osc_enabled,
         can_use_master_view: osc_enabled,
@@ -911,7 +983,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
 
     let transport_summary = if !osc_enabled {
         format!(
-            "OSC transport is disabled in native audio settings. Last configured endpoint is {}:{} with receive ports {}-{}.",
+            "OSC control is switched off in Setup. The last endpoint was {}:{} (receive ports {}-{}).",
             config.send_host,
             config.send_port,
             config.receive_port,
@@ -919,13 +991,13 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         )
     } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
         format!(
-            "Audio metering is in explicit simulated input mode. Simulated inventory exposes {} channels, {} mix targets, and {} snapshots for UI testing.",
+            "Test mode: the console is simulated and nothing reaches TotalMix. {} channels, {} outputs and {} snapshots.",
             channel_count, mix_target_count, snapshot_count
         )
     } else {
         match status {
             "ready" => format!(
-                "RME TotalMix OSC metering is live for {} with send ports {}-{} and receive ports {}-{}. Inventory exposes {} channels, {} mix targets, and {} snapshots.",
+                "TotalMix on {} is answering (port incoming {}-{}, port outgoing {}-{}): {} channels, {} outputs and {} snapshots.",
                 config.send_host,
                 config.send_port,
                 config.send_port.saturating_add(2),
@@ -936,7 +1008,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
                 snapshot_count
             ),
             "attention" => format!(
-                "RME TotalMix OSC metering is offline for {}. Verify the three OSC remote slots and Send Peak Level settings for send ports {}-{} and receive ports {}-{}.",
+                "No meter data from TotalMix on {}. In TotalMix Options › Settings › OSC, check remote controllers 1–3 (port incoming {}-{}, port outgoing {}-{}), turn on Send Peak Level Data, and keep remote 4 in Global OSC mode.",
                 config.send_host,
                 config.send_port,
                 config.send_port.saturating_add(2),
@@ -944,7 +1016,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
                 config.receive_port.saturating_add(2)
             ),
             _ => format!(
-                "RME TotalMix OSC metering is not verified. Configure three TotalMix OSC remotes for send ports {}-{} and receive ports {}-{}, enable Send Peak Level, then rerun the audio probe.",
+                "TotalMix is not verified yet. In TotalMix Options › Settings › OSC, set remote controllers 1–3 to port incoming {}-{} and port outgoing {}-{}, turn on Send Peak Level Data, then run the audio probe.",
                 config.send_port,
                 config.send_port.saturating_add(2),
                 config.receive_port,

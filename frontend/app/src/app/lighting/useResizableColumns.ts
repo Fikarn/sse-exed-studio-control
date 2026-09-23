@@ -18,11 +18,14 @@ interface ColumnSpec {
 }
 
 const COLUMN_SPECS: Record<OperatorLayoutMode, ColumnSpec> = {
+  // Visual overhaul A, Slice 5: the plate is D4's 416 px at the studio surface
+  // and the mock's 360 px below it. The rail's numbers are kept for the stored
+  // widths, but the rail itself is the shell's cluster now.
   studioFull: {
     railDefault: 280,
     railMin: 220,
     railMax: 420,
-    inspectorDefault: 360,
+    inspectorDefault: 416,
     inspectorMin: 280,
     inspectorMax: 560,
   },
@@ -30,7 +33,7 @@ const COLUMN_SPECS: Record<OperatorLayoutMode, ColumnSpec> = {
     railDefault: 260,
     railMin: 220,
     railMax: 320,
-    inspectorDefault: 320,
+    inspectorDefault: 360,
     inspectorMin: 280,
     inspectorMax: 380,
   },

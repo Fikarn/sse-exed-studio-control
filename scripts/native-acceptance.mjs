@@ -5,10 +5,12 @@ import { fileURLToPath } from "node:url";
 
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import {
+  acceptanceEngineEnv,
   assertAudioWorkflowParity,
   assertCoreParityContracts,
   assertLightingWorkflowParity,
   assertPlanningWorkflowParity,
+  awaitConsoleLinkQuiet,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
@@ -33,9 +35,9 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
-    env: {
+    env: acceptanceEngineEnv({
       SSE_LEGACY_DB_PATH: fixturePath,
-    },
+    }),
   });
 
   let backupPath;
@@ -55,14 +57,20 @@ async function main() {
     assert(initialPlanningSnapshot.counts?.projectCount === 2, "Expected imported project count to be 2.");
     assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected imported task count to be 3.");
 
+    // No hardware on this host: publish with the explicit probe override the
+    // engine now requires (2026-09 audit Slice 8) instead of pretending the
+    // probes ran.
     const commissioningUpdate = await firstRun.request("commissioning-ready", "commissioning.update", {
       stage: "ready",
+      overrideProbes: true,
     });
     assert(
       commissioningUpdate.startup?.targetSurface === "dashboard",
       `Expected commissioning update to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
     );
 
+    // The backup must carry the console's settled state, not a half-ingested one.
+    await awaitConsoleLinkQuiet(firstRun, "native-acceptance-installed-audio-quiet");
     const exportSummary = await firstRun.request("support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected native backup export to create an archive.");
@@ -80,9 +88,9 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
-    env: {
+    env: acceptanceEngineEnv({
       SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    }),
   });
 
   try {
@@ -103,7 +111,7 @@ async function main() {
     assert(restartedPlanningSnapshot.counts?.projectCount === 2, "Expected restarted project count to remain 2.");
     assert(restartedPlanningSnapshot.counts?.taskCount === 3, "Expected restarted task count to remain 3.");
     const restartedLightingSnapshot = await secondRun.request("lighting-snapshot-restart", "lighting.snapshot");
-    const restartedAudioSnapshot = await secondRun.request("audio-snapshot-restart", "audio.snapshot");
+    const restartedAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "native-acceptance-restart-audio-quiet");
 
     const workflowMutations = await assertPlanningWorkflowParity(
       secondRun,
@@ -147,7 +155,7 @@ async function main() {
 
     const restoredPlanningSnapshot = await secondRun.request("planning-snapshot-restored", "planning.snapshot");
     const restoredLightingSnapshot = await secondRun.request("lighting-snapshot-restored", "lighting.snapshot");
-    const restoredAudioSnapshot = await secondRun.request("audio-snapshot-restored", "audio.snapshot");
+    const restoredAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "native-acceptance-restored-audio-quiet");
     const restoredAppSnapshot = await secondRun.request("app-snapshot-restored", "app.snapshot");
     assert(restoredPlanningSnapshot.counts?.projectCount === 2, "Expected restore to roll project count back to 2.");
     assert(
@@ -208,10 +216,12 @@ async function main() {
         restoredAudioSnapshot.consoleStateConfidence === audioMutations.baselineConsoleStateConfidence,
       "Expected restore to clear the temporary audio sync and recall markers and return console confidence to the restart baseline."
     );
+    const { targets } = audioMutations;
     assert(
       restoredAudioSnapshot.channels?.some(
         (channel) =>
-          channel.id === "audio-input-12" &&
+          channel.id === targets.frontChannelId &&
+          channel.name === audioMutations.baselineFront.name &&
           channel.gain === audioMutations.baselineFront.gain &&
           channel.phantom === audioMutations.baselineFront.phantom &&
           channel.pad === audioMutations.baselineFront.pad &&
@@ -224,22 +234,22 @@ async function main() {
     assert(
       restoredAudioSnapshot.channels?.some(
         (channel) =>
-          channel.id === "audio-playback-1-2" &&
+          channel.id === targets.playbackChannelId &&
           channel.mute === audioMutations.baselinePlayback.mute &&
           channel.solo === audioMutations.baselinePlayback.solo &&
-          channel.mixLevels?.["audio-mix-phones-a"] ===
-            audioMutations.baselinePlayback.mixLevels?.["audio-mix-phones-a"]
+          channel.mixLevels?.[targets.playbackSendTargetId] ===
+            audioMutations.baselinePlayback.mixLevels?.[targets.playbackSendTargetId]
       ),
       "Expected restore to return the playback send state to the restart baseline."
     );
     assert(
       restoredAudioSnapshot.mixTargets?.some(
         (target) =>
-          target.id === "audio-mix-main" &&
-          target.volume === audioMutations.baselineMainMix.volume &&
-          target.dim === audioMutations.baselineMainMix.dim &&
-          target.mono === audioMutations.baselineMainMix.mono &&
-          target.talkback === audioMutations.baselineMainMix.talkback
+          target.id === targets.mixTargetId &&
+          target.volume === audioMutations.baselineMixTarget.volume &&
+          target.dim === audioMutations.baselineMixTarget.dim &&
+          target.mono === audioMutations.baselineMixTarget.mono &&
+          target.talkback === audioMutations.baselineMixTarget.talkback
       ),
       "Expected restore to return the control-room mix state to the restart baseline."
     );

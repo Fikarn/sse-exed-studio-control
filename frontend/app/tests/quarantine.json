@@ -1,0 +1,5 @@
+{
+  "exit": null,
+  "rule": "A case belongs here only when what it asserts is a wall-clock measurement, so a loaded runner can fail it with no defect behind the failure. A case that fails for a reason that can be found is fixed instead (production readiness S13 found and fixed five; S15 found the cause of the last three and emptied this list). A listed case carries an exit date at most 90 days out, and by that date it is made independent of the runner's speed and returned to the default project, or deleted with the reason written down; scripts/check-playwright-quarantine.mjs fails the frontend-e2e job after that day.",
+  "cases": []
+}

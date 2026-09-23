@@ -205,7 +205,7 @@ export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, 
         aria-pressed={selectedIndex === null}
       >
         <X aria-hidden="true" size={12} strokeWidth={1.75} />
-        <span>Clear</span>
+        <span>Clear color tag</span>
       </button>
     </div>,
     document.body

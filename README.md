@@ -56,10 +56,24 @@ All captures below are deterministic Tauri native renders at the target `2560x14
 - Closing the main window shows a warning and then fully quits the app if confirmed
 - Restored workspace and shell state come from the engine snapshot, not shell-local browser state
 - User data stays local on the workstation and survives reinstall/update flows unless manually removed
+- The saved data is checked at every start and backed up on its own — before an upgrade, daily and at every close; backups are verified and restored from Setup / Support or the recovery screen
+- One copy runs per workstation; if its hardware link stops during a session it is restarted on its own
+- The light outputs can be held until armed (the switch in Setup / Support, or `SSE_SAFE_START=1` at launch), and Setup / Support lists recent actions with who did them — screen, Stream Deck, TotalMix or the talkback watchdog
+- The Stream Deck bridge answers only the exported Companion profile, which carries a per-install token (re-import it once with Full Reset & Import after upgrading from a build older than 2026-09-10)
 
 Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Product Surface
+
+Every workspace reads as one instrument. The shell is the same on all four —
+header, a fixed cluster down the left that says what the subsystem is and carries
+the take-time keys, the bay in the middle, the plate on the right showing the
+whole selected thing at once, and one footer along the bottom. Nothing scrolls
+during normal operation, and the front-end never shows a state the engine has not
+reported. The visual system is specified in
+[docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md) and
+measured on every board by the UI contract — see
+[docs/DEVELOPMENT.md §2c](docs/DEVELOPMENT.md).
 
 ### Planning
 
@@ -69,9 +83,9 @@ Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ### Lighting
 
-- fixture control for the current studio lighting rig
-- compact grid/list operator views plus a polished 2D studio plot
-- DMX status visibility, scenes, grouping, and live spatial editing
+- fixture control for the current studio lighting rig over sACN
+- a backlit 2D studio plot as the bay, with the rig's state and the take-time keys in the cluster beside it
+- DMX status visibility, scenes, groups, palettes, and live spatial editing
 
 ### Audio
 
@@ -90,7 +104,7 @@ Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 This project is deliberately tuned to the current studio installation.
 
-- Display: dedicated second monitor, target `2560x1440`, minimum `1920x1080`
+- Display: dedicated second monitor at `2560x1440` — the only size that matters (operator ruling 2026-09-18: Windows only, `2560x1440` only; the smaller fallback layouts keep their guards but are not worked on)
 - Audio interface: RME Fireface UFX III
 - Lighting bridge: Litepanels Apollo Bridge
 - Control surface: Stream Deck+
@@ -108,6 +122,10 @@ Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PRO
 - [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
 - [docs/OPERATOR_WORKSTATION_ROLLOUT.md](docs/OPERATOR_WORKSTATION_ROLLOUT.md): final published-installer verification on the intended studio workstation
 - [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
+- [docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md): the visual system every operator surface is built to, and the measures that enforce it
+- [docs/plans/visual-overhaul-a-2026-09.md](docs/plans/visual-overhaul-a-2026-09.md): the thirteen-slice record of how it was implemented
+- [docs/plans/audit-remediation-2026-09.md](docs/plans/audit-remediation-2026-09.md): the thirteen-slice record of the 2026-09 truthfulness remediation
+- [docs/plans/production-readiness-2026-09.md](docs/plans/production-readiness-2026-09.md): the sixteen-slice record of the 2026-09 production readiness remediation (32 findings, each with the guard that holds it; Appendix B is the operator's hardware checklist)
 - [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
 - [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
 - [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence
@@ -182,13 +200,15 @@ npm run tauri:cutover:candidate
 npm run ci
 ```
 
+Beyond `dev:check`, which also enforces the Vitest coverage floors, three gates need the network or a long build and run as CI jobs: `npm run supply-chain:check` (npm audit for every lockfile and `cargo deny`, against dated exceptions), `npm run rust:coverage` (the Rust line-coverage floor) and the Playwright suite (`npm run frontend:playwright:test`; CI fails on its `default` project, and the quarantine project for wall-clock cases is empty since 2026-09-21). The `dev-checks` workflow runs ten jobs on every push and pull request; `docs/DEVELOPMENT.md §4` explains each.
+
 `tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) or Playwright preview.
 
 `tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
 
 The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
-`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`.
+`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`. Both keep `release/native` when a packaged app is in it (on a workstation that runs the app from the repository, that folder is the installed app) and say so; `-- --include-release` removes it as well and refuses while the app is running, and `-- --dry-run` removes nothing.
 
 ## Release Model
 

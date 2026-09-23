@@ -1,5 +1,9 @@
 .audioMeterCanvas {
-  position: absolute;
+  /* Visual overhaul A, Slice 4: the meters this canvas paints live in the bay
+     and in the shell's cluster, so the canvas covers the viewport rather than
+     the workspace element. Page coordinates are canvas coordinates (nothing
+     scrolls), so the geometry measurement is unchanged. */
+  position: fixed;
   inset: 0;
   z-index: 8;
   display: block;

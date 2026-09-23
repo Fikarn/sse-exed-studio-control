@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { modifierShortcut } from "./helpers/modifier-shortcut";
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: lighting workspace specs split out of
 // operator-shell.spec.ts. Covers the snapshot loading posture, fixture
@@ -16,10 +16,17 @@ test("renders the lighting snapshot loading posture", async ({ page }) => {
   await openFixture(page, "lighting-loading");
 
   const workspace = page.getByRole("main").first();
-  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
-  await expect(workspace.getByText("No scenes saved yet")).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the Lighting workspace toolbar. New: the
+  // shell's cluster, which carries what the toolbar carried and the rig's state
+  // above it. Reason: Lighting follows the cluster rule — the state first and
+  // fixed, then the keys, in the same place as every other workspace.
+  await expect(page.getByTestId("lighting-cluster")).toBeVisible();
+  // Visual overhaul A, Slice 5: the scenes are the cluster's, outside the
+  // workspace's own main element.
+  await expect(page.getByTestId("lighting-cluster").getByText("No scenes saved yet")).toBeVisible();
   await expect(workspace.getByText("No fixtures on the rig yet")).toBeVisible();
-  await expect(workspace.getByText("0 / 0 patched")).toBeVisible();
+  // Visual overhaul A, Slice 5: how many fixtures are patched is a footer item.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("0 / 0 patched");
   await expect(page.getByRole("button", { name: /Fixture /i })).toHaveCount(0);
 });
 
@@ -27,8 +34,16 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main").first();
-  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
-  await expect(workspace.getByText("192.168.1.80 · U1")).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the Lighting workspace toolbar. New: the
+  // shell's cluster, which carries what the toolbar carried and the rig's state
+  // above it. Reason: Lighting follows the cluster rule — the state first and
+  // fixed, then the keys, in the same place as every other workspace.
+  await expect(page.getByTestId("lighting-cluster")).toBeVisible();
+  // Visual overhaul A, Slice 5 said "192.168.1.80 · universe 1" — the footer in
+  // words. Slice 8 takes it back to "192.168.1.80 · U1": system §9 fixes the
+  // universe's form as U1, the plate and Setup both print it that way, and one
+  // fact should not have two forms on one screen.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("192.168.1.80 · U1");
   await expect(workspace.getByText("Warm wash").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toHaveAttribute(
     "data-selected",
@@ -41,8 +56,15 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
     "true"
   );
   await expect(workspace.getByText("1 fixture selected")).toBeVisible();
-  await expect(workspace.getByText("Scene state")).toBeVisible();
-  await expect(workspace.getByText("Saved", { exact: true })).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the health bar's "Scene state" cell. New:
+  // the footer's Scene item and the state display's word. Reason: the footer is
+  // the shell's, and whether the rig matches the scene is a state, so it is in
+  // the state display too.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("Scene");
+  await expect(page.getByTestId("lighting-state-display")).toContainText("REACHABLE");
+  // Visual overhaul A, Slice 5. Old: the health bar's "Saved" cell. New: the
+  // shell footer's Scene item says "saved". Reason: the footer is the shell's.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("saved");
   await expect(page.getByRole("img", { name: "Scene intensity shape for Warm wash" })).toBeVisible();
 
   await page.keyboard.press("KeyS");
@@ -76,10 +98,14 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   await page.getByRole("button", { name: "Turn off" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Warm wash, off,/ })).toHaveAttribute("aria-pressed", "true");
 
+  // Visual overhaul A, Slice 5b. Old: inspect the group, then click the Group
+  // tab. New: the plate shows what is selected, so inspecting the group is
+  // enough. Reason: the plate has no tab row.
   await page.getByRole("button", { name: "Inspect Front group" }).click();
-  await page.getByRole("tab", { name: "Group" }).click();
   await expect(page.getByRole("heading", { name: "Group" })).toBeVisible();
-  await expect(workspace.getByText("Front", { exact: true }).last()).toBeVisible();
+  // Visual overhaul A, Slice 5b: the group's own section is the plate's, which
+  // sits beside the plot rather than inside it.
+  await expect(page.getByTestId("lighting-plate").getByText("Front", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Turn group off" }).click();
   await expect(page.getByRole("button", { name: /Front, 2 fixtures.*off\. Toggle on\./i })).toBeVisible();
 });
@@ -123,9 +149,16 @@ test("keeps the full lighting workspace visible at the 1920x1080 fallback size",
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main").first();
-  await expect(page.getByRole("toolbar", { name: "Lighting workspace toolbar" })).toBeVisible();
-  await expect(workspace.getByText("Scenes", { exact: true })).toBeVisible();
-  await expect(workspace.getByText("Groups", { exact: true })).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the Lighting workspace toolbar. New: the
+  // shell's cluster, which carries what the toolbar carried and the rig's state
+  // above it. Reason: Lighting follows the cluster rule — the state first and
+  // fixed, then the keys, in the same place as every other workspace.
+  await expect(page.getByTestId("lighting-cluster")).toBeVisible();
+  // The scenes and the groups are the cluster's sections now, so they are read
+  // off the cluster rather than the workspace's own main element.
+  const cluster = page.getByTestId("lighting-cluster");
+  await expect(cluster.getByText("Scenes", { exact: true })).toBeVisible();
+  await expect(cluster.getByText("Groups", { exact: true })).toBeVisible();
   await expect(page.getByRole("application", { name: "Lighting stage plot" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Patch/ })).toBeVisible();
   await expect(workspace.getByText("1 fixture selected")).toBeVisible();
@@ -156,7 +189,7 @@ test("adapts lighting layout modes across supported logical viewport sizes", asy
     await openFixture(page, "lighting-populated");
 
     await expect(page.locator("[data-operator-layout-root]")).toHaveAttribute("data-layout-mode", entry.mode);
-    await expect(page.getByTestId("lighting-toolbar")).toBeVisible();
+    await expect(page.getByTestId("lighting-cluster")).toBeVisible();
     await expect(page.getByTestId("lighting-stage")).toBeVisible();
     await expectToolbarPrimaryControlsFit(page);
     await expectNoDocumentScroll(page);
@@ -165,13 +198,13 @@ test("adapts lighting layout modes across supported logical viewport sizes", asy
     expect(stageBounds?.width ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 520 : 560);
     expect(stageBounds?.height ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 400 : 440);
 
-    if (entry.mode !== "studioFull") {
-      await page.getByTestId("lighting-toolbar-overflow").click();
-      await expect(page.getByRole("menuitem", { name: /Highlight selection|Clear Highlight/ })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: /Solo selection|Clear Solo/ })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "Find selected fixtures" })).toBeVisible();
-      await page.keyboard.press("Escape");
-    }
+    // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
+    // tools folded into a toolbar overflow menu. New: Highlight, Solo and Find
+    // are keys on the cluster at every size. Reason: the cluster carries the
+    // rig's standing actions, and it is the same cluster at every size.
+    await expect(page.getByTestId("lighting-highlight-toggle")).toBeVisible();
+    await expect(page.getByTestId("lighting-solo-toggle")).toBeVisible();
+    await expect(page.getByTestId("lighting-identify-find")).toBeVisible();
 
     if (entry.mode === "narrowUtility") {
       await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
@@ -182,6 +215,102 @@ test("adapts lighting layout modes across supported logical viewport sizes", asy
       await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
     }
   }
+});
+
+// Visual overhaul A, Slice 5 (plan Slice 5, findings M3 and C3): when the
+// bridge is not answering, the rig's writes are refused — so every rig control
+// is outlined and says why, the plot says so on its face, and the header lamp
+// is red.
+test("unreachable: the state display carries the bridge sentence, the rig is outlined and the header lamp is red", async ({
+  page,
+}) => {
+  await openFixture(page, "lighting-dmx-unreachable");
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("UNREACHABLE");
+  await expect(stateDisplay).toHaveAttribute("data-tone", "error");
+  await expect(stateDisplay).toContainText(/is not answering/i);
+  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-lighting")).toHaveAttribute("data-tone", "error");
+
+  for (const testId of ["lighting-power-toggle", "lighting-emergency-cut", "lighting-grand-master"]) {
+    const control = page.getByTestId(testId);
+    await expect(control, `${testId} refuses`).toHaveAttribute("aria-disabled", "true");
+    // A locked key is dashed on its own edge; a locked slider keeps its
+    // geometry and dashes the cap the hand would take hold of.
+    const dashed = await control.evaluate((node) => {
+      if (getComputedStyle(node).borderStyle === "dashed") return true;
+      return Array.from(node.querySelectorAll("*")).some((child) => getComputedStyle(child).borderStyle === "dashed");
+    });
+    expect(dashed, `${testId} is outlined while the rig refuses`).toBe(true);
+  }
+
+  await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-locked", "");
+  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveText(
+    "locked · the bridge is not answering · Open Setup"
+  );
+});
+
+// Visual overhaul A, Slice 5: the rig has drifted from the scene it was
+// recalled from — the state display says so and offers both ways back.
+test("unsaved: the state display says the rig no longer matches the scene and offers both ways back", async ({
+  page,
+}) => {
+  await openFixture(page, "lighting-populated");
+  await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("UNSAVED");
+  await expect(stateDisplay).toHaveAttribute("data-tone", "attention");
+  await expect(stateDisplay).toContainText(/no longer matches/i);
+  await expect(page.getByTestId("lighting-state-save")).toBeVisible();
+  await expect(page.getByTestId("lighting-state-revert")).toBeVisible();
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("unsaved changes");
+});
+
+// Visual overhaul A, Slice 5: editing offline is a state, not a banner — the
+// plot carries the blue keyline and the display offers the two ways out.
+test("preview: the plot carries the blue keyline and the state display offers save or discard", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await page.getByTestId("lighting-preview-toggle").click();
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("PREVIEW");
+  await expect(stateDisplay).toHaveAttribute("data-tone", "info");
+  await expect(page.getByTestId("lighting-state-preview-save")).toBeVisible();
+  await expect(page.getByTestId("lighting-state-preview-discard")).toBeVisible();
+  await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-preview", "");
+});
+
+// Visual overhaul A, Slice 5b (plan Slice 5, the plate): the selected fixture's
+// whole story at once — what it is, Identify and on / off, its levels, where it
+// stands, what it answers on, what the saved scene holds for it, and the
+// palettes — with no tab row to hide half of it behind.
+test("the plate shows the selected fixture's sections at once, with no tab row", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const plate = page.getByTestId("lighting-plate");
+  await expect(plate).toBeVisible();
+  await expect(plate.getByRole("tab")).toHaveCount(0);
+
+  await expect(plate.getByRole("button", { name: "Identify" })).toBeVisible();
+  await expect(plate.getByRole("button", { name: /Turn off|Turn on/ })).toBeVisible();
+  await expect(plate.getByLabel("Fixture intensity")).toBeVisible();
+  await expect(plate.getByLabel("Fixture CCT")).toBeVisible();
+  await expect(plate.getByLabel("Fixture rotation in degrees")).toBeVisible();
+
+  const patchFacts = page.getByTestId("lighting-plate-patch-facts");
+  await expect(patchFacts).toContainText("DMX start");
+  await expect(patchFacts).toContainText("Universe");
+
+  // What the saved scene holds for this fixture, beside what the rig is doing.
+  const sceneValues = page.getByTestId("lighting-plate-scene-values");
+  await expect(sceneValues).toContainText("In scene Warm wash");
+  await expect(sceneValues).toContainText("Saved intensity");
+  await expect(sceneValues).toContainText("On the rig now");
+
+  await expect(page.getByTestId("lighting-plate-palettes")).toBeAttached();
+  await expect(plate.getByRole("button", { name: "Delete fixture" })).toBeVisible();
 });
 
 test("renders scaled studio preview inside the current MacBook-sized viewport", async ({ page }) => {
@@ -196,6 +325,9 @@ test("renders scaled studio preview inside the current MacBook-sized viewport", 
   await expect(root).toHaveAttribute("data-layout-width", "2560");
   await expect(root).toHaveAttribute("data-layout-height", "1440");
   await expect(page.getByText(/Studio Preview/)).toBeVisible();
+  // S14: the helper reads the primary controls once; the workspace is a chunk
+  // of its own now, so wait until it is the thing on screen.
+  await expectWorkspaceMounted(page, "lighting");
   await expectToolbarPrimaryControlsFit(page);
   await expectNoDocumentScroll(page);
 
@@ -209,20 +341,21 @@ test("enters and exits scaled studio preview from the command palette", async ({
   await page.setViewportSize({ width: 1512, height: 982 });
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press("Meta+K");
   await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" })).toBeVisible();
-  await page.getByRole("option", { name: "Studio Preview: Enter 2560x1440 Review" }).click();
+  await expect(page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" })).toBeVisible();
+  await page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" }).click();
 
   const root = page.locator("[data-operator-layout-root]");
   await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
   await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
-  await expect(page.getByText(/Studio Preview - 2560x1440 @/)).toBeVisible();
+  await expect(page.getByText(/Studio Preview — 2560 × 1440 at/)).toBeVisible();
 
   await page.keyboard.press("Meta+K");
   await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Studio Preview: Exit Review" })).toBeVisible();
-  await page.getByRole("option", { name: "Studio Preview: Exit Review" }).click();
+  await expect(page.getByRole("option", { name: "Exit Studio Preview" })).toBeVisible();
+  await page.getByRole("option", { name: "Exit Studio Preview" }).click();
 
   await expect(root).toHaveAttribute("data-review-surface", "native");
 });
@@ -230,22 +363,31 @@ test("enters and exits scaled studio preview from the command palette", async ({
 test("supports lighting preview mode without driving live scene state", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
-  const workspace = page.getByRole("main").first();
   await page.getByRole("button", { name: /Preview/ }).click();
-  await expect(page.getByLabel("Lighting preview mode")).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: a preview banner across the canvas. New:
+  // the state display says PREVIEW and offers Save to the rig / Discard.
+  // Reason: a state is a state display, in the same place every time.
+  await expect(page.getByTestId("lighting-state-display")).toContainText("PREVIEW");
   await expect(page.getByText("Editing offline")).toBeVisible();
   await expect(page.getByRole("button", { name: /Patch/ })).toBeDisabled();
   await expect(page.getByText("Preview values")).toBeVisible();
 
   await page.getByLabel("Fixture intensity").focus();
   await page.getByLabel("Fixture intensity").press("End");
-  await expect(workspace.getByText("Offline edits", { exact: true })).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the health bar's "Offline edits" cell.
+  // New: the footer's Preview item says "offline edits", and the state display
+  // says PREVIEW above it.
+  await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("offline edits");
   await expect(page.getByRole("button", { name: /^Fixture Key, 100 percent,/ })).toHaveAttribute(
     "aria-pressed",
     "true"
   );
 
-  await page.getByRole("button", { name: /Exit preview/ }).click();
+  // Visual overhaul A, Slice 5. Old: the preview banner carried an Exit key.
+  // New: the cluster's Preview key is the way in and the way out. Reason: the
+  // banner is gone — the state display says PREVIEW and offers Save / Discard,
+  // and the toggle that entered preview leaves it.
+  await page.getByTestId("lighting-preview-toggle").click();
   await expect(page.getByRole("dialog", { name: "Exit preview with offline edits?" })).toBeVisible();
   await page.getByRole("button", { name: "Cancel" }).click();
 
@@ -255,15 +397,19 @@ test("supports lighting preview mode without driving live scene state", async ({
   await expect(page.getByRole("button", { name: "Recall scene Interview (preview)" })).toBeVisible();
 
   await page.getByRole("button", { name: "Discard" }).click();
-  await expect(page.getByLabel("Lighting preview mode")).toHaveCount(0);
+  await expect(page.getByTestId("lighting-state-display")).not.toContainText("PREVIEW");
   await expect(page.getByRole("button", { name: /^Fixture Key, 76 percent,/ })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("supports lighting palette pools from the inspector and quick picker", async ({ page }) => {
   await openFixture(page, "lighting-palettes-selected");
 
-  const inspector = page.getByLabel(/Lighting inspector.*Palettes/);
-  await expect(page.getByRole("tab", { name: "Palettes" })).toHaveAttribute("aria-selected", "true");
+  // Visual overhaul A, Slice 5b. Old: the Palettes tab was selected and the
+  // panel was scoped by the plate's label. New: the palettes are a section of
+  // the plate, under whatever is selected. Reason: they are a tool for the
+  // selection, not a place to go.
+  const inspector = page.getByTestId("lighting-plate-palettes");
+  await expect(inspector).toBeVisible();
   await expect(inspector.getByRole("heading", { name: "Intensity" })).toBeVisible();
   await expect(inspector.getByRole("heading", { name: "CCT" })).toBeVisible();
   await expect(inspector.getByText("1 selected")).toBeVisible();
@@ -276,9 +422,9 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   const quickPicker = page.getByRole("dialog", { name: "Lighting palettes" });
   await expect(quickPicker).toBeVisible();
   await expect(quickPicker.getByLabel("Search palettes")).toBeFocused();
-  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10%" }).first()).toBeVisible();
+  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10 %" }).first()).toBeVisible();
   await quickPicker.getByLabel("Search palettes").fill("studio");
-  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000K" }).click();
+  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000 K" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent, 4000 kelvin/i })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -297,7 +443,7 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   await page.keyboard.press(modifierShortcut("Shift+KeyP"));
   await expect(page.getByText("Select fixtures to apply.")).toBeVisible();
   await expect(
-    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10%" })
+    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10 %" })
   ).toBeDisabled();
   await page.keyboard.press("Escape");
 
@@ -315,7 +461,6 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
 test("supports lighting toolbar search, patch mode, and empty-state fixture create", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
-  const workspace = page.getByRole("main").first();
   await page.getByRole("button", { name: "Recall scene Interview" }).click();
   await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
   await page.getByRole("button", { name: "Recall scene Warm wash" }).click();
@@ -339,17 +484,24 @@ test("supports lighting toolbar search, patch mode, and empty-state fixture crea
   await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toBeVisible();
 
   await page.getByLabel("Search fixtures, scenes and groups").fill("zzz");
-  await expect(workspace.getByText(/No scenes match .zzz./)).toBeVisible();
-  await expect(workspace.getByText(/No groups match .zzz./)).toBeVisible();
+  await expect(page.getByTestId("lighting-cluster").getByText(/No scenes match .zzz./)).toBeVisible();
+  await expect(page.getByTestId("lighting-cluster").getByText(/No groups match .zzz./)).toBeVisible();
   await page.getByLabel("Search fixtures, scenes and groups").fill("");
-  await expect(workspace.getByText(/No scenes match .zzz./)).toBeHidden();
+  await expect(page.getByTestId("lighting-cluster").getByText(/No scenes match .zzz./)).toBeHidden();
 
   await page.getByRole("button", { name: /Patch/ }).click();
-  await expect(workspace.getByText("Master · paused · patch mode")).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the master card's eyebrow read
+  // "Master · paused · patch mode". New: patch mode outlines the rig's keys and
+  // says why on each of them, and the scenes section says it is paused. Reason:
+  // a locked control says why it is locked, rather than a card saying it once.
+  await expect(page.getByTestId("lighting-cluster").getByText("paused while patching")).toBeVisible();
+  await expect(page.getByTestId("lighting-power-toggle")).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByLabel("Fixture patch start channel")).toBeVisible();
   await expect(page.getByTestId("lighting-beam-fixture-key")).toHaveCount(0);
   await page.getByLabel("Fixture patch start channel").fill("3");
-  await page.getByRole("button", { name: "Apply" }).click();
+  // The palettes' own "Apply <name>" keys share the plate with the patch
+  // panel's Apply, so the patch one is matched exactly.
+  await page.getByRole("button", { name: "Apply", exact: true }).click();
   await expect(page.getByText("003", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Identify" }).click();
   await expect(page.getByRole("button", { name: /Bursting/ })).toHaveAttribute("aria-pressed", "true");
@@ -413,7 +565,7 @@ test("supports lighting drag-lasso multi-select and group save", async ({ page }
   await page.keyboard.up("Shift");
 
   await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("2 fixtures selected")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Clear all selection" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear the selection" })).toBeVisible();
 
   await page.getByRole("button", { name: "Create a new lighting group" }).click();
   const createGroupDialog = page.getByRole("dialog", { name: "New lighting group" });
@@ -426,6 +578,7 @@ test("supports lighting drag-lasso multi-select and group save", async ({ page }
 test("saves the current lighting selection as a scene from the inspector prompt", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press(modifierShortcut("Shift+KeyS"));
   const saveSceneDialog = page.getByRole("dialog", { name: "Save as new scene" });
   await expect(saveSceneDialog.getByLabel("Scene name")).toBeFocused();
@@ -494,8 +647,12 @@ test("opens lighting intensity typed entry via a bare double-click", async ({ pa
 test("opens typed numeric entry on the lighting grand master and commits", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  // Visual overhaul A, Slice 5: the grand master is the design system's slider,
+  // which asks its host for typed entry on a double press or on Enter (old: the
+  // scrub slider's own double-click).
   const master = page.getByRole("slider", { name: "Grand master intensity" });
-  await master.dblclick();
+  await master.focus();
+  await page.keyboard.press("Enter");
 
   const dialog = page.getByRole("dialog", { name: "Set Grand master" });
   await expect(dialog).toBeVisible();
@@ -503,15 +660,17 @@ test("opens typed numeric entry on the lighting grand master and commits", async
   await dialog.getByRole("button", { name: "Set" }).click();
 
   await expect(dialog).toBeHidden();
+  // The design system's slider reports 0..100 per cent of its travel, which for
+  // the grand master is the value itself.
   await expect(master).toHaveAttribute("aria-valuenow", "60");
 });
 
 test("drags the selected fixture to a new plot position", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   // Slice 9e: studioFull now rests on the content frame (fitContent). This test's
-  // fixed pixel-delta drag assumes the un-zoomed Fill Desk plot, so select it and
+  // fixed pixel-delta drag assumes the un-zoomed Fill screen plot, so select it and
   // wait for the inner transform to settle to identity before driving the pointer.
-  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  await page.getByRole("button", { name: "Fill screen", exact: true }).click();
   await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const fixture = page.getByRole("button", { name: /^Fixture Key,/ });
@@ -567,9 +726,9 @@ test("mirrors fixture intensity slider drafts on the stage plot before commit", 
 test("rotates the selected fixture from the plot and inspector", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   // Slice 9e: studioFull now rests on the content frame (fitContent), whose uniform
-  // "meet" scaling changes the screen->plot angle vs. Fill Desk's non-uniform stretch.
-  // This test's pixel-based rotate-handle drag assumes Fill Desk, so select it first.
-  await page.getByRole("button", { name: "Fill Desk", exact: true }).click();
+  // "meet" scaling changes the screen->plot angle vs. Fill screen's non-uniform stretch.
+  // This test's pixel-based rotate-handle drag assumes Fill screen, so select it first.
+  await page.getByRole("button", { name: "Fill screen", exact: true }).click();
   await expect(page.locator('[data-inner-content="true"]')).toHaveAttribute("transform", "translate(0 0) scale(1)");
 
   const rotationInput = page.getByLabel("Fixture rotation in degrees");
@@ -603,7 +762,20 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
   await expect.poll(async () => output.getAttribute("transform")).not.toBe(startOutputTransform);
   await page.mouse.up();
   expect(await output.getAttribute("transform")).not.toBe(startOutputTransform);
-  await expect(rotationInput).toHaveValue("82");
+  // Visual overhaul A, Slice 5. Old: the drag landed on exactly 82°. New: it
+  // lands between 80° and 85°. Reason: the rail left the body, so the plot is
+  // wider and the same pixel offset maps to a slightly different angle; what
+  // the test is for — dragging the handle right and a little up rotates the
+  // fixture to about a right angle — is unchanged.
+  // Production readiness S13. Old: the field was read once, straight after the
+  // pointer came up. New: wait for it to leave 0 first. Reason: the field shows
+  // the fixture's stored rotation, which moves when the reply to the drag's
+  // commit has been fetched, not when the pointer comes up; a read that beat
+  // the reply saw 0 (runs 34487837771 and 34595097112).
+  await expect(rotationInput).not.toHaveValue("0");
+  const draggedRotation = Number(await rotationInput.inputValue());
+  expect(draggedRotation, "the rotate handle drag lands near 82°").toBeGreaterThanOrEqual(80);
+  expect(draggedRotation, "the rotate handle drag lands near 82°").toBeLessThanOrEqual(85);
 
   await rotationInput.fill("270");
   await rotationInput.press("Enter");
@@ -617,6 +789,7 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
 test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press(modifierShortcut("Shift+KeyM"));
   const dmxMonitorDialog = page.getByRole("dialog", { name: "DMX universe U1" });
   await expect(dmxMonitorDialog).toBeVisible();
@@ -634,7 +807,12 @@ test("opens the compact DMX strip and expands it to the full monitor", async ({ 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Patched to a fixture")).toBeVisible();
   await expect(dialog.getByRole("grid", { name: "DMX universe U1 channels" })).toBeVisible();
-  await expect(dialog.locator('[title="Ch 1 · Key · Dimmer"]')).toBeVisible();
+  const keyDimmer = dialog.locator('[title="Ch 1 · Key · Dimmer"]');
+  await expect(keyDimmer).toBeVisible();
+  // 2026-09 audit remediation, Slice 12: DMX values read as decimal 0–255
+  // (they used to be two-digit hex). Key's dimmer resolves to 194 here (≈76 % of 255).
+  await expect(keyDimmer.getByTestId("dmx-cell-value")).toHaveText("194");
+  await expect(dialog.getByTestId("dmx-cell-value").filter({ hasText: /[A-F]/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 });
@@ -642,18 +820,30 @@ test("opens the compact DMX strip and expands it to the full monitor", async ({ 
 test("shows lighting DMX-unreachable posture and blackout hold", async ({ page }) => {
   await openFixture(page, "lighting-dmx-unreachable");
 
-  const workspace = page.getByRole("main").first();
-  await expect(page.getByText("DMX bridge unreachable")).toBeVisible();
-  await expect(workspace.getByText(/Lighting commands won't reach the rig/i)).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: a "DMX bridge unreachable" banner across
+  // the canvas with its sentence. New: the state display says UNREACHABLE, says
+  // why in the operator's words, and offers the way out. Reason: a state is a
+  // state display, in the same place every time.
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("UNREACHABLE");
+  await expect(stateDisplay).toContainText(/is not answering, so nothing you press will reach the rig/i);
+  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
   await expect(page.getByRole("button", { name: "Identify" })).toBeDisabled();
 
   await openFixture(page, "lighting-populated");
-  await page.getByRole("button", { name: "Emergency cut all fixtures" }).click();
+  // Visual overhaul A, Slice 5. Old: the key was named "Emergency cut all
+  // fixtures". New: "Cut all fixtures to 0 %". Reason: the cluster's danger key
+  // says what it does in the operator's words; "emergency" is not one of them.
+  await page.getByRole("button", { name: "Cut all fixtures to 0 %" }).click();
   const cutAllDialog = page.getByRole("dialog", { name: "Cut all fixtures?" });
   await expect(cutAllDialog).toBeVisible();
   await cutAllDialog.getByRole("button", { name: "Cut all", exact: true }).click();
-  await expect(page.getByText("All fixtures off")).toBeVisible();
-  await expect(page.getByText("Master · 0 / 4 on")).toBeVisible();
+  // Visual overhaul A, Slice 5. Old: the master card printed "All fixtures off"
+  // and "Master · 0 / 4 on". New: the cluster's Lighting key says it is off and
+  // nothing is lit, and the state display's meta line carries the count.
+  // Reason: the master card is the cluster's key and hero now.
+  await expect(page.getByTestId("lighting-power-toggle")).toContainText("nothing lit");
+  await expect(page.getByTestId("lighting-state-display")).toContainText("0 of 4 fixtures on");
   await expect(page.getByRole("button", { name: /^Fixture Key, off,/ })).toHaveAttribute("aria-pressed", "true");
 });
 
@@ -663,7 +853,7 @@ test("frames the populated rig via the stage-plot Frame mode (DENSITY-04)", asyn
 
   const inner = page.locator('[data-inner-content="true"]');
   const frame = page.getByRole("button", { name: "Frame", exact: true });
-  const fitRoom = page.getByRole("button", { name: "Fit Room", exact: true });
+  const fitRoom = page.getByRole("button", { name: "Fit room", exact: true });
   const IDENTITY = "translate(0 0) scale(1)";
 
   // studioFull (2560x1440) now rests on the content frame by default — the rig is

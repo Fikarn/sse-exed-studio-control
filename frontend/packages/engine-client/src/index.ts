@@ -1,4 +1,16 @@
 export { createShellStore, useAudioMeterFrame, useShellSnapshot } from "./store/createShellStore";
+export type { ShellStoreOptions } from "./store/createShellStore";
+export { EVENT_DOMAIN_REFRESH } from "./store/domainRefresh";
+export type { DomainKey } from "./store/domainRefresh";
+export {
+  AUDIO_FADER_UNITY,
+  FADER_MAX_DB,
+  FADER_OFF_DB,
+  FADER_POSITION_STEPS,
+  faderDbIsOff,
+  faderDbToLin,
+  faderLinToDb,
+} from "./audio/faderCurve";
 export { createFixtureTransport } from "./transports/fixtureTransport";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {
@@ -6,6 +18,7 @@ export type {
   CommissioningCheckTarget,
   CommissioningStage,
   CommissioningUpdateRequest,
+  EngineLaunchInfo,
   EngineTransport,
   FixtureScenario,
   AudioClipClearRequest,
@@ -17,6 +30,8 @@ export type {
   AudioSnapshotCreateRequest,
   AudioSnapshotDeleteRequest,
   AudioSnapshotUpdateRequest,
+  AudioTalkbackHoldRequest,
+  BackgroundFailure,
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+#[cfg(test)]
 use std::path::Path;
 
 use crate::lighting_backend::{
@@ -16,7 +17,11 @@ pub fn load_lighting_editor_state(settings: &HashMap<String, String>) -> Lightin
     load_lighting_editor_state_with_inventory(settings, &config, &inventory)
 }
 
-pub fn save_lighting_editor_state(
+/// Test seeding only. The Stream Deck bridge used to write the whole state
+/// through this; since Slice 10 every writer goes through a lighting
+/// function under the state lock.
+#[cfg(test)]
+pub(super) fn save_lighting_editor_state(
     db_path: &Path,
     state: &LightingEditorState,
 ) -> Result<(), LightingCommandError> {

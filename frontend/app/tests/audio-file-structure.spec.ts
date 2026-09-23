@@ -8,18 +8,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "../../../");
 
+// Visual overhaul A, Slice 4c. Old: the list named AudioInspectorTabStrip.tsx,
+// AudioInspectorOverviewCards.tsx and AudioInspectorChannelSendActions.tsx.
+// New: they are gone. Reason: the plate has no tab row (so no strip), no tab
+// previews (so no overview cards) and no second copy of the strip's Mute /
+// Solo / Unity row (so no send-actions card) — the sends section carries the
+// send itself. The rule the list guards is unchanged: the plate stays split
+// per section rather than growing back into one file.
 const EXPECTED_INSPECTOR_FILES = [
   "frontend/app/src/app/audio/components/inspector/audioInspectorHelpers.ts",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelHardwareCard.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelHeader.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelMeterCard.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorChannelSendActions.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorDynamicsTab.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorEqTab.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorOutputView.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorOverviewCards.tsx",
   "frontend/app/src/app/audio/components/inspector/AudioInspectorSendsTab.tsx",
-  "frontend/app/src/app/audio/components/inspector/AudioInspectorTabStrip.tsx",
 ];
 
 const EXPECTED_HOOK_FILES = [
@@ -30,14 +34,29 @@ const EXPECTED_HOOK_FILES = [
   "frontend/app/src/app/audio/hooks/useAudioPaletteRegistration.ts",
 ];
 
+// Visual overhaul A, Slice 4a. Old: the list named AudioHealthBar.module.css
+// and AudioSnapshotDeck.module.css. New: it names AudioCluster.module.css and
+// AudioSnapshotKeys.module.css. Reason: the health bar's telemetry moved onto
+// the shell's footer (the design-system Footer, which carries its own module)
+// and the snapshot deck became the cluster's snapshot keys. The rule the list
+// guards is unchanged — every Console component keeps its own stylesheet, so
+// the workspace shell module cannot grow back.
+//
+// 2026-09-09. Old: the list also named AudioRail.module.css and
+// AudioToolbar.module.css. New: both are gone. Reason: those two sheets belonged
+// to the unmounted AudioRail / AudioToolbar hosts kept under the Phase-2
+// GS-AUD-44 dead-code posture. That posture was closed and the hosts deleted —
+// the surface they were preserved to revert to (AudioTopBar + AudioMonitorBar)
+// was itself removed in Slice 4a, so there was nothing left to re-mount. The
+// one class AudioLiveMeterReadout borrowed from the rail sheet (.masterHalo, a
+// passthrough compose) moved into AudioLiveMeterReadout.module.css. The rule
+// the list guards is unchanged; it just no longer guards dead sheets.
 const EXPECTED_PER_COMPONENT_CSS_MODULES = [
-  "frontend/app/src/app/audio/components/AudioHealthBar.module.css",
+  "frontend/app/src/app/audio/components/AudioCluster.module.css",
   "frontend/app/src/app/audio/components/AudioInspector.module.css",
   "frontend/app/src/app/audio/components/AudioMixerLane.module.css",
-  "frontend/app/src/app/audio/components/AudioRail.module.css",
   "frontend/app/src/app/audio/components/AudioSignalCanvas.module.css",
-  "frontend/app/src/app/audio/components/AudioSnapshotDeck.module.css",
-  "frontend/app/src/app/audio/components/AudioToolbar.module.css",
+  "frontend/app/src/app/audio/components/AudioSnapshotKeys.module.css",
 ];
 
 const EXPECTED_AUDIO_SHARED_MODULES = [

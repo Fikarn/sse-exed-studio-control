@@ -204,7 +204,9 @@ export function InspectorPatch({
                 </span>
               </div>
             ) : (
-              <p className={styles.helpText}>No conflict-free start channel is available in this universe.</p>
+              <p className={styles.helpText}>
+                No free start channel is left in this universe. Free one by moving another fixture off its range.
+              </p>
             )}
           </div>
         </InspectorSection>

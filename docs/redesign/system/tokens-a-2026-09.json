@@ -1,0 +1,237 @@
+{
+  "$description": "Studio Control — the A system's tokens as a design-token JSON mirror of tokens-a-2026-09.css (2026-09-06). Docs proposal only; Slice 1 of the plan folds it into frontend/packages/tokens/src/tokens/core.json and themes.css with the old names aliased until Slice 11. Values are the ones every A mock rendered and measured with.",
+  "material": {
+    "studio": {
+      "bg": { "$value": "#0b0b0d" },
+      "bay": { "$value": "#060607" },
+      "panel": { "$value": "#111114" },
+      "panelTop": { "$value": "#17171b" },
+      "key": { "$value": "#1b1c21" },
+      "keyTop": { "$value": "#26272e" },
+      "well": { "$value": "#000000" },
+      "line": { "$value": "rgba(255, 255, 255, 0.09)" },
+      "line2": { "$value": "rgba(255, 255, 255, 0.2)" },
+      "sheen": { "$value": "rgba(255, 255, 255, 0.08)" },
+      "shade": { "$value": "rgba(0, 0, 0, 0.6)" },
+      "wellShade": { "$value": "rgba(0, 0, 0, 0.85)" },
+      "text": { "$value": "#f4f4f5" },
+      "text2": { "$value": "#a6a6ad" },
+      "accent": { "$value": "#f4f4f5" }
+    },
+    "graphite": {
+      "bg": { "$value": "#13151a" },
+      "bay": { "$value": "#0c0d11" },
+      "panel": { "$value": "#1a1d24" },
+      "panelTop": { "$value": "#20242c" },
+      "key": { "$value": "#262a33" },
+      "keyTop": { "$value": "#31363f" },
+      "well": { "$value": "#07080b" },
+      "line": { "$value": "rgba(255, 255, 255, 0.1)" },
+      "line2": { "$value": "rgba(255, 255, 255, 0.22)" },
+      "sheen": { "$value": "rgba(255, 255, 255, 0.09)" },
+      "shade": { "$value": "rgba(0, 0, 0, 0.55)" },
+      "wellShade": { "$value": "rgba(0, 0, 0, 0.8)" },
+      "text": { "$value": "#f2f4f8" },
+      "text2": { "$value": "#a9b0bc" },
+      "accent": { "$value": "#f2f4f8" }
+    },
+    "bone": {
+      "bg": { "$value": "#f1f0ec" },
+      "bay": { "$value": "#e5e4df" },
+      "panel": { "$value": "#fbfbfa" },
+      "panelTop": { "$value": "#ffffff" },
+      "key": { "$value": "#f6f6f4" },
+      "keyTop": { "$value": "#ffffff" },
+      "well": { "$value": "#101012" },
+      "line": { "$value": "rgba(0, 0, 0, 0.12)" },
+      "line2": { "$value": "rgba(0, 0, 0, 0.3)" },
+      "sheen": { "$value": "rgba(255, 255, 255, 0.9)" },
+      "shade": { "$value": "rgba(0, 0, 0, 0.14)" },
+      "wellShade": { "$value": "rgba(0, 0, 0, 0.8)" },
+      "text": { "$value": "#1b1b1d" },
+      "text2": { "$value": "#5d5e64" },
+      "accent": { "$value": "#1b1b1d" }
+    }
+  },
+  "role": {
+    "$description": "hue names the family, form names the meaning: fill = engaged / live / hazard on a key that is on; lamp or keyline = attention; text = the word",
+    "dark": {
+      "amber": {
+        "fill": { "$value": "#f0b35b" },
+        "fillTop": { "$value": "#f8c977" },
+        "ink": { "$value": "#1a1000" },
+        "text": { "$value": "#f0b35b" },
+        "bloom": { "$value": "rgba(240, 179, 91, 0.45)" }
+      },
+      "green": {
+        "fill": { "$value": "#3ddc7a" },
+        "fillTop": { "$value": "#66e99a" },
+        "ink": { "$value": "#04200f" },
+        "text": { "$value": "#3ddc7a" },
+        "textGraphite": { "$value": "#46d67c" },
+        "bloom": { "$value": "rgba(61, 220, 122, 0.5)" }
+      },
+      "red": {
+        "fill": { "$value": "#ff6161" },
+        "ink": { "$value": "#230505" },
+        "text": { "$value": "#ff6b6b" },
+        "textGraphite": { "$value": "#ff7676" },
+        "bloom": { "$value": "rgba(255, 97, 97, 0.5)" }
+      },
+      "blue": {
+        "text": { "$value": "#7cc4ff" },
+        "textGraphite": { "$value": "#8ccaff" },
+        "bloom": { "$value": "rgba(124, 196, 255, 0.45)" }
+      },
+      "primary": {
+        "fill": { "$value": "#eeeef0" },
+        "fillTop": { "$value": "#ffffff" },
+        "ink": { "$value": "#0b0b0d" },
+        "sheen": { "$value": "rgba(255, 255, 255, 0.6)" }
+      },
+      "cap": {
+        "fill": { "$value": "#f4f4f7" },
+        "fill2": { "$value": "#d3d3d9" },
+        "sheen": { "$value": "rgba(255, 255, 255, 0.7)" },
+        "line": { "$value": "#0b0b0d" }
+      }
+    },
+    "bone": {
+      "amber": {
+        "fill": { "$value": "#e9a83e" },
+        "fillTop": { "$value": "#f4bd5c" },
+        "ink": { "$value": "#1a1000" },
+        "text": { "$value": "#8a5a00" },
+        "bloom": { "$value": "rgba(233, 168, 62, 0.5)" }
+      },
+      "green": {
+        "fill": { "$value": "#2fbf6a" },
+        "fillTop": { "$value": "#52d287" },
+        "ink": { "$value": "#04200f" },
+        "text": { "$value": "#1a6b36" },
+        "bloom": { "$value": "rgba(47, 191, 106, 0.4)" }
+      },
+      "red": {
+        "fill": { "$value": "#c62d2a" },
+        "ink": { "$value": "#ffffff" },
+        "text": { "$value": "#b3261e" },
+        "bloom": { "$value": "rgba(198, 45, 42, 0.35)" }
+      },
+      "blue": { "text": { "$value": "#0b62c2" }, "bloom": { "$value": "rgba(11, 98, 194, 0.3)" } },
+      "primary": {
+        "fill": { "$value": "#1b1b1d" },
+        "fillTop": { "$value": "#2c2c30" },
+        "ink": { "$value": "#ffffff" },
+        "sheen": { "$value": "rgba(255, 255, 255, 0.14)" }
+      },
+      "cap": {
+        "fill": { "$value": "#2c2d33" },
+        "fill2": { "$value": "#141517" },
+        "sheen": { "$value": "rgba(255, 255, 255, 0.18)" },
+        "line": { "$value": "#ffffff" }
+      }
+    }
+  },
+  "display": {
+    "$description": "inks printed on a well (a black backlit display) in every theme",
+    "text": { "$value": "#f4f4f5" },
+    "text2": { "$value": "#a6a6ad" },
+    "text2Bone": { "$value": "#b3b3b8" },
+    "green": { "$value": "#3ddc7a" },
+    "amber": { "$value": "#f0b35b" },
+    "red": { "$value": "#ff6b6b" },
+    "blue": { "$value": "#7cc4ff" }
+  },
+  "signal": {
+    "meterLow": { "$value": "#2ee06a" },
+    "meterMid": { "$value": "#ffd23f" },
+    "meterHot": { "$value": "#ff8a3d" },
+    "meterOver": { "$value": "#ff4d4d" },
+    "peak": { "$value": "#ffffff" },
+    "peakBloom": { "$value": "rgba(255, 255, 255, 0.45)" },
+    "rampStops": { "$value": "0–70 % low (to −18 dBFS), 70–90 % mid (to −6), 90–95 % hot (to −3), 95–100 % over" },
+    "cctTrack": { "$value": "linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff)" }
+  },
+  "font": {
+    "family": {
+      "ui": { "$value": "Inter, system-ui, sans-serif" },
+      "mono": { "$value": "JetBrains Mono, ui-monospace, monospace" }
+    },
+    "size": {
+      "tick": { "$value": "12px" },
+      "label": { "$value": "13px" },
+      "body": { "$value": "14px" },
+      "name": { "$value": "15px" },
+      "value": { "$value": "16px" },
+      "word": { "$value": "20px" },
+      "state": { "$value": "24px" },
+      "heroSmall": { "$value": "32px" },
+      "hero": { "$value": "44px" }
+    },
+    "lineHeight": { "tight": { "$value": "1" }, "text": { "$value": "1.35" } },
+    "tracking": { "cap": { "$value": "0.04em" }, "eyebrow": { "$value": "0.06em" } },
+    "weight": { "regular": { "$value": "400" }, "medium": { "$value": "500" }, "semibold": { "$value": "600" } }
+  },
+  "radius": {
+    "ctl": { "$value": "4px" },
+    "key": { "$value": "8px" },
+    "screen": { "$value": "12px" },
+    "pill": { "$value": "999px" }
+  },
+  "chrome": {
+    "2560x1440": {
+      "header": { "$value": "56px" },
+      "footer": { "$value": "40px" },
+      "cluster": { "$value": "424px" },
+      "plate": { "$value": "416px" },
+      "stateDisplay": { "$value": "180px" },
+      "gutter": { "$value": "16px" },
+      "strip": { "$value": "120px" },
+      "strips": { "$value": "4 / 6 / 3" }
+    },
+    "1920x1080": {
+      "header": { "$value": "52px" },
+      "footer": { "$value": "36px" },
+      "cluster": { "$value": "360px" },
+      "plate": { "$value": "360px" },
+      "stateDisplay": { "$value": "168px" },
+      "gutter": { "$value": "12px" },
+      "strip": { "$value": "98px" },
+      "strips": { "$value": "4 / 4 / 3 banked" }
+    },
+    "1280x800": {
+      "header": { "$value": "48px" },
+      "footer": { "$value": "32px" },
+      "cluster": { "$value": "232px" },
+      "plate": { "$value": "drawer 360px" },
+      "stateDisplay": { "$value": "140px" },
+      "gutter": { "$value": "8px" },
+      "strip": { "$value": "84px" },
+      "strips": { "$value": "4 / 4 / 3 banked, deck short names" }
+    }
+  },
+  "elevation": {
+    "plate": { "$value": "background linear-gradient(180deg, panelTop, panel); inset 0 1px 0 sheen" },
+    "bay": { "$value": "inset 0 2px 10px wellShade" },
+    "well": { "$value": "inset 0 2px 6px wellShade, inset 0 -1px 0 rgba(255,255,255,0.05)" },
+    "key": { "$value": "background linear-gradient(180deg, keyTop, key); inset 0 1px 0 sheen, 0 1px 2px shade" },
+    "keyLitAmber": { "$value": "inset 0 1px 0 rgba(255,255,255,0.4), 0 0 14px amber.bloom" },
+    "keyLitGreen": { "$value": "inset 0 1px 0 rgba(255,255,255,0.4), 0 0 18px green.bloom" },
+    "cap": { "$value": "inset 0 1px 0 cap.sheen, 0 2px 4px shade" },
+    "lamp": { "$value": "0 0 10px role.bloom (lit only)" },
+    "peak": { "$value": "0 0 6px peakBloom" },
+    "float": { "$value": "0 12px 32px rgba(0,0,0,0.6) — the utility drawer only" },
+    "stateTint": { "$value": "radial-gradient(110% 90% at 0% 0%, role at 14–16 %, transparent 60%) over well" }
+  },
+  "motion": {
+    "lamp": { "$value": "0ms (switch; ≤ 60 ms budget)" },
+    "press": { "$value": "100ms" },
+    "state": { "$value": "160ms" },
+    "enter": { "$value": "200ms" },
+    "exit": { "$value": "120ms" },
+    "move": { "$value": "160ms" },
+    "ease": { "$value": "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    "idle": { "$value": "0 running animations on an idle surface; hover never moves anything" }
+  },
+  "target": { "min": { "$value": "24px" }, "takeTime": { "$value": "28px" }, "takeTimeStudio": { "$value": "32px" } }
+}

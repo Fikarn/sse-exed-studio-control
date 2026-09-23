@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { Button, StatusBadge, Surface } from "@sse/design-system";
+import { Button, Key, StatusBadge } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 
 import {
   asRecord,
   asStatusTone,
+  describeBackupKind,
   formatBackupTimestamp,
   getSupportBackups,
-  mapStatusBadgeTone,
+  healthCheckTone,
   statusToneLabel,
   type SnapshotRecord,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
 import { useLiveCallback } from "../shared/useLiveCallback";
+import { PreReadyState } from "../startup/PreReadyState";
+import recoveryStyles from "../startup/RecoveryBands.module.css";
 import styles from "../OperatorShell.module.css";
 import {
   type ActionFeedback,
@@ -68,20 +71,33 @@ export function SetupRecoverySurface({
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const lastBackup = backups[0] ?? null;
-  const summary = failure?.message ?? String(healthSnapshot?.summary ?? "The shell needs operator recovery.");
+  const summary =
+    failure?.message ??
+    String(
+      healthSnapshot?.summary ?? "Studio Control needs operator recovery. Retry startup, or restore the latest backup."
+    );
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
   const pathEntries = Object.entries(runtimePaths);
-  const engineRequestsAvailable = failure?.code !== "PROTOCOL_MISMATCH";
+  // The hardware link answers the backup requests here only in recovery
+  // mode — after a storage failure it stays up for exactly that (2026-09
+  // production readiness, Slice 7 — F20); after any other failure it is gone.
+  const engineRequestsAvailable =
+    failure === null || failure.code === "STORAGE_CORRUPT" || failure.code === "STORAGE_MIGRATION_FAILED";
+  // Slice 8 (system §9): name the hardware. "Control surface", "DMX" and "OSC"
+  // are the wires; the operator knows the deck, the bridge and the desk.
   const diagnosticsChecks = [
-    { key: "controlSurface", label: "Control surface" },
-    { key: "lighting", label: "DMX" },
-    { key: "audio", label: "OSC" },
+    { key: "controlSurface", label: "The deck" },
+    { key: "lighting", label: "The bridge" },
+    { key: "audio", label: "The desk" },
   ].map(({ key, label }) => {
     const check = asRecord(asRecord(healthSnapshot?.checks)?.[key]);
     return {
-      detail: String(check?.summary ?? "No startup snapshot from this adapter was published."),
+      detail: String(check?.summary ?? `${label} reported nothing at startup.`),
       label,
-      tone: asStatusTone(check?.status, failure ? "attention" : "info"),
+      // The hardware link reports each check in its own words (`ready`,
+      // `not-verified`, `unavailable`, …); `healthCheckTone` reads them as the
+      // header does. A check that said nothing keeps the fallback.
+      tone: check?.status === undefined ? (failure ? "attention" : "info") : healthCheckTone(check.status),
     };
   });
 
@@ -131,10 +147,7 @@ export function SetupRecoverySurface({
       liveTransportRequested,
       supportSnapshot: toJsonValue(supportSnapshot),
     };
-    const path = await exportShellDiagnostics(
-      report,
-      typeof runtimePaths.logsDir === "string" ? runtimePaths.logsDir : undefined
-    );
+    const path = await exportShellDiagnostics(report);
     return {
       message: `Shell diagnostics exported to ${path}.`,
       tone: "ok" as const,
@@ -144,13 +157,42 @@ export function SetupRecoverySurface({
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
     return {
-      message: `Restore requested from ${String(result?.sourcePath ?? path)}.`,
+      message:
+        result?.requiresRestart === true
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
+          : `Restore requested from ${String(result?.sourcePath ?? path)}.`,
       tone: "ok" as const,
     };
   };
 
   return (
-    <div className={styles.setupRecoveryShell}>
+    // Visual overhaul A, Slice 7: the incident on the same skeleton as every
+    // workspace — the word, the engine's sentence, its code in the display's
+    // own slot, and the ways out as keys on the display.
+    <PreReadyState
+      tone="error"
+      word={getFailureTitle(failure).toUpperCase()}
+      sentence={summary}
+      code={failure?.code ?? undefined}
+      meta={`${formatFailureCode(failure)} · failed at ${failure?.stage ?? "runtime"} · recover from Setup / Support`}
+      actions={
+        <>
+          <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
+            Retry startup
+          </Key>
+          <Key
+            size="small"
+            disabled={!canReturnToConsole}
+            testId="setup-recovery-console"
+            onClick={() => void store.setWorkspace("planning")}
+          >
+            Back to Console
+          </Key>
+          <Key size="small" cap="Shortcuts" hint="?" testId="setup-recovery-shortcuts" onClick={onShowShortcuts} />
+        </>
+      }
+      testId="setup-recovery-surface"
+    >
       {feedback ? (
         <div aria-live="polite" className={styles.setupFeedbackBanner} data-tone={feedback.tone} role="status">
           <StatusBadge
@@ -161,46 +203,9 @@ export function SetupRecoverySurface({
         </div>
       ) : null}
 
-      <div className={styles.setupUtilityRow}>
-        <div className={styles.setupUtilityActions}>
-          <Button
-            disabled={!canReturnToConsole}
-            onClick={() => {
-              void store.setWorkspace("planning");
-            }}
-            variant="ghost"
-          >
-            Back to Console
-          </Button>
-        </div>
-        <div className={styles.setupUtilityMeta}>
-          <div className={styles.setupUtilityEyebrow}>Setup / Support</div>
-          <div className={styles.setupUtilityTitle}>Incident recovery</div>
-        </div>
-        <div className={styles.setupUtilityActions}>
-          <Button disabled size="compact" variant="secondary">
-            Runner
-          </Button>
-          <Button size="compact" variant="primary">
-            Support
-          </Button>
-          <Button onClick={onShowShortcuts} size="compact" variant="ghost">
-            Shortcuts
-          </Button>
-        </div>
-      </div>
-
       <div className={styles.setupIncidentGrid}>
-        <Surface className={styles.setupIncidentHero} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentHero} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentPrompt}>What went wrong?</div>
-          <div className={styles.setupIncidentHeader}>
-            <div>
-              <div className={styles.setupIncidentEyebrow}>Restore</div>
-              <h1 className={styles.setupIncidentTitle}>{getFailureTitle(failure)}</h1>
-              <p className={styles.setupIncidentBody}>{summary}</p>
-            </div>
-            <StatusBadge label={formatFailureCode(failure)} tone="error" />
-          </div>
 
           {failure?.code === "PROTOCOL_MISMATCH" ? (
             <div className={styles.setupIncidentMetaGrid}>
@@ -223,8 +228,10 @@ export function SetupRecoverySurface({
                 {String(
                   supportSnapshot?.restoreSummary ??
                     (engineRequestsAvailable
-                      ? "Restore from a native support archive or a legacy db.json export."
-                      : "Protocol recovery is read-only until the shell and engine agree on the contract.")
+                      ? "Restore a backup archive or a database backup from the backups folder."
+                      : failure?.code === "PROTOCOL_MISMATCH"
+                        ? "Nothing can be restored until the app and the hardware link are the same version."
+                        : "Nothing can be restored from here; use Retry startup, or Setup / Support once Studio Control is back.")
                 )}
               </span>
             </div>
@@ -233,7 +240,7 @@ export function SetupRecoverySurface({
               <input
                 className={styles.setupIncidentInput}
                 onChange={(event) => setRestorePath(event.target.value)}
-                placeholder={String(runtimePaths.backupDir ?? "/path/to/backup.json")}
+                placeholder={String(runtimePaths.backupDir ?? "a file inside the backups folder")}
                 value={restorePath}
               />
             </label>
@@ -289,14 +296,15 @@ export function SetupRecoverySurface({
                     <small>{backup.path}</small>
                   </span>
                   <span className={styles.setupIncidentHint}>
-                    {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)}
+                    {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
+                    {describeBackupKind(backup.kind)}
                   </span>
                 </button>
               ))
             ) : (
               <div className={styles.setupIncidentEmptyState}>
-                No backup list was published before startup failed. Use the archive path below or restore a known file
-                directly.
+                No backup list was published before startup failed. Name a file inside the backups folder above and
+                restore it directly.
               </div>
             )}
           </div>
@@ -321,12 +329,12 @@ export function SetupRecoverySurface({
                 disabled={!String(runtimePaths.updateRepositoryPath ?? "").trim()}
                 onClick={() => {
                   void performAction("open-update-repo", () =>
-                    openReferencePath("Update repo", String(runtimePaths.updateRepositoryPath ?? ""))
+                    openReferencePath("Update folder", String(runtimePaths.updateRepositoryPath ?? ""))
                   );
                 }}
                 type="button"
               >
-                Update repo
+                Update folder
               </button>
               <button
                 className={styles.setupIncidentRailButton}
@@ -342,10 +350,10 @@ export function SetupRecoverySurface({
               </button>
               <button
                 className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? "").trim()}
+                disabled={!String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? "").trim()}
                 onClick={() => {
                   void performAction("open-diagnostics", () =>
-                    openReferencePath("Diagnostics", String(runtimePaths.logsDir ?? runtimePaths.appDataDir ?? ""))
+                    openReferencePath("Diagnostics", String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""))
                   );
                 }}
                 type="button"
@@ -364,16 +372,16 @@ export function SetupRecoverySurface({
               </button>
             </div>
           </div>
-        </Surface>
+        </div>
 
-        <Surface className={styles.setupIncidentCard} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentSectionLabel}>Diagnostics</div>
           <div className={styles.setupIncidentCheckGrid}>
             {diagnosticsChecks.map((check) => (
               <div key={check.label} className={styles.setupIncidentCheckCard}>
                 <div className={styles.setupIncidentCheckHeader}>
                   <div className={styles.setupIncidentCheckTitle}>{check.label}</div>
-                  <StatusBadge label={statusToneLabel(check.tone)} tone={mapStatusBadgeTone(check.tone)} />
+                  <StatusBadge label={statusToneLabel(check.tone)} tone={asStatusTone(check.tone)} />
                 </div>
                 <div className={styles.setupIncidentHint}>{check.detail}</div>
               </div>
@@ -393,7 +401,7 @@ export function SetupRecoverySurface({
               </ul>
             ) : (
               <div className={styles.setupIncidentHint}>
-                Startup failed before the engine could publish detailed incident evidence.
+                Startup failed before Studio Control could write detailed incident evidence.
               </div>
             )}
           </div>
@@ -422,7 +430,7 @@ export function SetupRecoverySurface({
           </div>
 
           <div className={styles.setupIncidentSubsection}>
-            <div className={styles.setupIncidentMetaLabel}>Runtime paths</div>
+            <div className={styles.setupIncidentMetaLabel}>File paths</div>
             <ul className={styles.setupIncidentDetailList}>
               {pathEntries.length > 0 ? (
                 pathEntries.map(([key, value]) => (
@@ -433,16 +441,14 @@ export function SetupRecoverySurface({
                 ))
               ) : (
                 <li>
-                  <span className={styles.setupIncidentHint}>
-                    No runtime paths were attached to this startup failure.
-                  </span>
+                  <span className={styles.setupIncidentHint}>No file paths were attached to this startup failure.</span>
                 </li>
               )}
             </ul>
           </div>
-        </Surface>
+        </div>
 
-        <Surface className={styles.setupIncidentCard} padding="lg" tone="raised">
+        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentSectionLabel}>Install & Update</div>
           <div className={styles.setupIncidentInfoList}>
             <div>
@@ -464,8 +470,8 @@ export function SetupRecoverySurface({
               </span>
             </div>
           </div>
-        </Surface>
+        </div>
       </div>
-    </div>
+    </PreReadyState>
   );
 }

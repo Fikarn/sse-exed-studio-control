@@ -20,6 +20,7 @@ export const NavItem = ({ id, label, icon, active = false, onClick, className }:
       className={classes}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
+      data-lit={active ? "" : undefined}
     >
       {icon ? <span className={styles.icon}>{icon}</span> : null}
       <span>{label}</span>

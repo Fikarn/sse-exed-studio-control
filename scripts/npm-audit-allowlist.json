@@ -1,0 +1,4 @@
+{
+  "description": "Advisories `npm run supply-chain:npm` accepts for now (scripts/check-npm-audit.mjs). Take the fix first; list an advisory here only when there is none. An entry is { \"id\": \"GHSA-xxxx-xxxx-xxxx\", \"package\": \"<the package the advisory is on>\", \"reason\": \"<why it is acceptable here>\", \"expires\": \"YYYY-MM-DD\" } with the date at most 90 days out. An expired entry fails the gate and allows nothing.",
+  "entries": []
+}

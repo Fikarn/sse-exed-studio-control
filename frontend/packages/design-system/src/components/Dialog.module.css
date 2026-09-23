@@ -4,27 +4,40 @@
   z-index: var(--z-dialog);
   display: grid;
   place-items: center;
-  padding: var(--space-5);
-  background: color-mix(in srgb, var(--color-background-950) 78%, transparent);
+  padding: 20px;
+  background: color-mix(in srgb, var(--material-well) 60%, transparent);
 }
 
+/* Level +3: the plate recipe plus the one large blur (system §5). */
 .dialog {
-  width: min(720px, calc(100vw - (var(--space-5) * 2)));
-  max-height: calc(100vh - (var(--space-5) * 2));
+  width: min(720px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
   overflow: auto;
+  padding: 20px 24px 24px;
+  border-radius: var(--radius-screen);
+  border: 1px solid var(--material-line2);
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
+  outline: none;
+}
+
+.dialog:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .overlay {
-    animation: sseDialogOverlayIn 140ms var(--motion-easing-standard);
+    animation: aDialogOverlayIn var(--motion-duration-exit) var(--motion-easing-out);
   }
 
   .dialog {
-    animation: sseDialogPanelIn 160ms var(--motion-easing-standard);
+    animation: aDialogPanelIn var(--motion-duration-enter) var(--motion-easing-out);
   }
 }
 
-@keyframes sseDialogOverlayIn {
+@keyframes aDialogOverlayIn {
   from {
     opacity: 0;
   }
@@ -33,34 +46,33 @@
   }
 }
 
-@keyframes sseDialogPanelIn {
+@keyframes aDialogPanelIn {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.985);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 .title {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.12 var(--font-family-display);
-  font-variation-settings: "opsz" 34;
-  letter-spacing: 0;
+  font: 600 var(--font-size-state) / 1.1 var(--font-family-ui);
+  letter-spacing: -0.01em;
+  color: var(--text-text);
 }
 
 .body {
-  margin: var(--space-3) 0 0;
-  color: var(--color-text-muted);
-  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-md)) / 1.55 var(--font-family-ui);
-  letter-spacing: 0;
+  margin: 12px 0 0;
+  color: var(--text-text2);
+  font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
 }
 
 .footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
+  gap: 8px;
+  margin-top: 20px;
 }

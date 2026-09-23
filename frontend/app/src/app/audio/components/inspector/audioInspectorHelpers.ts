@@ -19,7 +19,9 @@ export type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]
 export type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel"]>;
 export type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];
 export type AudioLowCut = SelectedAudioChannel["eq"]["lowCut"];
-export type InspectorTab = "channel" | "eq" | "dynamics" | "sends";
+// Visual overhaul A, Slice 4c: the plate has no tabs. What the tab ids named is
+// now a section of the plate, and the accelerators bring one into view.
+export type PlateSection = "preamp" | "send" | "sends" | "eq" | "dynamics" | "meter" | "channel" | "output";
 
 /**
  * Pointer-drag anchor used by the EQ graph. Lives in the shared helpers so
@@ -74,18 +76,15 @@ export const EQ_GAIN_MARKERS = [
   { gainDb: -20, label: "-20 dB" },
 ] as const;
 
-export const INSPECTOR_TABS: Array<{ id: InspectorTab; label: string; testId: string; shortcut: string }> = [
-  // 2026-05-27 Console redesign: tab labels match the prototype's Preamp /
-  // EQ / Dyn / Routing rhythm. The internal `id` strings stay the Phase 3
-  // values so existing routing / state hooks keep working unmodified.
-  // `shortcut` is the plain-key accelerator wired in useAudioKeyboardShortcuts
-  // (mirrored onto `aria-keyshortcuts` + `title` for discoverability). Preamp
-  // also answers Q, but P is the advertised key.
-  { id: "channel", label: "Preamp", testId: "audio-inspector-channel", shortcut: "P" },
-  { id: "eq", label: "EQ", testId: "audio-inspector-eq", shortcut: "E" },
-  { id: "dynamics", label: "Dyn", testId: "audio-inspector-dynamics", shortcut: "D" },
-  { id: "sends", label: "Routing", testId: "audio-inspector-sends", shortcut: "R" },
-];
+// The plain-key accelerators the tab strip carried, now pointing at the plate's
+// sections: P/Q the preamp, E the equaliser, D the dynamics, R the sends.
+export const PLATE_SECTION_KEYS: Partial<Record<string, PlateSection>> = {
+  p: "preamp",
+  q: "preamp",
+  e: "eq",
+  d: "dynamics",
+  r: "send",
+};
 
 export function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;

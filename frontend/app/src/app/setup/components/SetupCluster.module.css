@@ -1,0 +1,174 @@
+/* Visual overhaul A, Slice 7: Setup's cluster. Every value is a token; the
+   geometry is the mock's — the state display first and fixed, Runner · Support
+   under it, the five steps, the three probes, and the standing actions at the
+   foot. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow-y: auto;
+}
+
+.section {
+  flex: none;
+  min-width: 0;
+}
+
+.modeSwitch {
+  flex: none;
+}
+
+.modeSwitch > * {
+  flex: 1;
+}
+
+/* ---- the five steps ----------------------------------------------------- */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 56px;
+  padding: 8px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: linear-gradient(180deg, var(--material-key-top), var(--material-key));
+  color: var(--text-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.step[data-current="true"] {
+  border-color: var(--accent);
+}
+
+.stepNumber {
+  grid-row: 1 / span 2;
+  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+}
+
+.stepName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-value) / 1.2 var(--font-family-ui);
+}
+
+.stepHint {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 3px;
+  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.stepStanding {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  color: var(--text-text2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.step[data-current="true"] .stepStanding {
+  color: var(--text-text);
+  font-weight: 600;
+}
+
+/* ---- the three probes --------------------------------------------------- */
+
+.probes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.probe {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+}
+
+.probeName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--display-text);
+}
+
+.probeDetail {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--display-text2);
+}
+
+.probeStanding {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--role-green-text);
+}
+
+.probeStanding[data-status="attention"] {
+  color: var(--role-amber-text);
+}
+
+.probeStanding[data-status="error"] {
+  color: var(--role-red-text);
+}
+
+/* ---- the standing actions ----------------------------------------------- */
+
+.actions {
+  margin-top: auto;
+  flex: none;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actionRow > * {
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* Below the studio surface the cluster spends less air; nothing is dropped. */
+:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
+  gap: 12px;
+  padding: 12px;
+}

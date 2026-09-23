@@ -1,0 +1,2596 @@
+<!doctype html>
+<html
+  lang="en"
+  data-theme="studio"
+  data-states="ready,not-verified,assumed,stale,offline,disconnected,disabled,action-failed,talkback-refused,armed"
+>
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Audio · Concept A — Cockpit · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         Concept A — COCKPIT (safety first), material v2 + every engine state
+         Composition: a fixed 424 px instrument cluster on the left holds everything
+         the operator touches during a take; its first element is the STATE DISPLAY,
+         a fixed 168 px slot that carries the console badge, the engine's sentence
+         and the way out — nothing below it ever moves. 13 strips at full height in
+         a recessed bay; a 416 px inspector on the right.
+         Material v2 ("premium"): one light from above. Plates (cluster, inspector)
+         are brushed panels with a top sheen; the mixer is a recessed bay; every
+         display (state, readout, meter, groove) is a black backlit well with an
+         inset shade; keys are machined slabs with a sheen and a 2 px shade; lit
+         things bloom (a lit lamp, an engaged amber key, a live green key, the
+         meter peak). Nothing on an idle screen moves.
+         States (?state=): ready · not-verified · assumed · stale · offline ·
+         disconnected · disabled · action-failed · talkback-refused · armed.
+         Locked controls (writes refused) become dashed outlines at 55 %; doubt
+         (assumed) is a dashed amber keyline on the value itself; arming renders on
+         the armed key and in the state display, never as a reflowing band.
+         ?theme=studio|graphite|bone · keys s / g / b · 1 toggles 1:1
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --m-lo: #2ee06a;
+        --m-mid: #ffd23f;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      [data-theme="studio"],
+      [data-theme="graphite"] {
+        --strip-floor: rgba(255, 255, 255, 0.025);
+        --strip-floor-sel: rgba(255, 255, 255, 0.045);
+      }
+      [data-theme="bone"] {
+        --strip-floor: rgba(255, 255, 255, 0.45);
+        --strip-floor-sel: rgba(255, 255, 255, 0.7);
+      } /* on a light bay a lifted strip is lighter, as a plate is */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+      .muted {
+        color: var(--text-2);
+      }
+      .amber {
+        color: var(--amber-text);
+      }
+
+      /* ---- material: plates, wells, keys, lamps ------------------------ */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      /* a well is a black backlit display in every theme, so whatever is printed on it uses the display's own inks */
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint,
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.refused {
+        border: 1px solid var(--red-text);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 0 14px var(--bloom-red);
+      }
+      .key.refused .hint {
+        color: var(--red-text);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+
+      /* ---- shell header ------------------------------------------------- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab kbd {
+        padding: 2px 4px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber {
+        color: var(--amber-text);
+        border-color: var(--amber-text);
+      }
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.red {
+        color: var(--red-text);
+        border-color: var(--red-text);
+      }
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body --------------------------------------------------------- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+
+      /* cluster */
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-code {
+        font: 500 12px/1.3 var(--mono);
+        color: var(--well-text-2);
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .state-actions .key.primary {
+        color: var(--primary-ink);
+      }
+      .armed-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 6px;
+        border: 1px solid var(--amber-text);
+        border-radius: var(--r8);
+        padding: 6px 10px;
+      }
+      .armed-row .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .armed-row .t {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text);
+      }
+      .armed-row .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .armed-row .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      .armed-row .bar i {
+        display: block;
+        height: 100%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .latch {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        border: 1px solid var(--amber-text);
+        background: rgba(240, 179, 91, 0.06);
+        font: 500 14px/1 var(--ui);
+      }
+      .latch .who {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .latch .key {
+        margin-left: auto;
+        min-height: 28px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .key.talk {
+        flex-direction: column;
+        gap: 10px;
+        min-height: 104px;
+      }
+      .key.talk .cap {
+        font-size: 20px;
+      }
+      .key.big {
+        flex-direction: column;
+        gap: 8px;
+        min-height: 64px;
+        flex: 1;
+      }
+      .row2 {
+        display: flex;
+        gap: 12px;
+      }
+      .label {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border-radius: var(--r12);
+      }
+      .seg .key {
+        flex: 1;
+        min-height: 44px;
+        border-radius: var(--r8);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 14px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .level {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .hero {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .hslider {
+        position: relative;
+        height: 34px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .hslider .unity {
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        background: var(--well-text);
+        left: calc(17px + 81.72% - 0.8172 * 34px);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 3px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .mmeter {
+        display: grid;
+        grid-template-columns: 18px 1fr 64px;
+        column-gap: 10px;
+        row-gap: 6px;
+        align-items: center;
+      }
+      .mmeter .ch {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .mmeter .val {
+        font: 500 16px/1 var(--mono);
+        text-align: right;
+      }
+      .hbar {
+        position: relative;
+        height: 24px;
+        border-radius: var(--r4);
+        overflow: hidden;
+      }
+      .hbar .ramp,
+      .hbar .glow {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          var(--m-lo) 0%,
+          var(--m-lo) 70%,
+          var(--m-mid) 70%,
+          var(--m-mid) 90%,
+          var(--m-hot) 90%,
+          var(--m-hot) 95%,
+          var(--m-over) 95%,
+          var(--m-over) 100%
+        );
+      }
+      .hbar .glow {
+        filter: blur(6px);
+        opacity: 0.55;
+      } /* the signal is emissive: a blurred copy of the ramp lights the well floor */
+      .hbar .peak {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 6px var(--bloom-white);
+      }
+      .hbar .ref {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 70%;
+        border-left: 1px dashed rgba(255, 255, 255, 0.45);
+      }
+      .mscale {
+        grid-column: 2;
+        display: flex;
+        justify-content: space-between;
+        font: 500 12px/1.2 var(--mono);
+        color: var(--text-2);
+      }
+      .mscale span {
+        padding: 0 3px;
+      }
+      .snaps {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .snaps-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .snaps-head .title {
+        font: 600 16px/1 var(--ui);
+      }
+      .snapgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .key.snap {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 4px;
+        min-height: 72px;
+        padding: 0 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .key.snap .n {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .key.snap .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .key.snap .tag {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .key.snap.current {
+        border: 2px solid var(--accent);
+      }
+      .key.snap.current .tag {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .key.snap.empty {
+        background: transparent;
+        border-style: dashed;
+        box-shadow: none;
+      }
+      .key.snap.empty .name {
+        color: var(--text-2);
+        font-weight: 500;
+      }
+      .key.snap.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+      }
+      .key.snap.armed .n,
+      .key.snap.armed .tag {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .key.snap.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        white-space: nowrap;
+      }
+
+      /* mixer bay */
+      .mixer {
+        padding: 16px;
+        display: flex;
+        gap: 0;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .tier {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+      }
+      .tier + .tier {
+        margin-left: 12px;
+        padding-left: 11px;
+        border-left: 1px solid var(--line);
+      } /* a hairline between tiers, so the eye finds the three groups */
+      .tier-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        height: 24px;
+      }
+      .tier-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .tier-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .tier-head .lock-note {
+        display: none;
+        font: 600 13px/1 var(--ui);
+        color: var(--amber-text);
+      }
+      .tier-head .lock-note.red {
+        color: var(--red-text);
+      }
+      .locked .tier-head .lock-note {
+        display: inline;
+      }
+      .strips {
+        display: flex;
+        gap: 8px;
+        flex: 1;
+        min-height: 0;
+      }
+      .strip {
+        width: 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 8px;
+        border-radius: var(--r12);
+        border: 1px solid transparent;
+        min-height: 0;
+        background: var(--strip-floor);
+      }
+      .strip.sel {
+        border-color: var(--accent);
+        background: var(--strip-floor-sel);
+      }
+      .s-head {
+        height: 56px;
+      }
+      .s-name {
+        font: 600 16px/1.15 var(--ui);
+      }
+      .s-sub {
+        font: 400 13px/1.2 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 3px;
+      }
+      .s-db {
+        height: 40px;
+        border-radius: var(--r8);
+        color: var(--well-text);
+        font: 600 20px/1 var(--mono);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .s-pre {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        height: 66px;
+      }
+      .s-pre .key {
+        min-height: 30px;
+        padding: 0 6px;
+        font: 600 13px/1 var(--mono);
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .s-pre .key.p48 {
+        color: var(--red-text);
+      }
+      .s-pre .key.p48 .lamp {
+        width: 7px;
+        height: 7px;
+        background: var(--red-text);
+        box-shadow: 0 0 8px var(--bloom-red);
+      }
+      .s-pre .key .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .s-tag {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        border: 1px dashed var(--line);
+        border-radius: var(--r8);
+      }
+      .s-tag.target {
+        border-style: solid;
+        border-color: var(--amber-text);
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .s-aux {
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        white-space: nowrap;
+      }
+      .s-aux.sends {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 3px;
+        align-items: center;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        padding: 0 4px;
+      }
+      .s-aux.sends b {
+        font: 600 12px/1 var(--mono);
+        color: var(--text);
+        text-align: right;
+      }
+      .s-aux .lampword {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .s-aux .lampword.on {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .s-keys {
+        display: flex;
+        gap: 6px;
+      }
+      .s-keys .key {
+        flex: 1;
+        min-height: 36px;
+        padding: 0;
+        font: 600 15px/1 var(--mono);
+      }
+      .s-fader {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        min-height: 0;
+        padding: 4px 0;
+      }
+      .scale {
+        position: relative;
+        width: 30px;
+      }
+      .scale span {
+        position: absolute;
+        right: 0;
+        transform: translateY(50%);
+        font: 500 12px/1.2 var(--mono);
+        color: var(--text-2);
+        padding: 0 3px;
+      }
+      /* the fader's pointer target is the 44 px column the cap rides in; the visible slot is 18 px */
+      .groove {
+        position: relative;
+        width: 44px;
+      }
+      .groove::before {
+        content: "";
+        position: absolute;
+        left: 13px;
+        right: 13px;
+        top: 0;
+        bottom: 0;
+        border-radius: var(--r8);
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow: inset 0 2px 6px var(--well-shade);
+      }
+      .travel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 14px;
+        bottom: 14px;
+      }
+      .groove .slot {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--line-2);
+      }
+      .groove .unity {
+        position: absolute;
+        left: 9px;
+        right: 9px;
+        height: 2px;
+        margin-bottom: -1px;
+        background: var(--well-text);
+        bottom: 81.72%;
+      }
+      .groove .cap {
+        position: absolute;
+        left: 50%;
+        width: 44px;
+        height: 26px;
+        margin-left: -22px;
+        transform: translateY(50%);
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .groove .cap::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        top: 50%;
+        height: 2px;
+        margin-top: -1px;
+        background: var(--cap-line);
+      }
+      .meter {
+        position: relative;
+        width: 24px;
+        border-radius: var(--r4);
+        overflow: hidden;
+      }
+      .meter.stereo {
+        width: 26px;
+      }
+      .meter .bar {
+        position: absolute;
+        top: 14px;
+        bottom: 14px;
+        left: 3px;
+        right: 3px;
+      }
+      .meter.stereo .bar.l {
+        right: 50%;
+        margin-right: 1px;
+      }
+      .meter.stereo .bar.r {
+        left: 50%;
+        margin-left: 1px;
+      }
+      .meter .ramp,
+      .meter .glow {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to top,
+          var(--m-lo) 0%,
+          var(--m-lo) 70%,
+          var(--m-mid) 70%,
+          var(--m-mid) 90%,
+          var(--m-hot) 90%,
+          var(--m-hot) 95%,
+          var(--m-over) 95%,
+          var(--m-over) 100%
+        );
+      }
+      .meter .glow {
+        left: -3px;
+        right: -3px;
+        filter: blur(6px);
+        opacity: 0.55;
+      }
+      .meter .peak {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: #fff;
+        box-shadow: 0 0 6px var(--bloom-white);
+      }
+      .meter .ref {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 70%;
+        border-top: 1px dashed rgba(255, 255, 255, 0.45);
+      }
+      .meter .clip {
+        position: absolute;
+        top: 3px;
+        left: 50%;
+        width: 8px;
+        height: 8px;
+        margin-left: -4px;
+        border-radius: var(--pill);
+        background: #2b2b30;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+
+      /* inspector */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .insp-head .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .send {
+        display: grid;
+        grid-template-columns: 1fr 96px;
+        align-items: center;
+        gap: 12px;
+      }
+      .send .hslider {
+        height: 30px;
+      }
+      .send .hslider .cap {
+        top: 2px;
+        height: 24px;
+      }
+      .send .v {
+        font: 600 20px/1 var(--mono);
+        text-align: right;
+      }
+      .send.small .v {
+        font-size: 16px;
+        color: var(--text-2);
+      }
+      .send.small .hslider {
+        height: 28px;
+      }
+      .send.small .hslider .cap {
+        top: 3px;
+        height: 20px;
+        width: 26px;
+        margin-left: -13px;
+      }
+      .send-label {
+        display: flex;
+        justify-content: space-between;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .send-label b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .eq {
+        border-radius: var(--r8);
+        height: 190px;
+        position: relative;
+        overflow: hidden;
+      }
+      .eq svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .eq text {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .eq .band text {
+        fill: var(--well-text);
+        font-weight: 600;
+      }
+      .eqrows {
+        display: grid;
+        grid-template-columns: 34px 1fr 1fr 1fr;
+        row-gap: 8px;
+        column-gap: 8px;
+        font: 500 14px/1 var(--mono);
+      }
+      .eqrows .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .eqrows .b {
+        font-family: var(--ui);
+        font-weight: 600;
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 16px/1 var(--mono);
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 36px;
+      }
+
+      /* footer */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .footer .hints span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ---- states -------------------------------------------------------- */
+      /* locked: every console write is refused — keys become dashed outlines at 55 %, caps become ghosts; displays and meters stay live */
+      .locked .key[data-take]:not(.state-key),
+      .locked .gain-key {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+      }
+      .locked .key.on[data-take] {
+        color: var(--amber-text);
+        border-color: var(--amber-text);
+      }
+      .locked .seg .key {
+        border: 1px dashed transparent;
+      }
+      .locked .seg .key.on {
+        border-color: var(--amber-text);
+        background: transparent;
+        box-shadow: none;
+      }
+      .locked .groove,
+      .locked .hslider[data-take] {
+        cursor: not-allowed;
+      }
+      .locked .groove .cap,
+      .locked .hslider[data-take] .cap {
+        background: transparent;
+        border: 2px dashed var(--cap);
+        box-shadow: none;
+        opacity: 0.55;
+      }
+      .locked .groove .cap::after,
+      .locked .hslider[data-take] .cap::after {
+        display: none;
+      }
+      .locked .groove .unity,
+      .locked .hslider[data-take] .unity {
+        opacity: 0.4;
+      }
+      .locked .key.snap:not(.empty) {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+      }
+      .locked .key.snap.current {
+        border-color: var(--line-2);
+      }
+      /* no metering: the wells stay, the signal is gone */
+      .no-meter .ramp,
+      .no-meter .glow,
+      .no-meter .peak {
+        display: none;
+      }
+      .no-meter .mmeter .val {
+        color: var(--text-2);
+      }
+      /* stale: the last frame, dimmed */
+      .stale .ramp {
+        opacity: 0.4;
+      }
+      .stale .glow {
+        display: none;
+      }
+      .stale .peak {
+        opacity: 0.4;
+      }
+      /* doubt: the value the desk has not confirmed carries its own mark */
+      .strip.doubt .s-db {
+        border: 1px dashed var(--amber-text);
+        color: var(--amber-text);
+      }
+      .strip.doubt .groove .cap {
+        outline: 2px dashed var(--amber-text);
+        outline-offset: 2px;
+      }
+      .strip.doubt .s-sub {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .send.doubt .hslider {
+        border: 1px dashed var(--amber-text);
+      }
+      .send.doubt .v {
+        color: var(--amber-text);
+      }
+
+      /* ---- viewports: density comes from the chrome, never from shrinking what is read to act ---- */
+      .short {
+        display: none;
+      }
+      /* 1920×1080 — the live minimum: header 52, footer 36, cluster 360, plate 360, strips 4 / 4 / 3 banked at 98 px */
+      #board[data-vw="1920"] {
+        grid-template-rows: 52px 1fr 36px;
+      }
+      #board[data-vw="1920"] .body {
+        grid-template-columns: 360px 1fr 360px;
+      }
+      #board[data-vw="1920"] .shell {
+        gap: 20px;
+        padding: 0 16px;
+      }
+      #board[data-vw="1920"] .cluster {
+        padding: 12px 12px 16px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .state {
+        height: 168px;
+        padding: 12px 14px;
+      }
+      #board[data-vw="1920"] .latch {
+        min-height: 32px;
+      }
+      #board[data-vw="1920"] .key.talk {
+        min-height: 76px;
+      }
+      #board[data-vw="1920"] .key.big {
+        min-height: 52px;
+      }
+      #board[data-vw="1920"] .seg .key {
+        min-height: 40px;
+      }
+      #board[data-vw="1920"] .hero {
+        font-size: 32px;
+      }
+      #board[data-vw="1920"] .hslider {
+        height: 30px;
+      }
+      #board[data-vw="1920"] .hslider .cap {
+        height: 22px;
+      }
+      #board[data-vw="1920"] .hbar {
+        height: 16px;
+      }
+      #board[data-vw="1920"] .key.snap {
+        min-height: 48px;
+      }
+      #board[data-vw="1920"] .key.snap .tag {
+        display: none;
+      }
+      #board[data-vw="1920"] .actions .key {
+        min-height: 36px;
+        font-size: 13px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1920"] .mixer {
+        padding: 12px;
+        gap: 16px;
+      }
+      #board[data-vw="1920"] .strips {
+        gap: 6px;
+      }
+      #board[data-vw="1920"] .strip {
+        width: 98px;
+        padding: 8px 4px;
+        gap: 8px;
+      }
+      #board[data-vw="1920"] .s-name {
+        font-size: 14px;
+      }
+      #board[data-vw="1920"] .s-head {
+        height: 52px;
+      }
+      #board[data-vw="1920"] .s-db {
+        height: 32px;
+        font-size: 16px;
+      }
+      #board[data-vw="1920"] .s-pre {
+        height: 62px;
+      }
+      #board[data-vw="1920"] .s-pre .key {
+        min-height: 28px;
+        padding: 0 4px;
+      }
+      #board[data-vw="1920"] .s-pre .key .l {
+        display: none;
+      }
+      #board[data-vw="1920"] .s-keys .key {
+        min-height: 30px;
+        font-size: 14px;
+      }
+      #board[data-vw="1920"] .scale {
+        width: 26px;
+      }
+      #board[data-vw="1920"] .groove {
+        width: 40px;
+      }
+      #board[data-vw="1920"] .groove::before {
+        left: 12px;
+        right: 12px;
+      }
+      #board[data-vw="1920"] .groove .cap {
+        width: 40px;
+        margin-left: -20px;
+        height: 22px;
+      }
+      #board[data-vw="1920"] .inspector {
+        padding: 14px 12px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .insp-head h2 {
+        font-size: 20px;
+      }
+      #board[data-vw="1920"] .eq {
+        height: 150px;
+      }
+      #board[data-vw="1920"] .footer {
+        padding: 0 16px;
+        gap: 18px;
+      }
+      /* 1280×800 — utility mode: header 48, footer 32, the cluster as a 232 px key rail with the deck's own short words, the plate as a drawer */
+      #board[data-vw="1280"] {
+        grid-template-rows: 48px 1fr 32px;
+      }
+      #board[data-vw="1280"] .body {
+        grid-template-columns: 232px 1fr 0px;
+        position: relative;
+      }
+      #board[data-vw="1280"] .shell {
+        gap: 14px;
+        padding: 0 12px;
+      }
+      #board[data-vw="1280"] .shell .tabs {
+        margin-left: 4px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .shell .tab {
+        height: 32px;
+        padding: 0 10px;
+      }
+      #board[data-vw="1280"] .shell kbd,
+      #board[data-vw="1280"] .long {
+        display: none;
+      }
+      #board[data-vw="1280"] .short {
+        display: inline;
+      }
+      #board[data-vw="1280"] .lampchip {
+        height: 28px;
+        padding: 0 8px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .clock {
+        margin-left: 4px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .cluster {
+        padding: 8px 8px 10px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .state {
+        height: 140px;
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .state-word {
+        font-size: 20px;
+      }
+      #board[data-vw="1280"] .state-sub {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .state-meta {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .state-actions .key {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .latch {
+        min-height: 30px;
+        padding: 0 8px;
+        font-size: 13px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .latch .muted {
+        display: none;
+      }
+      #board[data-vw="1280"] .latch .key {
+        min-height: 28px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .latch .key kbd {
+        display: none;
+      }
+      #board[data-vw="1280"] .key.talk {
+        min-height: 52px;
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .key.talk .cap {
+        font-size: 16px;
+      }
+      #board[data-vw="1280"] .key.talk .hint {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .row2 {
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .key.big {
+        min-height: 40px;
+        gap: 0;
+      }
+      #board[data-vw="1280"] .key.big .cap {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .key.big .hint {
+        display: none;
+      }
+      #board[data-vw="1280"] .label {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .seg {
+        gap: 4px;
+        padding: 3px;
+      }
+      #board[data-vw="1280"] .seg .key {
+        min-height: 34px;
+        padding: 0 4px;
+      }
+      #board[data-vw="1280"] .seg .key .cap {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .hero {
+        font-size: 32px;
+      }
+      #board[data-vw="1280"] .level {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .hslider {
+        height: 28px;
+      }
+      #board[data-vw="1280"] .hslider .cap {
+        height: 20px;
+      }
+      #board[data-vw="1280"] .mmeter {
+        grid-template-columns: 14px 1fr 44px;
+        column-gap: 6px;
+        row-gap: 4px;
+      }
+      #board[data-vw="1280"] .mmeter .val {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .hbar {
+        height: 14px;
+      }
+      #board[data-vw="1280"] .mscale span:nth-child(2n) {
+        display: none;
+      }
+      #board[data-vw="1280"] .snaps {
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .snaps-head .title {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .snaps-head .title .muted {
+        display: none;
+      }
+      #board[data-vw="1280"] .snapgrid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .key.snap {
+        min-height: 36px;
+        padding: 0 6px;
+        align-items: center;
+      }
+      #board[data-vw="1280"] .key.snap .n {
+        font: 600 14px/1 var(--mono);
+        color: var(--text);
+      }
+      #board[data-vw="1280"] .key.snap.current .n {
+        color: var(--amber-text);
+      }
+      #board[data-vw="1280"] .key.snap .name,
+      #board[data-vw="1280"] .key.snap .tag {
+        display: none;
+      }
+      #board[data-vw="1280"] .actions .key {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .actions .key:last-child {
+        display: none;
+      }
+      #board[data-vw="1280"] .mixer {
+        padding: 8px;
+        gap: 16px;
+      }
+      #board[data-vw="1280"] .tier-head {
+        height: 20px;
+      }
+      #board[data-vw="1280"] .tier-head .d {
+        display: none;
+      }
+      #board[data-vw="1280"] .strips {
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .strip {
+        width: 84px;
+        padding: 6px 4px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .s-head {
+        height: 20px;
+      }
+      #board[data-vw="1280"] .s-name {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #board[data-vw="1280"] .s-sub {
+        display: none;
+      }
+      #board[data-vw="1280"] .s-db {
+        height: 30px;
+        font-size: 15px;
+      }
+      #board[data-vw="1280"] .s-pre {
+        height: 62px;
+      }
+      #board[data-vw="1280"] .s-pre .key {
+        min-height: 28px;
+        padding: 0 4px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .s-pre .key .l {
+        display: none;
+      }
+      #board[data-vw="1280"] .s-aux.sends {
+        display: none;
+      }
+      #board[data-vw="1280"] .s-aux {
+        height: 28px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .s-aux .lampword {
+        font-size: 12px;
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .s-tag {
+        height: 28px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .s-keys {
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .s-keys .key {
+        min-height: 28px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .scale {
+        display: none;
+      }
+      #board[data-vw="1280"] .groove {
+        width: 40px;
+      }
+      #board[data-vw="1280"] .groove::before {
+        left: 12px;
+        right: 12px;
+      }
+      #board[data-vw="1280"] .groove .cap {
+        width: 40px;
+        margin-left: -20px;
+        height: 22px;
+      }
+      #board[data-vw="1280"] .meter {
+        width: 20px;
+      }
+      #board[data-vw="1280"] .meter.stereo {
+        width: 22px;
+      }
+      #board[data-vw="1280"] .inspector {
+        display: none;
+      }
+      #board[data-vw="1280"].drawer .inspector {
+        display: flex;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: 360px;
+        z-index: 5;
+        padding: 12px;
+        gap: 12px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+        border-left: 1px solid var(--line-2);
+      }
+      #board[data-vw="1280"].drawer .insp-head h2 {
+        font-size: 20px;
+      }
+      #board[data-vw="1280"].drawer .eq-section {
+        display: none;
+      } /* the drawer shows Sends and Meter; EQ is its own tab in utility mode */
+      #board[data-vw="1280"] .footer {
+        padding: 0 12px;
+        gap: 14px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .footer .hints span:nth-child(3) {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-cockpit">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>
+            <span class="long">Setup / Support</span><span class="short">Setup</span> <kbd>Ctrl 1</kbd>
+          </button>
+          <button class="tab" data-key>Lighting <kbd>Ctrl 2</kbd></button>
+          <button class="tab on" data-key>Audio <kbd>Ctrl 3</kbd></button>
+          <button class="tab" data-key>Planning <kbd>Ctrl 4</kbd></button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" id="hdrAudio" data-key><i class="lamp ok"></i><b>Audio</b> <span>ok</span></button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1</button>
+          <div class="clock">09:11</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <!-- ================= instrument cluster ================= -->
+        <aside class="cluster plate" data-region="cluster">
+          <!-- the state display: a fixed 168 px slot; the badge, the engine's sentence, the way out -->
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">VERIFIED</div>
+            </div>
+            <div class="state-sub" id="stateSub">Console · TotalMix on the UFX III</div>
+            <div class="state-meta" id="stateMeta">42 values confirmed · Last sync 18:24 · Metering RME live</div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+          <div class="latch">
+            <i class="lamp amber"></i>
+            <span class="who">1 solo</span>
+            <span class="muted">FX 3/4 · you hear the solo only</span>
+            <button class="key" data-key data-take>Clear all solo <kbd>Alt S</kbd></button>
+          </div>
+
+          <button class="key talk" id="talk" data-key data-take aria-label="Talkback, hold to talk">
+            <span class="cap">Talkback</span>
+            <span class="hint" id="talkHint">hold <kbd>T</kbd> · into Phones 1 and 2</span>
+          </button>
+          <div class="row2">
+            <button class="key big" data-key data-take>
+              <span class="cap">Dim</span><span class="hint">−20 dB on Main Out</span>
+            </button>
+            <button class="key big" data-key data-take>
+              <span class="cap">Mono</span><span class="hint">L+R on Main Out</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="label" style="margin-bottom: 8px">Mix target · faders set sends into</div>
+            <div class="seg well">
+              <button class="key on" data-key data-take>
+                <span class="cap long">Main Out</span><span class="cap short">→ Main</span>
+              </button>
+              <button class="key" data-key data-take>
+                <span class="cap long">Phones 1</span><span class="cap short">→ PH 1</span>
+              </button>
+              <button class="key" data-key data-take>
+                <span class="cap long">Phones 2</span><span class="cap short">→ PH 2</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="level">
+              <div class="label">Main Out level</div>
+              <div class="hero">-1.2 dB</div>
+            </div>
+            <div
+              class="hslider well"
+              data-key
+              data-take
+              role="slider"
+              aria-label="Main Out level"
+              style="margin-top: 8px"
+            >
+              <div class="track"></div>
+              <div class="unity"></div>
+              <div class="cap" id="mainCap"></div>
+            </div>
+          </div>
+
+          <div class="mmeter">
+            <div class="ch">L</div>
+            <div class="hbar well">
+              <div class="glow" id="gL"></div>
+              <div class="ramp" id="mL"></div>
+              <div class="ref"></div>
+              <div class="peak" id="pL"></div>
+            </div>
+            <div class="val" id="vL">-3.1</div>
+            <div class="ch">R</div>
+            <div class="hbar well">
+              <div class="glow" id="gR"></div>
+              <div class="ramp" id="mR"></div>
+              <div class="ref"></div>
+              <div class="peak" id="pR"></div>
+            </div>
+            <div class="val" id="vR">-5.6</div>
+            <div class="mscale">
+              <span>-60</span><span>-40</span><span>-30</span><span>-20</span><span>-18</span><span>-12</span
+              ><span>-6</span><span>-3</span><span>0</span>
+            </div>
+          </div>
+
+          <div class="snaps">
+            <div class="snaps-head">
+              <div class="title">
+                Snapshots
+                <span class="muted" style="font: 500 13px/1 var(--ui)">Shift 1–8 · press twice to recall</span>
+              </div>
+              <button class="key" data-key style="min-height: 32px; font-size: 13px">Capture</button>
+            </div>
+            <div class="snapgrid" id="snapgrid"></div>
+          </div>
+
+          <div class="actions">
+            <button class="key primary" data-key>Sync from TotalMix</button>
+            <button class="key" data-key>Run audio probe</button>
+            <button class="key" data-key>Clear clips</button>
+          </div>
+        </aside>
+
+        <!-- ================= mixer bay ================= -->
+        <main class="mixer" data-region="mixer">
+          <section class="tier">
+            <div class="tier-head">
+              <span class="t">Inputs</span><span class="d">4 preamps · mic · sends into Main Out</span
+              ><span class="lock-note"></span>
+            </div>
+            <div class="strips" id="strips-in"></div>
+          </section>
+          <section class="tier">
+            <div class="tier-head">
+              <span class="t">Playback</span><span class="d">6 stereo pairs · sends into Main Out</span
+              ><span class="lock-note"></span>
+            </div>
+            <div class="strips" id="strips-pb"></div>
+          </section>
+          <section class="tier">
+            <div class="tier-head">
+              <span class="t">Outputs</span><span class="d">3 mixes · level</span><span class="lock-note"></span>
+            </div>
+            <div class="strips" id="strips-out"></div>
+          </section>
+        </main>
+
+        <!-- ================= inspector ================= -->
+        <aside class="inspector plate" data-region="inspector">
+          <div class="insp-head">
+            <div>
+              <h2>FX 3/4</h2>
+              <div class="sub">Playback 02 · stereo pair · solo engaged</div>
+            </div>
+            <button class="key" data-key>Rename</button>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Send to Main Out</span><span class="d">the fader on the strip</span>
+            </div>
+            <div class="send" id="sendMain">
+              <div class="hslider well" data-key data-take role="slider" aria-label="Send to Main Out">
+                <div class="track"></div>
+                <div class="unity"></div>
+                <div class="cap" style="left: calc(17px + 88% - 0.88 * 34px)"></div>
+              </div>
+              <div class="v">+2.1 dB</div>
+            </div>
+            <div class="send-label"><b>Phones 1</b><span>cue A</span></div>
+            <div class="send small">
+              <div class="hslider well" data-key data-take role="slider" aria-label="Send to Phones 1">
+                <div class="track"></div>
+                <div class="unity"></div>
+                <div class="cap" style="left: calc(17px + 60% - 0.6 * 34px)"></div>
+              </div>
+              <div class="v">-7.2 dB</div>
+            </div>
+            <div class="send-label"><b>Phones 2</b><span>cue B</span></div>
+            <div class="send small">
+              <div class="hslider well" data-key data-take role="slider" aria-label="Send to Phones 2">
+                <div class="track"></div>
+                <div class="unity"></div>
+                <div class="cap" style="left: calc(17px + 50% - 0.5 * 34px)"></div>
+              </div>
+              <div class="v">-12.1 dB</div>
+            </div>
+          </div>
+
+          <div class="section eq-section">
+            <div class="section-head"><span class="t">Equaliser</span><span class="d">bypassed</span></div>
+            <div class="eq well">
+              <svg viewBox="0 0 384 190" preserveAspectRatio="none" aria-hidden="true">
+                <line x1="0" y1="95" x2="384" y2="95" stroke="rgba(255,255,255,0.35)" stroke-width="1" />
+                <line x1="96" y1="0" x2="96" y2="190" stroke="rgba(255,255,255,0.12)" />
+                <line x1="192" y1="0" x2="192" y2="190" stroke="rgba(255,255,255,0.12)" />
+                <line x1="288" y1="0" x2="288" y2="190" stroke="rgba(255,255,255,0.12)" />
+                <path
+                  d="M0 150 C 40 150, 50 96, 70 95 L 384 95"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.7)"
+                  stroke-width="2"
+                />
+                <g class="band">
+                  <circle cx="62" cy="95" r="10" fill="#0b0b0c" stroke="#fff" stroke-width="1.5" />
+                  <text x="62" y="99" text-anchor="middle">LC</text>
+                </g>
+                <g class="band">
+                  <circle cx="118" cy="95" r="10" fill="#0b0b0c" stroke="#fff" stroke-width="1.5" />
+                  <text x="118" y="99" text-anchor="middle">1</text>
+                </g>
+                <g class="band">
+                  <circle cx="228" cy="95" r="10" fill="#0b0b0c" stroke="#fff" stroke-width="1.5" />
+                  <text x="228" y="99" text-anchor="middle">2</text>
+                </g>
+                <g class="band">
+                  <circle cx="322" cy="95" r="10" fill="#0b0b0c" stroke="#fff" stroke-width="1.5" />
+                  <text x="322" y="99" text-anchor="middle">3</text>
+                </g>
+                <text x="96" y="182" text-anchor="middle">100 Hz</text>
+                <text x="192" y="182" text-anchor="middle">1 kHz</text>
+                <text x="288" y="182" text-anchor="middle">10 kHz</text>
+                <text x="6" y="14">+12 dB</text>
+                <text x="6" y="176">-12 dB</text>
+              </svg>
+            </div>
+            <div class="eqrows">
+              <span class="h">Band</span><span class="h">Frequency</span><span class="h">Gain</span
+              ><span class="h">Q</span> <span class="b">LC</span><span>80 Hz</span><span>12 dB/oct</span
+              ><span class="muted">—</span> <span class="b">1</span><span>180 Hz</span><span>0.0 dB</span
+              ><span>0.9</span> <span class="b">2</span><span>1.6 kHz</span><span>0.0 dB</span><span>1.2</span>
+              <span class="b">3</span><span>8.5 kHz</span><span>0.0 dB</span><span>shelf</span>
+            </div>
+            <div class="insp-keys"><button class="key" data-key data-take>Enable EQ</button></div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Meter</span><span class="d">post-fader · dBFS</span></div>
+            <div class="readouts">
+              <span>Level L / R</span><span class="v" id="rdLevel">-23 / -23 dB</span> <span>Peak hold L / R</span
+              ><span class="v" id="rdPeak">-18 / -19 dB</span>
+            </div>
+            <div class="insp-keys">
+              <button class="key on" data-key><span class="cap" style="font-size: 13px">Peak hold</span> on</button>
+              <button class="key" data-key>Reset peaks</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Channel</span><span class="d" id="chanD">as the desk reports it</span>
+            </div>
+            <div class="readouts">
+              <span>Stereo link</span><span class="v">linked</span> <span>Sends</span><span class="v">post-fader</span>
+              <span>Compressor</span><span class="v">off · -18 dB · 2:1</span> <span>Gate</span
+              ><span class="v">off · -48 dB</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Console <b id="ftConsole">confirmed · 42 values</b></span>
+        <span class="item">Metering <b id="ftMeter">RME · live</b></span>
+        <span class="item">Last sync <b>18:24</b></span>
+        <span class="item">Bank <b>all 13 strips</b></span>
+        <div class="hints">
+          <span><kbd>Ctrl K</kbd> Palette</span>
+          <span><kbd>?</kbd> Shortcuts</span>
+          <span><kbd>[</kbd><kbd>]</kbd> Bank</span>
+          <span><kbd>T</kbd> hold to talk</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // ---- viewport: the board takes the size from ?vw= (2560x1440 default); the mock lays out for it ----
+      const params = new URLSearchParams(location.search);
+      const VW = (params.get("vw") || "2560x1440").split("x").map(Number);
+      const board = document.getElementById("board");
+      board.style.width = VW[0] + "px";
+      board.style.height = VW[1] + "px";
+      board.dataset.vw = VW[0] >= 2560 ? "2560" : VW[0] >= 1920 ? "1920" : "1280";
+      if (params.get("drawer") === "1") board.classList.add("drawer");
+      const BANKED = VW[0] < 2560; // 4 / 4 / 3 strips below the studio width, the rest banked behind ] and [
+      const SHORT = VW[0] < 1920; // the deck's own short names when a strip is 84 px wide
+      // ---- facts from the audio-populated fixture (RME fader curve; dB as TotalMix prints it) ----
+      const UNITY = 836 / 1023;
+      function dbToLin(db) {
+        if (db <= -64.9) return 0;
+        if (db >= 6) return 1;
+        if (db === 0) return UNITY;
+        const pos = db >= -6 ? (db + 26.8235294118) / 0.0320855615 : 826 - Math.sqrt(-34869 - 11033 * db);
+        return Math.min(1, Math.max(0, pos / 1023));
+      }
+      const meterPct = (dbfs) => Math.max(0, Math.min(100, ((dbfs + 60) / 60) * 100));
+      const TICKS = [
+        [6, "+6"],
+        [0, "0"],
+        [-6, "-6"],
+        [-12, "-12"],
+        [-20, "-20"],
+        [-30, "-30"],
+        [-40, "-40"],
+        [-60, "-60"],
+      ];
+      // short: the fixture's shortName, which is what the deck prints
+      const INPUTS = [
+        { n: "Host", short: "HOST", sub: "Preamp 1 · mic", pos: 0.7, db: "-3.8 dB", gain: 32, meter: -9, peak: -6 },
+        {
+          n: "Co-host",
+          short: "CO-HOST",
+          sub: "Preamp 2 · mic",
+          pos: 0.68,
+          db: "-4.5 dB",
+          gain: 28,
+          meter: -12,
+          peak: -8,
+        },
+        {
+          n: "Guest 1",
+          short: "GUEST 1",
+          sub: "Preamp 3 · mic",
+          pos: 0.8,
+          db: "-0.6 dB",
+          gain: 45,
+          meter: -6,
+          peak: -3,
+        },
+        {
+          n: "Guest 2",
+          short: "GUEST 2",
+          sub: "Preamp 4 · mic",
+          pos: 0.64,
+          db: "-5.8 dB",
+          gain: 36,
+          meter: -14,
+          peak: -10,
+        },
+      ];
+      // ph1 / ph2: the same channel's sends into Phones 1 and Phones 2 (fixture mix levels through the RME curve)
+      const PLAYBACK_ALL = [
+        {
+          n: "Program 1/2",
+          short: "PGM",
+          sub: "Stereo",
+          pos: 0.9,
+          db: "+2.7 dB",
+          ph1: "-0.6",
+          ph2: "-1.2",
+          meter: -8,
+          peak: -4,
+        },
+        {
+          n: "FX 3/4",
+          short: "FX",
+          sub: "Stereo · solo",
+          pos: 0.88,
+          db: "+2.1 dB",
+          ph1: "-7.2",
+          ph2: "-12.1",
+          solo: true,
+          sel: true,
+          meter: -11,
+          peak: -7,
+        },
+        {
+          n: "N-1 5/6",
+          short: "N-1",
+          sub: "Stereo",
+          pos: 0.46,
+          db: "-14.6 dB",
+          ph1: "-27.6",
+          ph2: "-29.5",
+          meter: -22,
+          peak: -18,
+        },
+        {
+          n: "Music 7/8",
+          short: "MUS",
+          sub: "Stereo",
+          pos: 0.64,
+          db: "-5.8 dB",
+          ph1: "-11.0",
+          ph2: "-13.3",
+          meter: -16,
+          peak: -12,
+        },
+        {
+          n: "Playback 9/10",
+          short: "PB 9/10",
+          sub: "Stereo",
+          pos: 0.22,
+          db: "-35.9 dB",
+          ph1: "-42.9",
+          ph2: "-45.4",
+          meter: -38,
+          peak: -34,
+        },
+        {
+          n: "Playback 11/12",
+          short: "PB 11/12",
+          sub: "Stereo",
+          pos: 0.18,
+          db: "-40.5 dB",
+          ph1: "-48.0",
+          ph2: "-48.0",
+          meter: -45,
+          peak: -41,
+        },
+      ];
+      const PLAYBACK = BANKED ? PLAYBACK_ALL.slice(0, 4) : PLAYBACK_ALL;
+      // dim / mono: each output's own flags as the desk reports them (Phones 2 is summed to mono in the fixture)
+      const OUTPUTS = [
+        {
+          n: "Main Out",
+          short: "MAIN",
+          sub: "Monitor bus",
+          tag: "mix target",
+          pos: 0.78,
+          db: "-1.2 dB",
+          active: true,
+          dim: false,
+          mono: false,
+          meter: -3.1,
+          peak: -1,
+        },
+        {
+          n: "Phones 1",
+          short: "HP 1",
+          sub: "Cue A",
+          tag: "cue A",
+          pos: 0.56,
+          db: "-9.0 dB",
+          dim: false,
+          mono: false,
+          meter: -9,
+          peak: -7,
+        },
+        {
+          n: "Phones 2",
+          short: "HP 2",
+          sub: "Cue B",
+          tag: "cue B",
+          pos: 0.42,
+          db: "-17.4 dB",
+          dim: false,
+          mono: true,
+          meter: -17,
+          peak: -15,
+        },
+      ];
+      const SNAPS = [
+        { n: 1, name: "Open rehearsal", tag: "recalled 05:42" },
+        { n: 2, name: "Show open", tag: "Current · 06:05", current: true },
+        { n: 3, name: "Interview block", tag: "not recalled yet" },
+        { n: 4, name: "Break bumper", tag: "not recalled yet" },
+        { n: 5, name: "Credits", tag: "not recalled yet" },
+        { n: 6, empty: true },
+        { n: 7, empty: true },
+        { n: 8, empty: true },
+      ];
+      const meterHtml = (stereo, m, p) => {
+        const bar = (cls) =>
+          `<div class="bar ${cls}"><div class="glow" style="clip-path: inset(${100 - meterPct(m)}% 0 0 0)"></div><div class="ramp" style="clip-path: inset(${100 - meterPct(m)}% 0 0 0)"></div><div class="ref"></div><div class="peak" style="bottom:${meterPct(p)}%"></div></div>`;
+        return `<div class="meter well ${stereo ? "stereo" : ""}">${stereo ? bar("l") + bar("r") : bar("m")}<i class="clip"></i></div>`;
+      };
+      const scaleHtml = () =>
+        `<div class="scale"><div class="travel">${TICKS.map(([d, l]) => `<span style="bottom:${(dbToLin(d) * 100).toFixed(2)}%">${l}</span>`).join("")}</div></div>`;
+      function strip(c, tier) {
+        const lampword = (word, on) =>
+          `<span class="lampword ${on ? "on" : ""}"><i class="lamp ${on ? "amber" : ""}"></i>${word}</span>`;
+        const pre =
+          tier === "in"
+            ? `<div class="s-pre"><button class="key p48" data-key data-take aria-label="48 V phantom on, press twice to switch off"><i class="lamp"></i>48 V</button><button class="key gain-key" data-key aria-label="Preamp gain"><span class="l">Gain</span>${c.gain} dB</button></div>`
+            : tier === "pb"
+              ? `<div class="s-pre"><div class="s-tag">stereo</div><div class="s-aux sends"><span>Phones 1</span><b>${c.ph1}</b><span>Phones 2</span><b>${c.ph2}</b></div></div>`
+              : `<div class="s-pre"><div class="s-tag ${c.active ? "target" : ""}">${c.tag}</div><div class="s-aux">${lampword("dim", c.dim)}${lampword("mono", c.mono)}</div></div>`;
+        const keys =
+          tier === "out"
+            ? `<div class="s-keys"><button class="key" data-key data-take aria-label="Mute">M</button></div>`
+            : `<div class="s-keys"><button class="key" data-key data-take aria-label="Mute">M</button><button class="key ${c.solo ? "on" : ""}" data-key data-take aria-label="Solo">S</button></div>`;
+        // TotalMix order: name, value, preamp, mute / solo, then the fader — everything read or pressed sits at the top, within one glance of the name.
+        return `<div class="strip ${c.sel ? "sel" : ""}" data-strip="${c.n}" data-target role="button" aria-label="Select ${c.n}">
+          <div class="s-head"><div class="s-name">${SHORT ? c.short : c.n}</div><div class="s-sub">${c.sub}</div></div>
+          <div class="s-db well">${c.db}</div>
+          ${pre}
+          ${keys}
+          <div class="s-fader">${scaleHtml()}<div class="groove" data-key data-take role="slider" aria-label="${c.n} fader"><div class="slot"></div><div class="travel"><div class="unity"></div><div class="cap" style="bottom:${(c.pos * 100).toFixed(2)}%"></div></div></div>${meterHtml(tier !== "in", c.meter, c.peak)}</div>
+        </div>`;
+      }
+      document.getElementById("strips-in").innerHTML = INPUTS.map((c) => strip(c, "in")).join("");
+      document.getElementById("strips-pb").innerHTML = PLAYBACK.map((c) => strip(c, "pb")).join("");
+      document.getElementById("strips-out").innerHTML = OUTPUTS.map((c) => strip(c, "out")).join("");
+      if (BANKED) {
+        // below the studio width the playback tier shows 4 of its 6 pairs; ] and [ bank the rest
+        const pbHead = document.querySelector("#strips-pb").parentElement.querySelector(".tier-head .d");
+        pbHead.textContent = "4 of 6 pairs · ] shows Playback 9/10 and 11/12";
+        document.querySelector(".footer .item:nth-child(4) b").textContent = "1–4 · 1–4 of 6 · 1–3";
+      }
+      document.getElementById("snapgrid").innerHTML = SNAPS.map((s) =>
+        s.empty
+          ? `<button class="key snap empty" data-key data-take data-slot="${s.n}" aria-label="Snapshot slot ${s.n}, empty"><span class="n">${s.n}</span><span class="name">Empty</span></button>`
+          : `<button class="key snap ${s.current ? "current" : ""}" data-key data-take data-slot="${s.n}" aria-label="Recall snapshot ${s.n} ${s.name}"><span class="n">${s.n}</span><span class="name">${s.name}</span><span class="tag">${s.tag}</span></button>`
+      ).join("");
+      document.getElementById("mainCap").style.left =
+        `calc(17px + ${(0.78 * 100).toFixed(2)}% - ${(0.78 * 34).toFixed(2)}px)`;
+      for (const [id, db] of [
+        ["mL", -3.1],
+        ["gL", -3.1],
+        ["mR", -5.6],
+        ["gR", -5.6],
+      ])
+        document.getElementById(id).style.clipPath = `inset(0 ${100 - meterPct(db)}% 0 0)`;
+      document.getElementById("pL").style.left = meterPct(-1) + "%";
+      document.getElementById("pR").style.left = meterPct(-3) + "%";
+
+      // ---- every state the engine can report (words and sentences from audioFormatting.ts / the fixtures) ----
+      const READY_META = "42 values confirmed · Last sync 18:24 · Metering RME live";
+      const STATES = {
+        ready: {
+          tone: "ok",
+          word: "VERIFIED",
+          sub: "Console · TotalMix on the UFX III",
+          meta: READY_META,
+          hdr: ["ok", "ok"],
+          footer: ["confirmed · 42 values", "RME · live"],
+        },
+        "not-verified": {
+          tone: "attention",
+          word: "NOT VERIFIED",
+          sub: "Console controls stay locked until the audio probe passes.",
+          meta: "Names, snapshot slots and Sync still work · Metering RME live",
+          actions: [["Run audio probe", "primary"]],
+          locked: "locked · run the audio probe",
+          hdr: ["amber", "not verified"],
+          footer: ["not verified", "RME · live"],
+        },
+        assumed: {
+          tone: "attention",
+          word: "ASSUMED",
+          sub: "Showing the last state the console confirmed. Press Sync to pull the current state from TotalMix before trusting faders or recall.",
+          meta: "3 values unconfirmed · 39 confirmed · Last sync 18:24",
+          actions: [["Sync from TotalMix", "primary"]],
+          doubt: ["Host", "Guest 2", "FX 3/4"],
+          hdr: ["amber", "assumed"],
+          footer: ["assumed · 3 unconfirmed", "RME · live"],
+        },
+        stale: {
+          tone: "attention",
+          word: "STALE",
+          sub: "No meter data has arrived from TotalMix for a few seconds.",
+          meta: "42 values confirmed · Last sync 18:24 · Metering RME · stale",
+          actions: [["Run audio probe", ""]],
+          stale: true,
+          hdr: ["amber", "stale"],
+          footer: ["confirmed · 42 values", "RME · stale"],
+        },
+        offline: {
+          tone: "error",
+          word: "OFFLINE",
+          sub: "Audio may still pass, but the app cannot see or change the console right now.",
+          code: "Console did not answer OSC ping · AUDIO_SYNC_FAILED",
+          meta: "",
+          actions: [["Run audio probe", "primary"]],
+          locked: "locked · console unreachable",
+          lockedRed: true,
+          nometer: true,
+          hdr: ["red", "offline"],
+          footer: ["offline", "none"],
+        },
+        disconnected: {
+          tone: "error",
+          word: "DISCONNECTED",
+          sub: "TotalMix reports the UFX III is disconnected. Check the interface's USB link and power.",
+          meta: "Metering none · Last sync 18:24",
+          actions: [["Run audio probe", ""]],
+          locked: "locked · UFX III disconnected",
+          lockedRed: true,
+          nometer: true,
+          hdr: ["red", "disconnected"],
+          footer: ["disconnected", "none"],
+        },
+        disabled: {
+          tone: "attention",
+          word: "DISABLED",
+          sub: "OSC control is switched off in Setup. The Console is read-only until it is switched back on.",
+          meta: "Metering RME live · Last sync 18:24",
+          actions: [["Open Setup", ""]],
+          locked: "read-only · OSC control is off in Setup",
+          hdr: ["amber", "read-only"],
+          footer: ["read-only", "RME · live"],
+        },
+        "action-failed": {
+          tone: "error",
+          word: "ACTION FAILED",
+          sub: "Snapshot slot 3 did not match the current console layout.",
+          code: "Recall of Interview block · AUDIO_SNAPSHOT_RECALL_FAILED",
+          meta: "",
+          actions: [
+            ["Sync from TotalMix", "primary"],
+            ["Dismiss", ""],
+          ],
+          hdr: ["red", "failed"],
+          footer: ["confirmed · 42 values", "RME · live"],
+        },
+        "talkback-refused": {
+          tone: "error",
+          word: "TALKBACK REFUSED",
+          sub: "TotalMix has no talkback channel assigned. Assign one in TotalMix, then hold T again.",
+          meta: READY_META,
+          refused: true,
+          hdr: ["red", "talkback refused"],
+          footer: ["confirmed · 42 values", "RME · live"],
+        },
+        armed: {
+          tone: "ok",
+          word: "VERIFIED",
+          sub: "Console · TotalMix on the UFX III",
+          meta: READY_META,
+          armed: { slot: 3, name: "Interview block", left: "3.9 s", pct: 87 },
+          hdr: ["ok", "ok"],
+          footer: ["confirmed · 42 values", "RME · live"],
+        },
+      };
+      function applyState(name) {
+        const s = STATES[name] || STATES.ready;
+        const board = document.getElementById("board");
+        board.classList.toggle("locked", !!s.locked);
+        board.classList.toggle("no-meter", !!s.nometer);
+        board.classList.toggle("stale", !!s.stale);
+        board.dataset.state = name;
+        const st = document.getElementById("state");
+        st.className = "state well tone-" + s.tone;
+        document.getElementById("stateLamp").className =
+          "lamp " + (s.tone === "ok" ? "ok" : s.tone === "attention" ? "amber" : "red");
+        document.getElementById("stateWord").textContent = s.word;
+        document.getElementById("stateSub").textContent = s.sub;
+        const meta = document.getElementById("stateMeta");
+        if (s.armed) {
+          meta.innerHTML = `<div class="armed-row"><span class="w">ARMED</span><span class="t">Recall ${s.armed.name} · press again to apply · Esc cancels</span><span class="s">${s.armed.left}</span><span class="bar"><i style="width:${s.armed.pct}%"></i></span></div>`;
+        } else if (s.code) {
+          meta.innerHTML = `<span class="state-code">${s.code}</span>`;
+        } else {
+          meta.textContent = s.meta;
+        }
+        document.getElementById("stateActions").innerHTML = (s.actions || [])
+          .map(([label, cls]) => `<button class="key state-key ${cls}" data-key>${label}</button>`)
+          .join("");
+        // the shell lamp mirrors the worst state the workspace shows
+        const hdr = document.getElementById("hdrAudio");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + (s.hdr[0] === "ok" ? "ok" : s.hdr[0]);
+        hdr.querySelector("span").textContent = s.hdr[1];
+        document.getElementById("ftConsole").textContent = s.footer[0];
+        document.getElementById("ftMeter").textContent = s.footer[1];
+        // locked: the reason sits on every tier, and every refused control says so
+        document.getElementById("chanD").textContent = s.locked ? "last synced 18:24" : "as the desk reports it"; // the desk is not reporting while locked
+        document.querySelectorAll(".lock-note").forEach((el) => {
+          el.textContent = s.locked || "";
+          el.classList.toggle("red", !!s.lockedRed);
+        });
+        document.querySelectorAll("[data-take]:not(.state-key), .gain-key").forEach((el) => {
+          if (s.locked) el.setAttribute("aria-disabled", "true");
+          else el.removeAttribute("aria-disabled");
+        });
+        // no metering: the readouts say so
+        if (s.nometer) {
+          document.getElementById("vL").textContent = "—";
+          document.getElementById("vR").textContent = "—";
+          document.getElementById("rdLevel").textContent = "— / — dB";
+          document.getElementById("rdPeak").textContent = "— / — dB";
+        }
+        // doubt: the unconfirmed values carry their own mark
+        document.querySelectorAll(".strip").forEach((el) => {
+          const d = (s.doubt || []).includes(el.dataset.strip);
+          el.classList.toggle("doubt", d);
+          const sub = el.querySelector(".s-sub");
+          if (d && !sub.dataset.orig) {
+            sub.dataset.orig = sub.textContent;
+            sub.textContent = "unconfirmed · " + sub.dataset.orig;
+          }
+          if (!d && sub.dataset.orig) {
+            sub.textContent = sub.dataset.orig;
+            delete sub.dataset.orig;
+          }
+        });
+        document.getElementById("sendMain").classList.toggle("doubt", (s.doubt || []).includes("FX 3/4"));
+        // talkback refused: the key says why
+        const talk = document.getElementById("talk");
+        talk.classList.toggle("refused", !!s.refused);
+        document.getElementById("talkHint").innerHTML = s.refused
+          ? "refused · no talkback channel in TotalMix"
+          : "hold <kbd>T</kbd> · into Phones 1 and 2";
+        // armed: the key itself shows it
+        document.querySelectorAll(".key.snap").forEach((el) => {
+          const armed = s.armed && +el.dataset.slot === s.armed.slot;
+          el.classList.toggle("armed", !!armed);
+          const tag = el.querySelector(".tag");
+          if (tag) {
+            if (armed) {
+              tag.dataset.orig = tag.textContent;
+              tag.textContent = `ARMED · press again · ${s.armed.left}`;
+              el.insertAdjacentHTML("beforeend", `<i class="count" style="width:${s.armed.pct}%"></i>`);
+            } else if (tag.dataset.orig) {
+              tag.textContent = tag.dataset.orig;
+              delete tag.dataset.orig;
+              el.querySelector(".count")?.remove();
+            }
+          }
+        });
+      }
+
+      // ---- harness: theme + state from the URL, s/g/b keys; fit to window, 1 toggles 1:1 ----
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      applyState(params.get("state") || "ready");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / VW[0], innerHeight / VW[1]);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>

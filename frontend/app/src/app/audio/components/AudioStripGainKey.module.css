@@ -1,0 +1,9 @@
+/* Visual overhaul A, Slice 4b: the strip's gain key prints its label small and
+   its value in the deck's mono, on one 30 px row. */
+
+.gainKey {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 6px;
+}

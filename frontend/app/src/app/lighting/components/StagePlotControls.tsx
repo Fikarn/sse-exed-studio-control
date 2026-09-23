@@ -3,6 +3,7 @@ import { Bookmark, Minus, Plus, RotateCcw } from "lucide-react";
 
 import { ContextMenu, SegmentedControl, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
+import { formatShortcut } from "../../shared/shortcutGlyphs";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { StagePlotZoomMode, ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
 
@@ -87,7 +88,13 @@ export function StagePlotControls({
     : [];
 
   return (
-    <div className={styles.controls} role="toolbar" aria-label="Stage plot view">
+    <div
+      className={styles.controls}
+      role="toolbar"
+      aria-label="Stage plot view"
+      data-material="plate"
+      data-level="float"
+    >
       <span className={styles.renderModeGroup}>
         <SegmentedControl
           label="Stage plot render mode"
@@ -115,27 +122,27 @@ export function StagePlotControls({
             onClick={onFitRoom}
             aria-pressed={zoomMode === "fitRoom"}
           >
-            Fit Room
+            Fit room
           </button>
         </Tooltip>
-        <Tooltip content="Fill the desk surface using the current operator-familiar plot stretch" placement="top">
+        <Tooltip content="Fill the pane, stretching the room to fit it" placement="top">
           <button
             type="button"
             className={`${styles.modeButton} ${zoomMode === "fillDesk" ? styles.modeButtonActive : ""}`}
             onClick={onFillDesk}
             aria-pressed={zoomMode === "fillDesk"}
           >
-            Fill Desk
+            Fill screen
           </button>
         </Tooltip>
-        <Tooltip content="Reset pan and content zoom to 100%" placement="top">
+        <Tooltip content="Show the plot at 100 %" placement="top">
           <button
             type="button"
             className={`${styles.modeButton} ${zoomMode === "actual" ? styles.modeButtonActive : ""}`}
             onClick={onActualSize}
             aria-pressed={zoomMode === "actual"}
           >
-            100%
+            100 %
           </button>
         </Tooltip>
       </span>
@@ -145,7 +152,7 @@ export function StagePlotControls({
         </button>
       </Tooltip>
       <span className={styles.zoomLabel} aria-live="polite">
-        {Math.round(zoom * 100)}%
+        {Math.round(zoom * 100)} %
       </span>
       <Tooltip content="Zoom in · scroll wheel works too" placement="top">
         <button type="button" className={styles.button} onClick={onZoomIn} aria-label="Zoom in">
@@ -163,7 +170,7 @@ export function StagePlotControls({
             const filled = Boolean(viewBookmarks?.[slot]);
             const tooltip = filled
               ? `Recall view ${slot + 1} · Shift+${slot + 1}. Right-click for options.`
-              : `Empty slot ${slot + 1}. Right-click to save current view · ⌘⇧${slot + 1}.`;
+              : `Empty slot ${slot + 1}. Right-click to save current view · ${formatShortcut(["mod", "shift", String(slot + 1)])}.`;
             return (
               <Tooltip key={slot} content={tooltip} placement="top">
                 <button

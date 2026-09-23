@@ -2,8 +2,12 @@ name: dev-checks
 
 on:
   pull_request:
+  # Production readiness 2026-09, Slice 0 (finding F03): run on every branch
+  # push, not only on `main`, so a pushed slice is checked before a pull
+  # request exists. Dependabot branches are excluded because they already get
+  # a `pull_request` run and would otherwise run twice.
   push:
-    branches: [main]
+    branches: ["**", "!dependabot/**"]
 
 permissions:
   contents: read
@@ -78,6 +82,43 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run frontend:test
+      # Production readiness S13 (finding F25): the Vitest coverage floors of the
+      # app, the design system and the engine client (measured minus two points;
+      # each workspace's vitest.config.ts).
+      - run: npm run frontend:test:coverage
+
+  # Production readiness 2026-09, Slice 12 (finding F17): what the repository
+  # depends on is checked on every push. Three checks, each of which reports
+  # even when another has failed:
+  # - `supply-chain:npm` — `npm audit` for every lockfile (the shipped tree from
+  #   moderate, the build-and-test tree and `tools/sbom` from high) against
+  #   `scripts/npm-audit-allowlist.json`, whose entries expire;
+  # - the "review by" date on every advisory `native/deny.toml` ignores;
+  # - `cargo deny check`: advisories, bans, licenses, sources.
+  # All three read lockfiles only, so nothing is installed or built here. They
+  # also read the advisory databases as they are today: this job can turn red
+  # on a push that changed nothing, and that is the point of it.
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: npm audit against the allowlist
+        run: npm run supply-chain:npm
+      - name: cargo-deny ignore dates
+        if: ${{ !cancelled() }}
+        run: node scripts/check-deny-ignores.mjs
+      - name: cargo deny check (advisories, bans, licenses, sources)
+        if: ${{ !cancelled() }}
+        # Third-party action, pinned to the commit behind v2.1.1; Dependabot's
+        # github-actions updates move the pin.
+        uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          manifest-path: native/Cargo.toml
+          # native/rust-toolchain.toml pins this; the action's image has to match it.
+          rust-version: "1.95.0"
 
   # plan PR 1 / workstream B1 + B2 (consolidated).
   # `frontend:playwright:test` now includes the `visual-review.spec.ts`
@@ -103,7 +144,34 @@ jobs:
       - name: Install Playwright browser deps (chromium)
         working-directory: frontend/app
         run: npx playwright install --with-deps chromium
-      - run: npm run frontend:playwright:test
+      # Production readiness S13 (findings F25, F03). The job fails on the `default`
+      # project: every case but the few named in frontend/app/tests/quarantine.json,
+      # whose assertions are wall-clock measurements. That list is checked first —
+      # short, explained, no gate on it, and an exit date after which this step
+      # fails until the cases are back in `default` or gone.
+      - name: Quarantine list (short, explained, dated)
+        run: npm run frontend:playwright:quarantine:check
+      - name: Playwright, default project (blocking)
+        run: npm run frontend:playwright:test:blocking
+      # One worker, two retries, its own output folders; it reports and never
+      # fails the job. It reuses the builds of the step above, so it is skipped
+      # when that step did not get as far as running.
+      - name: Playwright, quarantine project (advisory)
+        id: quarantine
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-quarantine
+        run: npm run frontend:playwright:test:quarantine
+      - name: Say what the quarantine project did
+        if: ${{ !cancelled() }}
+        env:
+          QUARANTINE_OUTCOME: ${{ steps.quarantine.outcome }}
+        run: |
+          echo "Quarantine project (advisory, frontend/app/tests/quarantine.json): ${QUARANTINE_OUTCOME}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${QUARANTINE_OUTCOME}" != "success" ]; then
+            echo "::warning title=Quarantined Playwright cases::The quarantine project ended as ${QUARANTINE_OUTCOME}; see the playwright-quarantine artifact."
+          fi
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -120,20 +188,27 @@ jobs:
           path: frontend/app/test-results/
           if-no-files-found: ignore
           retention-days: 14
+      - name: Upload the quarantine project's report and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-quarantine
+          path: |
+            frontend/app/playwright-report-quarantine/
+            frontend/app/test-results-quarantine/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # plan PR 2 / workstream B3 (extends).
   # The plan says "Extends the existing `rust` job with `npm run
-  # native:acceptance` after `native:test`." native:acceptance requires
-  # real RME TotalMix OSC packets on 127.0.0.1; on stock GitHub runners
-  # there are none, so we opt into the new
-  # `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` escape that mirrors the
-  # existing `audioProbeBindDenied` skip — the rest of the harness
-  # (import → backup → restart → workflow parity → restore → verify
-  # rollback) still runs end-to-end. See plan Follow-ups.
+  # native:acceptance` after `native:test`." Since the 2026-09 audit
+  # remediation (Slice 2) the acceptance harness runs the engine in simulated
+  # audio input mode by default, so it needs no TotalMix and never writes to a
+  # console; the audio probe, sync and recall assertions all run against the
+  # simulated console. The live lane (`SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1`)
+  # exists only for the studio workstation.
   rust:
     runs-on: ubuntu-latest
-    env:
-      SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -153,6 +228,36 @@ jobs:
       - run: npm run native:check
       - run: npm run native:test
       - run: npm run native:acceptance
+
+  # Production readiness 2026-09, Slice 13 (finding F25): the line-coverage floor
+  # of the native workspace. `npm run rust:coverage` runs the same `cargo test
+  # --workspace` as the `rust` job, instrumented, and fails under the floor its
+  # script carries — the figure this runner measured, minus two points. A job of
+  # its own because the instrumented build shares nothing with the plain one
+  # (its own cache key) and should not hold up `rust`. Test builds still drop
+  # every datagram aimed at a TotalMix remote port; nothing here reaches hardware.
+  rust-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-tauri-linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native -> target
+          key: llvm-cov
+      - run: npm ci
+      # native/rust-toolchain.toml pins the toolchain cargo uses under native/;
+      # the component has to be added to that one, so rustup runs from there.
+      - name: Install llvm-tools and cargo-llvm-cov
+        run: |
+          (cd native && rustup component add llvm-tools-preview)
+          cargo install cargo-llvm-cov --locked --version 0.9.1
+      - run: npm run rust:coverage
 
   # plan PR 2 / workstream B4.
   # `tauri:foundation` = protocol:generate + native:engine:build +

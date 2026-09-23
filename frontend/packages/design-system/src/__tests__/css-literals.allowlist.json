@@ -1,0 +1,254 @@
+{
+  "app/src/app/OperatorLayoutProvider.module.css": {
+    "colour": 0,
+    "fontSize": 2,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/src/app/audio/components/AudioArmCountdown.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "app/src/app/audio/components/AudioDialog.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/src/app/audio/components/AudioHardwareReadout.module.css": {
+    "colour": 2,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/src/app/audio/components/AudioInspector.module.css": {
+    "colour": 4,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 3
+  },
+  "app/src/app/audio/components/AudioInspectorDynamicsTab.module.css": {
+    "colour": 1,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 2
+  },
+  "app/src/app/audio/components/AudioInspectorEqTab.module.css": {
+    "colour": 6,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 3
+  },
+  "app/src/app/audio/components/AudioKnob.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 1
+  },
+  "app/src/app/audio/components/AudioLiveMeterReadout.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/src/app/audio/components/AudioSignalCanvas.module.css": {
+    "colour": 1,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/src/app/audio/components/AudioSliderControl.module.css": {
+    "colour": 12,
+    "fontSize": 0,
+    "radius": 7,
+    "shadow": 9
+  },
+  "app/src/app/audio/components/AudioStereoMeter.module.css": {
+    "colour": 5,
+    "fontSize": 0,
+    "radius": 2,
+    "shadow": 5
+  },
+  "app/src/app/audio/components/AudioTieredMixer.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "app/src/app/lighting/LightingWorkspace.module.css": {
+    "colour": 0,
+    "fontSize": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/src/app/lighting/components/ColumnResizer.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "app/src/app/lighting/components/DMXCompactStrip.module.css": {
+    "colour": 0,
+    "fontSize": 4,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/src/app/lighting/components/DMXMonitorDialog.module.css": {
+    "colour": 0,
+    "fontSize": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "app/src/app/lighting/components/LightingInspector.module.css": {
+    "colour": 2,
+    "fontSize": 43,
+    "radius": 5,
+    "shadow": 1
+  },
+  "app/src/app/lighting/components/LightingRail.module.css": {
+    "colour": 5,
+    "fontSize": 21,
+    "radius": 6,
+    "shadow": 6
+  },
+  "app/src/app/lighting/components/RenameDialog.module.css": {
+    "colour": 0,
+    "fontSize": 4,
+    "radius": 0,
+    "shadow": 2
+  },
+  "app/src/app/lighting/components/SelectionChipStrip.module.css": {
+    "colour": 0,
+    "fontSize": 2,
+    "radius": 1,
+    "shadow": 0
+  },
+  "app/src/app/lighting/components/StagePlotControls.module.css": {
+    "colour": 1,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "app/src/app/planning/PlanningWorkspace.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 7
+  },
+  "app/src/app/setup/SetupSupportPilot.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 3
+  },
+  "app/src/app/shared/ShortcutOverlay.module.css": {
+    "colour": 0,
+    "fontSize": 7,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/ChipStrip.module.css": {
+    "colour": 1,
+    "fontSize": 2,
+    "radius": 2,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/ColorPicker.module.css": {
+    "colour": 5,
+    "fontSize": 0,
+    "radius": 2,
+    "shadow": 3
+  },
+  "packages/design-system/src/components/ContextMenu.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/HealthBar.module.css": {
+    "colour": 0,
+    "fontSize": 3,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/IconButton.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/InlineRename.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "packages/design-system/src/components/MultiValueSlider.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 0,
+    "shadow": 1
+  },
+  "packages/design-system/src/components/NavItem.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 1,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/NumberEntryDialog.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 1
+  },
+  "packages/design-system/src/components/PlotMeta.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/PlotPill.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/ScrubSlider.module.css": {
+    "colour": 0,
+    "fontSize": 2,
+    "radius": 3,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/SegmentedControl.module.css": {
+    "colour": 1,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/StatusDot.module.css": {
+    "colour": 0,
+    "fontSize": 0,
+    "radius": 1,
+    "shadow": 4
+  },
+  "packages/design-system/src/components/StatusPill.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 2,
+    "shadow": 1
+  },
+  "packages/design-system/src/components/Surface.module.css": {
+    "colour": 8,
+    "fontSize": 0,
+    "radius": 0,
+    "shadow": 0
+  },
+  "packages/design-system/src/components/Tooltip.module.css": {
+    "colour": 0,
+    "fontSize": 1,
+    "radius": 0,
+    "shadow": 0
+  }
+}

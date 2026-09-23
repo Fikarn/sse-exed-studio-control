@@ -1,0 +1,2619 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Gold standard · Skeleton across the four workspaces (2560×1440)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================================
+   Gold-standard skeleton mock v1.1 — docs/redesign/gold-standard-brief-2026-09.md
+   One shell, one top bar, one footer, one type scale, one state vocabulary,
+   one light (top-left) and five elevation levels: well / chassis / panel /
+   key / floating. Keys go down and stay down when engaged; lamps light instantly.
+   The board is a 2560×1440 canvas scaled to fit; press 1 for 1:1.
+   ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --display: "Fraunces", Georgia, serif;
+        --t-tick: 10px;
+        --t-caption: 11px;
+        --t-dense: 12px;
+        --t-body: 13px;
+        --t-emph: 14px;
+        --t-title: 16px;
+        --t-display: 20px;
+        --t-hero: 28px;
+        --r-ctl: 4px;
+        --r-card: 8px;
+        --r-float: 12px;
+        --h-header: 64px;
+        --h-topbar: 48px;
+        --h-footer: 40px;
+        --gutter: 16px;
+        --w-rail: 320px;
+        --w-inspector: 480px;
+        --ease-mech: cubic-bezier(0.2, 0.8, 0.2, 1);
+        --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      [data-theme="studio"] {
+        --chassis: #0d0f0d;
+        --panel: #151815;
+        --well: #090b09;
+        --float: #1b1f1b;
+        --bg-deep: #0a0c0a;
+        --sheen: rgba(250, 246, 230, 0.08);
+        --shade: rgba(0, 0, 0, 0.55);
+        --shade-edge: rgba(0, 0, 0, 0.6);
+        --shade-deep: rgba(0, 0, 0, 0.7);
+        --border: #2a2f28;
+        --border-strong: #3a4038;
+        --hairline: rgba(250, 246, 230, 0.06);
+        --text: #faf6e6;
+        --text-2: #d4cdb3;
+        --muted: #9a9480;
+        --accent: #99ba92;
+        --accent-soft: rgba(153, 186, 146, 0.12);
+        --accent-ink: #0b120c;
+        --focus: #b6d8ad;
+        --engaged: #d8a95a;
+        --engaged-ink: #1a1408;
+        --attention: #d8a95a;
+        --attention-soft: rgba(216, 169, 90, 0.14);
+        --error: #d56a65;
+        --error-soft: rgba(213, 106, 101, 0.14);
+        --error-ink: #1f0a08;
+        --live: #36ce71;
+        --live-ink: #06200f;
+        --info: #69a9d1;
+        --info-soft: rgba(105, 169, 209, 0.14);
+        --meter-lo: #36ce71;
+        --meter-mid: #f4c443;
+        --meter-hot: #f59f2a;
+        --meter-over: #ff3b30;
+        --meter-bg: #050608;
+        --tier-in: #d8c483;
+        --tier-pb: #d6acce;
+        --tier-out: #5dc5e8;
+        --plot: #080a08;
+        --grid: rgba(212, 205, 179, 0.2);
+        --grid-major: rgba(212, 205, 179, 0.4);
+        --grain-opacity: 0.04;
+        --talent: #c9b24a;
+      }
+      [data-theme="graphite"] {
+        --chassis: #0c0f12;
+        --panel: #141a1f;
+        --well: #080b0e;
+        --float: #1b2229;
+        --bg-deep: #090c0f;
+        --sheen: rgba(232, 237, 240, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --shade-edge: rgba(0, 0, 0, 0.65);
+        --shade-deep: rgba(0, 0, 0, 0.75);
+        --border: #2a333b;
+        --border-strong: #3a454e;
+        --hairline: rgba(232, 237, 240, 0.06);
+        --text: #e6f4f3;
+        --text-2: #bcccce;
+        --muted: #93a0a2;
+        --accent: #6fd6ce;
+        --accent-soft: rgba(111, 214, 206, 0.12);
+        --accent-ink: #06201e;
+        --focus: #9ce7df;
+        --engaged: #e0b463;
+        --engaged-ink: #1a1408;
+        --attention: #e0b463;
+        --attention-soft: rgba(224, 180, 99, 0.14);
+        --error: #e5736e;
+        --error-soft: rgba(229, 115, 110, 0.14);
+        --error-ink: #1f0a08;
+        --live: #4de08a;
+        --live-ink: #06200f;
+        --info: #7fc0e8;
+        --info-soft: rgba(127, 192, 232, 0.14);
+        --meter-lo: #36ce71;
+        --meter-mid: #f4c443;
+        --meter-hot: #f59f2a;
+        --meter-over: #ff3b30;
+        --meter-bg: #04070a;
+        --tier-in: #d8c483;
+        --tier-pb: #d6acce;
+        --tier-out: #5dc5e8;
+        --plot: #070a0d;
+        --grid: rgba(200, 214, 220, 0.2);
+        --grid-major: rgba(200, 214, 220, 0.4);
+        --grain-opacity: 0.035;
+        --talent: #c9b24a;
+      }
+      [data-theme="bone"] {
+        --chassis: #e2ddd2;
+        --panel: #ebe7dd;
+        --well: #d7d1c4;
+        --float: #f4f1ea;
+        --bg-deep: #ddd8cc;
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(110, 100, 80, 0.32);
+        --shade-edge: rgba(110, 100, 80, 0.28);
+        --shade-deep: rgba(60, 50, 40, 0.3);
+        --border: #cfc8b8;
+        --border-strong: #b7b0a0;
+        --hairline: rgba(26, 24, 20, 0.08);
+        --text: #262017;
+        --text-2: #4a4636;
+        --muted: #524e3e;
+        --accent: #36603a;
+        --accent-soft: rgba(54, 96, 58, 0.12);
+        --accent-ink: #f7f4ed;
+        --focus: #2d4f2f;
+        --engaged: #6f4a0a;
+        --engaged-ink: #fbf9f3;
+        --attention: #6f4a0a;
+        --attention-soft: rgba(111, 74, 10, 0.12);
+        --error: #9c2f26;
+        --error-soft: rgba(156, 47, 38, 0.12);
+        --error-ink: #fff4f2;
+        --live: #1f7a3e;
+        --live-ink: #f7f4ed;
+        --info: #215586;
+        --info-soft: rgba(33, 85, 134, 0.12);
+        --meter-lo: #2fa85c;
+        --meter-mid: #c99a1e;
+        --meter-hot: #c97a12;
+        --meter-over: #c8271c;
+        --meter-bg: #1a1814;
+        --tier-in: #7a6210;
+        --tier-pb: #7a3f6e;
+        --tier-out: #1f6a86;
+        --plot: #d5cfc0;
+        --grid: rgba(26, 24, 20, 0.2);
+        --grid-major: rgba(26, 24, 20, 0.4);
+        --grain-opacity: 0.05;
+        --talent: #5c4e00;
+      }
+      /* elevation tokens (brief §4) */
+      [data-theme] {
+        --elev-well: inset 2px 2px 4px var(--shade), inset -1px -1px 1px var(--sheen);
+        --elev-panel: inset 1px 1px 0 var(--sheen), 0 0 0 1px var(--shade-edge), 2px 2px 6px var(--shade);
+        --elev-key: inset 1px 1px 0 var(--sheen), inset -1px -1px 0 var(--shade-edge), 1px 1px 3px var(--shade);
+        --elev-key-down: inset 2px 2px 4px var(--shade), inset -1px -1px 1px var(--sheen);
+        --elev-float: 0 12px 32px var(--shade-deep), 0 0 0 1px var(--shade-edge), inset 1px 1px 0 var(--sheen);
+        --edge-machined: 0 1px 0 var(--shade-edge), 0 2px 0 var(--sheen);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #0a0b0a;
+        color: #ddd;
+        font-family: var(--ui);
+      }
+      body {
+        padding: 12px 16px 24px;
+      }
+      /* ---- mock controls (not part of the design) ---------------------------- */
+      .mock-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        align-items: center;
+        margin-bottom: 12px;
+        font: 500 12px/1.3 var(--ui);
+        color: #bbb;
+      }
+      .mock-bar .group {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+        padding: 4px;
+        border: 1px solid #333;
+        border-radius: 6px;
+      }
+      .mock-bar .group span {
+        color: #777;
+        padding: 0 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .mock-bar button {
+        font: 500 12px var(--ui);
+        color: #ccc;
+        background: #1a1c1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      .mock-bar button[aria-pressed="true"] {
+        background: #99ba92;
+        color: #0b120c;
+        border-color: #99ba92;
+      }
+      .mock-note {
+        font: 400 12px/1.5 var(--ui);
+        color: #888;
+        max-width: 1400px;
+        margin: 0 0 12px;
+      }
+      .stage {
+        width: 100%;
+        overflow: auto;
+      }
+      .board {
+        width: 2560px;
+        height: 1440px;
+        transform-origin: top left;
+        position: relative;
+        background: var(--chassis);
+        color: var(--text);
+        font: 400 var(--t-body)/1.35 var(--ui);
+        overflow: hidden;
+      }
+      .board::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        background-image: var(--grain);
+        opacity: var(--grain-opacity);
+        mix-blend-mode: soft-light;
+      }
+      /* ---- shell ------------------------------------------------------------- */
+      .shell {
+        display: grid;
+        grid-template-rows: var(--h-header) var(--h-topbar) minmax(0, 1fr) var(--h-footer);
+        height: 100%;
+        background: var(--chassis);
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 0 24px 0 20px;
+        background: var(--bg-deep);
+        box-shadow: var(--edge-machined);
+        position: relative;
+        z-index: 2;
+      }
+      .crest {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 2px solid var(--text-2);
+        display: grid;
+        place-items: center;
+        font: 600 11px var(--display);
+        color: var(--text-2);
+      }
+      .wordmark {
+        font: 600 11px/1.1 var(--ui);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-2);
+        border-left: 1px solid var(--border-strong);
+        padding-left: 12px;
+      }
+      .product {
+        font: 500 var(--t-display)/1 var(--display);
+        color: var(--text);
+        margin-left: 6px;
+      }
+      .nav {
+        display: flex;
+        gap: 4px;
+        margin-left: 20px;
+        height: 100%;
+        align-items: stretch;
+      }
+      .nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 16px;
+        font: 500 var(--t-title)/1 var(--ui);
+        color: var(--muted);
+        text-decoration: none;
+        position: relative;
+      }
+      .nav a .ic {
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid currentColor;
+        border-radius: 3px;
+        opacity: 0.8;
+      }
+      .nav a.active {
+        color: var(--text);
+      }
+      .nav a.active::after {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: 0;
+        height: 3px;
+        background: var(--accent);
+        border-radius: 2px 2px 0 0;
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+      }
+      /* lamp groove: a recessed strip holding the subsystem lamps (keys) */
+      .chips {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        padding: 5px 6px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: var(--r-ctl);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        font: 500 var(--t-caption)/1 var(--ui);
+        color: var(--text-2);
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          transform 100ms var(--ease-mech);
+      }
+      .chip:active {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+      }
+      .chip .word {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+      }
+      /* lamps: 8 px LEDs; lit = solid + bloom; unlit = a dark well */
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        flex: 0 0 auto;
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 65%, transparent);
+      }
+      .dot.attn {
+        background: var(--attention);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--attention) 65%, transparent);
+      }
+      .dot.err {
+        background: var(--error);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--error) 65%, transparent);
+      }
+      .dot.info {
+        background: var(--info);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--info) 65%, transparent);
+      }
+      .dot.neutral {
+        background: var(--well);
+        box-shadow:
+          inset 1px 1px 1px var(--shade),
+          inset -1px -1px 0 var(--sheen);
+      }
+      .clock {
+        margin-left: 12px;
+        font: 500 var(--t-emph) var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--text-2);
+      }
+      /* ---- workspace top bar ------------------------------------------------- */
+      .topbar {
+        display: grid;
+        grid-template-columns: auto auto auto minmax(0, 1fr) 360px auto auto;
+        align-items: center;
+        gap: 16px;
+        padding: 0 24px;
+        background: var(--chassis);
+        box-shadow: var(--edge-machined);
+        position: relative;
+        z-index: 1;
+      }
+      .topbar .title {
+        font: 500 var(--t-display)/1 var(--display);
+        color: var(--text);
+      }
+      .topbar .context {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 var(--t-body) var(--ui);
+        color: var(--text-2);
+        padding-left: 16px;
+        border-left: 1px solid var(--border);
+        height: 24px;
+      }
+      .topbar .context .val {
+        font-family: var(--mono);
+        color: var(--text);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 28px;
+        padding: 0 12px 0 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .badge.ok {
+        color: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+        background: var(--accent-soft);
+      }
+      .badge.attn {
+        color: var(--attention);
+        border-color: color-mix(in srgb, var(--attention) 45%, transparent);
+        background: var(--attention-soft);
+      }
+      .badge.err {
+        color: var(--error);
+        border-color: color-mix(in srgb, var(--error) 45%, transparent);
+        background: var(--error-soft);
+      }
+      .badge.info {
+        color: var(--info);
+        border-color: color-mix(in srgb, var(--info) 45%, transparent);
+        background: var(--info-soft);
+      }
+      .badge .dot {
+        width: 7px;
+        height: 7px;
+        background: currentColor;
+        box-shadow: 0 0 6px currentColor;
+      }
+      .search {
+        height: 32px;
+        border-radius: var(--r-ctl);
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        font: 400 var(--t-body) var(--mono);
+      }
+      .search kbd {
+        margin-left: auto;
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      /* ---- keys and buttons (level +2) --------------------------------------- */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 32px;
+        padding: 0 14px;
+        border-radius: var(--r-ctl);
+        border: 0;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text);
+        font: 500 var(--t-body)/1 var(--ui);
+        white-space: nowrap;
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          transform 100ms var(--ease-mech),
+          background 60ms linear;
+        cursor: pointer;
+      }
+      .btn:hover {
+        box-shadow:
+          inset 1px 1px 0 var(--sheen),
+          inset -1px -1px 0 var(--shade),
+          1px 1px 3px var(--shade);
+      }
+      .btn:active {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+      }
+      .btn.compact {
+        height: 28px;
+        padding: 0 12px;
+        font-size: var(--t-dense);
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+        box-shadow: none;
+        color: var(--text-2);
+      }
+      .btn.ghost:hover {
+        box-shadow: var(--elev-key);
+        background: var(--float);
+      }
+      .btn.danger {
+        background: var(--float);
+        color: var(--error);
+        box-shadow:
+          var(--elev-key),
+          inset 0 0 0 1px color-mix(in srgb, var(--error) 45%, transparent);
+      }
+      /* keys with a state stay down and light */
+      .btn.engaged,
+      .toggle.on,
+      .ms span.on {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--engaged);
+        color: var(--engaged-ink);
+        font-weight: 600;
+      }
+      .btn.live {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--live);
+        color: var(--live-ink);
+        font-weight: 600;
+      }
+      .btn.hazard {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+        background: var(--error);
+        color: var(--error-ink);
+        font-weight: 600;
+      }
+      .btn.armed {
+        box-shadow:
+          var(--elev-key-down),
+          0 0 0 2px var(--attention);
+        transform: translateY(1px);
+        color: var(--attention);
+        background: var(--attention-soft);
+        position: relative;
+      }
+      .btn.disabled {
+        box-shadow: none;
+        opacity: 0.45;
+        transform: none;
+        cursor: not-allowed;
+      }
+      .btn kbd {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+      }
+      .btn.primary kbd,
+      .btn.engaged kbd,
+      .btn.live kbd,
+      .btn.hazard kbd {
+        color: inherit;
+        border-color: color-mix(in srgb, currentColor 45%, transparent);
+      }
+      /* stamped key caps: hardware-mirroring keys read like the deck */
+      .toggle,
+      .ms span,
+      [data-talk] {
+        font: 600 var(--t-caption)/1 var(--mono) !important;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .overflow {
+        width: 32px;
+        height: 32px;
+        border-radius: var(--r-ctl);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        display: grid;
+        place-items: center;
+        color: var(--text-2);
+        font: 600 16px var(--mono);
+      }
+      /* ---- body ---------------------------------------------------------------- */
+      .body {
+        display: grid;
+        grid-template-columns: var(--w-rail) minmax(0, 1fr) var(--w-inspector);
+        grid-template-rows: auto minmax(0, 1fr);
+        column-gap: var(--gutter);
+        row-gap: 0;
+        padding: var(--gutter);
+        min-height: 0;
+      }
+      .body.no-rail {
+        grid-template-columns: minmax(0, 1fr) var(--w-inspector);
+      }
+      .band {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        margin-bottom: var(--gutter);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 16px;
+        height: 44px;
+        padding: 0 16px;
+        border-radius: var(--r-card);
+        box-shadow: var(--elev-panel);
+      }
+      .band.attn {
+        background: color-mix(in srgb, var(--attention) 14%, var(--panel));
+      }
+      .band.err {
+        background: color-mix(in srgb, var(--error) 14%, var(--panel));
+      }
+      .band.info {
+        background: color-mix(in srgb, var(--info) 14%, var(--panel));
+      }
+      .band .word {
+        font: 600 var(--t-caption) var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .band.attn .word {
+        color: var(--attention);
+      }
+      .band.err .word {
+        color: var(--error);
+      }
+      .band.info .word {
+        color: var(--info);
+      }
+      .band .msg {
+        font: 400 var(--t-body) var(--ui);
+        color: var(--text);
+      }
+      .rail,
+      .inspector,
+      .canvas {
+        grid-row: 2;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border-radius: var(--r-card);
+        box-shadow: var(--elev-panel);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      /* the canvas is a screen: a well the content is drawn on */
+      .card.canvas-card {
+        flex: 1;
+        min-height: 0;
+        padding: 0;
+        overflow: hidden;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .eyebrow {
+        font: 600 var(--t-caption)/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .eyebrow .n {
+        margin-left: auto;
+        color: var(--text-2);
+        font-weight: 500;
+      }
+      .h {
+        font: 600 var(--t-title)/1.2 var(--ui);
+        color: var(--text);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .row .grow {
+        flex: 1;
+      }
+      .val {
+        font: 500 var(--t-emph) var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--text);
+      }
+      .val.big {
+        font: 500 var(--t-hero)/1 var(--mono);
+      }
+      .sub {
+        font: 400 var(--t-dense)/1.3 var(--ui);
+        color: var(--muted);
+      }
+      .list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        height: 36px;
+        padding: 0 10px;
+        border-radius: var(--r-ctl);
+        border: 1px solid transparent;
+        font: 500 var(--t-body) var(--ui);
+        color: var(--text-2);
+      }
+      .item .meta {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+      }
+      .item.selected {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--text);
+        box-shadow: inset 0 0 0 1px var(--accent);
+      }
+      .item.current .tag {
+        font: 600 var(--t-tick) var(--mono);
+        letter-spacing: 0.06em;
+        color: var(--engaged-ink);
+        background: var(--engaged);
+        border-radius: 3px;
+        padding: 2px 6px;
+      }
+      .item.armed {
+        border: 2px solid var(--attention);
+        background: var(--attention-soft);
+        color: var(--text);
+        box-shadow: var(--elev-key-down);
+      }
+      .item.armed .tag {
+        font: 600 var(--t-tick) var(--mono);
+        letter-spacing: 0.06em;
+        color: var(--attention);
+        border: 1px solid var(--attention);
+        border-radius: 3px;
+        padding: 1px 6px;
+      }
+      .toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r-ctl);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text-2);
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          transform 100ms var(--ease-mech),
+          background 60ms linear;
+      }
+      .toggle:active {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+      }
+      /* sliders: a groove (well) with a key riding in it */
+      .slider {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--well);
+        box-shadow:
+          inset 1px 1px 2px var(--shade),
+          inset -1px -1px 0 var(--sheen);
+        position: relative;
+        flex: 1;
+      }
+      .slider i {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        border-radius: 4px;
+        background: var(--accent);
+      }
+      .slider b {
+        position: absolute;
+        top: 50%;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--float);
+        transform: translate(-50%, -50%);
+        box-shadow: var(--elev-key);
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font: 600 var(--t-caption) var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .field .in {
+        height: 32px;
+        border-radius: var(--r-ctl);
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        font: 500 var(--t-emph) var(--mono);
+        color: var(--text);
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      /* tabs: keys in a row, the engaged one down */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        padding: 4px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .tabs span {
+        padding: 8px 12px;
+        border-radius: var(--r-ctl);
+        font: 500 var(--t-body) var(--ui);
+        color: var(--muted);
+      }
+      .tabs span.on {
+        color: var(--text);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+      }
+      /* ---- footer: a recessed strip ------------------------------------------- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        margin: 0 var(--gutter) 8px;
+        padding: 0 16px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+      }
+      .footer .f {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .footer .f b {
+        font-weight: 500;
+        color: var(--text);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: var(--t-dense);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: inline-flex;
+        gap: 16px;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .footer kbd {
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        color: var(--text-2);
+      }
+      /* ---- lighting canvas ----------------------------------------------------- */
+      .plot {
+        position: absolute;
+        inset: 0;
+        background: var(--plot);
+        background-image:
+          linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+          linear-gradient(var(--grid-major) 1px, transparent 1px),
+          linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+        background-size:
+          58px 58px,
+          58px 58px,
+          290px 290px,
+          290px 290px;
+        background-position: 80px 60px;
+      }
+      .room {
+        position: absolute;
+        left: 80px;
+        top: 60px;
+        right: 80px;
+        bottom: 60px;
+        border: 2px solid var(--grid-major);
+      }
+      .beam {
+        position: absolute;
+        left: 140px;
+        top: 120px;
+        width: 620px;
+        height: 720px;
+        background: linear-gradient(180deg, rgba(243, 168, 122, 0.28), rgba(243, 168, 122, 0));
+        clip-path: polygon(0 0, 12% 0, 100% 100%, 40% 100%);
+      }
+      .fixture {
+        position: absolute;
+        width: 72px;
+        height: 44px;
+        border-radius: 6px;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        display: grid;
+        place-items: center;
+      }
+      .fixture i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #f3a87a;
+        box-shadow: 0 0 8px rgba(243, 168, 122, 0.7);
+      }
+      .fixture.selected {
+        outline: 2px solid var(--accent);
+        outline-offset: 4px;
+      }
+      .fixture .lbl {
+        position: absolute;
+        top: -26px;
+        left: 0;
+        font: 600 var(--t-caption) var(--mono);
+        color: var(--text);
+        letter-spacing: 0.06em;
+        white-space: nowrap;
+      }
+      .talent {
+        position: absolute;
+        bottom: 80px;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        border: 2px solid var(--talent);
+        display: grid;
+        place-items: center;
+        color: var(--talent);
+        font: 600 var(--t-tick) var(--mono);
+      }
+      .talent::after {
+        content: attr(data-l);
+        position: absolute;
+        top: 58px;
+        left: 50%;
+        transform: translateX(-50%);
+        font: 600 var(--t-caption) var(--mono);
+        letter-spacing: 0.06em;
+        color: var(--text);
+        background: var(--panel);
+        box-shadow: var(--elev-key);
+        border-radius: 3px;
+        padding: 2px 8px;
+        white-space: nowrap;
+      }
+      .glass {
+        position: absolute;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--r-ctl);
+        background: color-mix(in srgb, var(--panel) 84%, transparent);
+        box-shadow: var(--elev-panel);
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--text-2);
+        backdrop-filter: blur(8px);
+      }
+      .glass b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .viewctl {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .viewctl span {
+        padding: 6px 10px;
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        border-radius: 3px;
+      }
+      .viewctl span.on {
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text);
+      }
+      .scene {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        padding: 8px;
+        border-radius: var(--r-card);
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+      }
+      .scene .thumb {
+        width: 96px;
+        height: 56px;
+        border-radius: 4px;
+        background: #0b0d0b;
+        box-shadow: var(--elev-well);
+        position: relative;
+        overflow: hidden;
+      }
+      .scene .thumb i {
+        position: absolute;
+        bottom: 8px;
+        left: 8px;
+        width: 12px;
+        height: 6px;
+        background: #f3a87a;
+        box-shadow:
+          18px 0 #f3a87a,
+          36px 0 #ef8e5a;
+        border-radius: 1px;
+      }
+      .scene.current {
+        box-shadow:
+          var(--elev-panel),
+          inset 0 0 0 1px var(--engaged);
+      }
+      .scene .name {
+        font: 600 var(--t-emph) var(--ui);
+        color: var(--text);
+      }
+      .scene .cur {
+        font: 600 var(--t-tick) var(--mono);
+        letter-spacing: 0.06em;
+        color: var(--engaged-ink);
+        background: var(--engaged);
+        border-radius: 3px;
+        padding: 2px 6px;
+      }
+      /* ---- audio canvas: a bay of tier panels; strips are wells and keys ------- */
+      .tiers {
+        display: grid;
+        grid-template-columns: 4fr 6fr 3fr;
+        gap: 12px;
+        height: 100%;
+        padding: 12px;
+      }
+      .tier {
+        border-radius: var(--r-card);
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .tier .th {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--shade-edge);
+        box-shadow: 0 1px 0 var(--sheen);
+        font: 600 var(--t-caption) var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .tier .th .mixfor {
+        margin-left: auto;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .tier .th .mixfor b {
+        color: var(--text);
+      }
+      .tier.in .th {
+        color: var(--tier-in);
+      }
+      .tier.pb .th {
+        color: var(--tier-pb);
+      }
+      .tier.out .th {
+        color: var(--tier-out);
+      }
+      .strips {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        gap: 6px;
+        padding: 10px;
+        flex: 1;
+        min-height: 0;
+      }
+      .strip {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+        gap: 8px;
+        padding: 8px 6px;
+        border-radius: var(--r-ctl);
+        border: 1px solid transparent;
+        min-height: 0;
+      }
+      .strip + .strip {
+        border-left-color: var(--shade-edge);
+        box-shadow: inset 1px 0 0 var(--sheen);
+        border-radius: 0;
+      }
+      .strip.selected {
+        border-color: var(--accent) !important;
+        background: var(--accent-soft);
+        box-shadow: inset 0 0 0 1px var(--accent) !important;
+        border-radius: var(--r-ctl);
+      }
+      .strip.current {
+        border-color: var(--engaged) !important;
+        box-shadow: inset 0 0 0 1px var(--engaged) !important;
+        border-radius: var(--r-ctl);
+      }
+      .strip .nm {
+        font: 600 var(--t-emph)/1.2 var(--ui);
+        color: var(--text);
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .strip .nm small {
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+        letter-spacing: 0.06em;
+      }
+      .strip .tags {
+        display: flex;
+        gap: 4px;
+      }
+      .strip .tag {
+        font: 600 var(--t-tick) var(--mono);
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .strip .tag.p48 {
+        color: var(--error-ink);
+        background: var(--error);
+        border-color: transparent;
+        box-shadow: var(--elev-key-down);
+      }
+      .fader {
+        display: grid;
+        grid-template-columns: 22px 1fr 22px;
+        gap: 4px;
+        min-height: 0;
+      }
+      .meter {
+        background: var(--meter-bg);
+        border-radius: 3px;
+        box-shadow: var(--elev-well);
+        position: relative;
+        overflow: hidden;
+      }
+      .meter i {
+        position: absolute;
+        left: 2px;
+        right: 2px;
+        bottom: 2px;
+        border-radius: 1px;
+        background: linear-gradient(
+          0deg,
+          var(--meter-lo) 0 62%,
+          var(--meter-mid) 62% 82%,
+          var(--meter-hot) 82% 94%,
+          var(--meter-over) 94%
+        );
+      }
+      .meter b {
+        position: absolute;
+        left: 2px;
+        right: 2px;
+        height: 2px;
+        background: var(--text);
+        opacity: 0.85;
+      }
+      .track {
+        position: relative;
+      }
+      .track::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        margin-left: -3px;
+        border-radius: 3px;
+        background: var(--well);
+        box-shadow:
+          inset 1px 1px 2px var(--shade),
+          inset -1px -1px 0 var(--sheen);
+      }
+      .cap {
+        position: absolute;
+        left: 50%;
+        width: 22px;
+        height: 44px;
+        margin-left: -11px;
+        border-radius: 4px;
+        background: var(--float);
+        box-shadow: var(--elev-key);
+      }
+      .cap::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        right: 4px;
+        top: 50%;
+        height: 2px;
+        background: var(--text-2);
+      }
+      .cap.assumed {
+        box-shadow:
+          var(--elev-key),
+          0 0 0 2px var(--attention);
+        outline: 2px dashed var(--attention);
+        outline-offset: -2px;
+      }
+      .ticks {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+        text-align: right;
+        padding: 2px 0;
+      }
+      .strip .db {
+        font: 500 var(--t-emph) var(--mono);
+        color: var(--text);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .ms {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
+      }
+      .ms span {
+        height: 30px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--r-ctl);
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text-2);
+        transition:
+          box-shadow 100ms var(--ease-mech),
+          transform 100ms var(--ease-mech),
+          background 60ms linear;
+      }
+      .ms span:active {
+        box-shadow: var(--elev-key-down);
+        transform: translateY(1px);
+      }
+      .strip.disabled .fader .cap,
+      .strip.disabled .ms span {
+        box-shadow: none;
+      }
+      .strip.disabled .fader,
+      .strip.disabled .ms,
+      .strip.disabled .db {
+        opacity: 0.45;
+      }
+      .mm {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      .mbar {
+        height: 12px;
+        background: var(--meter-bg);
+        border-radius: 3px;
+        box-shadow: var(--elev-well);
+        position: relative;
+        overflow: hidden;
+      }
+      .mbar i {
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        bottom: 2px;
+        border-radius: 1px;
+        background: linear-gradient(
+          90deg,
+          var(--meter-lo) 0 62%,
+          var(--meter-mid) 62% 82%,
+          var(--meter-hot) 82% 94%,
+          var(--meter-over) 94%
+        );
+      }
+      .scale {
+        display: flex;
+        justify-content: space-between;
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+      }
+      /* ---- planning canvas ----------------------------------------------------- */
+      .tl {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        height: 100%;
+      }
+      .tl .lanes {
+        display: grid;
+        grid-auto-rows: 1fr;
+        background: var(--panel);
+        box-shadow: 1px 0 0 var(--shade-edge);
+      }
+      .tl .lane {
+        border-bottom: 1px solid var(--shade-edge);
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .tl .lane .nm {
+        font: 600 var(--t-emph) var(--ui);
+        color: var(--text);
+      }
+      .tl .grid {
+        position: relative;
+        display: grid;
+        grid-auto-rows: 1fr;
+        background-image: linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+        background-size: calc(100% / 13) 100%;
+      }
+      .tl .hours {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 28px;
+        display: grid;
+        grid-template-columns: repeat(13, 1fr);
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--text-2);
+        border-bottom: 1px solid var(--border);
+      }
+      .tl .hours span {
+        padding: 8px 6px;
+      }
+      .tl .now {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(100% / 13 * 0.18);
+        width: 2px;
+        background: var(--accent);
+        box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+      }
+      .tl .now::before {
+        content: "09:11";
+        position: absolute;
+        top: 6px;
+        left: 6px;
+        font: 600 var(--t-tick) var(--mono);
+        color: var(--accent);
+      }
+      .tl .r {
+        position: relative;
+        border-bottom: 1px solid var(--border);
+      }
+      .tl .r:first-child .block {
+        top: 40px;
+      }
+      .block {
+        position: absolute;
+        top: 12px;
+        bottom: 12px;
+        border-radius: var(--r-ctl);
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow: hidden;
+      }
+      .block .t {
+        font: 600 var(--t-dense) var(--ui);
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .block .m {
+        font: 500 var(--t-tick) var(--mono);
+        color: var(--muted);
+      }
+      .block.selected {
+        box-shadow:
+          var(--elev-panel),
+          inset 0 0 0 2px var(--accent);
+        background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+      }
+      .block.running {
+        box-shadow:
+          var(--elev-panel),
+          inset 0 0 0 1px var(--engaged);
+      }
+      .block.running .t::before {
+        content: "●";
+        color: var(--engaged);
+        margin-right: 6px;
+        text-shadow: 0 0 6px var(--engaged);
+      }
+      .block.blocked {
+        box-shadow:
+          var(--elev-panel),
+          inset 0 0 0 1px color-mix(in srgb, var(--error) 60%, transparent);
+        background: color-mix(in srgb, var(--error) 12%, var(--panel));
+      }
+      .seg {
+        display: inline-flex;
+        padding: 3px;
+        border-radius: 6px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .seg span {
+        padding: 6px 12px;
+        font: 500 var(--t-dense) var(--ui);
+        color: var(--muted);
+        border-radius: 3px;
+      }
+      .seg span.on {
+        background: var(--float);
+        box-shadow: var(--elev-key);
+        color: var(--text);
+      }
+      .pill {
+        font: 600 var(--t-tick) var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        color: var(--muted);
+      }
+      .pill.run {
+        color: var(--engaged);
+        border-color: color-mix(in srgb, var(--engaged) 50%, transparent);
+      }
+      .pill.blk {
+        color: var(--error);
+        border-color: color-mix(in srgb, var(--error) 50%, transparent);
+      }
+      .check {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font: 400 var(--t-body) var(--ui);
+        color: var(--text-2);
+      }
+      .check i {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+      }
+      .check i.on {
+        background: var(--accent);
+        box-shadow: var(--elev-key-down);
+      }
+      /* ---- setup canvas -------------------------------------------------------- */
+      .steps {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        height: 56px;
+        padding: 0 10px;
+        border-radius: var(--r-ctl);
+        border: 1px solid transparent;
+      }
+      .step .num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--well);
+        box-shadow: var(--elev-well);
+        display: grid;
+        place-items: center;
+        font: 600 var(--t-caption) var(--mono);
+        color: var(--text-2);
+      }
+      .step .nm {
+        font: 500 var(--t-body) var(--ui);
+        color: var(--text);
+      }
+      .step .st {
+        font: 500 var(--t-caption) var(--mono);
+        color: var(--muted);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .step.done .num {
+        background: var(--accent);
+        color: var(--accent-ink);
+        box-shadow:
+          var(--elev-key-down),
+          0 0 8px color-mix(in srgb, var(--accent) 50%, transparent);
+      }
+      .step.selected {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .probe {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 16px;
+        align-items: center;
+        padding: 12px 14px;
+        border-radius: var(--r-card);
+        background: var(--panel);
+        box-shadow: var(--elev-panel);
+      }
+      .probe .nm {
+        font: 600 var(--t-emph) var(--ui);
+        color: var(--text);
+      }
+      .probe .sub {
+        margin-top: 2px;
+      }
+      .skeleton {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .skeleton i {
+        display: block;
+        height: 14px;
+        border-radius: 4px;
+        background: var(--float);
+      }
+      .skeleton i.w60 {
+        width: 60%;
+      }
+      .skeleton i.w40 {
+        width: 40%;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body data-theme="studio">
+    <div class="mock-bar">
+      <div class="group">
+        <span>Board</span>
+        <button data-board="lighting" aria-pressed="true">Lighting</button>
+        <button data-board="audio">Audio</button>
+        <button data-board="planning">Planning</button>
+        <button data-board="setup">Setup / Support</button>
+      </div>
+      <div class="group">
+        <span>Theme</span>
+        <button data-theme-btn="studio" aria-pressed="true">Studio</button>
+        <button data-theme-btn="graphite">Graphite</button>
+        <button data-theme-btn="bone">Bone</button>
+      </div>
+      <div class="group" id="state-group"><span>State</span></div>
+      <div class="group">
+        <span>Zoom</span>
+        <button data-zoom="fit" aria-pressed="true">Fit</button>
+        <button data-zoom="1">1:1</button>
+      </div>
+    </div>
+    <p class="mock-note">
+      Gold-standard skeleton v1.1 (brief §3, §4, §13, §14): one light from the top-left and five elevation levels —
+      wells hold data, panels are mounted, keys go down and stay down when engaged, lamps light instantly. One 64 px
+      shell header with the four tabs and the monitor chips, one 48 px workspace top bar with fixed slots (title ·
+      context · state badge · search · actions · overflow), a 320 px rail, the canvas, a 480 px inspector, one 40 px
+      footer. The same chrome on every board; state renders in the same slot and the same forms (§7). Content is
+      representative, not pixel-complete.
+    </p>
+
+    <div class="stage">
+      <div class="board" id="board">
+        <!-- ========================================================= LIGHTING -->
+        <section class="shell" data-board="lighting">
+          <header class="header">
+            <div class="crest">SSE</div>
+            <div class="wordmark">Executive<br />Education</div>
+            <div class="product">Studio Control</div>
+            <nav class="nav">
+              <a><i class="ic"></i>Setup / Support</a><a class="active"><i class="ic"></i>Lighting</a
+              ><a><i class="ic"></i>Audio</a><a><i class="ic"></i>Planning</a>
+            </nav>
+            <div class="chips">
+              <span class="chip"
+                ><i class="dot" data-chip="lighting"></i>Lighting
+                <span class="word" data-chip-word="lighting">ready</span></span
+              >
+              <span class="chip"><i class="dot"></i>Audio <span class="word">ready</span></span>
+              <span class="chip"><i class="dot"></i>Surface <span class="word">ready</span></span>
+              <span class="chip"><i class="dot attn"></i>Solo <span class="word">2</span></span>
+              <span class="clock">09:11</span>
+            </div>
+          </header>
+          <div class="topbar">
+            <div class="title">Lighting</div>
+            <div class="context">Scene <span class="val">Warm wash</span></div>
+            <span class="badge ok" data-badge><i class="dot"></i><span data-badge-word>Ready</span></span>
+            <div></div>
+            <div class="search">Search fixtures, scenes, groups <kbd>Ctrl F</kbd></div>
+            <div class="actions">
+              <span class="btn">Patch <kbd>P</kbd></span
+              ><span class="btn">Preview <kbd>B</kbd></span
+              ><span class="btn primary">Add fixture</span>
+            </div>
+            <div class="overflow">⋯</div>
+          </div>
+          <div class="body" data-body>
+            <div class="band err hidden" data-band="unreachable">
+              <span class="word">Bridge unreachable</span
+              ><span class="msg"
+                >Lighting commands will not reach the rig until the bridge at 192.168.1.80 (universe 1) answers. Check
+                the network, or run the bridge probe.</span
+              ><span class="btn compact">Run bridge probe</span>
+            </div>
+            <div class="band info hidden" data-band="preview">
+              <span class="word">Preview</span
+              ><span class="msg"
+                >Editing offline. The rig is unchanged until you save this scene or discard the preview.</span
+              ><span class="actions"
+                ><span class="btn compact primary">Save scene</span><span class="btn compact">Discard</span
+                ><span class="btn compact ghost">Exit preview</span></span
+              >
+            </div>
+            <aside class="rail">
+              <div class="card">
+                <div class="eyebrow">Master <span class="n">3 / 4 on</span></div>
+                <div class="row">
+                  <span class="h" data-master-title>Lighting on</span><span class="grow"></span
+                  ><span class="toggle on" data-master-toggle>On</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Grand master</span
+                  ><span class="slider"><i style="width: 100%"></i><b style="left: 100%"></b></span
+                  ><span class="val">100 %</span>
+                </div>
+                <span class="btn danger">Cut all</span>
+              </div>
+              <div class="card" style="flex: 1">
+                <div class="eyebrow">Scenes <span class="n">2 saved</span></div>
+                <div class="scene current">
+                  <div class="thumb"><i></i></div>
+                  <div>
+                    <div class="name">Warm wash</div>
+                    <div class="sub">3 on · 3500 K · recalled 19 h ago</div>
+                  </div>
+                  <span class="cur">Current</span>
+                </div>
+                <div class="scene">
+                  <div class="thumb">
+                    <i
+                      style="
+                        box-shadow:
+                          18px 0 #f3a87a,
+                          36px 0 #f3a87a,
+                          54px 0 #ebe5d2;
+                      "
+                    ></i>
+                  </div>
+                  <div>
+                    <div class="name">Interview</div>
+                    <div class="sub">4 on · 4375 K</div>
+                  </div>
+                  <span class="btn compact ghost">Recall</span>
+                </div>
+                <span class="btn compact ghost">＋ New scene</span>
+              </div>
+              <div class="card">
+                <div class="eyebrow">Groups <span class="n">1 / 2 on</span></div>
+                <div class="list">
+                  <div class="item"><i class="dot"></i>Front<span class="meta">2 fixtures · 67 %</span></div>
+                  <div class="item"><i class="dot neutral"></i>Back<span class="meta">2 fixtures · off</span></div>
+                </div>
+              </div>
+            </aside>
+            <main class="canvas">
+              <div class="card canvas-card" style="position: relative">
+                <div class="plot">
+                  <div class="room"></div>
+                  <div class="beam"></div>
+                  <div class="fixture selected" style="left: 150px; top: 150px">
+                    <span class="lbl">Key · 76 % · 3200 K</span><i></i>
+                  </div>
+                  <div class="fixture" style="left: 240px; top: 150px"><i style="opacity: 0.5"></i></div>
+                  <div class="fixture" style="left: 190px; top: 230px; width: 120px; height: 20px">
+                    <i style="width: 80px; height: 6px; border-radius: 2px"></i>
+                  </div>
+                  <div class="talent" data-l="Talent 1" style="left: 880px">1</div>
+                  <div class="talent" data-l="Talent 2" style="left: 1080px">2</div>
+                  <div class="talent" data-l="Talent 3" style="left: 1280px">3</div>
+                  <div class="glass" style="left: 16px; top: 16px">
+                    <i class="dot engaged" style="background: var(--engaged)"></i>Current scene <b>Warm wash</b>
+                  </div>
+                  <div class="glass" style="right: 16px; top: 16px">
+                    Floor <b>12 m × 8 m</b> · Grid <b>0.5 / 1 / 5 m</b>
+                  </div>
+                  <div class="viewctl">
+                    <span class="on">Rig</span><span>Coverage</span><span>Photometric</span><span>Pixel</span
+                    ><span style="border-left: 1px solid var(--border)">Frame</span><span>Fit room</span
+                    ><span>100 %</span>
+                  </div>
+                </div>
+              </div>
+            </main>
+            <aside class="inspector">
+              <div class="card" style="flex: 1">
+                <div class="tabs"><span>Scene</span><span class="on">Fixture</span><span>Palettes</span></div>
+                <div class="row">
+                  <div>
+                    <div class="eyebrow">Fixture · Astra Bi-Color · 2 ch</div>
+                    <div class="h" style="font: 500 var(--t-display) var(--display)">Key</div>
+                  </div>
+                  <span class="grow"></span><span class="btn compact">Identify</span
+                  ><span class="btn compact engaged">On</span>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Levels</div>
+                <div class="row">
+                  <span class="sub" style="width: 120px">Intensity</span
+                  ><span class="slider"><i style="width: 76%"></i><b style="left: 76%"></b></span
+                  ><span class="val">76 %</span>
+                </div>
+                <div class="row">
+                  <span class="sub" style="width: 120px">Colour temp.</span
+                  ><span class="slider"><i style="width: 0%"></i><b style="left: 0%"></b></span
+                  ><span class="val">3200 K</span>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Position</div>
+                <div class="grid2">
+                  <div class="field">
+                    <label>Stage X (m)</label>
+                    <div class="in">0.24</div>
+                  </div>
+                  <div class="field">
+                    <label>Stage Y (m)</label>
+                    <div class="in">0.26</div>
+                  </div>
+                  <div class="field">
+                    <label>Rig height (m)</label>
+                    <div class="in">4.2</div>
+                  </div>
+                  <div class="field">
+                    <label>Rotation (°)</label>
+                    <div class="in">0</div>
+                  </div>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Patch</div>
+                <div class="row">
+                  <span class="val">U1 · 001–002</span><span class="grow"></span
+                  ><span class="btn compact ghost">Open patch</span>
+                </div>
+                <div style="flex: 1"></div>
+                <div class="row"><span class="btn compact danger">Delete fixture…</span></div>
+              </div>
+            </aside>
+          </div>
+          <footer class="footer">
+            <span class="f"><i class="dot" data-foot="bridge"></i>Bridge <b>192.168.1.80 · U1</b></span>
+            <span class="f"><i class="dot"></i>Universe <b>12 / 512 ch</b></span>
+            <span class="f"><i class="dot attn"></i>Fixtures <b>3 / 4 patched</b></span>
+            <span class="f"><i class="dot"></i>Scene <b>Saved</b></span>
+            <span class="f">Session <b>0 m</b></span>
+            <span class="f">App <b>v2.2.1</b></span>
+            <span class="hints"
+              ><span><kbd>Ctrl K</kbd> Palette</span><span><kbd>?</kbd> Shortcuts</span
+              ><span><kbd>Ctrl Shift M</kbd> DMX monitor</span></span
+            >
+            <span class="toggle" style="height: 28px; font-size: var(--t-caption)">DMX strip</span>
+          </footer>
+        </section>
+
+        <!-- ========================================================= AUDIO -->
+        <section class="shell hidden" data-board="audio">
+          <header class="header">
+            <div class="crest">SSE</div>
+            <div class="wordmark">Executive<br />Education</div>
+            <div class="product">Studio Control</div>
+            <nav class="nav">
+              <a><i class="ic"></i>Setup / Support</a><a><i class="ic"></i>Lighting</a
+              ><a class="active"><i class="ic"></i>Audio</a><a><i class="ic"></i>Planning</a>
+            </nav>
+            <div class="chips">
+              <span class="chip"><i class="dot"></i>Lighting <span class="word">ready</span></span>
+              <span class="chip"
+                ><i class="dot" data-chip="audio"></i>Audio <span class="word" data-chip-word="audio">ready</span></span
+              >
+              <span class="chip"><i class="dot"></i>Surface <span class="word">ready</span></span>
+              <span class="chip"><i class="dot attn"></i>Solo <span class="word">1</span></span>
+              <span class="clock">09:11</span>
+            </div>
+          </header>
+          <div class="topbar">
+            <div class="title">Audio</div>
+            <div class="context">Snapshot <span class="val">Show open</span> · UFX III</div>
+            <span class="badge ok" data-badge><i class="dot"></i><span data-badge-word>Ready</span></span>
+            <div></div>
+            <div class="search">Search channels, snapshots <kbd>Ctrl F</kbd></div>
+            <div class="actions">
+              <span class="btn">Sync</span><span class="btn">Run audio probe</span
+              ><span class="btn primary">Capture snapshot</span>
+            </div>
+            <div class="overflow">⋯</div>
+          </div>
+          <div class="body" data-body>
+            <div class="band attn hidden" data-band="notverified">
+              <span class="word">Not verified</span
+              ><span class="msg">Console controls stay locked until the audio probe passes.</span
+              ><span class="btn compact primary">Run audio probe</span>
+            </div>
+            <div class="band attn hidden" data-band="assumed">
+              <span class="word">Assumed</span
+              ><span class="msg"
+                >Showing the last state TotalMix confirmed. 6 values are unconfirmed (dashed). Sync pulls the current
+                state from the desk and never changes it.</span
+              ><span class="btn compact primary">Sync</span>
+            </div>
+            <div class="band attn hidden" data-band="solo">
+              <span class="word">Solo</span
+              ><span class="msg">1 solo on FX 3/4 — the mix you hear is not the mix you see.</span
+              ><span class="btn compact">Clear all solo <kbd>Alt S</kbd></span>
+            </div>
+            <aside class="rail">
+              <div class="card">
+                <div class="eyebrow">Monitor <span class="n">→ Main Out</span></div>
+                <div class="mm">
+                  <div class="row">
+                    <span class="sub" style="width: 16px">L</span
+                    ><span class="mbar" style="flex: 1"><i style="width: 84%"></i></span
+                    ><span class="val" style="width: 64px; text-align: right">−3.1</span>
+                  </div>
+                  <div class="row">
+                    <span class="sub" style="width: 16px">R</span
+                    ><span class="mbar" style="flex: 1"><i style="width: 80%"></i></span
+                    ><span class="val" style="width: 64px; text-align: right">−5.6</span>
+                  </div>
+                  <div class="scale" style="padding-left: 24px">
+                    <span>−∞</span><span>−40</span><span>−20</span><span>−12</span><span>−6</span><span>0</span>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="sub">Main level</span><span class="grow"></span
+                  ><span class="val big"
+                    >−1.2 <small style="font: 500 var(--t-caption) var(--mono); color: var(--muted)">dB</small></span
+                  >
+                </div>
+                <div class="row" style="gap: 6px">
+                  <span class="btn live" style="flex: 1; height: 44px" data-talk>Talkback <kbd>hold T</kbd></span>
+                </div>
+                <div class="row" style="gap: 6px">
+                  <span class="toggle on" style="flex: 1">Dim −20</span><span class="toggle" style="flex: 1">Mono</span>
+                </div>
+              </div>
+              <div class="card" style="flex: 1">
+                <div class="eyebrow">Snapshots <span class="n">Shift 1–8</span></div>
+                <div class="list">
+                  <div class="item" data-snap="1">
+                    <span class="meta">1</span>Open rehearsal<span class="meta">—</span>
+                  </div>
+                  <div class="item current"><span class="meta">2</span>Show open<span class="tag">Current</span></div>
+                  <div class="item"><span class="meta">3</span>Interview block<span class="meta">06:05</span></div>
+                  <div class="item"><span class="meta">4</span>Break bumper<span class="meta">—</span></div>
+                  <div class="item"><span class="meta">5</span>Credits<span class="meta">—</span></div>
+                  <div class="item">
+                    <span class="meta">6</span><span class="sub">Empty</span><span class="meta"></span>
+                  </div>
+                  <div class="item">
+                    <span class="meta">7</span><span class="sub">Empty</span><span class="meta"></span>
+                  </div>
+                  <div class="item">
+                    <span class="meta">8</span><span class="sub">Empty</span><span class="meta"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="eyebrow">Console link</div>
+                <div class="row">
+                  <span class="sub">Confirmed</span><span class="grow"></span
+                  ><span class="val" data-trust-confirmed>42</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Unconfirmed</span><span class="grow"></span
+                  ><span class="val" data-trust-assumed>0</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Metering</span><span class="grow"></span><span class="val">RME · live</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Last sync</span><span class="grow"></span><span class="val">18:24</span>
+                </div>
+              </div>
+            </aside>
+            <main class="canvas">
+              <div class="card canvas-card">
+                <div class="tiers">
+                  <div class="tier in">
+                    <div class="th">
+                      01 · Inputs<span class="mixfor">Mix for <b>Main Out</b></span>
+                    </div>
+                    <div class="strips" data-strips="in"></div>
+                  </div>
+                  <div class="tier pb">
+                    <div class="th">
+                      02 · Playback<span class="mixfor">Mix for <b>Main Out</b></span>
+                    </div>
+                    <div class="strips" data-strips="pb"></div>
+                  </div>
+                  <div class="tier out">
+                    <div class="th">
+                      03 · Outputs<span class="mixfor">Active <b>Main Out</b></span>
+                    </div>
+                    <div class="strips" data-strips="out"></div>
+                  </div>
+                </div>
+              </div>
+            </main>
+            <aside class="inspector">
+              <div class="card" style="flex: 1">
+                <div class="tabs">
+                  <span class="on">Preamp</span><span>EQ</span><span>Dynamics</span><span>Routing</span>
+                </div>
+                <div class="row">
+                  <div>
+                    <div class="eyebrow">Playback 02 · stereo</div>
+                    <div class="h" style="font: 500 var(--t-display) var(--display)">FX 3/4</div>
+                  </div>
+                  <span class="grow"></span><span class="btn compact">Rename</span>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Send to Main Out</div>
+                <div class="row">
+                  <span class="slider"><i style="width: 86%"></i><b style="left: 86%"></b></span
+                  ><span class="val">+2.1 dB</span>
+                </div>
+                <div class="row" style="gap: 6px">
+                  <span class="toggle" style="flex: 1">Mute</span><span class="toggle on" style="flex: 1">Solo</span
+                  ><span class="btn" style="flex: 1; justify-content: center">Unity</span>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Equaliser <span class="n">Bypassed</span></div>
+                <div class="card" style="background: var(--meter-bg); height: 150px; border-color: var(--border)"></div>
+                <div class="eyebrow" style="margin-top: 6px">Meter</div>
+                <div class="row">
+                  <span class="sub">Level L / R</span><span class="grow"></span><span class="val">−23 / −23 dB</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Peak hold</span><span class="grow"></span><span class="val">−18 / −19 dB</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+          <footer class="footer">
+            <span class="f"
+              ><i class="dot" data-foot="console"></i>Console <b data-foot-word>Confirmed · 42 values</b></span
+            >
+            <span class="f"><i class="dot"></i>Metering <b>RME · live</b></span>
+            <span class="f">Last sync <b>18:24</b></span>
+            <span class="f">Clock <b>09:11</b></span>
+            <span class="hints"
+              ><span><kbd>Ctrl K</kbd> Palette</span><span><kbd>?</kbd> Shortcuts</span
+              ><span><kbd>[</kbd> <kbd>]</kbd> Bank</span><span><kbd>T</kbd> hold Talkback</span></span
+            >
+          </footer>
+        </section>
+
+        <!-- ========================================================= PLANNING -->
+        <section class="shell hidden" data-board="planning">
+          <header class="header">
+            <div class="crest">SSE</div>
+            <div class="wordmark">Executive<br />Education</div>
+            <div class="product">Studio Control</div>
+            <nav class="nav">
+              <a><i class="ic"></i>Setup / Support</a><a><i class="ic"></i>Lighting</a><a><i class="ic"></i>Audio</a
+              ><a class="active"><i class="ic"></i>Planning</a>
+            </nav>
+            <div class="chips">
+              <span class="chip"><i class="dot"></i>Lighting <span class="word">ready</span></span
+              ><span class="chip"><i class="dot"></i>Audio <span class="word">ready</span></span
+              ><span class="chip"><i class="dot"></i>Surface <span class="word">ready</span></span
+              ><span class="clock">09:11</span>
+            </div>
+          </header>
+          <div class="topbar">
+            <div class="title">Planning</div>
+            <div class="context">Today <span class="val">Thu 23 Apr</span> · 09:00 → 22:00</div>
+            <span class="badge ok"><i class="dot"></i>Ready</span>
+            <div></div>
+            <div class="search">Search tasks <kbd>Ctrl F</kbd></div>
+            <div class="actions">
+              <span class="seg"><span>Board</span><span class="on">Timeline</span></span
+              ><span class="btn">Time report</span><span class="btn primary">New project <kbd>N</kbd></span>
+            </div>
+            <div class="overflow">⋯</div>
+          </div>
+          <div class="body">
+            <aside class="rail">
+              <div class="card" style="flex: 1">
+                <div class="eyebrow">Projects <span class="n">5 · 8 tasks</span></div>
+                <div class="list">
+                  <div class="item"><i class="dot neutral"></i>evening_service<span class="meta">4 · todo</span></div>
+                  <div class="item selected">
+                    <i class="dot" style="background: var(--engaged)"></i>booth_2<span class="meta">2 · running</span>
+                  </div>
+                  <div class="item">
+                    <i class="dot" style="background: var(--engaged)"></i>audio<span class="meta">1 · running</span>
+                  </div>
+                  <div class="item"><i class="dot err"></i>lighting<span class="meta">1 · blocked</span></div>
+                  <div class="item"><i class="dot neutral"></i>ops<span class="meta">2 · todo</span></div>
+                </div>
+                <div style="flex: 1"></div>
+                <div class="eyebrow">Unscheduled <span class="n">1</span></div>
+                <div class="list">
+                  <div class="item"><i class="dot neutral"></i>Archive Q3 cue library<span class="meta">P2</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="eyebrow">Today</div>
+                <div class="row">
+                  <span class="sub">On time</span><span class="grow"></span><span class="val">8</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Slipped</span><span class="grow"></span><span class="val">0</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Blocked</span><span class="grow"></span
+                  ><span class="val" style="color: var(--error)">1</span>
+                </div>
+              </div>
+            </aside>
+            <main class="canvas">
+              <div class="card canvas-card">
+                <div class="tl">
+                  <div class="lanes">
+                    <div class="lane" style="padding-top: 40px">
+                      <span class="nm">evening_service</span><span class="pill">Todo · 4</span>
+                    </div>
+                    <div class="lane"><span class="nm">booth_2</span><span class="pill run">Running · 1</span></div>
+                    <div class="lane"><span class="nm">audio</span><span class="pill run">Running · 1</span></div>
+                    <div class="lane"><span class="nm">lighting</span><span class="pill blk">Blocked · 1</span></div>
+                    <div class="lane"><span class="nm">ops</span><span class="pill">Todo · 2</span></div>
+                  </div>
+                  <div class="grid">
+                    <div class="hours">
+                      <span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span><span>13:00</span
+                      ><span>14:00</span><span>15:00</span><span>16:00</span><span>17:00</span><span>18:00</span
+                      ><span>19:00</span><span>20:00</span><span>21:00</span>
+                    </div>
+                    <div class="now"></div>
+                    <div class="r">
+                      <div class="block" style="left: 3%; width: 6%">
+                        <span class="t">Import companion profile</span><span class="m">20 min · P2</span>
+                      </div>
+                      <div class="block" style="left: 9.5%; width: 7%">
+                        <span class="t">Probe hardware · DMX/OSC</span><span class="m">35 min · P1</span>
+                      </div>
+                      <div class="block" style="left: 62%; width: 6%">
+                        <span class="t">House-light scene "preshow"</span><span class="m">35 min · P1</span>
+                      </div>
+                      <div class="block" style="left: 92%; width: 8%">
+                        <span class="t">Draft run-of-show · Tue</span><span class="m">120 min · P0</span>
+                      </div>
+                    </div>
+                    <div class="r">
+                      <div class="block" style="left: 60%; width: 5%">
+                        <span class="t">Verify OSC bindings</span><span class="m">18 min · P1</span>
+                      </div>
+                      <div class="block selected running" style="left: 69%; width: 12%">
+                        <span class="t">Commission Stream Deck+ · Booth 2</span
+                        ><span class="m">85 min · P0 · 1 h 18 m tracked</span>
+                      </div>
+                    </div>
+                    <div class="r">
+                      <div class="block running" style="left: 75%; width: 11%">
+                        <span class="t">Level-match overflow</span><span class="m">90 min · P1</span>
+                      </div>
+                    </div>
+                    <div class="r">
+                      <div class="block blocked" style="left: 63%; width: 24%">
+                        <span class="t">DMX splitter · stage right</span
+                        ><span class="m">180 min · P0 · waiting on ops</span>
+                      </div>
+                    </div>
+                    <div class="r">
+                      <div class="block" style="left: 56%; width: 5%">
+                        <span class="t">Save backup · pre-service</span><span class="m">15 min · P2</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+            <aside class="inspector">
+              <div class="card" style="flex: 1">
+                <div class="row">
+                  <div>
+                    <div class="eyebrow">booth_2 · task</div>
+                    <div class="h" style="font: 500 var(--t-display) var(--display)">
+                      Commission Stream Deck+ · Booth 2
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="seg"
+                    ><span>Todo</span><span class="on">Running</span><span>Blocked</span><span>Done</span></span
+                  ><span class="grow"></span><span class="btn compact engaged">■ Stop timer</span>
+                </div>
+                <div class="grid2">
+                  <div class="field">
+                    <label>Scheduled</label>
+                    <div class="in">17:00 · 85 min</div>
+                  </div>
+                  <div class="field">
+                    <label>Priority</label>
+                    <div class="in">P0</div>
+                  </div>
+                  <div class="field">
+                    <label>Tracked</label>
+                    <div class="in">1 h 18 m</div>
+                  </div>
+                  <div class="field">
+                    <label>Due</label>
+                    <div class="in">Today</div>
+                  </div>
+                </div>
+                <div class="eyebrow" style="margin-top: 6px">Checklist <span class="n">2 / 4</span></div>
+                <div class="check"><i class="on"></i>Import Companion profile (full reset)</div>
+                <div class="check"><i class="on"></i>Walk Setup steps 3–5 on the deck</div>
+                <div class="check"><i></i>Verify TALK / DIM / → MAIN mirror the app</div>
+                <div class="check"><i></i>Export support backup</div>
+                <div class="eyebrow" style="margin-top: 6px">Notes</div>
+                <div class="sub">Secondary booth deck commissioning. Re-import after the fader-curve update.</div>
+                <div style="flex: 1"></div>
+                <div class="row">
+                  <span class="btn compact ghost">Unschedule</span><span class="grow"></span
+                  ><span class="btn compact danger">Delete task…</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+          <footer class="footer">
+            <span class="f"><i class="dot" style="background: var(--engaged)"></i>Running <b>2 timers</b></span>
+            <span class="f">Tracked today <b>3 h 52 m</b></span>
+            <span class="f">Backup <b>22 Apr 09:12</b></span>
+            <span class="hints"
+              ><span><kbd>Ctrl K</kbd> Palette</span><span><kbd>?</kbd> Shortcuts</span
+              ><span><kbd>Shift B</kbd> Board</span><span><kbd>Shift T</kbd> Timeline</span></span
+            >
+          </footer>
+        </section>
+
+        <!-- ========================================================= SETUP -->
+        <section class="shell hidden" data-board="setup">
+          <header class="header">
+            <div class="crest">SSE</div>
+            <div class="wordmark">Executive<br />Education</div>
+            <div class="product">Studio Control</div>
+            <nav class="nav">
+              <a class="active"><i class="ic"></i>Setup / Support</a><a><i class="ic"></i>Lighting</a
+              ><a><i class="ic"></i>Audio</a><a><i class="ic"></i>Planning</a>
+            </nav>
+            <div class="chips">
+              <span class="chip"><i class="dot"></i>Lighting <span class="word">ready</span></span
+              ><span class="chip"><i class="dot attn"></i>Audio <span class="word">not verified</span></span
+              ><span class="chip"><i class="dot"></i>Surface <span class="word">ready</span></span
+              ><span class="clock">09:11</span>
+            </div>
+          </header>
+          <div class="topbar">
+            <div class="title">Setup</div>
+            <div class="context">Step <span class="val">5 / 5 · Publish</span></div>
+            <span class="badge attn"><i class="dot"></i>Audio not verified</span>
+            <div></div>
+            <div class="search" style="visibility: hidden"></div>
+            <div class="actions">
+              <span class="seg"><span class="on">Runner</span><span>Support</span></span
+              ><span class="btn">Restart bridge…</span><span class="btn">Export backup</span>
+            </div>
+            <div class="overflow">⋯</div>
+          </div>
+          <div class="body">
+            <aside class="rail">
+              <div class="card" style="flex: 1">
+                <div class="eyebrow">Commissioning <span class="n">4 / 5 done</span></div>
+                <div class="steps">
+                  <div class="step done">
+                    <span class="num">✓</span><span class="nm">Import profile</span
+                    ><span class="st"><i class="dot"></i>Done</span>
+                  </div>
+                  <div class="step done">
+                    <span class="num">✓</span><span class="nm">Probe hardware</span
+                    ><span class="st"><i class="dot attn"></i>1 attention</span>
+                  </div>
+                  <div class="step done">
+                    <span class="num">✓</span><span class="nm">Map bindings</span
+                    ><span class="st"><i class="dot"></i>48 controls</span>
+                  </div>
+                  <div class="step done">
+                    <span class="num">✓</span><span class="nm">Verify live echo</span
+                    ><span class="st"><i class="dot"></i>Done</span>
+                  </div>
+                  <div class="step selected">
+                    <span class="num">5</span><span class="nm">Publish</span
+                    ><span class="st"><i class="dot attn"></i>Needs override</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="eyebrow">Workstation</div>
+                <div class="row">
+                  <span class="sub">Profile</span><span class="grow"></span><span class="val">Studio workstation</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Bridge</span><span class="grow"></span><span class="val">127.0.0.1:38201</span>
+                </div>
+                <div class="row">
+                  <span class="sub">Companion</span><span class="grow"></span
+                  ><span class="val">4 pages · 48 controls</span>
+                </div>
+              </div>
+            </aside>
+            <main class="canvas">
+              <div class="card" style="flex: 1">
+                <div class="row">
+                  <div>
+                    <div class="eyebrow">Step 5</div>
+                    <div class="h" style="font: 500 var(--t-display) var(--display)">Publish</div>
+                  </div>
+                </div>
+                <div class="sub" style="font-size: var(--t-body); color: var(--text-2); max-width: 900px">
+                  Publishing commits the commissioning gate, writes a fresh support backup and returns the desk to the
+                  console. Every probe must be green, or you record an override here.
+                </div>
+                <div class="eyebrow" style="margin-top: 8px">Probes</div>
+                <div class="probe">
+                  <div>
+                    <div class="nm">Lighting bridge</div>
+                    <div class="sub">Universe 1 responding at 192.168.1.80 · 12 channels patched</div>
+                  </div>
+                  <span class="badge ok"><i class="dot"></i>Passed</span><span class="btn compact">Run again</span>
+                </div>
+                <div class="probe">
+                  <div>
+                    <div class="nm">Audio console</div>
+                    <div class="sub">
+                      TotalMix remote 4 answered, but no meter packets arrived. In TotalMix, turn on Send Peak Level
+                      Data, then run the probe again.
+                    </div>
+                  </div>
+                  <span class="badge attn"><i class="dot"></i>Not verified</span
+                  ><span class="btn compact primary">Run audio probe</span>
+                </div>
+                <div class="probe">
+                  <div>
+                    <div class="nm">Control surface</div>
+                    <div class="sub">Companion profile current · deck bound to page-follow triggers</div>
+                  </div>
+                  <span class="badge ok"><i class="dot"></i>Passed</span><span class="btn compact">Run again</span>
+                </div>
+                <div class="eyebrow" style="margin-top: 8px">Backup</div>
+                <div class="probe">
+                  <div>
+                    <div class="nm">native-backup-2026-04-22T07-12-00.json</div>
+                    <div class="sub">22 Apr 2026, 09:12 · 4.0 KB · will be refreshed on publish</div>
+                  </div>
+                  <span class="badge ok"><i class="dot"></i>Ready</span><span class="btn compact">Export now</span>
+                </div>
+                <div style="flex: 1"></div>
+                <div class="row">
+                  <span class="btn ghost">← Back to Verify</span><span class="grow"></span
+                  ><span class="btn">Publish with override…</span
+                  ><span class="btn primary disabled">Publish setup</span>
+                </div>
+              </div>
+            </main>
+            <aside class="inspector">
+              <div class="card">
+                <div class="eyebrow">Health</div>
+                <div class="list">
+                  <div class="item"><i class="dot"></i>Lighting<span class="meta">bridge reachable</span></div>
+                  <div class="item"><i class="dot attn"></i>Audio<span class="meta">not verified</span></div>
+                  <div class="item"><i class="dot"></i>Control surface<span class="meta">bridge reachable</span></div>
+                  <div class="item"><i class="dot"></i>Storage<span class="meta">healthy</span></div>
+                </div>
+              </div>
+              <div class="card" style="flex: 1">
+                <div class="eyebrow">Deck echo <span class="n">live</span></div>
+                <div class="sub">Press a key or turn a dial on the Stream Deck; the matching control lights here.</div>
+                <div class="grid2" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px">
+                  <span class="toggle">→ Main</span><span class="toggle">→ Ph 1</span><span class="toggle">→ Ph 2</span
+                  ><span class="toggle">Bank</span> <span class="toggle on">Dim</span><span class="toggle">Gain</span
+                  ><span class="toggle">Talk</span><span class="toggle">Solo clr</span>
+                </div>
+                <div class="row" style="margin-top: 6px">
+                  <span class="sub">Last echo</span><span class="grow"></span><span class="val">DIM · 09:10:48</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="eyebrow">Support</div>
+                <div class="row">
+                  <span class="btn compact" style="flex: 1; justify-content: center">Export diagnostics</span
+                  ><span class="btn compact" style="flex: 1; justify-content: center">Engine log</span>
+                </div>
+                <div class="row">
+                  <span class="btn compact ghost" style="flex: 1; justify-content: center">Restore from backup…</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+          <footer class="footer">
+            <span class="f">Step <b>5 / 5 · Publish</b></span>
+            <span class="f"><i class="dot attn"></i>Checks <b>2 / 3 passed</b></span>
+            <span class="f"><i class="dot attn"></i>Commissioning <b>Override needed</b></span>
+            <span class="f">Backup <b>22 Apr 09:12</b></span>
+            <span class="hints"
+              ><span><kbd>Ctrl K</kbd> Palette</span><span><kbd>?</kbd> Shortcuts</span
+              ><span><kbd>Shift S</kbd> Runner / Support</span></span
+            >
+          </footer>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      // ---- strips for the audio board --------------------------------------------
+      const strips = {
+        in: [
+          ["Host", "Preamp 1", -3.8, 62, true],
+          ["Co-host", "Preamp 2", -4.5, 58, true],
+          ["Guest 1", "Preamp 3", -0.6, 70, true],
+          ["Guest 2", "Preamp 4", -5.8, 55, true],
+        ],
+        pb: [
+          ["Program 1/2", "stereo", 2.7, 66],
+          ["FX 3/4", "stereo", 2.1, 40, false, true],
+          ["N-1 5/6", "stereo", -14.6, 48],
+          ["Music 7/8", "stereo", -5.8, 52],
+          ["Playback 9/10", "stereo", -35.9, 20],
+          ["Playback 11/12", "stereo", -40.5, 12],
+        ],
+        out: [
+          ["Main Out", "monitor bus", -1.2, 80, false, false, true],
+          ["Phones 1", "cue A", -9.0, 44],
+          ["Phones 2", "cue B", -17.4, 30],
+        ],
+      };
+      function renderStrips(state) {
+        for (const [tier, list] of Object.entries(strips)) {
+          const host = document.querySelector(`[data-strips="${tier}"]`);
+          host.innerHTML = list
+            .map(([nm, sub, db, lvl, p48, sel, cur], i) => {
+              const cls = [
+                "strip",
+                sel ? "selected" : "",
+                cur ? "current" : "",
+                state === "notverified" ? "disabled" : "",
+              ].join(" ");
+              const capTop = 100 - Math.min(96, Math.max(6, 58 + db * 1.6));
+              const assumed = state === "assumed" && i % 2 === 0 ? " assumed" : "";
+              return `<div class="${cls}"><div class="nm"><span>${nm}</span><small>${String(i + 1).padStart(2, "0")}</small></div>
+        <div class="tags"><span class="tag">${sub}</span>${p48 ? '<span class="tag p48">48 V</span>' : ""}</div>
+        <div class="fader"><div class="ticks"><span>0</span><span>−6</span><span>−12</span><span>−18</span><span>−24</span><span>−40</span><span>−60</span></div>
+          <div class="track"><div class="cap${assumed}" style="top:${capTop}%"></div></div>
+          <div class="meter"><i style="height:${lvl}%"></i><b style="bottom:${Math.min(97, lvl + 8)}%"></b></div></div>
+        <div class="db">${db > 0 ? "+" : ""}${db.toFixed(1)} dB</div>
+        <div class="ms"><span>M</span><span class="${sel ? "on" : ""}">S</span></div></div>`;
+            })
+            .join("");
+        }
+      }
+      // ---- boards / states / themes ---------------------------------------------
+      const stateSets = {
+        lighting: {
+          Ready: {},
+          Unreachable: {
+            band: "unreachable",
+            badge: ["err", "Bridge unreachable"],
+            chip: ["err", "unreachable"],
+            master: ["Lighting on · bridge down", "On"],
+            foot: "err",
+          },
+          Preview: { band: "preview", badge: ["info", "Preview"], chip: ["info", "preview"] },
+        },
+        audio: {
+          Ready: {},
+          "Not verified": {
+            band: "notverified",
+            badge: ["attn", "Not verified"],
+            chip: ["attn", "not verified"],
+            foot: ["attn", "Locked · run the probe"],
+          },
+          Assumed: {
+            band: "assumed",
+            badge: ["attn", "Assumed"],
+            chip: ["attn", "assumed"],
+            foot: ["attn", "6 values unconfirmed"],
+            trust: 6,
+          },
+          Armed: { armed: true },
+          Solo: { band: "solo" },
+        },
+        planning: { Ready: {} },
+        setup: { Publish: {} },
+      };
+      let board = "lighting",
+        theme = "studio",
+        state = "Ready";
+      const sg = document.getElementById("state-group");
+      function applyState() {
+        const sec = document.querySelector(`section[data-board="${board}"]`);
+        const set = stateSets[board] || {};
+        const s = set[state] || {};
+        sec.querySelectorAll("[data-band]").forEach((b) => b.classList.toggle("hidden", b.dataset.band !== s.band));
+        const badge = sec.querySelector("[data-badge]");
+        if (badge) {
+          badge.className = "badge " + (s.badge ? s.badge[0] : "ok");
+          badge.querySelector("[data-badge-word]").textContent = s.badge ? s.badge[1] : "Ready";
+        }
+        const chip = sec.querySelector("[data-chip]");
+        if (chip) {
+          chip.className = "dot " + (s.chip ? s.chip[0] : "");
+          sec.querySelector("[data-chip-word]").textContent = s.chip ? s.chip[1] : "ready";
+        }
+        const mt = sec.querySelector("[data-master-title]");
+        if (mt) {
+          mt.textContent = s.master ? s.master[0] : "Lighting on";
+        }
+        const fb = sec.querySelector("[data-foot='bridge']");
+        if (fb) fb.className = "dot " + (s.foot === "err" ? "err" : "");
+        const fc = sec.querySelector("[data-foot='console']");
+        if (fc) {
+          fc.className = "dot " + (s.foot ? s.foot[0] : "");
+          sec.querySelector("[data-foot-word]").textContent = s.foot ? s.foot[1] : "Confirmed · 42 values";
+        }
+        const ta = sec.querySelector("[data-trust-assumed]");
+        if (ta) {
+          ta.textContent = s.trust || 0;
+          sec.querySelector("[data-trust-confirmed]").textContent = 42 - (s.trust || 0);
+        }
+        const snap = sec.querySelector("[data-snap='1']");
+        if (snap) {
+          snap.className = "item" + (s.armed ? " armed" : "");
+          snap.innerHTML = s.armed
+            ? '<span class="meta">1</span>Open rehearsal<span class="tag">Armed · 3.9 s · press again</span>'
+            : '<span class="meta">1</span>Open rehearsal<span class="meta">—</span>';
+        }
+        if (board === "audio")
+          renderStrips(s.band === "notverified" ? "notverified" : s.band === "assumed" ? "assumed" : "ready");
+      }
+      function renderStateButtons() {
+        sg.querySelectorAll("button").forEach((b) => b.remove());
+        for (const name of Object.keys(stateSets[board])) {
+          const b = document.createElement("button");
+          b.textContent = name;
+          b.setAttribute("aria-pressed", String(name === state));
+          b.onclick = () => {
+            state = name;
+            renderStateButtons();
+            applyState();
+          };
+          sg.appendChild(b);
+        }
+      }
+      document.querySelectorAll("[data-board]").forEach((b) => {
+        if (b.tagName === "BUTTON")
+          b.onclick = () => {
+            board = b.dataset.board;
+            state = Object.keys(stateSets[board])[0];
+            document
+              .querySelectorAll("button[data-board]")
+              .forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+            document
+              .querySelectorAll("section[data-board]")
+              .forEach((s) => s.classList.toggle("hidden", s.dataset.board !== board));
+            renderStateButtons();
+            applyState();
+          };
+      });
+      document.querySelectorAll("[data-theme-btn]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            theme = b.dataset.themeBtn;
+            document.body.dataset.theme = theme;
+            document
+              .querySelectorAll("[data-theme-btn]")
+              .forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+          })
+      );
+      let zoom = "fit";
+      function fit() {
+        const el = document.getElementById("board");
+        const k = zoom === "1" ? 1 : Math.min(1, (window.innerWidth - 32) / 2560);
+        el.style.transform = `scale(${k})`;
+        el.parentElement.style.height = `${1440 * k}px`;
+      }
+      document.querySelectorAll("[data-zoom]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            zoom = b.dataset.zoom;
+            document.querySelectorAll("[data-zoom]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+            fit();
+          })
+      );
+      window.addEventListener("resize", fit);
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          zoom = zoom === "1" ? "fit" : "1";
+          fit();
+        }
+      });
+      const params = new URLSearchParams(location.search);
+      if (params.get("board")) document.querySelector(`button[data-board="${params.get("board")}"]`)?.click();
+      if (params.get("theme")) document.querySelector(`[data-theme-btn="${params.get("theme")}"]`)?.click();
+      renderStateButtons();
+      applyState();
+      fit();
+      if (params.get("state")) {
+        const btn = [...sg.querySelectorAll("button")].find((b) => b.textContent === params.get("state"));
+        btn?.click();
+      }
+    </script>
+  </body>
+</html>

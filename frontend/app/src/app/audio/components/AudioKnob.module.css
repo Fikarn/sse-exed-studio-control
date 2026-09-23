@@ -17,7 +17,7 @@
   place-items: center;
   outline: none;
   border-radius: 50%;
-  transition: box-shadow var(--motion-duration-fast) var(--easing);
+  transition: box-shadow var(--motion-duration-exit) var(--easing);
 }
 
 /* C14: pre-interaction hover affordance — the knob is the one interactive
@@ -39,17 +39,17 @@
 
 .caption {
   font-family: var(--font-mono);
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fg-4);
+  color: var(--audio-caption-muted);
   text-align: center;
   white-space: nowrap;
 }
 
 .value {
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-tick);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   color: var(--fg);
@@ -79,7 +79,7 @@
 }
 
 .valueInsideUnit {
-  font-size: var(--font-size-4xs-plus);
+  font-size: var(--audio-type-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fg-3);

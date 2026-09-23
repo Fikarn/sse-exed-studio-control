@@ -41,7 +41,8 @@
 
   .label {
     font-family: var(--font-family-mono);
-    font-size: 9px;
+    /* 2026-09 audit Slice 10: 9 px literal → the 9.5 px microtype floor. */
+    font-size: var(--font-size-3xs-plus);
     letter-spacing: 0;
     text-transform: uppercase;
     color: var(--color-brand-text-muted);
@@ -101,7 +102,7 @@
     align-items: center;
     gap: 10px;
     font-family: var(--font-family-mono);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     color: var(--color-brand-text-muted);
     letter-spacing: 0;
     white-space: nowrap;
@@ -109,11 +110,11 @@
 
   .kbd {
     font-family: var(--font-family-mono);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     background: var(--color-bg-soft);
     border: 1px solid var(--color-bg-border);
     border-bottom-width: 2px;
-    border-radius: var(--radius-tight-xs);
+    border-radius: var(--radius-ctl);
     padding: 2px 6px;
     color: var(--color-brand-text-secondary);
   }
@@ -141,7 +142,8 @@
     border-top: 1px solid var(--hb-line);
     background: var(--hb-bg);
     font-family: var(--hb-font-mono);
-    font-size: 9px;
+    /* 2026-09 audit Slice 10: 9 px literal → the 9.5 px microtype floor. */
+    font-size: var(--font-size-3xs-plus);
     letter-spacing: 0.12em;
     color: var(--hb-fg-muted);
     text-transform: uppercase;
@@ -186,7 +188,7 @@
     text-transform: uppercase;
     letter-spacing: 0.12em;
     cursor: pointer;
-    transition: color var(--motion-duration-fast) var(--hb-easing);
+    transition: color var(--motion-duration-exit) var(--hb-easing);
   }
 
   .captionShortcut:hover {

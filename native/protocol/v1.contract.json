@@ -47,6 +47,7 @@
     "audio.snapshot.recall",
     "audio.snapshot.update",
     "audio.sync",
+    "audio.talkback.hold",
     "commissioning.check.run",
     "commissioning.seedPlanningDemo",
     "commissioning.snapshot",
@@ -72,6 +73,7 @@
     "lighting.group.power",
     "lighting.group.reorder",
     "lighting.group.update",
+    "lighting.output.setArmed",
     "lighting.palette.apply",
     "lighting.palette.create",
     "lighting.palette.delete",
@@ -109,6 +111,7 @@
     "storage.importLegacyDb",
     "support.backup.export",
     "support.backup.restore",
+    "support.backup.verify",
     "support.snapshot"
   ],
   "events": [
@@ -116,6 +119,7 @@
     "audio.changed",
     "audio.meters",
     "commissioning.changed",
+    "engine.exited",
     "engine.ready",
     "engine.startupFailed",
     "lighting.changed",

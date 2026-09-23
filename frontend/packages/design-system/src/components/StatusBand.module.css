@@ -3,7 +3,7 @@
     align-items: center;
     background: var(--color-surface-raised);
     border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-key);
     display: grid;
     gap: var(--space-4);
     grid-template-columns: auto minmax(0, 1fr) auto;

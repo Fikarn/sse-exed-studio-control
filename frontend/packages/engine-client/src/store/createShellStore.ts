@@ -8,26 +8,18 @@ import {
   type JsonValue,
 } from "../generated/protocol";
 import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
-import type { LightingDmxMonitorSnapshot } from "../generated/snapshots/LightingDmxMonitorSnapshot";
-import type { LightingFixtureCatalogSnapshot } from "../generated/snapshots/LightingFixtureCatalogSnapshot";
-import type { LightingSnapshot } from "../generated/snapshots/LightingSnapshot";
-import type { PlanningSnapshot } from "../generated/snapshots/PlanningSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
+import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
+import { SnapshotShapeError, snapshotProblem } from "./snapshotGuards";
 
-// Boundary cast for typed snapshots produced by ts-rs codegen. The
-// engine boundary is the contract; we don't run runtime validation here
-// (no Zod, no schema check) for two reasons:
-//
-//   1. The IPC envelope is already validated by the engine; the wire
-//      format is JSON of a known shape that matches the ts-rs binding
-//      one-to-one.
-//   2. Adding runtime validation in the hot path would cost shell
-//      startup time on every refresh.
-//
-// If a snapshot ever returns null or a non-object, we still return null
-// here — that lets the UI keep rendering its empty state rather than
-// throwing.
+// Boundary cast for a command result that may or may not be a whole audio
+// snapshot (`coerceAudioSnapshot` below tells the two apart). The snapshots
+// the store fetches go through `snapshotGuards.ts` instead (2026-09 production
+// readiness, Slice 9 — finding F32): the engine boundary is still the
+// contract and there is still no schema library in the hot path, but the top
+// of each shape is checked, so a malformed reply is refused where it arrives
+// rather than thrown from inside a workspace.
 function coerceSnapshot<T>(value: JsonValue): T | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as unknown as T) : null;
 }
@@ -37,8 +29,11 @@ import type {
   AudioMeterFrame,
   AudioMixTargetUpdateRequest,
   AudioSettingsUpdateRequest,
+  AudioTalkbackHoldRequest,
+  BackgroundFailure,
   CommissioningCheckRequest,
   CommissioningUpdateRequest,
+  EngineLaunchInfo,
   EngineTransport,
   LightingFixtureCreateRequest,
   LightingFixtureUpdateRequest,
@@ -78,7 +73,34 @@ const initialState: ShellState = {
   startupFailure: null,
   lastEvent: null,
   errorSummary: null,
+  backgroundFailures: [],
+  snapshotFault: null,
 };
+
+/** Where each domain's snapshot lives in the state. */
+const DOMAIN_STATE_KEYS = {
+  health: "healthSnapshot",
+  app: "appSnapshot",
+  commissioning: "commissioningSnapshot",
+  lightingFixtureCatalog: "lightingFixtureCatalogSnapshot",
+  lighting: "lightingSnapshot",
+  lightingDmxMonitor: "lightingDmxMonitorSnapshot",
+  audio: "audioSnapshot",
+  planning: "planningSnapshot",
+  support: "supportSnapshot",
+  controlSurface: "controlSurfaceSnapshot",
+} as const satisfies Record<DomainKey, keyof ShellState>;
+
+export interface ShellStoreOptions {
+  /**
+   * A development build (`import.meta.env.DEV` in the app): a reply that fails
+   * its guard throws, and `useShellSnapshot` rethrows it while rendering so the
+   * error boundary names it; an event this build does not know is logged. A
+   * production build keeps the last good snapshot instead and records the
+   * failure for the diagnostics export.
+   */
+  development?: boolean;
+}
 
 const initialAudioMeterFrame: AudioMeterFrame = {
   activeMixTargetId: null,
@@ -97,6 +119,42 @@ interface PendingStartupGate {
   reject: (failure: StartupFailure) => void;
   resolve: (payload: JsonObject) => void;
   timeoutId: number;
+}
+
+// 2026-09 production readiness, Slice 5 (finding F09): an engine that stops
+// on its own is restarted on its own — one, two and four seconds after the
+// first, second and third stop within five minutes — and a fourth stop is
+// left on the recovery surface for the operator.
+const AUTOMATIC_RESTART_LIMIT = 3;
+/** The start-up failures after which the engine stays up in recovery mode,
+ *  answering only the backup requests (Slice 7 — F20). */
+const RECOVERY_MODE_CODES = new Set(["STORAGE_CORRUPT", "STORAGE_MIGRATION_FAILED"]);
+const AUTOMATIC_RESTART_WINDOW_MS = 5 * 60_000;
+const AUTOMATIC_RESTART_BACKOFF_MS: readonly number[] = [1_000, 2_000, 4_000];
+/** Background failures kept for the diagnostics export (Slice 9 renders them). */
+const BACKGROUND_FAILURE_LIMIT = 20;
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  const record = asRecord(error);
+  if (record && typeof record.message === "string") {
+    return record.message;
+  }
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function launchGeneration(launch: EngineLaunchInfo | void | undefined): number | null {
+  const record = asRecord(launch);
+  return typeof record?.generation === "number" ? record.generation : null;
 }
 
 function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
@@ -327,6 +385,24 @@ function patchAudioMixTarget(snapshot: AudioSnapshot, value: JsonValue): AudioSn
   };
 }
 
+// `audio.talkback.hold` answers `{ mixTargetId, talkback, changed }` — patch
+// the one flag locally so a hold heartbeat (every 750 ms) never triggers a
+// full snapshot refetch.
+function patchAudioTalkback(snapshot: AudioSnapshot, value: JsonValue): AudioSnapshot | null {
+  const result = asRecord(value);
+  const id = typeof result?.mixTargetId === "string" ? result.mixTargetId : null;
+  const talkback = result?.talkback;
+  if (!id || typeof talkback !== "boolean" || !snapshot.mixTargets.some((mixTarget) => mixTarget.id === id)) {
+    return null;
+  }
+  return {
+    ...snapshot,
+    mixTargets: snapshot.mixTargets.map((mixTarget) =>
+      mixTarget.id === id && mixTarget.talkback !== talkback ? { ...mixTarget, talkback } : mixTarget
+    ),
+  };
+}
+
 function patchAudioSnapshotList(method: string, snapshot: AudioSnapshot, params: JsonObject, value: JsonValue) {
   const result = asRecord(value);
   const scene = asRecord(result?.snapshot);
@@ -375,7 +451,7 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
     const pathsRecord = asRecord(error.paths);
     return {
       code: String(error.code),
-      message: String(error.message ?? "Engine startup failed."),
+      message: String(error.message ?? "Studio Control could not start."),
       paths: pathsRecord
         ? Object.fromEntries(
             Object.entries(pathsRecord).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : []))
@@ -414,25 +490,55 @@ function normalizeStartupFailure(error: unknown): StartupFailure {
 
   return {
     code: "ENGINE_STARTUP_FAILED",
-    message: "Engine startup failed.",
+    message: "Studio Control could not start.",
     stage: "frontend-bootstrap",
   };
 }
 
-export function createShellStore(transport: EngineTransport): ShellStore {
+export function createShellStore(transport: EngineTransport, options: ShellStoreOptions = {}): ShellStore {
+  const development = options.development === true;
   let state = initialState;
+  // Slice 9 (F11): the snapshots asked for and not yet fetched, who is waiting
+  // for them, and whether a batch is out. One batch is in flight at a time;
+  // whatever is asked for meanwhile goes out together as the next one, so a
+  // burst of events costs one request per snapshot and not one per event.
+  let dirtyDomains = new Set<DomainKey>();
+  let refreshWaiters: Array<{ resolve: () => void; reject: (error: unknown) => void }> = [];
+  let refreshEvent: EventName | null = null;
+  let refreshRunning = false;
+  // Advanced by every bootstrap and dispose. A batch belongs to the run that
+  // sent it: a request that never settles must not hold the queue past a
+  // restart, which is the operator's remedy for a screen that stopped updating.
+  let refreshRun = 0;
+  let refreshInFlightWaiters: typeof refreshWaiters = [];
+  // The fixture catalog is compiled into the hardware link: fetched once per
+  // session, kept across a restart, fetched again only by `refresh()`.
+  let catalogLoaded = false;
   let audioMeterFrame = initialAudioMeterFrame;
   const listeners = new Set<() => void>();
   const audioMeterListeners = new Set<() => void>();
   let unsubscribeTransport = () => {};
   let initializePromise: Promise<void> | null = null;
   let pendingStartupGate: PendingStartupGate | null = null;
+  // 2026-09 production readiness, Slice 3: the failure the engine reported
+  // during this bootstrap, if any. It can arrive while `engine_start` is still
+  // returning — before the ready gate exists — and it is the answer, not a
+  // ready timeout ten seconds later.
+  let engineStartupFailure: StartupFailure | null = null;
+  // Slice 5 (F09): the launch the shell reported for this bootstrap, so an
+  // `engine.exited` about a process the shell already replaced is ignored.
+  let engineGeneration: number | null = null;
+  let automaticRestartTimeoutId: number | null = null;
+  let automaticRestartsAt: number[] = [];
   let bootstrapGeneration = 0;
   let audioRefreshInFlight = false;
   let audioRefreshQueued = false;
   let audioMeterSequence = 0;
   let audioLocalMutationDepth = 0;
   let audioRefreshSuppressUntilMs = 0;
+  // A console echo (TotalMix reporting a change, or an unconfirmed send) that
+  // arrived while a local mutation was in flight; replayed once it finishes.
+  let audioEchoRefreshPending = false;
 
   const setState = (nextState: ShellState) => {
     state = nextState;
@@ -500,6 +606,11 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
     }
 
+    if (method === "audio.talkback.hold") {
+      const patched = patchAudioTalkback(currentAudioSnapshot, result);
+      return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
+    }
+
     if (
       method === "audio.snapshot.create" ||
       method === "audio.snapshot.update" ||
@@ -513,26 +624,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return applyPatchedAudioSnapshot(patchAudioClipClear(currentAudioSnapshot, params), "audio.changed");
     }
 
-    if (method === "audio.sync") {
-      const record = asRecord(result);
-      return applyPatchedAudioSnapshot(
-        {
-          ...currentAudioSnapshot,
-          consoleStateConfidence:
-            typeof record?.consoleStateConfidence === "string"
-              ? record.consoleStateConfidence
-              : currentAudioSnapshot.consoleStateConfidence,
-          lastActionCode: null,
-          lastActionMessage:
-            typeof record?.summary === "string" ? record.summary : currentAudioSnapshot.lastActionMessage,
-          lastActionStatus: "succeeded",
-          lastConsoleSyncAt: new Date().toISOString(),
-          lastConsoleSyncReason: "manual sync",
-        },
-        "audio.changed"
-      );
-    }
-
+    // `audio.sync` is deliberately not patched locally (2026-09 audit
+    // remediation, Slice 3): a sync is now a console pull that rewrites
+    // channel and mix-target state engine-side, so the only truthful thing to
+    // show is a fresh `audio.snapshot`. Returning false triggers that refresh.
     return false;
   };
 
@@ -579,12 +674,16 @@ export function createShellStore(transport: EngineTransport): ShellStore {
   const waitForEngineReady = () =>
     new Promise<JsonObject>((resolve, reject) => {
       clearStartupGate();
+      if (engineStartupFailure) {
+        reject(engineStartupFailure);
+        return;
+      }
       const timeoutId = window.setTimeout(() => {
         pendingStartupGate = null;
         reject(
           normalizeStartupFailure({
             code: "ENGINE_READY_TIMEOUT",
-            message: "Timed out waiting for the engine ready event.",
+            message: "Studio Control did not answer within ten seconds of starting.",
             stage: "ready-event",
           })
         );
@@ -623,55 +722,153 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     }
   };
 
-  const refreshDomain = async (eventName: EventName | null = null) => {
-    const [
-      healthSnapshot,
-      appSnapshot,
-      commissioningSnapshot,
-      lightingFixtureCatalogSnapshot,
-      lightingSnapshot,
-      lightingDmxMonitorSnapshot,
-      audioSnapshot,
-      planningSnapshot,
-      supportSnapshot,
-      controlSurfaceSnapshot,
-    ] = await Promise.all([
-      transport.request("health.snapshot").then((value) => value as JsonObject),
-      transport.request("app.snapshot").then((value) => value as JsonObject),
-      transport.request("commissioning.snapshot").then((value) => value as JsonObject),
-      transport
-        .request("lighting.fixtureCatalog.snapshot")
-        .then((value) => coerceSnapshot<LightingFixtureCatalogSnapshot>(value)),
-      transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
-      transport
-        .request("lighting.dmxMonitor.snapshot")
-        .then((value) => coerceSnapshot<LightingDmxMonitorSnapshot>(value)),
-      transport.request("audio.snapshot").then((value) => coerceSnapshot<AudioSnapshot>(value)),
-      transport.request("planning.snapshot").then((value) => coerceSnapshot<PlanningSnapshot>(value)),
-      transport.request("support.snapshot").then((value) => value as JsonObject),
-      transport.request("controlSurface.snapshot").then((value) => value as JsonObject),
-    ]);
+  // Slice 9 (F32): a reply is looked at before it becomes a snapshot. A
+  // development build throws on a malformed one and leaves the fault in the
+  // state, where `useShellSnapshot` rethrows it for the error boundary; a
+  // production build records it and answers `null`, and the caller keeps the
+  // last good snapshot — a failed refresh, never a throw.
+  const acceptSnapshot = (domain: DomainKey, value: JsonValue): { value: JsonValue | null } | null => {
+    const problem = snapshotProblem(domain, value);
+    if (problem === null) {
+      return { value: value ?? null };
+    }
+    const error = new SnapshotShapeError(domain, problem);
+    if (development) {
+      setState({ ...state, snapshotFault: error.message });
+      throw error;
+    }
+    recordBackgroundFailure(error, "reply refused");
+    return null;
+  };
 
-    setState({
-      ...state,
-      lifecycle: "ready",
-      recovery: deriveRecoveryState(healthSnapshot),
-      healthSnapshot,
-      appSnapshot,
-      commissioningSnapshot,
-      lightingFixtureCatalogSnapshot,
-      lightingSnapshot,
-      lightingDmxMonitorSnapshot,
-      audioSnapshot,
-      planningSnapshot,
-      supportSnapshot,
-      controlSurfaceSnapshot,
-      activeWorkspace: deriveWorkspace(appSnapshot),
-      startupFailure: null,
-      lastEvent: eventName ?? state.lastEvent,
-      errorSummary: null,
+  // Fetches `domains` side by side. A request that fails does not cost the
+  // others their answers: what arrived is returned with the failures beside it.
+  const fetchDomains = async (domains: readonly DomainKey[], isCurrent: () => boolean) => {
+    const settled = await Promise.allSettled(domains.map((domain) => transport.request(DOMAIN_REQUESTS[domain])));
+    if (!isCurrent()) {
+      return null;
+    }
+    const accepted = new Map<DomainKey, JsonValue | null>();
+    const failures: unknown[] = [];
+    settled.forEach((result, index) => {
+      const domain = domains[index]!;
+      if (result.status === "rejected") {
+        failures.push(result.reason);
+        return;
+      }
+      try {
+        const snapshot = acceptSnapshot(domain, result.value);
+        if (snapshot) {
+          accepted.set(domain, snapshot.value);
+        }
+      } catch (error) {
+        failures.push(error);
+      }
     });
-    publishAudioMeterFrame(audioSnapshot);
+    return { accepted, failures };
+  };
+
+  // What a set of fetched snapshots changes in the state, and nothing else:
+  // the lifecycle and the start-up failure are the bootstrap's to write, the
+  // workspace follows the app snapshot only when that was fetched, and the
+  // recovery state follows the health snapshot only when that was.
+  const snapshotsToState = (accepted: ReadonlyMap<DomainKey, JsonValue | null>): Partial<ShellState> => {
+    const partial: Partial<Record<keyof ShellState, unknown>> = {};
+    for (const [domain, value] of accepted) {
+      partial[DOMAIN_STATE_KEYS[domain]] = value;
+    }
+    if (accepted.has("health")) {
+      partial.recovery = deriveRecoveryState(accepted.get("health") as JsonObject | null);
+    }
+    if (accepted.has("app")) {
+      partial.activeWorkspace = deriveWorkspace(accepted.get("app") as JsonObject | null);
+    }
+    if (accepted.get("lightingFixtureCatalog")) {
+      catalogLoaded = true;
+    }
+    return partial as Partial<ShellState>;
+  };
+
+  const runRefresh = async (run: number) => {
+    try {
+      while (run === refreshRun && dirtyDomains.size > 0) {
+        const domains = [...dirtyDomains];
+        const waiters = refreshWaiters;
+        const eventName = refreshEvent;
+        dirtyDomains = new Set();
+        refreshWaiters = [];
+        refreshEvent = null;
+        refreshInFlightWaiters = waiters;
+        const generation = bootstrapGeneration;
+        try {
+          const fetched = await fetchDomains(
+            domains,
+            () => run === refreshRun && generation === bootstrapGeneration && state.lifecycle === "ready"
+          );
+          if (fetched) {
+            setState({
+              ...state,
+              ...snapshotsToState(fetched.accepted),
+              lastEvent: eventName ?? state.lastEvent,
+            });
+            if (fetched.accepted.has("audio")) {
+              publishAudioMeterFrame(state.audioSnapshot);
+            }
+            if (fetched.failures.length > 0) {
+              throw fetched.failures[0];
+            }
+          }
+          for (const waiter of waiters) {
+            waiter.resolve();
+          }
+        } catch (error) {
+          for (const waiter of waiters) {
+            waiter.reject(error);
+          }
+        }
+      }
+    } finally {
+      // A run that was abandoned leaves the flag to the run that replaced it.
+      if (run === refreshRun) {
+        refreshRunning = false;
+      }
+    }
+  };
+
+  /** Resolves once `domains` have been fetched by a batch that went out after this call. */
+  const refreshDomains = (domains: readonly DomainKey[], eventName: EventName | null = null) => {
+    if (domains.length === 0) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve, reject) => {
+      for (const domain of domains) {
+        dirtyDomains.add(domain);
+      }
+      refreshEvent = eventName ?? refreshEvent;
+      refreshWaiters.push({ resolve, reject });
+      if (!refreshRunning) {
+        refreshRunning = true;
+        const run = refreshRun;
+        queueMicrotask(() => void runRefresh(run));
+      }
+    });
+  };
+
+  // A restart or a dispose makes whatever was still queued pointless: the
+  // bootstrap that follows fetches everything. The batch that is out is
+  // abandoned with it — its answers are dropped if they ever come — so the
+  // queue starts clean however the last run ended.
+  const cancelQueuedRefresh = () => {
+    refreshRun += 1;
+    refreshRunning = false;
+    const waiters = [...refreshInFlightWaiters, ...refreshWaiters];
+    refreshInFlightWaiters = [];
+    dirtyDomains = new Set();
+    refreshWaiters = [];
+    refreshEvent = null;
+    for (const waiter of waiters) {
+      waiter.resolve();
+    }
   };
 
   const refreshAudioSnapshot = async (eventName: EventName) => {
@@ -682,15 +879,112 @@ export function createShellStore(transport: EngineTransport): ShellStore {
 
     audioRefreshInFlight = true;
     try {
-      const audioSnapshot = await transport.request("audio.snapshot").then((value) => coerceAudioSnapshot(value));
-      applyAudioSnapshot(audioSnapshot, eventName);
+      const snapshot = acceptSnapshot("audio", await transport.request("audio.snapshot"));
+      if (snapshot) {
+        applyAudioSnapshot(snapshot.value as AudioSnapshot | null, eventName);
+      }
     } finally {
       audioRefreshInFlight = false;
       if (audioRefreshQueued) {
         audioRefreshQueued = false;
-        void refreshAudioSnapshot(eventName);
+        void refreshAudioSnapshot(eventName).catch(inBackground("queued audio refresh"));
       }
     }
+  };
+
+  // 2026-09 production readiness, Slice 5 (finding F09): what went wrong in
+  // the background — a refresh the engine did not answer, an error nothing
+  // caught — is kept, last twenty, for the diagnostics export. It never
+  // changes what the operator sees; Slice 9 renders the ring.
+  const recordBackgroundFailure = (error: unknown, context = "background") => {
+    const failure: BackgroundFailure = {
+      at: new Date().toISOString(),
+      context,
+      message: describeError(error),
+    };
+    setState({
+      ...state,
+      backgroundFailures: [...state.backgroundFailures.slice(-(BACKGROUND_FAILURE_LIMIT - 1)), failure],
+    });
+  };
+
+  const inBackground = (context: string) => (error: unknown) => recordBackgroundFailure(error, context);
+
+  const cancelAutomaticRestart = () => {
+    if (automaticRestartTimeoutId !== null) {
+      window.clearTimeout(automaticRestartTimeoutId);
+      automaticRestartTimeoutId = null;
+    }
+  };
+
+  const restartEngine = async () => {
+    cancelAutomaticRestart();
+    bootstrapGeneration++;
+    initializePromise = null;
+    clearStartupGate();
+    unsubscribeTransport();
+    unsubscribeTransport = () => {};
+    await transport.dispose?.();
+    return start();
+  };
+
+  // The restart policy: one, two and four seconds after the first, second
+  // and third stop inside five minutes; a fourth stop stays on the recovery
+  // surface. Returns the sentence the surface shows.
+  const scheduleAutomaticRestart = (stopped: string) => {
+    const now = Date.now();
+    automaticRestartsAt = automaticRestartsAt.filter((at) => now - at < AUTOMATIC_RESTART_WINDOW_MS);
+    if (automaticRestartsAt.length >= AUTOMATIC_RESTART_LIMIT) {
+      return `${stopped} It stopped ${AUTOMATIC_RESTART_LIMIT} times within five minutes, so it is not restarted again on its own; use Retry startup once the desk and the rig are ready.`;
+    }
+    const delayMs =
+      AUTOMATIC_RESTART_BACKOFF_MS[Math.min(automaticRestartsAt.length, AUTOMATIC_RESTART_BACKOFF_MS.length - 1)] ??
+      4_000;
+    automaticRestartsAt.push(now);
+    const attempt = automaticRestartsAt.length;
+    cancelAutomaticRestart();
+    automaticRestartTimeoutId = window.setTimeout(() => {
+      automaticRestartTimeoutId = null;
+      void restartEngine().catch(inBackground("automatic restart"));
+    }, delayMs);
+    return `${stopped} Studio Control restarts it on its own in ${delayMs / 1000} s (attempt ${attempt} of ${AUTOMATIC_RESTART_LIMIT}).`;
+  };
+
+  // The shell reports that the engine process is gone. A stop the shell
+  // asked for (a restart, the close) is not a failure; a report about a
+  // process the shell already replaced is stale; and a start-up failure the
+  // engine reported itself stands — the exit that follows it says nothing
+  // new and must not restart an engine that would only refuse again.
+  const handleEngineExited = (event: EventEnvelope<EventName>) => {
+    const payload = asRecord(event.payload);
+    if (payload?.graceful === true) {
+      return;
+    }
+    const generation = typeof payload?.generation === "number" ? payload.generation : null;
+    if (generation !== null && engineGeneration !== null && generation !== engineGeneration) {
+      return;
+    }
+    if (engineStartupFailure) {
+      return;
+    }
+
+    const status = typeof payload?.status === "number" ? `exit status ${payload.status}` : "no exit status";
+    const failure: StartupFailure = {
+      code: "ENGINE_EXITED",
+      message: scheduleAutomaticRestart(`The hardware link stopped unexpectedly (${status}).`),
+      stage: "runtime",
+    };
+    engineStartupFailure = failure;
+    setState({
+      ...state,
+      lifecycle: "failed",
+      recovery: "recovery",
+      startupFailure: failure,
+      lastEvent: event.event,
+      errorSummary: failure.message,
+    });
+    publishAudioMeterFrame(null);
+    pendingStartupGate?.reject(failure);
   };
 
   const handleTransportEvent = (event: EventEnvelope<EventName>) => {
@@ -701,6 +995,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
 
     if (event.event === "engine.startupFailed") {
       const startupFailure = normalizeStartupFailure(event.payload);
+      engineStartupFailure = startupFailure;
 
       setState({
         ...state,
@@ -715,6 +1010,13 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return;
     }
 
+    // Handled before the refresh path below: the engine is gone, so there
+    // is nothing to refresh from.
+    if (event.event === "engine.exited") {
+      handleEngineExited(event);
+      return;
+    }
+
     if (state.lifecycle === "ready") {
       const payload = asRecord(event.payload);
       if (event.event === "audio.meters" || (event.event === "audio.changed" && payload?.reason === "metering-tick")) {
@@ -722,13 +1024,33 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         return;
       }
       if (event.event === "audio.changed") {
+        // 2026-09 audit remediation, Slice 2: a console echo is the console's
+        // truth (an operator move at TotalMix, an adjusted or unconfirmed
+        // send). It must not be swallowed by the 250 ms tail suppression that
+        // protects a local edit from its own event; it only waits for an
+        // in-flight local mutation to finish, then refreshes once.
+        if (payload?.reason === "console-echo") {
+          if (audioLocalMutationDepth > 0) {
+            audioEchoRefreshPending = true;
+            return;
+          }
+          void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
+          return;
+        }
         if (audioLocalMutationDepth > 0 || currentMonotonicTimestampMs() < audioRefreshSuppressUntilMs) {
           return;
         }
-        void refreshAudioSnapshot(event.event);
+        void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
         return;
       }
-      void refreshDomain(event.event);
+      // Slice 9 (F11): every other event refreshes the snapshots it names in
+      // `EVENT_DOMAIN_REFRESH`. An event this build does not know — a newer
+      // hardware link — refreshes everything that can change.
+      const { domains, known } = domainsForEvent(event.event);
+      if (!known && development) {
+        console.warn(`[shell store] '${event.event}' is not in EVENT_DOMAIN_REFRESH.`);
+      }
+      void refreshDomains(domains, event.event).catch(inBackground(`refresh after ${event.event}`));
     }
   };
 
@@ -736,12 +1058,21 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     const generation = ++bootstrapGeneration;
     const isCurrentBootstrap = () => generation === bootstrapGeneration;
 
+    cancelAutomaticRestart();
+    cancelQueuedRefresh();
     clearStartupGate();
+    engineStartupFailure = null;
+    engineGeneration = null;
     unsubscribeTransport();
     unsubscribeTransport = () => {};
 
     setState({
       ...initialState,
+      // The failure ring outlives a restart: it is what the diagnostics
+      // export carries about the session. So does the fixture catalog, which
+      // is fetched once per session (Slice 9).
+      backgroundFailures: state.backgroundFailures,
+      lightingFixtureCatalogSnapshot: catalogLoaded ? state.lightingFixtureCatalogSnapshot : null,
       lifecycle: transitionStartupState("idle", { type: "spawned" }),
     });
     publishAudioMeterFrame(null);
@@ -753,8 +1084,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     });
 
     try {
-      await transport.initialize?.();
+      const launch = await transport.initialize?.();
       if (!isCurrentBootstrap()) return;
+      engineGeneration = launchGeneration(launch);
 
       updateState({
         lifecycle: transitionStartupState("launching-process", {
@@ -770,7 +1102,7 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       if (reportedProtocol !== PROTOCOL_VERSION) {
         throw normalizeStartupFailure({
           code: "PROTOCOL_MISMATCH",
-          message: `Shell expected protocol ${PROTOCOL_VERSION} but engine reported ${reportedProtocol}.`,
+          message: `Studio Control expected version ${PROTOCOL_VERSION} from its hardware link but got ${reportedProtocol}.`,
           requestedProtocol: PROTOCOL_VERSION,
           stage: "protocol-negotiation",
           supportedProtocol: reportedProtocol,
@@ -783,67 +1115,46 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         }),
       });
 
-      const healthSnapshot = (await transport.request("health.snapshot")) as JsonObject;
-      if (!isCurrentBootstrap()) return;
+      // The bootstrap keeps the whole fetch (Slice 9 scopes what follows it):
+      // health first, because the start-up steps show it arriving, then every
+      // other snapshot side by side. A request that fails here fails the start.
+      const health = await fetchDomains(["health"], isCurrentBootstrap);
+      if (!health) return;
+      if (health.failures.length > 0) {
+        throw health.failures[0];
+      }
 
       updateState({
+        ...snapshotsToState(health.accepted),
         lifecycle: transitionStartupState("waiting-for-health-snapshot", {
           type: "health-loaded",
         }),
-        healthSnapshot,
-        recovery: deriveRecoveryState(healthSnapshot),
       });
 
-      const [
-        appSnapshot,
-        commissioningSnapshot,
-        lightingFixtureCatalogSnapshot,
-        lightingSnapshot,
-        lightingDmxMonitorSnapshot,
-        audioSnapshot,
-        planningSnapshot,
-        supportSnapshot,
-        controlSurfaceSnapshot,
-      ] = await Promise.all([
-        transport.request("app.snapshot").then((value) => value as JsonObject),
-        transport.request("commissioning.snapshot").then((value) => value as JsonObject),
-        transport
-          .request("lighting.fixtureCatalog.snapshot")
-          .then((value) => coerceSnapshot<LightingFixtureCatalogSnapshot>(value)),
-        transport.request("lighting.snapshot").then((value) => coerceSnapshot<LightingSnapshot>(value)),
-        transport
-          .request("lighting.dmxMonitor.snapshot")
-          .then((value) => coerceSnapshot<LightingDmxMonitorSnapshot>(value)),
-        transport.request("audio.snapshot").then((value) => coerceSnapshot<AudioSnapshot>(value)),
-        transport.request("planning.snapshot").then((value) => coerceSnapshot<PlanningSnapshot>(value)),
-        transport.request("support.snapshot").then((value) => value as JsonObject),
-        transport.request("controlSurface.snapshot").then((value) => value as JsonObject),
-      ]);
-      if (!isCurrentBootstrap()) return;
+      const rest = await fetchDomains(
+        ALL_DOMAINS.filter((domain) => domain !== "health" && !(domain === "lightingFixtureCatalog" && catalogLoaded)),
+        isCurrentBootstrap
+      );
+      if (!rest) return;
+      if (rest.failures.length > 0) {
+        throw rest.failures[0];
+      }
 
       setState({
+        ...state,
+        ...snapshotsToState(rest.accepted),
         lifecycle: transitionStartupState("waiting-for-app-snapshot", { type: "app-loaded" }),
-        recovery: deriveRecoveryState(healthSnapshot),
-        activeWorkspace: deriveWorkspace(appSnapshot),
-        appSnapshot,
-        healthSnapshot,
-        commissioningSnapshot,
-        lightingFixtureCatalogSnapshot,
-        lightingSnapshot,
-        lightingDmxMonitorSnapshot,
-        audioSnapshot,
-        planningSnapshot,
-        supportSnapshot,
-        controlSurfaceSnapshot,
         startupFailure: null,
         lastEvent: "engine.ready",
         errorSummary: null,
       });
-      publishAudioMeterFrame(audioSnapshot);
+      publishAudioMeterFrame(state.audioSnapshot);
     } catch (error) {
       if (!isCurrentBootstrap()) return;
 
-      const startupFailure = normalizeStartupFailure(error);
+      // What the engine said about itself outranks whatever the bootstrap
+      // tripped over afterwards (a request against a process that is gone).
+      const startupFailure = engineStartupFailure ?? normalizeStartupFailure(error);
       setState({
         ...state,
         lifecycle: "failed",
@@ -851,6 +1162,19 @@ export function createShellStore(transport: EngineTransport): ShellStore {
         startupFailure,
         errorSummary: startupFailure.message,
       });
+      // Recovery mode (Slice 7 — F20): after a storage failure the engine
+      // stays up to list, verify and restore backups, so the recovery
+      // surface gets the backup list it needs to do that.
+      if (RECOVERY_MODE_CODES.has(startupFailure.code)) {
+        void transport
+          .request("support.snapshot")
+          .then((supportSnapshot) => {
+            if (isCurrentBootstrap()) {
+              setState({ ...state, supportSnapshot: supportSnapshot as JsonObject });
+            }
+          })
+          .catch(inBackground("backup list in recovery"));
+      }
     } finally {
       if (isCurrentBootstrap()) {
         clearStartupGate();
@@ -871,10 +1195,16 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     return initializePromise;
   };
 
+  // Slice 9 (F11): the refresh after a request is scoped to what the method
+  // can change (`domainsForMethod`). It stays beside the event's own refresh
+  // because not every request raises an event — `settings.update` raises none
+  // on the hardware link, so a workspace switch reaches the screen only from
+  // here — and the two share the one queue above, so they never run side by
+  // side.
   const performRequest = async (method: string, params: JsonObject = {}) => {
     const result = await transport.request(method as never, params);
     if (state.lifecycle === "ready") {
-      await refreshDomain(state.lastEvent);
+      await refreshDomains(domainsForMethod(method, params));
     }
     return result;
   };
@@ -895,6 +1225,10 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return result;
     } finally {
       audioLocalMutationDepth = Math.max(0, audioLocalMutationDepth - 1);
+      if (audioLocalMutationDepth === 0 && audioEchoRefreshPending) {
+        audioEchoRefreshPending = false;
+        void refreshAudioSnapshot("audio.changed").catch(inBackground("console echo refresh"));
+      }
     }
   };
 
@@ -909,16 +1243,14 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       if (state.lifecycle !== "ready") {
         return;
       }
-      await refreshDomain(state.lastEvent);
+      // The one refresh that fetches everything, the fixture catalog included.
+      await refreshDomains(ALL_DOMAINS);
     },
     async restart() {
-      bootstrapGeneration++;
-      initializePromise = null;
-      clearStartupGate();
-      unsubscribeTransport();
-      unsubscribeTransport = () => {};
-      await transport.dispose?.();
-      return start();
+      return restartEngine();
+    },
+    reportBackgroundFailure(error, context) {
+      recordBackgroundFailure(error, context);
     },
     async setWorkspace(workspaceId) {
       return performRequest("settings.update", { workspace: workspaceId });
@@ -992,6 +1324,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     },
     async updateAudioMixTarget(request: AudioMixTargetUpdateRequest) {
       return performAudioRequest("audio.mixTarget.update", request as unknown as JsonObject);
+    },
+    async holdAudioTalkback(request: AudioTalkbackHoldRequest) {
+      return performAudioRequest("audio.talkback.hold", request as unknown as JsonObject);
     },
     async updateAudioSettings(request: AudioSettingsUpdateRequest) {
       return performAudioRequest("audio.settings.update", request as unknown as JsonObject);
@@ -1087,6 +1422,9 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async setLightingAllPower(on: boolean) {
       return performRequest("lighting.power.all", { on });
     },
+    async setLightingOutputArmed(armed: boolean) {
+      return performRequest("lighting.output.setArmed", { armed });
+    },
     async recallLightingScene(sceneId: string, fadeMs?: number) {
       return performRequest("lighting.scene.recall", fadeMs === undefined ? { sceneId } : { sceneId, fadeMs });
     },
@@ -1120,14 +1458,42 @@ export function createShellStore(transport: EngineTransport): ShellStore {
     async togglePlanningTaskComplete(taskId: string) {
       return performRequest("planning.task.toggleComplete", { taskId });
     },
+    async setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle") {
+      return performRequest("planning.task.timer", { action, taskId });
+    },
+    async deletePlanningTask(taskId: string) {
+      return performRequest("planning.task.delete", { taskId });
+    },
     async exportSupportBackup() {
       return performRequest("support.backup.export");
     },
     async restoreSupportBackup(path: string) {
-      return performRequest("support.backup.restore", { path });
+      const result = await performRequest("support.backup.restore", { path });
+      // A database backup is staged, not applied (2026-09 production
+      // readiness, Slice 7 — F20): the engine takes it at its next start, so
+      // the link is restarted here through the same path as Retry startup.
+      // The shell reports that stop as graceful, so no automatic-restart
+      // budget is spent on it.
+      if (asRecord(result)?.requiresRestart === true) {
+        try {
+          await restartEngine();
+        } catch (error) {
+          recordBackgroundFailure(error, "restart after a database restore");
+        }
+      }
+      return result;
+    },
+    async verifySupportBackup(path: string) {
+      return transport.request("support.backup.verify", { path });
     },
     async exportCompanionConfig(baseUrl?: string) {
       return performRequest("exports.companion.export", baseUrl ? { baseUrl } : {});
+    },
+    async refreshControlSurfaceSnapshot() {
+      if (state.lifecycle !== "ready") {
+        return;
+      }
+      await refreshDomains(["controlSurface"]);
     },
     getAudioMeterFrame() {
       return audioMeterFrame;
@@ -1141,6 +1507,8 @@ export function createShellStore(transport: EngineTransport): ShellStore {
       return () => listeners.delete(listener);
     },
     async dispose() {
+      cancelAutomaticRestart();
+      cancelQueuedRefresh();
       bootstrapGeneration++;
       initializePromise = null;
       clearStartupGate();
@@ -1156,5 +1524,12 @@ export function useAudioMeterFrame(store: ShellStore) {
 }
 
 export function useShellSnapshot(store: ShellStore) {
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  // Slice 9 (F32): a development build's store leaves a reply that failed its
+  // guard here, and it is thrown while rendering so the error boundary shows
+  // it with the request and the field named. A production store never sets it.
+  if (snapshot.snapshotFault !== null) {
+    throw new Error(snapshot.snapshotFault);
+  }
+  return snapshot;
 }

@@ -14,11 +14,12 @@
  * on signature width. Slice 5C closes the drift by biting the wide
  * signature and documenting the dependency count here.
  */
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
 
 import { isEditableTarget, type AudioChannelEntry } from "../../shellData";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
+import { PLATE_SECTION_KEYS, type PlateSection } from "../components/inspector/audioInspectorHelpers";
 
 type SelectableSource = { id: string; kind: "channel" | "output" };
 
@@ -27,7 +28,6 @@ interface UseAudioKeyboardShortcutsArgs {
   clearAllSolo: () => void;
   clearClips: (channelId?: string) => void;
   contextMenu: unknown;
-  inspectorTab: string;
   nextBank: () => void;
   orderedSelectableSources: SelectableSource[];
   previousBank: () => void;
@@ -37,12 +37,10 @@ interface UseAudioKeyboardShortcutsArgs {
   selectChannel: (channelId: string | null) => void;
   selectOutputMixTarget: (mixTargetId: string) => void;
   setContextMenu: (value: null) => void;
-  setInspectorTab: (tab: "channel" | "eq" | "dynamics" | "sends") => void;
-  syncAudio: () => void;
+  revealPlateSection: (section: PlateSection) => void;
   updateChannel: (request: { channelId: string; mute?: boolean; solo?: boolean; phase?: boolean }) => void;
   viewModel: AudioWorkspaceViewModel | null;
   visibleSelectableChannels: AudioChannelEntry[];
-  warningBandRef: RefObject<HTMLDivElement | null>;
 }
 
 export function useAudioKeyboardShortcuts({
@@ -50,7 +48,6 @@ export function useAudioKeyboardShortcuts({
   clearAllSolo,
   clearClips,
   contextMenu,
-  inspectorTab,
   nextBank,
   orderedSelectableSources,
   previousBank,
@@ -60,12 +57,10 @@ export function useAudioKeyboardShortcuts({
   selectChannel,
   selectOutputMixTarget,
   setContextMenu,
-  setInspectorTab,
-  syncAudio,
+  revealPlateSection,
   updateChannel,
   viewModel,
   visibleSelectableChannels,
-  warningBandRef,
 }: UseAudioKeyboardShortcutsArgs) {
   const handleKeyDown = useLiveCallback((event: KeyboardEvent) => {
     if (!viewModel || event.defaultPrevented) return;
@@ -83,11 +78,8 @@ export function useAudioKeyboardShortcuts({
       return;
     }
     if (plain && event.key === "Escape") {
-      if (inspectorTab !== "channel") {
-        setInspectorTab("channel");
-        event.preventDefault();
-        return;
-      }
+      // Visual overhaul A, Slice 4c: the plate has no tabs to back out of, so
+      // Escape goes straight to letting the strip go.
       if (viewModel.selectedChannelId) {
         selectChannel(null);
         event.preventDefault();
@@ -97,21 +89,14 @@ export function useAudioKeyboardShortcuts({
 
     if (isEditableTarget(event.target)) return;
 
-    // Inspector tab accelerators. Only meaningful when a channel is selected —
-    // an output-only selection forces the strip back to the single "channel"
-    // (Output) tab via `outputSelectionOnly`, so the keys stay inert there.
-    // P/Q → Preamp, E → EQ, D → Dynamics, R → Routing. No overlap with m/s/u.
+    // Plate accelerators. Only meaningful when a channel is selected — an
+    // output-only selection shows the output's own section, so the keys stay
+    // inert there. P/Q → Preamp, E → EQ, D → Dynamics, R → Sends; the plate
+    // brings the section into view. No overlap with m/s/u.
     if (plain && viewModel.selectedChannel) {
-      const tabForKey: Partial<Record<string, "channel" | "eq" | "dynamics" | "sends">> = {
-        p: "channel",
-        q: "channel",
-        e: "eq",
-        d: "dynamics",
-        r: "sends",
-      };
-      const nextTab = tabForKey[key];
-      if (nextTab) {
-        setInspectorTab(nextTab);
+      const section = PLATE_SECTION_KEYS[key];
+      if (section) {
+        revealPlateSection(section);
         event.preventDefault();
         return;
       }
@@ -130,7 +115,10 @@ export function useAudioKeyboardShortcuts({
       return;
     }
     if (cmdOrCtrl && !event.altKey && key === "s") {
-      saveCurrentSnapshot();
+      // A held key auto-repeats; a repeat is never the confirming press of an
+      // armed action (2026-09 audit Slice 7 — the dwell in useAudioArming is
+      // the second guard).
+      if (!event.repeat) saveCurrentSnapshot();
       event.preventDefault();
       return;
     }
@@ -147,7 +135,8 @@ export function useAudioKeyboardShortcuts({
     if (plain && event.shiftKey && /^Digit[1-8]$/.test(event.code)) {
       const snapshot = viewModel.snapshots[Number(event.code.replace("Digit", "")) - 1];
       if (snapshot) {
-        recallSnapshot(snapshot.id);
+        // Key repeat arms once and never confirms (2026-09 audit Slice 7).
+        if (!event.repeat) recallSnapshot(snapshot.id);
         event.preventDefault();
       }
       return;
@@ -196,16 +185,9 @@ export function useAudioKeyboardShortcuts({
       }
       return;
     }
-    if (
-      plain &&
-      event.key === "Enter" &&
-      warningBandRef.current &&
-      document.activeElement === warningBandRef.current &&
-      viewModel.capabilities.canSync
-    ) {
-      syncAudio();
-      event.preventDefault();
-    }
+    // Visual overhaul A, Slice 4: the state display's way-out key is a real
+    // key, so Enter on it syncs natively; the focused-warning-band shortcut
+    // this replaced had no target once the band went.
   });
 
   useEffect(() => {

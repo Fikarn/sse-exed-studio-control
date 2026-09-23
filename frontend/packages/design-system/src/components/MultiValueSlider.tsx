@@ -127,8 +127,8 @@ export const MultiValueSlider = forwardRef<HTMLDivElement, MultiValueSliderProps
   };
 
   const displayText = summary.mixed
-    ? `Mixed (${Math.round(summary.min)}–${Math.round(summary.max)}${unit})`
-    : `${Math.round(summary.avg)}${unit}`;
+    ? `Mixed (${Math.round(summary.min)}–${Math.round(summary.max)}${unit ? ` ${unit}` : ""})`
+    : `${Math.round(summary.avg)}${unit ? ` ${unit}` : ""}`;
 
   return (
     <div ref={ref} className={styles.wrapper}>
@@ -154,7 +154,7 @@ export const MultiValueSlider = forwardRef<HTMLDivElement, MultiValueSliderProps
         onChange={(event) => setDraftDelta(event.currentTarget.value)}
         onKeyDown={onDeltaSubmit}
         onBlur={() => setDraftDelta("")}
-        aria-label={`${ariaLabel} delta expression`}
+        aria-label={`${ariaLabel} value or change`}
         disabled={disabled}
         autoComplete="off"
         spellCheck={false}

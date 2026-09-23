@@ -1,14 +1,21 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
-use crate::audio::{
-    parse_audio_snapshot_recall_request, read_audio_snapshot, recall_audio_snapshot,
-};
+use crate::audio::read_audio_snapshot;
 use crate::bootstrap::RuntimeContext;
-use crate::diagnostics::append_log;
+use crate::control_surface_audio::{
+    audio_deck_bank, audio_deck_dial_mode, audio_deck_gate_label, audio_key_lcd_text,
+    audio_state_value_text, audio_strip_key_index, audio_strip_lcd_text, audio_strip_level_text,
+    audio_strip_state_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
+    AudioDeckStrip,
+};
 use crate::lighting::{
-    load_lighting_editor_state, parse_lighting_scene_recall_request, read_lighting_snapshot,
-    recall_lighting_scene, save_lighting_editor_state, LightingCommandError,
-    LightingEditorFixtureState, LightingEditorSceneFixtureState, LightingEditorSceneState,
-    LightingEditorState,
+    create_lighting_scene_with_preview, delete_lighting_scene, load_lighting_editor_state,
+    lock_shared_lighting_preview, parse_lighting_all_power_request,
+    parse_lighting_fixture_update_request, parse_lighting_scene_create_request,
+    parse_lighting_scene_delete_request, parse_lighting_scene_recall_request,
+    read_lighting_fixture_levels, recall_lighting_scene_with_preview,
+    set_lighting_all_power_with_preview, update_lighting_fixture_with_preview,
+    with_lighting_state_and_preview, LightingCommandError, LightingEditorState,
+    LightingFixtureLevels, LightingPreviewRuntimeState,
 };
 use crate::planning::{
     apply_planning_project_create, apply_planning_project_delete, apply_planning_project_reorder,
@@ -21,22 +28,22 @@ use crate::planning::{
     PlanningCommandError, PlanningContextSnapshot,
 };
 use crate::planning_settings::{PLANNING_SETTINGS_PREFIX, SORT_BY_KEY};
-use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned};
-use serde::{Deserialize, Serialize};
+use crate::shell_settings::{DEFAULT_WORKSPACE, SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
+use crate::storage::{
+    list_settings_by_prefix, open_connection, set_settings_owned, set_settings_owned_and,
+};
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::thread;
-use std::time::Duration;
+use std::sync::mpsc::Sender;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
 pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
 
 const SELECTED_LIGHT_ID_KEY: &str = "app.control_surface.selected_light_id";
 const SELECTED_SCENE_ID_KEY: &str = "app.control_surface.selected_scene_id";
-const AUDIO_STATE_KEY: &str = "app.control_surface.audio.state";
+const LAST_EVENT_KEY: &str = "app.control_surface.last_event";
 
 const PROJECT_STATUS_CYCLE: &[&str] = &["todo", "in-progress", "blocked", "done"];
 const PROJECT_PRIORITY_CYCLE: &[&str] = &["p0", "p1", "p2", "p3"];
@@ -53,49 +60,58 @@ pub struct ControlSurfaceBridgeInfo {
     pub error: Option<String>,
 }
 
-type LightingDeckState = LightingEditorState;
-type LightingDeckFixtureState = LightingEditorFixtureState;
-type LightingDeckSceneState = LightingEditorSceneState;
-type LightingDeckSceneFixtureState = LightingEditorSceneFixtureState;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct AudioDeckState {
-    channels: Vec<AudioDeckChannelState>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct AudioDeckChannelState {
-    id: String,
-    name: String,
-    gain: i64,
-    mute: bool,
-    phantom: bool,
-}
-
 #[derive(Debug)]
 pub enum ControlSurfaceError {
     InvalidParams(String),
     Unsupported(String),
     Rejected(String),
     Storage(String),
+    /// Missing or wrong bearer token (401) — `control_surface_http`.
+    Unauthorized(String),
+    /// A browser origin presented itself (403).
+    Forbidden(String),
+    /// The request did not arrive within the deadline (408).
+    Timeout(String),
+    /// A body without a usable `Content-Length` (411).
+    LengthRequired(String),
+    /// The declared body exceeds the cap (413).
+    TooLarge(String),
+    /// The headers exceed the cap (431).
+    HeadersTooLarge(String),
+    /// The worker queue is full (503).
+    Busy(String),
 }
 
 impl ControlSurfaceError {
-    fn status_code(&self) -> u16 {
+    pub(crate) fn status_code(&self) -> u16 {
         match self {
             Self::InvalidParams(_) => 400,
-            Self::Unsupported(_) => 501,
+            Self::Unauthorized(_) => 401,
+            Self::Forbidden(_) => 403,
+            Self::Timeout(_) => 408,
             Self::Rejected(_) => 409,
+            Self::LengthRequired(_) => 411,
+            Self::TooLarge(_) => 413,
+            Self::HeadersTooLarge(_) => 431,
             Self::Storage(_) => 500,
+            Self::Unsupported(_) => 501,
+            Self::Busy(_) => 503,
         }
     }
 
-    fn message(&self) -> &str {
+    pub(crate) fn message(&self) -> &str {
         match self {
             Self::InvalidParams(message)
             | Self::Unsupported(message)
             | Self::Rejected(message)
-            | Self::Storage(message) => message,
+            | Self::Storage(message)
+            | Self::Unauthorized(message)
+            | Self::Forbidden(message)
+            | Self::Timeout(message)
+            | Self::LengthRequired(message)
+            | Self::TooLarge(message)
+            | Self::HeadersTooLarge(message)
+            | Self::Busy(message) => message,
         }
     }
 }
@@ -107,57 +123,63 @@ pub fn resolve_control_surface_port() -> u16 {
         .unwrap_or(DEFAULT_CONTROL_SURFACE_PORT)
 }
 
-pub fn start_control_surface_bridge(
-    db_path: &Path,
-    log_file_path: &Path,
-    requested_port: u16,
-) -> ControlSurfaceBridgeInfo {
-    match bind_control_surface_listener(requested_port) {
-        Ok(listener) => {
-            let port = listener
-                .local_addr()
-                .map(|address| address.port())
-                .unwrap_or(requested_port);
-            let base_url = format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{port}");
-            let db_path = db_path.to_path_buf();
-            let log_file_path = log_file_path.to_path_buf();
-            let summary = format!(
-                "Native control-surface bridge is serving deck actions and LCD payloads at {base_url}."
-            );
-
-            let _ = append_log(log_file_path.as_path(), "INFO", &summary);
-
-            thread::spawn(move || run_control_surface_bridge(listener, db_path, log_file_path));
-
-            ControlSurfaceBridgeInfo {
-                base_url,
-                port,
-                available: true,
-                status: String::from("ready"),
-                summary,
-                error: None,
-            }
-        }
-        Err(message) => ControlSurfaceBridgeInfo {
-            base_url: format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{requested_port}"),
-            port: requested_port,
-            available: false,
-            status: String::from("unavailable"),
-            summary: format!(
-                "Native control-surface bridge is unavailable because the listener could not bind: {message}"
-            ),
-            error: Some(message),
-        },
-    }
+/// The bridge shares the engine-wide out-of-band event sender
+/// (`engine_events`) with the console link; kept under its historical name
+/// for the startup wiring in `main.rs`.
+pub fn register_control_surface_event_sender(sender: Sender<Value>) {
+    crate::engine_events::register_engine_event_sender(sender);
 }
+
+pub(crate) fn emit_audio_changed() {
+    crate::engine_events::emit_audio_changed("control-surface");
+}
+
+// The listener, the bearer token, the request limits and the worker pool live
+// in `control_surface_http`; this module owns what a request does.
 
 pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurfaceError> {
     let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let context = read_planning_context(db_path, &planning_settings)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    let (app_settings, audio_snapshot) = current_audio_snapshot(db_path)?;
+    let bank = audio_deck_bank(&app_settings);
+    let strips = (1..=4)
+        .map(
+            |strip_index| match resolve_audio_deck_strip(&audio_snapshot, &bank, strip_index) {
+                Ok(AudioDeckStrip::Channel(channel)) => json!({
+                    "position": strip_index,
+                    "kind": "channel",
+                    "id": channel.id,
+                    "name": channel.name,
+                }),
+                Ok(AudioDeckStrip::MixTarget(target)) => json!({
+                    "position": strip_index,
+                    "kind": "mixTarget",
+                    "id": target.id,
+                    "name": target.name,
+                }),
+                Err(_) => json!({
+                    "position": strip_index,
+                    "kind": "empty",
+                    "id": Value::Null,
+                    "name": Value::Null,
+                }),
+            },
+        )
+        .collect::<Vec<_>>();
 
     Ok(json!({
+        "workspace": read_active_workspace(db_path)?,
+        "audio": {
+            "status": audio_snapshot.status,
+            "gated": audio_deck_gate_label(&audio_snapshot).is_some(),
+            "bank": bank,
+            "dialMode": audio_deck_dial_mode(&app_settings),
+            "selectedMixTargetId": audio_snapshot.selected_mix_target_id,
+            "selectedChannelId": audio_snapshot.selected_channel_id,
+            "strips": strips,
+        },
         "selectedProject": context.selected_project,
         "projectIndex": context.project_index,
         "projectCount": context.project_count,
@@ -182,10 +204,8 @@ pub fn read_control_surface_lcd_text(
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let context = read_planning_context(db_path, &planning_settings)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let lighting_snapshot = read_lighting_snapshot(&app_settings);
     let audio_snapshot = read_audio_snapshot(&app_settings);
-    let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
-    let audio_state = load_audio_deck_state(&app_settings, &audio_snapshot);
+    let lighting_state = load_lighting_editor_state(&app_settings);
 
     match key {
         "project_nav" => {
@@ -262,14 +282,14 @@ pub fn read_control_surface_lcd_text(
                     .iter()
                     .map(|fixture| fixture.id.as_str()),
             );
-            if let Some(selected_light_id) = selected_light_id {
-                if let Some(fixture) = lighting_state
-                    .fixtures
-                    .iter()
-                    .find(|fixture| fixture.id == selected_light_id)
-                {
-                    return Ok(format!("INTENSITY\\n{}%", fixture.intensity));
-                }
+            if let Some(levels) =
+                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
+            {
+                return Ok(format!(
+                    "INTENSITY\\n{}%{}",
+                    levels.intensity,
+                    preview_lcd_line(&levels)
+                ));
             }
             Ok(String::from("INTENSITY\\n--"))
         }
@@ -282,14 +302,14 @@ pub fn read_control_surface_lcd_text(
                     .iter()
                     .map(|fixture| fixture.id.as_str()),
             );
-            if let Some(selected_light_id) = selected_light_id {
-                if let Some(fixture) = lighting_state
-                    .fixtures
-                    .iter()
-                    .find(|fixture| fixture.id == selected_light_id)
-                {
-                    return Ok(format!("CCT\\n{}K", fixture.cct));
-                }
+            if let Some(levels) =
+                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
+            {
+                return Ok(format!(
+                    "CCT\\n{}K{}",
+                    levels.cct,
+                    preview_lcd_line(&levels)
+                ));
             }
             Ok(String::from("CCT\\n--"))
         }
@@ -316,32 +336,73 @@ pub fn read_control_surface_lcd_text(
             }
             Ok(String::from("SCENE\\n(none)\\n--"))
         }
-        "audio_ch_nav" | "audio_gain1" | "audio_gain2" | "audio_gain3" => {
-            let channel_index = match key {
-                "audio_ch_nav" => 0,
-                "audio_gain1" => 1,
-                "audio_gain2" => 2,
-                "audio_gain3" => 3,
-                _ => 0,
-            };
-
-            if let Some(channel) = audio_state.channels.get(channel_index) {
-                Ok(format!(
-                    "{}\\n{}dB{}",
-                    truncate(&channel.name, 12),
-                    channel.gain,
-                    if channel.mute { " M" } else { "" }
-                ))
-            } else {
-                Ok(format!("CH {}\\n(none)", channel_index + 1))
-            }
+        "audio_strip_1" | "audio_strip_2" | "audio_strip_3" | "audio_strip_4" => {
+            let strip_index = key
+                .rsplit('_')
+                .next()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(1);
+            Ok(audio_strip_lcd_text(
+                &app_settings,
+                &audio_snapshot,
+                strip_index,
+            ))
         }
+        "audio_key_1" | "audio_key_2" | "audio_key_3" | "audio_key_4" | "audio_key_5"
+        | "audio_key_6" | "audio_key_7" | "audio_key_8" => {
+            let key_index = key
+                .rsplit('_')
+                .next()
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(1);
+            Ok(audio_key_lcd_text(
+                &app_settings,
+                &audio_snapshot,
+                key_index,
+            ))
+        }
+        "audio_strip_1_state"
+        | "audio_strip_2_state"
+        | "audio_strip_3_state"
+        | "audio_strip_4_state" => Ok(audio_strip_state_text(
+            &app_settings,
+            &audio_snapshot,
+            audio_strip_key_index(key),
+        )),
+        "audio_strip_1_level"
+        | "audio_strip_2_level"
+        | "audio_strip_3_level"
+        | "audio_strip_4_level" => Ok(audio_strip_level_text(
+            &app_settings,
+            &audio_snapshot,
+            audio_strip_key_index(key),
+        )),
+        "audio_state_target" | "audio_state_bank" | "audio_state_mode" | "audio_state_dim"
+        | "audio_state_talk" | "audio_state_solo" | "audio_state_gated" => audio_state_value_text(
+            &app_settings,
+            &audio_snapshot,
+            key.trim_start_matches("audio_state_"),
+        ),
+        "workspace" => read_active_workspace(db_path),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported LCD key: {key}"
         ))),
     }
 }
 
+fn read_active_workspace(db_path: &Path) -> Result<String, ControlSurfaceError> {
+    let shell_settings = list_settings_by_prefix(db_path, SHELL_SETTINGS_PREFIX)
+        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    Ok(shell_settings
+        .get(WORKSPACE_KEY)
+        .filter(|value| !value.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| String::from(DEFAULT_WORKSPACE)))
+}
+
+// Mirrors the operator app's fader curve (normalizedToFaderDb in
+// frontend/app/src/app/audio/audioFormatting.ts) — the deck and the screen
+// must always print the same dB number for the same wire value.
 pub fn handle_control_surface_http_action(
     db_path: &Path,
     path: &str,
@@ -355,235 +416,98 @@ pub fn handle_control_surface_http_action(
         .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("action is required")))?;
     let value = body.get("value").and_then(Value::as_str);
 
-    match path {
+    let response = match path {
         "/api/deck/action" => handle_planning_action(db_path, action, value),
         "/api/deck/light-action" => handle_light_action(db_path, action, value),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported action route: {path}"
         ))),
-    }
-}
-
-fn bind_control_surface_listener(requested_port: u16) -> Result<TcpListener, String> {
-    TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, requested_port))
-        .map_err(|error| error.to_string())
-}
-
-fn run_control_surface_bridge(
-    listener: TcpListener,
-    db_path: std::path::PathBuf,
-    log_file_path: std::path::PathBuf,
-) {
-    let _ = listener.set_nonblocking(false);
-    for incoming in listener.incoming() {
-        match incoming {
-            Ok(stream) => {
-                let db_path = db_path.clone();
-                let log_file_path = log_file_path.clone();
-                thread::spawn(move || {
-                    if let Err(error) = handle_control_surface_connection(stream, &db_path) {
-                        let _ = append_log(
-                            log_file_path.as_path(),
-                            "WARN",
-                            &format!("Control-surface bridge request failed: {}", error.message()),
-                        );
-                    }
-                });
+    };
+    if let Ok(reply) = &response {
+        // The action log (Slice 11 — F30): every key through the bridge is
+        // the Stream Deck's, so this is where a row gets the source `deck`.
+        // The reply says what the key did and whether it was staged in the
+        // preview; the row rides the transaction that stamps the last
+        // event, so a key waits for the disk no more often than before.
+        let actions = crate::action_log::deck_actions(path, action, reply);
+        if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions)
+        {
+            crate::diagnostics::log_event(
+                crate::diagnostics::LogLevel::Warn,
+                &format!(
+                    "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
+                    actions.len(),
+                    error.message()
+                ),
+            );
+        }
+        match deck_change_event(path, action) {
+            Some(DeckChange::Lighting) => {
+                crate::engine_events::emit_lighting_changed("control-surface")
             }
-            Err(error) => {
-                let _ = append_log(
-                    log_file_path.as_path(),
-                    "WARN",
-                    &format!("Control-surface bridge accept failed: {error}"),
-                );
-                thread::sleep(Duration::from_millis(50));
+            Some(DeckChange::Planning) => {
+                crate::engine_events::emit_planning_changed("control-surface")
             }
+            None => {}
         }
     }
+    response
 }
 
-fn handle_control_surface_connection(
-    mut stream: TcpStream,
+/// What a deck action changed, as the screen needs to hear it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeckChange {
+    Lighting,
+    Planning,
+}
+
+/// The event a successful deck action raises (2026-09 production readiness,
+/// Slice 10), so an open workspace follows the deck instead of waiting for
+/// its next request. The audio route announces itself (`emit_audio_changed`);
+/// the deck mode is a planning setting although its key sits on the lighting
+/// route; `openDetail` changes nothing.
+fn deck_change_event(path: &str, action: &str) -> Option<DeckChange> {
+    match (path, action) {
+        ("/api/deck/action", "openDetail") => None,
+        ("/api/deck/action", _) => Some(DeckChange::Planning),
+        ("/api/deck/light-action", "switchToDeckMode") => Some(DeckChange::Planning),
+        ("/api/deck/light-action", _) => Some(DeckChange::Lighting),
+        _ => None,
+    }
+}
+
+fn stamp_control_surface_last_event(
     db_path: &Path,
+    route: &str,
+    action: &str,
+    value: Option<&str>,
+    actions: &[crate::action_log::ActionRecord],
 ) -> Result<(), ControlSurfaceError> {
-    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-    let request = read_http_request(&mut stream)?;
-    let response = route_control_surface_request(db_path, &request);
-    write_http_response(&mut stream, response.status_code, &response.body)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
-}
-
-struct HttpRequest {
-    method: String,
-    target: String,
-    body: Vec<u8>,
-}
-
-struct HttpResponse {
-    status_code: u16,
-    body: Vec<u8>,
-}
-
-fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, ControlSurfaceError> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0_u8; 1024];
-
-    loop {
-        let bytes_read = stream
-            .read(&mut chunk)
-            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-        if bytes_read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
-        }
-        if buffer.len() > 64 * 1024 {
-            return Err(ControlSurfaceError::InvalidParams(String::from(
-                "HTTP request header exceeded the native bridge limit",
-            )));
-        }
-    }
-
-    let Some(header_end) = buffer.windows(4).position(|window| window == b"\r\n\r\n") else {
-        return Err(ControlSurfaceError::InvalidParams(String::from(
-            "Malformed HTTP request",
-        )));
-    };
-    let header_end = header_end + 4;
-    let header_text = String::from_utf8_lossy(&buffer[..header_end]).to_string();
-    let mut lines = header_text.lines();
-    let request_line = lines
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing request line")))?;
-    let mut parts = request_line.split_whitespace();
-    let method = parts
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing HTTP method")))?
-        .to_string();
-    let target = parts
-        .next()
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("Missing HTTP target")))?
-        .to_string();
-
-    let content_length = header_text
-        .lines()
-        .skip(1)
-        .filter_map(|line| line.split_once(':'))
-        .find_map(|(name, value)| {
-            if name.trim().eq_ignore_ascii_case("content-length") {
-                value.trim().parse::<usize>().ok()
-            } else {
-                None
-            }
-        })
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0);
-
-    while buffer.len() < header_end + content_length {
-        let bytes_read = stream
-            .read(&mut chunk)
-            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-        if bytes_read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..bytes_read]);
-    }
-
-    let mut body = buffer.split_off(header_end);
-    if body.len() > content_length {
-        body.truncate(content_length);
-    }
-
-    Ok(HttpRequest {
-        method,
-        target,
-        body,
-    })
+    let event = json!({
+        "route": route,
+        "action": action,
+        "value": value,
+        "at": at,
+    });
+    set_settings_owned_and(
+        db_path,
+        &[(String::from(LAST_EVENT_KEY), event.to_string())],
+        |transaction| crate::action_log::insert_actions(transaction, actions),
+    )
+    .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
 }
 
-fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpResponse {
-    let (path, query) = split_target(&request.target);
-
-    let result = match (request.method.as_str(), path) {
-        ("GET", "/api/deck/context") => read_control_surface_context(db_path),
-        ("GET", "/api/deck/lcd") => {
-            let key = query_parameter(query, "key").ok_or_else(|| {
-                ControlSurfaceError::InvalidParams(String::from("Missing ?key= parameter"))
-            });
-            key.and_then(|key| read_control_surface_lcd_text(db_path, &key).map(Value::String))
-        }
-        ("POST", "/api/deck/action")
-        | ("POST", "/api/deck/light-action")
-        | ("POST", "/api/deck/audio-action") => parse_json_body(&request.body)
-            .and_then(|body| handle_control_surface_http_action(db_path, path, &body)),
-        _ => Err(ControlSurfaceError::InvalidParams(format!(
-            "Unsupported bridge endpoint: {} {}",
-            request.method, path
-        ))),
-    };
-
-    match result {
-        Ok(value) => HttpResponse {
-            status_code: 200,
-            body: serde_json::to_vec(&value).unwrap_or_else(|_| b"{}".to_vec()),
-        },
-        Err(error) => HttpResponse {
-            status_code: error.status_code(),
-            body: serde_json::to_vec(&json!({ "error": error.message() }))
-                .unwrap_or_else(|_| b"{\"error\":\"bridge failure\"}".to_vec()),
-        },
-    }
-}
-
-fn write_http_response(
-    stream: &mut TcpStream,
-    status_code: u16,
-    body: &[u8],
-) -> Result<(), std::io::Error> {
-    let status_text = match status_code {
-        200 => "OK",
-        400 => "Bad Request",
-        404 => "Not Found",
-        409 => "Conflict",
-        500 => "Internal Server Error",
-        501 => "Not Implemented",
-        _ => "Error",
-    };
-    let headers = format!(
-        "HTTP/1.1 {status_code} {status_text}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        body.len()
-    );
-    stream.write_all(headers.as_bytes())?;
-    stream.write_all(body)?;
-    stream.flush()
-}
-
-fn split_target(target: &str) -> (&str, &str) {
-    target.split_once('?').unwrap_or((target, ""))
-}
-
-fn query_parameter(query: &str, name: &str) -> Option<String> {
-    query
-        .split('&')
-        .filter_map(|pair| pair.split_once('='))
-        .find_map(|(key, value)| {
-            if key == name {
-                Some(value.replace("%20", " "))
-            } else {
-                None
-            }
-        })
-}
-
-fn parse_json_body(body: &[u8]) -> Result<Value, ControlSurfaceError> {
-    if body.is_empty() {
-        return Ok(json!({}));
-    }
-
-    serde_json::from_slice(body)
-        .map_err(|error| ControlSurfaceError::InvalidParams(error.to_string()))
+pub fn control_surface_last_event(db_path: &Path) -> Value {
+    list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+        .ok()
+        .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
+        .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
+        .unwrap_or(Value::Null)
 }
 
 fn handle_planning_action(
@@ -794,22 +718,37 @@ fn handle_light_action(
     action: &str,
     value: Option<&str>,
 ) -> Result<Value, ControlSurfaceError> {
+    if action == "switchToDeckMode" {
+        let deck_mode = value.unwrap_or("light");
+        let result = update_planning_settings(
+            db_path,
+            &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
+                .map_err(ControlSurfaceError::InvalidParams)?,
+        )
+        .map_err(map_planning_error)?;
+        return Ok(json!({ "deckMode": result.settings.deck_mode }));
+    }
+
+    // Every lighting key reads, decides and writes under the lighting state
+    // lock, with the preview the IPC loop uses, and changes lighting state
+    // only through the functions the screen's requests run (2026-09
+    // production readiness, Slice 10 — F12): two keys, or a key and the
+    // screen, can no longer overwrite each other's change, and a key pressed
+    // while previewing edits the preview buffer, not the light output.
+    with_lighting_state_and_preview(|preview| locked_light_action(db_path, action, preview))
+}
+
+fn locked_light_action(
+    db_path: &Path,
+    action: &str,
+    preview: &mut LightingPreviewRuntimeState,
+) -> Result<Value, ControlSurfaceError> {
+    let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+    let lighting_state = load_lighting_editor_state(&app_settings);
+
     match action {
-        "switchToDeckMode" => {
-            let deck_mode = value.unwrap_or("light");
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "deckMode": result.settings.deck_mode }))
-        }
         "selectNextLight" | "selectPrevLight" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let selected_light_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_LIGHT_ID_KEY,
@@ -830,10 +769,6 @@ fn handle_light_action(
             Ok(json!({ "selectedLightId": next_light_id }))
         }
         "selectNextScene" | "selectPrevScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let selected_scene_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_SCENE_ID_KEY,
@@ -847,148 +782,106 @@ fn handle_light_action(
             persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, next_scene_id.as_deref())?;
             Ok(json!({ "selectedSceneId": next_scene_id }))
         }
-        "toggleLight" | "allOn" | "allOff" | "intensityUp" | "intensityDown" | "cctUp"
-        | "cctDown" | "resetIntensity" | "resetCct" | "saveScene" | "deleteScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let mut lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
-
-            match action {
-                "toggleLight" => {
-                    let (fixture_id, next_on) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.on = !fixture.on;
-                        (fixture.id.clone(), fixture.on)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "on": next_on } }))
-                }
-                "allOn" | "allOff" => {
-                    let next_on = action == "allOn";
-                    for fixture in &mut lighting_state.fixtures {
-                        fixture.on = next_on;
-                    }
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "on": next_on }))
-                }
-                "intensityUp" | "intensityDown" => {
-                    let (fixture_id, intensity) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        let delta = if action == "intensityUp" { 5 } else { -5 };
-                        fixture.intensity = clamp_i64(fixture.intensity + delta, 0, 100);
-                        (fixture.id.clone(), fixture.intensity)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "intensity": intensity } }))
-                }
-                "cctUp" | "cctDown" => {
-                    let (fixture_id, cct) = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        let delta = if action == "cctUp" { 200 } else { -200 };
-                        fixture.cct = clamp_i64(fixture.cct + delta, 2700, 6500);
-                        (fixture.id.clone(), fixture.cct)
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "cct": cct } }))
-                }
-                "resetIntensity" => {
-                    let fixture_id = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.intensity = 100;
-                        fixture.id.clone()
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "intensity": 100 } }))
-                }
-                "resetCct" => {
-                    let fixture_id = {
-                        let fixture =
-                            selected_lighting_fixture_mut(&app_settings, &mut lighting_state)?;
-                        fixture.cct = 4500;
-                        fixture.id.clone()
-                    };
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    Ok(json!({ "light": { "id": fixture_id, "cct": 4500 } }))
-                }
-                "saveScene" => {
-                    if lighting_state.fixtures.is_empty() {
-                        return Err(ControlSurfaceError::Rejected(String::from(
-                            "No lighting fixtures are available.",
-                        )));
-                    }
-                    let next_index = lighting_state.scenes.len() + 1;
-                    let scene_id = format!("scene-custom-{next_index}");
-                    let scene_name = format!("Scene {next_index}");
-                    lighting_state.scenes.push(LightingDeckSceneState {
-                        id: scene_id.clone(),
-                        name: scene_name.clone(),
-                        fixture_states: lighting_state
-                            .fixtures
-                            .iter()
-                            .map(|fixture| LightingDeckSceneFixtureState {
-                                fixture_id: fixture.id.clone(),
-                                intensity: fixture.intensity,
-                                cct: fixture.cct,
-                                on: fixture.on,
-                                control_values: fixture.control_values.clone(),
-                            })
-                            .collect(),
-                        color_index: None,
-                    });
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, Some(&scene_id))?;
-                    Ok(json!({ "scene": { "id": scene_id, "name": scene_name } }))
-                }
-                "deleteScene" => {
-                    let selected_scene_id = resolve_selected_inventory_id(
-                        &app_settings,
-                        SELECTED_SCENE_ID_KEY,
-                        lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
-                    )
-                    .ok_or_else(|| {
-                        ControlSurfaceError::Rejected(String::from(
-                            "No lighting scene is selected.",
-                        ))
-                    })?;
-                    let current_index = lighting_state
-                        .scenes
-                        .iter()
-                        .position(|scene| scene.id == selected_scene_id)
-                        .ok_or_else(|| {
-                            ControlSurfaceError::Rejected(String::from(
-                                "Selected lighting scene was not found.",
-                            ))
-                        })?;
-                    lighting_state
-                        .scenes
-                        .retain(|scene| scene.id != selected_scene_id);
-                    save_lighting_deck_state(db_path, &lighting_state)?;
-                    let next_scene_id = lighting_state
-                        .scenes
-                        .get(current_index.min(lighting_state.scenes.len().saturating_sub(1)))
-                        .map(|scene| scene.id.clone());
-                    persist_optional_setting(
-                        db_path,
-                        SELECTED_SCENE_ID_KEY,
-                        next_scene_id.as_deref(),
-                    )?;
-                    Ok(json!({ "deleted": true, "sceneId": selected_scene_id }))
-                }
-                _ => Err(ControlSurfaceError::Unsupported(String::from(
-                    "Unsupported lighting mutation",
-                ))),
-            }
+        "toggleLight" | "intensityUp" | "intensityDown" | "cctUp" | "cctDown"
+        | "resetIntensity" | "resetCct" => {
+            let fixture_id = selected_lighting_fixture_id(&app_settings, &lighting_state)?;
+            // The relative keys start from what the operator means the
+            // fixture to be: the preview buffer while previewing, otherwise
+            // the stored value with a running fade sampled now.
+            let levels = read_lighting_fixture_levels(&app_settings, preview, &fixture_id)
+                .ok_or_else(|| {
+                    ControlSurfaceError::Rejected(String::from(
+                        "Selected lighting fixture was not found.",
+                    ))
+                })?;
+            let (field, change) = match action {
+                "toggleLight" => ("on", json!(!levels.on)),
+                "intensityUp" => ("intensity", json!(clamp_i64(levels.intensity + 5, 0, 100))),
+                "intensityDown" => ("intensity", json!(clamp_i64(levels.intensity - 5, 0, 100))),
+                "cctUp" => ("cct", json!(clamp_i64(levels.cct + 200, 2700, 6500))),
+                "cctDown" => ("cct", json!(clamp_i64(levels.cct - 200, 2700, 6500))),
+                "resetIntensity" => ("intensity", json!(100)),
+                _ => ("cct", json!(4500)),
+            };
+            let mut params = json!({ "fixtureId": fixture_id });
+            params[field] = change;
+            let result = update_lighting_fixture_with_preview(
+                db_path,
+                &parse_lighting_fixture_update_request(&params)
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            // The reply carries what was stored — the fixture's own CCT range
+            // may be narrower than the deck's 2700–6500 K.
+            let stored = match field {
+                "on" => json!(result.fixture.on),
+                "intensity" => json!(result.fixture.intensity),
+                _ => json!(result.fixture.cct),
+            };
+            let mut light = json!({ "id": result.fixture.id, "name": result.fixture.name });
+            light[field] = stored;
+            Ok(json!({ "light": light, "preview": result.source == "preview" }))
+        }
+        "allOn" | "allOff" => {
+            let next_on = action == "allOn";
+            let previewing = preview.enabled;
+            set_lighting_all_power_with_preview(
+                db_path,
+                &parse_lighting_all_power_request(&json!({ "on": next_on }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            Ok(json!({ "on": next_on, "preview": previewing }))
+        }
+        "saveScene" => {
+            // The deck keeps its own name for the scene ("Scene N"); the id
+            // comes from the rule the screen's scenes use, which never hands
+            // out an id a live scene already has.
+            let scene_name = format!("Scene {}", lighting_state.scenes.len() + 1);
+            let result = create_lighting_scene_with_preview(
+                db_path,
+                &parse_lighting_scene_create_request(&json!({ "name": scene_name }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
+            )
+            .map_err(map_lighting_error)?;
+            persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, Some(&result.scene.id))?;
+            Ok(json!({ "scene": { "id": result.scene.id, "name": result.scene.name } }))
+        }
+        "deleteScene" => {
+            let selected_scene_id = resolve_selected_inventory_id(
+                &app_settings,
+                SELECTED_SCENE_ID_KEY,
+                lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
+            )
+            .ok_or_else(|| {
+                ControlSurfaceError::Rejected(String::from("No lighting scene is selected."))
+            })?;
+            let current_index = lighting_state
+                .scenes
+                .iter()
+                .position(|scene| scene.id == selected_scene_id)
+                .unwrap_or(0);
+            delete_lighting_scene(
+                db_path,
+                &parse_lighting_scene_delete_request(&json!({ "sceneId": selected_scene_id }))
+                    .map_err(ControlSurfaceError::InvalidParams)?,
+            )
+            .map_err(map_lighting_error)?;
+            let remaining = lighting_state
+                .scenes
+                .iter()
+                .filter(|scene| scene.id != selected_scene_id)
+                .collect::<Vec<_>>();
+            let next_scene_id = remaining
+                .get(current_index.min(remaining.len().saturating_sub(1)))
+                .map(|scene| scene.id.clone());
+            persist_optional_setting(db_path, SELECTED_SCENE_ID_KEY, next_scene_id.as_deref())?;
+            Ok(json!({ "deleted": true, "sceneId": selected_scene_id }))
         }
         "recallScene" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_snapshot = read_lighting_snapshot(&app_settings);
-            let mut lighting_state = load_lighting_deck_state(&app_settings, &lighting_snapshot);
             let scene_id = resolve_selected_inventory_id(
                 &app_settings,
                 SELECTED_SCENE_ID_KEY,
@@ -997,176 +890,23 @@ fn handle_light_action(
             .ok_or_else(|| {
                 ControlSurfaceError::Rejected(String::from("No lighting scene is available."))
             })?;
-            let result = recall_lighting_scene(
+            // The recall writes everything a recall writes; nothing is saved
+            // after it (the deck used to save its pre-recall copy of the
+            // state over what the recall had just written).
+            let result = recall_lighting_scene_with_preview(
                 db_path,
                 &parse_lighting_scene_recall_request(&json!({
                     "sceneId": scene_id,
                     "fadeDurationSeconds": 0.0
                 }))
                 .map_err(ControlSurfaceError::InvalidParams)?,
+                preview,
             )
-            .map_err(|error| match error {
-                crate::lighting::LightingCommandError::Rejected(_, message) => {
-                    ControlSurfaceError::Rejected(message)
-                }
-                crate::lighting::LightingCommandError::Storage(message) => {
-                    ControlSurfaceError::Storage(message)
-                }
-            })?;
-            if let Some(scene) = lighting_state
-                .scenes
-                .iter()
-                .find(|scene| scene.id == scene_id)
-                .cloned()
-            {
-                for fixture in &mut lighting_state.fixtures {
-                    if let Some(scene_state) = scene
-                        .fixture_states
-                        .iter()
-                        .find(|fixture_state| fixture_state.fixture_id == fixture.id)
-                    {
-                        fixture.intensity = scene_state.intensity;
-                        fixture.cct = scene_state.cct;
-                        fixture.on = scene_state.on;
-                    }
-                }
-            }
-            save_lighting_deck_state(db_path, &lighting_state)?;
-            Ok(json!({ "recalled": result.scene_name }))
+            .map_err(map_lighting_error)?;
+            Ok(json!({ "recalled": result.scene_name, "preview": result.preview_mode }))
         }
         _ => Err(ControlSurfaceError::Unsupported(format!(
             "Unsupported lighting deck action: {action}"
-        ))),
-    }
-}
-
-fn handle_audio_action(
-    db_path: &Path,
-    action: &str,
-    value: Option<&str>,
-) -> Result<Value, ControlSurfaceError> {
-    match action {
-        "switchToDeckMode" => {
-            let deck_mode = value.unwrap_or("audio");
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "deckMode": result.settings.deck_mode }))
-        }
-        "recallSnapshot" => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let audio_snapshot = read_audio_snapshot(&app_settings);
-            let Some(snapshot) = audio_snapshot.snapshots.first() else {
-                return Err(ControlSurfaceError::Rejected(String::from(
-                    "No audio snapshot is available.",
-                )));
-            };
-            let result = recall_audio_snapshot(
-                db_path,
-                &parse_audio_snapshot_recall_request(&json!({
-                    "snapshotId": snapshot.id
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(|error| match error {
-                crate::audio::AudioCommandError::Rejected(_, message) => {
-                    ControlSurfaceError::Rejected(message)
-                }
-                crate::audio::AudioCommandError::Storage(message) => {
-                    ControlSurfaceError::Storage(message)
-                }
-            })?;
-            Ok(json!({ "recalled": result.snapshot_name }))
-        }
-        "toggleMute" | "togglePhantom" | "gainUp" | "gainDown" => {
-            let channel_index = value
-                .ok_or_else(|| {
-                    ControlSurfaceError::InvalidParams(format!(
-                        "{action} requires a channel index value"
-                    ))
-                })?
-                .parse::<usize>()
-                .map_err(|_| {
-                    ControlSurfaceError::InvalidParams(String::from(
-                        "channel index must be an integer",
-                    ))
-                })?;
-            if channel_index == 0 {
-                return Err(ControlSurfaceError::InvalidParams(String::from(
-                    "channel index must be at least 1",
-                )));
-            }
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let audio_snapshot = read_audio_snapshot(&app_settings);
-            let mut audio_state = load_audio_deck_state(&app_settings, &audio_snapshot);
-            match action {
-                "toggleMute" => {
-                    let (channel_name, mute) = {
-                        let channel =
-                            audio_state
-                                .channels
-                                .get_mut(channel_index - 1)
-                                .ok_or_else(|| {
-                                    ControlSurfaceError::Rejected(format!(
-                                        "Audio channel {} is not available.",
-                                        channel_index
-                                    ))
-                                })?;
-                        channel.mute = !channel.mute;
-                        (channel.name.clone(), channel.mute)
-                    };
-                    save_audio_deck_state(db_path, &audio_state)?;
-                    Ok(json!({ "channel": channel_name, "mute": mute }))
-                }
-                "togglePhantom" => {
-                    let (channel_name, phantom) = {
-                        let channel =
-                            audio_state
-                                .channels
-                                .get_mut(channel_index - 1)
-                                .ok_or_else(|| {
-                                    ControlSurfaceError::Rejected(format!(
-                                        "Audio channel {} is not available.",
-                                        channel_index
-                                    ))
-                                })?;
-                        channel.phantom = !channel.phantom;
-                        (channel.name.clone(), channel.phantom)
-                    };
-                    save_audio_deck_state(db_path, &audio_state)?;
-                    Ok(json!({ "channel": channel_name, "phantom": phantom }))
-                }
-                "gainUp" | "gainDown" => {
-                    let (channel_name, gain) = {
-                        let channel =
-                            audio_state
-                                .channels
-                                .get_mut(channel_index - 1)
-                                .ok_or_else(|| {
-                                    ControlSurfaceError::Rejected(format!(
-                                        "Audio channel {} is not available.",
-                                        channel_index
-                                    ))
-                                })?;
-                        let delta = if action == "gainUp" { 3 } else { -3 };
-                        channel.gain = clamp_i64(channel.gain + delta, 0, 75);
-                        (channel.name.clone(), channel.gain)
-                    };
-                    save_audio_deck_state(db_path, &audio_state)?;
-                    Ok(json!({ "channel": channel_name, "gain": gain }))
-                }
-                _ => Err(ControlSurfaceError::Unsupported(String::from(
-                    "Unsupported audio mutation",
-                ))),
-            }
-        }
-        _ => Err(ControlSurfaceError::Unsupported(format!(
-            "Unsupported audio deck action: {action}"
         ))),
     }
 }
@@ -1230,7 +970,7 @@ fn resolve_completion_task_id(
         })
 }
 
-fn map_planning_error(error: PlanningCommandError) -> ControlSurfaceError {
+pub(crate) fn map_planning_error(error: PlanningCommandError) -> ControlSurfaceError {
     match error {
         PlanningCommandError::InvalidParams(message) => ControlSurfaceError::InvalidParams(message),
         PlanningCommandError::Storage(message) => ControlSurfaceError::Storage(message),
@@ -1303,130 +1043,50 @@ fn persist_optional_setting(
             .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
         for key in deletes {
             connection
-                .execute("DELETE FROM settings WHERE key = ?1", [key])
+                .execute("DELETE FROM app_settings WHERE key = ?1", [key])
                 .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
         }
     }
     Ok(())
 }
 
-fn save_lighting_deck_state(
-    db_path: &Path,
-    state: &LightingDeckState,
-) -> Result<(), ControlSurfaceError> {
-    save_lighting_editor_state(db_path, state).map_err(map_lighting_error)
-}
-
-fn save_audio_deck_state(
-    db_path: &Path,
-    state: &AudioDeckState,
-) -> Result<(), ControlSurfaceError> {
-    let serialized = serde_json::to_string(state)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    set_settings_owned(db_path, &[(String::from(AUDIO_STATE_KEY), serialized)])
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
-}
-
-fn load_lighting_deck_state(
+fn selected_lighting_fixture_id(
     settings: &HashMap<String, String>,
-    _lighting_snapshot: &crate::lighting::LightingSnapshot,
-) -> LightingDeckState {
-    load_lighting_editor_state(settings)
-}
-
-fn load_audio_deck_state(
-    settings: &HashMap<String, String>,
-    audio_snapshot: &crate::audio::AudioSnapshot,
-) -> AudioDeckState {
-    settings
-        .get(AUDIO_STATE_KEY)
-        .and_then(|value| serde_json::from_str::<AudioDeckState>(value).ok())
-        .map(|state| normalize_audio_deck_state(state, audio_snapshot))
-        .unwrap_or_else(|| default_audio_deck_state(audio_snapshot))
-}
-
-fn default_audio_deck_state(audio_snapshot: &crate::audio::AudioSnapshot) -> AudioDeckState {
-    AudioDeckState {
-        channels: audio_snapshot
-            .channels
-            .iter()
-            .enumerate()
-            .map(|(index, channel)| AudioDeckChannelState {
-                id: channel.id.clone(),
-                name: channel.name.clone(),
-                gain: default_audio_gain(index),
-                mute: false,
-                phantom: index < 2,
-            })
-            .collect(),
-    }
-}
-
-fn normalize_audio_deck_state(
-    existing: AudioDeckState,
-    audio_snapshot: &crate::audio::AudioSnapshot,
-) -> AudioDeckState {
-    AudioDeckState {
-        channels: audio_snapshot
-            .channels
-            .iter()
-            .enumerate()
-            .map(|(index, channel)| {
-                let existing_channel = existing
-                    .channels
-                    .iter()
-                    .find(|entry| entry.id == channel.id);
-                AudioDeckChannelState {
-                    id: channel.id.clone(),
-                    name: channel.name.clone(),
-                    gain: existing_channel
-                        .map(|entry| entry.gain)
-                        .unwrap_or_else(|| default_audio_gain(index)),
-                    mute: existing_channel.map(|entry| entry.mute).unwrap_or(false),
-                    phantom: existing_channel
-                        .map(|entry| entry.phantom)
-                        .unwrap_or(index < 2),
-                }
-            })
-            .collect(),
-    }
-}
-
-fn selected_lighting_fixture_mut<'a>(
-    settings: &HashMap<String, String>,
-    state: &'a mut LightingDeckState,
-) -> Result<&'a mut LightingDeckFixtureState, ControlSurfaceError> {
-    let selected_light_id = resolve_selected_inventory_id(
+    state: &LightingEditorState,
+) -> Result<String, ControlSurfaceError> {
+    resolve_selected_inventory_id(
         settings,
         SELECTED_LIGHT_ID_KEY,
         state.fixtures.iter().map(|fixture| fixture.id.as_str()),
-    );
-    let selected_light_id = selected_light_id.ok_or_else(|| {
-        ControlSurfaceError::Rejected(String::from("No lighting fixture is available."))
-    })?;
-    state
-        .fixtures
-        .iter_mut()
-        .find(|fixture| fixture.id == selected_light_id)
-        .ok_or_else(|| {
-            ControlSurfaceError::Rejected(String::from("Selected lighting fixture was not found."))
-        })
+    )
+    .ok_or_else(|| ControlSurfaceError::Rejected(String::from("No lighting fixture is available.")))
 }
 
-fn default_audio_gain(index: usize) -> i64 {
-    match index {
-        0 | 1 => 24,
-        2 | 3 => 0,
-        4 => 12,
-        _ => 6,
+/// The LCD is a reader: it takes the shared preview alone, and reads the
+/// settings under it — a preview-aware mutation holds the preview from its
+/// first read to its last write, so the pair read here is from one side of
+/// it, never the stored value of one moment beside the preview of another.
+fn deck_fixture_levels(db_path: &Path, fixture_id: &str) -> Option<LightingFixtureLevels> {
+    let preview = lock_shared_lighting_preview();
+    let settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX).ok()?;
+    read_lighting_fixture_levels(&settings, &preview, fixture_id)
+}
+
+/// A third LCD line while previewing: the number above it is staged, not on
+/// the light output.
+fn preview_lcd_line(levels: &LightingFixtureLevels) -> &'static str {
+    if levels.previewing {
+        "\\nPREVIEW"
+    } else {
+        ""
     }
 }
 
-fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {
+pub(crate) fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {
     value.max(min).min(max)
 }
 
-fn truncate(value: &str, max_chars: usize) -> String {
+pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     let mut chars = value.chars().collect::<Vec<_>>();
     if chars.len() <= max_chars {
         return value.to_string();
@@ -1465,7 +1125,7 @@ fn sort_label(value: &str) -> &'static str {
     }
 }
 
-fn cycle_value(values: &[&str], current: &str, forward: bool) -> String {
+pub(crate) fn cycle_value(values: &[&str], current: &str, forward: bool) -> String {
     let index = values
         .iter()
         .position(|value| *value == current)
@@ -1491,27 +1151,72 @@ pub fn build_control_surface_health_check(runtime: &RuntimeContext) -> Value {
     })
 }
 
+/// Test fixtures shared with `control_surface_http::tests`.
 #[cfg(test)]
-mod tests {
-    use super::*;
+pub(crate) mod test_support {
+    use crate::storage::{initialize_test_database, set_settings_owned};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn truncate_preserves_short_text() {
-        assert_eq!(truncate("Host Mic", 12), "Host Mic");
+    pub(crate) struct TestDir {
+        path: PathBuf,
     }
 
-    #[test]
-    fn truncate_limits_long_text() {
-        assert_eq!(truncate("Very Long Fixture Name", 12), "Very Long Fi");
+    impl TestDir {
+        pub(crate) fn new(label: &str) -> Self {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0);
+            let path = std::env::temp_dir().join(format!(
+                "studio-control-engine-deck-{label}-{}-{unique}",
+                process::id()
+            ));
+            fs::create_dir_all(&path).expect("test dir should be created");
+            Self { path }
+        }
+
+        pub(crate) fn path(&self) -> &Path {
+            &self.path
+        }
+
+        pub(crate) fn db_path(&self) -> PathBuf {
+            self.path.join("native.sqlite3")
+        }
     }
 
-    #[test]
-    fn cycle_value_wraps_forward() {
-        assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "done", true), "todo");
+    impl Drop for TestDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
     }
 
-    #[test]
-    fn cycle_value_wraps_backward() {
-        assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "todo", false), "done");
+    pub(crate) fn ready_audio_test_db(label: &str) -> TestDir {
+        let test_dir = TestDir::new(label);
+        initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+        set_settings_owned(
+            test_dir.db_path().as_path(),
+            &[
+                (
+                    String::from("app.commissioning.check.audio.status"),
+                    String::from("passed"),
+                ),
+                (
+                    String::from("app.audio.send_host"),
+                    String::from("127.0.0.1"),
+                ),
+                (
+                    String::from("app.audio.metering_source"),
+                    String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+                ),
+            ],
+        )
+        .expect("ready audio settings should persist");
+        test_dir
     }
 }
+
+#[cfg(test)]
+mod tests;

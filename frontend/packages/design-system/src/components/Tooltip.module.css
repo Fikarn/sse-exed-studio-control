@@ -16,10 +16,10 @@
   z-index: 50;
   background: var(--color-bg-deep);
   border: 1px solid var(--color-bg-border);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-ui);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   line-height: 1.4;
   padding: 6px 9px;
   max-width: 240px;

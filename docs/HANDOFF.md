@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the top-level engineering handoff for the repository as of `2026-06-10` (dependency maintenance current through `2026-08-12`).
+This is the top-level engineering handoff for the repository as of `2026-09-23`.
 
 Read this first before resuming product, release, or cleanup work. Use it as the entry point into the more detailed documents linked below.
 
@@ -13,7 +13,9 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 - The legacy Electron/Next.js runtime was retired in `v2.1.0`. There is no browser-served or Electron-served path left in the repository.
 - Native packaging, installer, update-repository, and release automation lanes exist, produce signed/unsigned operator-ready artifacts, and are driven from tagged releases.
 - Native operator parity is engineering-complete. Acceptance is layered: deterministic offscreen `2560x1440` captures, real-GPU onscreen spot captures, and the install-time first-launch smoke test shipped in the QtIFW installer.
-- Native and replacement-shell release verification are target-host gates. The `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs eight jobs on pull requests (`format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust`, `tauri-foundation`, `qualification`) and is required merge hygiene on `main`; target-host evidence remains the release acceptance mechanism. The frontend-e2e job includes the committed `visual-review.spec.ts` + `storybook.spec.ts` baselines (Playwright `toHaveScreenshot`) and uploads the report + snapshot diffs as artifacts so reviewers can audit "visual review passed" from the PR Checks tab. The `rust` job extends to `native:acceptance` with `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC=1` (CI has no live RME TotalMix OSC traffic); `qualification` runs both Tauri qualifications under xvfb with extended timeouts and the audio-probe skipped for the same reason.
+- Native and replacement-shell release verification are target-host gates. The `dev-checks` workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) runs ten jobs on pull requests and branch pushes (`format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `supply-chain` — since production readiness Slice 12: the npm audit gate and `cargo deny check` — `frontend-e2e`, `rust`, `rust-coverage` — since Slice 13 — `tauri-foundation`, `qualification`) and is required merge hygiene on `main`; target-host evidence remains the release acceptance mechanism. The frontend-e2e job includes the committed `visual-review.spec.ts` + `storybook.spec.ts` baselines (Playwright `toHaveScreenshot`) and uploads the report + snapshot diffs as artifacts so reviewers can audit "visual review passed" from the PR Checks tab. The `rust` job extends to `native:acceptance`, whose harness runs the engine in simulated audio input mode (a runner has no TotalMix, and the harness never writes to a console); `qualification` runs both Tauri qualifications under xvfb with extended timeouts and the audio probe skipped for the same reason.
+- **The studio workstation runs a build of `production-readiness-2026-09`, not `v2.2.1`, since 2026-09-21** (the operator's decision that day: "Move to the new build and use real data"). `release\native\windows\SSE ExEd Studio Control Native\` holds the packaged build of `e62bcba` since 2026-09-23 08:15 — the app code of `122cef2`, with every fix made after `7b85f04` (promoted as `6fbae80` at 12:56, replaced by `db2df4d` at 13:37, by `7b85f04`, the bridge fix, on 2026-09-22 at 11:57, and by `e62bcba` on 2026-09-23; the `7b85f04` build is kept at `release\native\windows.7b85f04-2026-09-23\` as the rollback, the `db2df4d` build at `release\native\windows.db2df4d-2026-09-21\`, the `6fbae80` build at `release\native\windows.6fbae80-2026-09-21\`, the S2-era build at `release\native\windows.s2-era-2026-09-10\`; sizes and sha256 in the production readiness ledger, After the program), running on the real app-data `%APPDATA%\ExEd Studio Control Native`, whose database is at schema 7 since 2026-09-18 08:27 — older builds refuse it. It opens fullscreen on display 3 (`\\.\DISPLAY3`, 2560×1440 at 100 % scaling). `scripts/native-package.mjs` rebuilds `release\native\windows` from scratch, so on this machine it runs only with that folder moved aside first (the procedure is in the production readiness ledger), and no engine from the repository may be started against the default app-data directory without `SSE_APP_DATA_DIR` pointing elsewhere.
+- **Talkback is not used: the operator's ruling of 2026-09-23.** The studio desk has no TotalMix talkback channel and nobody wants one, so nothing more is spent on talkback: no new code, fixes, tests, reviews or walk steps. Its code and tests stay as they are, and removing them needs the operator's say. `docs/OPERATIONS.md` still describes talkback, because the app still has it. The talkback steps of the operator checklists are not applicable: the audit checklist's B5 with its channel assignment, the talkback clause of B8, the `TALK` clause of visual overhaul item 4, and the production readiness item 5's TALK step and Watchdog row (the production readiness ledger, After the program).
 - Responsive operator layout support landed in [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71) on `2026-05-03` (`4af7e8b8427cff78837054326478e1a67398154c`). Lighting now has logical CSS-pixel layout modes, mode-keyed column persistence, toolbar priority overflow, a narrow inspector drawer, separate stage zoom controls, shell-owned window layout persistence, and Scaled Studio Preview for current-hardware human review.
 - Lighting fixture catalog implementation landed after the responsive pass. The Rust engine now owns fixture definitions, mode/channel metadata, DMX mapping and validation, persistence compatibility, universe-aware patching, scene `controlValues`, and catalog snapshots. React renders catalog metadata and sends explicit commands only; it is not the source of truth for fixture/DMX policy. Verified catalog entries are selectable in the Add Fixture dialog; `research-needed` entries remain non-selectable tracking metadata.
 - Stage plot fixture identity implementation landed after the catalog pass. The engine-owned catalog now exposes additive visual metadata for existing fixture definitions, and React renders fixture family symbols, output footprints, live drag/rotation/value previews, render modes, and selected-scene previews from snapshots only. Fixture/device policy remains engine-owned; React does not own DMX footprint, persistence, or vendor behavior.
@@ -25,26 +27,66 @@ Read this first before resuming product, release, or cleanup work. Use it as the
 
 - **Audio "Console" UX polish (2026-06-02, branch `claude/audio-ux-polish` — merged 2026-06-05 via PR #121).** A 21-finding front-end-only refinement pass over the Console surface, driven by an adversarially-verified UX audit committed at `docs/archive/audio-ux-audit-2026-06-02.md`. It closed two shipped defects (the inspector send/fader/action controls left unstyled by five undefined CSS classes; the "Listen" button that silently drove the −20 dB Dim), drove status severity into the chrome (`--danger` dot + warning band on faults), and added a persistent SOLO indicator + `⌥S`, typed knob entry, inspector-tab keyboard accelerators, per-theme meter contrast + Bone-theme AA, a `--control-disabled-opacity` token, ~44 px of reclaimed vertical budget, and a token/scale normalization (the legacy `--audio-*` fork migrated onto the canonical `--bg/--fg/--accent` set; ~75 font literals moved onto the loaded Inter/JetBrains faces, so sans text no longer falls back to system-ui). Five batch commits plus one visual-evidence commit on the branch; `npm run dev:check` and the audio Playwright behavior specs are green; the `darwin` audio visual baselines were regenerated (`linux` siblings refresh on the first CI run) and `FULL_RENDER_MAX_DIFF_PX` was raised 400→800 to absorb the enlarged meter-sim + Inter-AA jitter. The native `2560×1440` operator sign-off and the `linux` baseline refresh were both done at merge time. On top of the audit, #121 also reconciled the operator's Claude Design prototype on the same branch — carved/molded faders + unity detents, meters ported into the live 30 Hz canvas (fixed cream→amber→red dBFS zones, cylindrical glass, mono single-bar), tier-header title-over-meta cards, output-lane routing footers, an inspector EQ mini-preview, the input `MIC/MONO` identity chip, and restored channel-strip fill heights (`flex:1 1 240px` + `align-self:stretch`) — with the `darwin` + `linux` audio visual baselines regenerated (linux bootstrapped from CI's first-run artifact) and the full `dev:check` + Playwright matrix green. Native review also reversed C15: the master monitor meter is now a view-only live meter (the #111-dropped live mini-meter wiring restored so it tracks Main Out), not a draggable level control.
 
+- **2026-09 audit remediation (branch `audit-remediation-2026-09`, 13 slices, landed 2026-09-04, not yet pushed).** The 2026-09-02 program audit found the audio console lying about the RME desk. The remediation makes it truthful: the engine reads TotalMix back over Global OSC remote 4 and confirms every send (`aligned` is written only after a complete pull or a fully confirmed push), Sync is a real pull, Recall pushes everything except 48V (listed per channel), fader dB follows RME's published curve (unity at step 836 of 1023), talkback is momentary on every surface with a 2 s engine watchdog, console writes are refused until the audio probe passes, Publish needs every probe green or an explicit override, arm-then-apply has a 350 ms dwell, the 1920×1080 monitor gets a compact density that never scrolls, the Bone header and the Console's 9.5 px type floor are legible and measured, closing the window asks first and stops the engine gracefully, shortcut labels follow the host OS, DMX reads decimal, and sample planning asks before seeding. The ledger `docs/plans/audit-remediation-2026-09.md` is the authoritative record (per-slice gate honesty, tests added / changed, validation, baselines) and its Appendix B is the operator hardware checklist that is still unsigned.
+
+- **Visual overhaul A (branch `ui-gold-standard-2026-09`, thirteen slices, landed 2026-09-09, pushed but not merged).** Every operator surface is now built to one written visual system — Concept A, chosen from five Console concepts on 2026-09-06 and approved as plan decisions D1–D14 on 2026-09-07 (`D4: 2560×1440 is the only resolution that matters`; D9 withdrawn). The system is specified in [docs/redesign/system-a-2026-09.md](redesign/system-a-2026-09.md) and the implementation record is [docs/plans/visual-overhaul-a-2026-09.md](plans/visual-overhaul-a-2026-09.md), whose thirteen Status lines are authoritative for what landed, what moved and what was deliberately left. Every surface reads as one instrument: header · cluster · bay · plate · footer. The Console's top bar, monitor bar, health bar, snapshot deck and warning bands are gone, replaced by a fixed cluster on the left; Lighting, Planning and Setup follow the same rule; the plate shows the whole selected thing at once with no tab row; and the four workspaces share one footer. The system is **measured, not reviewed**: `frontend/app/tests/ui-contract.spec.ts` renders 81 boards (27 fixtures × 3 themes at 2560×1440) plus the Storybook primitive pages and ratchets 16 measures per board in `frontend/app/tests/ui-contract.ratchets.json` — type floor 12 px and at most 8 sizes, pixel-sampled text contrast ≥ 4.5:1, every enabled target ≥ 24 px, radii ⊆ {4, 8, 12, pill}, no negative shadow offsets, no blur over 8 px off a lit element, 0 animations at idle, 0 forbidden words, no page scroll, nothing off the viewport. **Every one of those measures is met on every one of the 81 boards.** The commands, the re-seed flow and the traps are in [docs/DEVELOPMENT.md §2c](DEVELOPMENT.md).
+
 ## Start Here
 
-Read these in order:
+If you are new to this repository, read these six in order. They are about two
+hours and they are the whole picture:
 
-1. `README.md`
-2. `docs/DEVELOPER_QUICKSTART.md`
-3. `docs/HANDOFF.md`
-4. `docs/RELEASE.md`
-5. `docs/HARDWARE_PROFILE.md`
-6. `docs/ARCHITECTURE.md`
-7. `docs/adr/0001-frontend-replatform.md`
-8. `docs/archive/FRONTEND_CUTOVER_PLAN.md`
-9. `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`
+1. `README.md` — what the product is and where everything lives.
+2. `docs/DEVELOPER_QUICKSTART.md` — clone to running app.
+3. `docs/HANDOFF.md` — this file. Current Operating Truth, then Current Blockers.
+4. `docs/ARCHITECTURE.md` — the two-process boundary. The one rule that must not
+   bend: no device or DB logic in React.
+5. `docs/HARDWARE_PROFILE.md` — the room this is built for. `2560×1440` on a fixed
+   second monitor is the only resolution that matters (operator ruling, plan D4).
+6. `AGENTS.md` — the working contract: lanes, rescope protocol, done criteria.
 
-Use these for deeper context only after the above are clear:
+Then, before you change anything the operator can see:
 
-- `docs/PRODUCTIZATION_PLAN.md`
-- `native/README.md`
-- `docs/archive/DESKTOP_ARCHITECTURE_PLAN.md` (historical; frozen at `v2.1.0`)
-- `docs/archive/NATIVE_PARITY_HANDOFF.md` (historical; frozen at `v2.1.0`)
+7. `docs/redesign/system-a-2026-09.md` — the visual system every surface is built
+   to. §10 is the list of things that are measured on every board.
+8. `docs/DEVELOPMENT.md §2c` — how those measures are run, re-seeded and refreshed,
+   and the traps that have cost real time here.
+
+Deeper context, once the above is clear:
+
+- `docs/RELEASE.md` and `docs/PRODUCTIZATION_PLAN.md` — versioning, installers, the
+  target-host gates, and the deferred signing posture.
+- `docs/OPERATIONS.md` — what the operator actually does with the app.
+- `docs/plans/visual-overhaul-a-2026-09.md` and
+  `docs/plans/audit-remediation-2026-09.md` — the two 13-slice ledgers behind the
+  current state of the app. Read the slice status before changing a surface it
+  names; it usually explains why something is the way it is.
+- `docs/plans/production-readiness-2026-09.md` — the execution record of the
+  production readiness remediation program (branch `production-readiness-2026-09`,
+  cut from `ui-gold-standard-2026-09` on 2026-09-10; sixteen slices S0–S15 closing
+  the 32 findings of the 2026-09-10 readiness audit, all landed by 2026-09-21). Its
+  traceability table names each finding's commit and the guard that holds it;
+  Appendix A says which lane runs each guard; Appendix B is the operator hardware
+  checklist, still unsigned.
+- `native/README.md`, `docs/adr/0001-frontend-replatform.md`.
+- Historical, frozen: `docs/archive/FRONTEND_CUTOVER_PLAN.md`,
+  `docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md`,
+  `docs/archive/DESKTOP_ARCHITECTURE_PLAN.md`,
+  `docs/archive/NATIVE_PARITY_HANDOFF.md` (the last two at `v2.1.0`).
+
+### The first thing to run
+
+```bash
+npm install
+npm run doctor          # environment check
+npm run dev:check       # the whole local code-health gate; exit 0 = green
+```
+
+`dev:check` is the gate every commit in the two 2026-09 programs was held to. If
+it is green on a clean checkout, your environment is right. From there,
+`docs/DEVELOPMENT.md §4` tells you which lane matches the risk of what you are
+about to change — do not run the full matrix for a typo, and do not skip
+`frontend:playwright:test` for a layout change.
 
 ## Locked Decisions
 
@@ -82,10 +124,35 @@ The highest-value unresolved work is:
    Fixture definitions, DMX footprints, DMX labels/encoders, universe-aware overlap validation, scene serialization, and persisted compatibility live in `native/rust-engine/src/lighting/`. Frontend code may mirror catalog metadata for fixture transport tests and render controls/shapes from snapshots, but it must not own device policy. Do not add GDTF import, Sidus Bluetooth discovery, firmware update, or vendor auto-configuration without a new scoped plan.
 8. Preserve stage-plot smoothness.
    Fixture drag, rotation, scene recall, and value slider edits now rely on short-lived render previews so the marker, output beam, active scene pill, and scene rail selection stay visually continuous while engine IPC catches up. Future changes should keep that preview layer render-only and clear it when authoritative snapshots match.
+9. Land the 2026-09 program work. **This is the top of the queue.**
+
+   Four bodies of work sit stacked on `origin/main`, each containing the one below it, all pushed to GitHub and **none merged**. Counts are as of `2026-09-23`:
+
+   | Branch                          | Commits ahead of `main` | What it is                                                                                              |
+   | ------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
+   | `studio-bringup-sacn-globalosc` | 11                      | sACN DMX output, TotalMix Global OSC, the Stream Deck+ audio surface (S1–S6)                            |
+   | `audit-remediation-2026-09`     | 26                      | the above + the 13-slice 2026-09-02 audit remediation                                                   |
+   | `ui-gold-standard-2026-09`      | 64                      | the above + visual overhaul A (13 slices, 2 follow-ups, these hand-over docs)                           |
+   | `production-readiness-2026-09`  | 125                     | the above + the 16-slice production readiness remediation (S0–S15) and eleven fixes that are not slices |
+
+   `production-readiness-2026-09` is therefore the whole program, and it is also what the studio workstation runs (Current Operating Truth). Merging it merges all four.
+
+   Where each thing that stood between here and `main` stands:
+
+   1. **CI runs on every branch push** since production readiness Slice 0 (2026-09-10) — before that no job had ever run on these branches. Every job has been green on the pushes of Slices 13 and 14, on `db2df4d`, on the bridge fix `7b85f04` (run 35712843386) and on Slice 15's (run 35607162991, on its quarantine-test follow-up `b098233`; the slice commit's own run failed only `format-protocol`, on a new test that needed a Storybook build the job does not make); the bridge fix's ledger follow-up (`5746f2b`, run 35714853611) was red once on `qualification`, where the setup-support lane read a launch number before the test bridge had it (a race in the lane, fixed the same day by `e991cc8`, whose run 35751453676 was green; the app restarted once, as it should); every job was green on the two fixture-double fixes, `7413b53` (run 35758670685) and `a598b11` (run 35762169673), and on Setup's reading of the hardware link's words, `d3adaca` (run 35765735404), as well; on the fixture double's health words (`f29bbad` with its baselines `293678b`, run 35773235805) every job but `frontend-e2e` was green, and that one failed only the 27 linux captures the operator chose not to refresh, and so on the test-isolation commit `a922b51` (run 35780094809), the console-link fix `919047b` (run 35800307224) and the bridge's log line `122cef2` (run 35801341394); the runs are recorded in the ledger.
+   2. **The `linux` baselines are current** (production readiness Slice 13 refreshed the 91 stale or missing ones, every capture inspected; the repository carries 93 `linux` beside 93 `win32`), and `frontend-e2e` fails on its `default` project. Since the fixture double's health words (2026-09-22) 27 captures show the header's new lamp words; by the operator's decision only the 15 win32 captures at 2560×1440 were refreshed, so `frontend-e2e` fails on those 27 linux captures, and the local lane on the 12 win32 ones at other sizes, until they are refreshed (the ledger's Baseline refresh procedure). On 2026-09-23 the operator decided to refresh the 27 linux captures once and to require all ten checks; the 12 win32 ones keep their old baselines. `darwin` (75) was pending the macOS host; by the operator's ruling of 2026-09-18 (Windows only, `2560×1440` only) it is nobody's work.
+   3. **Three operator checklists are open**, all walked on the studio hardware, not in CI: `docs/plans/audit-remediation-2026-09.md` Appendix B (B1–B8; B5 and B8's talkback clause are not applicable since the operator's talkback ruling of 2026-09-23, and so is the `TALK` clause of the overhaul's item 4 and of readiness item 5), `docs/plans/visual-overhaul-a-2026-09.md` Appendix B (nine items on the 2560×1440 monitor; item 7 — Bone and Graphite from the chair — is the one the gates can least stand in for) and `docs/plans/production-readiness-2026-09.md` Appendix B (item 1 was signed on 2026-09-22, so Slice 2 is verified; items 2–5 move Slices 5, 6, 7, 10 and 11 from `landed` to `verified`; items 6–8 are the pull request and its required checks, the signing certificates and the sign-off; item 7 was signed on 2026-09-23: stay unsigned).
+   4. **Decide how it lands.** One PR for the whole stack, or stacked PRs merged bottom-up. The repo is squash-merge-only, which would collapse the stack into one or four commits on `main` and lose the per-slice `git log` that all three ledgers reference by subject line. That is a deliberate decision for the maintainer, not a default; the required checks to set are listed under Slice 13 of the production readiness ledger (D4). **Decided 2026-09-23:** one squash pull request from `production-readiness-2026-09`, with the tag `archive/program-2026-09` pushed first to keep the per-commit history, and all ten checks required. Each GitHub step is taken on the operator's go-ahead. The operator's other decisions of that day are in the production readiness ledger, After the program.
 
 ## Execution Queue
 
-The current GitHub execution queue is empty as of `2026-05-20`; no open issues or pull requests are waiting for handoff. Audio meter PRs [#83](https://github.com/Fikarn/sse-exed-studio-control/pull/83) and [#84](https://github.com/Fikarn/sse-exed-studio-control/pull/84) were merged, required checks passed after rebasing #84 onto the updated `main`, and stale remote Claude branches were pruned from GitHub.
+As of `2026-09-21`:
+
+- **No open issues.**
+- **Nine open Dependabot pull requests**, all against `main`, opened between `2026-09-01` and `2026-09-11`: [#192](https://github.com/Fikarn/sse-exed-studio-control/pull/192) `actions/setup-node` 6 → 7, [#193](https://github.com/Fikarn/sse-exed-studio-control/pull/193) `fuzzysort` 3.1.0 → 4.0.2, [#194](https://github.com/Fikarn/sse-exed-studio-control/pull/194) native-runtime group, [#195](https://github.com/Fikarn/sse-exed-studio-control/pull/195) tooling group, [#196](https://github.com/Fikarn/sse-exed-studio-control/pull/196) `tauri` 2.11.4 → 2.11.5, [#197](https://github.com/Fikarn/sse-exed-studio-control/pull/197) `storybook` 10.5.7 → 10.5.10, [#198](https://github.com/Fikarn/sse-exed-studio-control/pull/198) `browserslist` 4.28.2 → 4.28.9, [#199](https://github.com/Fikarn/sse-exed-studio-control/pull/199) `baseline-browser-mapping` 2.10.20 → 2.11.22, [#200](https://github.com/Fikarn/sse-exed-studio-control/pull/200) `vitest` 4.1.8 → 4.1.11. They target `main`, so none of them conflicts with the feature branches — but every one of them will need re-running once the program work lands, and `storybook`, `tauri` and `vitest` in particular touch lanes the visual baselines and the coverage floors depend on. Prefer landing the program work first, then the dependency queue. **Decided 2026-09-23:** after the landing, #198 and #199 are closed as overtaken, #193 is decided on its own, and #200 goes first, then #197, #196, #195, #194 and #192, one at a time on green checks.
+- **Six open Dependabot alerts** on the default branch, all development-scope: 1 high (`browserslist` — already updated on `production-readiness-2026-09` by Slice 12), 3 medium (`vitest`, `@vitest/mocker`, `baseline-browser-mapping`), 2 low (`@babel/core`, `esbuild`). None reaches the shipped engine or shell; the branch's `supply-chain` job holds its own lockfiles to the bars in `scripts/check-npm-audit.mjs`.
+
+Historical: the queue was last empty on `2026-05-20`. Audio meter PRs [#83](https://github.com/Fikarn/sse-exed-studio-control/pull/83) and [#84](https://github.com/Fikarn/sse-exed-studio-control/pull/84) were merged, required checks passed after rebasing #84 onto the updated `main`, and stale remote Claude branches were pruned from GitHub.
 
 Completed repository-readiness record:
 
@@ -100,6 +167,65 @@ Completed rollout record:
 - [Issue #5: Checkpoint D: plan Qt fallback retirement](https://github.com/Fikarn/sse-exed-studio-control/issues/5), executed through [docs/QT_FALLBACK_RETIREMENT_AUDIT.md](./archive/QT_FALLBACK_RETIREMENT_AUDIT.md)
 
 ## Recent Session Record
+
+### Production readiness remediation (Slices 0-15, 2026-09-10 → 2026-09-21)
+
+Branch `production-readiness-2026-09`, one commit per slice (`Readiness S<N>: …`) with its CI run recorded in a `Readiness S<N> (ledger): …` follow-up. Ledger: [docs/plans/production-readiness-2026-09.md](plans/production-readiness-2026-09.md) — the traceability table names each of the 32 findings' commit and guard, Appendix A the lane that runs each guard, Appendix B the operator's hardware checklist. `verified` = every lane green and no hardware exposure; `landed` = waiting only on its Appendix B item.
+
+| Slice | Commit    | What landed                                                                                               | State             |
+| ----- | --------- | --------------------------------------------------------------------------------------------------------- | ----------------- |
+| S0    | `d935aaa` | CI on every branch push; the ledger                                                                       | verified          |
+| S1    | `b9da9dc` | the dev-fixtures method compiled out, a durable app-data default, no CWD import, Vite on loopback         | verified          |
+| S2    | `c2b7361` | the Stream Deck bridge's token, request caps, worker pool, percent decoding                               | verified          |
+| S3    | `e4c283d` | integrity check at start, verified database backups, `synchronous = FULL`                                 | verified          |
+| S4    | `f3db990` | async shell commands, unique request ids, CSP, folder keys limited to the app's folders                   | verified          |
+| S5    | `f1dc897` | the engine watched and restarted, one instance per workstation                                            | landed (B item 2) |
+| S6    | `bee067b` | the TotalMix meter ports on loopback, reading TotalMix only                                               | landed (B item 3) |
+| S7    | `9bb1f8d` | backup verify and restore from Setup / Support and the recovery screen, database backups included         | landed (B item 4) |
+| S8    | `b00ecaf` | a health status that moves, a rotating log, stderr kept                                                   | verified          |
+| S9    | `96ae4e9` | error boundaries, domain-scoped refresh, reply guards, the background-failure band                        | verified          |
+| S10   | `957acc9` | one lighting lock, deck keys through the preview, the sACN settings cache                                 | landed (B item 5) |
+| S11   | `9c45d36` | the action log with sources, held light outputs and safe start (schema 7)                                 | landed (B item 5) |
+| S12   | `d507356` | the `supply-chain` job, release evidence on a tag, SBOMs                                                  | verified          |
+| S13   | `cf681ad` | blocking e2e, coverage floors, property tests, the linux baselines                                        | verified          |
+| S14   | `354306c` | the three orchestrators split, a chunk per workspace, no file-size allowlist                              | verified          |
+| S15   | `93603e1` | these documents; the Playwright quarantine emptied at the causes; two Rust tests that raced their threads | verified          |
+
+Eleven commits in the range are not slices: `235241c` (`npm run clean` keeps a packaged app), `db2df4d` (the header lamps read the hardware link's own words, found on the workstation the day the operator moved to this branch's build), `7b85f04` (the deck's once-a-second LCD burst is no longer partly refused as busy, found on 2026-09-22 the moment the profile was imported with its token), `e991cc8` (the setup-support qualification counts engine launches from numbers it waited for, after a red CI run), `7413b53` (the fixture double's answers to the rig's eight lighting actions — Identify, Highlight and Solo, Find and its Esc, delete, pin and the two rails' reorder — which it had answered with nothing), `a598b11` (the fixture double's Recent actions, which list every action the screen asks for as the hardware link records it), `d3adaca` (Setup's Import and Publish steps and the recovery screen reading the hardware link's own words for the Stream Deck bridge and the health checks, as the header's lamps already did), `f29bbad` (the fixture double answering the health checks and the Stream Deck bridge in the hardware link's words, with its win32 baselines `293678b`), `a922b51` (the engine tests that send to the console run one at a time with the console-link tests), `919047b` (the console link's fix that keeps a change made at TotalMix just before the app's own write from outliving it) and `122cef2` (the bridge's start written to the engine log once instead of twice); the nine of 2026-09-22 and 23 are in the ledger's After the program.
+
+### Visual overhaul A (Slices 0-11, 2026-09-07 → 2026-09-09)
+
+Branch `ui-gold-standard-2026-09`, one commit per slice (`A S<N>: …`) with the refreshed captures as their own `A S<N> (baselines): …` commit beside it. Ledger: [docs/plans/visual-overhaul-a-2026-09.md](plans/visual-overhaul-a-2026-09.md). System: [docs/redesign/system-a-2026-09.md](redesign/system-a-2026-09.md). The mocks the system was drawn from are `docs/redesign/assets/concepts/A-*.html` — open them in a browser; they are self-contained.
+
+What each slice did, in one line, because the commit subjects are the index into the ledger:
+
+| Slice    | Commit                        | What landed                                                                            |
+| -------- | ----------------------------- | -------------------------------------------------------------------------------------- |
+| S0       | `fa6b53d`                     | the UI contract lanes — type, contrast, targets, radii, chrome, light, motion, copy    |
+| S1       | `8df6ba1`                     | the A token set (material, roles, display inks, signal, type, radii, chrome, motion)   |
+| S2       | `b45a1c3`                     | the shell skeleton — header, footer, cluster grid, drawer, tone map — on every surface |
+| S3       | `d9bf957`                     | the primitives: StateDisplay, the Key family, Lamp, the Well family, Plate, Drawer     |
+| S4a/b/c  | `f9538a7` `ec84272` `5644541` | the Console: cluster + footer, the bay's thirteen strips, the plate                    |
+| S5 / S5b | `05aa84d` `d85aba7`           | Lighting on the cluster rule, then its plate                                           |
+| S6       | `7e3ace4`                     | Planning on the cluster rule; the timeline is a screen                                 |
+| S7       | `0c03064`                     | Setup / Support and the pre-ready surfaces                                             |
+| S8       | `4638f6a` (+ `9446dba`)       | the operator copy pass and the copy gate                                               |
+| S9       | `3853de4`                     | one light, calm surfaces, the motion policy — the frosted glass is gone                |
+| S10      | `76f075f`                     | Graphite and Bone pass the legibility gate; the Console stops hiding the Phones levels |
+| S11      | `107dcf6` (+ `b6b38c1`)       | close-out: one vocabulary, one type scale, no target under 24 px                       |
+
+Facts worth knowing before touching this surface:
+
+- **The front-end never displays a state the engine does not report.** Every state word on screen comes from a snapshot; there are no locally-invented states. This was the rule the whole overhaul was written against.
+- **The ratchets are the test.** No slice added a spec for "does it look right"; each one moved numbers in `ui-contract.ratchets.json` and the gate holds them there. If you are about to write a visual assertion by hand, check whether the census already measures it.
+- **Baselines are per-platform.** `win32` and `linux` are current (`linux` since production readiness Slice 13), except the captures the fixture double's health words moved on 2026-09-22: by the operator's decision only the 15 win32 ones at 2560×1440 were refreshed, and 12 win32 captures at other sizes and 27 linux ones were not; `darwin` is not, and by the operator's ruling of 2026-09-18 nobody works on it. See Current Blockers item 9.
+- Three named layout fixes are load-bearing and easy to undo by accident: the Console's tier heads are laid out at zero width and filled to the tier (S10 — otherwise a head with a lock note steals 170 px from the Outputs strips and the canvas clips the Phones levels); the Lighting palette tile puts its keys on a second row (S11 — otherwise the name column collapses to 20 px and no palette shows its name); and the sends row folds to 2 × 2 when its card is narrow (S11 — otherwise `PRE FADER` loses its R at 1920).
+- The eight Lighting components the cluster replaced were deleted in S11, but `LightingRail.module.css` **stays** — six live components still compose from it. The same trap caught the Console's `AudioRail.module.css` before it.
+- `docs/redesign/` holds the whole design pass: the brief, the review, the five Console concepts, the three-viewport study, the polish pass and the system sheet. It is the record of _why_, and it is not source material for new work — the system doc and the plan are.
+
+### 2026-09 audit remediation (Slices 0-13)
+
+Branch `audit-remediation-2026-09`, one commit per slice (`Audit S<N>: …`), ledger `docs/plans/audit-remediation-2026-09.md`. Ground truth: RME's Global OSC table (TotalMix FX 2.1, 2026-07-21) and live probing on the studio UFX III — TotalMix does not echo a write to its sender (confirmation is by read-back), dumps report dB, hidden layout channels drop writes, and the desk had no talkback channel assigned. Engine: `rme_console_link.rs` + `audio/console_link.rs` (ingest, classification, flush, confidence writer), `audio/sync.rs` pull, recall push plan, `audio/fader_curve.rs`, `audio/talkback.rs` watchdog + `audio.talkback.hold`, publish gate, graceful `EngineBridge::stop`. Frontend: gate-aware controls with **Run audio probe**, recall band with per-channel 48V arming, `useMomentaryTalkback`, arm dwell, compact density, shell header tokens + `audio-legibility.spec.ts`, close dialog, `shared/shortcutGlyphs.ts`. Final lanes on the workstation (2026-09-04): `dev:check`, full Playwright (261), `native:acceptance`, `native:test:hardware` (live pull on the desk), Windows packaging + bridge verify + smoke. Open: operator checklist, push / PR, linux and darwin baselines.
 
 ### Audio page gold-standard and Scaled Studio Preview fidelity
 
@@ -228,7 +354,7 @@ Important facts for future sessions:
 - `AudioHardwareReadout` is a CSS-only wrapper for short value badges only (Outputs Bus level, Rail Monitor level, inspector Send-to-bus). The full EQ and Dynamics graphs share the same amber-backlight vocabulary at the CSS level (`::after` pseudo-elements on `.eqGraphFull` / `.dynamicsGraphFull`) — wrapping the graphs in the component would paint a bezel-in-bezel against their grid backgrounds. The inspector small preamp is deliberately not wrapped for the same reason (it's already a fully-skeuomorphic raster element).
 - Talkback active state stays on `--audio-talk` green (broadcast convention for talkback "go"), even though the Slice 2 plan listed it under engaged amber. Recorded as a motivated deviation in [docs/plans/audio-ui-phase-3-followup-fixes.md](./plans/audio-ui-phase-3-followup-fixes.md) under D12.
 - The TALENT identity badge stays on `--audio-group-talent` ochre — it's part of the per-group color palette (talent / line / bed / fx / remote each have a distinct color), not part of the yellow overload Slice 2 was reducing. Recorded as a motivated deviation under D13.
-- `AudioToolbar.tsx` is dead code (not mounted in any active layout — preserved for a future toolbar re-mount under the GS-AUD-44 precedent). Since the 2026-05-27 Console rebuild, `AudioRail.tsx` is dead code too — features that need toolbar/rail-style chrome go in the live Console hosts (`AudioTopBar`, `AudioMonitorBar`). Historical note: the Slice 7 status dot was originally added to the dead toolbar and the follow-up moved it to `AudioRail.tsx`, which was the live host at that time.
+- **The GS-AUD-44 dead-code posture is closed (2026-09-09).** `AudioToolbar.tsx`, `AudioToolbar.module.css`, `AudioRail.tsx` and `AudioRail.module.css` were deleted. They had been preserved unmounted so a future surface could re-mount them, but Visual overhaul A Slice 4a deleted `AudioTopBar` and `AudioMonitorBar` — the very hosts the rail was retired in favour of — so the revert target no longer existed and the posture had nothing left to protect. Features that need toolbar/rail-style chrome go in the live Console hosts (`AudioCluster`, `AudioInspector`, the shell footer). Removed with them: the twelve `.audioShell` aliases only they read (`--audio-panel/-border/-accent/-hot/-talk/-engaged-fill` and the `--color-surface-900/800/700` + `--color-text-strong/muted/subtle` overrides) and the `[data-output-role]` `--audio-accent` rule. Historical note: the Slice 7 status dot lived on the toolbar, then moved to `AudioRail.tsx` when that was the live host; no spec asserts on its `audio-toolbar-status-dot` testid today. The `audio-toolbar-current-snapshot` testid that `audio.spec.ts` still asserts is served by the live `AudioSnapshotKeys.tsx`.
 - The "Rescope protocol (sliced plans)" section in [AGENTS.md](../AGENTS.md) is the canonical rule for handling plan divergences: edit the plan doc + re-number/rename the slice + open a follow-up item, instead of silently substituting different work under the same slice number. Phase 3 Slice 4 and Slice 6 are the case study.
 
 Validation recorded for the follow-up pass:
@@ -258,10 +384,20 @@ Native baseline:
 ```bash
 npm run native:check
 npm run native:test
+npm run native:test:hardware   # studio workstation only: live read-only pull from TotalMix
 npm run native:foundation
 npm run frontend:foundation
 npm run tauri:foundation
 npm run native:acceptance
+```
+
+Operator-visible frontend change (see `docs/DEVELOPMENT.md §2c`):
+
+```bash
+npm run build --workspace @sse/frontend-app   # Playwright serves dist — always build first
+cd frontend/app && npx playwright test        # 415 specs, 95 of them visual captures
+node scripts/ui-census.mjs                    # the 81-board UI contract; ~4 min
+cd ../.. && node scripts/check-operator-copy.mjs
 ```
 
 Full release verification (before tagging):
@@ -271,7 +407,7 @@ npm run doctor:release
 npm run release:verify
 ```
 
-GitHub Actions runs the eight-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request: `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, and `qualification` (see "Current Operating Truth" above for the per-job detail). Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other four run on every PR but are advisory. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
+GitHub Actions runs the ten-job workflow in [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml) on every pull request and, since production readiness Slice 0 (2026-09-10), on every branch push (Dependabot branches excluded — their pull requests already run): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `frontend-e2e`, `rust` (rustfmt + clippy + cargo check + cargo test + `native:acceptance`), `tauri-foundation`, `qualification`, — since production readiness Slice 12 — `supply-chain` and — since Slice 13 — `rust-coverage` (see "Current Operating Truth" above for the per-job detail). Since Slice 13 `frontend-e2e` fails on Playwright's `default` project alone; the wall-clock cases named in `frontend/app/tests/quarantine.json` run in a step that reports and never fails the job, and since Slice 15 there are none. Four of them are required merge hygiene on `main` (`format-protocol`, `lint`, `frontend-typecheck`, `rust`); the other six run on every PR but are advisory until the operator sets the required checks the production readiness ledger lists (its Slice 13 entry, decision D4). A `v*` tag additionally runs `release-evidence.yml` (bundle, SHA256 manifest and SBOMs from clean Windows and macOS runners; it publishes nothing). Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance mechanism for this repo; CI failures are merge blockers, not release evidence.
 
 ## Repo Hygiene Rules
 

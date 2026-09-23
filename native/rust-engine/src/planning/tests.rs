@@ -1,7 +1,7 @@
 use super::*;
 use crate::legacy_import::LegacyImportRequest;
 use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
-use crate::storage::{import_legacy_db, initialize_database, list_settings_by_prefix};
+use crate::storage::{import_legacy_db, initialize_test_database, list_settings_by_prefix};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +38,7 @@ impl Drop for TestDir {
 }
 
 fn seed_planning_state(db_path: &Path, source_path: &Path) {
-    initialize_database(db_path).expect("database should initialize");
+    initialize_test_database(db_path).expect("database should initialize");
 
     fs::write(
         source_path,

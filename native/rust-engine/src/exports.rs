@@ -1,9 +1,21 @@
 use crate::bootstrap::RuntimeContext;
+use crate::exports_audio::{
+    audio_controls, deck_asset, generate_companion_custom_variables, AUDIO_LCD_KEYS,
+};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::time::Duration;
 
 const INSTANCE_ID: &str = "projmgr";
+// Companion connection labels only allow letters, digits, underscore, and dash;
+// every $(label:variable) reference below must use this exact token.
+const INSTANCE_LABEL: &str = "SSE_Studio_Control";
+const GENERIC_HTTP_MODULE_VERSION: &str = "2.7.0";
+const COMPANION_EXPORT_FORMAT_VERSION: u64 = 9;
+const DEFAULT_COMPANION_URL: &str = "http://127.0.0.1:8000";
 
 #[derive(Debug)]
 pub enum ExportCommandError {
@@ -22,6 +34,10 @@ pub struct CompanionExportSummary {
     pub page_count: usize,
     #[serde(rename = "actionCount")]
     pub action_count: usize,
+    #[serde(rename = "triggerCount")]
+    pub trigger_count: usize,
+    #[serde(rename = "deckSurfaceId")]
+    pub deck_surface_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -86,12 +102,22 @@ pub fn export_companion_config(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(&runtime.control_surface_bridge.base_url);
-    let config = generate_companion_config(base_url);
+    let deck_surface_id = discover_streamdeck_surface_id();
+    let config = generate_companion_config(
+        base_url,
+        deck_surface_id.as_deref(),
+        &runtime.control_surface_token,
+    );
     let action_count = count_companion_actions(&config);
     let page_count = config
         .get("pages")
         .and_then(Value::as_object)
         .map(|pages| pages.len())
+        .unwrap_or(0);
+    let trigger_count = config
+        .get("triggers")
+        .and_then(Value::as_object)
+        .map(|triggers| triggers.len())
         .unwrap_or(0);
     let json = serde_json::to_vec_pretty(&config)
         .map_err(|error| ExportCommandError::Storage(error.to_string()))?;
@@ -103,7 +129,59 @@ pub fn export_companion_config(
         base_url: String::from(base_url),
         page_count,
         action_count,
+        trigger_count,
+        deck_surface_id,
     })
+}
+
+// Asks the local Companion for its configured surfaces so the page-follow
+// triggers can bind to the physical Stream Deck+ instead of "self" (which has
+// no meaning in a trigger context). Companion being closed is not an error —
+// the export then targets "self" and the operator re-exports with Companion
+// running to get surface-bound follow.
+fn discover_streamdeck_surface_id() -> Option<String> {
+    let companion_url =
+        std::env::var("SSE_COMPANION_URL").unwrap_or_else(|_| String::from(DEFAULT_COMPANION_URL));
+    let body = fetch_companion_export_json(&companion_url)?;
+    let parsed = serde_json::from_str::<Value>(&body).ok()?;
+    parsed
+        .get("surfaces")
+        .and_then(Value::as_object)?
+        .keys()
+        .find(|key| key.starts_with("streamdeck:"))
+        .cloned()
+}
+
+fn fetch_companion_export_json(companion_url: &str) -> Option<String> {
+    let host_port = companion_url
+        .trim()
+        .strip_prefix("http://")
+        .unwrap_or(companion_url)
+        .trim_end_matches('/');
+    let host = host_port.split(':').next().unwrap_or("127.0.0.1");
+    let stream = TcpStream::connect(host_port).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(3))).ok()?;
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .ok()?;
+    let mut stream = stream;
+    // HTTP/1.0 so the server closes the connection instead of chunking.
+    stream
+        .write_all(
+            format!(
+                "GET /int/export/full?format=json HTTP/1.0\r\nHost: {host}\r\nAccept: application/json\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .ok()?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).ok()?;
+    let response = String::from_utf8_lossy(&response);
+    let (headers, body) = response.split_once("\r\n\r\n")?;
+    if !headers.starts_with("HTTP/1.0 200") && !headers.starts_with("HTTP/1.1 200") {
+        return None;
+    }
+    Some(String::from(body))
 }
 
 pub fn build_control_surface_snapshot() -> ControlSurfaceSnapshot {
@@ -151,48 +229,245 @@ fn count_companion_actions(config: &Value) -> usize {
         .unwrap_or(0)
 }
 
-fn generate_companion_config(base_url: &str) -> Value {
+fn generate_companion_config(
+    base_url: &str,
+    deck_surface_id: Option<&str>,
+    bridge_token: &str,
+) -> Value {
+    let mut config = generate_companion_config_without_auth(base_url, deck_surface_id);
+    apply_bridge_auth_header(&mut config, &bridge_auth_header_option(bridge_token));
+    config
+}
+
+/// The generic-http `header` option: a JSON object the module parses and sends
+/// with every request. Carrying the bridge token here is what makes the
+/// exported profile a client the bridge accepts (2026-09 production readiness,
+/// Slice 2 — finding F01).
+fn bridge_auth_header_option(bridge_token: &str) -> String {
+    json!({ "Authorization": format!("Bearer {bridge_token}") }).to_string()
+}
+
+/// Every action that talks to the bridge connection — key presses, dial turns,
+/// the per-action LCD refreshes and the 1 s poll trigger — gets the auth
+/// header, wherever it sits in the profile. Walking the finished profile is
+/// what guarantees no request is left out.
+fn apply_bridge_auth_header(value: &mut Value, header: &str) {
+    match value {
+        Value::Object(map) => {
+            if map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID) {
+                if let Some(Value::Object(options)) = map.get_mut("options") {
+                    if options.contains_key("header") {
+                        options.insert(String::from("header"), Value::String(header.to_string()));
+                    }
+                }
+            }
+            for child in map.values_mut() {
+                apply_bridge_auth_header(child, header);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                apply_bridge_auth_header(item, header);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Option<&str>) -> Value {
     let mut pages = Map::new();
     pages.insert(
         String::from("1"),
-        build_page("PROJECTS", project_controls()),
+        build_page("sse-page-projects", "PROJECTS", project_controls()),
     );
-    pages.insert(String::from("2"), build_page("TASKS", task_controls()));
-    pages.insert(String::from("3"), build_page("LIGHTS", light_controls()));
-    pages.insert(String::from("4"), build_page("AUDIO", audio_controls()));
+    pages.insert(
+        String::from("2"),
+        build_page("sse-page-tasks", "TASKS", task_controls()),
+    );
+    pages.insert(
+        String::from("3"),
+        build_page("sse-page-lights", "LIGHTS", light_controls()),
+    );
+    pages.insert(
+        String::from("4"),
+        build_page("sse-page-audio", "AUDIO", audio_controls()),
+    );
 
     json!({
-        "version": 6,
+        "version": COMPANION_EXPORT_FORMAT_VERSION,
         "type": "full",
         "pages": pages,
+        "triggers": generate_companion_triggers(deck_surface_id),
+        "triggerCollections": [],
+        "custom_variables": generate_companion_custom_variables(),
+        "customVariablesCollections": [],
+        "expressionVariables": {},
+        "expressionVariablesCollections": [],
+        "connectionCollections": [],
         "instances": {
             INSTANCE_ID: {
-                "label": "SSE ExEd Studio Control Native",
+                "moduleInstanceType": "connection",
                 "instance_type": "generic-http",
+                "moduleVersionId": GENERIC_HTTP_MODULE_VERSION,
+                "sortOrder": 0,
+                "label": INSTANCE_LABEL,
+                "isFirstInit": false,
                 "config": {
                     "prefix": base_url,
                     "proxyAddress": "",
                     "rejectUnauthorized": true
                 },
-                "isFirstInit": false,
-                "lastUpgradeIndex": 0,
-                "enabled": true,
-                "sortOrder": 0
+                "secrets": {},
+                "lastUpgradeIndex": 1,
+                "enabled": true
             }
         }
     })
 }
 
+fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
+    let controller = deck_surface_id.unwrap_or("self");
+    let mut triggers = Map::new();
+
+    triggers.insert(
+        String::from("sse-trigger-lcd-poll"),
+        json!({
+            "type": "trigger",
+            "options": {
+                "name": "SSE audio LCD poll",
+                "enabled": true,
+                "sortOrder": 0
+            },
+            "actions": trigger_lcd_refreshes(AUDIO_LCD_KEYS),
+            "condition": [],
+            "events": [
+                {
+                    "id": "sse-evt-lcd-poll",
+                    "type": "interval",
+                    "enabled": true,
+                    "options": { "seconds": 1 }
+                }
+            ],
+            "localVariables": []
+        }),
+    );
+
+    for (slug, workspace, page, sort_order) in [
+        ("audio", "audio", 4, 1),
+        ("lighting", "lighting", 3, 2),
+        ("planning", "planning", 1, 3),
+    ] {
+        triggers.insert(
+            format!("sse-trigger-follow-{slug}"),
+            json!({
+                "type": "trigger",
+                "options": {
+                    "name": format!("SSE follow app - {slug}"),
+                    "enabled": true,
+                    "sortOrder": sort_order
+                },
+                "actions": [
+                    {
+                        "id": format!("sse-act-follow-{slug}"),
+                        "definitionId": "set_page",
+                        "connectionId": "internal",
+                        "options": {
+                            "controller_from_variable": false,
+                            "controller": controller,
+                            "controller_variable": "self",
+                            "page_from_variable": false,
+                            "page": page,
+                            "page_variable": "1"
+                        },
+                        "type": "action",
+                        "children": {}
+                    }
+                ],
+                "condition": [
+                    {
+                        "id": format!("sse-cond-follow-{slug}"),
+                        "definitionId": "variable_value",
+                        "connectionId": "internal",
+                        "options": {
+                            "variable": "custom:lcd_workspace",
+                            "op": "eq",
+                            "value": workspace
+                        },
+                        "type": "feedback",
+                        "style": {
+                            "color": 16777215,
+                            "bgcolor": 16711680
+                        },
+                        "isInverted": false,
+                        "children": {}
+                    }
+                ],
+                "events": [
+                    {
+                        "id": format!("sse-evt-follow-{slug}"),
+                        "type": "condition_true",
+                        "enabled": true,
+                        "options": {}
+                    }
+                ],
+                "localVariables": []
+            }),
+        );
+    }
+
+    Value::Object(triggers)
+}
+
+fn trigger_lcd_refreshes(keys: &[&str]) -> Vec<Value> {
+    lcd_refreshes(keys)
+        .into_iter()
+        .map(|mut action| {
+            if let Some(object) = action.as_object_mut() {
+                object.insert(String::from("children"), json!({}));
+            }
+            action
+        })
+        .collect()
+}
+
 #[derive(Clone)]
-struct ControlDef {
+pub(crate) struct ControlDef {
     row: &'static str,
     col: &'static str,
     label: &'static str,
     is_rotary: bool,
     down: Vec<Value>,
+    up: Vec<Value>,
     rotate_left: Vec<Value>,
     rotate_right: Vec<Value>,
     text_expression: Option<&'static str>,
+    hold_repeats_down: bool,
+    png_asset: Option<&'static str>,
+    text_size: Option<&'static str>,
+    hide_topbar: bool,
+    feedbacks: Vec<Value>,
+}
+
+impl ControlDef {
+    pub(crate) fn png(mut self, asset: &'static str) -> Self {
+        self.png_asset = Some(asset);
+        self
+    }
+
+    pub(crate) fn size(mut self, size: &'static str) -> Self {
+        self.text_size = Some(size);
+        self
+    }
+
+    pub(crate) fn no_topbar(mut self) -> Self {
+        self.hide_topbar = true;
+        self
+    }
+
+    pub(crate) fn with_feedbacks(mut self, feedbacks: Vec<Value>) -> Self {
+        self.feedbacks = feedbacks;
+        self
+    }
 }
 
 fn control_surface_page(
@@ -289,10 +564,10 @@ fn control_surface_control(
 
 fn extract_page_nav_target(actions: &[Value]) -> Option<&'static str> {
     for action in actions {
-        if action.get("instance").and_then(Value::as_str) != Some("internal") {
+        if action.get("connectionId").and_then(Value::as_str) != Some("internal") {
             continue;
         }
-        if action.get("action").and_then(Value::as_str) != Some("set_page") {
+        if action.get("definitionId").and_then(Value::as_str) != Some("set_page") {
             continue;
         }
         let page = action
@@ -314,7 +589,7 @@ fn extract_page_nav_target(actions: &[Value]) -> Option<&'static str> {
 
 fn extract_primary_request(actions: &[Value]) -> Option<(String, String, Option<Value>)> {
     for action in actions {
-        let Some(action_name) = action.get("action").and_then(Value::as_str) else {
+        let Some(action_name) = action.get("definitionId").and_then(Value::as_str) else {
             continue;
         };
         let method = match action_name {
@@ -382,8 +657,8 @@ fn dial_rotation_label(actions: &[Value], direction: &str) -> String {
             ("cctUp", _) => String::from("CCT Up"),
             ("selectPrevScene", _) => String::from("Prev Scene"),
             ("selectNextScene", _) => String::from("Next Scene"),
-            ("gainDown", _) => String::from("Gain Down"),
-            ("gainUp", _) => String::from("Gain Up"),
+            ("dialTurn", "left") => String::from("Level Down"),
+            ("dialTurn", "right") => String::from("Level Up"),
             _ => {
                 if direction == "left" {
                     String::from("Previous")
@@ -461,23 +736,35 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         "resetCct" => String::from("Reset the selected light CCT."),
         "cctDown" => String::from("Lower the selected light CCT."),
         "cctUp" => String::from("Raise the selected light CCT."),
-        "toggleMute" => format!(
-            "Toggle mute on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
-        ),
-        "togglePhantom" => format!(
-            "Toggle 48V on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
-        ),
         "recallSnapshot" => String::from("Recall the current audio snapshot."),
-        "gainDown" => format!(
-            "Lower gain on channel {}.",
+        "dialTurn" => format!(
+            "Ride the level on strip {}.",
+            value
+                .as_deref()
+                .and_then(|value| value.split(':').next())
+                .unwrap_or("the selected")
+        ),
+        "dialPress" => format!(
+            "Toggle mute on strip {}.",
             value.unwrap_or_else(|| String::from("the selected"))
         ),
-        "gainUp" => format!(
-            "Raise gain on channel {}.",
-            value.unwrap_or_else(|| String::from("the selected"))
+        "stripTap" => format!(
+            "Select strip {} in the app inspector.",
+            value.unwrap_or_else(|| String::from("the tapped"))
         ),
+        "setMixTarget" => format!(
+            "Make {} the active mix target.",
+            value
+                .as_deref()
+                .map(format_filter_value)
+                .unwrap_or_else(|| String::from("the selected output"))
+        ),
+        "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
+        "toggleDialMode" => String::from("Toggle the input dials between fader and gain."),
+        "dimToggle" => String::from("Toggle control-room dim on the main out."),
+        "talkOn" => String::from("Hold to talk to the phones mixes."),
+        "talkOff" => String::from("Release talkback."),
+        "soloClearAll" => String::from("Clear solo on every audio channel."),
         _ => format!("{interaction} {fallback_label}."),
     }
 }
@@ -504,55 +791,77 @@ fn format_filter_value(value: &str) -> String {
     value.replace('-', " ")
 }
 
-fn build_page(name: &str, controls: Vec<ControlDef>) -> Value {
+fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
     let mut rows = Map::new();
     for control in controls {
+        let size = control.text_size.unwrap_or("auto");
+        let png64 = control
+            .png_asset
+            .map(|asset| Value::String(String::from(deck_asset(asset))))
+            .unwrap_or(Value::Null);
+        let show_topbar: Value = if control.hide_topbar {
+            Value::Bool(false)
+        } else {
+            Value::String(String::from("default"))
+        };
         let style = if let Some(expression) = control.text_expression {
             json!({
                 "text": expression,
                 "textExpression": true,
-                "size": "auto",
-                "png64": Value::Null,
+                "size": size,
+                "png64": png64,
                 "alignment": "center:center",
                 "pngalignment": "center:center",
                 "color": 16777215,
                 "bgcolor": 0,
-                "show_topbar": "default"
+                "show_topbar": show_topbar
             })
         } else {
             json!({
                 "text": control.label.replace(' ', "\\n"),
                 "textExpression": false,
-                "size": "auto",
-                "png64": Value::Null,
+                "size": size,
+                "png64": png64,
                 "alignment": "center:center",
                 "pngalignment": "center:center",
                 "color": 16777215,
                 "bgcolor": 0,
-                "show_topbar": "default"
+                "show_topbar": show_topbar
             })
+        };
+        let run_while_held = if control.hold_repeats_down {
+            control
+                .down
+                .iter()
+                .filter_map(|action| action.get("id").and_then(Value::as_str))
+                .map(String::from)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
         };
         let control_value = json!({
             "type": "button",
-            "options": {
-                "rotaryActions": control.is_rotary,
-                "stepAutoProgress": true
-            },
             "style": style,
-            "feedbacks": [],
+            "options": {
+                "stepProgression": "auto",
+                "stepExpression": "",
+                "rotaryActions": control.is_rotary
+            },
+            "feedbacks": control.feedbacks,
             "steps": {
                 "0": {
                     "action_sets": {
                         "down": control.down,
-                        "up": [],
+                        "up": control.up,
                         "rotate_left": control.rotate_left,
                         "rotate_right": control.rotate_right
                     },
                     "options": {
-                        "runWhileHeld": []
+                        "runWhileHeld": run_while_held
                     }
                 }
-            }
+            },
+            "localVariables": []
         });
         rows.entry(control.row.to_string())
             .or_insert_with(|| Value::Object(Map::new()));
@@ -563,6 +872,7 @@ fn build_page(name: &str, controls: Vec<ControlDef>) -> Value {
     }
 
     json!({
+        "id": page_id,
         "name": name,
         "controls": rows,
         "gridSize": {
@@ -663,7 +973,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_nav)"),
+            Some("$(custom:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -681,7 +991,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Status",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_status)"),
+            Some("$(custom:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -693,7 +1003,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Priority",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_priority)"),
+            Some("$(custom:lcd_project_priority)"),
             Vec::new(),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -702,7 +1012,7 @@ fn project_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Sort",
-            Some("$(SSE ExEd Studio Control Native:lcd_sort_mode)"),
+            Some("$(custom:lcd_sort_mode)"),
             http_post("/api/deck/action", json!({"action":"resetSort"})),
             http_post("/api/deck/action", json!({"action":"prevSort"})),
             http_post("/api/deck/action", json!({"action":"nextSort"})),
@@ -771,7 +1081,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Project",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_nav)"),
+            Some("$(custom:lcd_project_nav)"),
             http_post("/api/deck/action", json!({"action":"openDetail"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -788,7 +1098,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Task",
-            Some("$(SSE ExEd Studio Control Native:lcd_task_nav)"),
+            Some("$(custom:lcd_task_nav)"),
             http_post("/api/deck/action", json!({"action":"toggleTimer"})),
             http_post("/api/deck/action", json!({"action":"selectPrevTask"})),
             http_post("/api/deck/action", json!({"action":"selectNextTask"})),
@@ -797,7 +1107,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "Status",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_status)"),
+            Some("$(custom:lcd_project_status)"),
             http_post(
                 "/api/deck/action",
                 json!({"action":"setStatus","value":"in-progress"}),
@@ -809,7 +1119,7 @@ fn task_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Priority",
-            Some("$(SSE ExEd Studio Control Native:lcd_project_priority)"),
+            Some("$(custom:lcd_project_priority)"),
             http_post("/api/deck/action", json!({"action":"toggleTaskComplete"})),
             http_post("/api/deck/action", json!({"action":"prevPriority"})),
             http_post("/api/deck/action", json!({"action":"nextPriority"})),
@@ -895,7 +1205,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "0",
             "Light",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_nav)"),
+            Some("$(custom:lcd_light_nav)"),
             http_post("/api/deck/light-action", json!({"action":"toggleLight"}))
                 .into_iter()
                 .chain(lcd_refreshes(&[
@@ -917,7 +1227,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "1",
             "Intensity",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_intensity)"),
+            Some("$(custom:lcd_light_intensity)"),
             http_post("/api/deck/light-action", json!({"action":"resetIntensity"})),
             http_post("/api/deck/light-action", json!({"action":"intensityDown"})),
             http_post("/api/deck/light-action", json!({"action":"intensityUp"})),
@@ -926,7 +1236,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "2",
             "CCT",
-            Some("$(SSE ExEd Studio Control Native:lcd_light_cct)"),
+            Some("$(custom:lcd_light_cct)"),
             http_post("/api/deck/light-action", json!({"action":"resetCct"})),
             http_post("/api/deck/light-action", json!({"action":"cctDown"})),
             http_post("/api/deck/light-action", json!({"action":"cctUp"})),
@@ -935,7 +1245,7 @@ fn light_controls() -> Vec<ControlDef> {
             "3",
             "3",
             "Scene",
-            Some("$(SSE ExEd Studio Control Native:lcd_scene_nav)"),
+            Some("$(custom:lcd_scene_nav)"),
             http_post("/api/deck/light-action", json!({"action":"recallScene"})),
             http_post(
                 "/api/deck/light-action",
@@ -949,165 +1259,14 @@ fn light_controls() -> Vec<ControlDef> {
     ]
 }
 
-fn audio_controls() -> Vec<ControlDef> {
-    vec![
-        button(
-            "0",
-            "0",
-            "<< LIGHTS",
-            page_jump(3)
-                .into_iter()
-                .chain(http_post(
-                    "/api/deck/audio-action",
-                    json!({"action":"switchToDeckMode","value":"light"}),
-                ))
-                .chain(lcd_refreshes(&[
-                    "light_nav",
-                    "light_intensity",
-                    "light_cct",
-                    "scene_nav",
-                ]))
-                .collect(),
-        ),
-        button(
-            "0",
-            "1",
-            "Mute 1",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"1"}),
-            ),
-        ),
-        button(
-            "0",
-            "2",
-            "Mute 2",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"2"}),
-            ),
-        ),
-        button(
-            "0",
-            "3",
-            "Mute 3",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"3"}),
-            ),
-        ),
-        button(
-            "1",
-            "0",
-            "Mute 4",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"4"}),
-            ),
-        ),
-        button(
-            "1",
-            "1",
-            "48V 1",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"togglePhantom","value":"1"}),
-            ),
-        ),
-        button(
-            "1",
-            "2",
-            "48V 2",
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"togglePhantom","value":"2"}),
-            ),
-        ),
-        button(
-            "1",
-            "3",
-            "Recall",
-            http_post("/api/deck/audio-action", json!({"action":"recallSnapshot"})),
-        ),
-        dial(
-            "3",
-            "0",
-            "Ch 1",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_ch_nav)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"1"}),
-            )
-            .into_iter()
-            .chain(lcd_refreshes(&["audio_ch_nav", "audio_gain1"]))
-            .collect(),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"1"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"1"}),
-            ),
-        ),
-        dial(
-            "3",
-            "1",
-            "Ch 2",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain1)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"2"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"2"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"2"}),
-            ),
-        ),
-        dial(
-            "3",
-            "2",
-            "Ch 3",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain2)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"3"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"3"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"3"}),
-            ),
-        ),
-        dial(
-            "3",
-            "3",
-            "Ch 4",
-            Some("$(SSE ExEd Studio Control Native:lcd_audio_gain3)"),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"toggleMute","value":"4"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainDown","value":"4"}),
-            ),
-            http_post(
-                "/api/deck/audio-action",
-                json!({"action":"gainUp","value":"4"}),
-            ),
-        ),
-    ]
+pub(crate) fn audio_action_with_refreshes(body: Value, refresh_keys: &[&str]) -> Vec<Value> {
+    http_post("/api/deck/audio-action", body)
+        .into_iter()
+        .chain(lcd_refreshes(refresh_keys))
+        .collect()
 }
 
-fn button(
+pub(crate) fn button(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1119,13 +1278,48 @@ fn button(
         label,
         is_rotary: false,
         down,
+        up: Vec::new(),
         rotate_left: Vec::new(),
         rotate_right: Vec::new(),
         text_expression: None,
+        hold_repeats_down: false,
+        png_asset: None,
+        text_size: None,
+        hide_topbar: false,
+        feedbacks: Vec::new(),
     }
 }
 
-fn dial(
+pub(crate) fn expression_button(
+    row: &'static str,
+    col: &'static str,
+    label: &'static str,
+    text_expression: &'static str,
+    down: Vec<Value>,
+) -> ControlDef {
+    ControlDef {
+        text_expression: Some(text_expression),
+        ..button(row, col, label, down)
+    }
+}
+
+pub(crate) fn momentary_button(
+    row: &'static str,
+    col: &'static str,
+    label: &'static str,
+    text_expression: &'static str,
+    down: Vec<Value>,
+    up: Vec<Value>,
+) -> ControlDef {
+    ControlDef {
+        up,
+        text_expression: Some(text_expression),
+        hold_repeats_down: true,
+        ..button(row, col, label, down)
+    }
+}
+
+pub(crate) fn dial(
     row: &'static str,
     col: &'static str,
     label: &'static str,
@@ -1140,29 +1334,37 @@ fn dial(
         label,
         is_rotary: true,
         down,
+        up: Vec::new(),
         rotate_left,
         rotate_right,
         text_expression,
+        hold_repeats_down: false,
+        png_asset: None,
+        text_size: None,
+        hide_topbar: false,
+        feedbacks: Vec::new(),
     }
 }
 
 fn page_jump(page: i64) -> Vec<Value> {
     vec![json!({
         "id": next_action_id(),
-        "instance": "internal",
-        "action": "set_page",
+        "definitionId": "set_page",
+        "connectionId": "internal",
         "options": {
             "page": page,
             "controller": "self"
-        }
+        },
+        "type": "action",
+        "children": {}
     })]
 }
 
-fn http_post(path: &'static str, body: Value) -> Vec<Value> {
+pub(crate) fn http_post(path: &'static str, body: Value) -> Vec<Value> {
     vec![json!({
         "id": next_action_id(),
-        "instance": INSTANCE_ID,
-        "action": "post",
+        "definitionId": "post",
+        "connectionId": INSTANCE_ID,
         "options": {
             "url": path,
             "header": "",
@@ -1171,17 +1373,18 @@ fn http_post(path: &'static str, body: Value) -> Vec<Value> {
             "result_stringify": true,
             "statusCodeVariable": "",
             "body": body.to_string()
-        }
+        },
+        "type": "action"
     })]
 }
 
-fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
+pub(crate) fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
     keys.iter()
         .map(|key| {
             json!({
                 "id": next_action_id(),
-                "instance": INSTANCE_ID,
-                "action": "get",
+                "definitionId": "get",
+                "connectionId": INSTANCE_ID,
                 "options": {
                     "url": format!("/api/deck/lcd?key={key}"),
                     "header": "",
@@ -1189,13 +1392,14 @@ fn lcd_refreshes(keys: &[&str]) -> Vec<Value> {
                     "jsonResultDataVariable": format!("lcd_{key}"),
                     "result_stringify": false,
                     "statusCodeVariable": ""
-                }
+                },
+                "type": "action"
             })
         })
         .collect()
 }
 
-fn next_action_id() -> String {
+pub(crate) fn next_action_id() -> String {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static ACTION_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -1203,22 +1407,134 @@ fn next_action_id() -> String {
     format!("act-{next}")
 }
 
+/// The most bridge requests the exported profile can have in flight at one
+/// instant: its once-a-second LCD poll, which sends every request at once,
+/// meeting the one press or turn that sends the most. The bridge's worker pool
+/// is sized to hold them all (`control_surface_http`,
+/// `the_pool_holds_the_decks_worst_instant`).
+#[cfg(test)]
+pub(crate) fn deck_worst_instant_requests() -> usize {
+    fn bridge_requests(value: &Value) -> usize {
+        match value {
+            Value::Object(map) => {
+                usize::from(map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID))
+                    + map.values().map(bridge_requests).sum::<usize>()
+            }
+            Value::Array(items) => items.iter().map(bridge_requests).sum(),
+            _ => 0,
+        }
+    }
+    fn entries(value: &Value) -> impl Iterator<Item = &Value> {
+        value.as_object().into_iter().flat_map(Map::values)
+    }
+
+    let config = generate_companion_config(
+        "http://127.0.0.1:38201",
+        Some("streamdeck:TESTSERIAL"),
+        "token",
+    );
+    let poll = bridge_requests(&config["triggers"]["sse-trigger-lcd-poll"]["actions"]);
+    let largest_press = entries(&config["pages"])
+        .flat_map(|page| entries(&page["controls"]))
+        .flat_map(entries)
+        .flat_map(|control| entries(&control["steps"]))
+        .flat_map(|step| entries(&step["action_sets"]))
+        .map(bridge_requests)
+        .max()
+        .unwrap_or(0);
+    poll + largest_press
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK, LEGACY_LCD_KEYS};
+
+    const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    fn collect_bridge_actions<'a>(value: &'a Value, into: &mut Vec<&'a Value>) {
+        match value {
+            Value::Object(map) => {
+                if map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID) {
+                    into.push(value);
+                }
+                for child in map.values() {
+                    collect_bridge_actions(child, into);
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    collect_bridge_actions(item, into);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // 2026-09 production readiness, Slice 2 (finding F01): the profile is the
+    // client the bridge accepts, so every request it makes must carry the
+    // token — and nothing else in the file may.
+    #[test]
+    fn companion_export_carries_the_bridge_token_on_every_request() {
+        let config = generate_companion_config(
+            "http://127.0.0.1:38201",
+            Some("streamdeck:TESTSERIAL"),
+            TEST_TOKEN,
+        );
+        let mut actions = Vec::new();
+        collect_bridge_actions(&config, &mut actions);
+        assert!(
+            actions.len() > 50,
+            "every deck key, dial and LCD refresh talks to the bridge: {}",
+            actions.len()
+        );
+
+        let expected = json!({ "Authorization": format!("Bearer {TEST_TOKEN}") });
+        for action in &actions {
+            let header = action["options"]["header"]
+                .as_str()
+                .unwrap_or_else(|| panic!("bridge action without a header option: {action}"));
+            let parsed: Value = serde_json::from_str(header)
+                .expect("the header option is the JSON object generic-http parses");
+            assert_eq!(parsed, expected, "{action}");
+        }
+
+        let poll_actions = config["triggers"]["sse-trigger-lcd-poll"]["actions"]
+            .as_array()
+            .expect("poll actions");
+        assert!(
+            !poll_actions.is_empty()
+                && poll_actions.iter().all(|action| action["options"]["header"]
+                    .as_str()
+                    .is_some_and(|header| header.contains(TEST_TOKEN))),
+            "the 1 s LCD poll must be authenticated too"
+        );
+
+        let serialized = config.to_string();
+        assert_eq!(
+            serialized.matches(TEST_TOKEN).count(),
+            actions.len(),
+            "the token appears once per bridge request and nowhere else"
+        );
+    }
 
     #[test]
     fn companion_export_contains_native_bridge_instance() {
-        let config = generate_companion_config("http://127.0.0.1:38201");
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
         assert_eq!(prefix, "http://127.0.0.1:38201");
+        assert_eq!(config["instances"][INSTANCE_ID]["label"], INSTANCE_LABEL);
+        assert!(
+            !INSTANCE_LABEL.contains(' '),
+            "Companion connection labels must not contain spaces"
+        );
     }
 
     #[test]
     fn companion_export_uses_override_base_url() {
-        let config = generate_companion_config("http://localhost:3000");
+        let config = generate_companion_config("http://localhost:3000", None, TEST_TOKEN);
         let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
             .as_str()
             .expect("prefix should be a string");
@@ -1226,16 +1542,180 @@ mod tests {
     }
 
     #[test]
-    fn companion_export_includes_audio_page() {
-        let config = generate_companion_config("http://127.0.0.1:38201");
+    fn companion_export_is_a_native_v9_full_config() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
+        assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
+        assert_eq!(config["type"], "full");
         assert_eq!(
             config["pages"].as_object().map(|pages| pages.len()),
             Some(4)
         );
+        assert!(config["pages"]["4"]["id"].is_string());
+        assert!(config.get("surfaces").is_none());
+
+        let custom_variables = config["custom_variables"]
+            .as_object()
+            .expect("custom variables should exist");
+        assert_eq!(
+            custom_variables.len(),
+            AUDIO_LCD_KEYS.len() + LEGACY_LCD_KEYS.len()
+        );
+        assert!(custom_variables.contains_key("lcd_project_nav"));
+        assert!(custom_variables.contains_key("lcd_audio_strip_1_level"));
+        assert!(
+            custom_variables.contains_key("lcd_workspace"),
+            "the polled LCD variables must ship with the profile - generic-http stores are silent no-ops without them"
+        );
+
+        let sample_action =
+            &config["pages"]["1"]["controls"]["0"]["0"]["steps"]["0"]["action_sets"]["down"][0];
+        assert_eq!(sample_action["connectionId"], INSTANCE_ID);
+        assert_eq!(sample_action["definitionId"], "post");
     }
 
     #[test]
-    fn control_surface_snapshot_matches_legacy_page_model() {
+    fn companion_export_audio_page_maps_the_deck_hardware() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
+        let controls = config["pages"]["4"]["controls"]
+            .as_object()
+            .expect("audio controls should exist");
+
+        for row in ["0", "1", "2", "3"] {
+            assert_eq!(
+                controls[row].as_object().map(|columns| columns.len()),
+                Some(4),
+                "audio row {row} should populate all four columns"
+            );
+        }
+
+        let strip_cell = &controls["2"]["0"];
+        assert_eq!(strip_cell["style"]["text"], "$(custom:lcd_audio_strip_1)");
+        let tap_body = strip_cell["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
+            .as_str()
+            .expect("tap body should exist");
+        assert!(tap_body.contains("stripTap"));
+
+        let encoder = &controls["3"]["0"];
+        assert_eq!(encoder["options"]["rotaryActions"], true);
+        let left_body = encoder["steps"]["0"]["action_sets"]["rotate_left"][0]["options"]["body"]
+            .as_str()
+            .expect("rotate body should exist");
+        assert!(left_body.contains("dialTurn") && left_body.contains("1:down"));
+        let press_body = encoder["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
+            .as_str()
+            .expect("press body should exist");
+        assert!(press_body.contains("dialPress"));
+
+        let talk = &controls["1"]["2"];
+        let talk_down_id = talk["steps"]["0"]["action_sets"]["down"][0]["id"]
+            .as_str()
+            .expect("talk down action id");
+        let run_while_held = talk["steps"]["0"]["options"]["runWhileHeld"]
+            .as_array()
+            .expect("runWhileHeld should be an array");
+        assert_eq!(run_while_held[0], talk_down_id);
+        let talk_up_body = talk["steps"]["0"]["action_sets"]["up"][0]["options"]["body"]
+            .as_str()
+            .expect("talk up body should exist");
+        assert!(talk_up_body.contains("talkOff"));
+    }
+
+    #[test]
+    fn companion_export_audio_page_carries_the_visual_language() {
+        let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
+        let controls = config["pages"]["4"]["controls"]
+            .as_object()
+            .expect("audio controls should exist");
+
+        let main_key = &controls["0"]["0"];
+        assert_eq!(main_key["style"]["text"], "MAIN");
+        assert_eq!(main_key["style"]["textExpression"], false);
+        assert_eq!(main_key["style"]["show_topbar"], false);
+        assert!(main_key["style"]["png64"]
+            .as_str()
+            .is_some_and(|png| png.starts_with("iVBOR")));
+        let main_feedbacks = main_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(
+            main_feedbacks[0]["options"]["variable"],
+            "custom:lcd_audio_state_target"
+        );
+        assert_eq!(main_feedbacks[0]["options"]["value"], "main");
+        assert_eq!(main_feedbacks[0]["style"]["bgcolor"], DECK_AMBER_BG);
+
+        let talk_key = &controls["1"]["2"];
+        let talk_feedbacks = talk_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(
+            talk_feedbacks[0]["options"]["variable"],
+            "custom:lcd_audio_state_talk"
+        );
+        assert_eq!(talk_feedbacks[0]["options"]["value"], "live");
+
+        let solo_key = &controls["1"]["3"];
+        let solo_feedbacks = solo_key["feedbacks"].as_array().expect("feedbacks");
+        assert_eq!(solo_feedbacks[0]["isInverted"], true);
+        assert_eq!(solo_feedbacks[0]["options"]["value"], "0");
+
+        let strip = &controls["2"]["0"];
+        assert_eq!(strip["style"]["show_topbar"], false);
+        let strip_feedbacks = strip["feedbacks"].as_array().expect("strip feedbacks");
+        // 13 normal + 13 muted bars, off, empty, plus 3 state color feedbacks.
+        assert_eq!(strip_feedbacks.len(), 31);
+        let png_feedbacks = strip_feedbacks
+            .iter()
+            .filter(|fb| fb["style"]["png64"].is_string())
+            .count();
+        assert_eq!(png_feedbacks, 28);
+        assert!(strip_feedbacks.iter().any(|fb| {
+            fb["options"]["variable"] == "custom:lcd_audio_strip_1_state"
+                && fb["options"]["value"] == "muted"
+                && fb["style"]["color"] == DECK_MUTED_INK
+        }));
+    }
+
+    #[test]
+    fn companion_export_triggers_poll_and_follow_the_app() {
+        let config = generate_companion_config(
+            "http://127.0.0.1:38201",
+            Some("streamdeck:TESTSERIAL"),
+            TEST_TOKEN,
+        );
+        let triggers = config["triggers"]
+            .as_object()
+            .expect("triggers should exist");
+        assert_eq!(triggers.len(), 4);
+
+        let poll = &triggers["sse-trigger-lcd-poll"];
+        assert_eq!(poll["options"]["enabled"], true);
+        assert_eq!(poll["events"][0]["type"], "interval");
+        assert_eq!(poll["events"][0]["options"]["seconds"], 1);
+        assert_eq!(
+            poll["actions"].as_array().map(Vec::len),
+            Some(AUDIO_LCD_KEYS.len())
+        );
+
+        let follow = &triggers["sse-trigger-follow-audio"];
+        assert_eq!(follow["events"][0]["type"], "condition_true");
+        assert_eq!(
+            follow["condition"][0]["options"]["variable"],
+            "custom:lcd_workspace"
+        );
+        assert_eq!(follow["condition"][0]["options"]["value"], "audio");
+        assert_eq!(follow["actions"][0]["definitionId"], "set_page");
+        assert_eq!(
+            follow["actions"][0]["options"]["controller"],
+            "streamdeck:TESTSERIAL"
+        );
+        assert_eq!(follow["actions"][0]["options"]["page"], 4);
+
+        let fallback = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
+        assert_eq!(
+            fallback["triggers"]["sse-trigger-follow-audio"]["actions"][0]["options"]["controller"],
+            "self"
+        );
+    }
+
+    #[test]
+    fn control_surface_snapshot_matches_the_deck_page_model() {
         let snapshot = build_control_surface_snapshot();
         assert_eq!(snapshot.pages.len(), 4);
         assert_eq!(snapshot.pages[0].label, "PROJECTS");
@@ -1269,11 +1749,33 @@ mod tests {
             snapshot.pages[0].dials[0].lcd_key.as_deref(),
             Some("project_nav")
         );
-        assert_eq!(snapshot.pages[3].label, "AUDIO");
-        assert!(snapshot.pages[3]
+
+        let audio = &snapshot.pages[3];
+        assert_eq!(audio.label, "AUDIO");
+        assert_eq!(
+            audio.buttons.len(),
+            12,
+            "audio page should model 8 keys plus 4 touch-strip cells"
+        );
+        assert_eq!(audio.dials.len(), 12);
+        assert!(audio.buttons.iter().any(|control| control
+            .body
+            .as_ref()
+            .is_some_and(
+                |body| body.get("action").and_then(Value::as_str) == Some("setMixTarget")
+            )));
+        let strip_cell = audio
             .buttons
             .iter()
-            .any(|control| control.label == "Recall"
-                && control.url.as_deref() == Some("/api/deck/audio-action")));
+            .find(|control| control.position == 9)
+            .expect("strip cell should sit at position 9");
+        assert_eq!(strip_cell.lcd_key.as_deref(), Some("audio_strip_1"));
+        assert!(audio
+            .dials
+            .iter()
+            .any(|control| control.control_type == "dial-turn-right"
+                && control.body.as_ref().is_some_and(|body| {
+                    body.get("action").and_then(Value::as_str) == Some("dialTurn")
+                })));
     }
 }

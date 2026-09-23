@@ -41,7 +41,7 @@
   flex-shrink: 0;
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
 }
 
@@ -55,6 +55,10 @@
   min-width: 0;
 }
 
+/* Visual overhaul A, Slice 11 (system §10: 24 px on the short side). A 16 px
+   remove key is the smallest thing the operator is asked to hit on the Lighting
+   surface, and it removes a fixture from the selection — a miss costs a
+   re-selection. The glyph stays 11 px; the key around it is 24. */
 .chipRemove {
   align-items: center;
   appearance: none;
@@ -64,13 +68,14 @@
   color: var(--color-brand-text-muted);
   cursor: pointer;
   display: inline-flex;
-  height: 16px;
+  height: 24px;
+  margin-block: -1px;
   justify-content: center;
   padding: 0;
   transition:
-    color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
-  width: 16px;
+    color var(--motion-duration-exit) ease,
+    background var(--motion-duration-exit) ease;
+  width: 24px;
 }
 
 .chipRemove:hover {
@@ -87,16 +92,16 @@
   appearance: none;
   background: transparent;
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   color: var(--color-brand-text-muted);
   cursor: pointer;
   flex-shrink: 0;
   font-family: var(--font-family-ui);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   padding: 4px 10px;
   transition:
-    color var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease;
+    color var(--motion-duration-exit) ease,
+    border-color var(--motion-duration-exit) ease;
 }
 
 .clearAll:hover {

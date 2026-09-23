@@ -1,0 +1,49 @@
+/* Visual overhaul A, Slice 7: the engine's handshake as rows on the pre-ready
+   surfaces — what the step is, what it does, and whether it is done. */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: linear-gradient(180deg, var(--material-key-top), var(--material-key));
+}
+
+.stepLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.stepDetail {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.stepStanding {
+  grid-row: 1 / span 2;
+  grid-column: 3;
+  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-text2);
+}

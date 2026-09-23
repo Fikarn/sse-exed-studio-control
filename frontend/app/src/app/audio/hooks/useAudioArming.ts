@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { type AudioArmedAction } from "../audioArming";
+import { AUDIO_ARM_MIN_DWELL_MS } from "../audioConstants";
 import type { AudioFeedbackTone } from "../audioFormatting";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 
@@ -17,6 +18,8 @@ export interface AudioArmingResetTriggers {
 }
 
 export interface UseAudioArmingArgs {
+  /** Monotonic clock, injectable for tests. Defaults to `performance.now`. */
+  now?: () => number;
   resetTriggers: AudioArmingResetTriggers;
   setFeedback: (feedback: AudioArmingFeedback | null) => void;
 }
@@ -43,7 +46,11 @@ export interface UseAudioArmingResult {
  * the canonical `armOrApplyAction` + `cancelArmedAction` pair so the toast is
  * raised consistently.
  */
-export function useAudioArming({ resetTriggers, setFeedback }: UseAudioArmingArgs): UseAudioArmingResult {
+export function useAudioArming({
+  now = () => performance.now(),
+  resetTriggers,
+  setFeedback,
+}: UseAudioArmingArgs): UseAudioArmingResult {
   const [armedAction, setArmedAction] = useState<AudioArmedAction | null>(null);
   const armedActionTimerRef = useRef<number | null>(null);
 
@@ -109,12 +116,18 @@ export function useAudioArming({ resetTriggers, setFeedback }: UseAudioArmingArg
 
   const armOrApplyAction = useLiveCallback((candidateInput: Omit<AudioArmedAction, "armedAt">, apply: () => void) => {
     if (armedAction?.key === candidateInput.key) {
+      // 2026-09 audit Slice 7: the confirming activation must come after a
+      // minimum dwell. Inside it, the repeat is a double-click, a bounced
+      // pointer or a held key — the arm stays and nothing is applied.
+      if (now() - armedAction.armedAt < AUDIO_ARM_MIN_DWELL_MS) {
+        return;
+      }
       setArmedAction(null);
       apply();
       return;
     }
 
-    const candidate: AudioArmedAction = { ...candidateInput, armedAt: performance.now() };
+    const candidate: AudioArmedAction = { ...candidateInput, armedAt: now() };
     setArmedAction(candidate);
     setFeedback({ message: `Armed: ${candidate.label}. Repeat the same action to apply.`, tone: "info" });
   });

@@ -28,6 +28,14 @@ pub const AUDIO_RECEIVE_PORT_KEY: &str = "app.commissioning.audio.receive_port";
 pub const CONTROL_SURFACE_CHECK_ID: &str = "control-surface";
 pub const LIGHTING_CHECK_ID: &str = "lighting";
 pub const AUDIO_CHECK_ID: &str = "audio";
+/// Set when the operator published with `overrideProbes: true` while a probe
+/// was not `passed` (2026-09 audit Slice 8); empty after a clean publish.
+pub const PUBLISH_OVERRIDE_AT_KEY: &str = "app.commissioning.publish_override_at";
+const PROBE_CHECKS: [(&str, &str); 3] = [
+    (CONTROL_SURFACE_CHECK_ID, "Control Surface Probe"),
+    (LIGHTING_CHECK_ID, "Lighting Bridge Probe"),
+    (AUDIO_CHECK_ID, "Audio OSC Probe"),
+];
 
 const DEFAULT_LIGHTING_UNIVERSE: i64 = 1;
 const DEFAULT_AUDIO_SEND_HOST: &str = "127.0.0.1";
@@ -72,6 +80,10 @@ pub struct CommissioningSnapshotPayload {
     pub config_summary: String,
     #[serde(rename = "readinessSummary")]
     pub readiness_summary: String,
+    /// When the last publish overrode incomplete probes (`None` after a
+    /// clean publish or before any publish).
+    #[serde(rename = "publishOverrideAt", default)]
+    pub publish_override_at: Option<String>,
     #[serde(rename = "planningProjectCount")]
     pub planning_project_count: usize,
     #[serde(rename = "planningTaskCount")]
@@ -289,6 +301,10 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
         audio.send_port,
         audio.receive_port
     );
+    let publish_override_at = app_settings
+        .get(PUBLISH_OVERRIDE_AT_KEY)
+        .filter(|value| !value.trim().is_empty())
+        .cloned();
     let readiness_summary = if commissioning.has_completed_setup {
         format!(
             "{} of {} commissioning probes passed. Startup routes directly into the dashboard.",
@@ -424,7 +440,12 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
         hardware_profile: commissioning.hardware_profile,
         summary,
         config_summary,
-        readiness_summary,
+        readiness_summary: with_publish_override_note(
+            readiness_summary,
+            publish_override_at.as_deref(),
+            commissioning.has_completed_setup,
+        ),
+        publish_override_at,
         planning_project_count: planning_counts.0,
         planning_task_count: planning_counts.1,
         sample_seed_available: true,
@@ -566,9 +587,23 @@ pub fn run_commissioning_check(
                 receive_port.to_string(),
             ));
 
-            match probe_audio_transport(&send_host, send_port as u16, receive_port as u16) {
-                Ok(summary) => (AUDIO_CHECK_ID, String::from("passed"), summary),
-                Err(summary) => (AUDIO_CHECK_ID, String::from("failed"), summary),
+            if crate::audio::audio_metering_is_simulated(&app_settings) {
+                // Simulated input mode has no console to probe. Passing here is
+                // honest because every audio surface labels the console "test
+                // simulation" while this mode is active; it is how CI hosts
+                // without TotalMix reach the `ready` gate.
+                (
+                    AUDIO_CHECK_ID,
+                    String::from("passed"),
+                    String::from(
+                        "Simulated audio input mode: the audio probe passes without TotalMix (test mode). Metering and console control stay simulated until this mode is turned off.",
+                    ),
+                )
+            } else {
+                match probe_audio_transport(&send_host, send_port as u16, receive_port as u16) {
+                    Ok(summary) => (AUDIO_CHECK_ID, String::from("passed"), summary),
+                    Err(summary) => (AUDIO_CHECK_ID, String::from("failed"), summary),
+                }
             }
         }
     };
@@ -655,6 +690,76 @@ fn current_timestamp(connection: &rusqlite::Connection) -> Result<String, rusqli
     })
 }
 
+fn with_publish_override_note(
+    readiness_summary: String,
+    publish_override_at: Option<&str>,
+    has_completed_setup: bool,
+) -> String {
+    match publish_override_at {
+        Some(at) if has_completed_setup => {
+            format!("{readiness_summary} Published with a probe override at {at}.")
+        }
+        _ => readiness_summary,
+    }
+}
+
+/// Every commissioning probe that is not `passed`, worded for the operator:
+/// "Audio OSC Probe failed", "Lighting Bridge Probe not run".
+pub fn failing_probes(settings: &HashMap<String, String>) -> Vec<String> {
+    PROBE_CHECKS
+        .iter()
+        .filter_map(|(check_id, label)| {
+            let status = settings
+                .get(&check_status_key(check_id))
+                .map(String::as_str)
+                .unwrap_or("idle");
+            match status {
+                "passed" => None,
+                "failed" => Some(format!("{label} failed")),
+                "idle" => Some(format!("{label} not run")),
+                other => Some(format!("{label} {other}")),
+            }
+        })
+        .collect()
+}
+
+/// Outcome of the publish gate (2026-09 audit Slice 8, operator decision 7).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PublishGate {
+    /// Every probe passed: publish, and clear any earlier override marker.
+    Clear,
+    /// A probe is not passed and the request did not override.
+    Refused { message: String },
+    /// A probe is not passed and the operator overrode explicitly: publish
+    /// and record the exception.
+    Overridden { failing: Vec<String> },
+}
+
+pub fn evaluate_publish_gate(
+    settings: &HashMap<String, String>,
+    override_probes: bool,
+) -> PublishGate {
+    let failing = failing_probes(settings);
+    if failing.is_empty() {
+        return PublishGate::Clear;
+    }
+    if override_probes {
+        return PublishGate::Overridden { failing };
+    }
+    PublishGate::Refused {
+        message: format!(
+            "Publish refused: {}. Run the probes until they pass, or publish with the explicit override to record the exception.",
+            failing.join(", ")
+        ),
+    }
+}
+
+/// Timestamp recorded under `PUBLISH_OVERRIDE_AT_KEY` for an overridden publish.
+pub fn publish_override_timestamp(db_path: &Path) -> EngineResult<String> {
+    let connection = open_connection(db_path)?;
+    Ok(current_timestamp(&connection)?)
+}
+
 fn read_check_snapshot(
     settings: &HashMap<String, String>,
     check_id: &str,
@@ -734,7 +839,7 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
 
     if rme_totalmix_osc::wait_for_live_metering(Duration::from_millis(1_500)) {
         Ok(format!(
-            "RME TotalMix OSC metering verified for {}. Configure slots with send ports {}-{} and receive ports {}-{}; live meter packets are arriving.",
+            "TotalMix on {} is sending meter data (port incoming {}-{}, port outgoing {}-{}).",
             host,
             send_port,
             send_port.saturating_add(2),
@@ -743,7 +848,7 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
         ))
     } else {
         Err(format!(
-            "No RME TotalMix OSC meter packets were received for {}. Configure three TotalMix OSC remote slots, set their outgoing ports to {}-{}, incoming ports to {}-{}, enable Send Peak Level, then rerun this probe.",
+            "No meter data arrived from TotalMix on {} within 1.5 s. In TotalMix Options › Settings › OSC, set remote controllers 1–3 to port outgoing {}-{} and port incoming {}-{}, turn on Send Peak Level Data, keep remote 4 in Global OSC mode, then run this probe again.",
             host,
             receive_port,
             receive_port.saturating_add(2),
@@ -776,7 +881,7 @@ mod tests {
         COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
     };
     use crate::control_surface::ControlSurfaceBridgeInfo;
-    use crate::storage::{initialize_database, set_settings};
+    use crate::storage::{initialize_test_database, set_settings};
     use std::fs;
     use std::path::PathBuf;
     use std::process;
@@ -827,6 +932,7 @@ mod tests {
                 journal_mode: String::from("wal"),
                 integrity_check: String::from("ok"),
             },
+            control_surface_token: String::from("bridge-token-for-tests"),
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 base_url: String::from("http://127.0.0.1:38201"),
                 port: 38201,
@@ -842,7 +948,7 @@ mod tests {
     fn commissioning_snapshot_reflects_seeded_planning_counts() {
         let test_dir = TestDir::new("commissioning-snapshot");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         let snapshot = seed_sample_planning_data(
             &runtime,
@@ -868,10 +974,103 @@ mod tests {
     }
 
     #[test]
+    fn publish_gate_refuses_until_every_probe_passed_and_records_an_override() {
+        // 2026-09 audit Slice 8. Nothing has run: every probe is "not run".
+        let mut settings: HashMap<String, String> = HashMap::new();
+        let super::PublishGate::Refused { message } =
+            super::evaluate_publish_gate(&settings, false)
+        else {
+            panic!("a fresh workstation must not publish");
+        };
+        assert!(message.starts_with("Publish refused: "), "{message}");
+        assert!(
+            message.contains("Control Surface Probe not run"),
+            "{message}"
+        );
+        assert!(
+            message.contains("Lighting Bridge Probe not run"),
+            "{message}"
+        );
+        assert!(message.contains("Audio OSC Probe not run"), "{message}");
+
+        settings.insert(
+            super::check_status_key(super::CONTROL_SURFACE_CHECK_ID),
+            String::from("passed"),
+        );
+        settings.insert(
+            super::check_status_key(super::LIGHTING_CHECK_ID),
+            String::from("failed"),
+        );
+        let super::PublishGate::Refused { message } =
+            super::evaluate_publish_gate(&settings, false)
+        else {
+            panic!("a failed probe must refuse");
+        };
+        assert!(
+            message.contains("Lighting Bridge Probe failed"),
+            "{message}"
+        );
+        assert!(message.contains("Audio OSC Probe not run"), "{message}");
+        assert!(!message.contains("Control Surface"), "{message}");
+
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, true),
+            super::PublishGate::Overridden {
+                failing: vec![
+                    String::from("Lighting Bridge Probe failed"),
+                    String::from("Audio OSC Probe not run"),
+                ],
+            }
+        );
+
+        settings.insert(
+            super::check_status_key(super::LIGHTING_CHECK_ID),
+            String::from("passed"),
+        );
+        settings.insert(
+            super::check_status_key(super::AUDIO_CHECK_ID),
+            String::from("passed"),
+        );
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, false),
+            super::PublishGate::Clear
+        );
+        // An override with nothing to override records nothing.
+        assert_eq!(
+            super::evaluate_publish_gate(&settings, true),
+            super::PublishGate::Clear
+        );
+    }
+
+    #[test]
+    fn readiness_summary_names_a_probe_override_only_after_publish() {
+        assert_eq!(
+            super::with_publish_override_note(
+                String::from("All good."),
+                Some("2026-09-04T10:00:00Z"),
+                true
+            ),
+            "All good. Published with a probe override at 2026-09-04T10:00:00Z."
+        );
+        assert_eq!(
+            super::with_publish_override_note(
+                String::from("Pending."),
+                Some("2026-09-04T10:00:00Z"),
+                false
+            ),
+            "Pending."
+        );
+        assert_eq!(
+            super::with_publish_override_note(String::from("All good."), None, true),
+            "All good."
+        );
+    }
+
+    #[test]
     fn control_surface_probe_records_passed_status() {
         let test_dir = TestDir::new("commissioning-control-surface");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         seed_sample_planning_data(
             &runtime,
@@ -908,7 +1107,7 @@ mod tests {
     fn audio_probe_rejects_invalid_host() {
         let test_dir = TestDir::new("commissioning-audio-invalid-host");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         let error = run_commissioning_check(
             &runtime.db_path,
@@ -939,7 +1138,7 @@ mod tests {
         crate::rme_totalmix_osc::with_shared_meter_state_for_test(|_| {
             let test_dir = TestDir::new("commissioning-audio-no-meter-packets");
             let runtime = runtime_for(&test_dir);
-            initialize_database(&runtime.db_path).expect("database should initialize");
+            initialize_test_database(&runtime.db_path).expect("database should initialize");
 
             let snapshot = run_commissioning_check(
                 &runtime.db_path,
@@ -948,7 +1147,9 @@ mod tests {
                     lighting_bridge_ip: None,
                     lighting_universe: None,
                     audio_send_host: Some(String::from("127.0.0.1")),
-                    audio_send_port: Some(7_001),
+                    // A dead send port: the probe's bus pins must never reach
+                    // the studio's real TotalMix remotes on 7001-7003.
+                    audio_send_port: Some(1),
                     audio_receive_port: Some(19_001),
                 },
             )
@@ -963,7 +1164,7 @@ mod tests {
             assert!(
                 audio_check
                     .message
-                    .contains("No RME TotalMix OSC meter packets")
+                    .contains("No meter data arrived from TotalMix")
                     || audio_check
                         .message
                         .contains("Audio OSC probe could not allocate a send socket"),
@@ -972,7 +1173,7 @@ mod tests {
             );
             if audio_check
                 .message
-                .contains("No RME TotalMix OSC meter packets")
+                .contains("No meter data arrived from TotalMix")
             {
                 assert!(audio_check.message.contains("19001-19003"));
             }
@@ -980,10 +1181,62 @@ mod tests {
     }
 
     #[test]
+    fn audio_probe_passes_in_simulated_input_mode() {
+        // 2026-09 audit remediation, Slice 1: console writes are refused until
+        // the audio probe passes, and CI hosts have no TotalMix. Simulated
+        // input mode is the honest way through — every audio surface labels
+        // the console "test simulation" while it is active — and it must open
+        // the same gate the operator faces.
+        let test_dir = TestDir::new("commissioning-audio-simulated");
+        let runtime = runtime_for(&test_dir);
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
+        crate::storage::set_settings_owned(
+            &runtime.db_path,
+            &[(
+                String::from("app.audio.metering_source"),
+                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+            )],
+        )
+        .expect("simulated metering source should persist");
+
+        let snapshot = run_commissioning_check(
+            &runtime.db_path,
+            &CommissioningCheckRequest {
+                target: CommissioningCheckTarget::Audio,
+                lighting_bridge_ip: None,
+                lighting_universe: None,
+                audio_send_host: Some(String::from("127.0.0.1")),
+                audio_send_port: Some(7_001),
+                audio_receive_port: Some(19_101),
+            },
+        )
+        .expect("audio probe should run in simulated mode");
+
+        let audio_check = snapshot
+            .checks
+            .iter()
+            .find(|check| check.id == AUDIO_CHECK_ID)
+            .expect("audio check should be present");
+        assert_eq!(audio_check.status, "passed");
+        assert!(
+            audio_check.message.contains("Simulated audio input mode"),
+            "unexpected audio probe message: {}",
+            audio_check.message
+        );
+
+        let app_settings = list_settings_by_prefix(&runtime.db_path, APP_SETTINGS_PREFIX)
+            .expect("settings should load");
+        let audio = crate::audio::read_audio_snapshot(&app_settings);
+        assert_eq!(audio.status, "ready");
+        assert!(audio.capabilities.can_edit_mixer_state);
+        assert!(audio.capabilities.can_sync);
+    }
+
+    #[test]
     fn sample_seed_preserves_commissioning_stage_and_workspace() {
         let test_dir = TestDir::new("commissioning-seed-preserve");
         let runtime = runtime_for(&test_dir);
-        initialize_database(&runtime.db_path).expect("database should initialize");
+        initialize_test_database(&runtime.db_path).expect("database should initialize");
 
         set_settings(
             &runtime.db_path,

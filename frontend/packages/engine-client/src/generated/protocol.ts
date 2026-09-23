@@ -19,6 +19,7 @@ export const REQUEST_METHODS = [
   "audio.snapshot.recall",
   "audio.snapshot.update",
   "audio.sync",
+  "audio.talkback.hold",
   "commissioning.check.run",
   "commissioning.seedPlanningDemo",
   "commissioning.snapshot",
@@ -44,6 +45,7 @@ export const REQUEST_METHODS = [
   "lighting.group.power",
   "lighting.group.reorder",
   "lighting.group.update",
+  "lighting.output.setArmed",
   "lighting.palette.apply",
   "lighting.palette.create",
   "lighting.palette.delete",
@@ -81,6 +83,7 @@ export const REQUEST_METHODS = [
   "storage.importLegacyDb",
   "support.backup.export",
   "support.backup.restore",
+  "support.backup.verify",
   "support.snapshot",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
@@ -90,6 +93,7 @@ export const EVENT_NAMES = [
   "audio.changed",
   "audio.meters",
   "commissioning.changed",
+  "engine.exited",
   "engine.ready",
   "engine.startupFailed",
   "lighting.changed",

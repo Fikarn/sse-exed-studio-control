@@ -5,7 +5,8 @@ use crate::audio::{
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
 use crate::rme_totalmix_osc::{
-    send_totalmix_eq_update, RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
+    send_totalmix_channel_update, send_totalmix_eq_update, send_totalmix_mix_target_update,
+    RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
 };
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -41,17 +42,6 @@ struct AudioMeterFrame {
 }
 
 #[derive(Debug)]
-pub struct AudioSyncOutcome {
-    pub summary: String,
-}
-
-#[derive(Debug)]
-pub struct AudioSnapshotRecallOutcome {
-    pub snapshot_name: String,
-    pub summary: String,
-}
-
-#[derive(Debug)]
 pub struct AudioChannelUpdateOutcome {
     pub summary: String,
 }
@@ -69,17 +59,10 @@ pub struct AudioEqUpdateOutcome {
 
 pub trait AudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory;
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String>;
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String>;
+    // Sync (a console pull) and recall (a console push) are owned by
+    // `audio::sync` / `audio::snapshots` (2026-09 audit remediation, Slices 3
+    // and 4); they need the console link and the database, so they are not
+    // backend methods.
     fn update_channel(
         &self,
         config: &AudioBackendConfig,
@@ -369,56 +352,6 @@ impl AudioBackend for SimulatedAudioBackend {
         }
     }
 
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        if inventory.channels.is_empty() || inventory.mix_targets.is_empty() {
-            return Err(String::from(
-                "Audio inventory is empty, so the simulated backend cannot stage a console sync.",
-            ));
-        }
-
-        Ok(AudioSyncOutcome {
-            summary: format!(
-                "Simulated console sync staged {} channels and {} mix targets over {}:{} / {}.",
-                inventory.channels.len(),
-                inventory.mix_targets.len(),
-                config.send_host,
-                config.send_port,
-                config.receive_port
-            ),
-        })
-    }
-
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        let snapshot = inventory
-            .snapshots
-            .iter()
-            .find(|entry| entry.id == snapshot_id)
-            .ok_or_else(|| {
-                format!("Audio snapshot '{snapshot_id}' is not exposed by the backend.")
-            })?;
-
-        Ok(AudioSnapshotRecallOutcome {
-            snapshot_name: snapshot.name.clone(),
-            summary: format!(
-                "Simulated audio snapshot '{}' was recalled over {}:{} / {}.",
-                snapshot.name, config.send_host, config.send_port, config.receive_port
-            ),
-        })
-    }
-
     fn update_channel(
         &self,
         config: &AudioBackendConfig,
@@ -433,7 +366,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -445,7 +378,7 @@ impl AudioBackend for SimulatedAudioBackend {
                 .any(|entry| entry.id == mix_target_id)
             {
                 return Err(format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     mix_target_id
                 ));
             }
@@ -513,7 +446,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.mix_target_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 )
             })?;
@@ -560,7 +493,7 @@ impl AudioBackend for SimulatedAudioBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -588,55 +521,6 @@ impl AudioBackend for RmeTotalMixOscBackend {
         inventory
     }
 
-    fn sync_console(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-    ) -> Result<AudioSyncOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        if inventory.channels.is_empty() || inventory.mix_targets.is_empty() {
-            return Err(String::from(
-                "Audio inventory is empty, so the RME TotalMix OSC backend cannot prepare the console surface.",
-            ));
-        }
-
-        Ok(AudioSyncOutcome {
-            summary: format!(
-                "RME TotalMix OSC metering is configured for {} channels and {} mix targets over receive ports {}-{}.",
-                inventory.channels.len(),
-                inventory.mix_targets.len(),
-                config.receive_port,
-                config.receive_port + 2
-            ),
-        })
-    }
-
-    fn recall_snapshot(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        snapshot_id: &str,
-    ) -> Result<AudioSnapshotRecallOutcome, String> {
-        ensure_transport_configured(config)?;
-
-        let snapshot = inventory
-            .snapshots
-            .iter()
-            .find(|entry| entry.id == snapshot_id)
-            .ok_or_else(|| {
-                format!("Audio snapshot '{snapshot_id}' is not exposed by the backend.")
-            })?;
-
-        Ok(AudioSnapshotRecallOutcome {
-            snapshot_name: snapshot.name.clone(),
-            summary: format!(
-                "Native audio snapshot '{}' was recalled. RME OSC snapshot-write control is outside this metering pass.",
-                snapshot.name
-            ),
-        })
-    }
-
     fn update_channel(
         &self,
         config: &AudioBackendConfig,
@@ -650,16 +534,16 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
 
+        let report =
+            send_totalmix_channel_update(&config.send_host, config.send_port, channel, request)?;
+
         Ok(AudioChannelUpdateOutcome {
-            summary: format!(
-                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
-                channel.name
-            ),
+            summary: totalmix_update_summary(&channel.name, &report),
         })
     }
 
@@ -676,16 +560,20 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.mix_target_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio mix target '{}' is not exposed by the backend.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 )
             })?;
 
+        let report = send_totalmix_mix_target_update(
+            &config.send_host,
+            config.send_port,
+            &mix_target.id,
+            request,
+        )?;
+
         Ok(AudioMixTargetUpdateOutcome {
-            summary: format!(
-                "Native audio state for '{}' was updated. Live meter truth remains sourced from RME TotalMix OSC packets.",
-                mix_target.name
-            ),
+            summary: totalmix_update_summary(&mix_target.name, &report),
         })
     }
 
@@ -702,7 +590,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
             .find(|entry| entry.id == request.channel_id)
             .ok_or_else(|| {
                 format!(
-                    "Audio channel '{}' is not exposed by the backend.",
+                    "Channel '{}' is not part of this console.",
                     request.channel_id
                 )
             })?;
@@ -712,7 +600,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
         if sent == 0 {
             return Ok(AudioEqUpdateOutcome {
                 summary: format!(
-                    "Updated local EQ state for '{}'; TotalMix exposes no OSC command for that field.",
+                    "Saved the EQ change for '{}' in the app only — TotalMix has no remote control for that field.",
                     channel.name
                 ),
                 hardware_status: String::from("local"),
@@ -721,7 +609,7 @@ impl AudioBackend for RmeTotalMixOscBackend {
 
         Ok(AudioEqUpdateOutcome {
             summary: format!(
-                "Sent {} TotalMix EQ command{} for '{}'; hardware confirmation is pending.",
+                "Sent {} EQ change{} for '{}' to TotalMix — waiting for the console to confirm.",
                 sent,
                 if sent == 1 { "" } else { "s" },
                 channel.name
@@ -729,6 +617,29 @@ impl AudioBackend for RmeTotalMixOscBackend {
             hardware_status: String::from("pending"),
         })
     }
+}
+
+fn totalmix_update_summary(
+    surface_name: &str,
+    report: &crate::rme_totalmix_osc::TotalMixSendReport,
+) -> String {
+    let mut summary = if report.sent == 0 {
+        format!("Saved '{surface_name}' in the app only — nothing to send to TotalMix.")
+    } else {
+        format!(
+            "Sent {} change{} for '{}' to TotalMix — waiting for the console to confirm.",
+            report.sent,
+            if report.sent == 1 { "" } else { "s" },
+            surface_name
+        )
+    };
+    if !report.local_only.is_empty() {
+        summary.push_str(&format!(
+            " Kept in the app only: {}.",
+            report.local_only.join(", ")
+        ));
+    }
+    summary
 }
 
 fn ensure_transport_configured(config: &AudioBackendConfig) -> Result<(), String> {
@@ -1120,29 +1031,6 @@ pub fn read_default_audio_inventory(config: &AudioBackendConfig) -> AudioBackend
     }
 }
 
-pub fn sync_default_audio_console(
-    config: &AudioBackendConfig,
-    inventory: &AudioBackendInventory,
-) -> Result<AudioSyncOutcome, String> {
-    if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        SimulatedAudioBackend.sync_console(config, inventory)
-    } else {
-        RmeTotalMixOscBackend.sync_console(config, inventory)
-    }
-}
-
-pub fn recall_default_audio_snapshot(
-    config: &AudioBackendConfig,
-    inventory: &AudioBackendInventory,
-    snapshot_id: &str,
-) -> Result<AudioSnapshotRecallOutcome, String> {
-    if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        SimulatedAudioBackend.recall_snapshot(config, inventory, snapshot_id)
-    } else {
-        RmeTotalMixOscBackend.recall_snapshot(config, inventory, snapshot_id)
-    }
-}
-
 pub fn update_default_audio_channel(
     config: &AudioBackendConfig,
     inventory: &AudioBackendInventory,
@@ -1215,28 +1103,6 @@ mod tests {
         assert_eq!(inventory.channels.len(), 18);
         assert_eq!(inventory.mix_targets.len(), 3);
         assert_eq!(inventory.snapshots.len(), 3);
-    }
-
-    #[test]
-    fn simulated_audio_backend_syncs_when_transport_and_inventory_exist() {
-        let config = valid_config();
-        let inventory = read_default_audio_inventory(&config);
-
-        let outcome =
-            sync_default_audio_console(&config, &inventory).expect("simulated sync should succeed");
-
-        assert!(outcome.summary.contains("Simulated console sync"));
-    }
-
-    #[test]
-    fn simulated_audio_backend_rejects_unknown_snapshot() {
-        let config = valid_config();
-        let inventory = read_default_audio_inventory(&config);
-
-        let error = recall_default_audio_snapshot(&config, &inventory, "snapshot-missing")
-            .expect_err("unknown snapshot should be rejected");
-
-        assert!(error.contains("snapshot-missing"));
     }
 
     #[test]

@@ -17,10 +17,29 @@
 // Source: previously inline at AudioWorkspace.tsx:103.
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
+// Why: arm-then-apply minimum dwell. A second activation of the same armed
+// key inside this window is ignored and the arm stays, so a double-click, a
+// bounced pointer or a held key's auto-repeat can never arm and apply a 48V
+// change, a snapshot recall or a snapshot overwrite in one motion. 350 ms is
+// past any double-click interval and well inside AUDIO_ARM_TIMEOUT_MS.
+// 2026-09 audit remediation, Slice 7.
+export const AUDIO_ARM_MIN_DWELL_MS = 350;
+
+// Why: below this operator-root width the Console runs at compact density
+// (4 inputs / 4 playback pairs / 3 outputs per bank, 380 px inspector) so the
+// 1920×1080 studio monitor never scrolls a tier sideways; from here up it is
+// the 2560 desktop density (4 / 6 / 3, 504 px inspector). The Scaled Studio
+// Preview measures its 2560 logical root, so it stays desktop.
+// 2026-09 audit remediation, Slice 9 (operator decision 6).
+export const AUDIO_COMPACT_DENSITY_MAX_WIDTH = 2200;
+
 // Why: rail prototype monitor level used as fallback when no draft/value is
 // present for the selected mix target's volume. Expressed in dBFS, converted
 // via `faderDbToNormalized` at the call site.
-// Source: previously inline at AudioRail.tsx:21.
+// Source: previously inline at AudioRail.tsx:21 — that file was deleted on
+// 2026-09-09 with the GS-AUD-44 dead-code posture, and it was this constant's
+// only production consumer. Kept because audio-constants.spec.ts pins the
+// value; drop both together if no Console surface reclaims it.
 export const PROTOTYPE_MONITOR_LEVEL_DB = -12;
 
 // Why: snapshot thumbnail mini-meter visualisation density. 12 vertical bars

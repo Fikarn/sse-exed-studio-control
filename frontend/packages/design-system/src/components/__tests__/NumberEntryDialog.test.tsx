@@ -26,7 +26,7 @@ describe("NumberEntryDialog", () => {
     expect(screen.getByRole("dialog", { name: "Set Fixture intensity" })).toBeInTheDocument();
     expect(screen.getByText("Intensity")).toBeInTheDocument();
     expect(screen.getByText("%")).toBeInTheDocument();
-    expect(screen.getByText("0 to 100")).toBeInTheDocument();
+    expect(screen.getByText("0 to 100 %")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton")).toHaveValue(40);
   });
 
@@ -45,11 +45,11 @@ describe("NumberEntryDialog", () => {
       />
     );
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "37" } });
-    fireEvent.click(screen.getByRole("button", { name: "Set" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set value" }));
     expect(onConfirm).toHaveBeenCalledWith(35); // 37 snapped to the nearest 5
   });
 
-  it("rejects an out-of-range value (Set disabled)", () => {
+  it("rejects an out-of-range value (Set value disabled)", () => {
     const onConfirm = vi.fn();
     render(
       <NumberEntryDialog
@@ -63,8 +63,8 @@ describe("NumberEntryDialog", () => {
       />
     );
     fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "250" } });
-    expect(screen.getByRole("button", { name: "Set" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Set" }));
+    expect(screen.getByRole("button", { name: "Set value" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Set value" }));
     expect(onConfirm).not.toHaveBeenCalled();
   });
 

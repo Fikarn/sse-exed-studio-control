@@ -3,6 +3,8 @@ name = "studio-control-engine"
 version = "2.2.1"
 edition.workspace = true
 rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
 
 [features]
 default = []
@@ -10,14 +12,27 @@ default = []
 # binding export when `cargo test --features ts-rs` runs. Production
 # builds must NOT enable this feature; it adds a dev-only dependency.
 ts-rs = ["dep:ts-rs"]
+# Compiles the dev-only `dev.parityFixture.load` method together with its
+# bundled fixture payloads (`parity_fixtures.rs`). Release engines are built
+# without it and answer METHOD_UNAVAILABLE; the method stays in the protocol
+# contract (2026-09 production readiness, Slice 1 — finding F04).
+dev-fixtures = []
 
 [dependencies]
 rusqlite.workspace = true
 rosc.workspace = true
+getrandom.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
 ts-rs = { workspace = true, optional = true }
+
+[dev-dependencies]
+# Property tests for the two parsers that read bytes from outside the process:
+# the control-surface bridge's HTTP reader and the TotalMix OSC ingest (2026-09
+# production readiness, Slice 13 - finding F25). Test builds only; `std` alone
+# leaves out the process-forking runner and its crates, which nothing here uses.
+proptest = { version = "1.11", default-features = false, features = ["std"] }
 
 [lints]
 workspace = true

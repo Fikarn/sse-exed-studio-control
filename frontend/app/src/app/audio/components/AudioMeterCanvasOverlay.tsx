@@ -35,6 +35,7 @@ interface MiniMeterGeometry {
   kind: "mini";
   meterId: string;
   meterKind: "channel" | "mixTarget";
+  orientation: "vertical" | "horizontal";
   rect: MeterRect;
   side: "left" | "right";
 }
@@ -389,6 +390,24 @@ function drawMiniMeter(
   const rect = geometry.rect;
   const bodyDbfs = geometry.side === "left" ? entry.bodyLeftDbfs : entry.bodyRightDbfs;
   const peakDbfs = geometry.side === "left" ? entry.peakLeftDbfs : entry.peakRightDbfs;
+
+  // Visual overhaul A, Slice 4b: a strip's meter bar runs bottom-to-top, so it
+  // is painted with the vertical body, sheen, reference and peak the tall
+  // meters already use; the cluster's bar keeps the horizontal treatment below.
+  if (geometry.orientation === "vertical") {
+    drawMeterBody(ctx, rect, bodyDbfs, colors, gradients);
+    drawVerticalGlassOverlay(ctx, rect);
+    drawNominalReference(ctx, rect, colors);
+    if (Number.isFinite(peakDbfs) && peakDbfs > METER_FLOOR_DBFS) {
+      drawPeakLine(ctx, rect, peakDbfs, colors);
+    }
+    if (entry.peakWarning) drawPeakWarningOverlay(ctx, rect, colors);
+    const overVertical = geometry.side === "left" ? entry.meterPointOverLeft : entry.meterPointOverRight;
+    if (overVertical) drawMeterPointOverIndicator(ctx, rect, colors);
+    if (entry.channelPathClip) drawClipOverlay(ctx, rect, colors);
+    return;
+  }
+
   const nominalX = rect.x + rect.width * (dbfsToMeterPercent(METER_NOMINAL_DBFS) / 100);
 
   const width = Math.max(0, rect.width * (dbfsToMeterPercent(bodyDbfs) / 100));
@@ -523,6 +542,7 @@ function measureGeometry(canvas: HTMLCanvasElement, root: HTMLElement) {
     const meterId = meter.dataset.miniMeterId;
     const meterKind = meter.dataset.miniMeterKind;
     const side = meter.dataset.miniMeterSide === "right" ? "right" : "left";
+    const orientation = meter.dataset.miniMeterOrientation === "vertical" ? "vertical" : "horizontal";
     const rect = elementRect(meter, canvasRect, scaleX, scaleY);
     if (!meterId || (meterKind !== "channel" && meterKind !== "mixTarget") || !rect) {
       continue;
@@ -532,6 +552,7 @@ function measureGeometry(canvas: HTMLCanvasElement, root: HTMLElement) {
       kind: "mini",
       meterId,
       meterKind,
+      orientation,
       rect,
       side,
     });
@@ -558,7 +579,12 @@ export function AudioMeterCanvasOverlay({
   useEffect(() => {
     const canvas = canvasRef.current;
     const root = canvas?.closest<HTMLElement>('[data-testid="audio-workspace"]');
-    if (!canvas || !root) return;
+    // Visual overhaul A, Slice 4: the cluster's meters live in the shell's own
+    // region, outside the workspace element, so the canvas covers the shell
+    // frame and the observers watch it. The workspace element stays the source
+    // of the palette and the metering gate.
+    const paintRoot = canvas?.closest<HTMLElement>("[data-shell-frame]") ?? root ?? null;
+    if (!canvas || !root || !paintRoot) return;
 
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
@@ -587,10 +613,10 @@ export function AudioMeterCanvasOverlay({
     });
 
     const resizeObserver = new ResizeObserver(requestMeasure);
-    resizeObserver.observe(root);
+    resizeObserver.observe(paintRoot);
 
     const mutationObserver = new MutationObserver(requestMeasure);
-    mutationObserver.observe(root, {
+    mutationObserver.observe(paintRoot, {
       attributeFilter: ["data-density", "data-view-mode", "data-selected"],
       attributes: true,
       childList: true,
@@ -599,7 +625,7 @@ export function AudioMeterCanvasOverlay({
 
     const paint = () => {
       if (needsMeasure) {
-        const measured = measureGeometry(canvas, root);
+        const measured = measureGeometry(canvas, paintRoot);
         colors = measured.colors;
         dpr = measured.dpr;
         geometry = measured.geometry;

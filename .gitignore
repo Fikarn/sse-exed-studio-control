@@ -22,14 +22,21 @@ temp/
 native/build/
 native/**/build/
 native/**/target/
+# cargo-cyclonedx writes beside each crate's manifest; the release SBOM step
+# moves its files under release/sbom/ (scripts/write-release-sboms.mjs).
+native/**/*.cdx.json
 artifacts/
 frontend/**/dist/
 frontend/**/storybook-static/
 frontend/**/playwright-report/
 frontend/**/test-results/
+frontend/**/test-results-quarantine/
+frontend/**/playwright-report-quarantine/
+frontend/**/coverage/
 test-results/
 
 # Audio design-comparison dev tooling (session-local; see memory/audio-ux-polish-handoff.md)
 /audio-page-seed.html
 /audio-page-seed-preview.png
 /seed-audio-prototype.mjs
+native/native-runtime/

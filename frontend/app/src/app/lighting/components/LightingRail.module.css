@@ -9,7 +9,7 @@
   font-family: var(--font-family-ui);
   font-size: var(--operator-font-size-md, 12px);
   color: var(--color-brand-text-primary);
-  transition: opacity var(--motion-duration-fast) ease;
+  transition: opacity var(--motion-duration-exit) ease;
 }
 
 :global([data-layout-mode="desktopCompact"]) .rail {
@@ -59,7 +59,7 @@
 
 .headLabel {
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
@@ -71,7 +71,7 @@
   margin-left: 8px;
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: 10px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   color: var(--color-brand-text-muted);
 }
@@ -86,10 +86,10 @@
   background: transparent;
   border: 1px solid var(--color-bg-stroke);
   color: var(--color-brand-text-secondary);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   padding: 3px 9px;
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   cursor: pointer;
   display: inline-flex;
@@ -136,11 +136,11 @@
 
 .headButtonKbd {
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   background: var(--color-bg-default);
   border: 1px solid var(--color-bg-border);
   border-bottom-width: 2px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   padding: 1px 5px;
   color: var(--color-brand-text-secondary);
   letter-spacing: 0;
@@ -153,11 +153,11 @@
   padding: 14px;
   background: var(--color-bg-default);
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-lg);
+  border-radius: var(--radius-key);
   box-shadow: var(--shadow-sm);
   transition:
-    border-color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease;
+    border-color var(--motion-duration-exit) ease,
+    background var(--motion-duration-exit) ease;
 }
 
 .masterOn {
@@ -182,7 +182,7 @@
 
 .masterEyebrow {
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
@@ -218,10 +218,10 @@
   cursor: pointer;
   flex-shrink: 0;
   transition:
-    background var(--motion-duration-fast) ease,
-    border-color var(--motion-duration-fast) ease,
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    background var(--motion-duration-exit) ease,
+    border-color var(--motion-duration-exit) ease,
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .masterToggle:disabled {
@@ -243,7 +243,7 @@
   height: 20px;
   border-radius: 50%;
   background: var(--color-brand-text-primary);
-  transition: transform var(--motion-duration-fast) ease;
+  transition: transform var(--motion-duration-exit) ease;
 }
 
 .masterToggleOn .masterTogglePin {
@@ -259,7 +259,7 @@
 
 .masterFaderLabel {
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
@@ -268,7 +268,7 @@
 .masterFaderValue {
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-green);
   font-weight: 600;
   min-width: 36px;
@@ -299,12 +299,13 @@
   box-shadow: var(--shadow-thumb-ring);
   cursor: pointer;
   transition:
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .masterSlider:hover::-webkit-slider-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 
@@ -313,7 +314,6 @@
 }
 
 .masterSlider:focus-visible::-webkit-slider-thumb {
-  transform: scale(1.15);
   box-shadow:
     var(--shadow-thumb-ring),
     0 0 0 2px var(--color-brand-green);
@@ -330,13 +330,14 @@
   background: var(--color-brand-text-primary);
   border: 2px solid var(--color-brand-green);
   transition:
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .masterSlider:hover::-moz-range-thumb,
 .masterSlider:focus-visible::-moz-range-thumb {
-  transform: scale(1.15);
+  /* Slice 9 (system §6): hover changes an edge, never a position. */
+  border-color: var(--color-brand-green);
   box-shadow: var(--shadow-thumb-ring);
 }
 
@@ -349,7 +350,7 @@
   padding: 8px 12px;
   background: linear-gradient(180deg, var(--color-danger-soft), var(--color-danger-glow));
   border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   color: var(--color-danger-500);
   font-family: var(--font-family-ui);
   font-size: 12px;
@@ -382,7 +383,7 @@
   appearance: none;
   background: var(--color-bg-soft);
   border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -396,8 +397,8 @@
     border-color 200ms var(--motion-easing-standard),
     background 200ms var(--motion-easing-standard),
     transform 200ms var(--motion-easing-standard),
-    box-shadow var(--motion-duration-fast) ease,
-    opacity var(--motion-duration-fast) ease;
+    box-shadow var(--motion-duration-exit) ease,
+    opacity var(--motion-duration-exit) ease;
 }
 
 /* Sortable drag visuals are owned by dnd-kit — it sets `transform`,
@@ -429,7 +430,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  border-radius: var(--radius-tight-md) 0 0 var(--radius-tight-md);
+  border-radius: var(--radius-key) 0 0 var(--radius-key);
   pointer-events: none;
 }
 
@@ -456,21 +457,24 @@
   box-shadow: var(--shadow-glow-amber);
 }
 
+/* Visual overhaul A, Slice 11 (system §10: 24 px on the short side). Two pixels
+   wider and two taller, and the inset drops by one so the pin keeps the centre
+   it had in the tile's corner. */
 .tilePinAction {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--color-glass-bg-strong);
   color: var(--color-brand-text-muted);
   cursor: pointer;
   opacity: 0;
-  transition: opacity var(--motion-duration-fast) ease;
+  transition: opacity var(--motion-duration-exit) ease;
 }
 
 .tile:hover .tilePinAction,
@@ -497,12 +501,14 @@
   background: linear-gradient(180deg, var(--color-brand-green-soft) 0%, var(--color-brand-green-glow) 100%);
 }
 
+/* Visual overhaul A, Slice 9 (system §5): a recalled scene tile is a lit
+   key, and a lit green key blooms at 18 px — one size, from the token. */
 .tileSelected {
   border-color: var(--color-brand-green);
   box-shadow:
     inset 0 0 0 1px var(--color-brand-green),
     0 0 0 1px rgba(153, 186, 146, 0.2),
-    var(--shadow-glow-green-sm);
+    0 0 18px var(--role-green-bloom);
 }
 
 .tileSelected .sceneVisual {
@@ -559,7 +565,7 @@
   align-items: center;
   gap: 4px;
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-green);
@@ -592,39 +598,16 @@
   box-shadow: var(--shadow-glow-amber);
 }
 
-@keyframes ssePulseGreenDot {
-  0%,
-  100% {
-    box-shadow: var(--shadow-glow-green-dot);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(153, 186, 146, 0.85);
-  }
-}
-
-@keyframes ssePulseYellowDot {
-  0%,
-  100% {
-    box-shadow: var(--shadow-glow-yellow-dot);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(232, 213, 97, 0.85);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .tileActive .tileBadgeDot {
-    animation: ssePulseGreenDot 1.6s ease-in-out infinite;
-  }
-  .tileModified .tileBadgeDot {
-    animation: ssePulseYellowDot 1.6s ease-in-out infinite;
-  }
-}
+/* Visual overhaul A, Slice 9 (system §6): nothing on an idle surface animates.
+   The active and modified scene dots pulsed for ever — the only thing still
+   moving on a Lighting board at rest. A lamp is lit or it is not; the dot's
+   colour and its one bloom already say which, so the pulse is gone and the
+   keyframes with it. */
 
 .tileSub {
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
-  font-size: 10px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-text-muted);
   letter-spacing: 0;
 }
@@ -633,7 +616,7 @@
   position: relative;
   display: block;
   width: 100%;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   overflow: hidden;
 }
 
@@ -648,7 +631,7 @@
   align-items: end;
   gap: 2px;
   padding: 2px;
-  border-radius: var(--radius-tight-xs);
+  border-radius: var(--radius-ctl);
   background: var(--color-scene-minigraph-bg);
   border: 1px solid var(--color-glass-border);
   pointer-events: none;
@@ -657,14 +640,14 @@
 .sceneShapeBar {
   display: block;
   min-height: 2px;
-  border-radius: var(--radius-tight-xs) var(--radius-tight-xs) 1px 1px;
+  border-radius: var(--radius-ctl);
   box-shadow: 0 0 5px rgba(250, 246, 230, 0.16);
 }
 
 .thumb {
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: var(--color-bg-deep);
   border: 1px solid var(--color-bg-stroke);
   display: block;
@@ -673,7 +656,7 @@
 .thumbPlaceholder {
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   background: var(--color-bg-deep);
   border: 1px dashed var(--color-bg-border);
 }
@@ -682,7 +665,7 @@
   appearance: none;
   background: var(--color-bg-soft);
   border: 1px dashed var(--color-bg-stroke);
-  border-radius: var(--radius-tight-md);
+  border-radius: var(--radius-key);
   padding: 12px 8px;
   display: flex;
   flex-direction: column;
@@ -691,17 +674,17 @@
   gap: 6px;
   cursor: pointer;
   font-family: var(--font-family-ui);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-text-secondary);
   width: 100%;
   min-height: 96px;
   text-align: center;
   transition:
-    border-color var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease,
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    border-color var(--motion-duration-exit) ease,
+    color var(--motion-duration-exit) ease,
+    background var(--motion-duration-exit) ease,
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .tileAdd:hover {
@@ -720,7 +703,7 @@
   line-height: 1.55;
   color: var(--color-brand-text-secondary);
   background: var(--color-bg-soft);
-  border-radius: var(--radius-tight-sm);
+  border-radius: var(--radius-ctl);
   border: 1px dashed var(--color-bg-stroke);
   text-align: center;
 }
@@ -754,7 +737,7 @@
   background: var(--color-bg-soft);
   border: 1px solid var(--color-bg-stroke);
   overflow: hidden;
-  transition: border-color var(--motion-duration-fast) ease;
+  transition: border-color var(--motion-duration-exit) ease;
 }
 
 .groupChipRow:hover {
@@ -790,7 +773,7 @@
   top: 4px;
   bottom: 4px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-ctl);
   pointer-events: none;
 }
 
@@ -834,11 +817,11 @@
   font-size: 12px;
   cursor: pointer;
   transition:
-    border-color var(--motion-duration-fast) ease,
-    color var(--motion-duration-fast) ease,
-    background var(--motion-duration-fast) ease,
-    transform var(--motion-duration-fast) ease,
-    box-shadow var(--motion-duration-fast) ease;
+    border-color var(--motion-duration-exit) ease,
+    color var(--motion-duration-exit) ease,
+    background var(--motion-duration-exit) ease,
+    transform var(--motion-duration-exit) ease,
+    box-shadow var(--motion-duration-exit) ease;
 }
 
 .groupChipAdd:hover {
@@ -853,7 +836,7 @@
   gap: 2px;
   margin-left: 4px;
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-tick);
 }
 
 .groupChipName {
@@ -862,14 +845,14 @@
 
 .groupChipCount {
   font-family: var(--font-family-mono);
-  font-size: 10px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-text-muted);
   font-feature-settings: "tnum", "zero";
 }
 
 .groupChipLevel {
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   color: var(--color-brand-green);
   font-feature-settings: "tnum", "zero";
   font-weight: 600;
@@ -934,7 +917,7 @@
 .tileEyebrow,
 .sceneTitle,
 .cueMetaLabel {
-  font-size: var(--operator-font-size-2xs, 9px);
+  font-size: var(--operator-font-size-2xs, var(--font-size-tick));
 }
 
 .headCount,
@@ -945,13 +928,13 @@
 .groupChipDelta,
 .groupChipCount,
 .cueMeta {
-  font-size: var(--operator-font-size-xs, 10px);
+  font-size: var(--operator-font-size-xs, var(--font-size-tick));
 }
 
 .tileMeta,
 .groupChipLevel,
 .sceneSubtitle {
-  font-size: var(--operator-font-size-sm, 11px);
+  font-size: var(--operator-font-size-sm, var(--font-size-tick));
 }
 
 .emptyText,

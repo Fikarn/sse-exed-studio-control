@@ -28,9 +28,12 @@ export function AudioInspectorChannelHeader({
   selectedMixTarget,
   viewModel,
 }: AudioInspectorChannelHeaderProps) {
+  // Production readiness S15: spans, not divs — this renders inside the plate
+  // head's `<p>`, where a `<div>` is invalid markup (React warned about it in
+  // every development build). Both classes lay the spans out as blocks.
   return (
     <>
-      <div className={styles.inspectorEyebrowRow}>
+      <span className={styles.inspectorEyebrowRow}>
         <span>
           Channel · {channelTypeLabel(selectedChannel.role)} {channelOrdinalLabel(viewModel, selectedChannel)}
         </span>
@@ -40,12 +43,13 @@ export function AudioInspectorChannelHeader({
             {selectedGroup}
           </span>
         </span>
-      </div>
-      <h2 className={styles.inspectorTitle}>{selectedChannel.name}</h2>
-      <div className={styles.inspectorSubtitle}>
+      </span>
+      {/* Visual overhaul A, Slice 4c: the plate head prints the name, so this
+          is the line under it — what the strip is and where it goes. */}
+      <span className={styles.inspectorSubtitle}>
         {channelRoutingSourceText(selectedChannel.role)} · {selectedChannel.stereo ? "Stereo" : "Mono"} →{" "}
         <strong>{selectedMixTarget?.name ?? "No output"}</strong>
-      </div>
+      </span>
     </>
   );
 }

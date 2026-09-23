@@ -1,0 +1,75 @@
+# cargo-deny policy for the native workspace (production readiness 2026-09,
+# Slice 12 — finding F17). Run it with `npm run supply-chain:cargo`; CI runs the
+# same four checks in the `supply-chain` job of `.github/workflows/dev-checks.yml`.
+#
+# Every exception in this file carries its reason. An advisory is ignored only
+# as `{ id = "…", reason = "… review by YYYY-MM-DD" }`, the date at most 90 days
+# out; `scripts/check-deny-ignores.mjs` fails the job once it has passed, so an
+# exception is a decision with a date on it and never a permanent mute.
+
+[graph]
+# What is built anywhere: the two operator targets and the Linux runners that
+# compile and test every push. The Android, iOS and wasm arms of the Tauri tree
+# are never compiled here and are left out of every check.
+targets = [
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+]
+# `dev-fixtures`, `ts-rs` and `test-bridge` are built by the lanes, so their
+# crates are part of what the checks see.
+all-features = true
+
+[advisories]
+# A vulnerability or an unsound crate anywhere in the tree fails. An
+# `unmaintained` notice fails only for a crate this workspace depends on
+# directly: the ones deep inside Tauri's GTK and URL-pattern chains
+# (`proc-macro-error`, the `unic-*` family) have no upgrade to take and are
+# upstream's to replace; a direct dependency going unmaintained is ours.
+unmaintained = "workspace"
+unsound = "all"
+yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 `VariantStrIter` is unsound; the fix is glib 0.20, which Tauri 2's GTK3 stack (gtk 0.18) cannot take. Linux only: compiled on the CI runners, never in the Windows or macOS bundles the operator runs, and nothing here iterates a GVariant string array. review by 2026-12-15" },
+]
+
+[licenses]
+confidence-threshold = 0.8
+# Written from `cargo deny list` and then cut down to what the check needs: a
+# crate offered under `MIT OR Apache-2.0 OR …` is satisfied by the first two,
+# so the LGPL arm of `r-efi` and the 0BSD / CC0 / MIT-0 / Unlicense arms of
+# other dual-licensed crates are deliberately not listed.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    # target-lexicon (build-time, through system-deps on the Linux runners).
+    "Apache-2.0 WITH LLVM-exception",
+    # brotli, alloc-no-stdlib, alloc-stdlib: Tauri's asset compression.
+    "BSD-3-Clause",
+    # cssparser, cssparser-macros, selectors, dtoa-short (Tauri's HTML and CSS
+    # handling) and option-ext (dirs). File-level copyleft: met by using the
+    # crates unmodified from crates.io, which is all this workspace does.
+    "MPL-2.0",
+    # The ICU4X crates behind `url` / `idna`, and unicode-ident's data tables.
+    "Unicode-3.0",
+    # foldhash (hashbrown's default hasher).
+    "Zlib",
+]
+
+[bans]
+# Tauri's tree carries several generations of `windows-sys`, `syn`, `toml` and
+# friends; duplicates are reported, not refused.
+multiple-versions = "warn"
+# A `*` requirement in one of our own manifests would let any version in. The
+# version-less path dependency on `studio-control-protocol` is the one allowed
+# form, and only because the three crates are `publish = false`.
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+# crates.io only: no git dependency and no other registry.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

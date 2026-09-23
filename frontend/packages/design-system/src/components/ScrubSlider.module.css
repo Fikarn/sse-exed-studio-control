@@ -1,7 +1,8 @@
 /* ScrubSlider — custom horizontal slider with fine/coarse modifier support
    and a value chip on the right. Track + thumb are positioned in CSS so
    the underlying tone (CCT gradient, plain bg) is composable via
-   `trackClassName`. */
+   `trackClassName` — which paints the bar, so a tone override belongs on
+   `.track::before`, not on the target column itself. */
 
 .wrapper {
   display: flex;
@@ -16,16 +17,32 @@
   pointer-events: none;
 }
 
+/* Visual overhaul A, Slice 11 (system §10: every enabled target is at least
+   24 px on its short side). The track was its own 14 px pointer target — a
+   third of a fingertip, and the thinnest thing the operator is asked to drag
+   anywhere in the app. The answer is the Slider's own: the element the pointer
+   hits is the full column the bar sits in, and the bar is painted inside it.
+   The negative margin gives that column back to the layout, so the row keeps
+   the height it had and nothing on the plate moves. */
 .track {
   position: relative;
   flex: 1 1 auto;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-bg-stroke);
+  height: 24px;
+  margin-block: -5px;
+  /* No paint of its own — this only shapes the focus ring around the column. */
+  border-radius: var(--radius-pill);
   cursor: ew-resize;
   outline: none;
   touch-action: none;
+}
+
+.track::before {
+  content: "";
+  position: absolute;
+  inset: 5px 0;
+  border-radius: 999px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-bg-stroke);
 }
 
 .track:focus-visible {
@@ -39,7 +56,7 @@
 
 .fill {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 5px auto 5px 0;
   background: linear-gradient(90deg, var(--color-brand-green-soft), var(--color-brand-green));
   border-radius: 999px;
   pointer-events: none;
@@ -88,7 +105,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-family-mono);
-  font-size: 9px;
+  font-size: var(--font-size-tick);
   letter-spacing: 0;
   color: var(--color-brand-text-muted);
   pointer-events: none;
@@ -98,7 +115,7 @@
 .valueText {
   flex-shrink: 0;
   font-family: var(--font-family-mono);
-  font-size: 11px;
+  font-size: var(--font-size-tick);
   font-variant-numeric: tabular-nums;
   color: var(--color-brand-text-primary);
   min-width: 4ch;

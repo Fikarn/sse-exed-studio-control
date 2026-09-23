@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-import { Surface } from "./Surface";
 import styles from "./Dialog.module.css";
 
 const FOCUSABLE_SELECTOR = [
@@ -29,6 +28,10 @@ function getFocusableElements(container: HTMLElement) {
   );
 }
 
+// Visual overhaul A, Slice 3 (system §5 level +3, §9): a dialog is a plate
+// that floats over the scrim with the one large blur, a 24 px title, the
+// sentence in body type and sentence-case verbs on keys. Focus moves in on
+// mount, stays inside on Tab, and returns on unmount; Escape closes.
 export function Dialog({ actions, body, children, className, labelledBy, onClose, title }: DialogProps) {
   const generatedTitleId = useId();
   const titleId = labelledBy ?? generatedTitleId;
@@ -84,15 +87,15 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
 
   return createPortal(
     <div className={styles.overlay} role="presentation">
-      <Surface
+      <section
         aria-labelledby={titleId}
         aria-modal="true"
         className={className ? `${styles.dialog} ${className}` : styles.dialog}
-        padding="lg"
+        data-level="float"
+        data-material="plate"
         ref={dialogRef}
         role="dialog"
         tabIndex={-1}
-        tone="raised"
       >
         <h2 className={styles.title} id={titleId}>
           {title}
@@ -100,7 +103,7 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
         {body ? <p className={styles.body}>{body}</p> : null}
         {children}
         {actions ? <div className={styles.footer}>{actions}</div> : null}
-      </Surface>
+      </section>
     </div>,
     document.body
   );

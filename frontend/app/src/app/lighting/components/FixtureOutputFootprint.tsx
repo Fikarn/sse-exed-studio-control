@@ -133,7 +133,7 @@ export function FixtureOutputFootprint({
             x={0}
             y={rectHeight + 48}
             textAnchor="middle"
-            fontSize={10}
+            fontSize={12}
             fontWeight={600}
             letterSpacing={0}
             pointerEvents="none"
@@ -197,7 +197,7 @@ export function FixtureOutputFootprint({
           x={0}
           y={length + 22}
           textAnchor="middle"
-          fontSize={10}
+          fontSize={12}
           fontWeight={600}
           letterSpacing={0}
           pointerEvents="none"

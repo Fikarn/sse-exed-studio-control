@@ -37,7 +37,7 @@ export function PlanningTimeReportOverlay({
               {loading ? "Loading…" : formatPlanningDuration(report?.totalSeconds ?? 0)}
             </div>
             <p className={planningStyles.planningTimeReportSubtitle}>
-              Total tracked time across the current planning dataset.
+              Total tracked time across every project in Planning.
             </p>
           </div>
           <Button variant="ghost" onClick={onClose}>
@@ -76,7 +76,9 @@ export function PlanningTimeReportOverlay({
                 </div>
               ))
             ) : (
-              <div className={planningStyles.planningTimeReportEmpty}>No time tracked yet.</div>
+              <div className={planningStyles.planningTimeReportEmpty}>
+                No time tracked yet. Close this and start a timer on a task.
+              </div>
             )}
           </section>
 
@@ -103,7 +105,9 @@ export function PlanningTimeReportOverlay({
                 </div>
               ))
             ) : (
-              <div className={planningStyles.planningTimeReportEmpty}>No time tracked yet.</div>
+              <div className={planningStyles.planningTimeReportEmpty}>
+                No time tracked yet. Close this and start a timer on a task.
+              </div>
             )}
           </section>
         </div>

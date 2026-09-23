@@ -20,7 +20,7 @@
 
   .strip::-webkit-scrollbar-thumb {
     background: var(--color-bg-stroke);
-    border-radius: 3px;
+    border-radius: var(--radius-ctl);
   }
 
   .chip {
@@ -34,8 +34,8 @@
     height: 24px;
     padding: 0 4px 0 10px;
     transition:
-      border-color var(--motion-duration-fast) ease,
-      background var(--motion-duration-fast) ease;
+      border-color var(--motion-duration-exit) ease,
+      background var(--motion-duration-exit) ease;
   }
 
   .chip:hover {
@@ -52,10 +52,14 @@
     cursor: pointer;
     display: inline-flex;
     font-family: var(--font-family-ui);
-    font-size: 11px;
+    font-size: var(--font-size-tick);
     gap: 6px;
     padding: 0;
-    height: 100%;
+    /* Visual overhaul A, Slice 11 (system §10: 24 px on the short side). The
+       chip is a 24 px pill, so `height: 100%` gave its body the content box
+       inside the two hairlines — 22 px. It takes the whole pill now. */
+    height: 24px;
+    margin-block: -1px;
   }
 
   .chipBody:focus-visible {
@@ -68,7 +72,7 @@
     color: var(--color-brand-text-muted);
     font-family: var(--font-family-mono);
     font-feature-settings: "tnum", "zero";
-    font-size: 10px;
+    font-size: var(--font-size-tick);
   }
 
   .chipAccent {

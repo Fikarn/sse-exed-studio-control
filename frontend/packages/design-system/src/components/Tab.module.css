@@ -1,0 +1,71 @@
+@layer components {
+  .tab {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-key);
+    background: none;
+    color: var(--text-text2);
+    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      color var(--motion-duration-state) var(--motion-easing-mech),
+      border-color var(--motion-duration-state) var(--motion-easing-mech);
+  }
+
+  .tab:hover {
+    color: var(--text-text);
+  }
+
+  .tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .active {
+    color: var(--text-text);
+    background: var(--elevation-key-fill);
+    border-color: var(--material-line);
+    box-shadow: var(--elevation-plate);
+  }
+
+  .tab[aria-disabled="true"] {
+    opacity: 0.55;
+    border-style: dashed;
+    border-color: var(--material-line2);
+    cursor: not-allowed;
+  }
+
+  .icon {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  .icon > svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .hint {
+    font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+    color: var(--text-text2);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-ctl);
+    padding: 2px 4px;
+  }
+
+  /* Fallback layouts below the studio surface (not a deliverable, plan D4):
+     the hints go first so the four tabs still fit. */
+  @media (max-width: 1919px) {
+    .hint {
+      display: none;
+    }
+  }
+}

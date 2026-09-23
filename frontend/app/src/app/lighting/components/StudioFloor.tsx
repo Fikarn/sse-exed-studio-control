@@ -68,7 +68,7 @@ export function StudioFloor({ layout }: StudioFloorProps) {
               <text
                 x={w / 2}
                 y={d / 2 + 4}
-                fontSize={10}
+                fontSize={12}
                 textAnchor="middle"
                 style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
               >
@@ -94,7 +94,7 @@ export function StudioFloor({ layout }: StudioFloorProps) {
           />
           <text
             y={20}
-            fontSize={10}
+            fontSize={12}
             textAnchor="middle"
             style={{ fill: TEXT_MUTED, fontFamily: "var(--font-family-ui)" }}
           >

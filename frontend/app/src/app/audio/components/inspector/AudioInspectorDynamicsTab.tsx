@@ -135,7 +135,10 @@ export function AudioInspectorDynamicsTab({
         </span>
         <span>
           <small>Makeup</small>
-          <strong>+{selectedChannel.dynamics.compressor.makeupDb.toFixed(1)} dB</strong>
+          <strong>
+            {selectedChannel.dynamics.compressor.makeupDb >= 0 ? "+" : "-"}
+            {Math.abs(selectedChannel.dynamics.compressor.makeupDb).toFixed(1)} dB
+          </strong>
         </span>
       </div>
       <div className={eqStyles.graphRangeRow} data-testid="audio-dynamics-range">

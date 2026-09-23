@@ -1,17 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
-import { ConfirmDialog, ContextMenu, type ContextMenuItem } from "@sse/design-system";
+import { ConfirmDialog, ContextMenu, ShellRegion, type ContextMenuItem } from "@sse/design-system";
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
-import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
+import {
+  AUDIO_COMPACT_DENSITY_MAX_WIDTH,
+  AUDIO_ARM_TIMEOUT_MS,
+  AUDIO_DRAFT_CLEAR_MS,
+  AUDIO_RECALL_PULSE_MS,
+} from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
 import { useAudioKeyboardShortcuts } from "./hooks/useAudioKeyboardShortcuts";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
 import { useAudioPaletteRegistration } from "./hooks/useAudioPaletteRegistration";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
-import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
+import { AUDIO_FADER_UNITY, type AudioDensityMode, type AudioFeedbackTone } from "./audioFormatting";
+import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
 import {
   audioChannelSupportsPhase,
   buildAudioViewModel,
@@ -19,13 +25,12 @@ import {
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
 } from "./audioViewModel";
-import { AudioHealthBar } from "./components/AudioHealthBar";
-import { AudioInspector, type InspectorTab } from "./components/AudioInspector";
+import { AudioCluster } from "./components/AudioCluster";
+import { AudioFooter } from "./components/AudioFooter";
+import { AudioInspector, type PlateSection } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
-import { AudioMonitorBar } from "./components/AudioMonitorBar";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
-import { AudioTopBar } from "./components/AudioTopBar";
 import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
@@ -58,6 +63,7 @@ type AudioDynamicsUpdate = Parameters<ShellStore["updateAudioChannelDynamics"]>[
 type AudioEqUpdate = Parameters<ShellStore["updateAudioChannelEq"]>[0];
 type AudioSendModeUpdate = Parameters<ShellStore["updateAudioChannelSendMode"]>[0];
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
+type AudioTalkbackHold = Parameters<ShellStore["holdAudioTalkback"]>[0];
 type AudioSettingsUpdate = Parameters<ShellStore["updateAudioSettings"]>[0];
 
 interface AudioContextMenuState {
@@ -82,8 +88,6 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "software-playback": [],
 };
 
-const AUDIO_DENSITY_MODE = "desktop";
-
 // Console redesign themes (Studio / Graphite / Bone) — applied via the
 // `data-audio-theme` attribute on the shell; CSS in AudioWorkspace.module.css
 // overrides Audio's private token family per theme. Slice 3c: the active theme
@@ -92,6 +96,10 @@ const AUDIO_DENSITY_MODE = "desktop";
 // anywhere carries the mixer along — the dark-chrome/light-mixer seam is closed.
 export type AudioTheme = "studio" | "graphite" | "bone";
 
+// Slice 8 (system §9): a write the desk did not take has one way out, and
+// every message that reports one names it.
+const SYNC_HINT = "Press Sync from TotalMix to pull the current state.";
+
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
   const { register } = usePalette();
   const [activeChannelGroups, setActiveChannelGroups] =
@@ -99,6 +107,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [bankIndex, setBankIndex] = useState(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
+  // 2026-09 audit remediation, Slice 4: what the last recall pushed and what
+  // the console confirmed, incl. the 48V differences that need arming.
+  const [recallReport, setRecallReport] = useState<AudioRecallReport | null>(null);
   const [recentlyRecalledSnapshotId, setRecentlyRecalledSnapshotId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
@@ -108,14 +119,27 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const draftStore = draftStoreRef.current;
   const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("channel");
+  // Visual overhaul A, Slice 4c: the plate shows every section at once, so this
+  // is no longer which tab is open but which section an accelerator last asked
+  // to see. The token makes the same key twice move the plate twice.
+  const [revealSection, setRevealSection] = useState<PlateSection | null>(null);
+  const [revealToken, setRevealToken] = useState(0);
+  const revealPlateSection = useLiveCallback((section: PlateSection) => {
+    setRevealSection(section);
+    setRevealToken((token) => token + 1);
+  });
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
   // Slice 3c — follow the global theme rather than an audio-local state, so the
   // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
   // AudioTopBar drives the same global setter.
-  const { theme: audioTheme, setTheme: setAudioTheme } = useOperatorLayout();
-  const warningBandRef = useRef<HTMLDivElement | null>(null);
+  const { bodyWidth, theme: audioTheme } = useOperatorLayout();
+  // 2026-09 audit Slice 9 (operator decision 6): below 2200 px of operator
+  // root the Console runs at compact density — 4 inputs, 4 playback pairs, 3
+  // outputs per bank, 380 px inspector — so the 1920×1080 studio monitor never
+  // scrolls a tier sideways. The Scaled Studio Preview measures its 2560
+  // logical root and stays desktop; the layout mode (studioFull) is untouched.
+  const density: AudioDensityMode = bodyWidth < AUDIO_COMPACT_DENSITY_MAX_WIDTH ? "compact" : "desktop";
   const recallPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -134,9 +158,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       appSnapshot,
       audioSnapshot: audioSnapshotForView,
       bankIndex,
-      density: AUDIO_DENSITY_MODE,
+      density,
     });
-  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
+  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex, density]);
 
   const { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction } = useAudioArming({
     setFeedback,
@@ -190,7 +214,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       await runner();
     } catch (error) {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio action could not be completed.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The action could not be completed. Try it again, or press Sync from TotalMix to see the desk's current state.",
         tone: "error",
       });
     } finally {
@@ -225,7 +252,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     void store.updateAudioSettings(request).catch((error) => {
       clearOptimistic();
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio setting could not be updated.",
+        message:
+          error instanceof Error ? error.message : "The selection could not be saved. Click the strip or output again.",
         tone: "error",
       });
     });
@@ -234,6 +262,22 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const syncAudio = useLiveCallback(() => {
     void performAction("audio-sync", async () => {
       await store.syncAudio();
+    });
+  });
+
+  // Why (2026-09 audit remediation, Slice 1): while the audio probe has not
+  // passed, every console write is refused, so the workspace offers the probe
+  // itself as the recovery action. The transport values come from the engine
+  // snapshot so the probe targets the commissioned ports, never a guess.
+  const runAudioProbe = useLiveCallback(() => {
+    if (!audioSnapshot) return;
+    void performAction("audio-probe", async () => {
+      await store.runCommissioningCheck({
+        receivePort: audioSnapshot.receivePort,
+        sendHost: audioSnapshot.sendHost,
+        sendPort: audioSnapshot.sendPort,
+        target: "audio",
+      });
     });
   });
 
@@ -255,15 +299,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       },
       () => {
         void performAction(`audio-snapshot-${snapshotId}`, async () => {
-          await store.recallAudioSnapshot(snapshotId);
+          const result = await store.recallAudioSnapshot(snapshotId);
+          setRecallReport(parseAudioRecallReport(result));
         });
       }
     );
   });
 
-  const recallCurrentSnapshot = useLiveCallback(() => {
-    if (!viewModel?.selectedSnapshot) return;
-    recallSnapshot(viewModel.selectedSnapshot.id);
+  const dismissRecallReport = useLiveCallback(() => {
+    setRecallReport(null);
   });
 
   const captureSnapshot = useLiveCallback(() => {
@@ -271,7 +315,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     const usedSlots = new Set(viewModel.snapshots.map((snapshot) => snapshot.oscIndex));
     const slotIndex = Array.from({ length: 8 }, (_, index) => index).find((index) => !usedSlots.has(index));
     if (slotIndex === undefined) {
-      setFeedback({ message: "All audio snapshot slots are populated.", tone: "info" });
+      setFeedback({
+        message: "All eight snapshot slots are full. Save over a slot or delete one first.",
+        tone: "info",
+      });
       return;
     }
     void performAction("audio-snapshot-capture", async () => {
@@ -383,7 +430,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       armOrApplyAction(
         {
           key: `phantom:${channelId}:${phantom}`,
-          label: `${phantom ? "Enable" : "Disable"} 48V on ${channelName}`,
+          label: `${phantom ? "Enable" : "Disable"} 48 V on ${channelName}`,
           targetId: channelId,
           targetKind: "phantom",
           timeoutMs: AUDIO_ARM_TIMEOUT_MS,
@@ -392,6 +439,12 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       );
     }
   );
+
+  // A recall never pushes 48V; the report lists each difference and this is
+  // the same armed flow the inspector uses.
+  const armPhantomFromRecall = useLiveCallback((channelId: string, channelName: string, phantom: boolean) => {
+    togglePhantom({ channelId, channelName, phantom });
+  });
 
   const updateChannelEq = useLiveCallback((request: AudioEqUpdate) => {
     void performAction(`audio-channel-eq-${request.channelId}`, async () => {
@@ -402,7 +455,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitChannelEqContinuous = useLiveCallback((request: AudioEqUpdate) => {
     void store.updateAudioChannelEq(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio EQ control could not be updated.",
+        message: error instanceof Error ? error.message : `The EQ control could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -426,14 +479,23 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
+  // Talkback holds bypass performAction on purpose: a hold re-sends every
+  // 750 ms, and a heartbeat must not clear an armed action, flash the busy
+  // state or wipe feedback. Errors still surface as feedback.
+  const holdTalkback = useLiveCallback((request: AudioTalkbackHold) => {
+    void store.holdAudioTalkback(request).catch((error) => {
+      setFeedback({
+        message:
+          error instanceof Error ? error.message : "Talkback could not be changed. Release T and press it again.",
+        tone: "error",
+      });
+    });
+  });
+
   const clearAllSolo = useLiveCallback(() => {
     void performAction("audio-clear-all-solo", async () => {
       await store.clearAllAudioSolo();
     });
-  });
-
-  const clearSolo = useLiveCallback((channelId: string) => {
-    updateChannel({ channelId, solo: false });
   });
 
   const clearClips = useLiveCallback((channelId?: string) => {
@@ -454,7 +516,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitChannelContinuous = useLiveCallback((request: AudioChannelUpdate) => {
     void store.updateAudioChannel(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio control could not be updated.",
+        message: error instanceof Error ? error.message : `The control could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -463,7 +525,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const commitMixTargetContinuous = useLiveCallback((request: AudioMixTargetUpdate) => {
     void store.updateAudioMixTarget(request).catch((error) => {
       setFeedback({
-        message: error instanceof Error ? error.message : "The audio output could not be updated.",
+        message: error instanceof Error ? error.message : `The output could not be changed. ${SYNC_HINT}`,
         tone: "error",
       });
     });
@@ -506,7 +568,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     clearAllSolo,
     clearClips,
     contextMenu,
-    inspectorTab,
     nextBank,
     orderedSelectableSources,
     previousBank,
@@ -516,12 +577,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     selectChannel,
     selectOutputMixTarget,
     setContextMenu,
-    setInspectorTab,
-    syncAudio,
+    revealPlateSection,
     updateChannel,
     viewModel,
     visibleSelectableChannels,
-    warningBandRef,
   });
 
   useAudioPaletteRegistration({
@@ -566,7 +625,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         disabled: !canMutate,
         icon: Pencil,
         id: "rename",
-        label: "Rename",
+        label: "Rename channel",
         onSelect: () => renameChannel(contextMenuChannel.id, contextMenuChannel.name),
       },
     ];
@@ -597,9 +656,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   if (!viewModel) {
     return (
       <div className={styles.audioShell} data-testid="audio-workspace">
-        <section className={styles.loadingPanel}>
+        <section className={styles.loadingPanel} data-material="plate" data-level="float">
           <span className={styles.eyebrow}>Audio</span>
-          <h1>Loading audio snapshot.</h1>
+          <h1>Loading the console…</h1>
           <div className={styles.loadingGrid}>
             {Array.from({ length: 16 }, (_, index) => (
               <span key={`audio-loading-${index}`} />
@@ -614,7 +673,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     <div
       className={styles.audioShell}
       data-audio-theme={audioTheme}
-      data-density={AUDIO_DENSITY_MODE}
+      data-density={density}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
@@ -627,49 +686,58 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         </div>
       ) : null}
 
-      <AudioTopBar
-        audioTheme={audioTheme}
-        onClearAllSolo={clearAllSolo}
-        onOpenSetup={openSetup}
-        onRecallCurrentSnapshot={recallCurrentSnapshot}
-        onSelectTheme={setAudioTheme}
-        onSync={syncAudio}
-        store={store}
-        viewModel={viewModel}
-      />
+      <ShellRegion region="cluster">
+        <AudioCluster
+          armedAction={armedAction}
+          busyAction={busyAction}
+          clearDraftValueLater={clearDraftValueLater}
+          commitMixTargetContinuous={commitMixTargetContinuous}
+          draftStore={draftStore}
+          getDraftValue={getDraftValue}
+          onCaptureSnapshot={captureSnapshot}
+          onClearAllSolo={clearAllSolo}
+          onClearClips={clearClips}
+          onDeleteSnapshot={deleteSnapshot}
+          onHoldTalkback={holdTalkback}
+          onOpenSetup={openSetup}
+          onRecallSnapshot={recallSnapshot}
+          onRenameSnapshot={renameSnapshot}
+          onRunAudioProbe={runAudioProbe}
+          onSaveSnapshot={saveSnapshot}
+          onSelectMixTarget={selectMixTarget}
+          onSync={syncAudio}
+          onUpdateMixTarget={updateMixTarget}
+          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
+          setDraftValue={setDraftValue}
+          viewModel={viewModel}
+        />
+      </ShellRegion>
+
+      <ShellRegion region="footer">
+        <AudioFooter viewModel={viewModel} />
+      </ShellRegion>
 
       <div className={styles.audioBody}>
         <AudioSignalCanvas
           armedAction={armedAction}
-          busyAction={busyAction}
           clearDraftValueLater={clearDraftValueLater}
           commitChannelContinuous={commitChannelContinuous}
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          onOpenChannelMenu={openChannelContextMenu}
-          onClearAllSolo={clearAllSolo}
           onClearClips={clearClips}
-          onClearSolo={clearSolo}
-          onCaptureSnapshot={captureSnapshot}
-          onDeleteSnapshot={deleteSnapshot}
-          onOpenSetup={openSetup}
-          onRecallSnapshot={recallSnapshot}
-          onRenameSnapshot={renameSnapshot}
-          onSaveSnapshot={saveSnapshot}
+          onOpenChannelMenu={openChannelContextMenu}
+          recallReport={recallReport}
+          onDismissRecallReport={dismissRecallReport}
+          onArmPhantomFromRecall={armPhantomFromRecall}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}
           onSelectMixTarget={selectMixTarget}
           onSelectOutputMixTarget={selectOutputMixTarget}
-          onSync={syncAudio}
-          onTogglePeakHold={togglePeakHold}
-          onResetPeakHolds={resetPeakHolds}
+          onTogglePhantom={togglePhantom}
           setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}
           onUpdateMixTarget={updateMixTarget}
-          peakHoldEnabled={peakHoldEnabled}
-          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
-          statusWarningRef={warningBandRef}
           store={store}
           viewModel={viewModel}
         />
@@ -681,9 +749,15 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          activeTab={inspectorTab}
-          onActiveTabChange={setInspectorTab}
+          onRenameChannel={(channelId) => {
+            const channel = viewModel.channels.find((entry) => entry.id === channelId);
+            if (channel) renameChannel(channel.id, channel.name);
+          }}
+          onResetPeakHolds={resetPeakHolds}
           onSelectMixTarget={selectMixTarget}
+          onTogglePeakHold={togglePeakHold}
+          revealSection={revealSection}
+          revealToken={revealToken}
           setDraftValue={setDraftValue}
           onUpdateChannelDynamics={updateChannelDynamics}
           onUpdateChannelEq={updateChannelEq}
@@ -697,8 +771,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           viewModel={viewModel}
         />
       </div>
-
-      <AudioMonitorBar onUpdateMixTarget={updateMixTarget} viewModel={viewModel} />
 
       <AudioMeterCanvasOverlay
         peakHoldEnabled={peakHoldEnabled}
@@ -724,23 +796,21 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           initialValue={textDialog.currentName}
           onCancel={() => setTextDialog(null)}
           onConfirm={confirmTextDialog}
-          title={textDialog.kind === "snapshot" ? "Rename Audio Snapshot" : "Rename Audio Channel"}
+          title={textDialog.kind === "snapshot" ? "Rename snapshot" : "Rename channel"}
         />
       ) : null}
 
       {deleteSnapshotDialog ? (
         <ConfirmDialog
-          body={`Delete "${deleteSnapshotDialog.name}" from the audio snapshot list.`}
+          body={`Delete "${deleteSnapshotDialog.name}" from the snapshot slots.`}
           busy={busyAction === `audio-snapshot-delete-${deleteSnapshotDialog.id}`}
           confirmLabel="Delete"
           danger
           onCancel={() => setDeleteSnapshotDialog(null)}
           onConfirm={confirmDeleteSnapshot}
-          title="Delete Audio Snapshot"
+          title="Delete snapshot"
         />
       ) : null}
-
-      <AudioHealthBar viewModel={viewModel} />
     </div>
   );
 }

@@ -101,7 +101,7 @@ The production target is fullscreen `2560x1440` on a fixed second monitor. Retin
 For built-in-display development, use the scaled studio preview workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
 
 - run the app with `npm run tauri:dev`
-- open `⌘K` and run `Studio Preview: Enter 2560x1440 Review`
+- open the command palette (`Ctrl+K`, `⌘K` on macOS) and run `Studio Preview: Enter 2560x1440 Review`
 - review the proportional `2560x1440` studio canvas scaled into the current window
 - exit scaled preview before judging native compact/windowed behavior
 - keep `npm run tauri:visual:review` as the repeatable capture lane
@@ -225,6 +225,8 @@ npm run clean:local
 ```
 
 `clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It does not remove `.tools/`.
+
+Both commands keep `release/native` when a packaged app is in it — on a workstation that runs Studio Control from the repository that folder is the installed app — and say so. `npm run clean -- --include-release` removes it too, and refuses while the app is running; `--dry-run` removes nothing. Details in [DEVELOPMENT.md §4a](./DEVELOPMENT.md).
 
 ## Dependency Policy
 

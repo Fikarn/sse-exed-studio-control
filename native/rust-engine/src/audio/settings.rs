@@ -23,10 +23,7 @@ pub fn update_audio_settings(
         {
             return Err(AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
-                format!(
-                    "Audio channel '{}' is not exposed by the engine.",
-                    channel_id
-                ),
+                format!("Channel '{}' is not part of this console.", channel_id),
             ));
         }
     }
@@ -39,10 +36,7 @@ pub fn update_audio_settings(
         {
             return Err(AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",
-                format!(
-                    "Audio mix target '{}' is not exposed by the engine.",
-                    mix_target_id
-                ),
+                format!("Output '{}' is not part of this console.", mix_target_id),
             ));
         }
     }
@@ -191,10 +185,7 @@ pub fn update_audio_settings(
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),
             String::new(),
         ));
-        updates.push((
-            String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-            String::from("unknown"),
-        ));
+        updates.push(confidence_setting(ConsoleConfidence::Unknown));
         updates.push((String::from(AUDIO_LAST_CONSOLE_SYNC_AT_KEY), String::new()));
         updates.push((
             String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),

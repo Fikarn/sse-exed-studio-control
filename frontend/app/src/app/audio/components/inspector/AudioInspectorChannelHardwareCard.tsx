@@ -70,9 +70,6 @@ export function AudioInspectorChannelHardwareCard({
       className={`${styles.inspectorMiniCard} ${styles.sourceCard} ${styles.inspectorStickyHardwareCard}`}
       data-testid="audio-inspector-hardware-mini"
     >
-      <span className={styles.eyebrow}>
-        {audioChannelSupportsGain(selectedChannel) ? "Mic / Line Gain" : "Software"}
-      </span>
       {audioChannelSupportsGain(selectedChannel) ? (
         <div className={styles.inspectorHardwareGrid}>
           <div className={styles.preampHero}>
@@ -108,7 +105,7 @@ export function AudioInspectorChannelHardwareCard({
           </div>
           <div className={styles.unsupportedToggleRow}>
             <button
-              aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48V on ${selectedChannel.name}`}
+              aria-label={`${selectedChannel.phantom ? "Disable" : "Enable"} 48 V on ${selectedChannel.name}`}
               aria-pressed={selectedChannel.phantom}
               data-armed={phantomArmed}
               data-active={selectedChannel.phantom}
@@ -158,8 +155,8 @@ export function AudioInspectorChannelHardwareCard({
       ) : (
         <div className={styles.softwarePanelStack}>
           <div className={styles.unavailableTelemetry} data-testid="audio-playback-telemetry-unavailable">
-            <strong>Playback telemetry not reported</strong>
-            <span>Driver buffer and latency are not exposed by the current engine snapshot.</span>
+            <strong>No playback stats from the driver</strong>
+            <span>Buffer size and latency appear here once the audio driver reports them.</span>
           </div>
           <div className={styles.detailGrid}>
             <span>

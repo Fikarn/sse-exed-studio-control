@@ -1,60 +1,123 @@
 @layer components {
+  .host {
+    container-type: inline-size;
+    min-width: 0;
+    width: 100%;
+  }
+
   .state {
     align-items: center;
-    background: var(--color-surface-default);
-    border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-sm);
+    background: var(--elevation-plate-fill);
+    border: 1px solid var(--material-line);
+    border-radius: var(--radius-screen);
+    box-shadow: var(--elevation-plate);
+    color: var(--text-text);
     display: grid;
-    gap: var(--space-4);
+    gap: 16px;
     grid-template-columns: auto minmax(0, 1fr) auto;
     min-height: 88px;
-    padding: var(--space-5);
+    padding: 20px;
+    min-width: 0;
+  }
+
+  /* Stacks to one column in a narrow host, so a title never wraps one word per line. */
+  @container (max-width: 320px) {
+    .state {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: start;
+      gap: 12px;
+      padding: 16px;
+    }
   }
 
   .icon {
-    color: var(--color-studio-300);
+    color: var(--text-text2);
     height: 24px;
     width: 24px;
+    flex: none;
+  }
+
+  .lampSlot {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .copy {
     display: grid;
-    gap: var(--space-1);
+    gap: 4px;
     min-width: 0;
   }
 
   .title {
-    color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--operator-font-size-title-sm, var(--font-size-lg)) / 1.2
-      var(--font-family-display);
-    letter-spacing: 0;
+    color: var(--text-text);
+    font: 600 var(--font-size-value) / 1.2 var(--font-family-ui);
   }
 
   .message {
-    color: var(--color-studio-400);
-    font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-sm)) / 1.4 var(--font-family-ui);
-    letter-spacing: 0;
+    color: var(--text-text2);
+    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
   }
 
   .actions {
     align-items: center;
     display: inline-flex;
-    gap: var(--space-2);
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .empty {
     border-style: dashed;
+    border-color: var(--material-line2);
   }
 
-  /* DES-07: tokenized off the raw Tailwind amber rgba() literals onto the shared
-     semantic warning token (matching .degraded .icon below) so the degraded wash
-     and border theme across Studio/Graphite/Bone. */
   .degraded {
-    background: color-mix(in srgb, var(--color-warning-500) 8%, transparent);
-    border-color: color-mix(in srgb, var(--color-warning-500) 30%, transparent);
+    border-color: var(--role-amber-text);
   }
 
   .degraded .icon {
-    color: var(--color-accent-amber);
+    color: var(--role-amber-text);
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px;
+    border-radius: var(--radius-screen);
+    border: 1px solid var(--material-line);
+    background: var(--material-bay);
+    box-shadow: var(--elevation-bay);
+  }
+
+  .fill {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .loadingLabel {
+    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  .skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .bone {
+    display: block;
+    height: var(--row-height, 40px);
+    border-radius: var(--radius-key);
+    background: var(--material-panel);
+    border: 1px solid var(--material-line);
+  }
+
+  .fill .bone:last-child {
+    flex: 1;
   }
 }

@@ -18,12 +18,91 @@
     }
   }
 
+  /* Visual overhaul A, Slice 7: the cluster and the footer are the shell's;
+     what is left here is the bay with the step screen on it and the Support
+     plate beside it. */
   .workspaceStack {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--setup-plate-width, 416px);
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .bay {
     display: flex;
     flex-direction: column;
-    gap: var(--space-4);
+    gap: 12px;
     min-height: 0;
-    padding: var(--space-4);
+    min-width: 0;
+    padding: 16px;
+    background: var(--material-bay);
+    box-shadow: var(--elevation-bay);
+    overflow-y: auto;
+  }
+
+  .bayTitle {
+    flex: none;
+    font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--text-text);
+  }
+
+  .bayDetail {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--text-text2);
+  }
+
+  .bayShortcuts {
+    flex: none;
+  }
+
+  .plateColumn {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    border-left: 1px solid var(--material-line);
+    background: linear-gradient(180deg, var(--material-panel-top), var(--material-panel));
+  }
+
+  /* One probe as the step screen records it: the row, what it says, and the
+     key that runs it again. */
+  .probeRecord {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Below the studio surface the Support plate gives the bay its width back;
+     Support is one press away on the cluster, and the bay shows it in full
+     (A-setup.html's 1280 board hides the inspector for the same reason). */
+  :global([data-operator-layout-root][data-chrome="compact"]) .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  :global([data-operator-layout-root][data-chrome="compact"]) .plateColumn {
+    display: none;
+  }
+
+  :global([data-operator-layout-root][data-chrome="compact"]) .bayShortcuts {
+    display: none;
+  }
+
+  :global([data-operator-layout-root][data-chrome="compact"]) .bay {
+    gap: 8px;
+    padding: 10px;
   }
 
   .degradedBanner,
@@ -34,19 +113,13 @@
     justify-content: space-between;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--color-surface-800) 94%, transparent),
-        color-mix(in srgb, var(--color-surface-700) 92%, transparent)
-      ),
-      radial-gradient(
-        circle at top right,
-        color-mix(in srgb, var(--color-primary-500) 12%, transparent),
-        transparent 56%
-      );
+    /* 2026-09 production readiness, Slice 14: the band is on system A's material
+       now, the one the design system's StatusBand is made of. It carried a pre-A
+       gradient pair that no board ever showed, so nothing measured it until
+       Slice 11's held-state case pressed a key that raises it. */
+    border: 1px solid var(--color-surface-border);
+    border-radius: var(--radius-key);
+    background: var(--color-surface-raised);
   }
 
   .degradedBanner {
@@ -74,7 +147,7 @@
 
   .supportPrompt {
     color: var(--color-text-subtle);
-    font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-md)) / 1 var(--font-family-mono);
+    font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-body)) / 1 var(--font-family-mono);
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -84,7 +157,7 @@
   .dialogBody {
     margin: 0;
     color: var(--color-text-muted);
-    font: var(--font-weight-regular) var(--font-size-md) / 1.6 var(--font-family-ui);
+    font: var(--font-weight-regular) var(--font-size-body) / 1.6 var(--font-family-ui);
   }
 
   .bannerActions,
@@ -102,7 +175,7 @@
   .selectionLabel,
   .sideLabel {
     color: var(--color-text-subtle);
-    font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+    font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
     letter-spacing: 0;
     text-transform: uppercase;
   }
@@ -127,55 +200,22 @@
     gap: var(--space-3);
   }
 
-  .stepButton,
   .pageTab,
   .backupRow,
   .deckButton,
   .dialChip,
   .railButton {
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-screen);
     background: color-mix(in srgb, var(--color-surface-800) 92%, transparent);
     color: inherit;
-    font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
     transition:
-      transform var(--motion-duration-fast) ease,
-      border-color var(--motion-duration-fast) ease,
-      background-color var(--motion-duration-fast) ease,
-      box-shadow var(--motion-duration-fast) ease;
-  }
-
-  .stepButton {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    text-align: left;
-  }
-
-  .stepButton[data-active="true"] {
-    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--color-primary-500) 18%, transparent),
-        color-mix(in srgb, var(--color-primary-500) 5%, transparent)
-      ),
-      var(--color-surface-raised);
-    transform: translateY(-1px);
-    box-shadow: 0 12px 32px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
-  }
-
-  /* S14 — Bone: the 42% primary border over the active wash computed 1.70:1
-     (sub-perceptible). 80% restores a ~3:1 supplementary keyline (3.35 vs the
-     active wash, 4.27 vs the panel). Bone-only; Studio 2.26 / Graphite 2.46
-     stay as-shipped. */
-  :global([data-theme="bone"]) .stepButton[data-active="true"] {
-    border-color: color-mix(in srgb, var(--color-primary-500) 80%, transparent);
-  }
-
-  .stepButton[data-status="error"] {
-    border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
+      transform var(--motion-duration-exit) ease,
+      border-color var(--motion-duration-exit) ease,
+      background-color var(--motion-duration-exit) ease,
+      box-shadow var(--motion-duration-exit) ease;
   }
 
   .stepNumber {
@@ -187,11 +227,11 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
     color: var(--color-primary-500);
-    font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-mono);
+    font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
   }
 
   .stepLabel {
-    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
   }
 
@@ -203,7 +243,7 @@
   .supportInfoList,
   .pathRow {
     color: var(--color-text-muted);
-    font: var(--font-weight-regular) var(--font-size-sm) / 1.5 var(--font-family-ui);
+    font: var(--font-weight-regular) var(--font-size-tick) / 1.5 var(--font-family-ui);
   }
 
   .runnerBody {
@@ -278,28 +318,39 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* Visual overhaul A, Slice 7: a field on the step screen is the screen's own
+     material, so its label and value read with the display inks in every theme
+     (they used to print a display ink on a light chassis panel in Bone). */
   .field,
   .checkCard,
   .selectionCard,
   .restoreHighlight,
   .sideRow {
     display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--display-text) 20%, transparent);
+    border-radius: var(--radius-key);
+    background: transparent;
+    color: var(--display-text);
+  }
+
+  .field > span:first-child {
+    color: var(--display-text2);
+    font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .textField {
     width: 100%;
-    min-height: var(--size-control-height);
-    padding: 0 var(--space-4);
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-pill);
-    background: color-mix(in srgb, var(--color-surface-900) 92%, transparent);
-    color: var(--color-text-strong);
-    font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-sm)) / 1 var(--font-family-ui);
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid color-mix(in srgb, var(--display-text) 24%, transparent);
+    border-radius: var(--radius-ctl);
+    background: transparent;
+    color: var(--display-text);
+    font: 600 var(--font-size-name) / 1 var(--font-family-mono);
     letter-spacing: 0;
   }
 
@@ -321,7 +372,8 @@
   .checkTitle,
   .selectionTitle,
   .dialogTitle {
-    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-display);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3
+      var(--font-family-display);
     color: var(--color-text-strong);
     letter-spacing: 0;
   }
@@ -388,9 +440,10 @@
 
   .deckButton[data-selected="true"] {
     border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+    /* Slice 9 (system §5): a selected key is marked by its edge. */
     box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 22%, transparent),
-      0 16px 36px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+      var(--elevation-key),
+      0 0 0 1px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
   }
 
   .deckButton[data-echo="true"],
@@ -409,7 +462,7 @@
   .deckButton small,
   .backupRow small {
     color: var(--color-text-subtle);
-    font: var(--font-weight-medium) var(--font-size-sm) / 1.4 var(--font-family-mono);
+    font: var(--font-weight-medium) var(--font-size-tick) / 1.4 var(--font-family-mono);
   }
 
   .dialRow {
@@ -439,7 +492,7 @@
 
   .backupRow strong {
     display: block;
-    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-md)) / 1.3 var(--font-family-mono);
+    font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-mono);
     color: var(--color-text-strong);
     letter-spacing: 0;
   }
@@ -447,8 +500,8 @@
   .backupRow:hover {
     /* SET-12: the transition above declared border/transform but no :hover
        existed — adopt the recovery surface's recipe. */
-    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
-    transform: translateY(-1px);
+    /* Slice 9 (system §6): hover changes an edge, never a position. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 46%, var(--color-border-default));
   }
 
   .supportGrid {
@@ -470,13 +523,13 @@
     gap: 6px;
     padding: var(--space-3);
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-screen);
     background: color-mix(in srgb, var(--color-surface-700) 94%, transparent);
   }
 
   .supportInfoList strong {
     color: var(--color-text-strong);
-    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-sm)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
   }
 
@@ -485,16 +538,16 @@
     border-radius: var(--radius-pill);
     background: transparent;
     color: var(--color-text-muted);
-    font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-mono);
+    font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
     letter-spacing: 0;
   }
 
   .railButton:hover {
     /* SET-12: converged on the recovery surface's hover recipe
        (.setupIncidentRailButton:hover) — primary-over-border mix + lift. */
-    border-color: color-mix(in srgb, var(--color-primary-500) 30%, var(--color-border-default));
+    /* Slice 9 (system §6): hover changes an edge, never a position. */
+    border-color: color-mix(in srgb, var(--color-primary-500) 46%, var(--color-border-default));
     color: var(--color-text-strong);
-    transform: translateY(-1px);
   }
 
   .railButton:disabled {
@@ -517,7 +570,7 @@
   .emptyState {
     padding: var(--space-4);
     border: 1px dashed var(--color-border-default);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-screen);
     text-align: center;
   }
 

@@ -10,8 +10,12 @@ pub fn update_audio_mix_target(
     db_path: &Path,
     request: &AudioMixTargetUpdateRequest,
 ) -> Result<AudioMixTargetSnapshot, AudioCommandError> {
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
+    // Every mix-target field (level, mute, dim, mono, talkback) is a console
+    // write, so the whole request passes the console gate first.
+    ensure_audio_action_allowed(db_path, &snapshot)?;
 
     let outcome = update_default_audio_mix_target(
         &resolve_audio_config(&app_settings),
@@ -43,7 +47,7 @@ pub fn update_audio_mix_target(
             AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",
                 format!(
-                    "Audio mix target '{}' is not exposed by the engine.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 ),
             )
@@ -74,10 +78,6 @@ pub fn update_audio_mix_target(
                 serialize_json_state(&mix_target_state)?,
             ),
             (
-                String::from(AUDIO_CONSOLE_STATE_CONFIDENCE_KEY),
-                String::from("aligned"),
-            ),
-            (
                 String::from(AUDIO_LAST_ACTION_STATUS_KEY),
                 String::from("succeeded"),
             ),
@@ -85,6 +85,17 @@ pub fn update_audio_mix_target(
             (String::from(AUDIO_LAST_ACTION_MESSAGE_KEY), outcome.summary),
         ],
     )?;
+
+    // Talkback is momentary on every surface (2026-09 audit, Slice 6): any
+    // caller that turns it on arms the watchdog, any caller that turns it off
+    // clears it, so nothing can latch talkback by construction.
+    if let Some(talkback) = request.talkback {
+        if talkback {
+            super::talkback::arm_talkback_hold(db_path, &request.mix_target_id);
+        } else {
+            super::talkback::clear_talkback_hold(db_path, &request.mix_target_id);
+        }
+    }
 
     let refreshed = read_audio_snapshot(&load_audio_settings(db_path)?);
     refreshed
@@ -95,7 +106,7 @@ pub fn update_audio_mix_target(
             AudioCommandError::Rejected(
                 "AUDIO_MIX_TARGET_NOT_FOUND",
                 format!(
-                    "Audio mix target '{}' is not exposed by the engine.",
+                    "Output '{}' is not part of this console.",
                     request.mix_target_id
                 ),
             )

@@ -1,0 +1,30 @@
+@layer components {
+  .lamp {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--material-line2);
+    flex: none;
+  }
+
+  .ok {
+    background: var(--role-green-text);
+    box-shadow: var(--elevation-lamp-green);
+  }
+
+  .attention {
+    background: var(--role-amber-text);
+    box-shadow: var(--elevation-lamp-amber);
+  }
+
+  .error {
+    background: var(--role-red-text);
+    box-shadow: var(--elevation-lamp-red);
+  }
+
+  .info {
+    background: var(--role-blue-text);
+    box-shadow: var(--elevation-lamp-blue);
+  }
+}

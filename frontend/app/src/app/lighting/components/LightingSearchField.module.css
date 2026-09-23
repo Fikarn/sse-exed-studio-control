@@ -1,0 +1,85 @@
+/* Visual overhaul A, Slice 5: the cluster's search well and the float that
+   hangs the recently recalled scenes under it. */
+
+.search {
+  position: relative;
+  flex: none;
+  min-width: 0;
+}
+
+.input {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-ctl);
+  background: var(--material-well);
+  color: var(--display-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.input::placeholder {
+  color: var(--display-text2);
+}
+
+.recents {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-key);
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-float);
+}
+
+.recentsHead {
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.recentOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
+  background: transparent;
+  color: var(--text-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.recentOption[aria-selected="true"] {
+  border-color: var(--role-amber-line);
+  background: var(--role-amber-fill-top);
+  color: var(--role-amber-ink);
+}
+
+.recentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recentMeta {
+  flex: none;
+  color: var(--text-text2);
+  font-size: var(--font-size-tick);
+}
+
+.recentOption[aria-selected="true"] .recentMeta {
+  color: var(--role-amber-ink);
+}

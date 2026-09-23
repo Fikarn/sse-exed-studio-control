@@ -1,0 +1,181 @@
+@layer components {
+  /* ---- horizontal ---- */
+  .slider {
+    position: relative;
+    height: 34px;
+    min-width: 120px;
+    border-radius: var(--radius-key);
+    background: var(--material-well);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-well);
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .slider:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .track {
+    position: absolute;
+    left: 17px;
+    right: 17px;
+    top: 50%;
+    height: 4px;
+    margin-top: -2px;
+    background: var(--material-line2);
+    border-radius: var(--radius-pill);
+  }
+
+  .cct .track {
+    height: 8px;
+    margin-top: -4px;
+    background: var(--signal-cct-track);
+  }
+
+  .unity {
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    margin-left: -1px;
+    left: calc(17px + var(--slider-unity, 0.8172) * (100% - 34px));
+    background: var(--display-text);
+  }
+
+  .cap {
+    position: absolute;
+    top: 3px;
+    width: 34px;
+    height: 26px;
+    left: calc(var(--slider-value, 0) * (100% - 34px));
+    border-radius: var(--radius-ctl);
+    background: var(--elevation-cap-fill);
+    box-shadow: var(--elevation-cap);
+  }
+
+  .cap::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    bottom: 4px;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--role-cap-line);
+  }
+
+  .doubt {
+    border: 1px dashed var(--display-amber);
+  }
+
+  .locked {
+    cursor: not-allowed;
+  }
+
+  .locked .cap,
+  .locked .grooveCap {
+    background: transparent;
+    border: 2px dashed var(--role-cap-fill);
+    box-shadow: none;
+    opacity: 0.55;
+  }
+
+  .locked .cap::after,
+  .locked .grooveCap::after {
+    display: none;
+  }
+
+  .locked .unity,
+  .locked .grooveUnity {
+    opacity: 0.4;
+  }
+
+  /* ---- vertical: the groove ---- */
+  .groove {
+    position: relative;
+    width: 44px;
+    min-height: 120px;
+    flex: 1;
+    cursor: ns-resize;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .groove:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-key);
+  }
+
+  .grooveWell {
+    position: absolute;
+    left: 13px;
+    right: 13px;
+    top: 0;
+    bottom: 0;
+    border-radius: var(--radius-key);
+    background: var(--material-well);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-well);
+  }
+
+  .travel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 14px;
+    bottom: 14px;
+  }
+
+  .slot {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--material-line2);
+  }
+
+  .grooveUnity {
+    position: absolute;
+    left: 9px;
+    right: 9px;
+    height: 2px;
+    margin-bottom: -1px;
+    bottom: calc(var(--slider-unity, 0.8172) * 100%);
+    background: var(--display-text);
+  }
+
+  .grooveCap {
+    position: absolute;
+    left: 50%;
+    width: 44px;
+    height: 26px;
+    margin-left: -22px;
+    bottom: calc(var(--slider-value, 0) * 100%);
+    transform: translateY(50%);
+    border-radius: var(--radius-ctl);
+    background: var(--elevation-cap-fill);
+    box-shadow: var(--elevation-cap);
+  }
+
+  .grooveCap::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    background: var(--role-cap-line);
+  }
+
+  .groove.doubt .grooveCap {
+    outline: 2px dashed var(--display-amber);
+    outline-offset: 2px;
+  }
+}

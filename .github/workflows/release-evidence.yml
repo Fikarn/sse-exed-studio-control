@@ -1,0 +1,210 @@
+name: release-evidence
+
+# Production readiness 2026-09, Slice 12 (findings F17 and F03, decision D2).
+#
+# A `v*` tag — or a manual run — builds the packaged bundle on a clean Windows
+# and a clean macOS runner and keeps, as workflow artifacts: the bundle archive,
+# its SHA256 manifest, and CycloneDX SBOMs of what the bundle carries (the npm
+# packages in the web assets, the crates in the engine, the crates in the shell).
+#
+# What this workflow does NOT do, on purpose:
+# - it publishes nothing. No GitHub Release is created or edited and nothing is
+#   uploaded anywhere but this run's artifacts (`contents: read` is the whole
+#   permission set). Publishing stays `npm run release:publish`, run by the
+#   operator from the workstation (docs/RELEASE.md).
+# - it builds no installer. QtIFW is not on a GitHub runner; the offline
+#   installers and the update repositories stay workstation-built.
+# - it restores no build cache. A release build starts from the lockfiles and
+#   nothing else, so the evidence is of a from-scratch build.
+#
+# Signing is wired and dormant (D2). The signing step runs on every run; with no
+# certificate secret it prints why it skipped and exits 0, and the summary says
+# the bundle is unsigned. It has never run with a certificate: the first run
+# after the secrets are added is its first test (docs/RELEASE.md, "Release
+# evidence"; the ledger's Appendix B item 7).
+#
+# A tag that ends in `-evidence` (`v0.0.0-evidence`) is a rehearsal: it skips
+# the check that the tag matches `package.json` and the changelog.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  # The version of the SBOM generator the job installs. `--locked` takes its
+  # own Cargo.lock, so the pin covers its whole tree.
+  CARGO_CYCLONEDX_VERSION: "0.5.9"
+
+# Two runs for the same ref are both evidence; neither cancels the other.
+concurrency:
+  group: release-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    name: bundle (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows
+            os: windows-latest
+            lane: win
+            archive: SSE-ExEd-Studio-Control-Native-windows.zip
+            manifest: SSE-ExEd-Studio-Control-Native-windows-SHA256.txt
+          - target: macos
+            os: macos-14
+            lane: mac
+            archive: SSE-ExEd-Studio-Control-Native-macOS.zip
+            manifest: SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          # setup-node caches npm downloads by itself as soon as package.json
+          # names a `packageManager`. It does not today; "no cache" should not
+          # depend on that staying true.
+          package-manager-cache: false
+
+      - name: Rust toolchain from native/rust-toolchain.toml
+        working-directory: native
+        run: |
+          # rustup >= 1.28 installs what the toolchain file names; an older
+          # rustup does it on the first cargo call below. No third-party action.
+          rustup toolchain install || true
+          cargo --version
+          rustc -vV
+
+      - run: npm ci
+
+      - name: Release metadata matches the tag
+        if: github.ref_type == 'tag' && !endsWith(github.ref_name, '-evidence')
+        run: npm run release:check
+
+      - run: npm run native:engine:build
+      - run: npm run tauri:build
+      - name: Package the bundle
+        run: npm run native:package:${{ matrix.lane }}:local
+
+      # --- signing (D2: wired, dormant until the secrets exist) ---------------
+      - name: Signing posture
+        id: signing
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.SSE_WINDOWS_SIGN_CERT_BASE64 }}
+          MACOS_IDENTITY: ${{ secrets.SSE_MACOS_CODESIGN_IDENTITY }}
+        run: |
+          if [ "${{ matrix.target }}" = "windows" ]; then
+            secret="SSE_WINDOWS_SIGN_CERT_BASE64"; value="$WINDOWS_CERTIFICATE"
+          else
+            secret="SSE_MACOS_CODESIGN_IDENTITY"; value="$MACOS_IDENTITY"
+          fi
+          if [ -n "$value" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            line="Signing: enabled — the secret $secret is set."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            line="Signing: SKIPPED — the secret $secret is not set, so this bundle is UNSIGNED. Signing stays dormant until certificates exist (decision D2; docs/RELEASE.md, Release evidence)."
+          fi
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Import the macOS signing certificate into a throwaway keychain
+        if: matrix.target == 'macos' && steps.signing.outputs.enabled == 'true'
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.SSE_MACOS_SIGN_CERT_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.SSE_MACOS_SIGN_CERT_PASSWORD }}
+        run: |
+          if [ -z "$CERTIFICATE_BASE64" ] || [ -z "$CERTIFICATE_PASSWORD" ]; then
+            echo "SSE_MACOS_CODESIGN_IDENTITY is set but SSE_MACOS_SIGN_CERT_BASE64 / SSE_MACOS_SIGN_CERT_PASSWORD are not: a runner has no keychain to find the identity in." >&2
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/sse-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          echo "$CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/sse-signing.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/sse-signing.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain"
+          security list-keychain -d user -s "$keychain"
+          rm -f "$RUNNER_TEMP/sse-signing.p12"
+
+      - name: Locate signtool
+        if: matrix.target == 'windows' && steps.signing.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe was not found under the Windows SDK." }
+          "SSE_WINDOWS_SIGNTOOL_PATH=$($signtool.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # Runs on every run. Without the secrets the script prints why it skipped
+      # and exits 0 — that skip is the dormant path, exercised each time.
+      # `--bundle-only`: the shell, the engine and the bundle archive; there is
+      # no installer on a runner.
+      - name: Sign the bundle (skips without a certificate)
+        env:
+          SSE_WINDOWS_SIGN_CERT_BASE64: ${{ secrets.SSE_WINDOWS_SIGN_CERT_BASE64 }}
+          SSE_WINDOWS_SIGN_CERT_PASSWORD: ${{ secrets.SSE_WINDOWS_SIGN_CERT_PASSWORD }}
+          SSE_WINDOWS_SIGN_TIMESTAMP_URL: ${{ secrets.SSE_WINDOWS_SIGN_TIMESTAMP_URL }}
+          SSE_MACOS_CODESIGN_IDENTITY: ${{ secrets.SSE_MACOS_CODESIGN_IDENTITY }}
+          SSE_MACOS_NOTARY_APPLE_ID: ${{ secrets.SSE_MACOS_NOTARY_APPLE_ID }}
+          SSE_MACOS_NOTARY_PASSWORD: ${{ secrets.SSE_MACOS_NOTARY_PASSWORD }}
+          SSE_MACOS_NOTARY_TEAM_ID: ${{ secrets.SSE_MACOS_NOTARY_TEAM_ID }}
+        run: npm run native:sign:${{ matrix.lane }}:bundle
+
+      # --- checksums (after signing: signing rebuilds the archive) ------------
+      - name: SHA256 manifest
+        run: npm run native:checksums:${{ matrix.lane }}:staged-write
+      - name: The manifest matches the archive
+        working-directory: release/native/${{ matrix.target }}
+        run: |
+          manifest="../../checksums/${{ matrix.target }}/${{ matrix.manifest }}"
+          cat "$manifest"
+          if command -v sha256sum > /dev/null; then sha256sum -c "$manifest"; else shasum -a 256 -c "$manifest"; fi
+
+      # --- SBOMs ----------------------------------------------------------------
+      - name: Install the SBOM generators
+        run: |
+          cargo install cargo-cyclonedx --locked --version "$CARGO_CYCLONEDX_VERSION"
+          npm run native:sbom:tools:install
+      - name: CycloneDX SBOMs
+        run: npm run native:sbom:${{ matrix.lane }}:write
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        run: |
+          {
+            echo ""
+            echo "### release evidence · ${{ matrix.target }}"
+            echo ""
+            echo "- ref \`${{ github.ref }}\` at \`${{ github.sha }}\` (${{ github.event_name }})"
+            echo "- $(cd native && rustc --version) · node $(node --version) · npm $(npm --version)"
+            echo "- nothing was published: the artifact \`release-evidence-${{ matrix.target }}\` of this run is the only output"
+            echo ""
+            echo '```'
+            cat "release/checksums/${{ matrix.target }}/${{ matrix.manifest }}" 2> /dev/null || echo "(no checksum manifest was written)"
+            ls -l "release/sbom/${{ matrix.target }}" 2> /dev/null || echo "(no SBOM was written)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ matrix.target }}
+          path: |
+            release/native/${{ matrix.target }}/${{ matrix.archive }}
+            release/checksums/${{ matrix.target }}/
+            release/sbom/${{ matrix.target }}/
+          if-no-files-found: error
+          retention-days: 30

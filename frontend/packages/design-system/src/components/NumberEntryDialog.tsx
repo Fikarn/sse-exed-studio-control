@@ -7,7 +7,7 @@ import styles from "./NumberEntryDialog.module.css";
 export interface NumberEntryDialogProps {
   /** Disables the form while a commit is in flight. */
   busy?: boolean;
-  /** Confirm-button label. Defaults to "Set". */
+  /** Confirm-button label. Defaults to "Set value". */
   confirmLabel?: string;
   /** Visible label for the number field. */
   fieldLabel: string;
@@ -39,7 +39,7 @@ export interface NumberEntryDialogProps {
  */
 export function NumberEntryDialog({
   busy = false,
-  confirmLabel = "Set",
+  confirmLabel = "Set value",
   fieldLabel,
   initialValue,
   max,
@@ -113,6 +113,7 @@ export function NumberEntryDialog({
         </div>
         <small>
           {min} to {max}
+          {suffix ? ` ${suffix}` : ""}
         </small>
       </form>
     </Dialog>

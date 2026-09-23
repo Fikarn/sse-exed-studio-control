@@ -1,0 +1,249 @@
+@layer components {
+  .key {
+    appearance: none;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border-radius: var(--radius-key);
+    background: var(--elevation-key-fill);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-key);
+    color: var(--text-text);
+    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      border-color var(--motion-duration-press) var(--motion-easing-mech),
+      color var(--motion-duration-press) var(--motion-easing-mech);
+  }
+
+  /* Hover changes an edge, never a position (system §6). */
+  .key:hover {
+    border-color: var(--material-line2);
+  }
+
+  .key:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .tall {
+    min-height: 64px;
+  }
+
+  .small {
+    min-height: 28px;
+    padding: 0 10px;
+    font-size: var(--font-size-label);
+  }
+
+  .stack {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cap {
+    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
+    text-transform: uppercase;
+  }
+
+  .tall .cap {
+    font-size: var(--font-size-word);
+  }
+
+  .label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hint {
+    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    color: var(--text-text2);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .key kbd {
+    font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+    color: var(--text-text2);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-ctl);
+    padding: 2px 4px;
+  }
+
+  /* Engaged: the lit amber fill with its bloom. */
+  .engaged {
+    background: var(--elevation-key-lit-amber-fill);
+    border-color: var(--role-amber-ink);
+    color: var(--role-amber-ink);
+    box-shadow: var(--elevation-key-lit-amber);
+  }
+
+  .engaged .hint,
+  .engaged kbd {
+    color: var(--role-amber-ink);
+    border-color: var(--role-amber-ink);
+  }
+
+  /* Live: the lit green fill, for exactly the hold. */
+  .live {
+    background: var(--elevation-key-lit-green-fill);
+    border-color: var(--role-green-ink);
+    color: var(--role-green-ink);
+    box-shadow: var(--elevation-key-lit-green);
+  }
+
+  .live .hint,
+  .live kbd {
+    color: var(--role-green-ink);
+    border-color: var(--role-green-ink);
+  }
+
+  .primary {
+    background: linear-gradient(180deg, var(--role-primary-fill-top), var(--role-primary-fill));
+    color: var(--role-primary-ink);
+    border-color: transparent;
+    box-shadow: var(--elevation-key-primary);
+  }
+
+  .primary .hint,
+  .primary kbd {
+    color: var(--role-primary-ink);
+    border-color: var(--role-primary-ink);
+  }
+
+  /* Danger: a red keyline, never a red fill at rest; at most one per surface. */
+  .danger {
+    color: var(--role-red-text);
+    border-color: var(--role-red-text);
+  }
+
+  .danger:hover {
+    border-color: var(--role-red-text);
+  }
+
+  /* Hazard: 48 V on is a red lamp and word on a dark key. */
+  .hazard {
+    color: var(--role-red-text);
+    font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  }
+
+  .hazardLamp {
+    width: 7px;
+    height: 7px;
+  }
+
+  /* Locked: the engine refuses it — the form changes, not only the opacity. */
+  .locked {
+    opacity: 0.55;
+    background: transparent;
+    box-shadow: none;
+    border-style: dashed;
+    border-color: var(--material-line2);
+    cursor: not-allowed;
+  }
+
+  .locked:hover {
+    border-color: var(--material-line2);
+  }
+
+  /* Segmented: a well holding transparent keys; the lit one is the choice. */
+  .segmented {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    border-radius: var(--radius-screen);
+    background: var(--material-well);
+    border: 1px solid var(--material-line);
+    box-shadow: var(--elevation-well);
+  }
+
+  .segmented .key {
+    flex: 1;
+    min-height: 40px;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--display-text);
+  }
+
+  .segmented .key .cap {
+    font-size: var(--font-size-body);
+  }
+
+  .segmented .engaged {
+    background: var(--elevation-key-lit-amber-fill);
+    color: var(--role-amber-ink);
+    box-shadow: var(--elevation-key-lit-amber);
+  }
+
+  .segmented .locked {
+    border: 1px dashed transparent;
+  }
+
+  .segmented .locked[data-engaged] {
+    border-color: var(--role-amber-text);
+    color: var(--role-amber-text);
+    background: transparent;
+    box-shadow: none;
+  }
+
+  /* Armed: the key becomes a well with an amber keyline, the tag and the bar. */
+  .armed {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    overflow: hidden;
+    padding: 8px 12px 14px;
+    border: 2px solid var(--display-amber);
+    background: var(--material-well);
+    color: var(--display-text);
+    box-shadow: var(--elevation-key-armed);
+  }
+
+  .armedTag {
+    font: 600 var(--font-size-tick) / 1 var(--font-family-ui);
+    color: var(--display-amber);
+  }
+
+  .armedLabel {
+    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+  }
+
+  .countdown {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 4px;
+    width: 100%;
+    background: var(--display-amber);
+    box-shadow: var(--elevation-bar);
+    transform-origin: left;
+    animation: aArmCountdown var(--arm-duration, 4500ms) linear forwards;
+    pointer-events: none;
+  }
+
+  @keyframes aArmCountdown {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .countdown {
+      animation: none;
+      transform: scaleX(1);
+      opacity: 0.6;
+    }
+  }
+}

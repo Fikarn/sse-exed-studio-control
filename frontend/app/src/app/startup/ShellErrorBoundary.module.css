@@ -1,0 +1,12 @@
+/* 2026-09 production readiness, Slice 9: the root boundary's page stands where
+   the whole shell stood, so it takes the window itself. Everything on it is the
+   pre-ready state display; this only gives that display a window to fill. */
+
+.page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--material-bay);
+  color: var(--text-text);
+}

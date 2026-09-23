@@ -27,7 +27,7 @@
   .value {
     color: var(--metric-value-color, var(--color-studio-050));
     font-family: var(--font-family-mono);
-    font-size: var(--operator-font-size-lg, var(--font-size-md));
+    font-size: var(--operator-font-size-lg, var(--font-size-body));
     font-variant-numeric: var(--metric-value-numeric, normal);
     font-weight: 600;
     letter-spacing: 0;

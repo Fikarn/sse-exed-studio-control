@@ -2,7 +2,18 @@
    The cursor change + subtle underline signal that the label is interactive
    while leaving the rest of the form layout untouched. */
 
+/* Visual overhaul A, Slice 11 (system §10: every enabled target is at least
+   24 px on its short side). A scrub label is a `role="slider"` the operator
+   drags, but it was only as tall as its own 12 px line — 18 px. It gets the
+   same target column the ScrubSlider's bar gets, paid for with a matching
+   negative margin so the field it labels keeps its spacing. The column grows
+   upward only — into the gap above the label rather than into the input below
+   it — which also leaves the dashed underline exactly where it was, tight
+   under the text. */
 .label {
+  display: inline-block;
+  padding-block: 6px 0;
+  margin-block: -6px 0;
   cursor: ew-resize;
   user-select: none;
   border-bottom: 1px dashed transparent;

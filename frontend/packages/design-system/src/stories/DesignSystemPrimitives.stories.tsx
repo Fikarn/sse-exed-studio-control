@@ -19,6 +19,10 @@ import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { Crest } from "../components/Crest";
 import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
 import { EmptyState, DegradedState } from "../components/OperationalState";
+import { Footer } from "../components/Footer";
+import { Lamp } from "../components/Lamp";
+import { LampChip } from "../components/LampChip";
+import { Tab } from "../components/Tab";
 import { HealthBar } from "../components/HealthBar";
 import { IconButton } from "../components/IconButton";
 import { InspectorPanel, InspectorSection } from "../components/InspectorPanel";
@@ -143,9 +147,9 @@ function PrimitiveConsoleBoard() {
         />
 
         <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <MetricCard caption="Protocol" tone="ready" value="v1" />
-          <MetricCard caption="Audio" tone="connected" value="OSC live" />
-          <MetricCard caption="Lighting" tone="warning" value="2 notes" />
+          <MetricCard caption="Protocol" tone="ok" value="v1" />
+          <MetricCard caption="Audio" tone="ok" value="OSC live" />
+          <MetricCard caption="Lighting" tone="attention" value="2 notes" />
         </div>
 
         <MeterBridge
@@ -168,7 +172,7 @@ function PrimitiveConsoleBoard() {
           ]}
           rows={[
             {
-              cells: { address: "1-6", fixture: "Key Astra", state: <StatusBadge label="ready" tone="ready" /> },
+              cells: { address: "1-6", fixture: "Key Astra", state: <StatusBadge label="ready" tone="ok" /> },
               id: "fixture-key",
               tone: "ready",
             },
@@ -176,13 +180,13 @@ function PrimitiveConsoleBoard() {
               cells: {
                 address: "7-18",
                 fixture: "Infinibar PB12",
-                state: <StatusBadge label="warning" tone="warning" />,
+                state: <StatusBadge label="warning" tone="attention" />,
               },
               id: "fixture-bar",
               tone: "warning",
             },
             {
-              cells: { address: "19-26", fixture: "Apollo Bridge", state: <StatusBadge label="idle" tone="idle" /> },
+              cells: { address: "19-26", fixture: "Apollo Bridge", state: <StatusBadge label="idle" tone="neutral" /> },
               id: "fixture-bridge",
               tone: "muted",
             },
@@ -193,7 +197,7 @@ function PrimitiveConsoleBoard() {
       <InspectorPanel
         actions={<IconButton icon={WandSparkles} label="Run local preview" />}
         eyebrow="Inspector"
-        status={<StatusBadge label="degraded" tone="degraded" />}
+        status={<StatusBadge label="degraded" tone="attention" />}
         title="Selected workspace"
       >
         <InspectorSection title="Dense list rows">
@@ -318,7 +322,7 @@ export const DirectionDHealthBar: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hint={{ kbd: "?", label: "Shortcuts" }}
+        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),
@@ -338,7 +342,7 @@ export const DirectionDHealthBarDirty: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hint={{ kbd: "?", label: "Shortcuts" }}
+        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),
@@ -501,5 +505,60 @@ export const DirectionDEmptyStateAction: StoryObj<typeof meta> = {
         />
       </div>
     </div>
+  ),
+};
+
+// Visual overhaul A, Slice 2: the shell primitives — the tab, the lamp, the
+// header chip and the footer — as the A-system-sheet specimen draws them.
+export const AShellTabs: StoryObj<typeof meta> = {
+  name: "A · Tab row",
+  render: () => (
+    <div style={{ display: "flex", gap: 4 }}>
+      <Tab id="setup" label="Setup / Support" hint="Ctrl+1" />
+      <Tab id="lighting" label="Lighting" hint="Ctrl+2" />
+      <Tab id="audio" label="Audio" hint="Ctrl+3" active />
+      <Tab id="planning" label="Planning" hint="Ctrl+4" disabled />
+    </div>
+  ),
+};
+
+export const AShellLamps: StoryObj<typeof meta> = {
+  name: "A · Lamps and lamp chips",
+  render: () => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <Lamp tone="ok" />
+        <Lamp tone="attention" />
+        <Lamp tone="error" />
+        <Lamp tone="info" />
+        <Lamp tone="off" />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <LampChip label="Lighting" word="ok" tone="ok" />
+        <LampChip label="Audio" word="not verified" tone="attention" />
+        <LampChip label="Surface" word="failed" tone="error" />
+        <LampChip label="Solo" word="1" tone="attention" latch />
+      </div>
+    </div>
+  ),
+};
+
+export const AShellFooter: StoryObj<typeof meta> = {
+  name: "A · Footer",
+  render: () => (
+    <Footer
+      items={[
+        { label: "Console", value: "confirmed · 42 values" },
+        { label: "Metering", value: "RME · live" },
+        { label: "Last sync", value: "18:24" },
+        { label: "Bank", value: "all 13 strips" },
+      ]}
+      hints={[
+        { kbd: "Ctrl+K", label: "Palette" },
+        { kbd: "?", label: "Shortcuts" },
+        { kbd: ["[", "]"], label: "Bank" },
+        { kbd: "T", label: "hold to talk" },
+      ]}
+    />
   ),
 };

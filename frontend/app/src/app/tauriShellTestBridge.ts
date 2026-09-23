@@ -5,6 +5,15 @@ import type { JsonValue, ShellState, ShellStore } from "@sse/engine-client";
 
 import { exportShellDiagnostics } from "./shellCommands";
 
+/**
+ * How often the bridge rewrites its status file whatever the shell state does
+ * (2026-09 production readiness, Slice 4 — finding F07). Every write is an
+ * IPC call the shell answers on its main thread, so a qualification lane can
+ * watch that thread stay free while a request the engine takes seconds to
+ * answer is in flight.
+ */
+const SHELL_TEST_BRIDGE_HEARTBEAT_MS = 250;
+
 interface ShellTestBridgeConfig {
   commandPath?: string | null;
   statusPath?: string | null;
@@ -12,6 +21,8 @@ interface ShellTestBridgeConfig {
 
 interface EngineSummary {
   binary_path?: string;
+  generation?: number;
+  pid?: number;
   protocol?: string;
   running?: boolean;
 }
@@ -41,6 +52,7 @@ function buildDiagnosticsReport(shellState: ShellState) {
   return {
     activeWorkspace: shellState.activeWorkspace,
     appSnapshot: toJsonValue(shellState.appSnapshot),
+    backgroundFailures: toJsonValue(shellState.backgroundFailures),
     commissioningSnapshot: toJsonValue(shellState.commissioningSnapshot),
     controlSurfaceSnapshot: toJsonValue(shellState.controlSurfaceSnapshot),
     healthSnapshot: toJsonValue(shellState.healthSnapshot),
@@ -59,10 +71,15 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
     case "exportCompanionConfig":
       return store.exportCompanionConfig(typeof command.baseUrl === "string" ? command.baseUrl : undefined);
     case "exportShellDiagnostics":
-      return exportShellDiagnostics(
-        buildDiagnosticsReport(shellState),
-        typeof command.directory === "string" ? command.directory : undefined
-      );
+      // A directory of the lane's own goes through the test-bridge command;
+      // the production command writes to the app-data exports folder only
+      // (2026-09 production readiness, Slice 4 — finding F15).
+      return typeof command.directory === "string"
+        ? invoke<string>("shell_test_bridge_export_diagnostics_to", {
+            directory: command.directory,
+            report: buildDiagnosticsReport(shellState),
+          })
+        : exportShellDiagnostics(buildDiagnosticsReport(shellState));
     case "exportSupportBackup":
       return store.exportSupportBackup();
     case "refresh":
@@ -76,6 +93,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("restoreSupportBackup requires a path.");
       }
       return store.restoreSupportBackup(command.path);
+    case "verifySupportBackup":
+      if (typeof command.path !== "string" || !command.path.trim()) {
+        throw new Error("verifySupportBackup requires a path.");
+      }
+      return store.verifySupportBackup(command.path);
     case "runCommissioningCheck":
       if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
         throw new Error("runCommissioningCheck requires a request object.");
@@ -155,6 +177,11 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("setLightingGroupPower requires boolean on.");
       }
       return store.setLightingGroupPower(command.groupId, command.on);
+    case "setLightingOutputArmed":
+      if (typeof command.armed !== "boolean") {
+        throw new Error("setLightingOutputArmed requires boolean armed.");
+      }
+      return store.setLightingOutputArmed(command.armed);
     case "syncAudio":
       return store.syncAudio();
     case "togglePlanningTaskComplete":
@@ -201,6 +228,8 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
   const [config, setConfig] = useState<ShellTestBridgeConfig | null>(null);
   const [engineSummary, setEngineSummary] = useState<EngineSummary | null>(null);
   const [lastCommand, setLastCommand] = useState<ShellTestCommandResult | null>(null);
+  const [heartbeat, setHeartbeat] = useState(0);
+  const [cspViolations, setCspViolations] = useState<Record<string, JsonValue>[]>([]);
   const latestShellStateRef = useRef(shellState);
   const processedCommandIdRef = useRef<string | null>(null);
   const commandInFlightRef = useRef(false);
@@ -253,18 +282,67 @@ export function useTauriShellTestBridge(shellState: ShellState, store: ShellStor
     };
   }, [config?.statusPath, shellState.lifecycle, shellState.lastEvent]);
 
+  useEffect(() => {
+    if (!config?.statusPath || !tauriAvailable()) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setHeartbeat((tick) => tick + 1);
+    }, SHELL_TEST_BRIDGE_HEARTBEAT_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [config?.statusPath]);
+
+  // Content Security Policy violations reach the status file, so a packaged
+  // build running under the policy (finding F15) can be checked for anything
+  // it fails to load: the webview reports a blocked image, font or script
+  // only here. The last twenty are kept.
+  useEffect(() => {
+    if (!tauriAvailable()) {
+      return;
+    }
+
+    const onViolation = (event: SecurityPolicyViolationEvent) => {
+      setCspViolations((list) => [
+        ...list.slice(-19),
+        {
+          blockedUri: event.blockedURI,
+          directive: event.effectiveDirective,
+          line: event.lineNumber,
+          sourceFile: event.sourceFile,
+        },
+      ]);
+    };
+    document.addEventListener("securitypolicyviolation", onViolation);
+
+    return () => {
+      document.removeEventListener("securitypolicyviolation", onViolation);
+    };
+  }, []);
+
   const statusPayload = useMemo(
     () => ({
       capturedAt: new Date().toISOString(),
       shellState: serializeShellState(shellState),
       testBridge: {
         commandPath: config?.commandPath ?? null,
+        cspViolations,
+        // 2026-09 production readiness, Slice 5 (finding F09): the engine's
+        // process id and launch number, so a lane can end the process from
+        // outside and watch the shell notice, report ENGINE_EXITED and
+        // restart it.
+        engineGeneration: engineSummary?.generation ?? null,
+        enginePid: engineSummary?.pid ?? null,
         engineSummary: toJsonValue(engineSummary),
+        heartbeat,
         lastCommand,
         statusPath: config?.statusPath ?? null,
       },
     }),
-    [config?.commandPath, config?.statusPath, engineSummary, lastCommand, shellState]
+    [config?.commandPath, config?.statusPath, cspViolations, engineSummary, heartbeat, lastCommand, shellState]
   );
 
   useEffect(() => {

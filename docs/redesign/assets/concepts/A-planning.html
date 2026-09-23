@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="en" data-theme="studio">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Planning · Concept A — Cockpit · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         PLANNING in Concept A's language (Cockpit).
+         Cluster (424 px): the day's state display (ON TIME / SLIPPED with the
+         counts), the running timers as live keys, the view switch (Timeline |
+         Board) and the day, the five projects, the standing actions. Bay: the
+         timeline 09:00–22:00 as a backlit screen — one lane per project, a card per
+         task at its start time with its duration drawn as a bar, the now marker,
+         the unscheduled tray. Plate (416 px): the selected task. Material v2.
+         ?theme=studio|graphite|bone
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint,
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.live .hint,
+      .key.live kbd {
+        color: var(--green-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.primary kbd {
+        color: var(--primary-ink);
+        border-color: currentColor;
+        opacity: 0.85;
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tracked {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 8px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+        padding: 0 4px;
+      }
+      .tracked .v {
+        font: 600 14px/1 var(--mono);
+      }
+      .tracked .total {
+        border-top: 1px solid var(--line);
+        padding-top: 8px;
+        font-weight: 600;
+      }
+      .tracked .total.v {
+        color: var(--green-text);
+      }
+      .activity {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        row-gap: 8px;
+        column-gap: 10px;
+        font: 500 14px/1.3 var(--ui);
+      }
+      .activity .t {
+        font: 600 13px/1.3 var(--mono);
+        color: var(--text-2);
+      }
+      .activity .d {
+        color: var(--text-2);
+        font-weight: 400;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab kbd {
+        padding: 2px 4px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-meta b {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .timer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 56px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+      }
+      .timer .name {
+        font: 600 15px/1.2 var(--ui);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--well-text);
+      }
+      .timer .meta {
+        grid-column: 1;
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+        margin-top: 4px;
+      }
+      .timer .key {
+        grid-row: 1 / span 2;
+        grid-column: 2;
+        min-height: 36px;
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .timer .el {
+        color: var(--green-text);
+        font: 600 15px/1 var(--mono);
+      }
+      .row2 {
+        display: flex;
+        gap: 8px;
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border-radius: var(--r12);
+        flex: 1;
+      }
+      .seg .key {
+        flex: 1;
+        min-height: 40px;
+        border-radius: var(--r8);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 14px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .day {
+        display: flex;
+        gap: 6px;
+      }
+      .day .key {
+        min-height: 40px;
+      }
+      .day .key.today {
+        flex: 1;
+      }
+      .proj {
+        display: grid;
+        grid-template-columns: 16px 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 52px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        text-align: left;
+      }
+      .proj .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .proj .meta {
+        grid-column: 2;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        margin-top: 3px;
+      }
+      .proj .st {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .proj.sel {
+        border: 2px solid var(--accent);
+      }
+      .proj .st.blocked {
+        color: var(--red-text);
+        font-weight: 600;
+      }
+      .proj .st.running {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* bay: the timeline */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .tl-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+      }
+      .tl-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .tl-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .tl-head .filters {
+        margin-left: auto;
+        display: flex;
+        gap: 4px;
+        padding: 3px;
+        border-radius: var(--r8);
+      }
+      .tl-head .filters .key {
+        min-height: 26px;
+        padding: 0 10px;
+        font-size: 13px;
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+        border-radius: var(--r4);
+      }
+      .tl-head .filters .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+      }
+      .tl-head .search {
+        height: 32px;
+        width: 280px;
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        gap: 10px;
+        font: 400 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .tl-head .search kbd {
+        margin-left: auto;
+        color: var(--well-text-2);
+        border-color: rgba(255, 255, 255, 0.28);
+      }
+      .screen {
+        flex: 1;
+        border-radius: var(--r12);
+        position: relative;
+        overflow: hidden;
+        min-height: 0;
+      }
+      .screen svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .screen text {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .screen text.lane {
+        font: 600 14px var(--ui);
+        fill: var(--well-text);
+      }
+      .screen text.lanemeta {
+        font: 500 12px var(--ui);
+        fill: var(--well-text-2);
+      }
+      .screen text.title {
+        font: 600 14px var(--ui);
+        fill: var(--well-text);
+      }
+      .screen text.meta {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .screen text.now {
+        font: 600 13px var(--mono);
+        fill: #f0b35b;
+      }
+      .screen text.run {
+        font: 600 12px var(--mono);
+        fill: #3ddc7a;
+      }
+      .screen .hour {
+        stroke: rgba(255, 255, 255, 0.08);
+      }
+      .screen .lanerule {
+        stroke: rgba(255, 255, 255, 0.12);
+      }
+      .screen .card {
+        fill: #1b1c21;
+        stroke: rgba(255, 255, 255, 0.28);
+      }
+      .screen .card.sel {
+        stroke: #f4f4f5;
+        stroke-width: 2;
+      }
+      .screen .card.blocked {
+        stroke: #ff6b6b;
+        stroke-width: 1.5;
+      }
+      .screen .bar {
+        fill: rgba(255, 255, 255, 0.5);
+      }
+      .screen .bar.run {
+        fill: #3ddc7a;
+      }
+      .screen .bar.blocked {
+        fill: #ff6b6b;
+      }
+      .screen .bar.done {
+        fill: #3ddc7a;
+        opacity: 0.6;
+      }
+      .screen .card.done {
+        fill: #141518;
+        stroke: rgba(255, 255, 255, 0.16);
+      }
+      .tray {
+        height: 88px;
+        border-radius: var(--r12);
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 16px;
+        color: var(--well-text);
+      }
+      .tray .t {
+        font: 600 14px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .tray .t span {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .tray .card {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+        min-height: 56px;
+        padding: 8px 12px;
+        border-radius: var(--r8);
+        border: 1px dashed rgba(255, 255, 255, 0.35);
+        justify-content: center;
+      }
+      .tray .card .title {
+        font: 600 14px/1 var(--ui);
+      }
+      .tray .card .meta {
+        font: 500 12px/1 var(--mono);
+        color: var(--well-text-2);
+      }
+      .tray .hint {
+        margin-left: auto;
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .tray .hint kbd {
+        color: var(--well-text-2);
+        border-color: rgba(255, 255, 255, 0.28);
+      }
+
+      /* inspector */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 44px;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .field {
+        border-radius: var(--r8);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field .v {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        font: 500 14px/1.3 var(--ui);
+      }
+      .check .box {
+        width: 20px;
+        height: 20px;
+        border-radius: var(--r4);
+        border: 1.5px solid var(--line-2);
+        display: grid;
+        place-items: center;
+        font: 600 13px/1 var(--mono);
+        flex: none;
+      }
+      .check.done .box {
+        background: var(--green);
+        color: var(--green-ink);
+        border-color: transparent;
+      }
+      .check.done {
+        color: var(--text-2);
+        text-decoration: line-through;
+      }
+      .notes {
+        border-radius: var(--r8);
+        min-height: 72px;
+        padding: 10px 12px;
+        font: 400 14px/1.4 var(--ui);
+        color: var(--well-text-2);
+      }
+      .danger {
+        margin-top: auto;
+      }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .footer .hints span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* ---- viewports ---- */
+      .short {
+        display: none;
+      }
+      #board[data-vw="1920"] {
+        grid-template-rows: 52px 1fr 36px;
+      }
+      #board[data-vw="1920"] .body {
+        grid-template-columns: 360px 1fr 360px;
+      }
+      #board[data-vw="1920"] .shell {
+        gap: 20px;
+        padding: 0 16px;
+      }
+      #board[data-vw="1920"] .cluster {
+        padding: 12px 12px 16px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .state {
+        height: 168px;
+        padding: 12px 14px;
+      }
+      #board[data-vw="1920"] .timer {
+        min-height: 50px;
+      }
+      #board[data-vw="1920"] .seg .key,
+      #board[data-vw="1920"] .day .key {
+        min-height: 36px;
+      }
+      #board[data-vw="1920"] .proj {
+        min-height: 46px;
+      }
+      #board[data-vw="1920"] .proj .meta {
+        display: none;
+      }
+      #board[data-vw="1920"] .actions .key {
+        min-height: 36px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1920"] .bay {
+        padding: 12px;
+      }
+      #board[data-vw="1920"] .tl-head .d {
+        display: none;
+      }
+      #board[data-vw="1920"] .tl-head .search {
+        width: 220px;
+      }
+      #board[data-vw="1920"] .tray {
+        height: 76px;
+      }
+      #board[data-vw="1920"] .inspector {
+        padding: 14px 12px;
+        gap: 12px;
+      }
+      #board[data-vw="1920"] .insp-head h2 {
+        font-size: 20px;
+      }
+      #board[data-vw="1920"] .footer {
+        padding: 0 16px;
+        gap: 18px;
+      }
+      #board[data-vw="1280"] {
+        grid-template-rows: 48px 1fr 32px;
+      }
+      #board[data-vw="1280"] .body {
+        grid-template-columns: 232px 1fr 0px;
+      }
+      #board[data-vw="1280"] .shell {
+        gap: 14px;
+        padding: 0 12px;
+      }
+      #board[data-vw="1280"] .shell .tabs {
+        margin-left: 4px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .shell .tab {
+        height: 32px;
+        padding: 0 10px;
+      }
+      #board[data-vw="1280"] .shell kbd,
+      #board[data-vw="1280"] .long {
+        display: none;
+      }
+      #board[data-vw="1280"] .short {
+        display: inline;
+      }
+      #board[data-vw="1280"] .lampchip {
+        height: 28px;
+        padding: 0 8px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .clock {
+        margin-left: 4px;
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .cluster {
+        padding: 8px 8px 10px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .state {
+        height: 140px;
+        padding: 10px 12px;
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .state-word {
+        font-size: 20px;
+      }
+      #board[data-vw="1280"] .state-sub {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .state-meta {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .sec {
+        gap: 6px;
+      }
+      #board[data-vw="1280"] .sec-head .title {
+        font-size: 14px;
+      }
+      #board[data-vw="1280"] .sec-head .title span {
+        display: none;
+      }
+      #board[data-vw="1280"] .timer {
+        min-height: 44px;
+        padding: 0 8px;
+        column-gap: 6px;
+      }
+      #board[data-vw="1280"] .timer .name {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .timer .meta {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .timer .key {
+        min-height: 30px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .seg {
+        padding: 3px;
+        gap: 4px;
+      }
+      #board[data-vw="1280"] .seg .key {
+        min-height: 32px;
+      }
+      #board[data-vw="1280"] .seg .key .cap {
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .day .key {
+        min-height: 32px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .sec.projects {
+        display: none;
+      }
+      #board[data-vw="1280"] .actions .key {
+        min-height: 34px;
+        font-size: 12px;
+        padding: 0 6px;
+      }
+      #board[data-vw="1280"] .actions .key kbd {
+        display: none;
+      }
+      #board[data-vw="1280"] .actions .key:last-child {
+        display: none;
+      }
+      #board[data-vw="1280"] .bay {
+        padding: 8px;
+        gap: 8px;
+      }
+      #board[data-vw="1280"] .tl-head {
+        height: 28px;
+      }
+      #board[data-vw="1280"] .tl-head .d {
+        display: none;
+      }
+      #board[data-vw="1280"] .tl-head .search {
+        width: 200px;
+        height: 28px;
+      }
+      #board[data-vw="1280"] .tl-head .filters .key {
+        min-height: 24px;
+        font-size: 12px;
+        padding: 0 8px;
+      }
+      #board[data-vw="1280"] .screen text.title {
+        font: 600 13px var(--ui);
+      }
+      #board[data-vw="1280"] .tray {
+        height: 60px;
+        padding: 0 10px;
+        gap: 10px;
+      }
+      #board[data-vw="1280"] .tray .card {
+        min-height: 44px;
+        padding: 4px 10px;
+        gap: 2px;
+      }
+      #board[data-vw="1280"] .tray .card .title {
+        font-size: 13px;
+      }
+      #board[data-vw="1280"] .tray .hint {
+        display: none;
+      }
+      #board[data-vw="1280"] .inspector {
+        display: none;
+      }
+      #board[data-vw="1280"] .footer {
+        padding: 0 12px;
+        gap: 14px;
+        font-size: 12px;
+      }
+      #board[data-vw="1280"] .footer .hints span:nth-child(n + 4) {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-planning">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>
+            <span class="long">Setup / Support</span><span class="short">Setup</span> <kbd>Ctrl 1</kbd>
+          </button>
+          <button class="tab" data-key>Lighting <kbd>Ctrl 2</kbd></button>
+          <button class="tab" data-key>Audio <kbd>Ctrl 3</kbd></button>
+          <button class="tab on" data-key>Planning <kbd>Ctrl 4</kbd></button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1</button>
+          <div class="clock">09:11</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok"></i>
+              <div class="state-word">ON TIME</div>
+            </div>
+            <div class="state-sub">Thursday 23 April · 9 tasks scheduled · 09:30 – 22:30</div>
+            <div class="state-meta">
+              0 slipped · <b>1 blocked · lighting</b> · 5 done · 2 timers running · 1 unscheduled
+            </div>
+            <div></div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Running <span>2 timers</span></div>
+            </div>
+            <div class="timer well">
+              <div class="name"><i class="lamp ok"></i>Commission Stream Deck+ · Booth 2</div>
+              <div class="meta">booth_2 · started 18:24 · <span class="el">1h 18m</span></div>
+              <button class="key" data-key data-take aria-label="Stop the timer on Commission Stream Deck+">
+                Stop
+              </button>
+            </div>
+            <div class="timer well">
+              <div class="name"><i class="lamp ok"></i>Level-match overflow</div>
+              <div class="meta">audio · started 19:00 · <span class="el">42m</span></div>
+              <button class="key" data-key data-take aria-label="Stop the timer on Level-match overflow">Stop</button>
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="seg well">
+              <button class="key on" data-key data-take><span class="cap">Timeline</span></button>
+              <button class="key" data-key data-take><span class="cap">Board</span></button>
+            </div>
+          </div>
+          <div class="day">
+            <button class="key" data-key data-take aria-label="Previous day"><span class="cap">‹</span></button>
+            <button class="key today" data-key data-take>
+              <span class="long">Today · Thursday 23 April</span><span class="short">Today · Thu 23 Apr</span>
+            </button>
+            <button class="key" data-key data-take aria-label="Next day"><span class="cap">›</span></button>
+          </div>
+
+          <div class="sec projects">
+            <div class="sec-head">
+              <div class="title">Projects <span>5 · one lane each</span></div>
+              <button class="key sm" data-key>New project</button>
+            </div>
+            <button class="key proj" data-key data-take>
+              <i class="lamp"></i><span class="name">evening_service</span
+              ><span class="meta">4 tasks · P1 · Tuesday run-of-show</span><span class="st">to do</span>
+            </button>
+            <button class="key proj sel" data-key data-take>
+              <i class="lamp amber"></i><span class="name">booth_2</span
+              ><span class="meta">2 tasks · P1 · booth deck commissioning</span
+              ><span class="st running">in progress</span>
+            </button>
+            <button class="key proj" data-key data-take>
+              <i class="lamp amber"></i><span class="name">audio</span
+              ><span class="meta">1 task · P1 · desk prep and tuning</span><span class="st running">in progress</span>
+            </button>
+            <button class="key proj" data-key data-take>
+              <i class="lamp red"></i><span class="name">lighting</span
+              ><span class="meta">1 task · P0 · fixes waiting on ops</span><span class="st blocked">blocked</span>
+            </button>
+            <button class="key proj" data-key data-take>
+              <i class="lamp"></i><span class="name">ops</span
+              ><span class="meta">2 tasks · P2 · operator maintenance</span><span class="st">to do</span>
+            </button>
+          </div>
+
+          <div class="sec tracked-sec">
+            <div class="sec-head">
+              <div class="title">Tracked today <span>by project · from the timers</span></div>
+              <button class="key sm" data-key>Time report</button>
+            </div>
+            <div class="tracked">
+              <span>booth_2</span><span class="v">1h 36m</span> <span>evening_service</span
+              ><span class="v">1h 30m</span> <span>audio</span><span class="v">42m</span> <span>ops</span
+              ><span class="v">4m</span> <span class="total">Today</span><span class="v total">3h 52m</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="key primary" data-key>New task <kbd>N</kbd></button>
+            <button class="key" data-key>Board view <kbd>B</kbd></button>
+            <button class="key" data-key>Backup</button>
+          </div>
+        </aside>
+
+        <main class="bay" data-region="timeline">
+          <div class="tl-head">
+            <span class="t">Timeline</span
+            ><span class="d"
+              >09:00 – 22:00 · one lane per project · a card sits at its start, the bar is its duration</span
+            >
+            <div class="filters well">
+              <button class="key on" data-key>All</button><button class="key" data-key>To do</button
+              ><button class="key" data-key>In progress</button><button class="key" data-key>Blocked</button
+              ><button class="key" data-key>Done</button>
+            </div>
+            <div class="search well">Search tasks and projects <kbd>Ctrl F</kbd></div>
+          </div>
+          <div class="screen well" id="screen"></div>
+          <div class="tray well">
+            <div class="t">Unscheduled <span>1 task</span></div>
+            <div class="card" data-key data-take role="button" aria-label="Archive Q3 cue library, unscheduled">
+              <span class="title">Archive Q3 cue library</span><span class="meta">ops · P3 · support</span>
+            </div>
+            <div class="hint">Drag a card onto a lane, or select it and press <kbd>S</kbd> to schedule it</div>
+          </div>
+        </main>
+
+        <aside class="inspector plate" data-region="inspector">
+          <div class="insp-head">
+            <div>
+              <h2>Commission Stream Deck+ · Booth 2</h2>
+              <div class="sub">booth_2 · in progress · P0 · control-surface</div>
+            </div>
+            <button class="key sm" data-key>Rename</button>
+          </div>
+          <div class="insp-keys">
+            <button class="key live" data-key data-take aria-label="Timer running 1h 18m, press to stop">
+              <span class="cap">Running</span><span class="hint">1h 18m · stop</span>
+            </button>
+            <button class="key" data-key data-take>Mark done</button>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Schedule</span><span class="d">today · drag the card to move it</span>
+            </div>
+            <div class="fields">
+              <div class="field well"><span class="l">Start</span><span class="v">18:24</span></div>
+              <div class="field well"><span class="l">Duration</span><span class="v">85 min</span></div>
+              <div class="field well"><span class="l">Ends</span><span class="v">19:49</span></div>
+              <div class="field well"><span class="l">Due</span><span class="v">—</span></div>
+              <div class="field well"><span class="l">Priority</span><span class="v">P0</span></div>
+              <div class="field well"><span class="l">Status</span><span class="v">in progress</span></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Checklist</span><span class="d">1 of 2 done</span></div>
+            <div class="check done"><span class="box">✓</span>Pair Booth 2 page</div>
+            <div class="check"><span class="box"></span>Verify companion trigger handoff</div>
+            <button class="key sm" data-key>Add item</button>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Notes</span><span class="d">none yet</span></div>
+            <div class="notes well">Add a note for whoever picks this up next.</div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Activity</span><span class="d">today</span></div>
+            <div class="activity">
+              <span class="t">18:24</span
+              ><span>Timer started <span class="d">· Stream Deck+ booth commissioning resumed.</span></span>
+              <span class="t">18:10</span><span>Created <span class="d">· booth_2 · P0</span></span>
+            </div>
+          </div>
+
+          <div class="danger insp-keys"><button class="key" data-key>Delete task…</button></div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Day <b>Today</b></span>
+        <span class="item">Scheduled <b>9</b></span>
+        <span class="item">Unscheduled <b>1</b></span>
+        <span class="item">Done <b>5</b></span>
+        <span class="item">Tracked today <b>3h 52m</b></span>
+        <div class="hints">
+          <span><kbd>Ctrl K</kbd> Palette</span>
+          <span><kbd>?</kbd> Shortcuts</span>
+          <span><kbd>N</kbd> New task</span>
+          <span><kbd>[</kbd><kbd>]</kbd> Day</span>
+          <span><kbd>Space</kbd> Timer</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // ---- the day from the planning-populated fixture (times as scheduled, durations in minutes) ----
+      const LANES = [
+        ["evening_service", "4 tasks · to do"],
+        ["booth_2", "2 tasks · in progress"],
+        ["audio", "1 task · in progress"],
+        ["lighting", "1 task · blocked"],
+        ["ops", "1 scheduled · 1 unscheduled"],
+      ];
+      // done: the fixture's `completed` flag; tracked: its totalSeconds
+      const TASKS = [
+        { t: "Import companion profile", lane: 0, start: "09:30", min: 20, p: "P2", done: "20m" },
+        { t: "Probe hardware · DMX/OSC", lane: 0, start: "10:15", min: 35, p: "P1", done: "35m" },
+        { t: 'House-light scene "preshow"', lane: 0, start: "16:35", min: 35, p: "P1", done: "35m" },
+        { t: "Draft run-of-show · Tue", lane: 0, start: "20:30", min: 120, p: "P0" },
+        { t: "Verify OSC bindings", lane: 1, start: "16:24", min: 18, p: "P1", done: "18m" },
+        {
+          t: "Commission Stream Deck+ · Booth 2",
+          lane: 1,
+          start: "18:24",
+          min: 85,
+          p: "P0",
+          running: "1h 18m",
+          sel: true,
+        },
+        { t: "Level-match overflow", lane: 2, start: "19:00", min: 90, p: "P1", running: "42m" },
+        { t: "DMX splitter · stage right", lane: 3, start: "17:00", min: 180, p: "P0", blocked: true },
+        { t: "Save backup · pre-service", lane: 4, start: "16:02", min: 15, p: "P2", done: "4m" },
+      ];
+      // ---- viewport ----
+      const params = new URLSearchParams(location.search);
+      const VW = (params.get("vw") || "2560x1440").split("x").map(Number);
+      const board = document.getElementById("board");
+      board.style.width = VW[0] + "px";
+      board.style.height = VW[1] + "px";
+      board.dataset.vw = VW[0] >= 2560 ? "2560" : VW[0] >= 1920 ? "1920" : "1280";
+      const H0 = 9,
+        H1 = 22,
+        PAD = 12,
+        AXIS = 32;
+      const LABEL = VW[0] >= 2560 ? 176 : VW[0] >= 1920 ? 150 : 120,
+        CARD = VW[0] >= 2560 ? 268 : VW[0] >= 1920 ? 210 : 180,
+        CARDH = VW[0] >= 2560 ? 78 : VW[0] >= 1920 ? 64 : 52;
+      function build() {
+        const el = document.getElementById("screen");
+        const W = el.clientWidth,
+          H = el.clientHeight;
+        const hourW = (W - LABEL - PAD) / (H1 - H0),
+          laneH = (H - AXIS) / LANES.length;
+        const xOf = (hhmm) => {
+          const [h, m] = hhmm.split(":").map(Number);
+          return LABEL + (h - H0 + m / 60) * hourW;
+        };
+        let s = "";
+        // below 90 px per hour only every other hour is labelled, so labels never touch
+        for (let h = H0; h <= H1; h++) {
+          const x = LABEL + (h - H0) * hourW,
+            last = h === H1;
+          s += `<line class="hour" x1="${x}" y1="${AXIS}" x2="${x}" y2="${H}"/>`;
+          if (hourW >= 90 || (h - H0) % 2 === 0 || last) {
+            if (hourW < 90 && last && (H1 - 1 - H0) % 2 === 0) continue;
+            s += `<text x="${last ? x - 6 : x + 6}" y="20" ${last ? 'text-anchor="end"' : ""}>${String(h).padStart(2, "0")}:00</text>`;
+          }
+        }
+        LANES.forEach(([name, meta], i) => {
+          const y = AXIS + i * laneH;
+          s += `<line class="lanerule" x1="0" y1="${y}" x2="${W}" y2="${y}"/><text class="lane" x="16" y="${y + 30}">${name}</text><text class="lanemeta" x="16" y="${y + 50}">${meta}</text>`;
+        });
+        // cards: at their start time; a second row when two cards in a lane would overlap
+        const rows = LANES.map(() => []);
+        for (const t of TASKS) {
+          // the bar always starts at the task's start time (clipped at 22:00); a card near the right edge hangs to the left of its start;
+          // a card whose box would cover another card in the lane drops to the second row
+          const sx = xOf(t.start),
+            x = sx + CARD + PAD > W ? sx - CARD : sx;
+          const row = rows[t.lane].some((r) => r.row === 0 && r.x < x + CARD + 8 && r.x + CARD + 8 > x) ? 1 : 0;
+          rows[t.lane].push({ x, row });
+          const TOP = CARDH >= 78 ? 22 : CARDH >= 64 ? 14 : 8;
+          const y = AXIS + t.lane * laneH + TOP + row * (CARDH + 8),
+            w = Math.min(W - PAD - sx, Math.max(6, (t.min / 60) * hourW));
+          const cls = `card ${t.sel ? "sel" : ""} ${t.blocked ? "blocked" : ""} ${t.done ? "done" : ""}`;
+          s += `<rect class="${cls}" x="${x}" y="${y}" width="${CARD}" height="${CARDH}" rx="8"/>`;
+          s += `<rect class="bar ${t.running ? "run" : ""} ${t.blocked ? "blocked" : ""} ${t.done ? "done" : ""}" x="${sx}" y="${y}" width="${w}" height="4" rx="2"/>`;
+          if (t.done)
+            s += `<text class="run" x="${x + CARD - 12}" y="${y + (CARDH >= 78 ? 52 : CARDH >= 64 ? 46 : 40)}" text-anchor="end">✓ done · ${t.done}</text>`;
+          const maxChars = Math.floor((CARD - 24) / 7.2),
+            title = t.t.length > maxChars ? t.t.slice(0, maxChars - 1) + "…" : t.t;
+          const ty = CARDH >= 78 ? 30 : CARDH >= 64 ? 26 : 22,
+            my = CARDH >= 78 ? 52 : CARDH >= 64 ? 46 : 40;
+          s += `<text class="title" x="${x + 12}" y="${y + ty}">${title}</text>`;
+          // a narrow card keeps the start and the duration; the timer, the priority and the blocked word drop in that order (the keyline still says blocked)
+          const dur = CARD < 200 ? `${t.min}m` : `${t.min} min`;
+          const meta = [
+            t.start,
+            dur,
+            !(t.running && CARD < 260) ? t.p : null,
+            t.blocked && CARD >= 200 ? "blocked" : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          s += `<text class="meta" x="${x + 12}" y="${y + my}">${meta}</text>`;
+          if (t.running)
+            s += `<text class="run" x="${x + CARD - 12}" y="${y + my}" text-anchor="end">● ${t.running}</text>`;
+        }
+        const nx = xOf("09:11");
+        s += `<line x1="${nx}" y1="${AXIS}" x2="${nx}" y2="${H}" stroke="#f0b35b" stroke-width="2"/><text class="now" x="${nx + 8}" y="${H - 10}">09:11 now</text>`;
+        el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" aria-label="Timeline">${s}</svg>`;
+      }
+      build();
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / VW[0], innerHeight / VW[1]);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>

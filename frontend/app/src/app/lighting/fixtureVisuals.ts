@@ -131,7 +131,7 @@ function confidenceLabel(confidence: FixtureVisualConfidence) {
       return "catalog";
     case "fallback":
     default:
-      return "fallback";
+      return "estimated";
   }
 }
 
@@ -201,13 +201,13 @@ function samplePhotometricLabel(samples: LightingFixtureVisualSnapshot["output"]
 }
 
 function formatEstimateLabel(beamAngle: number | null) {
-  return beamAngle ? `${Math.round(beamAngle)} deg est.` : "est.";
+  return beamAngle ? `${Math.round(beamAngle)}° estimated` : "estimated";
 }
 
 function formatBeamSummary(beamAngle: number | null, fieldAngle: number | null) {
-  if (beamAngle && fieldAngle) return `${Math.round(beamAngle)} / ${Math.round(fieldAngle)} deg`;
-  if (beamAngle) return `${Math.round(beamAngle)} deg beam`;
-  if (fieldAngle) return `${Math.round(fieldAngle)} deg field`;
+  if (beamAngle && fieldAngle) return `${Math.round(beamAngle)}° / ${Math.round(fieldAngle)}°`;
+  if (beamAngle) return `${Math.round(beamAngle)}° beam`;
+  if (fieldAngle) return `${Math.round(fieldAngle)}° field`;
   return null;
 }
 

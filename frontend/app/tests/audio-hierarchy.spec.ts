@@ -51,6 +51,14 @@ test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", 
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-pressed", /true|false/);
   }
+
+  // 2026-09 audit Slice 6: Talkback is a hold, not a toggle — the caption says
+  // so, and a plain click never leaves it engaged (the hold specs in
+  // audio-talkback.spec.ts drive the press / release paths).
+  const talkback = page.getByTestId("audio-monitor-talkback");
+  await expect(talkback).toContainText("Hold · T");
+  await talkback.click();
+  await expect(talkback).toHaveAttribute("aria-pressed", "false");
 });
 
 test("1920 fallback keeps the output lane Mute control tappable", async ({ page }) => {

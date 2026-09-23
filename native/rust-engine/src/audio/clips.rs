@@ -27,7 +27,7 @@ pub fn clear_audio_clips(
         {
             return Err(AudioCommandError::Rejected(
                 "AUDIO_CHANNEL_NOT_FOUND",
-                format!("Audio channel '{channel_id}' is not exposed by the engine."),
+                format!("Channel '{channel_id}' is not part of this console."),
             ));
         }
     }

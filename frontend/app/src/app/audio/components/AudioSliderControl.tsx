@@ -332,7 +332,7 @@ export function AudioSliderControl({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       role="slider"
-      style={{ "--slider-pct": `${pct}%` } as CSSProperties}
+      style={{ "--slider-pct": `${pct}%`, "--audio-fader-unity": AUDIO_FADER_UNITY } as CSSProperties}
       tabIndex={disabled ? -1 : 0}
     >
       <span className={styles.sliderTrack} aria-hidden="true" />

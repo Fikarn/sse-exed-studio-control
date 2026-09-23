@@ -17,4 +17,18 @@
   .lg {
     height: 72px;
   }
+
+  /* Visual overhaul A: the square crest of the header. */
+  .mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: var(--radius-key);
+    background: var(--text-text);
+    color: var(--material-bg);
+    font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+    letter-spacing: var(--font-tracking-cap);
+  }
 }

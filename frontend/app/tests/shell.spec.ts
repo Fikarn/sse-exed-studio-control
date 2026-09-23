@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { modifierShortcut } from "./helpers/modifier-shortcut";
-import { openFixture } from "./helpers/openFixture";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: shell-level specs split out of
 // operator-shell.spec.ts. Covers shell-wide keyboard overlays + workspace
@@ -10,6 +10,7 @@ import { openFixture } from "./helpers/openFixture";
 test("supports shell keyboard overlays and workspace switching", async ({ page }) => {
   await openFixture(page, "setup-required");
 
+  await expectWorkspaceMounted(page, "setup");
   await page.keyboard.press("Shift+/");
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -40,12 +41,51 @@ test("supports shell keyboard overlays and workspace switching", async ({ page }
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 
   await page.keyboard.press(modifierShortcut("Shift+KeyR"));
-  await expect(page.getByRole("dialog", { name: "Restart engine bridge?" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Restart engine bridge?" })).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeHidden();
 
   await page.keyboard.press(modifierShortcut("Digit2"));
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+});
+
+declare global {
+  interface Window {
+    __SSE_TEST_REQUEST_CLOSE__?: () => void;
+  }
+}
+
+// 2026-09 audit remediation, Slice 11: README and OPERATIONS promised a close
+// confirmation that did not exist — the X button killed the shell and the
+// engine with it. The native shell now prevents the close and raises
+// shell://close-requested; in the browser the same request comes through the
+// window hook. The native close itself is operator-verified (checklist B8).
+test("closing the window asks for confirmation; Cancel and Escape keep the session", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  const workspace = page.getByTestId("lighting-workspace");
+  await expect(workspace).toBeVisible();
+  const dialog = page.getByRole("dialog", { name: "Close Studio Control?" });
+
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("TotalMix keeps its current state");
+  await expect(dialog).toContainText("fixtures hold their last levels");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
+
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
+
+  // Confirming outside Tauri only closes the dialog — there is no shell to
+  // stop; in the native shell this is where shell_confirm_close runs.
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  await dialog.getByRole("button", { name: "Close Studio Control" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(workspace).toBeVisible();
 });
 
 // R2-A (round-2 audit, R2-GLO-01): the palette is a modal — Tab must never
@@ -84,6 +124,7 @@ test("command palette traps focus, closes on Escape from anywhere, and restores 
 test("opening the palette dismisses the shortcut guide", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  await expectWorkspaceMounted(page, "lighting");
   await page.keyboard.press("Shift+/");
   await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
 
@@ -109,8 +150,9 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
   // Mechanism: the layout provider stamps body as the scale host.
   await expect(page.locator('body[data-operator-scale-host][data-ui-scale="125"]')).toHaveCount(1);
 
-  // Consumer: a portaled dialog's title reads the title-lg token, so it must
-  // render at 22px * 1.25 = 27.5px rather than the unscaled 22px fallback.
+  // Consumer: a portaled dialog's title reads the A state step (24 px, visual
+  // overhaul A Slice 3; old: the 22 px title-lg token → 27.5px), so it must
+  // render at 24px * 1.25 = 30px rather than the unscaled 24px.
   await page.getByRole("button", { name: "Add fixture" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add fixture" });
   await expect(dialog).toBeVisible();
@@ -118,7 +160,7 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
     .locator("h2")
     .first()
     .evaluate((node) => getComputedStyle(node).fontSize);
-  expect(titleSize).toBe("27.5px");
+  expect(titleSize).toBe("30px");
 });
 
 // GLO-09: latched cross-workspace state (audio SOLO, lighting scene drift)
@@ -158,8 +200,207 @@ test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
   // Toggle the Front group off — the rig now diverges from the recalled
   // Warm wash scene, which must latch the drift chip; restoring the group
   // clears it.
-  await page.getByRole("button", { name: /^Front, 2 fixtures at 67%, on/ }).click();
+  await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
   await expect(driftChip).toBeVisible();
   await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
   await expect(driftChip).toHaveCount(0);
+});
+
+// 2026-09 audit remediation, Slice 12: shortcut hints render for the host OS.
+// The studio workstation is Windows; the Mac glyphs used to appear everywhere
+// with "(Ctrl+K on Windows)" footnotes.
+test("shortcut labels follow the host platform", async ({ page }) => {
+  const apple = process.platform === "darwin";
+  const paletteLabel = apple ? "⌘K" : "Ctrl+K";
+  const monitorLabel = apple ? "⌘⇧M" : "Ctrl+Shift+M";
+
+  await openFixture(page, "audio-populated");
+  await expect(page.locator("[data-health-bar] kbd").first()).toHaveText(paletteLabel);
+
+  await page.keyboard.press("Shift+/");
+  const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+  await expect(overlay).toBeVisible();
+  const paletteRow = overlay.locator("li", { hasText: "Open command palette" }).first();
+  await expect(paletteRow.locator("kbd").first()).toHaveText(apple ? "⌘" : "Ctrl");
+  await expect(overlay.getByText(/Ctrl\+K on Windows/)).toHaveCount(0);
+  await expect(overlay.getByText(/Ctrl substitutes/)).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(overlay).toBeHidden();
+
+  await page.keyboard.press(modifierShortcut("KeyK"));
+  const palette = page.getByRole("dialog", { name: /command palette/i });
+  await expect(palette).toBeVisible();
+  await expect(palette.getByText(apple ? "⌘⇧R" : "Ctrl+Shift+R", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await openFixture(page, "lighting-populated");
+  await expect(page.locator("[data-health-bar] kbd", { hasText: monitorLabel })).toHaveCount(1);
+});
+
+// Visual overhaul A, Slice 2 (plan D1, finding C3): the header lamp mirrors
+// the worst state its workspace shows — `ACTION FAILED` is red in the header
+// too. Until the state display lands (Slice 4), the workspace's state is its
+// current band: the Console's warning band and the Lighting bridge banner.
+// Visual overhaul A, Slice 4a. Old: both audio cases read
+// `audio-warning-band`. New: they read `audio-state-display`. Reason: the
+// Console's state, its sentence and its way out are the cluster's state
+// display now, so the band the header lamp mirrored no longer exists. Lighting
+// Visual overhaul A, Slice 5: Lighting's case moved the same way — the bridge
+// banner became the rig's state display.
+for (const { fixture, lamp, band, tone } of [
+  { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-state-display", tone: "error" },
+  { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
+  { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
+]) {
+  test(`the header lamp's tone equals the workspace's state tone on ${fixture}`, async ({ page }) => {
+    await openFixture(page, fixture);
+    const workspaceBand = page.getByTestId(band);
+    await expect(workspaceBand).toBeVisible();
+    await expect(workspaceBand).toHaveAttribute("data-tone", tone);
+    await expect(page.getByTestId(lamp)).toHaveAttribute("data-tone", tone);
+  });
+}
+
+// Visual overhaul A, Slice 2 (plan D1, finding H1): Setup / Support is a
+// workspace inside the one shell — the same header, tabs and lamps — and
+// once commissioning is published the operator can leave it from the tabs.
+test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  await expect(page.getByText("Commissioning runner")).toBeVisible();
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await expect(nav.getByRole("button", { name: "Setup / Support", exact: true })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  for (const id of ["lighting", "audio", "surface"]) {
+    await expect(page.getByTestId(`shell-lamp-${id}`)).toBeVisible();
+  }
+  await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
+  const header = page.locator('[data-region="header"]');
+  const headerBox = await header.boundingBox();
+  expect(Math.abs((headerBox?.height ?? 0) - 56), "header height within 2 px of D4").toBeLessThanOrEqual(2);
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+});
+
+// 2026-09 production readiness, Slice 9 (finding F10): a render error inside a
+// workspace used to leave a blank webview — header, tabs and dialogs gone with
+// it. `?crash=lighting` (fixture double only) makes Lighting throw while it
+// renders; the shell must survive it, Audio must stay usable, the failure must
+// reach the attention band, and "Reload this area" must bring Lighting back
+// once the fault is gone.
+test("workspace crash keeps shell alive", async ({ page }) => {
+  await openFixture(page, "audio-populated", { crash: "lighting" });
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  const boundary = page.getByTestId("workspace-boundary");
+  const band = page.getByTestId("background-failure-band");
+  await expect(page.getByTestId("audio-workspace")).toBeVisible();
+  await expect(band).toHaveCount(0);
+
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(boundary).toContainText("LIGHTING STOPPED");
+  await expect(boundary).toContainText("The rest of Studio Control keeps working");
+  await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
+  // The area failed, not the screen: the shell's own chrome is all still here.
+  await expect(page.getByTestId("shell-boundary")).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Lighting", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
+  await expect(page.getByTestId("shell-lamp-audio")).toBeVisible();
+  await page.keyboard.press(modifierShortcut("Shift+KeyR"));
+  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(band).toContainText("1 problem since");
+
+  // Audio is one tab away and works.
+  await nav.getByRole("button", { name: "Audio", exact: true }).click();
+  await expect(page.getByTestId("audio-workspace")).toBeVisible();
+  await expect(boundary).toHaveCount(0);
+  const soloButton = page.getByTestId("audio-strip-audio-playback-3-4").getByRole("button", { name: "Solo FX 3/4" });
+  await expect(soloButton).toHaveAttribute("aria-pressed", "true");
+  await soloButton.click();
+  await expect(soloButton).toHaveAttribute("aria-pressed", "false");
+  await page.getByTestId("background-failure-dismiss").click();
+  await expect(band).toHaveCount(0);
+
+  // While the fault stands Lighting fails again, and says so again.
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(boundary).toContainText("LIGHTING STOPPED");
+  await expect(band).toContainText("2 problems since");
+
+  // The fault goes away; reloading the area brings the workspace back whole.
+  await page.evaluate(() => window.__SSE_TEST_DISARM_CRASH__?.());
+  await page.getByTestId("workspace-boundary-reload").click();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+  await expect(boundary).toHaveCount(0);
+  await expect(page.locator('[data-region="footer"]')).toBeVisible();
+});
+
+// The hook is the fixture double's alone: without `?crash=` nothing is armed
+// and nothing about it is on the window.
+test("the crash hook is absent unless the fixture URL asks for it", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
+  expect(await page.evaluate(() => typeof window.__SSE_TEST_DISARM_CRASH__)).toBe("undefined");
+  await expect(page.getByTestId("background-failure-band")).toHaveCount(0);
+});
+
+// Production readiness S14 (finding F26): every workspace used to be part of the
+// one script the shell starts from, so all four were fetched and evaluated
+// before the startup surface drew. Each is a chunk of its own now. The markers
+// are test ids only that workspace draws: if a workspace is imported statically
+// again its marker moves into the entry script and this fails.
+const WORKSPACE_CHUNKS = {
+  LightingWorkspace: "lighting-stage-lock-note",
+  AudioWorkspace: "audio-monitor-bar",
+  PlanningWorkspace: "planning-unscheduled-tray",
+  SetupSupportPilot: "setup-screen-support",
+} as const;
+
+test("lazy workspace loads", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+
+  // The active workspace's chunk is asked for once the shell has drawn, the
+  // other three once it is ready and idle.
+  const scriptUrls = () =>
+    page.evaluate(() =>
+      performance
+        .getEntriesByType("resource")
+        .map((entry) => entry.name)
+        .filter((name) => name.endsWith(".js"))
+    );
+  for (const chunk of Object.keys(WORKSPACE_CHUNKS)) {
+    await expect.poll(async () => (await scriptUrls()).some((url) => url.includes(`/assets/${chunk}-`))).toBe(true);
+  }
+
+  const entryUrl = await page.evaluate(
+    () => document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? ""
+  );
+  expect(entryUrl).toContain("/assets/index-");
+  const entrySource = await (await page.request.get(entryUrl)).text();
+  const urls = await scriptUrls();
+  for (const [chunk, marker] of Object.entries(WORKSPACE_CHUNKS)) {
+    const chunkUrl = urls.find((url) => url.includes(`/assets/${chunk}-`));
+    expect(chunkUrl, `${chunk} should be a script of its own`).toBeTruthy();
+    const chunkSource = await (await page.request.get(chunkUrl!)).text();
+    expect(chunkSource, `${chunk} should carry its workspace`).toContain(marker);
+    expect(entrySource, `the entry script should not carry ${chunk}`).not.toContain(marker);
+  }
+
+  // A workspace whose chunk is in hand mounts in the commit that asks for it:
+  // the shell's loading surface is never drawn on the way to the Console.
+  await page.evaluate(() => {
+    const seen = { loading: false };
+    (window as unknown as { __sawWorkspaceLoading: typeof seen }).__sawWorkspaceLoading = seen;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="workspace-loading"]')) seen.loading = true;
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await page.keyboard.press(modifierShortcut("Digit3"));
+  await expectWorkspaceMounted(page, "audio");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __sawWorkspaceLoading: { loading: boolean } }).__sawWorkspaceLoading.loading
+    )
+  ).toBe(false);
 });

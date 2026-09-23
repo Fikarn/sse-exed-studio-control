@@ -1,39 +1,48 @@
-use crate::app_state::{build_app_snapshot, parse_commissioning_update, APP_SETTINGS_PREFIX};
+use crate::action_log::{
+    record_actions_or_log, ui_actions, ui_method_class, ui_method_stages_in_preview, UiMethodClass,
+};
+use crate::app_state::{
+    build_app_snapshot, parse_commissioning_override, parse_commissioning_update,
+    APP_SETTINGS_PREFIX, COMMISSIONING_COMPLETED_KEY,
+};
 use crate::audio::{
-    build_audio_health_check, clear_all_audio_solo, clear_audio_clips, create_audio_snapshot,
-    delete_audio_snapshot, parse_audio_channel_update_request, parse_audio_clip_clear_request,
+    clear_all_audio_solo, clear_audio_clips, create_audio_snapshot, delete_audio_snapshot,
+    hold_audio_talkback, parse_audio_channel_update_request, parse_audio_clip_clear_request,
     parse_audio_dynamics_update_request, parse_audio_eq_update_request,
     parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
     parse_audio_settings_update_request, parse_audio_snapshot_create_request,
     parse_audio_snapshot_delete_request, parse_audio_snapshot_recall_request,
-    parse_audio_snapshot_update_request, read_audio_snapshot, recall_audio_snapshot,
-    sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
+    parse_audio_snapshot_update_request, parse_audio_talkback_hold_request, read_audio_snapshot,
+    recall_audio_snapshot, sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
-use crate::bootstrap::{bootstrap_runtime, RuntimeContext};
+use crate::bootstrap::{bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths};
+use crate::commissioning::{
+    evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
+};
 use crate::commissioning::{
     parse_commissioning_check_request, parse_commissioning_seed_request,
     read_commissioning_snapshot, run_commissioning_check, seed_sample_planning_data,
     CommissioningCommandError,
 };
-use crate::control_surface::build_control_surface_health_check;
-use crate::diagnostics::{append_log, read_log_excerpt};
+use crate::diagnostics::{append_log, configured_log_level, request_log_line};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
-    apply_lighting_palette_with_preview, build_lighting_health_check,
+    apply_lighting_palette_with_preview, bump_lighting_render_generation,
     clear_lighting_identify_bursts, create_lighting_fixture, create_lighting_group,
     create_lighting_palette, create_lighting_scene_with_preview, delete_lighting_fixture,
     delete_lighting_group, delete_lighting_palette, delete_lighting_scene,
     discard_lighting_preview, identify_lighting_fixture, list_lighting_palettes,
-    parse_lighting_all_power_request, parse_lighting_fixture_create_request,
-    parse_lighting_fixture_delete_request, parse_lighting_fixture_highlight_request,
-    parse_lighting_fixture_identify_clear_all_request, parse_lighting_fixture_identify_request,
-    parse_lighting_fixture_identify_sequence_request, parse_lighting_fixture_update_request,
-    parse_lighting_group_create_request, parse_lighting_group_delete_request,
-    parse_lighting_group_power_request, parse_lighting_group_reorder_request,
-    parse_lighting_group_update_request, parse_lighting_palette_apply_request,
+    lock_shared_lighting_preview, parse_lighting_all_power_request,
+    parse_lighting_fixture_create_request, parse_lighting_fixture_delete_request,
+    parse_lighting_fixture_highlight_request, parse_lighting_fixture_identify_clear_all_request,
+    parse_lighting_fixture_identify_request, parse_lighting_fixture_identify_sequence_request,
+    parse_lighting_fixture_update_request, parse_lighting_group_create_request,
+    parse_lighting_group_delete_request, parse_lighting_group_power_request,
+    parse_lighting_group_reorder_request, parse_lighting_group_update_request,
+    parse_lighting_output_armed_request, parse_lighting_palette_apply_request,
     parse_lighting_palette_create_request, parse_lighting_palette_delete_request,
     parse_lighting_palette_update_request, parse_lighting_preview_discard_request,
     parse_lighting_preview_mode_request, parse_lighting_scene_create_request,
@@ -44,11 +53,12 @@ use crate::lighting::{
     read_lighting_snapshot_with_preview, recall_lighting_scene_with_preview,
     reorder_lighting_group, reorder_lighting_scene, set_lighting_all_power_with_preview,
     set_lighting_fixture_highlight, set_lighting_group_power_with_preview,
-    set_lighting_preview_mode, start_lighting_identify_sequence,
+    set_lighting_output_armed, set_lighting_preview_mode, start_lighting_identify_sequence,
     update_lighting_fixture_with_preview, update_lighting_group, update_lighting_palette,
-    update_lighting_scene_with_preview, update_lighting_settings, LightingCommandError,
-    LightingPreviewRuntimeState,
+    update_lighting_scene_with_preview, update_lighting_settings, with_lighting_state,
+    with_lighting_state_and_preview, LightingCommandError, LightingPreviewRuntimeState,
 };
+#[cfg(feature = "dev-fixtures")]
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
 };
@@ -76,19 +86,16 @@ use crate::protocol::{
     EVENT_LIGHTING_CHANGED, EVENT_PLANNING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
-use crate::storage::{
-    import_legacy_db, list_settings_by_prefix, read_sqlite_version, set_settings, EngineResult,
-};
+use crate::storage::{import_legacy_db, list_settings_by_prefix, set_settings, EngineResult};
 use crate::support::{
     export_support_backup, parse_support_restore_request, read_support_snapshot,
-    restore_support_backup, SupportCommandError,
+    restore_support_backup, verify_support_backup, SupportCommandError,
 };
 use serde_json::json;
-use std::sync::{Mutex, MutexGuard};
+use std::time::Instant;
 
 pub struct EngineApp {
     runtime: RuntimeContext,
-    lighting_preview: Mutex<LightingPreviewRuntimeState>,
 }
 
 pub struct EngineReply {
@@ -96,27 +103,49 @@ pub struct EngineReply {
     pub events: Vec<serde_json::Value>,
 }
 
-fn format_health_summary(
-    status: &str,
-    storage_summary: &str,
-    lighting_summary: &str,
-    audio_summary: &str,
-    control_surface_summary: &str,
-) -> String {
-    format!(
-        "Health '{}'. Storage {}. Lighting {}. Audio {}. Control surface {}.",
-        status, storage_summary, lighting_summary, audio_summary, control_surface_summary
-    )
+/// The requests a recovery-mode engine answers (Slice 7 — F20): the ones
+/// that list, verify and restore backups without opening the database that
+/// failed its check. Everything else is `ENGINE_NOT_READY`.
+const RECOVERY_METHODS: &[&str] = &[
+    "engine.ping",
+    "support.snapshot",
+    "support.backup.verify",
+    "support.backup.restore",
+];
+
+fn support_error_response(id: serde_json::Value, error: SupportCommandError) -> ResponseEnvelope {
+    match error {
+        SupportCommandError::InvalidParams(message) => invalid_params(id, message),
+        SupportCommandError::Storage(message) => error_response(id, "STORAGE_ERROR", message),
+        SupportCommandError::UnsupportedVersion(message) => {
+            error_response(id, "SUPPORT_RESTORE_UNSUPPORTED_VERSION", message)
+        }
+    }
 }
 
 impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
         append_log(&runtime.log_file_path, "INFO", "Engine bootstrap completed")?;
-        Ok(Self {
-            runtime,
-            lighting_preview: Mutex::new(LightingPreviewRuntimeState::default()),
-        })
+        Ok(Self { runtime })
+    }
+
+    /// The engine after a storage failure at start (Slice 7 — F20): no
+    /// database, no bridge, no metering. Only the support requests that list,
+    /// verify and restore backups are answered, so the recovery surface can
+    /// put a database backup in place and restart into it.
+    pub fn recovery(runtime_paths: &RuntimePaths) -> Self {
+        // The registry says why (Slice 8 — F14); `health.snapshot` is not
+        // among the recovery requests, so the recovery surface reads the
+        // startup failure, but the state is on record for any later reader.
+        crate::health::report(
+            crate::health::SUBSYSTEM_STORAGE,
+            crate::health::SubsystemState::Error,
+            "The saved data failed its check; verify and restore a database backup from Setup / Support",
+        );
+        Self {
+            runtime: recovery_runtime_context(runtime_paths),
+        }
     }
 
     pub fn ready_event(&self) -> serde_json::Value {
@@ -165,12 +194,69 @@ impl EngineApp {
             .unwrap_or(false)
     }
 
+    /// Answers one request. One `DEBUG` line per request — method, id,
+    /// milliseconds, outcome — replaces the `INFO` line every request used
+    /// to write (Slice 8 — F27); it exists only while `SSE_ENGINE_LOG_LEVEL`
+    /// is `DEBUG`.
     pub fn handle_request(&self, request: RequestEnvelope) -> EngineReply {
-        let _ = append_log(
-            &self.runtime.log_file_path,
-            "INFO",
-            &format!("Handling request: {}", request.method),
+        let started_at = Instant::now();
+        let method = request.method.clone();
+        let id = request.id.clone();
+        // The action log (Slice 11 — F30): what was asked is kept only for
+        // the methods that can leave a row.
+        let recorded_params = (ui_method_class(&method) == Some(UiMethodClass::Recorded))
+            .then(|| request.params.clone());
+        let reply = self.dispatch(request);
+        if let Some(params) = recorded_params {
+            self.record_ui_actions(&method, &params, &reply);
+        }
+        if let Some(line) = request_log_line(
+            configured_log_level(),
+            &method,
+            &id,
+            started_at.elapsed(),
+            reply.response.ok,
+        ) {
+            let _ = append_log(&self.runtime.log_file_path, "DEBUG", &line);
+        }
+        reply
+    }
+
+    /// Every request over IPC is the screen's, so this is where a row gets
+    /// the source `ui`; `action_log::ui_actions` holds the table. A refused
+    /// request leaves nothing, and neither does a change staged in the
+    /// lighting preview: only this thread switches the preview on or off, so
+    /// what it reads here is what the mutation saw.
+    fn record_ui_actions(&self, method: &str, params: &serde_json::Value, reply: &EngineReply) {
+        if !reply.response.ok || !self.runtime.storage_ready {
+            return;
+        }
+        let staged = ui_method_stages_in_preview(method) && lock_shared_lighting_preview().enabled;
+        let result = reply
+            .response
+            .result
+            .as_ref()
+            .unwrap_or(&serde_json::Value::Null);
+        record_actions_or_log(
+            &self.runtime.db_path,
+            &ui_actions(method, params, result, staged),
         );
+    }
+
+    fn dispatch(&self, request: RequestEnvelope) -> EngineReply {
+        // Recovery mode (Slice 7 — F20): the database could not be opened,
+        // so only the requests that verify and restore a backup are served;
+        // anything else would touch the file that failed its check.
+        if !self.runtime.storage_ready && !RECOVERY_METHODS.contains(&request.method.as_str()) {
+            return Self::reply(error_response(
+                request.id,
+                "ENGINE_NOT_READY",
+                format!(
+                    "The saved data needs attention, so {} is not available; verify and restore a database backup from Setup / Support first.",
+                    request.method
+                ),
+            ));
+        }
 
         match request.method.as_str() {
             "engine.ping" => Self::reply(ok_response(
@@ -383,6 +469,15 @@ impl EngineApp {
                 set_lighting_all_power_with_preview,
                 |_| "all-powered",
             ),
+            // Armed / held (Slice 11 — F31): a lighting mutation like any
+            // other, so the lock and the render generation come with it and
+            // the sACN thread sees the flag on its next tick.
+            "lighting.output.setArmed" => self.dispatch_lighting_mutate(
+                request,
+                parse_lighting_output_armed_request,
+                set_lighting_output_armed,
+                "output-armed-changed",
+            ),
             // -------------------------------------------------------------
             // Audio mutations (M-1event)
             // -------------------------------------------------------------
@@ -456,6 +551,7 @@ impl EngineApp {
                 update_audio_settings,
                 "settings-updated",
             ),
+            "audio.talkback.hold" => self.dispatch_audio_talkback_hold(request),
 
             // -------------------------------------------------------------
             // Planning mutations (M-1event with derived event payload)
@@ -640,12 +736,31 @@ impl EngineApp {
             // -------------------------------------------------------------
             // Commissioning mutations (M-1event + multi-event variants)
             // -------------------------------------------------------------
-            "commissioning.check.run" => self.dispatch_commissioning_mutate(
-                request,
-                parse_commissioning_check_request,
-                run_commissioning_check,
-                "check-updated",
-            ),
+            "commissioning.check.run" => {
+                // The audio probe outcome drives `audio_capabilities` (console
+                // writes are refused until it passes — 2026-09 audit
+                // remediation, Slice 1), so audio consumers re-derive their
+                // state when an audio probe completes. A rejected request
+                // emits no commissioning event and therefore no audio event.
+                let targets_audio = request
+                    .params
+                    .get("target")
+                    .and_then(|value| value.as_str())
+                    == Some("audio");
+                let mut reply = self.dispatch_commissioning_mutate(
+                    request,
+                    parse_commissioning_check_request,
+                    run_commissioning_check,
+                    "check-updated",
+                );
+                if targets_audio && !reply.events.is_empty() {
+                    reply.events.push(event_message(
+                        EVENT_AUDIO_CHANGED,
+                        json!({ "reason": "probe-updated" }),
+                    ));
+                }
+                reply
+            }
             "commissioning.seedPlanningDemo" => self.dispatch_commissioning_seed(
                 request,
                 parse_commissioning_seed_request,
@@ -654,14 +769,27 @@ impl EngineApp {
             ),
 
             // -------------------------------------------------------------
-            // Dev parity fixture (M-multievent)
+            // Dev parity fixture (M-multievent). Compiled only with the
+            // `dev-fixtures` feature; a release engine keeps the method in
+            // the contract and answers METHOD_UNAVAILABLE (2026-09
+            // production readiness, Slice 1 — finding F04). Both arms stay
+            // literal on one line for tests/contract.rs.
             // -------------------------------------------------------------
+            #[cfg(feature = "dev-fixtures")]
             "dev.parityFixture.load" => self.dispatch_parity_fixture(
                 request,
                 parse_parity_fixture_request,
                 load_parity_fixture,
                 "parity-fixture-loaded",
             ),
+            #[cfg(not(feature = "dev-fixtures"))]
+            "dev.parityFixture.load" => Self::reply(error_response(
+                request.id,
+                "METHOD_UNAVAILABLE",
+                String::from(
+                    "dev.parityFixture.load is only available in an engine built with the dev-fixtures feature.",
+                ),
+            )),
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
@@ -677,33 +805,36 @@ impl EngineApp {
                     ),
                     "backup-exported",
                 ),
-                Err(error) => match error {
-                    SupportCommandError::InvalidParams(message) => {
-                        Self::reply(invalid_params(request.id, message))
-                    }
-                    SupportCommandError::Storage(message) => {
-                        Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                    }
-                },
+                Err(error) => Self::reply(support_error_response(request.id, error)),
             },
-            "support.backup.restore" => match parse_support_restore_request(&request.params) {
+            "support.backup.verify" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
+                Ok(verify_request) => Self::reply(ok_response(
+                    request.id,
+                    serde_json::to_value(verify_support_backup(&verify_request))
+                        .unwrap_or_else(|_| json!({})),
+                )),
+                Err(message) => Self::reply(invalid_params(request.id, message)),
+            },
+            "support.backup.restore" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
                 Ok(restore_request) => {
-                    match restore_support_backup(&self.runtime, &restore_request) {
-                        Ok(result) => Self::reply_with_support_restore_change(
-                            ok_response(
+                    // The archive restore rewrites every lighting setting in
+                    // one transaction; under the lighting state lock a deck
+                    // key cannot write its older copy back over it (Slice 10).
+                    match with_lighting_state(|| restore_support_backup(&self.runtime, &restore_request)) {
+                        Ok(result) => {
+                            let response = ok_response(
                                 request.id,
                                 serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            ),
-                            "backup-restored",
-                        ),
-                        Err(error) => match error {
-                            SupportCommandError::InvalidParams(message) => {
-                                Self::reply(invalid_params(request.id, message))
+                            );
+                            if result.requires_restart {
+                                // Nothing changed yet: the database backup is
+                                // applied at the next start (Slice 7 — F20).
+                                Self::reply_with_support_change(response, "backup-restore-staged")
+                            } else {
+                                Self::reply_with_support_restore_change(response, "backup-restored")
                             }
-                            SupportCommandError::Storage(message) => {
-                                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                            }
-                        },
+                        }
+                        Err(error) => Self::reply(support_error_response(request.id, error)),
                     }
                 }
                 Err(message) => Self::reply(invalid_params(request.id, message)),
@@ -728,7 +859,10 @@ impl EngineApp {
                     },
                 }
             }
-            "commissioning.update" => match parse_commissioning_update(&request.params) {
+            "commissioning.update" => match parse_commissioning_update(&request.params)
+                .map_err(CommissioningUpdateRefusal::InvalidParams)
+                .and_then(|updates| self.gate_commissioning_publish(updates, &request.params))
+            {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
                     Ok(()) => match self.read_app_snapshot() {
                         Ok(result) => Self::reply_with_app_and_commissioning_change(
@@ -747,7 +881,15 @@ impl EngineApp {
                         error.to_string(),
                     )),
                 },
-                Err(message) => Self::reply(invalid_params(request.id, message)),
+                Err(CommissioningUpdateRefusal::InvalidParams(message)) => {
+                    Self::reply(invalid_params(request.id, message))
+                }
+                Err(CommissioningUpdateRefusal::ProbesIncomplete(message)) => Self::reply(
+                    error_response(request.id, "COMMISSIONING_PROBES_INCOMPLETE", message),
+                ),
+                Err(CommissioningUpdateRefusal::Storage(message)) => {
+                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+                }
             },
             "settings.update" => match parse_settings_update(&request.params) {
                 Ok(updates) => match set_settings(&self.runtime.db_path, &updates) {
@@ -888,8 +1030,11 @@ impl EngineApp {
     }
 
     fn read_lighting_snapshot(&self) -> EngineResult<serde_json::Value> {
+        // A reader takes the shared preview alone, and before the settings:
+        // a preview-aware mutation holds it from its first read to its last
+        // write, so the pair read here is from one side of it (Slice 10).
+        let preview = lock_shared_lighting_preview();
         let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        let preview = self.lighting_preview();
         Ok(serde_json::to_value(read_lighting_snapshot_with_preview(
             &app_settings,
             &preview,
@@ -926,77 +1071,18 @@ impl EngineApp {
     }
 
     fn read_control_surface_snapshot(&self) -> EngineResult<serde_json::Value> {
-        Ok(serde_json::to_value(build_control_surface_snapshot())?)
+        let mut snapshot = serde_json::to_value(build_control_surface_snapshot())?;
+        if let Some(object) = snapshot.as_object_mut() {
+            object.insert(
+                String::from("lastEvent"),
+                crate::control_surface::control_surface_last_event(&self.runtime.db_path),
+            );
+        }
+        Ok(snapshot)
     }
 
     fn read_health_snapshot(&self) -> EngineResult<serde_json::Value> {
-        let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        let lighting = build_lighting_health_check(&app_settings);
-        let audio = build_audio_health_check(&app_settings);
-        let control_surface = build_control_surface_health_check(&self.runtime);
-        let sqlite_version = read_sqlite_version(&self.runtime.db_path)?;
-        let status = if self.runtime.storage_ready {
-            "ok"
-        } else {
-            "starting"
-        };
-        let lighting_summary = lighting.summary.clone();
-        let audio_summary = audio.summary.clone();
-        let control_surface_summary = control_surface
-            .get("summary")
-            .and_then(|value| value.as_str())
-            .unwrap_or("Control-surface diagnostics unavailable.")
-            .to_string();
-        let storage_summary = format!(
-            "Schema v{}, journal mode {}, integrity {}, SQLite {}",
-            self.runtime.storage_bootstrap.schema_version,
-            self.runtime.storage_bootstrap.journal_mode,
-            self.runtime.storage_bootstrap.integrity_check,
-            sqlite_version,
-        );
-        let health_summary = format_health_summary(
-            status,
-            &storage_summary,
-            &lighting_summary,
-            &audio_summary,
-            &control_surface_summary,
-        );
-        Ok(json!({
-            "status": status,
-            "startupPhase": "storage-bootstrap",
-            "summary": health_summary,
-            "paths": {
-                "appDataDir": self.runtime.app_data_dir.display().to_string(),
-                "logsDir": self.runtime.logs_dir.display().to_string(),
-                "logFilePath": self.runtime.log_file_path.display().to_string(),
-                "dbPath": self.runtime.db_path.display().to_string(),
-                "backupDir": self.runtime.backups_dir.display().to_string(),
-                "updateRepositoryPath": self.runtime
-                    .update_repository_path
-                    .as_ref()
-                    .map(|path| path.display().to_string())
-            },
-            "details": {
-                "storage": storage_summary,
-                "lighting": lighting_summary,
-                "audio": audio_summary,
-                "controlSurface": control_surface_summary,
-            },
-            "recentLogExcerpt": read_log_excerpt(&self.runtime.log_file_path, 12),
-            "checks": {
-                "storage": {
-                    "ok": self.runtime.storage_ready,
-                    "dbPathExists": self.runtime.db_path.exists(),
-                    "schemaVersion": self.runtime.storage_bootstrap.schema_version,
-                    "journalMode": self.runtime.storage_bootstrap.journal_mode,
-                    "integrityCheck": self.runtime.storage_bootstrap.integrity_check,
-                    "sqliteVersion": sqlite_version
-                },
-                "lighting": lighting,
-                "audio": audio,
-                "controlSurface": control_surface,
-            }
-        }))
+        crate::health::read_health_snapshot(&self.runtime)
     }
 
     fn format_settings_updates(updates: &[(&str, String)]) -> String {
@@ -1065,12 +1151,6 @@ impl EngineApp {
         }
     }
 
-    fn lighting_preview(&self) -> MutexGuard<'_, LightingPreviewRuntimeState> {
-        self.lighting_preview
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
     fn dispatch_lighting_preview_mutate<P, R, F, H, K>(
         &self,
         request: RequestEnvelope,
@@ -1090,8 +1170,12 @@ impl EngineApp {
     {
         match parse(&request.params) {
             Ok(parsed) => {
-                let mut preview = self.lighting_preview();
-                match handler(&self.runtime.db_path, &parsed, &mut preview) {
+                // The lighting state lock first, then the preview the Stream
+                // Deck bridge shares (Slice 10 — F12).
+                let outcome = with_lighting_state_and_preview(|preview| {
+                    handler(&self.runtime.db_path, &parsed, preview)
+                });
+                match outcome {
                     Ok(result) => Self::reply_with_lighting_change(
                         ok_response(
                             request.id,
@@ -1124,7 +1208,7 @@ impl EngineApp {
         H: FnOnce(&std::path::Path, &P) -> Result<R, LightingCommandError>,
     {
         match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
+            Ok(parsed) => match with_lighting_state(|| handler(&self.runtime.db_path, &parsed)) {
                 Ok(result) => Self::reply_with_lighting_change(
                     ok_response(
                         request.id,
@@ -1158,6 +1242,53 @@ impl EngineApp {
         match parse(&request.params) {
             Ok(parsed) => self.run_audio_mutate(request.id, |db| handler(db, &parsed), reason),
             Err(message) => Self::reply(invalid_params(request.id, message)),
+        }
+    }
+
+    /// `audio.talkback.hold` announces `audio.changed` only when talkback
+    /// actually changed: the frontend re-sends the hold every 750 ms while
+    /// the operator holds, and those heartbeats must not fan out as events.
+    fn dispatch_audio_talkback_hold(&self, request: RequestEnvelope) -> EngineReply {
+        let parsed = match parse_audio_talkback_hold_request(&request.params) {
+            Ok(parsed) => parsed,
+            Err(message) => return Self::reply(invalid_params(request.id, message)),
+        };
+        match hold_audio_talkback(&self.runtime.db_path, &parsed) {
+            Ok(result) => {
+                let response = ok_response(
+                    request.id,
+                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                );
+                if result.changed {
+                    let reason = if result.talkback {
+                        "talkback-engaged"
+                    } else {
+                        "talkback-released"
+                    };
+                    Self::reply_with_audio_change(response, reason)
+                } else {
+                    Self::reply(response)
+                }
+            }
+            Err(AudioCommandError::Rejected(code, message)) => {
+                Self::reply(error_response(request.id, code, message))
+            }
+            Err(AudioCommandError::Storage(message)) => {
+                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    /// Graceful stop (stdin closed): release any talkback the engine is still
+    /// holding for a surface that can no longer release it.
+    pub fn shutdown(&self) {
+        let released = crate::audio::release_all_talkback_holds(&self.runtime.db_path);
+        if released > 0 {
+            let _ = append_log(
+                &self.runtime.log_file_path,
+                "INFO",
+                &format!("Released {released} talkback hold(s) on shutdown"),
+            );
         }
     }
 
@@ -1283,13 +1414,18 @@ impl EngineApp {
     {
         match parse(&request.params) {
             Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
-                Ok(result) => Self::reply_with_commissioning_change(
-                    ok_response(
-                        request.id,
-                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                    ),
-                    reason,
-                ),
+                Ok(result) => {
+                    // A lighting probe stores the bridge address and the
+                    // universe it used (Slice 10 — F18).
+                    bump_lighting_render_generation();
+                    Self::reply_with_commissioning_change(
+                        ok_response(
+                            request.id,
+                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                        ),
+                        reason,
+                    )
+                }
                 Err(CommissioningCommandError::InvalidParams(message)) => {
                     Self::reply(invalid_params(request.id, message))
                 }
@@ -1333,6 +1469,7 @@ impl EngineApp {
         }
     }
 
+    #[cfg(feature = "dev-fixtures")]
     fn dispatch_parity_fixture<P, R, F, H>(
         &self,
         request: RequestEnvelope,
@@ -1346,7 +1483,7 @@ impl EngineApp {
         H: FnOnce(&RuntimeContext, &P) -> Result<R, ParityFixtureError>,
     {
         match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime, &parsed) {
+            Ok(parsed) => match with_lighting_state(|| handler(&self.runtime, &parsed)) {
                 Ok(result) => Self::reply_with_app_commissioning_and_planning_change(
                     ok_response(
                         request.id,
@@ -1451,6 +1588,7 @@ impl EngineApp {
         }
     }
 
+    #[cfg(feature = "dev-fixtures")]
     fn reply_with_app_commissioning_and_planning_change(
         response: ResponseEnvelope,
         reason: &str,
@@ -1559,24 +1697,56 @@ impl EngineApp {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::format_health_summary;
+enum CommissioningUpdateRefusal {
+    InvalidParams(String),
+    ProbesIncomplete(String),
+    Storage(String),
+}
 
-    #[test]
-    fn health_summary_includes_all_native_domains() {
-        let summary = format_health_summary(
-            "ok",
-            "Schema v1, journal mode wal, integrity ok",
-            "Lighting ready.",
-            "Audio ready.",
-            "Bridge ready at http://127.0.0.1:38201",
-        );
-
-        assert!(summary.contains("Health 'ok'."));
-        assert!(summary.contains("Storage Schema v1"));
-        assert!(summary.contains("Lighting ready."));
-        assert!(summary.contains("Audio ready."));
-        assert!(summary.contains("Control surface Bridge ready"));
+impl EngineApp {
+    /// 2026-09 audit Slice 8 (operator decision 7): publishing (`stage:
+    /// ready`) is refused while any commissioning probe is not `passed`,
+    /// unless the request carries the explicit `overrideProbes: true`. An
+    /// override is recorded (`app.commissioning.publish_override_at`) and
+    /// logged; a clean publish clears any earlier marker. Requests that do
+    /// not publish pass through untouched.
+    fn gate_commissioning_publish(
+        &self,
+        mut updates: Vec<(&'static str, String)>,
+        params: &serde_json::Value,
+    ) -> Result<Vec<(&'static str, String)>, CommissioningUpdateRefusal> {
+        let override_probes = parse_commissioning_override(params)
+            .map_err(CommissioningUpdateRefusal::InvalidParams)?;
+        let publishing = updates
+            .iter()
+            .any(|(key, value)| *key == COMMISSIONING_COMPLETED_KEY && value == "true");
+        if !publishing {
+            return Ok(updates);
+        }
+        let settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)
+            .map_err(|error| CommissioningUpdateRefusal::Storage(error.to_string()))?;
+        match evaluate_publish_gate(&settings, override_probes) {
+            PublishGate::Clear => updates.push((PUBLISH_OVERRIDE_AT_KEY, String::new())),
+            PublishGate::Refused { message } => {
+                return Err(CommissioningUpdateRefusal::ProbesIncomplete(message));
+            }
+            PublishGate::Overridden { failing } => {
+                let at = publish_override_timestamp(&self.runtime.db_path)
+                    .map_err(|error| CommissioningUpdateRefusal::Storage(error.to_string()))?;
+                let _ = append_log(
+                    &self.runtime.log_file_path,
+                    "WARN",
+                    &format!(
+                        "Commissioning published with a probe override at {at}: {}",
+                        failing.join(", ")
+                    ),
+                );
+                updates.push((PUBLISH_OVERRIDE_AT_KEY, at));
+            }
+        }
+        Ok(updates)
     }
 }
+
+#[cfg(test)]
+mod tests;

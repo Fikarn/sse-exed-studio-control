@@ -11,7 +11,10 @@ The remediation-plan audit categorised the scripts by risk (43 at the
 time; 46 non-test scripts as of 2026-08-12). Tests live as
 `*.test.mjs` siblings of the script under test; the `scripts:test`
 lane (now glob-driven via `scripts/**/*.test.mjs`) picks them up
-automatically.
+automatically. The glob is double-quoted in `package.json`: npm runs
+scripts through `cmd.exe` on Windows, which hands single quotes to Node
+literally, and that made the lane run zero tests on the workstation
+until 2026-09 (production readiness, Slice 1).
 
 The `_accepted gap_` rows below were audited 2026-08-12: each is
 either exercised end-to-end by a CI lane or requires signing
@@ -24,16 +27,17 @@ risk profile changes.
 These run during the 12-stage release chain. A silent regression
 here ships broken artifacts or breaks rollback.
 
-| Script                                 | Test                                              |
-| -------------------------------------- | ------------------------------------------------- |
-| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)               |
-| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)             |
-| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10) |
-| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)      |
-| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)      |
-| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)        |
-| `native-sign-macos.mjs`                | _accepted gap_ (requires keychain identities)     |
-| `native-sign-windows.mjs`              | _accepted gap_ (requires signtool + cert)         |
+| Script                                 | Test                                                                                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)                                                                                                                                                        |
+| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)                                                                                                                                                      |
+| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10)                                                                                                                                          |
+| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
+| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
+| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)                                                                                                                                                 |
+| `native-sign-macos.mjs`                | `native-sign.test.mjs` pins the dormant path (skip, exit 0, the variable named) and that half a configuration fails; signing itself stays an _accepted gap_ (requires keychain identities) |
+| `native-sign-windows.mjs`              | `native-sign.test.mjs`, the same; signing itself stays an _accepted gap_ (requires signtool + cert)                                                                                        |
+| `write-release-sboms.mjs`              | `write-release-sboms.test.mjs` — the plan and the refusal rule; the two generators run in `release-evidence.yml`                                                                           |
 
 ### Tier 2 — build / acceptance
 
@@ -50,7 +54,7 @@ These run during foundation and visual-review lanes.
 
 Lower-blast-radius helpers. Tests are nice-to-have.
 
-- `clean.mjs`
+- `clean.mjs` — `clean.test.mjs` (2026-09-18). Not low-blast-radius after all: until then it deleted `release/` whole, and on the studio workstation `release/native/windows` is the installed app. It now keeps `release/native` when a packaged executable is in it, needs `--include-release` to remove it, and refuses while a process runs from the folder — one test starts a real process from a temp-dir app folder. Every test works in a temporary root; `clean()` has no default root.
 - `dev-doctor.mjs`
 - `file-health.mjs` _(covered by the `file:health` lane itself)_
 
@@ -63,6 +67,26 @@ Lower-blast-radius helpers. Tests are nice-to-have.
 - `release/write-release-manifest.test.mjs` (PR 3)
 - `release/helpers.test.mjs` (PR 3)
 - `check-slice-rescope.test.mjs` (PR 9)
+
+### Supply chain (2026-09 production readiness, Slice 12 — finding F17)
+
+| Script                    | Test                                                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `check-npm-audit.mjs`     | `check-npm-audit.test.mjs` — on the `npm audit --json` reports recorded under `fixtures/npm-audit/`; the tests never call the registry |
+| `check-deny-ignores.mjs`  | `check-deny-ignores.test.mjs`                                                                                                          |
+| `supply-chain-expiry.mjs` | the date rule both lists share; covered by the two files above                                                                         |
+
+Neither test judges a date against today's: whether an exception has
+expired is the `supply-chain` CI job's to say, so a date can never turn
+`scripts:test` (and with it `dev:check`) red by itself.
+
+### Repository guards
+
+Tests that hold a repository-wide property rather than a script:
+
+- `frontend/dev-server-host.test.mjs` — no local server surface (Vite,
+  Playwright, Storybook, Tauri dev) or helper script binds `0.0.0.0`
+  (2026-09 production readiness, Slice 1 — finding F24).
 
 ## Per-script test contract
 

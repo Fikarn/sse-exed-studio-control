@@ -363,6 +363,17 @@ async function runWorkspaceQualification() {
     });
     assertWorkspaceReady(initialStatus, "setup");
 
+    // All three probes run, so a workstation with live TotalMix publishes
+    // through the real gate. The engine refuses `stage: ready` while any probe
+    // is not `passed` (2026-09 audit Slice 8), so the explicit override is sent
+    // only when a probe cannot pass on this host: no TotalMix
+    // (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80 not bindable
+    // for the lighting probe server (2026-09 production readiness, Slice 1).
+    await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
+      request: {
+        target: "control-surface",
+      },
+    });
     await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
       request: {
         receivePort: audioReceivePort,
@@ -383,10 +394,12 @@ async function runWorkspaceQualification() {
     } finally {
       await closeLightingProbeServer(lightingProbeServer);
     }
+    const overrideProbes = SKIP_AUDIO_PROBE || lightingProbeServer === null;
     await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
         runnerStage: "publish",
         stage: "ready",
+        ...(overrideProbes ? { overrideProbes: true } : {}),
       },
     });
     await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
@@ -395,6 +408,7 @@ async function runWorkspaceQualification() {
     evidence.recordCheck("commissioning-probes-and-publish-complete", {
       audioReceivePort,
       lightingUniverse: 1,
+      overrideProbes,
     });
 
     const lightingWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
@@ -599,6 +613,33 @@ async function runWorkspaceQualification() {
     evidence.recordCheck("planning-live-mutations-round-trip", {
       projectTitle: planningProjectTitle,
       taskTitle: "Live shell acceptance task",
+    });
+
+    // 2026-09 production readiness, Slice 11 (F30): what this lane did on
+    // screen is in the action log with the screen as its source. The scene
+    // recall above is a row; the fixture's intensity and colour temperature
+    // were rides and are not. Recording an action raises no event (it would
+    // cost every action a request), so the list is fetched — as opening
+    // Setup fetches it — and needs no wait: the row is on disk before the
+    // hardware link answers the request that made it.
+    const refreshed = await dispatchCommand(firstSession, firstRun, "refresh");
+    const recentEvents = asArray(refreshed.status.shellState.supportSnapshot?.recentEvents);
+    const recallRow = recentEvents.find((row) => row?.action === "scene-recalled");
+    assert(
+      recallRow?.source === "ui" && typeof recallRow.detail === "string" && recallRow.detail.length > 0,
+      `Expected the scene recall in Recent actions with the screen as its source, got ${JSON.stringify(recentEvents)}.`
+    );
+    assert(
+      recentEvents.every((row) => ["ui", "deck", "console", "watchdog", "launch"].includes(row?.source)),
+      `Expected every recent action to name a known source, got ${JSON.stringify(recentEvents)}.`
+    );
+    assert(
+      !recentEvents.some((row) => row?.action === "light-on" || row?.action === "light-off"),
+      `Expected the fixture's intensity ride to leave no row, got ${JSON.stringify(recentEvents)}.`
+    );
+    evidence.recordCheck("ui-actions-appear-in-recent-actions", {
+      recallRow: `${recallRow.source}: ${recallRow.detail}`,
+      rows: recentEvents.length,
     });
   } finally {
     await closeTauriShell(firstRun);

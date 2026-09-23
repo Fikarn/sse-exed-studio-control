@@ -17,8 +17,9 @@ export interface PlotMetaProps {
 
 export const PlotMeta = ({ label, value, tone = "default", className }: PlotMetaProps) => {
   const classes = [styles.meta, tone === "selected" ? styles.selected : "", className].filter(Boolean).join(" ");
+  // Visual overhaul A, Slice 9 (system §5): a plate at the drawer's level.
   return (
-    <div className={classes}>
+    <div className={classes} data-material="plate" data-level="float">
       <span>{label}</span>
       <span className={styles.value}>{value}</span>
     </div>

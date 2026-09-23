@@ -6,7 +6,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion bridge available but setup incomplete."
         }
       },
@@ -36,15 +36,15 @@
       "summary": "Storage healthy. Operator mode locked pending setup.",
       "checks": {
         "lighting": {
-          "status": "attention",
+          "status": "unconfigured",
           "summary": "Bridge not commissioned."
         },
         "audio": {
-          "status": "attention",
+          "status": "not-verified",
           "summary": "Console not commissioned."
         },
         "controlSurface": {
-          "status": "ok",
+          "status": "ready",
           "summary": "Bridge reachable."
         }
       }
@@ -56,16 +56,19 @@
       "summary": "Complete commissioning to unlock operator mode.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "attention",
           "detail": "Universe not confirmed."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "attention",
           "detail": "Connection not verified."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "ok",
           "detail": "Companion bridge available."
@@ -79,7 +82,8 @@
       "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
       "backups": [],
       "summary": "No backup exported yet.",
-      "recentBackups": []
+      "recentBackups": [],
+      "recentEvents": []
     }
   },
   "setup-ready": {
@@ -89,7 +93,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "ok",
+          "status": "ready",
           "summary": "Companion bridge ready."
         }
       },
@@ -119,15 +123,15 @@
       "summary": "System healthy and ready.",
       "checks": {
         "lighting": {
-          "status": "ok",
+          "status": "ready",
           "summary": "DMX bridge online."
         },
         "audio": {
-          "status": "ok",
+          "status": "ready",
           "summary": "OSC connection synchronized."
         },
         "controlSurface": {
-          "status": "ok",
+          "status": "ready",
           "summary": "Companion bridge responding."
         }
       }
@@ -139,16 +143,19 @@
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "ok",
           "detail": "Universe 1 responding."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "ok",
           "detail": "OSC sync healthy."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "ok",
           "detail": "Profile export current."
@@ -169,7 +176,90 @@
         }
       ],
       "summary": "Latest backup exported this morning.",
-      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+      "recentBackups": ["2026-04-22T07:12:00.000Z"],
+      "recentEvents": [
+        {
+          "id": 9,
+          "at": "2026-04-22T07:41:12.412Z",
+          "source": "ui",
+          "domain": "lighting",
+          "action": "outputs-armed",
+          "target": "Light outputs",
+          "detail": "Light outputs armed"
+        },
+        {
+          "id": 8,
+          "at": "2026-04-22T07:40:03.118Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "scene-recalled",
+          "target": "Interview wide",
+          "detail": "Scene recalled: Interview wide"
+        },
+        {
+          "id": 7,
+          "at": "2026-04-22T07:39:48.905Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "all-off",
+          "target": "All lights",
+          "detail": "All lights off"
+        },
+        {
+          "id": 6,
+          "at": "2026-04-22T07:36:20.377Z",
+          "source": "console",
+          "domain": "audio",
+          "action": "mute",
+          "target": "Host",
+          "detail": "Mute on at TotalMix: Host"
+        },
+        {
+          "id": 5,
+          "at": "2026-04-22T07:31:09.640Z",
+          "source": "watchdog",
+          "domain": "audio",
+          "action": "talkback-off",
+          "target": "Talkback",
+          "detail": "Talkback released: nobody held it"
+        },
+        {
+          "id": 4,
+          "at": "2026-04-22T07:31:07.122Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "talkback-on",
+          "target": "Talkback",
+          "detail": "Talkback on"
+        },
+        {
+          "id": 3,
+          "at": "2026-04-22T07:24:51.003Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "phantom",
+          "target": "Host",
+          "detail": "48 V on: Host"
+        },
+        {
+          "id": 2,
+          "at": "2026-04-22T07:22:30.871Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "console-snapshot-recalled",
+          "target": "Panel",
+          "detail": "Console mix recalled: Panel"
+        },
+        {
+          "id": 1,
+          "at": "2026-04-22T07:12:44.250Z",
+          "source": "launch",
+          "domain": "lighting",
+          "action": "outputs-held",
+          "target": "Light outputs",
+          "detail": "Light outputs held at start (safe start)"
+        }
+      ]
     }
   },
   "setup-degraded": {
@@ -179,7 +269,7 @@
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion bridge responding but the deck export is stale."
         }
       },
@@ -211,21 +301,18 @@
         "lighting": "DMX bridge answered, but the configured universe changed after the last verification pass.",
         "controlSurface": "Companion export is older than the last planning seed."
       },
-      "recentLogExcerpt": [
-        "[WARN] Lighting bridge changed universe after commissioning.",
-        "[WARN] Companion profile export is older than the current planning data."
-      ],
+      "recentLogExcerpt": "[WARN] Lighting bridge changed universe after commissioning.\n[WARN] Companion profile export is older than the current planning data.",
       "checks": {
         "lighting": {
-          "status": "attention",
+          "status": "unconfigured",
           "summary": "DMX bridge needs re-verification."
         },
         "audio": {
-          "status": "ok",
+          "status": "ready",
           "summary": "OSC connection synchronized."
         },
         "controlSurface": {
-          "status": "attention",
+          "status": "ready",
           "summary": "Companion export stale."
         }
       }
@@ -237,16 +324,19 @@
       "summary": "Commissioning complete and operator mode unlocked.",
       "checks": [
         {
+          "id": "lighting",
           "label": "Lighting bridge",
           "status": "attention",
           "detail": "Universe changed after verification."
         },
         {
+          "id": "audio",
           "label": "Audio console",
           "status": "ok",
           "detail": "OSC sync healthy."
         },
         {
+          "id": "control-surface",
           "label": "Control surface",
           "status": "attention",
           "detail": "Companion export is stale."
@@ -267,7 +357,36 @@
         }
       ],
       "summary": "Latest backup exported before the degraded change.",
-      "recentBackups": ["2026-04-22T07:12:00.000Z"]
+      "recentBackups": ["2026-04-22T07:12:00.000Z"],
+      "recentEvents": [
+        {
+          "id": 3,
+          "at": "2026-04-22T07:24:51.003Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "phantom",
+          "target": "Host",
+          "detail": "48 V on: Host"
+        },
+        {
+          "id": 2,
+          "at": "2026-04-22T07:22:30.871Z",
+          "source": "ui",
+          "domain": "audio",
+          "action": "console-snapshot-recalled",
+          "target": "Panel",
+          "detail": "Console mix recalled: Panel"
+        },
+        {
+          "id": 1,
+          "at": "2026-04-22T07:12:44.250Z",
+          "source": "launch",
+          "domain": "lighting",
+          "action": "outputs-held",
+          "target": "Light outputs",
+          "detail": "Light outputs held at start (safe start)"
+        }
+      ]
     }
   },
   "startup-loading": {
@@ -304,10 +423,7 @@
         "storage": "SQLite integrity check returned corruption in the primary database file.",
         "support": "Use the support backup directory to recover a known-good archive."
       },
-      "recentLogExcerpt": [
-        "[ERROR] pragma integrity_check returned corruption.",
-        "[INFO] Startup aborted before app snapshot."
-      ]
+      "recentLogExcerpt": "[ERROR] pragma integrity_check returned corruption.\n[INFO] Startup aborted before app snapshot."
     },
     "startupFailure": {
       "stage": "bootstrap",
@@ -353,6 +469,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": "fixture-key",
       "selectedSceneId": "scene-warm-wash",
@@ -569,6 +686,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "warning",
       "selectedFixtureId": "fixture-back",
       "selectedSceneId": "scene-warm-wash",
@@ -767,6 +885,7 @@
       "enabled": true,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "fixtures": [],
       "groups": [],
       "scenes": [],
@@ -799,6 +918,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": null,
       "selectedSceneId": null,
@@ -835,6 +955,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": false,
+      "outputArmed": true,
       "lastActionStatus": "error",
       "selectedFixtureId": "fixture-key",
       "selectedSceneId": "scene-warm-wash",
@@ -2140,6 +2261,7 @@
       "grandMaster": 100,
       "connected": true,
       "reachable": true,
+      "outputArmed": true,
       "lastActionStatus": "ok",
       "selectedFixtureId": null,
       "selectedSceneId": "scene-warm-wash",

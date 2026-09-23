@@ -60,10 +60,10 @@ export function GroupChip({
   const levelClass = drifted ? `${styles.groupChipLevel} ${styles.groupChipLevelDrifted}` : styles.groupChipLevel;
   const meaningfulDelta = drifted && Math.abs(levelDelta) >= 1;
   const TrendIcon = levelDelta > 0 ? TrendingUp : TrendingDown;
-  const deltaText = meaningfulDelta ? `${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)}` : "";
+  const deltaText = meaningfulDelta ? `${levelDelta > 0 ? "+" : ""}${Math.round(levelDelta)} %` : "";
   const fixtureLabel = `${fixtureCount} fixture${fixtureCount === 1 ? "" : "s"}`;
   const driftSuffix = drifted ? ", drifted" : "";
-  const powerAriaLabel = `${name}, ${fixtureLabel}${on ? ` at ${level}%` : ""}${driftSuffix}, ${on ? "on" : "off"}. Toggle ${on ? "off" : "on"}.`;
+  const powerAriaLabel = `${name}, ${fixtureLabel}${on ? ` at ${level} %` : ""}${driftSuffix}, ${on ? "on" : "off"}. Toggle ${on ? "off" : "on"}.`;
 
   // dnd-kit sortable hook — same shape as SceneTile (Wave 23.B/C). When
   // `sortable` is false the hook still runs (rules-of-hooks) but we skip
@@ -164,10 +164,10 @@ export function GroupChip({
         ) : null}
         <StatusDot tone={on ? "ok" : "info"} size="sm" glow={on} />
         <span className={styles.groupChipName}>{name}</span>
-        <span className={styles.groupChipCount}>{fixtureCount}F</span>
+        <span className={styles.groupChipCount}>{fixtureCount} fixtures</span>
         {on ? (
           <span className={levelClass}>
-            {level}%
+            {level} %
             {meaningfulDelta || drifted ? (
               <span className={styles.groupChipDelta} aria-hidden="true">
                 <TrendIcon size={11} strokeWidth={2.5} />

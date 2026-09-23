@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="en" data-theme="studio">
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Audio · Concept B — Ledger · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         Concept B — LEDGER (truth per value)
+         Composition: the console is a table. One row per channel, grouped by tier,
+         with the same columns everywhere: name · 48 V · gain · fader (horizontal,
+         unity notch) · dB · meter (horizontal, −18 reference line running down the
+         whole column) · M · S · what the desk says. The monitor section is the
+         pinned first row ("what you are hearing"). Snapshots and the inspector share
+         a 640 px right column. A 48 px workspace top bar carries the state badge.
+         Hierarchy: the value and whether the desk confirmed it, read down a column
+         like a ledger; everything else is a column header away.
+         Material: flat tonal planes. No shadows, no gradients except the meter ramp,
+         hairline rules, panels one step lighter than the chassis, keys one step
+         lighter again. Colour only as state; selection is a cool keyline that can
+         never be confused with amber (engaged), green (live) or red (hazard).
+         ?theme=studio|graphite|bone · keys s / g / b · 1 toggles 1:1
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r6: 6px;
+        --r10: 10px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0e0f11;
+        --panel: #141518;
+        --panel-2: #191a1e;
+        --key: #202226;
+        --key-hi: #2a2c32;
+        --well: #0a0b0d;
+        --meter-well: #07080a;
+        --line: rgba(255, 255, 255, 0.07);
+        --line-2: rgba(255, 255, 255, 0.16);
+        --rule: rgba(255, 255, 255, 0.05);
+        --text: #f5f5f6;
+        --text-2: #a4a6ad;
+        --accent: #8b93ff;
+        --accent-tint: rgba(139, 147, 255, 0.09);
+        --amber: #e2a94f;
+        --amber-ink: #1a1204;
+        --amber-text: #e2a94f;
+        --green: #3ccf72;
+        --green-ink: #04200f;
+        --green-text: #3ccf72;
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --m-lo: #22c55e;
+        --m-mid: #f5c542;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #e8e8ec;
+        --cap-line: #0e0f11;
+      }
+      [data-theme="graphite"] {
+        --bg: #121418;
+        --panel: #191c22;
+        --panel-2: #1e2229;
+        --key: #262b33;
+        --key-hi: #31373f;
+        --well: #0d0f13;
+        --meter-well: #08090c;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-2: rgba(255, 255, 255, 0.18);
+        --rule: rgba(255, 255, 255, 0.06);
+        --text: #f3f5f8;
+        --text-2: #a9b0bc;
+        --accent: #9aa3ff;
+        --accent-tint: rgba(154, 163, 255, 0.1);
+        --amber: #e2a94f;
+        --amber-ink: #1a1204;
+        --amber-text: #e6b160;
+        --green: #3ccf72;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --m-lo: #22c55e;
+        --m-mid: #f5c542;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #eaedf2;
+        --cap-line: #121418;
+      }
+      [data-theme="bone"] {
+        --bg: #f4f4f2;
+        --panel: #ffffff;
+        --panel-2: #f8f8f6;
+        --key: #f1f1ef;
+        --key-hi: #e8e8e5;
+        --well: #e9e9e6;
+        --meter-well: #1c1d22;
+        --line: rgba(0, 0, 0, 0.1);
+        --line-2: rgba(0, 0, 0, 0.28);
+        --rule: rgba(0, 0, 0, 0.07);
+        --text: #17181c;
+        --text-2: #5c5f66;
+        --accent: #4f57c9;
+        --accent-tint: rgba(79, 87, 201, 0.09);
+        --amber: #e9a83e;
+        --amber-ink: #1a1204;
+        --amber-text: #8a5a00;
+        --green: #2fbf6a;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --m-lo: #22c55e;
+        --m-mid: #f5c542;
+        --m-hot: #ff8a3d;
+        --m-over: #ff4d4d;
+        --cap: #2a2b30;
+        --cap-line: #ffffff;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 48px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      kbd {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        border: 1px solid var(--line-2);
+        border-radius: var(--r4);
+        padding: 3px 5px;
+      }
+      .mono {
+        font-family: var(--mono);
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* shell */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r6);
+        border: 1px solid var(--line-2);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        margin-left: 8px;
+      }
+      .tab {
+        height: 34px;
+        padding: 0 12px;
+        border-radius: var(--r6);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab kbd {
+        padding: 2px 4px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: var(--key);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .lampchip {
+        height: 30px;
+        padding: 0 10px;
+        border-radius: var(--r6);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+      }
+      .lamp.red {
+        background: var(--red-text);
+      }
+      .lamp.accent {
+        background: var(--accent);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 10px;
+      }
+
+      /* top bar */
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .topbar h1 {
+        font: 600 20px/1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .context {
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .context b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .badge {
+        height: 30px;
+        padding: 0 12px;
+        border-radius: var(--r6);
+        border: 1px solid var(--green-text);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .badge .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0;
+      }
+      .search {
+        margin-left: auto;
+        height: 32px;
+        width: 340px;
+        border-radius: var(--r6);
+        background: var(--well);
+        border: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        gap: 10px;
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .search kbd {
+        margin-left: auto;
+      }
+      .btn {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--r6);
+        background: var(--key);
+        border: 1px solid var(--line);
+        font: 600 13px/1 var(--ui);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+      }
+      .btn.primary {
+        background: var(--text);
+        color: var(--bg);
+        border-color: transparent;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+
+      /* body */
+      .body {
+        display: grid;
+        grid-template-columns: 1fr 640px;
+        gap: 16px;
+        padding: 16px;
+        min-height: 0;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--r10);
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      /* ledger */
+      .ledger {
+        display: flex;
+        flex-direction: column;
+      }
+      .monitor {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-2);
+        height: 104px;
+      }
+      .monitor .who {
+        width: 244px;
+      }
+      .monitor .who .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .monitor .who .n {
+        font: 600 20px/1.1 var(--ui);
+        margin-top: 6px;
+      }
+      .monitor .who .s {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 3px;
+      }
+      .seg {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: var(--r6);
+        background: var(--well);
+        border: 1px solid var(--line);
+      }
+      .seg .key {
+        height: 38px;
+        padding: 0 14px;
+        border-radius: var(--r4);
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+      }
+      .seg .key.on {
+        background: var(--amber);
+        color: var(--amber-ink);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: var(--r6);
+        background: var(--key);
+        border: 1px solid var(--line);
+        color: var(--text);
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key.on {
+        background: var(--amber);
+        color: var(--amber-ink);
+        border-color: var(--line-2);
+      }
+      .key.on kbd {
+        color: var(--amber-ink);
+        border-color: rgba(0, 0, 0, 0.35);
+      }
+      .key.talk {
+        width: 168px;
+        height: 56px;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .key.talk .hint {
+        font: 500 12px/1 var(--ui);
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--text-2);
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .key.mid {
+        width: 88px;
+        height: 44px;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .key.mid .hint {
+        font: 500 12px/1 var(--ui);
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--text-2);
+      }
+      .mlevel {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 360px;
+      }
+      .mlevel .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        width: 40px;
+        line-height: 1.2;
+      }
+      .hfader {
+        position: relative;
+        height: 28px;
+        flex: 1;
+      }
+      .hfader .track {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        top: 50%;
+        height: 6px;
+        margin-top: -3px;
+        border-radius: var(--pill);
+        background: var(--well);
+        border: 1px solid var(--line);
+      }
+      .hfader .unity {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--text);
+        left: calc(12px + 81.72% - 0.8172 * 24px);
+        opacity: 0.7;
+      }
+      .hfader .cap {
+        position: absolute;
+        top: 0;
+        width: 24px;
+        height: 28px;
+        margin-left: -12px;
+        border-radius: var(--r4);
+        background: var(--cap);
+      }
+      .hfader .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 5px;
+        bottom: 5px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .mlevel .v {
+        font: 600 20px/1 var(--mono);
+        width: 92px;
+        text-align: right;
+      }
+      .mmeter {
+        width: 400px;
+        display: grid;
+        grid-template-columns: 14px 1fr 48px;
+        column-gap: 8px;
+        row-gap: 4px;
+        align-items: center;
+      }
+      .mmeter .ch {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .mmeter .val {
+        font: 500 14px/1 var(--mono);
+        text-align: right;
+      }
+      .hbar {
+        position: relative;
+        height: 14px;
+        border-radius: var(--r4);
+        background: var(--meter-well);
+        border: 1px solid var(--line);
+        overflow: hidden;
+      }
+      .hbar .ramp {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          var(--m-lo) 0%,
+          var(--m-lo) 70%,
+          var(--m-mid) 70%,
+          var(--m-mid) 90%,
+          var(--m-hot) 90%,
+          var(--m-hot) 95%,
+          var(--m-over) 95%,
+          var(--m-over) 100%
+        );
+      }
+      .hbar .peak {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #ffffff;
+      }
+      .hbar .ref {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 70%;
+        border-left: 1px dashed rgba(255, 255, 255, 0.45);
+      }
+      .mmeter .scale {
+        grid-column: 2;
+        display: flex;
+        justify-content: space-between;
+        font: 500 12px/1.2 var(--mono);
+        color: var(--text-2);
+      }
+      .mmeter .scale span {
+        padding: 0 3px;
+      }
+
+      .cols {
+        display: grid;
+        grid-template-columns: 40px 236px 60px 96px 560px 108px 420px 56px 56px 148px;
+        column-gap: 6px;
+        align-items: center;
+        padding: 0 16px;
+      }
+      .head {
+        height: 34px;
+        border-bottom: 1px solid var(--line);
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .head .axis {
+        position: relative;
+        height: 34px;
+      }
+      .head .axis span {
+        position: absolute;
+        top: 10px;
+        transform: translateX(-50%);
+        font: 500 12px/1.2 var(--mono);
+        text-transform: none;
+        letter-spacing: 0;
+        padding: 0 3px;
+      }
+      .head .axis span.first {
+        transform: none;
+      }
+      .head .axis span.last {
+        transform: translateX(-100%);
+      }
+      .group {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        height: 38px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--rule);
+        background: var(--panel-2);
+      }
+      .group .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .group .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .row {
+        height: 76px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .row.sel {
+        background: var(--accent-tint);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .row .num {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .row .name {
+        font: 600 16px/1.2 var(--ui);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .sub {
+        font: 400 13px/1.2 var(--ui);
+        color: var(--text-2);
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .key {
+        height: 36px;
+        width: 56px;
+      }
+      .row .key.p48 {
+        color: var(--red-text);
+        gap: 5px;
+        padding: 0 4px;
+        font-size: 12px;
+      }
+      .row .key.p48 .lamp {
+        width: 7px;
+        height: 7px;
+        background: var(--red-text);
+      }
+      .row .gain {
+        height: 36px;
+        width: 84px;
+        border-radius: var(--r6);
+        background: var(--well);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font: 500 14px/1 var(--mono);
+      }
+      .row .dash {
+        color: var(--text-2);
+        font: 500 14px/1 var(--mono);
+        text-align: center;
+      }
+      .row .db {
+        font: 600 16px/1 var(--mono);
+        text-align: right;
+        padding-right: 8px;
+      }
+      .row .desk {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .row .desk b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .row .desk .lamp {
+        background: var(--green-text);
+      }
+      .rowmeter {
+        position: relative;
+        height: 26px;
+      }
+      .rowmeter .hbar {
+        position: absolute;
+        inset: 0;
+        height: auto;
+      }
+      .rowmeter .clip {
+        position: absolute;
+        right: -14px;
+        top: 9px;
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--key-hi);
+        border: 1px solid var(--line-2);
+      }
+      .row .fader-cell {
+        display: flex;
+        align-items: center;
+      }
+      .row .hfader {
+        height: 36px;
+      }
+      .row .hfader .cap {
+        top: 2px;
+        height: 32px;
+      }
+
+      /* right column */
+      .right {
+        display: grid;
+        grid-template-rows: 396px 1fr;
+        gap: 16px;
+        min-height: 0;
+      }
+      .snaps {
+        display: flex;
+        flex-direction: column;
+      }
+      .snaps .ph {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--line);
+        height: 52px;
+      }
+      .snaps .ph .t {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+      .snaps .ph .t span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .snaprow {
+        display: grid;
+        grid-template-columns: 28px 1fr auto auto;
+        align-items: center;
+        column-gap: 10px;
+        height: 42px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--rule);
+        font: 500 14px/1 var(--ui);
+      }
+      .snaprow .n {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .snaprow .name {
+        font-weight: 600;
+      }
+      .snaprow.empty .name {
+        color: var(--text-2);
+        font-weight: 400;
+      }
+      .snaprow .meta {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .snaprow.current .meta {
+        color: var(--amber-text);
+        font-family: var(--ui);
+        font-weight: 600;
+      }
+      .snaprow .btn {
+        height: 28px;
+        padding: 0 10px;
+        font-size: 12px;
+      }
+      .snaprow.current {
+        background: var(--accent-tint);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+
+      .inspector {
+        display: flex;
+        flex-direction: column;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px 10px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .tabs2 {
+        display: flex;
+        gap: 2px;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tabs2 .tab {
+        height: 38px;
+        border-radius: 0;
+        border-bottom: 2px solid transparent;
+      }
+      .tabs2 .tab.on {
+        background: none;
+        border-bottom-color: var(--accent);
+      }
+      .insp-body {
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow: hidden;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .send {
+        display: grid;
+        grid-template-columns: 120px 1fr 96px;
+        align-items: center;
+        column-gap: 12px;
+        font: 500 14px/1 var(--ui);
+      }
+      .send .v {
+        font: 600 16px/1 var(--mono);
+        text-align: right;
+      }
+      .send.active .v {
+        font-size: 20px;
+      }
+      .send .hfader {
+        height: 30px;
+      }
+      .send .hfader .cap {
+        top: 1px;
+        height: 28px;
+      }
+      .eq {
+        border-radius: var(--r6);
+        background: var(--well);
+        border: 1px solid var(--line);
+        height: 210px;
+        position: relative;
+        overflow: hidden;
+      }
+      .eq svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .eq text {
+        font: 500 12px var(--mono);
+        fill: var(--text-2);
+      }
+      .eq .band text {
+        fill: var(--text);
+        font-weight: 600;
+      }
+      .eqrows {
+        display: grid;
+        grid-template-columns: 40px 1fr 1fr 1fr;
+        row-gap: 8px;
+        column-gap: 8px;
+        font: 500 14px/1 var(--mono);
+      }
+      .eqrows .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .eqrows .b {
+        font-family: var(--ui);
+        font-weight: 600;
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 16px/1 var(--mono);
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .btn {
+        flex: 1;
+        justify-content: center;
+      }
+      .insp-keys .btn.on {
+        background: var(--amber);
+        color: var(--amber-ink);
+        border-color: var(--line-2);
+      }
+
+      /* footer */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 20px;
+        border-top: 1px solid var(--line);
+        background: var(--panel);
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .hints {
+        margin-left: auto;
+        display: flex;
+        gap: 18px;
+        align-items: center;
+      }
+      .footer .hints span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="B-ledger">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control</div>
+        <nav class="tabs">
+          <button class="tab" data-key>Setup / Support <kbd>Ctrl 1</kbd></button>
+          <button class="tab" data-key>Lighting <kbd>Ctrl 2</kbd></button>
+          <button class="tab on" data-key>Audio <kbd>Ctrl 3</kbd></button>
+          <button class="tab" data-key>Planning <kbd>Ctrl 4</kbd></button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1 · FX 3/4</button>
+          <div class="clock">09:11</div>
+        </div>
+      </header>
+
+      <div class="topbar" data-region="topbar">
+        <h1>Audio</h1>
+        <div class="context">Snapshot <b>Show open</b> · UFX III</div>
+        <div class="badge">
+          <i class="lamp ok"></i>VERIFIED <span class="d">42 values confirmed · last sync 18:24</span>
+        </div>
+        <div class="search">Search channels, snapshots <kbd>Ctrl F</kbd></div>
+        <button class="btn" data-key>Sync from TotalMix</button>
+        <button class="btn" data-key>Run audio probe</button>
+        <button class="btn" data-key>Clear clips</button>
+        <button class="btn primary" data-key>Capture snapshot</button>
+        <button class="btn ghost" data-key aria-label="More">⋯</button>
+      </div>
+
+      <div class="body">
+        <section class="panel ledger" data-region="ledger">
+          <!-- pinned: what you are hearing -->
+          <div class="monitor" data-region="monitor">
+            <div class="who">
+              <div class="l">Monitor · you are hearing</div>
+              <div class="n">Main Out</div>
+              <div class="s">Faders below set sends into it</div>
+            </div>
+            <div class="seg">
+              <button class="key on" data-key data-take>Main Out</button>
+              <button class="key" data-key data-take>Phones 1</button>
+              <button class="key" data-key data-take>Phones 2</button>
+            </div>
+            <button class="key talk" data-key data-take aria-label="Talkback, hold to talk">
+              Talkback<span class="hint">hold <kbd>T</kbd></span>
+            </button>
+            <button class="key mid" data-key data-take>Dim<span class="hint">−20 dB</span></button>
+            <button class="key mid" data-key data-take>Mono<span class="hint">L+R</span></button>
+            <div class="mlevel">
+              <div class="l">Main level</div>
+              <div class="hfader" data-key data-take role="slider" aria-label="Main Out level">
+                <div class="track"></div>
+                <div class="unity"></div>
+                <div class="cap" style="left: calc(12px + 78% - 0.78 * 24px)"></div>
+              </div>
+              <div class="v">-1.2 dB</div>
+            </div>
+            <div class="mmeter">
+              <div class="ch">L</div>
+              <div class="hbar">
+                <div class="ramp" id="mL"></div>
+                <div class="ref"></div>
+                <div class="peak" id="pL"></div>
+              </div>
+              <div class="val">-3.1</div>
+              <div class="ch">R</div>
+              <div class="hbar">
+                <div class="ramp" id="mR"></div>
+                <div class="ref"></div>
+                <div class="peak" id="pR"></div>
+              </div>
+              <div class="val">-5.6</div>
+              <div class="scale">
+                <span>-60</span><span>-40</span><span>-30</span><span>-20</span><span>-18</span><span>-12</span
+                ><span>-6</span><span>-3</span><span>0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="cols head">
+            <span>#</span><span>Channel</span><span>48 V</span><span>Gain</span>
+            <div class="axis" id="faderAxis"></div>
+            <span style="text-align: right; padding-right: 8px">Fader</span>
+            <div class="axis" id="meterAxis"></div>
+            <span>Mute</span><span>Solo</span><span>Desk says</span>
+          </div>
+          <div id="rows"></div>
+        </section>
+
+        <aside class="right">
+          <section class="panel snaps" data-region="snapshots">
+            <div class="ph">
+              <div class="t">Snapshots <span>Shift 1–8 · press twice to recall</span></div>
+              <button class="btn" data-key>Capture</button>
+            </div>
+            <div id="snaprows"></div>
+          </section>
+
+          <section class="panel inspector" data-region="inspector">
+            <div class="insp-head">
+              <div>
+                <h2>FX 3/4</h2>
+                <div class="sub">Playback 02 · stereo pair · solo engaged</div>
+              </div>
+              <button class="btn" data-key>Rename</button>
+            </div>
+            <div class="tabs2">
+              <button class="tab on" data-key>Sends</button>
+              <button class="tab" data-key>EQ</button>
+              <button class="tab" data-key>Dynamics</button>
+              <button class="tab" data-key>Routing</button>
+            </div>
+            <div class="insp-body">
+              <div class="section">
+                <div class="section-head">
+                  <span class="t">Sends</span
+                  ><span class="d">Main Out is the mix target · its send is the fader in the row</span>
+                </div>
+                <div class="send active">
+                  <span><b>Main Out</b></span>
+                  <div class="hfader" data-key role="slider" aria-label="Send to Main Out">
+                    <div class="track"></div>
+                    <div class="unity"></div>
+                    <div class="cap" style="left: calc(12px + 88% - 0.88 * 24px)"></div>
+                  </div>
+                  <div class="v">+2.1 dB</div>
+                </div>
+                <div class="send">
+                  <span>Phones 1</span>
+                  <div class="hfader" data-key role="slider" aria-label="Send to Phones 1">
+                    <div class="track"></div>
+                    <div class="unity"></div>
+                    <div class="cap" style="left: calc(12px + 60% - 0.6 * 24px)"></div>
+                  </div>
+                  <div class="v">-7.2 dB</div>
+                </div>
+                <div class="send">
+                  <span>Phones 2</span>
+                  <div class="hfader" data-key role="slider" aria-label="Send to Phones 2">
+                    <div class="track"></div>
+                    <div class="unity"></div>
+                    <div class="cap" style="left: calc(12px + 50% - 0.5 * 24px)"></div>
+                  </div>
+                  <div class="v">-12.1 dB</div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head"><span class="t">Equaliser</span><span class="d">bypassed</span></div>
+                <div class="eq">
+                  <svg viewBox="0 0 606 210" preserveAspectRatio="none" aria-hidden="true">
+                    <line
+                      x1="0"
+                      y1="105"
+                      x2="606"
+                      y2="105"
+                      class="axisline"
+                      stroke="currentColor"
+                      stroke-opacity="0.35"
+                    />
+                    <line x1="151" y1="0" x2="151" y2="210" stroke="currentColor" stroke-opacity="0.1" />
+                    <line x1="303" y1="0" x2="303" y2="210" stroke="currentColor" stroke-opacity="0.1" />
+                    <line x1="454" y1="0" x2="454" y2="210" stroke="currentColor" stroke-opacity="0.1" />
+                    <path
+                      d="M0 170 C 60 170, 80 106, 110 105 L 606 105"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-opacity="0.75"
+                      stroke-width="2"
+                    />
+                    <g class="band">
+                      <circle cx="98" cy="105" r="11" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" />
+                      <text x="98" y="109" text-anchor="middle">LC</text>
+                    </g>
+                    <g class="band">
+                      <circle cx="186" cy="105" r="11" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" />
+                      <text x="186" y="109" text-anchor="middle">1</text>
+                    </g>
+                    <g class="band">
+                      <circle cx="360" cy="105" r="11" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" />
+                      <text x="360" y="109" text-anchor="middle">2</text>
+                    </g>
+                    <g class="band">
+                      <circle cx="508" cy="105" r="11" fill="var(--panel)" stroke="currentColor" stroke-width="1.5" />
+                      <text x="508" y="109" text-anchor="middle">3</text>
+                    </g>
+                    <text x="151" y="202" text-anchor="middle">100 Hz</text>
+                    <text x="303" y="202" text-anchor="middle">1 kHz</text>
+                    <text x="454" y="202" text-anchor="middle">10 kHz</text>
+                    <text x="8" y="16">+12 dB</text>
+                    <text x="8" y="196">-12 dB</text>
+                  </svg>
+                </div>
+                <div class="eqrows">
+                  <span class="h">Band</span><span class="h">Frequency</span><span class="h">Gain</span
+                  ><span class="h">Q</span> <span class="b">LC</span><span>80 Hz</span><span>12 dB/oct</span
+                  ><span class="muted">—</span> <span class="b">1</span><span>180 Hz</span><span>0.0 dB</span
+                  ><span>0.9</span> <span class="b">2</span><span>1.6 kHz</span><span>0.0 dB</span><span>1.2</span>
+                  <span class="b">3</span><span>8.5 kHz</span><span>0.0 dB</span><span>shelf</span>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head"><span class="t">Meter</span><span class="d">post-fader · dBFS</span></div>
+                <div class="readouts">
+                  <span>Level L / R</span><span class="v">-23 / -23 dB</span> <span>Peak hold L / R</span
+                  ><span class="v">-18 / -19 dB</span>
+                </div>
+                <div class="insp-keys">
+                  <button class="btn on" data-key>Peak hold · on</button>
+                  <button class="btn" data-key>Reset peaks</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Console <b>confirmed · 42 values</b></span>
+        <span class="item">Metering <b>RME · live</b></span>
+        <span class="item">Last sync <b>18:24</b></span>
+        <div class="hints">
+          <span><kbd>Ctrl K</kbd> Palette</span>
+          <span><kbd>?</kbd> Shortcuts</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> Row</span>
+          <span><kbd>←</kbd><kbd>→</kbd> Fader · Shift ×5</span>
+          <span><kbd>T</kbd> hold to talk</span>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      const UNITY = 836 / 1023;
+      function dbToLin(db) {
+        if (db <= -64.9) return 0;
+        if (db >= 6) return 1;
+        if (db === 0) return UNITY;
+        const pos = db >= -6 ? (db + 26.8235294118) / 0.0320855615 : 826 - Math.sqrt(-34869 - 11033 * db);
+        return Math.min(1, Math.max(0, pos / 1023));
+      }
+      const meterPct = (dbfs) => Math.max(0, Math.min(100, ((dbfs + 60) / 60) * 100));
+      const INPUTS = [
+        { n: "Host", sub: "Preamp 1 · mic", pos: 0.7, db: "-3.8 dB", gain: 32, meter: -9, peak: -6 },
+        { n: "Co-host", sub: "Preamp 2 · mic", pos: 0.68, db: "-4.5 dB", gain: 28, meter: -12, peak: -8 },
+        { n: "Guest 1", sub: "Preamp 3 · mic", pos: 0.8, db: "-0.6 dB", gain: 45, meter: -6, peak: -3 },
+        { n: "Guest 2", sub: "Preamp 4 · mic", pos: 0.64, db: "-5.8 dB", gain: 36, meter: -14, peak: -10 },
+      ];
+      const PLAYBACK = [
+        { n: "Program 1/2", sub: "Stereo pair", pos: 0.9, db: "+2.7 dB", meter: -8, peak: -4 },
+        {
+          n: "FX 3/4",
+          sub: "Stereo pair · solo engaged",
+          pos: 0.88,
+          db: "+2.1 dB",
+          solo: true,
+          sel: true,
+          meter: -11,
+          peak: -7,
+        },
+        { n: "N-1 5/6", sub: "Stereo pair", pos: 0.46, db: "-14.6 dB", meter: -22, peak: -18 },
+        { n: "Music 7/8", sub: "Stereo pair", pos: 0.64, db: "-5.8 dB", meter: -16, peak: -12 },
+        { n: "Playback 9/10", sub: "Stereo pair", pos: 0.22, db: "-35.9 dB", meter: -38, peak: -34 },
+        { n: "Playback 11/12", sub: "Stereo pair", pos: 0.18, db: "-40.5 dB", meter: -45, peak: -41 },
+      ];
+      const OUTPUTS = [
+        { n: "Main Out", sub: "Monitor bus · mix target", pos: 0.78, db: "-1.2 dB", meter: -3.1, peak: -1 },
+        { n: "Phones 1", sub: "Cue A", pos: 0.56, db: "-9.0 dB", meter: -9, peak: -7 },
+        { n: "Phones 2", sub: "Cue B · mono", pos: 0.42, db: "-17.4 dB", meter: -17, peak: -15 },
+      ];
+      const SNAPS = [
+        { n: 1, name: "Open rehearsal", meta: "05:42" },
+        { n: 2, name: "Show open", meta: "Current · 06:05", current: true },
+        { n: 3, name: "Interview block", meta: "—" },
+        { n: 4, name: "Break bumper", meta: "—" },
+        { n: 5, name: "Credits", meta: "—" },
+        { n: 6, empty: true },
+        { n: 7, empty: true },
+        { n: 8, empty: true },
+      ];
+      const hfader = (pos, label) =>
+        `<div class="hfader" data-key data-take role="slider" aria-label="${label}"><div class="track"></div><div class="unity"></div><div class="cap" style="left: calc(12px + ${(pos * 100).toFixed(2)}% - ${(pos * 24).toFixed(2)}px)"></div></div>`;
+      const hmeter = (m, p) =>
+        `<div class="rowmeter"><div class="hbar"><div class="ramp" style="clip-path: inset(0 ${(100 - meterPct(m)).toFixed(2)}% 0 0)"></div><div class="ref"></div><div class="peak" style="left:${meterPct(p).toFixed(2)}%"></div></div><i class="clip"></i></div>`;
+      function row(c, i, tier) {
+        const p48 =
+          tier === "in"
+            ? `<button class="key p48" data-key data-take aria-label="48 V phantom on, press twice to switch off"><i class="lamp"></i>48 V</button>`
+            : `<span class="dash">—</span>`;
+        const gain =
+          tier === "in"
+            ? `<button class="gain" data-key aria-label="Preamp gain">${c.gain} dB</button>`
+            : `<span class="dash">—</span>`;
+        const solo =
+          tier === "out"
+            ? `<span class="dash">—</span>`
+            : `<button class="key ${c.solo ? "on" : ""}" data-key data-take aria-label="Solo">S</button>`;
+        return `<div class="cols row ${c.sel ? "sel" : ""}" data-target role="button" aria-label="Select ${c.n}">
+          <span class="num">${String(i).padStart(2, "0")}</span>
+          <div><div class="name">${c.n}</div><div class="sub">${c.sub}</div></div>
+          ${p48}${gain}
+          <div class="fader-cell">${hfader(c.pos, c.n + " fader")}</div>
+          <div class="db">${c.db}</div>
+          ${hmeter(c.meter, c.peak)}
+          <button class="key" data-key data-take aria-label="Mute">M</button>
+          ${solo}
+          <div class="desk"><i class="lamp"></i><b>Confirmed</b></div>
+        </div>`;
+      }
+      const group = (t, d) => `<div class="group"><span class="t">${t}</span><span class="d">${d}</span></div>`;
+      document.getElementById("rows").innerHTML =
+        group("Inputs", "4 preamps · mic · sends into Main Out") +
+        INPUTS.map((c, i) => row(c, i + 1, "in")).join("") +
+        group("Playback", "6 stereo pairs · sends into Main Out") +
+        PLAYBACK.map((c, i) => row(c, i + 1, "pb")).join("") +
+        group("Outputs", "3 mixes · level of each output") +
+        OUTPUTS.map((c, i) => row(c, i + 1, "out")).join("");
+      const edge = (i, a) => (i === 0 ? "first" : i === a.length - 1 ? "last" : "");
+      document.getElementById("faderAxis").innerHTML = [
+        [-60, "-60"],
+        [-40, "-40"],
+        [-20, "-20"],
+        [-12, "-12"],
+        [-6, "-6"],
+        [0, "0 unity"],
+        [6, "+6"],
+      ]
+        .map(
+          ([d, l], i, a) =>
+            `<span class="${edge(i, a)}" style="left: calc(12px + ${(dbToLin(d) * 100).toFixed(2)}% - ${(dbToLin(d) * 24).toFixed(2)}px)">${l}</span>`
+        )
+        .join("");
+      document.getElementById("meterAxis").innerHTML = [-60, -40, -30, -20, -18, -12, -6, -3, 0]
+        .map(
+          (d, i, a) =>
+            `<span class="${edge(i, a)}" style="left:${meterPct(d).toFixed(2)}%">${d === -18 ? "-18 ref" : d}</span>`
+        )
+        .join("");
+      document.getElementById("snaprows").innerHTML = SNAPS.map((s) =>
+        s.empty
+          ? `<div class="snaprow empty"><span class="n">${s.n}</span><span class="name">Empty</span><span class="meta"></span><button class="btn" data-key data-take>Capture here</button></div>`
+          : `<div class="snaprow ${s.current ? "current" : ""}"><span class="n">${s.n}</span><span class="name">${s.name}</span><span class="meta">${s.meta}</span><button class="btn" data-key data-take aria-label="Recall ${s.name}, press twice">Recall</button></div>`
+      ).join("");
+      document.getElementById("mL").style.clipPath = `inset(0 ${100 - meterPct(-3.1)}% 0 0)`;
+      document.getElementById("mR").style.clipPath = `inset(0 ${100 - meterPct(-5.6)}% 0 0)`;
+      document.getElementById("pL").style.left = meterPct(-1) + "%";
+      document.getElementById("pR").style.left = meterPct(-3) + "%";
+
+      const params = new URLSearchParams(location.search);
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      addEventListener("keydown", (e) => {
+        if (e.key === "1") {
+          one = !one;
+          fit();
+        }
+        if (e.key === "s") document.documentElement.dataset.theme = "studio";
+        if (e.key === "g") document.documentElement.dataset.theme = "graphite";
+        if (e.key === "b") document.documentElement.dataset.theme = "bone";
+      });
+      fit();
+    </script>
+  </body>
+</html>

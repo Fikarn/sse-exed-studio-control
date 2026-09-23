@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
+import { liveAudioMasks } from "./helpers/liveAudioMasks";
 
 // Visual review baselines for the operator shell across the hardware-profile
 // fallback ladder plus the Scaled Studio Preview surface. Replaces the
@@ -45,26 +47,8 @@ const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x9
 // diff budget (first hit: lighting-populated bone 2560x1440, 2026-08-12).
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
-// Live, JS-driven surfaces that drift between captures (meter tracks redraw
-// every engine tick, the overlay canvas accumulates sample history, the
-// inspector signal canvas paints peaks). Mask these on audio fixtures so the
-// baseline diff covers layout + chrome, not live values.
-function liveAudioMasks(page: Page): Locator[] {
-  // The meter overlay (`audio-meter-canvas`) is a full-workspace
-  // position:absolute layer, so masking it blanked the entire audio surface and
-  // left nothing pixel-tested. It paints live values only inside
-  // [data-meter-component="stereo"] and [data-mini-meter-kind] slots, and the
-  // only other per-tick values are the inspector/monitor dB numerals
-  // ([data-meter-readout-mode] / the monitor master meter). Masking just those
-  // keeps the static mixer / inspector / snapshot-deck / top + monitor bar
-  // layout in the diff so it is actually regression-tested.
-  return [
-    page.locator('[data-meter-component="stereo"]'),
-    page.locator("[data-mini-meter-kind]"),
-    page.locator('[data-testid="audio-monitor-master-meter"]'),
-    page.locator("[data-meter-readout-mode]"),
-  ];
-}
+// The live-audio masks are shared with storybook.spec.ts since production
+// readiness S13: helpers/liveAudioMasks.ts (moved from here unchanged).
 
 // AA / font rendering on the unmasked full-page renders jitters run-to-run
 // (a stable element rendered a shade off at its edges) — e.g.
@@ -173,19 +157,22 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
 
   expect(details.layoutMode, `lighting layout mode @ ${size.label}`).toBe(expectedMode);
 
+  // Visual overhaul A, Slice 5. Old: seven toolbar primaries, "overflow" among
+  // them, each measured where it stood. New: the same ids on their new homes in
+  // the cluster, minus "overflow" — nothing folds into an overflow menu now.
+  // The cluster is one scrolling column, so a primary below the fold is
+  // reachable rather than clipped, and the clipping check is the helper's,
+  // which brings each one into view first.
   const primaryIds = details.primaryControls.map((entry) => entry.id).sort();
-  expect(primaryIds, `lighting toolbar primary controls @ ${size.label}`).toEqual([
+  expect(primaryIds, `lighting primary controls @ ${size.label}`).toEqual([
     "add",
-    "overflow",
     "patch",
     "preview",
     "search",
     "status",
     "title",
   ]);
-
-  const clipped = details.primaryControls.filter((entry) => !entry.fits).map((entry) => entry.id);
-  expect(clipped, `lighting toolbar primary controls clipped @ ${size.label}`).toEqual([]);
+  await expectToolbarPrimaryControlsFit(page);
 
   const stageMinWidth = expectedMode === "narrowUtility" ? 520 : 560;
   const stageMinHeight = expectedMode === "narrowUtility" ? 400 : 440;
@@ -193,16 +180,15 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
   expect(details.stage!.width, `lighting stage width @ ${size.label}`).toBeGreaterThanOrEqual(stageMinWidth);
   expect(details.stage!.height, `lighting stage height @ ${size.label}`).toBeGreaterThanOrEqual(stageMinHeight);
 
-  if (expectedMode !== "studioFull") {
-    await page.locator('[data-testid="lighting-toolbar-overflow"]').click();
-    const menuLabels = await page.locator('[role="menuitem"]').allTextContents();
-    for (const label of ["Highlight selection", "Solo selection", "Find selected fixtures"]) {
-      expect(
-        menuLabels.some((entry) => entry.includes(label)),
-        `lighting overflow missing '${label}' @ ${size.label}`
-      ).toBe(true);
-    }
-    await page.keyboard.press("Escape");
+  // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
+  // tools folded into a toolbar overflow menu, and this checked the menu held
+  // them. New: Highlight, Solo and Find are keys on the cluster at every size.
+  // Reason: there is no overflow menu — the cluster is the same at every size.
+  for (const testId of ["lighting-highlight-toggle", "lighting-solo-toggle", "lighting-identify-find"]) {
+    expect(
+      await page.locator(`[data-testid="${testId}"]`).count(),
+      `lighting cluster missing '${testId}' @ ${size.label}`
+    ).toBe(1);
   }
 
   if (expectedMode === "narrowUtility") {
@@ -236,11 +222,19 @@ async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Vi
     // knob (role=slider, square ~1:1) rather than a "preamp-panel-compact"
     // bitmap. The fidelity check is that the scaled studio preview preserves
     // the knob's square aspect ratio.
+    // Visual overhaul A, Slice 4b: the strips carry a gain key instead of a
+    // knob, so the fidelity check measures the strip's fader groove — the tall
+    // control the scale must not distort — and the plate's knob keeps the
+    // square check where it still stands.
     const preampKnobRatios = Array.from(
       document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="preamp gain"]')
     ).map((node) => ratioFor(node));
+    const grooveRatios = Array.from(
+      document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="send level"]')
+    ).map((node) => ratioFor(node));
 
     return {
+      grooveRatios,
       preampKnobRatios,
       root: root
         ? {
@@ -264,9 +258,14 @@ async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Vi
     // audio fidelity check now verifies the SVG preamp knobs render square in
     // the scaled studio preview (the scale must preserve their aspect ratio).
     expect(
-      details.preampKnobRatios.length,
-      `Audio Studio Preview must render preamp knobs @ ${size.label}`
+      details.grooveRatios.length,
+      `Audio Studio Preview must render strip faders @ ${size.label}`
     ).toBeGreaterThan(0);
+    // A 44 px column that is far taller than it is wide: the scale must keep
+    // it that way rather than squashing it.
+    details.grooveRatios.forEach((ratio, index) => {
+      expect(ratio ?? Number.NaN, `Audio Studio Preview strip fader ${index + 1} @ ${size.label}`).toBeLessThan(0.5);
+    });
     details.preampKnobRatios.forEach((ratio, index) => {
       assertRatioClose(ratio ?? Number.NaN, 1, `Audio Studio Preview preamp knob ${index + 1} @ ${size.label}`, 0.1);
     });

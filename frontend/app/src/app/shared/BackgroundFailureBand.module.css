@@ -1,0 +1,10 @@
+/* 2026-09 production readiness, Slice 9: the band is rendered ahead of the
+   surface, so the surface stays the workspace stack's last child and keeps the
+   stack's flex rule, and `order` puts the band at the foot of the bay, against
+   the footer. The footer itself is 40 px of fixed chrome (plan D4) that a band
+   cannot enter. */
+
+.band {
+  flex: none;
+  order: 1;
+}

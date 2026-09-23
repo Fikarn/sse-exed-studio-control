@@ -33,6 +33,12 @@ export interface CommissioningUpdateRequest {
   stage?: CommissioningStage;
   runnerStage?: RunnerStage;
   hardwareProfile?: string;
+  /**
+   * 2026-09 audit Slice 8: `stage: "ready"` is refused by the engine while
+   * any commissioning probe is not passed (`COMMISSIONING_PROBES_INCOMPLETE`)
+   * unless this is `true` — the operator's explicit, recorded decision.
+   */
+  overrideProbes?: boolean;
 }
 
 export interface LightingSettingsUpdateRequest {
@@ -160,6 +166,16 @@ export interface AudioMixTargetUpdateRequest {
   talkback?: boolean;
 }
 
+/**
+ * `audio.talkback.hold` (2026-09 audit Slice 6): talkback is momentary.
+ * `engaged: true` engages or re-arms the hold (the frontend re-sends it every
+ * 750 ms while held), `false` releases it. `mixTargetId` defaults to Main.
+ */
+export interface AudioTalkbackHoldRequest {
+  mixTargetId?: string;
+  engaged: boolean;
+}
+
 export interface PlanningProjectCreateRequest {
   title: string;
   description?: string;
@@ -268,6 +284,27 @@ export interface LightingGroupUpdateRequest {
   colorIndex?: number | null;
 }
 
+/**
+ * What the shell reported when it launched the engine (2026-09 production
+ * readiness, Slice 5 — finding F09): the launch number within this shell
+ * and the process id. The fixture transport reports nothing.
+ */
+export interface EngineLaunchInfo {
+  generation: number | null;
+  pid: number | null;
+}
+
+/**
+ * A failure that happened in the background and changed nothing on screen
+ * (Slice 5): a refresh the engine did not answer, an error nothing caught.
+ * The store keeps the last twenty for the diagnostics export.
+ */
+export interface BackgroundFailure {
+  at: string;
+  context: string;
+  message: string;
+}
+
 export interface StartupFailure {
   code: string;
   message: string;
@@ -300,7 +337,7 @@ export interface FixtureScenario {
 }
 
 export interface EngineTransport {
-  initialize?(): Promise<void>;
+  initialize?(): Promise<void | EngineLaunchInfo>;
   request(method: RequestMethod, params?: JsonObject): Promise<JsonValue>;
   subscribe(listener: (event: EventEnvelope<EventName>) => void): () => void;
   dispose?(): Promise<void>;
@@ -370,6 +407,12 @@ export interface ShellState {
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
+  backgroundFailures: BackgroundFailure[];
+  /**
+   * Development builds only (Slice 9): the reply that failed its shape guard,
+   * request and field named. `useShellSnapshot` throws it while rendering.
+   */
+  snapshotFault: string | null;
 }
 
 export interface ShellStore {
@@ -378,6 +421,8 @@ export interface ShellStore {
   getAudioMeterFrame(): AudioMeterFrame;
   refresh(): Promise<void>;
   restart(): Promise<void>;
+  /** Records a failure that changed nothing on screen (Slice 5); last twenty kept. */
+  reportBackgroundFailure(error: unknown, context?: string): void;
   subscribeAudioMeters(listener: () => void): () => void;
   setWorkspace(workspaceId: WorkspaceId): Promise<JsonValue>;
   setSetupSection(section: SetupSection): Promise<JsonValue>;
@@ -398,6 +443,7 @@ export interface ShellStore {
   updateAudioChannelDynamics(request: AudioDynamicsUpdateRequest): Promise<JsonValue>;
   updateAudioChannelSendMode(request: AudioSendModeUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
+  holdAudioTalkback(request: AudioTalkbackHoldRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;
   createLightingGroup(name: string): Promise<JsonValue>;
@@ -425,6 +471,9 @@ export interface ShellStore {
   deleteLightingFixture(fixtureId: string): Promise<JsonValue>;
   setLightingGroupPower(groupId: string, on: boolean): Promise<JsonValue>;
   setLightingAllPower(on: boolean): Promise<JsonValue>;
+  /** Arms or holds the light outputs (2026-09 production readiness, Slice 11 — F31).
+   *  Held, nothing is sent to the rig; everything else keeps working. */
+  setLightingOutputArmed(armed: boolean): Promise<JsonValue>;
   recallLightingScene(sceneId: string, fadeMs?: number): Promise<JsonValue>;
   seedPlanningDemo(replaceExistingData?: boolean): Promise<JsonValue>;
   createPlanningProject(request: PlanningProjectCreateRequest): Promise<JsonValue>;
@@ -436,9 +485,19 @@ export interface ShellStore {
   updatePlanningSettings(request: PlanningSettingsUpdateRequest): Promise<JsonValue>;
   reschedulePlanningTask(request: PlanningTaskRescheduleRequest): Promise<JsonValue>;
   togglePlanningTaskComplete(taskId: string): Promise<JsonValue>;
+  /** Visual overhaul A, Slice 6: the running-timer keys on the cluster and the
+   *  plate drive `planning.task.timer`, which the engine has always answered. */
+  setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle"): Promise<JsonValue>;
+  deletePlanningTask(taskId: string): Promise<JsonValue>;
   exportSupportBackup(): Promise<JsonValue>;
+  /** 2026-09 production readiness, Slice 7 (F20): a database backup answers
+   *  `requiresRestart`, and the store restarts the hardware link into it. */
   restoreSupportBackup(path: string): Promise<JsonValue>;
+  /** `support.backup.verify`: reads a file inside the backups folder without
+   *  changing anything and answers `{ ok, kind, detail, … }`. */
+  verifySupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;
+  refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;
   subscribe(listener: () => void): () => void;
