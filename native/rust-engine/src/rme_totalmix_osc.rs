@@ -1430,11 +1430,20 @@ pub(crate) fn pump_global_slot_for_test(
     send_host: &str,
     db_path: &std::path::Path,
 ) {
+    pump_global_slot_without_flush_for_test(slot, send_host);
+    flush_console_link_to_db(db_path);
+}
+
+/// The same tick without its flush: what the console says is ingested and the
+/// read-backs go out, but nothing reaches the database unless the code under
+/// test flushes it — for a test that must know which flush wrote a console
+/// change.
+#[cfg(test)]
+pub(crate) fn pump_global_slot_without_flush_for_test(slot: &mut GlobalOscSlot, send_host: &str) {
     let state = shared_meter_state();
     let mut drops = DroppedSourceLog::new(None);
     read_global_packets(slot, &state, monotonic_now_ms(), &mut drops);
     service_console_link(slot, send_host);
-    flush_console_link_to_db(db_path);
 }
 
 /// A Global OSC slot on an ephemeral loopback port whose read-backs go to

@@ -72,3 +72,5 @@ pub use types::*;
 mod tests;
 #[cfg(test)]
 mod tests_console_link;
+#[cfg(test)]
+mod tests_console_ordering;

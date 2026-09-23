@@ -2,11 +2,13 @@
 //!
 //! The metering thread drains `rme_console_link::shared_console_link()` every
 //! `FLUSH_INTERVAL_MS`: external changes (operator at TotalMix, another
-//! remote, read-back replies for parameters the app never touched) and
-//! adjusted sends (the console accepted something else than what was sent)
-//! are written into `channels_state` / `mix_targets_state` under
-//! `AUDIO_STATE_LOCK`, in one transaction, and one
-//! `audio.changed { reason: "console-echo" }` follows. Sends that were never
+//! remote, read-back replies for parameters the app never touched), adjusted
+//! sends (the console accepted something else than what was sent) and
+//! confirmed sends (the app's own value, so it lands after anything the desk
+//! reported before it) are written into `channels_state` / `mix_targets_state`
+//! under `AUDIO_STATE_LOCK`, in one transaction, and one
+//! `audio.changed { reason: "console-echo" }` follows when that changed
+//! anything. Sends that were never
 //! confirmed downgrade console-state confidence to `assumed` and surface as
 //! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0` resets it to
 //! `unknown`. Nothing here ever raises confidence — only a complete pull or a
@@ -36,46 +38,103 @@ pub struct ConsoleFlushReport {
     /// Sends that timed out without confirmation in this flush.
     pub unconfirmed: usize,
     pub connection_lost: bool,
+    /// The desk refused a talkback the app asked for; the refusal is recorded
+    /// even when a newer talkback send meant nothing else was written.
+    pub talkback_refused: bool,
 }
 
 impl ConsoleFlushReport {
     pub fn changed(&self) -> bool {
-        self.applied > 0 || self.unconfirmed > 0 || self.connection_lost
+        self.applied > 0 || self.unconfirmed > 0 || self.connection_lost || self.talkback_refused
     }
 }
 
 /// Drains the shared console link and persists whatever it produced. Safe to
 /// call every tick: it touches the database only when there is something to
 /// write.
+///
+/// The app's audio state is locked before the link gives up what it holds and
+/// stays locked until it is written (lock order: state, then link). A flush
+/// that took the reports first and waited for the state afterwards could write
+/// them after a write of the app's that came later — a recall's, an edit's, or
+/// another flush that took the confirmations that followed them.
 pub fn flush_console_link(db_path: &Path) -> Result<ConsoleFlushReport, AudioCommandError> {
-    let (updates, expired, connection_lost) = {
-        let link = shared_console_link();
-        let mut link = match link.lock() {
-            Ok(link) => link,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+    let link = shared_console_link();
+    let lock_link = || match link.lock() {
+        Ok(link) => link,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if !lock_link().has_activity() {
+        return Ok(ConsoleFlushReport::default());
+    }
+    let _state_guard = lock_audio_state();
+    let (updates, superseded, expired, connection_lost) = {
+        let mut link = lock_link();
+        // A report or a confirmation of a parameter the app has sent again
+        // since is older than that send: the desk takes the app's newer value,
+        // and its own read-back will confirm, adjust or expire it. (The link
+        // queues nothing for a parameter while a send of it is pending, and
+        // every edit registers its send under the state lock this flush holds,
+        // before it writes.)
+        let queued = link.take_queued();
+        let (superseded, updates): (Vec<ConsoleUpdate>, Vec<ConsoleUpdate>) = queued
+            .into_iter()
+            .partition(|update| link.has_pending(&update.key));
         (
-            link.take_queued(),
+            updates,
+            superseded,
             link.take_expired(),
             link.take_connection_lost(),
         )
     };
-    apply_console_activity(db_path, &updates, &expired, connection_lost)
+    apply_console_activity_locked(db_path, &updates, &superseded, &expired, connection_lost)
 }
 
 /// The persistence half of [`flush_console_link`], separated so tests can
 /// feed it directly.
+#[cfg(test)]
 pub(crate) fn apply_console_activity(
     db_path: &Path,
     updates: &[ConsoleUpdate],
     expired: &[PendingSend],
     connection_lost: bool,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
-    if updates.is_empty() && expired.is_empty() && !connection_lost {
+    let _state_guard = lock_audio_state();
+    apply_console_activity_locked(db_path, updates, &[], expired, connection_lost)
+}
+
+/// The persistence half of `flush_console_link`, for a caller that holds
+/// `AUDIO_STATE_LOCK`. `superseded` are the drained updates a newer send of
+/// the app's replaces: they are not written, but a change made at TotalMix
+/// among them is still a row in Recent actions, and a talkback refusal among
+/// them is still acted on.
+fn apply_console_activity_locked(
+    db_path: &Path,
+    updates: &[ConsoleUpdate],
+    superseded: &[ConsoleUpdate],
+    expired: &[PendingSend],
+    connection_lost: bool,
+) -> Result<ConsoleFlushReport, AudioCommandError> {
+    // A talkback the app asked for that the console answered with "off" is a
+    // refusal, not a mystery. Live on the studio UFX III (2026-09-04): with
+    // no talkback input channel assigned in TotalMix (`/controlroom/talkchannel
+    // -1`) the desk ignores `/controlroom/talkback 1` from every remote and
+    // reports 0, so the app must say so instead of silently flipping back —
+    // and the hold is dropped so the watchdog has nothing to release. A
+    // talkback the desk refused is a refusal even when the app has sent
+    // talkback again since (a release, or a press right after it).
+    let talkback_refused = updates.iter().chain(superseded).any(|update| {
+        update.adjusted
+            && matches!(
+                update.key,
+                ParamKey::ControlRoom(ControlRoomFunction::Talkback)
+            )
+            && matches!(update.value, ConsoleValue::Flag(false))
+    });
+    if updates.is_empty() && superseded.is_empty() && expired.is_empty() && !connection_lost {
         return Ok(ConsoleFlushReport::default());
     }
 
-    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     let mut channel_state = read_channel_state_map(&app_settings);
@@ -89,7 +148,29 @@ pub(crate) fn apply_console_activity(
     for update in updates {
         if apply_console_update(&snapshot, &mut channel_state, &mut mix_target_state, update) {
             applied += 1;
-            actions.extend(console_update_action(&snapshot, update));
+            // A confirmation of the app's own send is the app's action,
+            // already recorded where it was asked for, not a change at
+            // TotalMix.
+            if !update.confirms_send {
+                actions.extend(console_update_action(&snapshot, update));
+            }
+        }
+    }
+    // A change made at TotalMix that a newer send of the app's replaces is not
+    // written (the desk takes the app's value), but it happened: it is a row,
+    // measured against what the app now holds.
+    if superseded.iter().any(|update| !update.confirms_send) {
+        let mut replaced_channels = channel_state.clone();
+        let mut replaced_targets = mix_target_state.clone();
+        for update in superseded.iter().filter(|update| !update.confirms_send) {
+            if apply_console_update(
+                &snapshot,
+                &mut replaced_channels,
+                &mut replaced_targets,
+                update,
+            ) {
+                actions.extend(console_update_action(&snapshot, update));
+            }
         }
     }
 
@@ -134,20 +215,6 @@ pub(crate) fn apply_console_activity(
             ),
         ));
     }
-    // A talkback the app asked for that the console answered with "off" is a
-    // refusal, not a mystery. Live on the studio UFX III (2026-09-04): with
-    // no talkback input channel assigned in TotalMix (`/controlroom/talkchannel
-    // -1`) the desk ignores `/controlroom/talkback 1` from every remote and
-    // reports 0, so the app must say so instead of silently flipping back —
-    // and the hold is dropped so the watchdog has nothing to release.
-    let talkback_refused = updates.iter().any(|update| {
-        update.adjusted
-            && matches!(
-                update.key,
-                ParamKey::ControlRoom(ControlRoomFunction::Talkback)
-            )
-            && matches!(update.value, ConsoleValue::Flag(false))
-    });
     if talkback_refused {
         super::talkback::clear_talkback_hold(db_path, MAIN_MIX_TARGET_ID);
         writes.push((
@@ -170,7 +237,7 @@ pub(crate) fn apply_console_activity(
     if connection_lost {
         writes.push(confidence_setting(ConsoleConfidence::Unknown));
     }
-    if !writes.is_empty() {
+    if !writes.is_empty() || !actions.is_empty() {
         persist_audio_state_with_actions(db_path, &writes, &actions)?;
     }
 
@@ -178,7 +245,15 @@ pub(crate) fn apply_console_activity(
         applied,
         unconfirmed: expired.len(),
         connection_lost,
+        talkback_refused,
     })
+}
+
+/// A confirmation carries the level the app sent, which travelled as a 32-bit
+/// float: a stored level that rounds to it is the level the app sent, so the
+/// confirmation changes nothing.
+fn confirms_own_level(update: &ConsoleUpdate, stored: f64, confirmed: f64) -> bool {
+    update.confirms_send && stored as f32 == confirmed as f32
 }
 
 fn value_to_position(value: &ConsoleValue) -> Option<f64> {
@@ -321,6 +396,9 @@ pub(crate) fn apply_console_update(
             let Some(entry) = mix_target_state_entry(snapshot, mix_target_state, target_id) else {
                 return false;
             };
+            if confirms_own_level(update, entry.volume, position) {
+                return false;
+            }
             set_if_changed(&mut entry.volume, position)
         }
         ParamKey::MixFader {
@@ -340,12 +418,18 @@ pub(crate) fn apply_console_update(
             let Some((entry, _)) = channel_state_entry(snapshot, channel_state, &surface_id) else {
                 return false;
             };
-            let mut changed = entry
-                .mix_levels
-                .insert(String::from(target_id), position)
-                .map(|previous| (previous - position).abs() > f64::EPSILON)
-                .unwrap_or(true);
-            if target_id == MAIN_MIX_TARGET_ID {
+            let mut changed = false;
+            match entry.mix_levels.get(target_id).copied() {
+                Some(previous) if confirms_own_level(update, previous, position) => {}
+                previous => {
+                    entry.mix_levels.insert(String::from(target_id), position);
+                    changed = previous
+                        .map(|previous| (previous - position).abs() > f64::EPSILON)
+                        .unwrap_or(true);
+                }
+            }
+            if target_id == MAIN_MIX_TARGET_ID && !confirms_own_level(update, entry.fader, position)
+            {
                 changed |= set_if_changed(&mut entry.fader, position);
             }
             changed

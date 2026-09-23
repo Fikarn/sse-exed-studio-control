@@ -61,7 +61,7 @@ fn audio_sync_in_simulated_mode_reports_aligned_without_a_pull() {
 
 /// The pull tests share the process-wide console link (`slot_bound`, pending
 /// sends), so they run one at a time and start from a quiet link.
-fn serialize_shared_link() -> std::sync::MutexGuard<'static, ()> {
+pub(super) fn serialize_shared_link() -> std::sync::MutexGuard<'static, ()> {
     let guard = crate::rme_console_link::SHARED_LINK_TEST_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -194,7 +194,7 @@ impl SlotPump {
 
 /// How long a settle may take before the test gives up — a guard against a
 /// hang, never a timing the test depends on.
-const SETTLE_DEADLINE: Duration = Duration::from_secs(20);
+pub(super) const SETTLE_DEADLINE: Duration = Duration::from_secs(20);
 
 /// Production readiness S15. Waits until every send the shared link tracks has
 /// settled (confirmed, adjusted or expired), every read-back has had its
@@ -241,7 +241,7 @@ fn fast_pull_timing() -> PullTiming {
 }
 
 /// A ready engine database whose transport points at `fake_port - 3`.
-fn pull_test_db(label: &str, fake_port: u16) -> TestDir {
+pub(super) fn pull_test_db(label: &str, fake_port: u16) -> TestDir {
     let test_dir = TestDir::new(label);
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     update_audio_settings(
@@ -541,6 +541,7 @@ fn console_echo_updates_channel_and_mix_target_state() {
         key,
         value,
         adjusted: false,
+        confirms_send: false,
     };
     let updates = vec![
         update(
@@ -767,6 +768,7 @@ fn console_refusing_talkback_records_the_reason_and_drops_the_hold() {
         ),
         value: crate::rme_console_link::ConsoleValue::Flag(false),
         adjusted: true,
+        confirms_send: false,
     };
     let report = apply_console_activity(test_dir.db_path().as_path(), &[refused], &[], false)
         .expect("refusal should apply");
@@ -929,15 +931,15 @@ fn console_confidence_has_one_writer() {
 // wrote and answers read-backs from that memory, in dB, like the desk does.
 // ---------------------------------------------------------------------------
 
-struct ConsoleModel {
+pub(super) struct ConsoleModel {
     socket: Option<std::net::UdpSocket>,
-    port: u16,
+    pub(super) port: u16,
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     handle: Option<std::thread::JoinHandle<()>>,
 }
 
 impl ConsoleModel {
-    fn bind() -> Self {
+    pub(super) fn bind() -> Self {
         let socket = std::net::UdpSocket::bind("127.0.0.1:0").expect("console model should bind");
         socket
             .set_read_timeout(Some(Duration::from_millis(40)))
@@ -951,7 +953,7 @@ impl ConsoleModel {
         }
     }
 
-    fn start(&mut self, reply_to_port: u16) {
+    pub(super) fn start(&mut self, reply_to_port: u16) {
         let socket = self.socket.take().expect("model socket");
         let stop = self.stop.clone();
         self.handle = Some(std::thread::spawn(move || {
@@ -1046,7 +1048,7 @@ impl Drop for ConsoleModel {
     }
 }
 
-fn channel_request(channel_id: &str) -> AudioChannelUpdateRequest {
+pub(super) fn channel_request(channel_id: &str) -> AudioChannelUpdateRequest {
     AudioChannelUpdateRequest {
         channel_id: String::from(channel_id),
         mix_target_id: None,
@@ -1063,7 +1065,7 @@ fn channel_request(channel_id: &str) -> AudioChannelUpdateRequest {
     }
 }
 
-fn mix_target_request(mix_target_id: &str) -> AudioMixTargetUpdateRequest {
+pub(super) fn mix_target_request(mix_target_id: &str) -> AudioMixTargetUpdateRequest {
     AudioMixTargetUpdateRequest {
         mix_target_id: String::from(mix_target_id),
         volume: None,
@@ -1426,6 +1428,7 @@ fn console_changes_record_source_console() {
         key,
         value,
         adjusted: false,
+        confirms_send: false,
     };
     let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");

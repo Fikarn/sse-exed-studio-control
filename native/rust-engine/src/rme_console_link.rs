@@ -465,6 +465,10 @@ pub struct ConsoleUpdate {
     pub key: ParamKey,
     pub value: ConsoleValue,
     pub adjusted: bool,
+    /// The desk confirmed a value the app sent. It is written like any other
+    /// report, so it lands after whatever the desk said about the parameter
+    /// before it, but it is the app's own action, not a change at TotalMix.
+    pub confirms_send: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -876,21 +880,25 @@ impl ConsoleLinkState {
         let pulling = self.pull.is_some();
         if let Some(pending) = self.pending.get(&parsed.key) {
             if values_match(&pending.value, &parsed.value) {
+                let sent = pending.value.clone();
                 self.pending.remove(&parsed.key);
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
                 if let Some(push) = self.push.as_mut() {
                     push.note(&parsed.key, Classification::Confirmed);
                 }
-                // During a pull the dump is the truth for everything it
-                // lists, so a confirming value is applied as well (a no-op
-                // when the app already holds it).
-                if pulling {
-                    self.queued.push(ConsoleUpdate {
-                        key: parsed.key,
-                        value: parsed.value,
-                        adjusted: false,
-                    });
-                }
+                // The desk holds the app's value now, and that is applied
+                // too: a report of this parameter that was waiting for a flush
+                // when the app wrote its own value (a change at TotalMix just
+                // before a recall or an edit) must not be the last word. When
+                // the app's state already says it, applying it changes
+                // nothing. During a pull the dump is the truth for everything
+                // it lists, so the value the desk reported is applied.
+                self.queued.push(ConsoleUpdate {
+                    key: parsed.key,
+                    value: if pulling { parsed.value } else { sent },
+                    adjusted: false,
+                    confirms_send: true,
+                });
                 return Classification::Confirmed;
             }
             let reply_is_stale = !pulling
@@ -910,6 +918,7 @@ impl ConsoleLinkState {
                 key: parsed.key,
                 value: parsed.value,
                 adjusted: true,
+                confirms_send: false,
             });
             return Classification::Adjusted;
         }
@@ -919,6 +928,7 @@ impl ConsoleLinkState {
             key: parsed.key,
             value: parsed.value,
             adjusted: false,
+            confirms_send: false,
         });
         Classification::External
     }
@@ -981,11 +991,20 @@ impl ConsoleLinkState {
                 .map(|(key, _)| key.clone())
                 .collect();
             for key in absent_sends {
-                self.pending.remove(&key);
+                let Some(pending) = self.pending.remove(&key) else {
+                    continue;
+                };
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
                 if let Some(push) = self.push.as_mut() {
                     push.note(&key, Classification::Confirmed);
                 }
+                // Applied like a confirming reply (see `ingest`).
+                self.queued.push(ConsoleUpdate {
+                    key,
+                    value: pending.value,
+                    adjusted: false,
+                    confirms_send: true,
+                });
             }
         }
 
@@ -1017,6 +1036,12 @@ impl ConsoleLinkState {
         });
     }
 
+    /// Whether a flush has anything to write: queued changes, expired sends
+    /// or a lost connection.
+    pub fn has_activity(&self) -> bool {
+        !self.queued.is_empty() || !self.expired.is_empty() || self.connection_lost
+    }
+
     pub fn take_queued(&mut self) -> Vec<ConsoleUpdate> {
         std::mem::take(&mut self.queued)
     }
@@ -1041,13 +1066,20 @@ impl ConsoleLinkState {
         self.pending.len()
     }
 
+    /// Console changes waiting for the next flush.
+    #[cfg(test)]
+    pub fn queued_count(&self) -> usize {
+        self.queued.len()
+    }
+
     /// Read-backs still waiting for their replies to go quiet.
     #[cfg(test)]
     pub fn outstanding_count(&self) -> usize {
         self.outstanding.len()
     }
 
-    #[cfg(test)]
+    /// Whether the app has sent this parameter and the desk has not yet
+    /// confirmed, adjusted or failed to confirm it.
     pub fn has_pending(&self, key: &ParamKey) -> bool {
         self.pending.contains_key(key)
     }
@@ -1432,7 +1464,24 @@ mod tests {
         assert_eq!(summary.confirmed_sends, 3);
         assert_eq!(summary.unconfirmed_sends, 0);
         assert_eq!(summary.last_echo_age_ms, Some(40));
-        assert!(link.take_queued().is_empty(), "confirmations queue nothing");
+        // 2026-09-22: each confirmation is queued as the app's own value (the
+        // position it sent, not the dB the desk reported), so a report the
+        // desk made before it cannot be written last. Was: "confirmations
+        // queue nothing".
+        let queued = link.take_queued();
+        assert_eq!(queued.len(), 3);
+        assert!(queued
+            .iter()
+            .all(|update| update.confirms_send && !update.adjusted));
+        let fader = queued
+            .iter()
+            .find(|update| matches!(update.key, ParamKey::MixFader { .. }))
+            .expect("the fader's confirmation");
+        assert!(
+            matches!(fader.value, ConsoleValue::Position(position) if (position - 0.02).abs() < 1e-6),
+            "the value the app sent: {:?}",
+            fader.value
+        );
     }
 
     #[test]
@@ -1452,6 +1501,7 @@ mod tests {
                 key: ParamKey::InputGain { channel: 8 },
                 value: ConsoleValue::Db(44.0),
                 adjusted: true,
+                confirms_send: false,
             }]
         );
         assert_eq!(link.summary(200).adjusted_sends, 1);
@@ -1527,6 +1577,21 @@ mod tests {
         assert_eq!(link.pending_count(), 0, "absence confirms the off node");
         assert_eq!(link.summary(250).confirmed_sends, 1);
         assert_eq!(link.summary(250).unconfirmed_sends, 0);
+        // The other node is the desk's report; the off node's confirmation is
+        // queued after it as the value the app sent (2026-09-22).
+        let queued = link.take_queued();
+        assert_eq!(queued.len(), 2);
+        assert!(!queued[0].confirms_send);
+        assert!(queued[1].confirms_send);
+        assert_eq!(
+            queued[1].key,
+            ParamKey::MixFader {
+                bus: ConsoleBus::Playback,
+                channel: 6,
+                output: 10,
+            }
+        );
+        assert_eq!(queued[1].value, ConsoleValue::Position(0.0));
     }
 
     #[test]
@@ -1658,20 +1723,27 @@ mod tests {
 
     #[test]
     fn pull_applies_every_dump_value_even_when_it_confirms_a_pending_send() {
-        // Outside a pull a confirming reply is not re-applied (the app already
-        // holds the value). During a pull the dump is authoritative, so it is
-        // queued too — otherwise a value that happened to match an in-flight
-        // send would never reach the database if the app's copy was stale.
+        // Outside a pull a confirming reply is queued as the value the app
+        // sent (2026-09-22: the app's copy can be older than the desk's when a
+        // report was written after the app's own write; before, it was not
+        // queued at all). During a pull the dump is authoritative, so the
+        // value the desk reported is queued — otherwise a value that happened
+        // to match an in-flight send would never reach the database if the
+        // app's copy was stale.
         let mut link = ConsoleLinkState::default();
         link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 0);
         assert_eq!(
             link.ingest(&msg("/input/8/mute", f(1.0)), 50),
             Classification::Confirmed
         );
-        assert!(
-            link.take_queued().is_empty(),
-            "no pull: confirmation queues nothing"
+        let queued = link.take_queued();
+        assert_eq!(
+            queued.len(),
+            1,
+            "no pull: the confirmation, as the app's value"
         );
+        assert!(queued[0].confirms_send);
+        assert_eq!(queued[0].value, ConsoleValue::Flag(true));
 
         link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 100);
         link.register_outgoing(&[(String::from("/input/8/gain"), f(41.0))], 100);
@@ -1689,8 +1761,26 @@ mod tests {
         assert_eq!(queued.len(), 2);
         assert_eq!(queued[0].value, ConsoleValue::Flag(true));
         assert!(!queued[0].adjusted);
+        assert!(queued[0].confirms_send);
         assert_eq!(queued[1].value, ConsoleValue::Db(33.0));
         assert!(queued[1].adjusted);
+        assert!(!queued[1].confirms_send);
+
+        // A fader confirmed during a pull carries the dB the desk reported,
+        // not the position the app sent (0.5 is -12.13 dB on the RME curve).
+        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.5))], 160);
+        assert_eq!(
+            link.ingest(&msg("/mix/pb/6/10/fader", f(-12.13)), 170),
+            Classification::Confirmed
+        );
+        let queued = link.take_queued();
+        assert_eq!(queued.len(), 1);
+        assert!(queued[0].confirms_send);
+        assert!(
+            matches!(queued[0].value, ConsoleValue::Db(_)),
+            "{:?}",
+            queued[0].value
+        );
         assert_eq!(link.pending_count(), 0);
     }
 
