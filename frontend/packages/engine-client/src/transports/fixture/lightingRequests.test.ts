@@ -248,4 +248,35 @@ describe("the fixture double's rig actions", () => {
       "Lighting group 'group-gone' is not exposed by the native editor state."
     );
   });
+
+  // 2026-09-23: the double refused `grandMaster` until then, so the Lighting
+  // page's Grand master failed against it. The hardware link reads it as a
+  // number, rounds it and clamps it to 0–100 (`parse.rs`), stores it and names
+  // it in the summary before any selection (`settings.rs`), and refuses the
+  // whole request, storing nothing, when a selection names nothing.
+  it("lighting.settings.update takes the Grand master, rounded and clamped, as the hardware link does", async () => {
+    const { request, snapshot, reasons } = openDouble();
+    expect((await snapshot()).grandMaster).toBe(100);
+
+    const reply = await request("lighting.settings.update", { grandMaster: 62.6 });
+    expect(reply).toMatchObject({ grandMaster: 63, summary: "Native lighting settings updated: grand master -> 63%." });
+    expect(reasons).toEqual(["settings-updated"]);
+    expect((await snapshot()).grandMaster).toBe(63);
+
+    expect(await request("lighting.settings.update", { grandMaster: 140 })).toMatchObject({ grandMaster: 100 });
+    expect(await request("lighting.settings.update", { grandMaster: -5 })).toMatchObject({ grandMaster: 0 });
+    expect(
+      await request("lighting.settings.update", { grandMaster: 40, selectedFixtureId: "fixture-key" })
+    ).toMatchObject({
+      grandMaster: 40,
+      selectedFixtureId: "fixture-key",
+      summary: "Native lighting settings updated: grand master -> 40%, selected fixture -> Key.",
+    });
+
+    await expect(request("lighting.settings.update", { grandMaster: "50" })).rejects.toThrow("value must be a number");
+    await expect(
+      request("lighting.settings.update", { grandMaster: 20, selectedSceneId: "scene-gone" })
+    ).rejects.toThrow("Lighting scene 'scene-gone' is not present in the scene list.");
+    expect((await snapshot()).grandMaster).toBe(40);
+  });
 });

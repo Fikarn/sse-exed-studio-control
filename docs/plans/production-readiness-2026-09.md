@@ -705,6 +705,19 @@ Guards: `frontend/app/tests/lighting-keyboard.spec.ts`, three Playwright cases o
 
 All three fail with the two components as they were at `1911559` (the app rebuilt; each fails at the step that shows the defect), and pass with the fix. The two keyboard drags in `lighting-rig-actions.spec.ts` still pass.
 
+**2026-09-23 — the fixture double takes the Grand Master** (branch `after-the-program-2026-09`; the finding recorded under `f29bbad`; decision 7). The Lighting page's Grand master sends `lighting.settings.update { grandMaster }` 200 ms after the last move (`useLightingRigControls.ts`). The double answered only `selectedSceneId` and `selectedFixtureId` and refused anything else, so against it the page showed "Grand master update failed." and a re-read put the master back at 100 %.
+
+The double now reads `grandMaster` as the hardware link does (`E/lighting/parse.rs`, `parse_i64_value`): a number, rounded and clamped to 0–100, or refused with the same sentence. It stores it, names it in the summary before any selection (`E/lighting/settings.rs`: "grand master -> 63%"), and returns it in the reply. As the hardware link does, it checks every selection before it stores anything, so a request naming an unknown scene or fixture changes nothing. The DMX monitor already scaled by the stored master.
+
+Guards:
+
+- `lightingRequests.test.ts` "lighting.settings.update takes the Grand master, rounded and clamped, as the hardware link does": 62.6 → 63, 140 → 100, −5 → 0, a master together with a fixture selection and its summary, a text value refused, and a refusal with an unknown scene storing nothing.
+- `lighting-rig-actions.spec.ts` "The Grand master is taken and kept": Home on the Grand master slider, the stopped page clock moved past the 200 ms commit, then Setup and back to Lighting. The readout still reads 0 % and no failure toast shows.
+
+Both fail against the double as it was at `1911559` (the Vitest case with "lighting.settings.update requires one or more supported fields", the Playwright case with the readout back at 100 %), and both pass with the fix.
+
+The double's "no bridge" on the Console boards stays as it is, by the operator's decision: fixing it moves captures.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

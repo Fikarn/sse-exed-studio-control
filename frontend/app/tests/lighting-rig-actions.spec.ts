@@ -180,6 +180,31 @@ test("Dragging a scene reorders the scene rail (lighting.scene.reorder)", async 
   await expect(tiles.nth(1)).toHaveAccessibleName(/^Recall scene Warm wash/);
 });
 
+// 2026-09-23: the double refused `grandMaster` (a finding recorded under
+// `f29bbad`), so moving the Grand master against it showed "Grand master update
+// failed." and a re-read put it back at 100 %. The page commits a move 200 ms
+// after the last one (`useLightingRigControls.ts`), so the case moves the
+// stopped clock past that, then leaves Lighting and comes back: the value on
+// screen is then the one the double stored.
+test("The Grand master is taken and kept (lighting.settings.update { grandMaster })", async ({ page }) => {
+  await openPopulatedRig(page, { stopClock: true });
+  const readout = page.getByTestId("lighting-grand-master-readout");
+  await expect(readout).toHaveText("100 %");
+
+  await page.getByRole("slider", { name: "Grand master intensity" }).focus();
+  await page.keyboard.press("Home");
+  await expect(readout).toHaveText("0 %");
+  await page.clock.runFor(250);
+  await page.clock.resume();
+
+  await page.keyboard.press("Control+1");
+  await expectWorkspaceMounted(page, "setup");
+  await page.keyboard.press("Control+2");
+  await expectWorkspaceMounted(page, "lighting");
+  await expect(page.getByTestId("lighting-grand-master-readout")).toHaveText("0 %");
+  await expect(page.getByText("Grand master update failed.")).toHaveCount(0);
+});
+
 test("Dragging a group reorders the group rail (lighting.group.reorder)", async ({ page }) => {
   await openPopulatedRig(page);
   const chips = page
