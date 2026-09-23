@@ -635,6 +635,22 @@ Closed as not pursued, from the review of `919047b` (open under it until today):
 
 Changed with this entry: Appendix B item 5 and Slice 11's Operator hands in this file, and the two findings under `919047b`; `docs/plans/audit-remediation-2026-09.md` (Slice 6's `Status:`, Appendix B items 5 and 8 and its sign-off state); `docs/plans/visual-overhaul-a-2026-09.md` (Appendix B item 4); `docs/HANDOFF.md` (Current Operating Truth and Current Blockers 9.3). `docs/OPERATIONS.md` still describes talkback, because the app still has it.
 
+Its commit `e62bcba` ran as 35820854071: nine jobs green; `frontend-e2e` failed only the same 27 linux captures (405 passed in 6.6 min).
+
+**2026-09-23 — a new live build: the fixes made after `7b85f04` reach the workstation** (not a slice; the operator's go-ahead for the build in the session prompt, and in chat right before the close). The live app had run `7b85f04` since 2026-09-22 11:57, without the fixes that landed after it. Three of them change the packaged app: Setup's bridge row and recovery diagnostics in the hardware link's words (`d3adaca`), the console link's ordering fix (`919047b`), and the bridge's start written to the log once (`122cef2`). The other commits since `7b85f04` change tests, the browser test double, the qualification lane or documents, none of which the packaged app carries.
+
+- Built from the branch head `e62bcba`, whose app code is `122cef2`'s (the two commits after it change documents only): `npm run native:engine:build` after `dev:check` (engine 9,355,264 bytes, the normal build, not the test-time one), then `npm run tauri:build` (shell 10,378,752 bytes). No local qualification lane: CI's `qualification` passed on `919047b` (run 35800307224) and on `122cef2` (run 35801341394).
+- Closed at 08:15:02 by ending its shell (pid 34308), with the operator's go-ahead. Its hardware link wrote `db-2026-09-23T06-15-02-111Z-shutdown.sqlite3` and exited within half a second: no app process at 08:15:02.4, and port 38201 free.
+- `release\native\windows` was moved aside to `release\native\windows.7b85f04-2026-09-23\` and kept as the rollback: shell 10,375,680 bytes, sha256 `859b40ff5c65128a…`; engine 9,342,976, `ecdb011ddd2379d5…` (the build recorded on 2026-09-22).
+- `native:package:win:local` packaged the new builds (exit 0, 3 s), and `native:bridge:win:verify` passed against the packaged engine on a temporary app-data root (exit 0, 8 s).
+- The new live build: shell 10,378,752 bytes, sha256 `ecbc1c839a239b67…`; engine 9,355,264 bytes, sha256 `fffc87569f49bb54…`.
+- Reopened at 08:15:31 with no `SSE_*` variable, checked in the process, user and machine scopes. It came up fullscreen on display 3 (x 2560–5120, y 0–1440, from `GetWindowRect` on the shell's main window): shell pid 2156, its hardware link pid 52168 as its child, the bridge on `127.0.0.1:38201`, the meter ports on `127.0.0.1:9001`–`9004`. The app was closed for 29 seconds.
+- The log reads `Storage initialized: schema=7, format=1, journal_mode=wal, integrity=ok`, the bridge's serving line once (the old build wrote it twice at every start), and `Light outputs held at start`. It has no refusal, `WARN` or `ERROR` line up to 08:17:49, while Companion polled at its usual rate (about 3,000 connections to the bridge's port in `TIME_WAIT` at 08:17).
+- The profile was not imported again: the token file is unchanged since 2026-09-17. The operator pressed a deck key (BANK on the Audio page) and watched the dial displays refresh: "Both work".
+- `windows.db2df4d-2026-09-21`, `windows.6fbae80-2026-09-21` and `windows.s2-era-2026-09-10` are untouched.
+
+This follow-up's own run is not recorded, by convention.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
@@ -676,7 +692,7 @@ Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane
 
 ## Appendix B — Operator hardware checklist (signed by date)
 
-Sign-off state (2026-09-22): item 1 signed; items 2–5 are walkable — every slice has landed, and since 2026-09-21 the live app is this branch's build (the correction under Slice 11). Item 1: the operator imported the profile at 10:56 on 2026-09-22 (the `401`s stopped), which uncovered the bridge refusing part of every LCD poll (After the program); with the fix live since 11:57, a key press and an LCD refresh both worked, and the operator signed. Since 2026-09-23 item 5 has no talkback step (the operator's talkback ruling, After the program). Only the operator can do these. Sign each with the date next to the item; the matching slice's `Status:` then moves from `landed (operator verification pending)` to `verified`.
+Sign-off state (2026-09-22): item 1 signed; items 2–5 are walkable — every slice has landed, and since 2026-09-21 the live app is this branch's build (the correction under Slice 11) — since 2026-09-23 08:15 the build of `e62bcba`, which carries every fix made after the program (After the program). Item 1: the operator imported the profile at 10:56 on 2026-09-22 (the `401`s stopped), which uncovered the bridge refusing part of every LCD poll (After the program); with the fix live since 11:57, a key press and an LCD refresh both worked, and the operator signed. Since 2026-09-23 item 5 has no talkback step (the operator's talkback ruling, After the program). Only the operator can do these. Sign each with the date next to the item; the matching slice's `Status:` then moves from `landed (operator verification pending)` to `verified`.
 
 1. After S2: Companion → Full Reset & Import of the regenerated Stream Deck profile; press one deck key and watch one LCD refresh. Signed: 2026-09-22 — the operator ("Key press and LCD refresh both work, sign item 1"; recorded by the session).
 2. After S5: kill the engine process during a session; confirm recovery + automatic restart; try launching a second copy of the app. Signed: \_\_\_\_
