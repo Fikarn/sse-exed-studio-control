@@ -1443,8 +1443,8 @@ fn a_phones_fader_edit_leaves_the_main_fader_alone() {
 // 2026-09-23 (a finding recorded under `919047b`): every channel edit reads,
 // changes and writes the stored channel map under `AUDIO_STATE_LOCK`, which the
 // console flush on the metering thread holds while it writes what the desk
-// reported. The dynamics and send-mode edits did not take it, so a flush
-// committed between their read and their write was undone. The lock is held
+// reported. The dynamics and send-mode edits and the clip clear did not take
+// it, so a flush committed between their read and their write was undone. The lock is held
 // here on the test's thread; each edit, run on a second one, must wait for it.
 #[test]
 fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
@@ -1459,7 +1459,7 @@ fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
     )
     .expect("probe state should persist");
 
-    for edit in ["dynamics", "send mode"] {
+    for edit in ["dynamics", "send mode", "clip clear"] {
         let guard = super::helpers::lock_audio_state();
         let (sender, receiver) = std::sync::mpsc::channel();
         let db_path = test_dir.db_path();
@@ -1476,6 +1476,14 @@ fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
                         attack_ms: None,
                         release_ms: None,
                         makeup_db: None,
+                    },
+                )
+                .map(|_| ())
+            } else if edit == "clip clear" {
+                clear_audio_clips(
+                    db_path.as_path(),
+                    &AudioClipClearRequest {
+                        channel_id: Some(String::from("audio-input-9")),
                     },
                 )
                 .map(|_| ())
