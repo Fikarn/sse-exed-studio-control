@@ -747,6 +747,18 @@ Guard: `audio::tests::a_phones_fader_edit_leaves_the_main_fader_alone`. A Phones
 
 Guard: `audio::tests::dynamics_and_send_mode_edits_wait_for_the_audio_state_lock`. The test holds the lock on its own thread and runs each edit on a second one: the edit must not finish within 300 ms, and must finish once the lock is dropped. It fails on `channels.rs` as it was at `1911559` ("the dynamics edit went ahead while the audio state lock was held"). With only the send-mode edit's lock taken out, it fails on that edit.
 
+**2026-09-23 — a Sync during an edit no longer takes an older dump line as the desk's answer** (branch `after-the-program-2026-09`; the finding recorded under `919047b`; decision 7). A reply can answer a pending send only if something asked the desk after the send: its own read-back, whose request time the link keeps. Outside a pull, an older reply is `Stale` and ignored. During a pull the link skipped that test (`ConsoleLinkState::ingest` in `E/rme_console_link.rs`), so it took any differing dump line as the desk adjusting the send. For a send made while the pull was under way, the line could predate the send, because the desk dumped it before the send reached it. It was written, the send was dropped without a read-back, and Sync wrote `aligned` over a value the desk no longer held.
+
+The fix: the pull's request, which covers every parameter, counts as a request made at the pull's start. So a differing dump line still wins for a send made before the pull began (the pull asked after it), and is `Stale` for a send made during the pull until that send's own read-back has been asked for. That read-back then confirms or adjusts it, as outside a pull. Sync may still write `aligned` while such a send waits. If its read-back never comes, the send expires as any unconfirmed send does: `AUDIO_CONSOLE_UNCONFIRMED`, and the confidence goes to `assumed`.
+
+Guard: `rme_console_link::tests::a_dump_line_for_a_send_made_during_the_pull_does_not_answer_it`:
+
+- the pull begins, a gain is sent, and a differing dump line is `Stale`, the send pending and nothing queued;
+- the send's read-back confirms the app's value;
+- a differing value that follows a read-back asked after the send is `Adjusted` and queued.
+
+It fails with the old rule (`left: Adjusted`, `right: Stale`). Test changed: `pull_applies_every_dump_value_even_when_it_confirms_a_pending_send` keeps its assertions (its gain was sent before the pull began, so the dump still wins); its comment "never stale" now says that it concerns a send made before the pull. The console-link, pull and ordering suites pass (40 cases).
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
