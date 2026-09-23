@@ -68,8 +68,9 @@ jobs:
       - run: npm run frontend:typecheck
 
   # Vitest unit + component tests across the frontend workspaces (app, design
-  # system, engine client, tokens), then the coverage floors in each
-  # vitest.config.ts (production readiness Slice 13).
+  # system, engine client, tokens, shared graphics), then the coverage floors
+  # of the app, the design system and the engine client (production
+  # readiness Slice 13).
   frontend-test:
     runs-on: ubuntu-latest
     steps:
