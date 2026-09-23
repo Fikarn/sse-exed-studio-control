@@ -132,6 +132,7 @@ pub struct SupportFileEntry {
     pub path: String,
     #[serde(rename = "sizeBytes")]
     pub size_bytes: u64,
+    /// The file's last-modified time, milliseconds since the Unix epoch.
     #[serde(rename = "modifiedAt")]
     pub modified_at: i64,
     pub kind: SupportBackupKind,
@@ -1404,11 +1405,7 @@ fn list_backup_files(directory: &Path) -> EngineResult<Vec<SupportFileEntry>> {
         };
 
         let metadata = entry.metadata()?;
-        let modified_at = metadata
-            .modified()
-            .ok()
-            .and_then(unix_timestamp)
-            .unwrap_or(0);
+        let modified_at = metadata.modified().ok().and_then(unix_millis).unwrap_or(0);
 
         entries.push(SupportFileEntry {
             name: entry.file_name().to_string_lossy().to_string(),
@@ -1476,9 +1473,11 @@ pub fn prune_exports(exports_dir: &Path, now: SystemTime) -> EngineResult<Vec<Pa
     Ok(removed)
 }
 
-fn unix_timestamp(time: SystemTime) -> Option<i64> {
+/// Milliseconds since the Unix epoch, what the screen's `Date` reads. Seconds
+/// here put every backup time on screen in January 1970.
+fn unix_millis(time: SystemTime) -> Option<i64> {
     let duration = time.duration_since(UNIX_EPOCH).ok()?;
-    Some(duration.as_secs() as i64)
+    i64::try_from(duration.as_millis()).ok()
 }
 
 fn sanitize_for_file_name(value: &str) -> String {

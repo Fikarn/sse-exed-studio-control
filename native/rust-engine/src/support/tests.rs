@@ -720,6 +720,34 @@ fn restore_round_trips_all_prefixes() {
     assert_eq!(restored, archive.settings);
 }
 
+#[test]
+fn backup_times_are_milliseconds_since_the_epoch() {
+    // The screen reads `modifiedAt` with `new Date(value)`, which takes
+    // milliseconds; seconds put every backup time in January 1970.
+    let test_dir = TestDir::new("list-times");
+    let runtime = seeded_runtime(&test_dir);
+    snapshot_database(
+        &runtime.db_path,
+        &runtime.backups_dir,
+        SnapshotReason::Daily,
+    )
+    .expect("database backup should write");
+    let now_ms = i64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after the epoch")
+            .as_millis(),
+    )
+    .expect("milliseconds fit in i64");
+
+    let snapshot = read_support_snapshot(&runtime).expect("snapshot should load");
+    let modified_at = snapshot.backups[0].modified_at;
+    assert!(
+        (now_ms - 60_000..=now_ms + 1_000).contains(&modified_at),
+        "modifiedAt {modified_at} is not within a minute of now ({now_ms} ms)"
+    );
+}
+
 // Slice 7 (F20): the engine's own database backups are listed next to
 // the JSON archives, each with its kind; sidecars and strays are not.
 #[test]
