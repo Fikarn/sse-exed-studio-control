@@ -689,6 +689,22 @@ This follow-up's own run is not recorded, by convention.
 
 From here on, work goes on branches cut from `main` and lands by pull request. The ledgers' hashes resolve through the tag.
 
+**2026-09-23 — Enter and F2 on a scene tile, and Enter on a group chip, do what they say** (branch `after-the-program-2026-09`, cut from `main` at `1911559`; the finding recorded under `7413b53`; decision 7 of the operator's decisions). A scene tile (`SceneTile.tsx`) and a group chip (`GroupChip.tsx`) are dnd-kit sortable items. dnd-kit's `listeners` carry an `onKeyDown` of their own, the keyboard sensor's activator, and it was spread after the item's `onKeyDown={handleKeyDown}`, so it replaced it:
+
+- Enter on a focused scene tile picked the tile up for a drag instead of recalling the scene;
+- F2 never opened the rename;
+- Enter on a focused group chip picked the chip up instead of switching the group on or off, as its label says ("… Toggle on.").
+
+The fix: each item takes dnd-kit's `onKeyDown` out of `listeners`, runs its own handler first, and passes on to dnd-kit only a key its own handler left alone (`defaultPrevented` unset). Space still picks an item up, which is the key both rails document for a keyboard drag, and the one `lighting-rig-actions.spec.ts` drags with.
+
+Guards: `frontend/app/tests/lighting-keyboard.spec.ts`, three Playwright cases on `lighting-populated`:
+
+- Enter recalls the Interview scene (`aria-current`), and the tile is not picked up;
+- F2 opens "Rename scene Interview", focused and holding the name, and Esc leaves it;
+- Enter switches the Back group (`aria-pressed` flips), and the chip is not picked up.
+
+All three fail with the two components as they were at `1911559` (the app rebuilt; each fails at the step that shows the defect), and pass with the fix. The two keyboard drags in `lighting-rig-actions.spec.ts` still pass.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

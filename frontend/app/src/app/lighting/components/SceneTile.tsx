@@ -219,6 +219,17 @@ export function SceneTile({
     }
   };
 
+  // dnd-kit's `listeners` carry an `onKeyDown` of their own (the keyboard
+  // sensor's activator). Spread after `handleKeyDown`, it replaced it: Enter
+  // picked the tile up for a drag instead of recalling the scene, and F2 never
+  // reached the rename. The tile's own keys go first; the sensor sees only the
+  // keys they leave alone (Space picks the tile up).
+  const { onKeyDown: sortableKeyDown, ...sortableListeners } = listeners ?? {};
+  const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    handleKeyDown(event);
+    if (!event.defaultPrevented) sortableKeyDown?.(event);
+  };
+
   // Rendered as <div role="button"> instead of <button> — dnd-kit's
   // listeners include drag-start handlers that want to be free of the
   // browser's button keyboard activation semantics. Keyboard activation
@@ -237,7 +248,7 @@ export function SceneTile({
         onRecall(id);
       }}
       onContextMenu={handleContextMenu}
-      onKeyDown={handleKeyDown}
+      onKeyDown={handleTileKeyDown}
       onMouseEnter={onHoverPreview ? () => onHoverPreview(id) : undefined}
       onMouseLeave={onHoverPreviewClear ? () => onHoverPreviewClear(id) : undefined}
       aria-current={isActive ? "true" : undefined}
@@ -247,7 +258,7 @@ export function SceneTile({
       data-dragging={isDragging || undefined}
       data-fading={normalizedFadeProgress !== null || undefined}
       {...attributes}
-      {...listeners}
+      {...sortableListeners}
       // dnd-kit's `attributes` already provides role="button" and
       // tabIndex={0}; spreading them earlier would conflict with
       // setting them explicitly below. Override role only after the
