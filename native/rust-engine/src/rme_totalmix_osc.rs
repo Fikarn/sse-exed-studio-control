@@ -985,8 +985,10 @@ pub(crate) fn accept_source(source: SocketAddr, expected: IpAddr) -> bool {
 
 /// Dropped-datagram bookkeeping for the metering thread: a source that is not
 /// the console is noted in the engine log (WARN) at most once a minute, keyed
-/// by address, and the datagram is discarded. Written through `append_log`
-/// until Slice 8 moves the module to `log_event`.
+/// by address, and the datagram is discarded. Written through `append_log`,
+/// which since Slice 8 goes through the process-wide rotating writer when the
+/// path is the engine log (and appends directly to any other path, the temp
+/// log the tests read).
 pub(crate) struct DroppedSourceLog {
     log_file_path: Option<PathBuf>,
     last_logged: HashMap<IpAddr, Instant>,

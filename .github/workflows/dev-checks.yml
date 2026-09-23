@@ -12,8 +12,8 @@ on:
 permissions:
   contents: read
 
-# actions/cache and actions/upload-artifact (@v4) still ship a Node.js 20
-# runtime. Opt them into Node 24 now — GitHub forces it from 2026-06-16 and the
+# actions/upload-artifact@v4 still ships a Node.js 20 runtime (actions/cache
+# is on v6). Opt it into Node 24 now — GitHub forces it from 2026-06-16 and the
 # actions already support it — so the deprecation warning clears ahead of the
 # runner change without waiting on a new action major.
 env:
@@ -67,11 +67,10 @@ jobs:
       - run: npm ci
       - run: npm run frontend:typecheck
 
-  # plan PR 4 / workstream D1: Vitest unit + component tests across the
-  # frontend workspaces. Currently passes-with-no-tests because the suites
-  # land in subsequent plan PRs (D2, D3, D6); the job exists now so the
-  # very first vitest test added in a follow-up doesn't have to also wire
-  # up CI.
+  # Vitest unit + component tests across the frontend workspaces (app, design
+  # system, engine client, tokens, shared graphics), then the coverage floors
+  # of the app, the design system and the engine client (production
+  # readiness Slice 13).
   frontend-test:
     runs-on: ubuntu-latest
     steps:
@@ -227,6 +226,10 @@ jobs:
       - run: npm run rust:clippy
       - run: npm run native:check
       - run: npm run native:test
+      # The development build's parity-fixture method and its F04 guards
+      # (`parity_fixture_loads_with_feature`, `load_defaults_to_merge`) exist
+      # only with the `dev-fixtures` feature, which no other step builds.
+      - run: npm run native:test:dev-fixtures
       - run: npm run native:acceptance
 
   # Production readiness 2026-09, Slice 13 (finding F25): the line-coverage floor

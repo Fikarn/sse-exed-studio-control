@@ -79,8 +79,9 @@ test("a second click inside the dwell keeps the arm; after the dwell it applies 
 test("a held Shift+digit arms once and its key repeats never apply", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const tile = page.getByTestId("audio-snapshot-snapshot-interview-block");
-  // Production readiness S13. `audio-workspace` is also the test id of the
-  // "Loading the console…" surface, where nothing listens for the snapshot
+  // Production readiness S13. `audio-workspace` was also the test id of the
+  // "Loading the console…" surface (until 2026-09-23; it is
+  // `audio-workspace-loading` now), where nothing listens for the snapshot
   // keys yet; a click that lands there sends Shift+3 to nobody, and a held key
   // is not sent twice (run 35211159050). Wait for the console itself.
   await expect(tile).toBeVisible();

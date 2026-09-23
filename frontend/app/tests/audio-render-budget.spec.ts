@@ -14,8 +14,8 @@ async function getInspectorRenderCount(page: Page) {
 // their baseline. New: they wait for what ends those renders. Reason: the
 // Console renders three times as it starts — its mount, then the recall pulse
 // on the snapshot key the fixture says was just recalled, then that pulse's end
-// on a 1.5 s timer (AUDIO_RECALL_PULSE_MS) — and `audio-workspace` is also the
-// id of the Console's loading surface. On a loaded machine the baseline was
+// on a 1.5 s timer (AUDIO_RECALL_PULSE_MS) — and `audio-workspace` was also the
+// id of the Console's loading surface (until 2026-09-23). On a loaded machine the baseline was
 // read before the mount or before the pulse ended, and the rest of the burst
 // was counted in the idle window; with the burst over, an idle Console renders
 // nothing, on any machine. The pulse is recorded in the page as it happens, so

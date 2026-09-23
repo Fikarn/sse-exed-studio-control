@@ -97,6 +97,7 @@
     "native:test": "cd native && cargo test --workspace",
     "native:engine:build": "cd native && cargo build --package studio-control-engine",
     "native:engine:build:dev-fixtures": "cd native && cargo build --package studio-control-engine --features dev-fixtures",
+    "native:test:dev-fixtures": "cd native && cargo clippy --package studio-control-engine --all-targets --features dev-fixtures -- -D warnings && cargo test --package studio-control-engine --features dev-fixtures && cargo build --package studio-control-engine",
     "native:shipping:build": "npm run native:engine:build && npm run tauri:build",
     "native:release:build": "node scripts/native-release-build.mjs",
     "native:release:win:evidence": "node scripts/native-windows-release-evidence.mjs",
@@ -169,7 +170,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.5.2",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
@@ -177,7 +178,7 @@
     "lint-staged": "^17.5.1",
     "prettier": "^3.9.8",
     "typescript-eslint": "^8.70.0",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   },
   "allowScripts": {
     "esbuild@0.27.7": true

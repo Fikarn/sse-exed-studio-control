@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
-// plan PR 4 / workstream D1: Vitest foundation. Engine-client unit
-// coverage (transports, machines, store) lands in D3.
+// plan PR 4 / workstream D1: Vitest foundation for the engine client's unit
+// tests (transports, machines, store).
 
 export default defineConfig({
   test: {
@@ -20,7 +20,7 @@ export default defineConfig({
       exclude: ["**/*.test.{ts,tsx}", "**/*.stories.{ts,tsx}", "**/*.d.ts", "src/generated/**"],
       reporter: ["text-summary", "json-summary"],
       reportsDirectory: "coverage",
-      thresholds: { statements: 39.78, branches: 37.24, functions: 45.06, lines: 40.63 },
+      thresholds: { statements: 50.95, branches: 47.24, functions: 55.06, lines: 51.78 },
     },
   },
 });
