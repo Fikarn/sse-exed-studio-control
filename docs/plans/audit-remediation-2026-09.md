@@ -151,7 +151,7 @@ Operator hands: checklist B4 — TotalMix fader at 0 dB → app reads 0.0 dB wit
 
 ## Slice 6 — Talkback momentary, shared watchdog, `audio.talkback.hold`
 
-Status: landed 2026-09-04 (operator verification pending — checklist B5, which now needs the TotalMix talkback channel assigned first). Commit `Audit S6`.
+Status: closed — not applicable (the operator's ruling of 2026-09-23: talkback is not needed and will not be used, so checklist B5 is not walked and no talkback channel is assigned in TotalMix; the code and its tests stay as they are — `docs/plans/production-readiness-2026-09.md`, After the program); landed 2026-09-04, when it waited on checklist B5 with the TotalMix talkback channel assigned first. Commit `Audit S6`.
 
 Scope: `audio/talkback.rs` (watchdog moved from the deck module, testable expiry); `update_audio_mix_target` arms/clears on any `talkback` write; new IPC method `audio.talkback.hold`; deck delegates; frontend `useMomentaryTalkback` (pointer hold, heartbeat 750 ms, `T` keydown/keyup, blur/hidden/unmount release), caption "Hold · T", no toggle path left.
 
@@ -388,16 +388,16 @@ Operator hands (all still open on 2026-09-04 — the operator was away from Slic
 
 ## Appendix B — Operator hardware checklist
 
-Sign-off state (2026-09-04): none signed yet — every item below is open. Sign each with the date next to the item; the matching slice's `Status:` then flips to `complete`.
+Sign-off state (2026-09-04): none signed yet — every item below is open. Sign each with the date next to the item; the matching slice's `Status:` then flips to `complete`. Since the operator's ruling of 2026-09-23 that talkback is not needed, item 5 and its talkback clause in item 8 are not applicable (below).
 
 1. TotalMix remote 4 (Global OSC, in 7004 / out 9004): "Send changes" on, "Follow Submix" off, remote active.
 2. After Slice 3: move a fader and toggle a mute in TotalMix → app follows within ~1 s; press Sync → toast reports the value count, badge aligned, nothing moved in TotalMix.
 3. After Slice 4: capture a snapshot, change a fader, a mute and 48V on Host in TotalMix, recall → fader and mute return in order, 48V does not, the band names Host, arming from the band flips it.
 4. After Slice 5: TotalMix fader at 0 dB → app 0.0 dB at the notch; −6 dB → app −6.0; deck LCD the same; Companion profile re-imported.
-5. After Slice 6: first assign the talkback input channel in TotalMix (`Options → Settings → Mixer → Talkback`; on 2026-09-04 it was unassigned and the desk refused every talkback write). Then: hold the button → TotalMix talkback lights; release → clears; hold `T` → same; deck `TALK` → same; graceful stop mid-hold releases it.
+5. After Slice 6: **not applicable** — the operator's ruling of 2026-09-23: talkback is not needed, so this item is not walked and no talkback input channel is assigned (Slice 6's `Status:`). As written before the ruling: first assign the talkback input channel in TotalMix (`Options → Settings → Mixer → Talkback`; on 2026-09-04 it was unassigned and the desk refused every talkback write). Then: hold the button → TotalMix talkback lights; release → clears; hold `T` → same; deck `TALK` → same; graceful stop mid-hold releases it.
 6. After Slice 1: reset the audio probe → every fader/mute/48V disabled with the reason and "Run audio probe"; run it → controls return.
 7. After Slice 9: studio monitor at 1920×1080 → no tier scrolls; 4/4/3 strips visible.
-8. After Slice 11: X / Alt+F4 → dialog; Cancel keeps the session; Confirm quits and no `studio-control-engine.exe` remains.
+8. After Slice 11: X / Alt+F4 → dialog; Cancel keeps the session; Confirm quits and no `studio-control-engine.exe` remains. The talkback clause (a close with a talkback hold active releases it: Slice 11's operator hands and the end of item 5) is not applicable under the talkback ruling of 2026-09-23; the rest of the item stands.
 
 ## Baseline refresh procedure
 

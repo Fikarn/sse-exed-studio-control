@@ -276,7 +276,7 @@ Sign-off state: **none signed. Every item is open** — as of Slice 11 (2026-09-
 1. After S2: on the studio monitor, the header is one row, every lamp is readable from the chair, and Setup shows the tabs and lamps.
 2. After S4 (B1): arm a snapshot recall; nothing moves; the key goes amber with its countdown and the display shows the armed row; Esc clears both.
 3. After S4 (B2): with TotalMix remote 4 disabled, move a desk fader, re-enable, watch `ASSUMED`, the count and (once F2 lands) the doubt keylines; press Sync; everything clears.
-4. After S4 (B3): press `DIM` on the deck and on screen — both are lit amber; hold `TALK` — the on-screen key is green for exactly the hold; confirm the deck's selected-strip colour against F1.
+4. After S4 (B3): press `DIM` on the deck and on screen — both are lit amber; hold `TALK` — the on-screen key is green for exactly the hold; confirm the deck's selected-strip colour against F1. The `TALK` clause is not applicable: the operator's ruling of 2026-09-23 that talkback is not needed (`docs/plans/production-readiness-2026-09.md`, After the program); the `DIM` and selected-strip clauses stand.
 5. After S5 (B4): select a fixture from the cluster list and then on the plot; the plate follows both; the footer values are complete.
 6. After S7 (B5): walk Setup to Publish and Support › Restore without scrolling the step; the commissioning record and the archive row are visible; the Console's cluster keeps `TALKBACK`, `DIM`, `MONO`, the target keys and the level.
 7. After S10 (B6): Bone and Graphite from the chair: every readout, eyebrow and lamp readable without leaning in.
