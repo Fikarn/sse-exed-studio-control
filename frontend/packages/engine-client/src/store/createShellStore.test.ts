@@ -850,3 +850,62 @@ describe("createShellStore snapshot guards", () => {
     }
   });
 });
+
+// 2026-09-23 (a finding recorded 2026-09-22 under `a598b11`): the hardware link
+// works out at every read whether an Identify or Find flash is still lit and
+// announces nothing when one starts or ends, so the store read the lighting
+// state once, during the first flash, and the page went on showing it. The
+// store now reads it again as each flash starts and ends (`identifyFlashes.ts`),
+// a little after the moment; a clear-all drops what is still waiting.
+describe("createShellStore identify flashes", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads the lighting state again as each Identify or Find flash starts and ends", async () => {
+    const log: string[] = [];
+    const store = createShellStore(
+      recordingTransport(createFixtureTransport(getFixtureScenario("lighting-populated")), log)
+    );
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    vi.useFakeTimers({ now: Date.parse("2026-09-23T12:00:00.000Z") });
+
+    const lightingReads = () => log.filter((method) => method === "lighting.snapshot").length;
+    const back = () =>
+      (store.getSnapshot().lightingSnapshot?.fixtures ?? []).find((fixture) => fixture.id === "fixture-back");
+    expect(back()).toMatchObject({ on: false });
+
+    // Identify: the reply's own read shows the flash; one more read 1.2 s on.
+    await store.identifyLightingFixture("fixture-back");
+    expect(back()).toMatchObject({ on: true, intensity: 100 });
+    log.length = 0;
+    await vi.advanceTimersByTimeAsync(1_200 + 59);
+    expect(lightingReads()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
+    await settle(() => back()?.on === false);
+    expect(lightingReads()).toBe(1);
+    expect(log).toContain("lighting.dmxMonitor.snapshot");
+    expect(back()).toMatchObject({ on: false });
+
+    // Find over three lights 400 ms apart, 1.2 s each: reads at 400, 800, 1200,
+    // 1600 and 2000 ms, each 60 ms late, and none after.
+    await store.startLightingIdentifySequence(["fixture-key", "fixture-fill", "fixture-back"], 400, 1_200);
+    log.length = 0;
+    await vi.advanceTimersByTimeAsync(2_060);
+    await settle(() => lightingReads() === 5);
+    expect(lightingReads()).toBe(5);
+    expect(back()).toMatchObject({ on: false });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(lightingReads()).toBe(5);
+
+    // A clear-all ends the flashes and drops the reads still waiting.
+    await store.startLightingIdentifySequence(["fixture-key", "fixture-fill", "fixture-back"], 400, 1_200);
+    await store.clearLightingIdentifyBursts();
+    log.length = 0;
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(lightingReads()).toBe(0);
+
+    await store.dispose();
+  });
+});

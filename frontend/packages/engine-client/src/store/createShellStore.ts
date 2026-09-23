@@ -11,6 +11,7 @@ import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
 import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
+import { identifyFlashMoments } from "./identifyFlashes";
 import { SnapshotShapeError, snapshotProblem } from "./snapshotGuards";
 
 // Boundary cast for a command result that may or may not be a whole audio
@@ -910,6 +911,36 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
   const inBackground = (context: string) => (error: unknown) => recordBackgroundFailure(error, context);
 
+  // An Identify or a Find changes what the lighting state shows as each flash
+  // starts and ends, and the hardware link announces neither
+  // (`identifyFlashes.ts`). After the reply the store reads the lighting state
+  // again at each of those moments, a little after it: the hardware link timed
+  // the flashes from before its reply left, so the store's moment is never
+  // early. A clear-all, a restart and a dispose drop what is still waiting.
+  const IDENTIFY_REFRESH_MARGIN_MS = 60;
+  let identifyRefreshTimeoutIds: number[] = [];
+
+  const cancelIdentifyRefreshes = () => {
+    for (const timeoutId of identifyRefreshTimeoutIds) {
+      window.clearTimeout(timeoutId);
+    }
+    identifyRefreshTimeoutIds = [];
+  };
+
+  const scheduleIdentifyRefreshes = (reply: unknown) => {
+    for (const moment of identifyFlashMoments(reply)) {
+      const timeoutId = window.setTimeout(() => {
+        identifyRefreshTimeoutIds = identifyRefreshTimeoutIds.filter((pending) => pending !== timeoutId);
+        if (state.lifecycle === "ready") {
+          void refreshDomains(["lighting", "lightingDmxMonitor"]).catch(
+            inBackground("refresh after an identify flash")
+          );
+        }
+      }, moment + IDENTIFY_REFRESH_MARGIN_MS);
+      identifyRefreshTimeoutIds.push(timeoutId);
+    }
+  };
+
   const cancelAutomaticRestart = () => {
     if (automaticRestartTimeoutId !== null) {
       window.clearTimeout(automaticRestartTimeoutId);
@@ -1060,6 +1091,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
     cancelAutomaticRestart();
     cancelQueuedRefresh();
+    cancelIdentifyRefreshes();
     clearStartupGate();
     engineStartupFailure = null;
     engineGeneration = null;
@@ -1392,10 +1424,12 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return performRequest("lighting.fixture.update", request as unknown as JsonObject);
     },
     async identifyLightingFixture(fixtureId: string, durationMs?: number) {
-      return performRequest(
+      const reply = await performRequest(
         "lighting.fixture.identify",
         durationMs === undefined ? { fixtureId } : { fixtureId, durationMs }
       );
+      scheduleIdentifyRefreshes(reply);
+      return reply;
     },
     async highlightLightingFixtures(fixtureIds: readonly string[], mode: "highlight" | "solo" | "off") {
       return performRequest("lighting.fixture.highlight", {
@@ -1404,14 +1438,18 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       });
     },
     async startLightingIdentifySequence(fixtureIds: readonly string[], stepMs: number, durationMs: number) {
-      return performRequest("lighting.fixture.identifySequence", {
+      const reply = await performRequest("lighting.fixture.identifySequence", {
         fixtureIds: [...fixtureIds],
         stepMs,
         durationMs,
       });
+      scheduleIdentifyRefreshes(reply);
+      return reply;
     },
     async clearLightingIdentifyBursts() {
-      return performRequest("lighting.fixture.identify.clearAll");
+      const reply = await performRequest("lighting.fixture.identify.clearAll");
+      cancelIdentifyRefreshes();
+      return reply;
     },
     async deleteLightingFixture(fixtureId: string) {
       return performRequest("lighting.fixture.delete", { fixtureId });
@@ -1509,6 +1547,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async dispose() {
       cancelAutomaticRestart();
       cancelQueuedRefresh();
+      cancelIdentifyRefreshes();
       bootstrapGeneration++;
       initializePromise = null;
       clearStartupGate();

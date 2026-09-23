@@ -718,6 +718,27 @@ Both fail against the double as it was at `1911559` (the Vitest case with "light
 
 The double's "no bridge" on the Console boards stays as it is, by the operator's decision: fixing it moves captures.
 
+**2026-09-23 — the Lighting page shows an Identify or Find flash end** (branch `after-the-program-2026-09`; the finding recorded under `a598b11`; decision 7). The hardware link stores each flash with its start and length and works out at every read whether it is still lit (`E/lighting/identify.rs`, `active_identify_burst_ids`). It announces nothing when a flash starts or ends. So the page read the lighting state once, during the flash, and went on showing it: the light at 100 % and its highest colour temperature, and "Scene drift: unsaved", until something else refreshed Lighting. Leaving the page then asked about unsaved changes nobody had made, and a Find showed its first flash only.
+
+The fix is in the shell's store, which already decides what to read and when:
+
+- `identifyFlashes.ts` (new): `identifyFlashMoments(reply)` gives the moments at which an Identify or a Find changes the lighting state, read from the hardware link's reply. For an Identify (`durationMs`) that is the flash's end. For a Find (`fixtureCount`, `stepMs`, `durationMs`) it is every flash's start but the first, and every flash's end, capped at the hardware link's 64 fixtures.
+- `createShellStore.ts`: after the reply of `identifyLightingFixture` or `startLightingIdentifySequence`, the store reads `lighting.snapshot` and `lighting.dmxMonitor.snapshot` again 60 ms after each of those moments. The hardware link timed the flashes from before its reply left, so the store is never early.
+- A clear-all, a restart and a dispose drop the reads still waiting.
+
+No protocol, hardware-link or test-double change. The same store runs on the workstation and against the double, so the browser case below exercises the code the operator runs.
+
+Guards:
+
+- `identifyFlashes.test.ts`, 4 cases: an Identify, a Find (including a step as long as a flash, and one light), the 64-light cap, and replies that give no moment.
+- `createShellStore.test.ts` "reads the lighting state again as each Identify or Find flash starts and ends", on the double with fake timers after start-up:
+  - no read before 1,260 ms and one read at it, with the light off again;
+  - five reads for a Find over three lights, and none after;
+  - none after a clear-all.
+- `lighting-rig-actions.spec.ts` "The page shows each flash start and end by itself: Identify, then Find", on the stopped page clock with nothing else pressed: Back lit, then off after 1.3 s; then a Find over Key and Back, with Back lit, then off with Key lit, then Key back at 76 %.
+
+The store case fails with the store as it was at `1911559` ("expected 0 to be 1"). So does the Playwright case, at the Identify flash's end: the light still reads 100 percent.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.

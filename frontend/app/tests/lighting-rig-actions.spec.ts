@@ -128,6 +128,32 @@ test("Esc ends a Find sequence, the flashes still waiting included (lighting.fix
   await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 76 percent, /);
 });
 
+// 2026-09-23 (a finding recorded 2026-09-22 under `a598b11`): nothing read the
+// rig again when a flash ended, so the page went on showing it until something
+// else refreshed Lighting — the cases above select another light to force that
+// read. The store now reads again as each flash starts and ends, a little after
+// the moment (`identifyFlashes.ts`); here nothing else is pressed.
+test("The page shows each flash start and end by itself: Identify, then Find", async ({ page }) => {
+  await openPopulatedRig(page, { stopClock: true });
+  await selectFixture(page, "Back");
+  await page.getByRole("button", { name: "Identify", exact: true }).click();
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, 100 percent, /);
+  await page.clock.runFor(1_300);
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, off, /);
+
+  // Find over Key and Back: as in the Find case above, Back (added last)
+  // flashes first, 400 ms, and Key 500 ms after it.
+  await selectFixture(page, "Key");
+  await selectFixture(page, "Back", { additive: true });
+  await page.getByTestId("lighting-identify-find").click();
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, 100 percent, /);
+  await page.clock.runFor(560);
+  await expect(marker(page, "Back")).toHaveAccessibleName(/^Fixture Back, off, /);
+  await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 100 percent, /);
+  await page.clock.runFor(500);
+  await expect(marker(page, "Key")).toHaveAccessibleName(/^Fixture Key, 76 percent, /);
+});
+
 test("Delete fixture takes the light off the plot and out of every scene (lighting.fixture.delete)", async ({
   page,
 }) => {
