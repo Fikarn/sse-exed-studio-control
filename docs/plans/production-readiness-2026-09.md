@@ -887,6 +887,21 @@ Every run in the table was ten green on its first attempt.
 
 Guard: `support::tests::backup_times_are_milliseconds_since_the_epoch`: a fresh backup's `modifiedAt` lies within a minute of now in milliseconds. With the old seconds it fails ("modifiedAt 1790177177 is not within a minute of now (1790177177762 ms)"). `npm run dev:check` and `npm run native:acceptance` pass. The live app (`98bbb06`) still shows 1970; the walk checklist treats that as a known finding, and the fix reaches the workstation with the next live build.
 
+**2026-09-23 — the release chain ran on `main`; CI and dependency tidy-ups** (branch `chore/ci-and-dependency-tidy-ups`; found by the check of the plan, recorded above; the operator's go-ahead for all of it).
+
+- **`release-evidence` on `main`**, run 35880530122, started by hand on `f583f41`: the first run since the rehearsal tags of 2026-09-17, after setup-node 7 and Tauri 2.11.6.
+  - Windows (9.0 min, green): the bundle archive's SHA256 manifest checks `OK`, and three SBOMs were written (web assets 22 components, shell 239, hardware link 38). Signing was skipped because no certificate secret is set, so the bundle is unsigned, as decided (Appendix B item 7). Nothing was published. setup-node 7 ran without its package-manager cache, as the workflow asks.
+  - macOS (4.7 min, green): recorded only, under the ruling of 2026-09-18.
+  - Rescope (10) of Slice 12 said the manual run could only be tried once the workflow was on the default branch; it has now been tried, and it works.
+- **The `dev-fixtures` build runs in CI:** `npm run native:test:dev-fixtures` (clippy and `cargo test` of the engine with that feature) is a step of the `rust` job. The development parity-fixture method and the F04 guards `parity_fixture_loads_with_feature` and `load_defaults_to_merge` compile only with it, and no lane built it after 2026-09-17. On the workstation it passes: clippy clean, 416 passed, 1 ignored.
+- **`vitest` and `@vitest/coverage-v8` 4.1.11**, a targeted install; `npm audit fix` was not run. The lockfile moves only vitest's own tree and four of its small dependencies. `npm audit` no longer lists `vitest` or `@vitest/mocker`, the two medium Dependabot alerts. `npm run supply-chain:npm` passes: nothing on what ships, and below the bar on the build tools, where `esbuild` (low) and `qs` (moderate) remain.
+- **The Vitest floors raised by their own rule** (measured minus two points), on the workstation with vitest 4.1.11:
+  - app: 10.11 / 9.79 / 8.97 / 10.32 % measured, floors 8.11 / 7.79 / 6.97 / 8.32, up from 6.75 / 5.79 / 6.01 / 6.89;
+  - engine client: 52.95 / 49.24 / 57.06 / 53.78 % measured, floors 50.95 / 47.24 / 55.06 / 51.78, up from 39.78 / 37.24 / 45.06 / 40.63;
+  - design system: its floors already equal its figures minus two, so they stay.
+- **The Console's loading surface has its own test id**, `audio-workspace-loading`. `audio-workspace` now means the mounted Console, which closes the note Slice 14 left open. The degraded-and-loading case asserts both, and fails with the old id. Locally, the audio, shell, startup and UI-contract specs passed, 190 of them, and the loading boards measure the same. The comment in `audio-talkback.spec.ts` is left as it is (the talkback ruling).
+- **Stale comments** corrected in `dev-checks.yml`, the two `vitest.config.ts` files, `domainRefresh.ts`, `rme_totalmix_osc.rs` (`DroppedSourceLog`) and `tools/sbom/package.json`.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
