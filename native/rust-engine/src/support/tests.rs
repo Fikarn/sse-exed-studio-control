@@ -720,8 +720,6 @@ fn restore_round_trips_all_prefixes() {
     assert_eq!(restored, archive.settings);
 }
 
-// Slice 7 (F20): the engine's own database backups are listed next to
-// the JSON archives, each with its kind; sidecars and strays are not.
 #[test]
 fn backup_times_are_milliseconds_since_the_epoch() {
     // The screen reads `modifiedAt` with `new Date(value)`, which takes
@@ -750,6 +748,8 @@ fn backup_times_are_milliseconds_since_the_epoch() {
     );
 }
 
+// Slice 7 (F20): the engine's own database backups are listed next to
+// the JSON archives, each with its kind; sidecars and strays are not.
 #[test]
 fn list_includes_sqlite3() {
     let test_dir = TestDir::new("list-kinds");
