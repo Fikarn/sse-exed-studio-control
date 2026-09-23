@@ -9,7 +9,7 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 - For multi-step or risky work, make a short plan after inspection and before edits.
 - Keep changes inside the right layer. If a task crosses the shell/engine/protocol boundary, state the boundary impact before changing files.
 - If validation cannot run, say exactly why and list the next command a human should run. Do not silently stop at partial verification.
-- When the user asks to close out or publish a session, finish the GitHub workflow: commit, push, open or update the PR, wait for the advisory checks that apply, merge the approved PR, prune/delete the feature branch, and sync local `main`.
+- When the user asks to close out or publish a session, finish the GitHub workflow: commit, push, open or update the PR, wait for the ten required `dev-checks` jobs, merge the PR, prune/delete the feature branch, and sync local `main`.
 
 ## What this product is
 
@@ -31,7 +31,7 @@ Rule: if a change would move product state, persistence, or device policy into R
 
 - Primary operator surface: fullscreen `2560×1440` on a fixed second monitor. **Operator ruling 2026-09-07 (visual overhaul A, plan D4): `2560×1440` is the only resolution that matters.** Chrome budget: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
 - `1920×1080` and `1280×800` remain as fallback layouts, not deliverables: their guards stay (`audio-legibility`, `viewport-contract`, the six-size scroll check) but no design gate runs below `2560×1440`.
-- **Operator ruling 2026-09-18: only the Windows build and only `2560×1440` matter.** Do no work for Linux, macOS or any other resolution (no linux or darwin captures, no fallback-viewport fixes). Leave their guards as they are; if one turns red for a reason that is not also a Windows `2560×1440` reason, say so, record it and move on — and ask before deleting such a guard.
+- **Operator ruling 2026-09-18: only the Windows build and only `2560×1440` matter.** Do no work for Linux, macOS or any other resolution (no linux or darwin captures, no fallback-viewport fixes). Leave their guards as they are; if one turns red for a reason that is not also a Windows `2560×1440` reason, say so, record it and move on — and ask before deleting such a guard. One exception (operator decision, 2026-09-23): `frontend-e2e` is a required check, so a change that moves a board refreshes its `linux` capture too, from the branch push run's `playwright-test-results` artifact, before it merges (the production readiness ledger, Baseline refresh procedure); `darwin` and the win32 captures at other sizes stay as they are.
 - **No scroll during normal operation.** Dense fixed-height layouts.
 - Devices currently in play: RME Fireface UFX III (audio), Litepanels Apollo Bridge / Astra Bi-Color / Aputure Infinimat / Infinibar PB12 (lighting), Stream Deck+ + Bitfocus Companion local (control).
 
