@@ -464,6 +464,10 @@ pub fn update_audio_channel_dynamics(
     db_path: &Path,
     request: &AudioDynamicsUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    // Read, change and write the channel map under the state lock, like every
+    // other channel edit: without it a console flush committed in between
+    // (the metering thread's, under the lock) was undone by this write.
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     if !snapshot.capabilities.can_edit_processing {
@@ -553,6 +557,9 @@ pub fn update_audio_channel_send_mode(
     db_path: &Path,
     request: &AudioSendModeUpdateRequest,
 ) -> Result<AudioChannelSnapshot, AudioCommandError> {
+    // Under the state lock, like every other channel edit (see the dynamics
+    // edit above).
+    let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
     if !snapshot.capabilities.can_edit_mixer_state {

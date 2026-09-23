@@ -1439,3 +1439,74 @@ fn a_phones_fader_edit_leaves_the_main_fader_alone() {
         Some(phones_level)
     );
 }
+
+// 2026-09-23 (a finding recorded under `919047b`): every channel edit reads,
+// changes and writes the stored channel map under `AUDIO_STATE_LOCK`, which the
+// console flush on the metering thread holds while it writes what the desk
+// reported. The dynamics and send-mode edits did not take it, so a flush
+// committed between their read and their write was undone. The lock is held
+// here on the test's thread; each edit, run on a second one, must wait for it.
+#[test]
+fn dynamics_and_send_mode_edits_wait_for_the_audio_state_lock() {
+    let test_dir = TestDir::new("channel-edits-take-the-lock");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from("app.commissioning.check.audio.status"),
+            String::from("passed"),
+        )],
+    )
+    .expect("probe state should persist");
+
+    for edit in ["dynamics", "send mode"] {
+        let guard = super::helpers::lock_audio_state();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let db_path = test_dir.db_path();
+        let worker = std::thread::spawn(move || {
+            let outcome = if edit == "dynamics" {
+                update_audio_channel_dynamics(
+                    db_path.as_path(),
+                    &AudioDynamicsUpdateRequest {
+                        channel_id: String::from("audio-input-9"),
+                        section: String::from("compressor"),
+                        enabled: Some(true),
+                        threshold_db: Some(-18.0),
+                        ratio: None,
+                        attack_ms: None,
+                        release_ms: None,
+                        makeup_db: None,
+                    },
+                )
+                .map(|_| ())
+            } else {
+                update_audio_channel_send_mode(
+                    db_path.as_path(),
+                    &AudioSendModeUpdateRequest {
+                        channel_id: String::from("audio-playback-7-8"),
+                        mix_target_id: String::from("audio-mix-phones-b"),
+                        pre_fader: Some(true),
+                        mute: None,
+                        link_stereo: None,
+                        solo: None,
+                    },
+                )
+                .map(|_| ())
+            };
+            let _ = sender.send(outcome.is_ok());
+        });
+        let early = receiver.recv_timeout(Duration::from_millis(300));
+        drop(guard);
+        assert!(
+            early.is_err(),
+            "the {edit} edit went ahead while the audio state lock was held"
+        );
+        assert!(
+            receiver
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the edit should finish once the lock is free"),
+            "the {edit} edit should succeed"
+        );
+        worker.join().expect("the edit's thread should finish");
+    }
+}

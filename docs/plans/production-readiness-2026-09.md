@@ -743,6 +743,10 @@ The store case fails with the store as it was at `1911559` ("expected 0 to be 1"
 
 Guard: `audio::tests::a_phones_fader_edit_leaves_the_main_fader_alone`. A Phones 2 edit on playback 7/8 keeps `fader` at its Main level and stores the Phones 2 level; a Main edit then writes both. It fails on `channels.rs` as it was at `1911559` (`left: 0.3`, `right: 0.52`).
 
+**2026-09-23 — the dynamics and send-mode edits take the audio state lock** (branch `after-the-program-2026-09`; the finding recorded under `919047b`; decision 7). Every channel edit reads the stored channel map, changes it and writes it back under `AUDIO_STATE_LOCK`, which the metering thread's console flush also holds while it writes what the desk reported (since `919047b`). `update_audio_channel_dynamics` and `update_audio_channel_send_mode` did not take it, so a flush committed between their read and their write was undone by the write. Both take it first now, as `update_audio_channel`, `update_audio_channel_eq` and `clear_all_audio_solo` do. Only the request dispatcher calls them, and it holds no audio lock, so nothing can deadlock.
+
+Guard: `audio::tests::dynamics_and_send_mode_edits_wait_for_the_audio_state_lock`. The test holds the lock on its own thread and runs each edit on a second one: the edit must not finish within 300 ms, and must finish once the lock is dropped. It fails on `channels.rs` as it was at `1911559` ("the dynamics edit went ahead while the audio state lock was held"). With only the send-mode edit's lock taken out, it fails on that edit.
+
 ## Appendix A — Gate honesty map (finding → guard → lane that runs it)
 
 Complete at Slice 15 (2026-09-21): every guard below exists and runs in the lane named; the traceability table above names each finding's commit and status.
