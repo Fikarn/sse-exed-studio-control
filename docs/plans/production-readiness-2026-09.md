@@ -728,7 +728,7 @@ The fix is in the shell's store, which already decides what to read and when:
 
 - `identifyFlashes.ts` (new): `identifyFlashMoments(reply)` gives the moments at which an Identify or a Find changes the lighting state, read from the hardware link's reply. For an Identify (`durationMs`) that is the flash's end. For a Find (`fixtureCount`, `stepMs`, `durationMs`) it is every flash's start but the first, and every flash's end, capped at the hardware link's 64 fixtures.
 - `createShellStore.ts`: after the reply of `identifyLightingFixture` or `startLightingIdentifySequence`, the store reads `lighting.snapshot` and `lighting.dmxMonitor.snapshot` again 60 ms after each of those moments. The hardware link timed the flashes from before its reply left, so the store is never early.
-- A clear-all, a restart and a dispose drop the reads still waiting.
+- A clear-all and a dispose drop the reads still waiting (a restart keeps them since the review below).
 
 No protocol, hardware-link or test-double change. The same store runs on the workstation and against the double, so the browser case below exercises the code the operator runs.
 
@@ -742,6 +742,8 @@ Guards:
 - `lighting-rig-actions.spec.ts` "The page shows each flash start and end by itself: Identify, then Find", on the stopped page clock with nothing else pressed: Back lit, then off after 1.3 s; then a Find over Key and Back, with Back lit, then off with Key lit, then Key back at 76 %.
 
 The store case fails with the store as it was at `1911559` ("expected 0 to be 1"). So does the Playwright case, at the Identify flash's end: the light still reads 100 percent.
+
+Review, the same day. Two gaps in the first version, both rare. (1) It scheduled the re-reads only after the read that follows every command, so if that read failed (a refused snapshot in the same batch), the Identify threw while its flash was lit and no re-read was scheduled. `performRequest` now takes an `onReply` hook that runs as soon as the reply arrives, before that read, and the two identify requests schedule from it. (2) A restart of the hardware link dropped the waiting re-reads, but the flashes are stored (`app.lighting.identify_bursts`, wall-clock) and outlive a restart. The re-reads are now kept across a restart; a moment that falls while the link is down is skipped by the ready check at fire time, and the restart's own full read covers it. A clear-all and a dispose still drop them. Guard: `createShellStore.test.ts` "schedules the re-reads from the reply and keeps them across a restart", with the monitor read refused until the Identify has failed, then a restart between an Identify and its flash's end. It fails with the store as committed in `12da801`, and again with only the restart's cancel put back.
 
 **2026-09-23 — a phones fader edit leaves the main fader alone** (branch `after-the-program-2026-09`; the finding recorded under `919047b`; decision 7). A channel's `fader` is its Main Out level, and `mix_levels` holds every output's. The console link and Sync write `fader` for `audio-mix-main` alone (`E/audio/console_link.rs`, `E/audio/sync.rs`). `update_audio_channel` (`E/audio/channels.rs`) wrote the level into `fader` for every mix target, so a fader edit on Phones 1 or 2 overwrote the channel's Main level, and what the main fader showed depended on which was written last. Now it writes `fader` only for a Main edit, and `mix_levels` for every edit, as before.
 

@@ -908,4 +908,53 @@ describe("createShellStore identify flashes", () => {
 
     await store.dispose();
   });
+
+  // The same day's review: the re-reads were scheduled only after the read that
+  // follows every command, so a failure of that read (the flash already lit)
+  // left none; and a restart dropped them, although the flashes are stored and
+  // outlive a restart of the hardware link.
+  it("schedules the re-reads from the reply and keeps them across a restart", async () => {
+    const log: string[] = [];
+    let refuseMonitor = false;
+    const inner = createFixtureTransport(getFixtureScenario("lighting-populated"));
+    const transport: EngineTransport = {
+      initialize: () => inner.initialize?.() ?? Promise.resolve(),
+      request: (method, params) => {
+        log.push(method);
+        if (refuseMonitor && method === "lighting.dmxMonitor.snapshot") {
+          return Promise.reject(new Error("STORAGE_ERROR: the database is busy"));
+        }
+        return inner.request(method, params);
+      },
+      subscribe: (listener) => inner.subscribe(listener),
+      dispose: () => inner.dispose?.() ?? Promise.resolve(),
+    };
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    vi.useFakeTimers({ now: Date.parse("2026-09-23T12:00:00.000Z") });
+    const lightingReads = () => log.filter((method) => method === "lighting.snapshot").length;
+
+    // The read after the command fails, and the Identify with it; the flash is
+    // lit all the same, and its end is still read.
+    refuseMonitor = true;
+    await expect(store.identifyLightingFixture("fixture-back")).rejects.toThrow("STORAGE_ERROR");
+    refuseMonitor = false;
+    log.length = 0;
+    await vi.advanceTimersByTimeAsync(1_260);
+    await settle(() => lightingReads() === 1);
+    expect(lightingReads()).toBe(1);
+
+    // A restart between an Identify and its flash's end keeps the read.
+    await store.identifyLightingFixture("fixture-back");
+    const restarting = store.restart();
+    await settle(() => store.getSnapshot().lifecycle === "ready");
+    await restarting;
+    log.length = 0;
+    await vi.advanceTimersByTimeAsync(1_260);
+    await settle(() => lightingReads() === 1);
+    expect(lightingReads()).toBe(1);
+
+    await store.dispose();
+  });
 });
