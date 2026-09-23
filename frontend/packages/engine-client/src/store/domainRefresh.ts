@@ -121,10 +121,11 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
 ];
 
 // Opening a workspace refreshes what that workspace shows. Not every change
-// on the hardware link raises an event: the Stream Deck changes lights and
-// tasks and raises none, the daily backup appears in the backups folder
-// unannounced, and the health sentences describe lighting and audio state
-// that moves without a health event. Scoped refreshes no longer sweep those up
+// on the hardware link raises an event: the daily backup appears in the
+// backups folder unannounced, the health sentences describe lighting and
+// audio state that moves without a health event, and a recorded action
+// raises no `support.changed`. (The Stream Deck's keys raise lighting.changed
+// and planning.changed since production readiness Slice 10.) Scoped refreshes no longer sweep those up
 // by accident, so the moment the operator looks is when they are fetched —
 // two to five requests where every switch used to cost ten.
 const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {

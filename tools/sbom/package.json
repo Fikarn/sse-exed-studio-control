@@ -2,7 +2,7 @@
   "name": "sse-exed-sbom-tools",
   "version": "0.0.0",
   "private": true,
-  "description": "The CycloneDX generator behind `npm run sbom:npm`. A package of its own, outside the root workspaces, so its 160-odd packages are installed only where an SBOM is written (the release-evidence workflow) and never by the everyday `npm ci`.",
+  "description": "The CycloneDX generator behind `npm run native:sbom:win:write` / `native:sbom:mac:write` (installed by `npm run native:sbom:tools:install`). A package of its own, outside the root workspaces, so its 160-odd packages are installed only where an SBOM is written (the release-evidence workflow) and never by the everyday `npm ci`.",
   "license": "MIT",
   "engines": {
     "node": ">=24"

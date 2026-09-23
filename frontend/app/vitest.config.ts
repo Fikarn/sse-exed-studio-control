@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 // plan PR 4 / workstream D1: Vitest foundation for unit + component tests
 // in the frontend/app workspace. Playwright still owns end-to-end specs
 // (`tests/*.spec.ts`); Vitest picks up colocated `*.test.ts` / `*.test.tsx`
-// files in src/. Subsequent plan PRs (D2, D3, D6) populate the suite.
+// files in src/.
 
 export default defineConfig({
   // The app version is a Vite define (vite.config.ts); component tests that
