@@ -395,6 +395,10 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
 
   await openFixture(page, "audio-loading");
   await expect(page.getByText("Loading the console…")).toBeVisible();
+  // The loading surface has an id of its own (2026-09-23): `audio-workspace`
+  // means the Console is up, so a spec that waits for it cannot land on this.
+  await expect(page.getByTestId("audio-workspace-loading")).toBeVisible();
+  await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
 });
 
 // Visual overhaul A, Slice 4b (plan Slice 4, finding C2): when the console is

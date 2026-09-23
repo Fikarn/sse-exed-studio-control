@@ -301,8 +301,9 @@ npm run test --workspace @sse/design-system          # incl. the CSS-literal all
   workspace is on screen. A spec whose first step after `openFixture` is a key or
   a one-shot DOM read calls `expectWorkspaceMounted(page, workspace)` first
   (`tests/helpers/openFixture.ts`; it waits for a mark only the mounted workspace
-  draws). `data-testid="audio-workspace"` is also on the Console's loading
-  surface — never wait for that id to mean "the Console is up".
+  draws). Since 2026-09-23 the Console's loading surface is
+  `data-testid="audio-workspace-loading"`, and `audio-workspace` is drawn only
+  by the mounted Console (before, the loading surface carried it too).
 - A value that depends on the page's clock is pinned or driven, never waited out
   (S15). The fixture double's simulated meters are a function of `Date.now()`, and
   the four strip levels are the Console's audio state as it was fetched at start —
