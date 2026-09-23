@@ -223,9 +223,13 @@ export function SceneTile({
   // sensor's activator). Spread after `handleKeyDown`, it replaced it: Enter
   // picked the tile up for a drag instead of recalling the scene, and F2 never
   // reached the rename. The tile's own keys go first; the sensor sees only the
-  // keys they leave alone (Space picks the tile up).
+  // keys they leave alone (Space picks the tile up). Only keys pressed on the
+  // tile at rest count: a key typed inside it (the rename's input) is the
+  // input's, and while the tile is being dragged every key is the sensor's
+  // (Enter and Space drop it, Esc puts it back), heard on the document.
   const { onKeyDown: sortableKeyDown, ...sortableListeners } = listeners ?? {};
   const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || isDragging) return;
     handleKeyDown(event);
     if (!event.defaultPrevented) sortableKeyDown?.(event);
   };

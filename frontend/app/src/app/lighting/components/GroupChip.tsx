@@ -139,9 +139,12 @@ export function GroupChip({
   // sensor's activator). Spread after `handleKeyDown`, it replaced it: Enter
   // picked the chip up for a drag instead of switching the group, as its label
   // says it does. The chip's own keys go first; the sensor sees only the keys
-  // they leave alone (Space picks the chip up).
+  // they leave alone (Space picks the chip up). Only keys pressed on the chip
+  // at rest count: while it is being dragged every key is the sensor's (Enter
+  // and Space drop it, Esc puts it back), heard on the document.
   const { onKeyDown: sortableKeyDown, ...sortableListeners } = listeners ?? {};
   const handleChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || isDragging) return;
     handleKeyDown(event);
     if (!event.defaultPrevented) sortableKeyDown?.(event);
   };
