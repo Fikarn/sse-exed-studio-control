@@ -253,7 +253,8 @@ describe("the fixture double's rig actions", () => {
   // page's Grand master failed against it. The hardware link reads it as a
   // number, rounds it and clamps it to 0–100 (`parse.rs`), stores it and names
   // it in the summary before any selection (`settings.rs`), and refuses the
-  // whole request, storing nothing, when a selection names nothing.
+  // whole request, storing nothing, when a selection names nothing: the
+  // fixture checked first, then the scene, in the hardware link's sentences.
   it("lighting.settings.update takes the Grand master, rounded and clamped, as the hardware link does", async () => {
     const { request, snapshot, reasons } = openDouble();
     expect((await snapshot()).grandMaster).toBe(100);
@@ -274,9 +275,34 @@ describe("the fixture double's rig actions", () => {
     });
 
     await expect(request("lighting.settings.update", { grandMaster: "50" })).rejects.toThrow("value must be a number");
+    const before = await snapshot();
     await expect(
       request("lighting.settings.update", { grandMaster: 20, selectedSceneId: "scene-gone" })
-    ).rejects.toThrow("Lighting scene 'scene-gone' is not present in the scene list.");
-    expect((await snapshot()).grandMaster).toBe(40);
+    ).rejects.toThrow("Lighting scene 'scene-gone' is not exposed by the native editor state.");
+    await expect(
+      request("lighting.settings.update", { grandMaster: 20, selectedFixtureId: "fixture-gone" })
+    ).rejects.toThrow("Lighting fixture 'fixture-gone' is not exposed by the native editor state.");
+    // A known scene beside an unknown fixture: the fixture is named first, and
+    // neither the master nor the scene is stored.
+    const knownScene = ((before.scenes as JsonObject[]).find((scene) => scene.id !== before.selectedSceneId) ?? {})
+      .id as string;
+    await expect(
+      request("lighting.settings.update", {
+        grandMaster: 20,
+        selectedSceneId: "scene-gone",
+        selectedFixtureId: "fixture-gone",
+      })
+    ).rejects.toThrow("Lighting fixture 'fixture-gone' is not exposed by the native editor state.");
+    await expect(
+      request("lighting.settings.update", {
+        grandMaster: 20,
+        selectedSceneId: knownScene,
+        selectedFixtureId: "fixture-gone",
+      })
+    ).rejects.toThrow("Lighting fixture 'fixture-gone' is not exposed by the native editor state.");
+    const after = await snapshot();
+    expect(after.grandMaster).toBe(40);
+    expect(after.selectedSceneId).toBe(before.selectedSceneId);
+    expect(after.selectedFixtureId).toBe(before.selectedFixtureId);
   });
 });

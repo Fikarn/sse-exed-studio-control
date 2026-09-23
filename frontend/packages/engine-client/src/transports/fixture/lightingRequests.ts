@@ -715,24 +715,25 @@ export function handleFixtureLightingRequest(
         .filter((scene): scene is JsonObject => scene !== null);
       const summaryParts: string[] = [];
 
-      // Validated like the hardware link: every selection is checked before
-      // anything is stored, so a refused request changes nothing.
-      if (hasSelectedSceneId && params.selectedSceneId !== null) {
-        const sceneId = asString(params.selectedSceneId).trim();
-        if (!sceneId) {
-          throw new Error("selectedSceneId must be a string or null");
-        }
-        if (!scenes.some((entry) => asString(entry.id) === sceneId)) {
-          throw new Error(`Lighting scene '${sceneId}' is not present in the scene list.`);
-        }
-      }
+      // Validated like the hardware link (`E/lighting/settings.rs`): the
+      // fixture, then the scene, each checked before anything is stored, so a
+      // refused request changes nothing, and refused in its words.
       if (hasSelectedFixtureId && params.selectedFixtureId !== null) {
         const fixtureId = asString(params.selectedFixtureId).trim();
         if (!fixtureId) {
           throw new Error("selectedFixtureId must be a string or null");
         }
         if (!fixtures.some((entry) => asString(entry.id) === fixtureId)) {
-          throw new Error(`Lighting fixture '${fixtureId}' is not present in the fixture inventory.`);
+          throw new Error(`Lighting fixture '${fixtureId}' is not exposed by the native editor state.`);
+        }
+      }
+      if (hasSelectedSceneId && params.selectedSceneId !== null) {
+        const sceneId = asString(params.selectedSceneId).trim();
+        if (!sceneId) {
+          throw new Error("selectedSceneId must be a string or null");
+        }
+        if (!scenes.some((entry) => asString(entry.id) === sceneId)) {
+          throw new Error(`Lighting scene '${sceneId}' is not exposed by the native editor state.`);
         }
       }
 
