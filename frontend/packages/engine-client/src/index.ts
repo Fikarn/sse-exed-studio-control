@@ -35,8 +35,6 @@ export type {
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,
-  PlanningProjectReorderRequest,
-  PlanningTaskCreateRequest,
   RecoveryState,
   RunnerStage,
   ShellState,
@@ -102,10 +100,3 @@ export type { LightingSceneFixtureSnapshot } from "./generated/snapshots/Lightin
 export type { LightingSceneSnapshot } from "./generated/snapshots/LightingSceneSnapshot";
 export type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
 export type { LightingSpatialMarker } from "./generated/snapshots/LightingSpatialMarker";
-export type { PlanningActivityEntry } from "./generated/snapshots/PlanningActivityEntry";
-export type { PlanningChecklistItem } from "./generated/snapshots/PlanningChecklistItem";
-export type { PlanningCounts } from "./generated/snapshots/PlanningCounts";
-export type { PlanningProject } from "./generated/snapshots/PlanningProject";
-export type { PlanningSettingsSnapshot } from "./generated/snapshots/PlanningSettingsSnapshot";
-export type { PlanningSnapshot } from "./generated/snapshots/PlanningSnapshot";
-export type { PlanningTask } from "./generated/snapshots/PlanningTask";

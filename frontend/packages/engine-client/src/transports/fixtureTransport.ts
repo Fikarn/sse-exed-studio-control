@@ -1,7 +1,6 @@
 import { type FixtureRequestHandler, type FixtureRequestContext, NOT_HANDLED } from "./fixture/requestContext";
 import { handleFixtureLightingRequest } from "./fixture/lightingRequests";
 import { handleFixtureAudioRequest } from "./fixture/audioRequests";
-import { handleFixturePlanningRequest } from "./fixture/planningRequests";
 import { handleFixtureSetupRequest } from "./fixture/setupRequests";
 import type { FixtureScenario, EngineTransport } from "../types";
 import type { EventEnvelope, EventName, JsonObject, RequestMethod, JsonValue } from "../generated/protocol";
@@ -22,7 +21,6 @@ export { calculateNextFixturePeakHold } from "./fixture/audioMetering";
 const FIXTURE_REQUEST_HANDLERS: readonly FixtureRequestHandler[] = [
   handleFixtureLightingRequest,
   handleFixtureAudioRequest,
-  handleFixturePlanningRequest,
   handleFixtureSetupRequest,
 ];
 
@@ -100,8 +98,6 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       case "audio.snapshot":
         refreshFixtureAudioMetering(state);
         return cloneJson(state.audioSnapshot);
-      case "planning.snapshot":
-        return cloneJson(state.planningSnapshot);
       case "support.snapshot":
         return cloneJson(state.supportSnapshot);
       case "controlSurface.snapshot":

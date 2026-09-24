@@ -131,12 +131,6 @@
     "radius": 0,
     "shadow": 1
   },
-  "app/src/app/planning/PlanningWorkspace.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 7
-  },
   "app/src/app/setup/SetupSupportPilot.module.css": {
     "colour": 0,
     "fontSize": 0,

@@ -43,8 +43,8 @@ describe("Tab", () => {
 
   it("a locked tab is aria-disabled, disabled and does not fire", () => {
     const onClick = vi.fn();
-    render(<Tab id="planning" label="Planning" disabled onClick={onClick} />);
-    const tab = screen.getByRole("button", { name: "Planning" });
+    render(<Tab id="lighting" label="Lighting" disabled onClick={onClick} />);
+    const tab = screen.getByRole("button", { name: "Lighting" });
     expect(tab).toHaveAttribute("aria-disabled", "true");
     expect(tab).toBeDisabled();
     fireEvent.click(tab);
@@ -117,7 +117,6 @@ describe("AppShellFrame", () => {
     { id: "setup", label: "Setup / Support", hint: "Ctrl+1" },
     { id: "lighting", label: "Lighting", hint: "Ctrl+2" },
     { id: "audio", label: "Audio", hint: "Ctrl+3" },
-    { id: "planning", label: "Planning", hint: "Ctrl+4" },
   ];
   const monitorItems = [
     { id: "lighting", label: "Lighting", detail: "ok", status: "ok" as const },
@@ -149,7 +148,7 @@ describe("AppShellFrame", () => {
     expect(regions()).toEqual(["header", "cluster", "bay", "plate", "footer"]);
   });
 
-  it("prints the product with its owner's eyebrow, the four tabs, the lamps with their tones and the clock", () => {
+  it("prints the product with its owner's eyebrow, the three tabs, the lamps with their tones and the clock", () => {
     render(
       <AppShellFrame activeWorkspace="audio" clock="09:11" monitorItems={monitorItems} workspaces={workspaces}>
         <p>bay</p>
@@ -157,7 +156,7 @@ describe("AppShellFrame", () => {
     );
     expect(screen.getByText("Studio Control")).toBeInTheDocument();
     expect(screen.getByText("SSE Executive Education")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Workspace navigation" }).querySelectorAll("button")).toHaveLength(4);
+    expect(screen.getByRole("navigation", { name: "Workspace navigation" }).querySelectorAll("button")).toHaveLength(3);
     expect(screen.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("shell-lamp-audio")).toHaveAttribute("data-tone", "error");
     expect(screen.getByTestId("shell-lamp-latched-solo")).toHaveAttribute("data-latch");
@@ -170,7 +169,7 @@ describe("AppShellFrame", () => {
         <p>startup</p>
       </AppShellFrame>
     );
-    for (const label of ["Setup / Support", "Lighting", "Audio", "Planning"]) {
+    for (const label of ["Setup / Support", "Lighting", "Audio"]) {
       expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-disabled", "true");
     }
     rerender(
@@ -178,7 +177,7 @@ describe("AppShellFrame", () => {
         activeWorkspace="setup"
         monitorItems={[]}
         workspaces={workspaces}
-        disabledWorkspaces={["lighting", "audio", "planning"]}
+        disabledWorkspaces={["lighting", "audio"]}
       >
         <p>setup</p>
       </AppShellFrame>

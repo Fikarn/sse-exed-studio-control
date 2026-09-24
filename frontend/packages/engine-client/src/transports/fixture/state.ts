@@ -22,7 +22,6 @@ import {
   buildAudioSnapshotPreview,
   refreshAudioCapabilities,
 } from "./audioConsole";
-import { buildDefaultPlanningSnapshot, normalizePlanningViewFilter, normalizePlanningModeSection } from "./planning";
 import type { IdentifyBursts } from "./lightingOverlay";
 
 export interface MutableFixtureState {
@@ -39,7 +38,6 @@ export interface MutableFixtureState {
    *  is kept (the hardware link's `app.lighting.enabled`). */
   lightingAuthored: { status: string | null; enabled: boolean | null };
   audioSnapshot: JsonObject | null;
-  planningSnapshot: JsonObject | null;
   supportSnapshot: JsonObject;
   controlSurfaceSnapshot: JsonObject;
 }
@@ -244,10 +242,6 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
               } as JsonObject)
             : cloneJson(buildDefaultAudioSnapshot())
         : cloneJson(buildDefaultAudioSnapshot()),
-    planningSnapshot:
-      "planningSnapshot" in scenario
-        ? cloneJson((scenario.planningSnapshot ?? null) as JsonObject | null)
-        : cloneJson(buildDefaultPlanningSnapshot()),
     supportSnapshot: cloneJson((scenario.supportSnapshot ?? {}) as JsonObject),
     controlSurfaceSnapshot: cloneJson(
       (scenario.controlSurfaceSnapshot ?? buildDefaultControlSurfaceSnapshot()) as JsonObject
@@ -378,8 +372,6 @@ export function buildCommissioningSteps(
   checkCount: number,
   passedChecks: number,
   failedChecks: number,
-  planningProjectCount: number,
-  planningTaskCount: number,
   hasCompletedSetup: boolean
 ) {
   const stageIndex =
@@ -399,10 +391,7 @@ export function buildCommissioningSteps(
       id: "import",
       label: "Import profile",
       status: stageIndex > 0 ? "completed" : "current",
-      summary:
-        planningProjectCount > 0
-          ? "Profile export and sample planning data are ready for commissioning."
-          : "Export the Companion profile and seed sample planning data before probing hardware.",
+      summary: "Export the Companion profile before probing hardware.",
     },
     {
       id: "probe",
@@ -423,10 +412,7 @@ export function buildCommissioningSteps(
       id: "map",
       label: "Map bindings",
       status: stageIndex > 2 ? "completed" : runnerStage === "map" ? "current" : allChecksPassed ? "ready" : "pending",
-      summary:
-        planningProjectCount > 0
-          ? `Review ${planningProjectCount} projects and ${planningTaskCount} tasks across the mapped control-surface pages.`
-          : "Review the engine-owned control-surface pages before moving to live verification.",
+      summary: "Review the engine-owned control-surface pages before moving to live verification.",
     },
     {
       id: "verify",
@@ -450,7 +436,7 @@ export function buildCommissioningSteps(
             : "pending",
       summary: hasCompletedSetup
         ? "Startup is routed directly into the dashboard surface and the publish backup can be restored."
-        : "Commit setup, export a support backup, and return to Planning.",
+        : "Commit setup, export a support backup, and return to the Console.",
     },
   ];
 }
@@ -463,59 +449,16 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   const shell = asRecord(state.appSnapshot.shell) ?? {};
   const shellSetup = asRecord(shell.setup) ?? {};
   const shellLighting = asRecord(shell.lighting) ?? {};
-  const planningAppSnapshot = asRecord(state.appSnapshot.planning) ?? {};
   const startup = asRecord(state.appSnapshot.startup) ?? {};
   const commissioning = asRecord(state.appSnapshot.commissioning) ?? {};
   const lightingConfig = asRecord(state.commissioningSnapshot.lighting) ?? {};
   const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
   const audioConfig = asRecord(state.commissioningSnapshot.audio) ?? {};
   const checks = ensureCommissioningChecks(state);
-  const planningSnapshotRecord = asRecord(state.planningSnapshot);
   const backups = asArray(state.supportSnapshot.backups)
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null)
     .sort((left, right) => asNumber(right.modifiedAt) - asNumber(left.modifiedAt));
-  const planningProjects = asArray(planningSnapshotRecord?.projects)
-    .map((project) => asRecord(project))
-    .filter((project): project is JsonObject => project !== null);
-  const planningTasks = asArray(planningSnapshotRecord?.tasks)
-    .map((task) => asRecord(task))
-    .filter((task): task is JsonObject => task !== null);
-  const planningActivityLog = asArray(planningSnapshotRecord?.activityLog);
-  const planningSettings = {
-    ...planningAppSnapshot,
-    ...(asRecord(planningSnapshotRecord?.settings) ?? {}),
-  };
-  planningSettings.viewFilter = asString(planningSettings.viewFilter, "all");
-  planningSettings.viewFilter = normalizePlanningViewFilter(planningSettings.viewFilter);
-  planningSettings.sortBy = asString(planningSettings.sortBy, "manual");
-  planningSettings.dashboardView = asString(planningSettings.dashboardView, "kanban");
-  planningSettings.deckMode = asString(planningSettings.deckMode, "project");
-  planningSettings.modeSection = normalizePlanningModeSection(planningSettings.modeSection);
-  planningSettings.timelineStartHour = clampNumber(Math.round(asNumber(planningSettings.timelineStartHour, 9)), 0, 23);
-  planningSettings.timelineEndHour = clampNumber(Math.round(asNumber(planningSettings.timelineEndHour, 22)), 1, 23);
-  if (planningSettings.timelineEndHour <= planningSettings.timelineStartHour) {
-    planningSettings.timelineEndHour = Math.min(23, planningSettings.timelineStartHour + 1);
-  }
-  planningSettings.selectedProjectId =
-    typeof planningSettings.selectedProjectId === "string" ? planningSettings.selectedProjectId : null;
-  planningSettings.selectedTaskId =
-    typeof planningSettings.selectedTaskId === "string" ? planningSettings.selectedTaskId : null;
-  if (planningSnapshotRecord) {
-    planningSnapshotRecord.projects = planningProjects;
-    planningSnapshotRecord.tasks = planningTasks;
-    planningSnapshotRecord.activityLog = planningActivityLog;
-    planningSnapshotRecord.settings = planningSettings;
-    planningSnapshotRecord.counts = {
-      projectCount: planningProjects.length,
-      taskCount: planningTasks.length,
-      runningTaskCount: planningTasks.filter((task) => asBoolean(task.isRunning, false)).length,
-      completedTaskCount: planningTasks.filter((task) => asBoolean(task.completed, false)).length,
-    };
-    state.planningSnapshot = planningSnapshotRecord;
-  } else {
-    state.planningSnapshot = null;
-  }
 
   const hardwareProfile = asString(
     state.commissioningSnapshot.hardwareProfile ?? commissioning.hardwareProfile,
@@ -529,8 +472,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     legacyStageFromRunnerStage(runnerStage, asBoolean(state.commissioningSnapshot.hasCompletedSetup, false)),
     "setup-required"
   ) as CommissioningStage;
-  const planningProjectCount = planningProjects.length;
-  const planningTaskCount = planningTasks.length;
   const passedChecks = checks.filter((check) => {
     const status = asString(check.status);
     return status === "ok" || status === "passed";
@@ -548,8 +489,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   state.commissioningSnapshot.runnerStage = runnerStage;
   state.commissioningSnapshot.stage = stage;
   state.commissioningSnapshot.hardwareProfile = hardwareProfile;
-  state.commissioningSnapshot.planningProjectCount = planningProjectCount;
-  state.commissioningSnapshot.planningTaskCount = planningTaskCount;
   state.commissioningSnapshot.lighting = {
     bridgeIp: asString(lightingConfig.bridgeIp, ""),
     universe: asNumber(lightingConfig.universe, 1),
@@ -559,12 +498,13 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     sendPort: asNumber(audioConfig.sendPort, 7001),
     receivePort: asNumber(audioConfig.receivePort, 9001),
   };
-  state.commissioningSnapshot.sampleSeedAvailable = true;
+  // New pages program, Slice 1: the Planning counts and the sample seed left
+  // the double with the page. Its summary said "Verification complete" only
+  // while it held Planning data, which it no longer does, so every state that
+  // held none reads as it did.
   state.commissioningSnapshot.summary = hasCompletedSetup
     ? "Commissioning complete and operator mode unlocked."
-    : allChecksPassed && planningProjectCount > 0
-      ? "Verification complete. Publish to unlock operator mode."
-      : "Complete commissioning to unlock operator mode.";
+    : "Complete commissioning to unlock operator mode.";
   state.commissioningSnapshot.configSummary = `Profile '${hardwareProfile}'. Lighting bridge '${asString(state.commissioningSnapshot.lighting.bridgeIp, "unconfigured")}' on universe ${asNumber(state.commissioningSnapshot.lighting.universe, 1)}. Audio send ${asString(state.commissioningSnapshot.audio.sendHost, "127.0.0.1")}:${asNumber(state.commissioningSnapshot.audio.sendPort, 7001)} and receive ${asNumber(state.commissioningSnapshot.audio.receivePort, 9001)}.`;
   const publishOverrideAt =
     typeof state.commissioningSnapshot.publishOverrideAt === "string"
@@ -572,14 +512,12 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
       : null;
   state.commissioningSnapshot.readinessSummary = hasCompletedSetup
     ? `${passedChecks} of ${checks.length} commissioning probes passed. Startup routes directly into the dashboard.${publishOverrideAt ? ` Published with a probe override at ${publishOverrideAt}.` : ""}`
-    : `${passedChecks} of ${checks.length} commissioning probes passed. Planning store has ${planningProjectCount} projects and ${planningTaskCount} tasks. Startup remains on Setup until publish.`;
+    : `${passedChecks} of ${checks.length} commissioning probes passed. Startup remains on Setup until publish.`;
   state.commissioningSnapshot.steps = buildCommissioningSteps(
     runnerStage,
     checks.length,
     passedChecks,
     failedChecks,
-    planningProjectCount,
-    planningTaskCount,
     hasCompletedSetup
   );
 
@@ -601,19 +539,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   commissioning.hardwareProfile = hardwareProfile;
   commissioning.summary = state.commissioningSnapshot.summary;
   state.appSnapshot.commissioning = commissioning;
-
-  state.appSnapshot.planning = {
-    settingsPrefix: asString(planningAppSnapshot.settingsPrefix, "planning."),
-    viewFilter: planningSettings.viewFilter,
-    sortBy: planningSettings.sortBy,
-    dashboardView: planningSettings.dashboardView,
-    deckMode: planningSettings.deckMode,
-    modeSection: planningSettings.modeSection,
-    timelineStartHour: planningSettings.timelineStartHour,
-    timelineEndHour: planningSettings.timelineEndHour,
-    selectedProjectId: planningSettings.selectedProjectId,
-    selectedTaskId: planningSettings.selectedTaskId,
-  };
 
   shell.workspace = asString(shell.workspace, "setup");
   shellSetup.activeSection = asString(shellSetup.activeSection, "commissioning");
@@ -987,11 +912,6 @@ export function updateFixtureCheck(
         ? "publish"
         : "probe";
   }
-}
-
-export function countPlanningActivity(state: MutableFixtureState) {
-  const activityEntries = asArray(asRecord(state.planningSnapshot)?.activityLog);
-  return Math.max(1, activityEntries.length);
 }
 
 export function validateIpv4(value: string) {

@@ -62,7 +62,7 @@
   }
 
   /* Fallback layouts below the studio surface (not a deliverable, plan D4):
-     the hints go first so the four tabs still fit. */
+     the hints go first so the tabs still fit. */
   @media (max-width: 1919px) {
     .hint {
       display: none;
