@@ -95,14 +95,34 @@ test.describe("UI contract", () => {
   // A loading board is the one kind of board allowed to move at rest, so it is
   // the honest board to prove the setting on: with reduced motion asked for,
   // nothing on it runs. New pages program, Slice 1: the board is the Console's
-  // loading skeleton. Old: Planning's, whose sweep left with Planning.
+  // loading skeleton. Old: Planning's, whose sweep left with Planning — and it
+  // was the only animation running at rest on any board, so the case now adds
+  // a probe that would run forever: it must run without the setting (the
+  // control), and stop with it, which only the app-wide rule in global.css can
+  // do.
   test("prefers-reduced-motion stops everything, the loading skeleton included", async ({ page }) => {
+    const addProbe = () =>
+      page.evaluate(() => {
+        const style = document.createElement("style");
+        style.textContent =
+          "@keyframes reducedMotionProbe { to { opacity: 0.5; } } " +
+          "#reduced-motion-probe { animation: reducedMotionProbe 1s linear infinite; }";
+        document.head.appendChild(style);
+        const probe = document.createElement("div");
+        probe.id = "reduced-motion-probe";
+        document.body.appendChild(probe);
+      });
+    const running = () =>
+      page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running").length);
+
+    await openBoard(page, "audio-loading", "studio");
+    await addProbe();
+    expect(await running(), "the probe must run while motion is allowed").toBeGreaterThan(0);
+
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openBoard(page, "audio-loading", "studio");
-    const running = await page.evaluate(
-      () => document.getAnimations().filter((animation) => animation.playState === "running").length
-    );
-    expect(running, "reduced motion left something running").toBe(0);
+    await addProbe();
+    await expect.poll(running, { message: "reduced motion left something running" }).toBe(0);
   });
 
   // The state display sits at the same x-band on every workspace (system §2);
