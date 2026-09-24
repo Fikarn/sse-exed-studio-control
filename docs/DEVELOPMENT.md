@@ -109,7 +109,7 @@ npm run tauri:package:win:evidence
 npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
 ```
 
-`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, a database backup verified and restored through the running shell (`database-restore`: the graceful restart's `shutdown` backup is verified — junk beside it is called junk — then restored; the store restarts the link on `requiresRestart`, the bootstrap moves the backup into place and keeps the old file as `replaced` — 2026-09 production readiness, Slice 7), degraded startup/recovery posture (a blocked app-data directory and a corrupt database, the latter restored from the recovery surface through the engine's recovery mode and restarted into the restored data), an engine ended from outside (`engine-crash`: `ENGINE_EXITED` on the recovery surface within two seconds, then the automatic restart with a new process — 2026-09 production readiness, Slice 5) and a second copy of the shell launched while the first is up (`second-instance`: refused by the single-instance plugin — within 5 s on Windows and macOS, on Linux only after GTK's start-up, which waits about 30 s on the AT-SPI bus lookup under xvfb — or by the engine's `engine.lock` on a Linux session without a D-Bus session bus). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting, Audio, and Planning mutations across restart persistence.
+`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, a database backup verified and restored through the running shell (`database-restore`: the graceful restart's `shutdown` backup is verified — junk beside it is called junk — then restored; the store restarts the link on `requiresRestart`, the bootstrap moves the backup into place and keeps the old file as `replaced` — 2026-09 production readiness, Slice 7), degraded startup/recovery posture (a blocked app-data directory and a corrupt database, the latter restored from the recovery surface through the engine's recovery mode and restarted into the restored data), an engine ended from outside (`engine-crash`: `ENGINE_EXITED` on the recovery surface within two seconds, then the automatic restart with a new process — 2026-09 production readiness, Slice 5) and a second copy of the shell launched while the first is up (`second-instance`: refused by the single-instance plugin — within 5 s on Windows and macOS, on Linux only after GTK's start-up, which waits about 30 s on the AT-SPI bus lookup under xvfb — or by the engine's `engine.lock` on a Linux session without a D-Bus session bus). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting and Audio mutations across restart persistence. Since the new pages program's Slice 1 the saved data both lanes follow through backups, restores and restarts is a snapshot slot of the Console (it was the Planning projects), and the saved page is Lighting.
 
 Both Tauri qualification lanes and Playwright preview use the fixed local port `127.0.0.1:4173` with strict port binding. Do not run them concurrently with each other or with the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`); a stale or competing server makes the result invalid.
 
@@ -119,7 +119,7 @@ The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially. None of those lanes calls the dev parity-fixture method; a session that needs it builds the engine with `npm run native:engine:build:dev-fixtures` first.
 
-`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting, Audio, and Planning screenshots at `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit, compact overflow reachability, narrow inspector drawer behavior, stage minimum bounds, and CSS-viewport-driven layout mode selection. Audio visual review also captures Scaled Studio Preview evidence for the key audio fixtures with `operatorReview=studio` and records preview fidelity metrics in the summary. This complements, but does not replace, live human review with Scaled Studio Preview or the fixed studio monitor.
+`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting and Audio screenshots at `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit, compact overflow reachability, narrow inspector drawer behavior, stage minimum bounds, and CSS-viewport-driven layout mode selection. Audio visual review also captures Scaled Studio Preview evidence for the key audio fixtures with `operatorReview=studio` and records preview fidelity metrics in the summary. This complements, but does not replace, live human review with Scaled Studio Preview or the fixed studio monitor.
 
 `npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` are Checkpoint C hardening lanes for historical/pre-switch replacement-shell evidence. They stage the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verify staged payload parity. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`.
 
@@ -218,8 +218,8 @@ slices, each with a Status line saying what landed, what moved, and what was
 deliberately left. Read the slice status before changing a surface it names — it
 usually explains why something is the way it is.
 
-**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 81 boards —
-27 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
+**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 66 boards —
+22 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
 measures each one: type floor and distinct sizes, font families, pixel-sampled
 text contrast, pointer-target size, radii, shadows and blur, gradients, running
 animations at idle, chrome heights, page scroll, targets off the viewport, and a
@@ -330,22 +330,20 @@ Use a port other than `4173`: Playwright binds that one with `--strictPort` and
 will fail to start if you are holding it.
 
 **Front-end map** (after production readiness S14). The shell is
-`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the four
+`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the three
 `import()` calls in `workspaceChunks.ts` (the active one is fetched after the
-shell's first draw, the other three at idle once ready; the fallback is
+shell's first draw, the other two at idle once ready; the fallback is
 `startup/WorkspaceLoadingSurface.tsx`, test id `workspace-loading`). There is
 deliberately no `manualChunks` rule by folder, and `build.cssCodeSplit` is `false`
-so rule order never depends on which workspace opened first. The three large
-workspaces are assemblers:
+so rule order never depends on which workspace opened first. Planning, the fourth
+workspace, left the screen in the new pages program's Slice 1
+(`docs/plans/new-pages-2026-09.md`). The two large workspaces are assemblers:
 
 - Lighting — `lighting/LightingWorkspace.tsx` over `lighting/useLightingEditor.ts`,
   which composes the six hooks in `lighting/editor/` (rig, session, scene editor,
   fixture editor, rig controls, commands); the render is the six components in
   `lighting/regions/` (cluster, plate, bay, quick palette, bottom strips, dialogs),
   and `lighting/lightingWorkspaceModel.ts` holds the module-level helpers.
-- Planning — `planning/PlanningWorkspace.tsx` over `planning/usePlanningEditor.ts`,
-  the three hooks in `planning/editor/` (view, actions, shortcuts) and the six
-  components in `planning/bays/`.
 - Setup / Support — `setup/SetupSupportPilot.tsx` over `setup/useSetupPilot.ts`,
   `setup/pilot/` (state, actions, shortcuts, chrome), the runner's four steps in
   `setup/steps/` and `setup/support/` (the support screen, the dialogs, and
@@ -355,8 +353,7 @@ The Console (`audio/AudioWorkspace.tsx` and `audio/components/`) was never over
 the size guard and was not split. The fixture double is
 `frontend/packages/engine-client/src/transports/fixtureTransport.ts` over twelve
 modules in `transports/fixture/`, one request handler per domain
-(`lightingRequests.ts`, `audioRequests.ts`, `planningRequests.ts`,
-`setupRequests.ts`); `scripts/check-operator-copy.mjs` skips that folder. The
+(`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`); `scripts/check-operator-copy.mjs` skips that folder. The
 boundaries are `startup/ShellErrorBoundary.tsx` (root) and
 `startup/WorkspaceErrorBoundary.tsx` (per workspace).
 
@@ -376,7 +373,7 @@ npm run frontend:foundation
 npm run tauri:foundation
 ```
 
-The store refreshes by domain (2026-09 production readiness, Slice 9 — findings F10, F11, F32). `engine-client/src/store/domainRefresh.ts` holds the two maps: `EVENT_DOMAIN_REFRESH satisfies Record<EventName, …>` (an event added to the protocol fails the typecheck until it is mapped) and the method-prefix list behind `domainsForMethod`, which also adds a workspace's own snapshots to the `settings.update` that opens it. Write a mapping from what the engine's snapshot builder reads, not from the event's name: the DMX monitor is built from the lighting snapshot, the commissioning snapshot carries the planning counts, a probe decides the lighting snapshot's `reachable` and the audio capabilities — both qualification lanes failed on couplings like these while the slice was written, and `domainRefresh.test.ts` holds the rules that came out of it. Every refresh goes through one queue in `createShellStore.ts` (`refreshDomains`): one batch in flight, whatever is asked for meanwhile goes out as the next, a partial refresh writes only the snapshots it fetched, and only the bootstrap writes the lifecycle. The fixture catalog is fetched once per session. Replies pass `snapshotGuards.ts` (top-level lists and ids only). `createShellStore(transport, { development })` — the app passes `import.meta.env.DEV` — decides what a malformed reply does: a development build throws, and `useShellSnapshot` rethrows it while rendering so the root boundary names the request and the field; a production build keeps the last good snapshot and records the failure. `vite dev`, Vitest and both qualification lanes (`tauri dev`) run the development store, so a reply the guards refuse fails them loudly; Playwright runs the production build. Boundaries: `startup/ShellErrorBoundary.tsx` at the root in `main.tsx` (works with no store), `startup/WorkspaceErrorBoundary.tsx` around the bay's surface in `OperatorShell.tsx`, keyed by experience, workspace and a reload counter, adding no element of its own. `?crash=<workspace>` on a fixture URL makes that workspace throw while rendering (fixture transport only, never inside the Tauri runtime); `window.__SSE_TEST_DISARM_CRASH__()` ends the fault. Record UI failures through `startup/reportUiFailure.ts`, which keeps each error object once.
+The store refreshes by domain (2026-09 production readiness, Slice 9 — findings F10, F11, F32). `engine-client/src/store/domainRefresh.ts` holds the two maps: `EVENT_DOMAIN_REFRESH satisfies Record<EventName, …>` (an event added to the protocol fails the typecheck until it is mapped) and the method-prefix list behind `domainsForMethod`, which also adds a workspace's own snapshots to the `settings.update` that opens it. Write a mapping from what the engine's snapshot builder reads, not from the event's name: the DMX monitor is built from the lighting snapshot, the commissioning snapshot carries the planning counts (until the new pages program's Slice 2; `planning.changed` refreshes only the commissioning snapshot since its Slice 1), a probe decides the lighting snapshot's `reachable` and the audio capabilities — both qualification lanes failed on couplings like these while the slice was written, and `domainRefresh.test.ts` holds the rules that came out of it. Every refresh goes through one queue in `createShellStore.ts` (`refreshDomains`): one batch in flight, whatever is asked for meanwhile goes out as the next, a partial refresh writes only the snapshots it fetched, and only the bootstrap writes the lifecycle. The fixture catalog is fetched once per session. Replies pass `snapshotGuards.ts` (top-level lists and ids only). `createShellStore(transport, { development })` — the app passes `import.meta.env.DEV` — decides what a malformed reply does: a development build throws, and `useShellSnapshot` rethrows it while rendering so the root boundary names the request and the field; a production build keeps the last good snapshot and records the failure. `vite dev`, Vitest and both qualification lanes (`tauri dev`) run the development store, so a reply the guards refuse fails them loudly; Playwright runs the production build. Boundaries: `startup/ShellErrorBoundary.tsx` at the root in `main.tsx` (works with no store), `startup/WorkspaceErrorBoundary.tsx` around the bay's surface in `OperatorShell.tsx`, keyed by experience, workspace and a reload counter, adding no element of its own. `?crash=<workspace>` on a fixture URL makes that workspace throw while rendering (fixture transport only, never inside the Tauri runtime); `window.__SSE_TEST_DISARM_CRASH__()` ends the fault. Record UI failures through `startup/reportUiFailure.ts`, which keeps each error object once.
 
 #### Engine changes
 
