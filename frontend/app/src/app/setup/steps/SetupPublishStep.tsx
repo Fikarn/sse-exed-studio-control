@@ -89,7 +89,7 @@ export function SetupPublishStep({ editor }: { editor: SetupPilot }) {
                   : notPassedProbes.length > 0
                     ? "Publish with override…"
                     : isReady
-                      ? "Open planning"
+                      ? "Open the Console"
                       : "Publish setup"}
               </Key>
               {backKey}

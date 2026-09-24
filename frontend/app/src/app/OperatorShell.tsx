@@ -1,5 +1,5 @@
 import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Calendar, Mic, Sliders, Sun } from "lucide-react";
+import { Mic, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
@@ -87,7 +87,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const deferredLightingFixtureCatalogSnapshot = useDeferredValue(shellState.lightingFixtureCatalogSnapshot);
   const deferredLightingSnapshot = useDeferredValue(shellState.lightingSnapshot);
   const deferredAudioSnapshot = useDeferredValue(shellState.audioSnapshot);
-  const deferredPlanningSnapshot = useDeferredValue(shellState.planningSnapshot);
   const deferredSupportSnapshot = useDeferredValue(shellState.supportSnapshot);
 
   // GLO-09: latched cross-workspace state gets a persistent attention chip in
@@ -225,14 +224,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         action: () => void tryNavigateWorkspace("audio"),
       },
       {
-        id: "workspace:planning",
-        label: "Switch to Planning",
-        group: "Workspace",
-        keywords: ["planning", "tasks", "projects"],
-        shortcut: formatShortcut(["mod", "4"]),
-        action: () => void tryNavigateWorkspace("planning"),
-      },
-      {
         id: "system:restart-engine",
         label: "Restart the hardware link",
         group: "System",
@@ -317,13 +308,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
           hint: formatShortcut(["mod", "2"]),
         },
         { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} />, hint: formatShortcut(["mod", "3"]) },
-        {
-          id: "planning",
-          label: "Planning",
-          meta: "secondary",
-          icon: <Calendar size={16} />,
-          hint: formatShortcut(["mod", "4"]),
-        },
       ] as const,
     []
   );
@@ -380,20 +364,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         return;
       }
 
-      if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey && activeWorkspace === "planning") {
-        if (event.key.toLowerCase() === "b") {
-          void environment.store.updatePlanningSettings({ modeSection: "board" });
-          event.preventDefault();
-          return;
-        }
-
-        if (event.key.toLowerCase() === "t") {
-          void environment.store.updatePlanningSettings({ modeSection: "timeline" });
-          event.preventDefault();
-          return;
-        }
-      }
-
       if (
         (event.key === "?" || (event.key === "/" && event.shiftKey)) &&
         !event.metaKey &&
@@ -406,7 +376,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
       }
 
       const modifier = event.metaKey || event.ctrlKey;
-      if (modifier && ["1", "2", "3", "4"].includes(event.key)) {
+      if (modifier && ["1", "2", "3"].includes(event.key)) {
         const nextWorkspace = workspaces[Number(event.key) - 1]?.id;
         if (nextWorkspace) {
           void tryNavigateWorkspace(nextWorkspace);
@@ -423,7 +393,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeWorkspace, confirmIntent, environment.store, palette, showShortcutGuide, tryNavigateWorkspace, workspaces]);
+  }, [activeWorkspace, confirmIntent, palette, showShortcutGuide, tryNavigateWorkspace, workspaces]);
 
   const shellExperience = deriveShellExperience(shellState);
 
@@ -434,7 +404,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   useEffect(() => {
     void preloadWorkspace(activeWorkspace);
   }, [activeWorkspace]);
-  // The other three follow once the shell is ready and idle: a workspace whose
+  // The other two follow once the shell is ready and idle: a workspace whose
   // chunk is in hand mounts in the commit that asks for it, with no loading
   // surface in between.
   useEffect(() => {
@@ -496,7 +466,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const operatorModeUnlocked =
     String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
   const tabsDisabled = shellExperience !== "ready";
-  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "planning"] : [];
+  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio"] : [];
   const monitorItems = buildMonitorItems(
     shellState.healthSnapshot,
     { lightingSceneDrift, audioSolo },
@@ -505,14 +475,11 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions once it has moved onto the cluster rule. The Console did in
-  // Slice 4, Lighting in Slice 5, Planning in Slice 6 and Setup in Slice 7.
+  // Slice 4, Lighting in Slice 5 and Setup in Slice 7.
   // The pre-ready surfaces render their own frame (they are not workspaces).
   const workspaceRegions =
     shellExperience === "ready" &&
-    (activeWorkspace === "audio" ||
-      activeWorkspace === "lighting" ||
-      activeWorkspace === "planning" ||
-      activeWorkspace === "setup")
+    (activeWorkspace === "audio" || activeWorkspace === "lighting" || activeWorkspace === "setup")
       ? ("slot" as const)
       : undefined;
 
@@ -527,7 +494,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const SetupSurface = workspaceChunks.setup.Surface;
   const LightingSurface = workspaceChunks.lighting.Surface;
   const AudioSurface = workspaceChunks.audio.Surface;
-  const PlanningSurface = workspaceChunks.planning.Surface;
 
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
@@ -587,19 +553,15 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         store={environment.store}
       />
     );
-  } else if (activeWorkspace === "audio") {
+  } else {
+    // The Console. Setup is drawn above in every shell state and Lighting just
+    // above, so Audio is the one workspace left to reach this branch (new pages
+    // program, D1: a page saved while Planning was open reads as the
+    // Console).
     surface = (
       <AudioSurface
         appSnapshot={shellState.appSnapshot}
         audioSnapshot={deferredAudioSnapshot}
-        store={environment.store}
-      />
-    );
-  } else {
-    surface = (
-      <PlanningSurface
-        appSnapshot={shellState.appSnapshot}
-        planningSnapshot={deferredPlanningSnapshot}
         store={environment.store}
       />
     );

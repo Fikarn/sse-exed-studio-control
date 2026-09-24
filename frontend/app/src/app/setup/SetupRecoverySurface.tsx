@@ -184,7 +184,7 @@ export function SetupRecoverySurface({
             size="small"
             disabled={!canReturnToConsole}
             testId="setup-recovery-console"
-            onClick={() => void store.setWorkspace("planning")}
+            onClick={() => void store.setWorkspace("audio")}
           >
             Back to Console
           </Key>

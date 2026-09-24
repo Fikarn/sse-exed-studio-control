@@ -707,10 +707,6 @@ button.lightingDmxDrawerCell {
   font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
 }
 
-button.planningProjectDetailTaskCard {
-  width: 100%;
-}
-
 @media (max-width: 1440px) {
   .setupUtilityRow {
     flex-direction: column;

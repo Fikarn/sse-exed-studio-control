@@ -92,12 +92,13 @@ test.describe("UI contract", () => {
   }
 
   // Slice 9 (system §6): "prefers-reduced-motion removes enter, exit and move."
-  // The loading skeleton is the one thing the app animates on purpose, so it is
+  // A loading board is the one kind of board allowed to move at rest, so it is
   // the honest board to prove the setting on: with reduced motion asked for,
-  // even it stops.
+  // nothing on it runs. New pages program, Slice 1: the board is the Console's
+  // loading skeleton. Old: Planning's, whose sweep left with Planning.
   test("prefers-reduced-motion stops everything, the loading skeleton included", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await openBoard(page, "planning-loading-board", "studio");
+    await openBoard(page, "audio-loading", "studio");
     const running = await page.evaluate(
       () => document.getAnimations().filter((animation) => animation.playState === "running").length
     );
@@ -108,7 +109,7 @@ test.describe("UI contract", () => {
   // measured once the regions are declared (Slice 2).
   test("the state display keeps one x-band across the workspaces", async ({ page }) => {
     const xs: Array<{ fixture: string; x: number }> = [];
-    for (const fixture of ["audio-populated", "lighting-populated", "planning-populated", "setup-ready"]) {
+    for (const fixture of ["audio-populated", "lighting-populated", "setup-ready"]) {
       await openBoard(page, fixture, "studio");
       const { measures } = await measureBoard(page);
       if (measures.stateDisplayX !== null) xs.push({ fixture, x: measures.stateDisplayX });

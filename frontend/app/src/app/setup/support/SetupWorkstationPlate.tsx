@@ -7,18 +7,8 @@ import type { SetupPilot } from "../useSetupPilot";
  *  recent actions, theme and scale, and the backup and diagnostics keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
-  const {
-    backups,
-    lastBackup,
-    busyAction,
-    runtime,
-    recentActions,
-    theme,
-    uiScale,
-    setSeedPlanningPrompt,
-    setTheme,
-    setUiScale,
-  } = editor.state;
+  const { backups, lastBackup, busyAction, runtime, recentActions, theme, uiScale, setTheme, setUiScale } =
+    editor.state;
   const { engineLogPath, openEngineLog } = editor.chrome;
   const { performAction, exportSupportBackup, exportDiagnostics, restoreBackup, setLightOutputsArmed, verifyBackup } =
     editor.actions;
@@ -40,7 +30,6 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       uiScale={uiScale}
       onExportBackup={() => void performAction("support-export-main", exportSupportBackup)}
       onExportDiagnostics={() => void performAction("export-shell-diagnostics", exportDiagnostics)}
-      onLoadSamplePlanning={() => setSeedPlanningPrompt(true)}
       onOpenEngineLog={openEngineLog}
       onRestartBridge={onRequestRestart}
       onRestoreLatest={() => {

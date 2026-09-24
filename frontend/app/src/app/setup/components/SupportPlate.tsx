@@ -46,7 +46,6 @@ export interface SupportPlateProps {
   canOpenEngineLog: boolean;
   onExportBackup: () => void;
   onExportDiagnostics: () => void;
-  onLoadSamplePlanning: () => void;
   onOpenEngineLog: () => void;
   onRestartBridge: () => void;
   onRestoreLatest: () => void;
@@ -75,7 +74,6 @@ export function SupportPlate({
   canOpenEngineLog,
   onExportBackup,
   onExportDiagnostics,
-  onLoadSamplePlanning,
   onOpenEngineLog,
   onRestartBridge,
   onRestoreLatest,
@@ -203,14 +201,6 @@ export function SupportPlate({
           </Key>
           <Key size="small" disabled={busy || !canOpenEngineLog} testId="support-engine-log" onClick={onOpenEngineLog}>
             Engine log
-          </Key>
-        </div>
-      </Section>
-
-      <Section title="Sample data" detail="asks first" testId="support-sample-data">
-        <div className={styles.keys}>
-          <Key size="small" disabled={busy} testId="support-load-sample-planning" onClick={onLoadSamplePlanning}>
-            Load sample planning
           </Key>
         </div>
       </Section>

@@ -88,12 +88,15 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   // ready, or a tab that could be pressed.
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   await expect(nav).toBeVisible();
-  for (const label of ["Setup / Support", "Lighting", "Audio", "Planning"]) {
+  // New pages program, Slice 1: three tabs, and no others. Old: four, the
+  // fourth being Planning.
+  const tabLabels = ["Setup / Support", "Lighting", "Audio"];
+  await expect(nav.getByRole("button")).toHaveCount(tabLabels.length);
+  for (const label of tabLabels) {
     await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-disabled", "true");
   }
   await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
-  await expect(page.getByTestId("planning-workspace")).toHaveCount(0);
 });
 
 test("recovery shell scrolls within the frame at 1920x1080 (SET-11)", async ({ page }) => {

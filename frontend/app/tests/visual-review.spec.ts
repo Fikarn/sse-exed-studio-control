@@ -9,13 +9,7 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // `tests/__visual__/visual-review.spec.ts-snapshots/`, and PR diffs upload via
 // the GitHub Actions `playwright-report` / `test-results` artifacts.
 
-const FIXTURES = [
-  "setup-ready",
-  "protocol-mismatch",
-  "lighting-populated",
-  "audio-populated",
-  "planning-populated",
-] as const;
+const FIXTURES = ["setup-ready", "protocol-mismatch", "lighting-populated", "audio-populated"] as const;
 
 interface Viewport {
   readonly width: number;
@@ -37,14 +31,15 @@ const SIZES: readonly Viewport[] = [
 // regression-tested on the proportional `2560x1440` review canvas, not just
 // the Audio fixture. The host viewport mirrors the built-in 14-inch M5
 // MacBook (the documented review surface in `docs/DEVELOPMENT.md §2b`).
-const STUDIO_PREVIEW_FIXTURES = ["setup-ready", "lighting-populated", "audio-populated", "planning-populated"] as const;
+const STUDIO_PREVIEW_FIXTURES = ["setup-ready", "lighting-populated", "audio-populated"] as const;
 const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x982" };
 
-// Planning AND lighting fixtures render relative time labels ("in 5 minutes",
-// "last 19h ago" on scene cards). Freezing the clock for every fixture keeps
-// those labels stable across runs — a planning-only guard let the lighting
-// scene-card label drift with wall-clock time until baselines rotted past the
-// diff budget (first hit: lighting-populated bone 2560x1440, 2026-08-12).
+// Lighting fixtures render relative time labels ("last 19h ago" on scene
+// cards), and every shell prints the header clock. Freezing the clock for every
+// fixture keeps them stable across runs — a guard for one workspace's fixtures
+// only let the lighting scene-card label drift with wall-clock time until
+// baselines rotted past the diff budget (first hit: lighting-populated bone
+// 2560x1440, 2026-08-12).
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
 // The live-audio masks are shared with storybook.spec.ts since production
@@ -315,20 +310,14 @@ test.describe("studio preview", () => {
 
 // Slice 3 — per-theme foundation; Slice 14 — the full per-surface set.
 // Graphite/Bone become app-wide via the global `data-theme` attribute. One
-// fixture per surface at the primary resolution: setup (runner), planning,
-// lighting, startup/recovery (protocol-mismatch) and the audio mixer. Theming
+// fixture per surface at the primary resolution: setup (runner), lighting,
+// startup/recovery (protocol-mismatch) and the audio mixer. Theming
 // is colour-only, so no-scroll is unaffected and only the at-rest render is
 // captured. The audio capture needs the explicit theme settle below (the S3-era
 // canvas-dark quirk): the theme attribute lands post-mount, and the screenshot
 // stabilizer could grab the pre-flip frame on the canvas-heavy mixer — so wait
 // until the attribute + the themed background are live before capturing.
-const PER_THEME_FIXTURES = [
-  "setup-ready",
-  "planning-populated",
-  "lighting-populated",
-  "protocol-mismatch",
-  "audio-populated",
-] as const;
+const PER_THEME_FIXTURES = ["setup-ready", "lighting-populated", "protocol-mismatch", "audio-populated"] as const;
 const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
 
 async function settleTheme(page: Page, theme: (typeof NON_STUDIO_THEMES)[number]) {
@@ -358,18 +347,16 @@ test.describe("per-theme foundation", () => {
 });
 
 // R2-C (round-2 audit, R2-FIX-01): the designed empty/degraded states were
-// functionally tested but never visually locked — the Planning hero
-// EmptyState, the lighting "No fixtures on the rig yet" canvas state, the
-// setup degraded banner posture and the audio assumed-state warning band
-// could all silently regress. One state-locking capture each at the primary
-// resolution (these states carry no layout-ladder risk — the populated
-// fixtures own the 6-viewport ladder).
+// functionally tested but never visually locked — the lighting "No fixtures
+// on the rig yet" canvas state, the setup degraded banner posture and the
+// audio assumed-state warning band could all silently regress. One
+// state-locking capture each at the primary resolution (these states carry no
+// layout-ladder risk — the populated fixtures own the 6-viewport ladder).
 // Close-out extension: the remaining degraded postures from the round-2
 // audit's R2-FIX-01 matrix (audio not-verified / offline / action-failed
 // warning bands + the lighting DMX-unreachable posture) join the loop —
 // the full designed-state set is now locked.
 const STATE_FIXTURES = [
-  "planning-empty",
   "lighting-empty",
   "setup-degraded",
   "audio-state-assumed",

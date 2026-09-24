@@ -26,7 +26,7 @@ const SHORTCUTS: readonly ShortcutSection[] = [
       { keys: ["mod", "K"], description: "Open command palette" },
       { keys: ["?"], description: "Toggle this shortcuts overlay" },
       { keys: ["Esc"], description: "Close current overlay / clear selection" },
-      { keys: ["mod", "1–4"], description: "Switch workspaces (Setup, Lighting, Audio, Planning)" },
+      { keys: ["mod", "1–3"], description: "Switch workspaces (Setup, Lighting, Audio)" },
       { keys: ["shift", "S"], description: "Open Setup / Support" },
       { keys: ["A"], description: "Open Audio workspace" },
       { keys: ["mod", "shift", "R"], description: "Restart the hardware link" },
@@ -113,18 +113,6 @@ const SHORTCUTS: readonly ShortcutSection[] = [
     ],
   },
   {
-    heading: "Planning",
-    entries: [
-      { keys: ["shift", "B"], description: "Toggle Board view" },
-      { keys: ["shift", "T"], description: "Toggle Timeline view" },
-      { keys: ["[", "]"], description: "Move the time window" },
-      { keys: ["0"], description: "Snap timeline view back to now" },
-      { keys: ["shift", "[", "]"], description: "Change the Planning day" },
-      { keys: ["shift", "←", "→"], description: "Nudge the selected schedule block" },
-      { keys: ["0–4"], description: "Filter Planning board columns" },
-    ],
-  },
-  {
     heading: "Setup · runner",
     entries: [
       { keys: ["Tab"], description: "Move forward through runner steps" },
@@ -156,7 +144,7 @@ export interface ShortcutOverlayProps {
  * substring-filters across every entry's description + keys live as the
  * operator types. Esc / `?` / backdrop click / Close button all dismiss.
  *
- * Sections cover every workspace (Shell, Lighting, Audio, Planning, Setup)
+ * Sections cover every workspace (Shell, Lighting, Audio, Setup)
  * so the operator can browse cross-workspace shortcuts without switching
  * away from their current view.
  */

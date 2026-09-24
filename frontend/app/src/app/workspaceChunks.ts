@@ -5,7 +5,7 @@ import type { WorkspaceId } from "@sse/engine-client";
 // 2026-09 production readiness, Slice 14 (finding F26). Each workspace is its
 // own chunk, so the startup surface draws before any workspace's code has been
 // fetched or evaluated. The shell asks for the active workspace's chunk once it
-// has drawn, and for the other three when it is ready and idle, so a chunk is
+// has drawn, and for the other two when it is ready and idle, so a chunk is
 // in hand before the operator can ask for its workspace.
 //
 // The three modules the shell itself reads from a workspace's folder
@@ -75,12 +75,9 @@ export const workspaceChunks = {
     import("./lighting/LightingWorkspace").then((module) => module.LightingWorkspaceSurface)
   ),
   audio: workspaceChunk(() => import("./audio/AudioWorkspace").then((module) => module.AudioWorkspace)),
-  planning: workspaceChunk(() =>
-    import("./planning/PlanningWorkspace").then((module) => module.PlanningWorkspaceSurface)
-  ),
 };
 
-export const WORKSPACE_IDS: readonly WorkspaceId[] = ["setup", "lighting", "audio", "planning"];
+export const WORKSPACE_IDS: readonly WorkspaceId[] = ["setup", "lighting", "audio"];
 
 export function preloadWorkspace(workspaceId: WorkspaceId): Promise<void> {
   return workspaceChunks[workspaceId].preload();

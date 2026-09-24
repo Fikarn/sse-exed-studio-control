@@ -547,8 +547,10 @@ test("persists lighting view bookmark slots through workspace changes", async ({
   await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
   await expect(page.getByText("Saved view 1.")).toBeVisible();
 
-  await page.keyboard.press(modifierShortcut("Digit4"));
-  await expect(page.getByTestId("planning-workspace")).toBeVisible();
+  // New pages program, Slice 1: Planning has left the screen, so the way out
+  // and back is the Console (Ctrl+3). Old: Ctrl+4 and the Planning workspace.
+  await page.keyboard.press(modifierShortcut("Digit3"));
+  await expectWorkspaceMounted(page, "audio");
   await page.keyboard.press(modifierShortcut("Digit2"));
 
   await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();

@@ -345,14 +345,14 @@ test("the crash hook is absent unless the fixture URL asks for it", async ({ pag
 });
 
 // Production readiness S14 (finding F26): every workspace used to be part of the
-// one script the shell starts from, so all four were fetched and evaluated
+// one script the shell starts from, so every one was fetched and evaluated
 // before the startup surface drew. Each is a chunk of its own now. The markers
 // are test ids only that workspace draws: if a workspace is imported statically
-// again its marker moves into the entry script and this fails.
+// again its marker moves into the entry script and this fails. (New pages
+// program, Slice 1: Planning and its chunk are gone.)
 const WORKSPACE_CHUNKS = {
   LightingWorkspace: "lighting-stage-lock-note",
   AudioWorkspace: "audio-monitor-bar",
-  PlanningWorkspace: "planning-unscheduled-tray",
   SetupSupportPilot: "setup-screen-support",
 } as const;
 
@@ -361,7 +361,7 @@ test("lazy workspace loads", async ({ page }) => {
   await expectWorkspaceMounted(page, "lighting");
 
   // The active workspace's chunk is asked for once the shell has drawn, the
-  // other three once it is ready and idle.
+  // other two once it is ready and idle.
   const scriptUrls = () =>
     page.evaluate(() =>
       performance

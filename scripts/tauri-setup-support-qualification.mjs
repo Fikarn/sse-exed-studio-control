@@ -30,6 +30,46 @@ function assert(condition, message) {
   }
 }
 
+// The saved data the backup and restore steps follow (new pages program,
+// Slice 1). Until then it was the Planning data: the sample projects and a
+// project added later, counted on the commissioning snapshot. Planning has
+// left the screen, and its data leaves the hardware link in Slice 2, so the
+// marker is now a snapshot slot of the Console, found by name. A slot is
+// saved data (`app.audio.snapshots_state` in the settings table), so a database
+// backup carries it; the archive carries every `app.audio.` setting and a
+// restore rewrites them as a whole; and creating or deleting one sends
+// nothing to the console, so the hardware link allows it before the audio
+// probe has passed (this lane never runs that probe). Found by name, because
+// a deleted slot's id is given to the next one created.
+const ARCHIVE_MARKER = "Qualification: kept by the archive";
+const DATABASE_MARKER = "Qualification: kept by the database backup";
+const LATER_CHANGE = "Qualification: added after the backup";
+const MARKER_CHANGED =
+  "New pages program, Slice 1: the saved data followed is a snapshot slot of the Console; until then it was the Planning projects and tasks.";
+// The page the shell opens on is saved data too. The lane leaves on Lighting:
+// a page never saved, and a saved Planning page, read as the Console (the
+// program's D1), so only a page that was saved and came back reads as Lighting.
+const WORKSPACE_CHANGED =
+  "New pages program, Slice 1: the saved page is Lighting and the restored snapshot slot is checked too; until then the page was Planning.";
+
+function audioSnapshotNames(status) {
+  const snapshots = status?.shellState?.audioSnapshot?.snapshots;
+  return (Array.isArray(snapshots) ? snapshots : []).map((entry) => entry?.name);
+}
+
+async function createAudioSnapshotSlot(session, child, name, oscIndex) {
+  const created = await dispatchCommand(session, child, "createAudioSnapshot", {
+    request: { name, oscIndex },
+  });
+  const id = created.result?.snapshot?.id;
+  assert(typeof id === "string" && id.length > 0, `Expected the new snapshot slot '${name}' to come back with an id.`);
+  assert(
+    audioSnapshotNames(created.status).includes(name),
+    `Expected the snapshot slot '${name}' in the Console's list, got ${JSON.stringify(audioSnapshotNames(created.status))}.`
+  );
+  return { id, status: created.status };
+}
+
 function createRuntimeDirs(prefix) {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
   const appDataDir = path.join(root, "app-data");
@@ -521,6 +561,9 @@ async function runSetupSupportQualification() {
       targetSurface: publishStatus.status.shellState.appSnapshot?.startup?.targetSurface,
     });
 
+    // The saved data the archive must carry, written before it is exported.
+    const archiveMarker = await createAudioSnapshotSlot(firstSession, firstRun, ARCHIVE_MARKER, 5);
+
     const backupExport = await dispatchCommand(firstSession, firstRun, "exportSupportBackup");
     const backupPath = backupExport.result?.path;
     assert(
@@ -568,17 +611,16 @@ async function runSetupSupportQualification() {
       file: path.basename(defaultDiagnosticsPath),
     });
 
-    const seedStatus = await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
-      replaceExistingData: true,
+    // The saved data changes after the export: the marker goes and a slot the
+    // archive never saw arrives. The restore must undo both.
+    const markerDeleted = await dispatchCommand(firstSession, firstRun, "deleteAudioSnapshot", {
+      request: { snapshotId: archiveMarker.id },
     });
     assert(
-      seedStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
-      "Expected demo seeding to populate two planning projects through the live Tauri shell."
+      !audioSnapshotNames(markerDeleted.status).includes(ARCHIVE_MARKER),
+      `Expected the snapshot slot '${ARCHIVE_MARKER}' to be gone after it was deleted.`
     );
-    assert(
-      seedStatus.status.shellState.commissioningSnapshot?.planningTaskCount === 3,
-      "Expected demo seeding to populate three planning tasks through the live Tauri shell."
-    );
+    await createAudioSnapshotSlot(firstSession, firstRun, LATER_CHANGE, 7);
 
     const restoreStatus = await dispatchCommand(firstSession, firstRun, "restoreSupportBackup", {
       path: backupPath,
@@ -592,24 +634,27 @@ async function runSetupSupportQualification() {
         existsSync(restoreStatus.result.rollbackBackupPath),
       "Expected restore to create a rollback backup archive."
     );
+    const restoredNames = audioSnapshotNames(restoreStatus.status);
     assert(
-      restoreStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 0,
-      "Expected restore to return planning project count to the exported baseline."
+      restoredNames.includes(ARCHIVE_MARKER),
+      `Expected the restore to bring back the snapshot slot the archive carried, got ${JSON.stringify(restoredNames)}.`
     );
     assert(
-      restoreStatus.status.shellState.commissioningSnapshot?.planningTaskCount === 0,
-      "Expected restore to return planning task count to the exported baseline."
+      !restoredNames.includes(LATER_CHANGE),
+      `Expected the restore to undo the snapshot slot added after the export, got ${JSON.stringify(restoredNames)}.`
     );
     evidence.recordCheck("backup-restore-round-trips-native-support-backup", {
+      marker: ARCHIVE_MARKER,
+      markerChanged: MARKER_CHANGED,
       sourceFormat: restoreStatus.result?.sourceFormat,
     });
 
-    const planningStatus = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
-      workspaceId: "planning",
+    const workspaceStatus = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
+      workspaceId: "lighting",
     });
     assert(
-      planningStatus.status.shellState.activeWorkspace === "planning",
-      "Expected workspace switch to planning to persist through the live Tauri shell."
+      workspaceStatus.status.shellState.activeWorkspace === "lighting",
+      "Expected workspace switch to lighting to persist through the live Tauri shell."
     );
   } finally {
     await closeTauriShell(firstRun);
@@ -646,33 +691,34 @@ async function runSetupSupportQualification() {
       "Expected restarted Tauri runtime to keep dashboard startup after publish and restore."
     );
     assert(
-      restartStatus.shellState.activeWorkspace === "planning",
-      "Expected restarted Tauri runtime to restore the planning workspace."
+      restartStatus.shellState.activeWorkspace === "lighting",
+      "Expected restarted Tauri runtime to restore the lighting workspace."
     );
     assert(
       restartStatus.shellState.supportSnapshot?.backupCount >= 2,
       "Expected restarted Tauri runtime to preserve support backup history."
     );
+    assert(
+      audioSnapshotNames(restartStatus).includes(ARCHIVE_MARKER),
+      `Expected restarted Tauri runtime to keep the restored snapshot slot, got ${JSON.stringify(audioSnapshotNames(restartStatus))}.`
+    );
     evidence.recordCheck("persisted-restart-restores-dashboard-state", {
       activeWorkspace: restartStatus.shellState.activeWorkspace,
+      keptMarker: ARCHIVE_MARKER,
+      scopeChanged: WORKSPACE_CHANGED,
       targetSurface: restartStatus.shellState.appSnapshot?.startup?.targetSurface,
     });
 
     // Scenario `database-restore` (2026-09 production readiness, Slice 7 —
     // F20): a database backup is verified and restored through the running
     // shell. The restart the test bridge asks for stops the engine
-    // gracefully, which writes a `shutdown` database backup; a project added
-    // after it is the change the restore must undo. Verify reads the backup
-    // without touching anything (and calls junk junk); the restore stages
-    // the backup, the store restarts the hardware link, and the bootstrap
-    // moves the backup into place with the old file kept as `replaced`.
-    const seededStatus = await dispatchCommand(secondSession, secondRun, "seedPlanningDemo", {
-      replaceExistingData: true,
-    });
-    assert(
-      seededStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
-      "Expected demo seeding to populate two planning projects before the database backup."
-    );
+    // gracefully, which writes a `shutdown` database backup; a snapshot slot
+    // saved before it must come back, and one added after it is the change
+    // the restore must undo. Verify reads the backup without touching
+    // anything (and calls junk junk); the restore stages the backup, the store
+    // restarts the hardware link, and the bootstrap moves the backup into
+    // place with the old file kept as `replaced`.
+    await createAudioSnapshotSlot(secondSession, secondRun, DATABASE_MARKER, 6);
     // Launch numbers reach the status file after the fact, so each count starts
     // from a number that was waited for and waits for the next one
     // (`tauri-launch-number.mjs`).
@@ -717,13 +763,7 @@ async function runSetupSupportQualification() {
     );
     databaseBackupBytes = readFileSync(shutdownBackup.path);
 
-    const addedStatus = await dispatchCommand(secondSession, secondRun, "createPlanningProject", {
-      request: { title: "Added after the backup" },
-    });
-    assert(
-      addedStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 3,
-      "Expected a third planning project after the backup was written."
-    );
+    await createAudioSnapshotSlot(secondSession, secondRun, LATER_CHANGE, 7);
 
     const verifyStatus = await dispatchCommand(secondSession, secondRun, "verifySupportBackup", {
       path: shutdownBackup.path,
@@ -780,9 +820,14 @@ async function runSetupSupportQualification() {
       launchAfterRestore === generationBeforeRestart + 2,
       `Expected launch ${generationBeforeRestart + 2} after the restore's restart, got ${launchAfterRestore}.`
     );
+    const restoredDatabaseNames = audioSnapshotNames(restoreDatabaseStatus.status);
     assert(
-      restoreDatabaseStatus.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
-      `Expected the database restore to undo the project added after the backup, got ${restoreDatabaseStatus.status.shellState.commissioningSnapshot?.planningProjectCount} projects.`
+      restoredDatabaseNames.includes(DATABASE_MARKER),
+      `Expected the database restore to keep the snapshot slot saved before the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
+    );
+    assert(
+      !restoredDatabaseNames.includes(LATER_CHANGE),
+      `Expected the database restore to undo the snapshot slot added after the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
     );
     assert(
       !existsSync(path.join(runtime.appDataDir, "restore-pending.sqlite3")),
@@ -795,6 +840,8 @@ async function runSetupSupportQualification() {
     );
     evidence.recordCheck("database-backup-verifies-and-restores-after-restart", {
       backup: shutdownBackup.name,
+      marker: DATABASE_MARKER,
+      markerChanged: MARKER_CHANGED,
       replaced: replacedFiles[0],
       rollback: path.basename(restoreDatabaseStatus.result.rollbackBackupPath),
       schemaVersion: verifyStatus.result?.schemaVersion,
@@ -957,8 +1004,8 @@ async function runSetupSupportQualification() {
       `Expected launch ${recoveryGeneration + 1} after the restore's restart, got ${launchAfterRecoveryRestore}.`
     );
     assert(
-      recoveryRestore.status.shellState.commissioningSnapshot?.planningProjectCount === 2,
-      `Expected the restored database to carry the two seeded projects, got ${recoveryRestore.status.shellState.commissioningSnapshot?.planningProjectCount}.`
+      audioSnapshotNames(recoveryRestore.status).includes(DATABASE_MARKER),
+      `Expected the restored database to carry the snapshot slot saved before the backup, got ${JSON.stringify(audioSnapshotNames(recoveryRestore.status))}.`
     );
     const replacedJunk = readdirSync(corruptBackupsDir).filter((name) => name.endsWith("-replaced.sqlite3"));
     assert(
@@ -967,6 +1014,8 @@ async function runSetupSupportQualification() {
     );
     evidence.recordCheck("corrupt-db-restores-from-database-backup", {
       generation: launchAfterRecoveryRestore,
+      marker: DATABASE_MARKER,
+      markerChanged: MARKER_CHANGED,
       replaced: replacedJunk[0],
     });
   } finally {
