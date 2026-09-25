@@ -202,8 +202,9 @@ fn seed_v7_database(db_path: &Path) {
 
 /// Planning rows in all four tables, the two selection settings the build
 /// before Slice 2 wrote while a project and a task were selected, a
-/// `planning.*` key no build wrote (the step removes the whole prefix), and
-/// what an earlier db.json import recorded.
+/// `planning.*` key no build wrote (the step removes the whole prefix), the
+/// Control Surface Probe's line about that selection, and what an earlier
+/// db.json import recorded.
 fn seed_v7_planning_data(db_path: &Path) {
     let connection = open_connection(db_path).expect("connection should open");
     connection
@@ -224,7 +225,9 @@ fn seed_v7_planning_data(db_path: &Path) {
             INSERT INTO app_settings(key, value) VALUES
               ('planning.selected_project_id', 'proj-1'),
               ('planning.selected_task_id', 'task-1'),
-              ('planning.some_later_key', 'x');
+              ('planning.some_later_key', 'x'),
+              ('app.commissioning.check.control-surface.message',
+               'Planning context is reachable. Selected project ''Spring season'' exposes 1 tasks for operator navigation.');
             INSERT INTO app_metadata(key, value) VALUES
               ('legacy_import.source_path', 'C:/old/db.json'),
               ('legacy_import.source_schema_version', '8'),
@@ -250,6 +253,10 @@ fn seed_v7_other_data(db_path: &Path) {
               ('app.commissioning.completed', 'true'),
               ('app.commissioning.stage', 'ready'),
               ('app.commissioning.runnerStage', 'publish'),
+              ('app.commissioning.check.control-surface.status', 'passed'),
+              ('app.commissioning.check.control-surface.checked_at', '2026-09-20T09:00:00Z'),
+              ('app.commissioning.check.lighting.status', 'passed'),
+              ('app.commissioning.check.lighting.message', 'Lighting bridge answered on the stored address.'),
               ('app.lighting.editor.state', '{"fixtures":[],"groups":[{"id":"g1","name":"Stage"}],"scenes":[],"palettes":[],"paletteOrder":[]}'),
               ('app.audio.snapshots_state', '[{"id":"asnap-1","name":"Interview Setup","oscIndex":0,"order":0}]'),
               ('shell.window.mode', 'fullscreen'),
@@ -263,7 +270,9 @@ fn seed_v7_other_data(db_path: &Path) {
 
 // D2: the 7 -> 8 step, on a schema-7 database with Planning in it. The four
 // tables and their indexes go, every `planning.*` setting goes, the saved
-// Planning page opens the Console, and nothing else is touched. The verified
+// Planning page opens the Console, the Control Surface Probe's line about
+// Planning reads as checked before this version (its status stands), and
+// nothing else is touched. The verified
 // pre-migration copy — written before this step by the mechanism every
 // upgrade goes through — still holds all of it: the way back to an older
 // build, which refuses schema 8.
@@ -308,8 +317,18 @@ fn migrate_v7_to_v8_drops_planning_after_snapshot() {
         Some("audio"),
         "a saved Planning page opens the Console"
     );
+    assert_eq!(
+        rows_after
+            .get(CONTROL_SURFACE_MESSAGE_KEY)
+            .map(|(value, _)| value.as_str()),
+        Some(PROBE_CHECKED_BEFORE_THIS_VERSION),
+        "the probe's line no longer talks about Planning"
+    );
     for (key, row) in &rows_before {
-        if key.starts_with("planning.") || key == WORKSPACE_KEY {
+        if key.starts_with("planning.")
+            || key == WORKSPACE_KEY
+            || key == CONTROL_SURFACE_MESSAGE_KEY
+        {
             continue;
         }
         assert_eq!(rows_after.get(key), Some(row), "{key} was touched");
@@ -395,6 +414,14 @@ fn migrate_v7_to_v8_drops_planning_after_snapshot() {
         )
         .expect("the copy's page should read");
     assert_eq!(copy_workspace, "planning");
+    let copy_probe_line: String = copy
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = ?1",
+            [CONTROL_SURFACE_MESSAGE_KEY],
+            |row| row.get(0),
+        )
+        .expect("the copy's probe line should read");
+    assert!(copy_probe_line.starts_with(PLANNING_ERA_PROBE_PREFIX));
     drop(copy);
 
     // A second start changes nothing and writes no copy.

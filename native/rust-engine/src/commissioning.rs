@@ -21,6 +21,16 @@ pub const AUDIO_CHECK_ID: &str = "audio";
 /// Set when the operator published with `overrideProbes: true` while a probe
 /// was not `passed` (2026-09 audit Slice 8); empty after a clean publish.
 pub const PUBLISH_OVERRIDE_AT_KEY: &str = "app.commissioning.publish_override_at";
+/// The key the Control Surface Probe's last line is saved under.
+pub const CONTROL_SURFACE_MESSAGE_KEY: &str = "app.commissioning.check.control-surface.message";
+/// How every line the Control Surface Probe saved while Planning was part of
+/// the app begins ("Planning context is reachable. ..."; builds before the
+/// new pages program, Slice 2).
+pub const PLANNING_ERA_PROBE_PREFIX: &str = "Planning context is reachable.";
+/// What such a line reads once schema 8 or a restore retires it. The probe's
+/// status stays as it was, so publishing is not affected.
+pub const PROBE_CHECKED_BEFORE_THIS_VERSION: &str =
+    "Checked before this version of Studio Control. Run the probe again to refresh this line.";
 const PROBE_CHECKS: [(&str, &str); 3] = [
     (CONTROL_SURFACE_CHECK_ID, "Control Surface Probe"),
     (LIGHTING_CHECK_ID, "Lighting Bridge Probe"),
@@ -564,6 +574,16 @@ fn summarize_control_surface_probe() -> String {
         "Control surface bridge exposes {controls} mapped controls across {} pages.",
         snapshot.pages.len()
     )
+}
+
+/// A saved probe line that still talks about Planning reads as checked before
+/// this version; every other line is kept word for word.
+pub fn retire_planning_probe_message(message: &str) -> &str {
+    if message.starts_with(PLANNING_ERA_PROBE_PREFIX) {
+        PROBE_CHECKED_BEFORE_THIS_VERSION
+    } else {
+        message
+    }
 }
 
 fn current_timestamp(connection: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
@@ -1120,5 +1140,32 @@ mod tests {
         assert_eq!(audio.status, "ready");
         assert!(audio.capabilities.can_edit_mixer_state);
         assert!(audio.capabilities.can_sync);
+    }
+
+    // New pages program, Slice 2 review: both lines the probe wrote while
+    // Planning was part of the app read as checked before this version; the
+    // line it writes now, and any other, is kept word for word.
+    #[test]
+    fn a_probe_line_about_planning_reads_as_checked_before_this_version() {
+        for planning_era in [
+            "Planning context is reachable. No projects are loaded yet, so the deck surface would start empty.",
+            "Planning context is reachable. Selected project 'Spring season' exposes 3 tasks for operator navigation.",
+        ] {
+            assert_eq!(
+                retire_planning_probe_message(planning_era),
+                PROBE_CHECKED_BEFORE_THIS_VERSION
+            );
+        }
+        let current = summarize_control_surface_probe();
+        for kept in [
+            current.as_str(),
+            "Not run yet.",
+            "Probe failed. Planning context is reachable.",
+        ] {
+            assert_eq!(retire_planning_probe_message(kept), kept);
+        }
+        assert!(!PROBE_CHECKED_BEFORE_THIS_VERSION
+            .to_lowercase()
+            .contains("planning"));
     }
 }

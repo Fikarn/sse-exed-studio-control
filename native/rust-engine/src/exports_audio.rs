@@ -35,11 +35,13 @@ pub(crate) const AUDIO_LCD_KEYS: &[&str] = &[
     "workspace",
 ];
 
-// The LIGHTS page's LCD keys: not polled, refreshed by the keys that change
-// them and by the lighting page-follow trigger as the deck arrives. (New pages
-// program, Slice 2: the Planning keys `project_nav`, `project_status`,
-// `project_priority`, `sort_mode` and `task_nav` left with the PROJECTS and
-// TASKS pages; the list was called `LEGACY_LCD_KEYS` until then.)
+// The LIGHTS page's LCD keys: not polled. The lighting page-follow trigger
+// refreshes all four as the deck arrives on LIGHTS, and the Light dial's press
+// refreshes `light_nav`, `light_intensity` and `light_cct`; the dial turns and
+// the scene keys refresh none of them. (New pages program, Slice 2: the
+// Planning keys `project_nav`, `project_status`, `project_priority`,
+// `sort_mode` and `task_nav` left with the PROJECTS and TASKS pages; the list
+// was called `LEGACY_LCD_KEYS` until then.)
 pub(crate) const LIGHT_LCD_KEYS: &[&str] =
     &["light_nav", "light_intensity", "light_cct", "scene_nav"];
 

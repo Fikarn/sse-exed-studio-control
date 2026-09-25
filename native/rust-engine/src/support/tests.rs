@@ -4,7 +4,7 @@ use crate::audio::{
     read_audio_snapshot, update_audio_channel, update_audio_mix_target, update_audio_settings,
     AudioChannelUpdateRequest, AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest,
 };
-use crate::commissioning::read_commissioning_snapshot;
+use crate::commissioning::{read_commissioning_snapshot, PROBE_CHECKED_BEFORE_THIS_VERSION};
 use crate::control_surface::ControlSurfaceBridgeInfo;
 use crate::lighting::read_lighting_snapshot;
 use crate::storage::{initialize_database, initialize_test_database, set_settings_owned};
@@ -992,6 +992,16 @@ fn database_restore_stages_pending_file_and_keeps_rollback() {
     let rollback_facts =
         inspect_database_backup(&rollback).expect("the pre-restore copy is a good database");
     assert_eq!(rollback_facts.schema_version, STORAGE_SCHEMA_VERSION);
+    // The copy is the live database as the restore found it — with the
+    // setting written after the backup — not the backup being restored.
+    assert_eq!(
+        list_settings_by_prefix(&rollback, "app.test.")
+            .expect("the pre-restore copy's settings should read")
+            .get("app.test.after_backup")
+            .map(String::as_str),
+        Some("yes"),
+        "the pre-restore copy holds what the restore replaces"
+    );
     let pending = runtime.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
     assert!(pending.is_file());
     assert_eq!(
@@ -1298,6 +1308,19 @@ fn format_4_archive(runtime: &RuntimeContext, with_rows: bool) -> Value {
         serde_json::to_value(build_support_backup_archive(runtime).expect("archive should build"))
             .expect("archive should serialize to value");
     archive["formatVersion"] = json!(4);
+    // The Control Surface Probe's line as that build wrote it with nothing
+    // loaded; the operator's archive of 2026-09-24 carries one like it.
+    let checks = archive["commissioning"]["checks"]
+        .as_array_mut()
+        .expect("the archive lists its probes");
+    let control_surface = checks
+        .iter_mut()
+        .find(|check| check["id"] == json!("control-surface"))
+        .expect("the archive holds the Control Surface Probe");
+    control_surface["status"] = json!("passed");
+    control_surface["message"] = json!(
+        "Planning context is reachable. No projects are loaded yet, so the deck surface would start empty."
+    );
     archive["shell"]["workspace"] = json!("planning");
     archive["settings"][WORKSPACE_KEY] = json!("planning");
     let rows = |entries: Value| if with_rows { entries } else { json!([]) };
@@ -1536,11 +1559,23 @@ fn a_format_4_archive_restores_everything_but_its_planning_part() {
         Some("audio"),
         "the saved Planning page opens the Console"
     );
-    assert!(
-        read_commissioning_snapshot(&runtime.db_path)
-            .expect("commissioning snapshot should load")
-            .has_completed_setup
+    let commissioning =
+        read_commissioning_snapshot(&runtime.db_path).expect("commissioning snapshot should load");
+    assert!(commissioning.has_completed_setup);
+    let control_surface = commissioning
+        .checks
+        .iter()
+        .find(|check| check.id == "control-surface")
+        .expect("the Control Surface Probe is listed");
+    assert_eq!(
+        control_surface.status, "passed",
+        "the probe's status stands"
     );
+    assert_eq!(
+        control_surface.message, PROBE_CHECKED_BEFORE_THIS_VERSION,
+        "the probe's line no longer talks about Planning"
+    );
+    assert_operator_words(PROBE_CHECKED_BEFORE_THIS_VERSION);
     let planning_keys = settings
         .keys()
         .filter(|key| key.starts_with("planning."))

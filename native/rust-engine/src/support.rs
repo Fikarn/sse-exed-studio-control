@@ -4,8 +4,8 @@ use crate::app_state::{
 };
 use crate::bootstrap::RuntimeContext;
 use crate::commissioning::{
-    read_commissioning_snapshot, AUDIO_RECEIVE_PORT_KEY, AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY,
-    LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
+    read_commissioning_snapshot, retire_planning_probe_message, AUDIO_RECEIVE_PORT_KEY,
+    AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY, LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
 };
 use crate::diagnostics::append_log;
 use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
@@ -1164,10 +1164,11 @@ fn write_support_settings(
         let key_prefix = format!("app.commissioning.check.{}", check.id);
         upsert_setting(transaction, &format!("{key_prefix}.status"), &check.status)?;
         settings_restored += 1;
+        // An archive from before Slice 2 can carry a line about Planning.
         upsert_setting(
             transaction,
             &format!("{key_prefix}.message"),
-            &check.message,
+            retire_planning_probe_message(&check.message),
         )?;
         settings_restored += 1;
         if let Some(checked_at) = &check.checked_at {

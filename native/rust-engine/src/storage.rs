@@ -2,7 +2,10 @@ use crate::app_state::{
     default_app_settings_entries, CommissioningSnapshot, COMMISSIONING_COMPLETED_KEY,
     COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
 };
-use crate::commissioning::default_settings_entries as default_commissioning_settings_entries;
+use crate::commissioning::{
+    default_settings_entries as default_commissioning_settings_entries,
+    CONTROL_SURFACE_MESSAGE_KEY, PLANNING_ERA_PROBE_PREFIX, PROBE_CHECKED_BEFORE_THIS_VERSION,
+};
 use crate::legacy_import::{
     load_legacy_import_payload, ImportLegacyError, LegacyImportRequest, LegacyImportSummary,
 };
@@ -700,11 +703,12 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
         // v7 -> v8 (new pages program, Slice 2 — D2): Planning left the app.
         // Its four tables go (children first; their indexes go with them),
         // every `planning.*` setting goes, the Planning counts an earlier
-        // db.json import recorded go, and a saved Planning page opens the
-        // Console. The pre-migration copy written above keeps all of it: it
-        // is the way back to an older build, which refuses schema 8. A new
-        // database takes this step too, so it ends without the tables that
-        // steps 2 and 3 created.
+        // db.json import recorded go, a saved Planning page opens the
+        // Console, and the Control Surface Probe's saved line stops talking
+        // about Planning (its status stays). The pre-migration copy written
+        // above keeps all of it: it is the way back to an older build, which
+        // refuses schema 8. A new database takes this step too, so it ends
+        // without the tables that steps 2 and 3 created.
         let transaction = connection.transaction()?;
         transaction.execute_batch(
             r#"
@@ -726,6 +730,15 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
                SET value = 'audio', updated_at = CURRENT_TIMESTAMP
              WHERE key = 'shell.workspace' AND value = 'planning';
             "#,
+        )?;
+        transaction.execute(
+            "UPDATE app_settings SET value = ?1, updated_at = CURRENT_TIMESTAMP \
+             WHERE key = ?2 AND substr(value, 1, length(?3)) = ?3",
+            params![
+                PROBE_CHECKED_BEFORE_THIS_VERSION,
+                CONTROL_SURFACE_MESSAGE_KEY,
+                PLANNING_ERA_PROBE_PREFIX
+            ],
         )?;
         transaction.execute("INSERT INTO schema_migrations(version) VALUES (8)", [])?;
         transaction.commit()?;

@@ -1,6 +1,6 @@
 import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
-import { runnerStepOrder } from "../setupPilotModel";
+import { deckKeySlots, runnerStepOrder } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
 /** Runner steps 3 and 4: the Stream Deck's pages and controls, mapped and verified. */
@@ -75,20 +75,25 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
                     </button>
                   ))}
                 </div>
-                <div className={styles.buttonMatrix}>
-                  {selectedPage.buttons.map((control) => (
-                    <button
-                      key={control.id}
-                      className={styles.deckButton}
-                      data-echo={activeStepId === "verify" && control.id === echoControlId}
-                      data-selected={control.id === selectedControl?.id}
-                      onClick={() => setSelectedControlId(control.id)}
-                      type="button"
-                    >
-                      <span>{control.label}</span>
-                      <small>{control.type}</small>
-                    </button>
-                  ))}
+                <div className={styles.buttonMatrix} data-testid="setup-deck-keys">
+                  {deckKeySlots(selectedPage.buttons).map((control, index) =>
+                    control ? (
+                      <button
+                        key={control.id}
+                        className={styles.deckButton}
+                        data-echo={activeStepId === "verify" && control.id === echoControlId}
+                        data-selected={control.id === selectedControl?.id}
+                        onClick={() => setSelectedControlId(control.id)}
+                        type="button"
+                      >
+                        <span>{control.label}</span>
+                        <small>{control.type}</small>
+                      </button>
+                    ) : (
+                      // A key the page leaves blank, where the deck has it.
+                      <span key={`blank-${index + 1}`} aria-hidden="true" className={styles.deckSlot} data-blank-key />
+                    )
+                  )}
                 </div>
                 <div className={styles.dialRow}>
                   {selectedPage.dials.map((control) => (

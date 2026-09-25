@@ -29,7 +29,8 @@ struct DeckPage {
     /// deck here.
     workspace: &'static str,
     /// The LCDs the page-follow trigger refreshes as the deck arrives: the
-    /// LIGHTS texts are refreshed only by keys, the AUDIO ones by the 1 s poll.
+    /// LIGHTS texts are not polled, so they are refreshed here; the AUDIO ones
+    /// by the 1 s poll.
     arrival_refreshes: &'static [&'static str],
     controls: fn() -> Vec<ControlDef>,
 }
