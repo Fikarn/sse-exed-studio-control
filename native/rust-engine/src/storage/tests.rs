@@ -11,12 +11,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::process;
 
-struct TestDir {
+pub(super) struct TestDir {
     path: PathBuf,
 }
 
 impl TestDir {
-    fn new(label: &str) -> Self {
+    pub(super) fn new(label: &str) -> Self {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -29,7 +29,7 @@ impl TestDir {
         Self { path }
     }
 
-    fn path(&self) -> &Path {
+    pub(super) fn path(&self) -> &Path {
         &self.path
     }
 }
@@ -40,13 +40,19 @@ impl Drop for TestDir {
     }
 }
 
+// New pages program, Slice 2 (D1, D2): a new database ends at schema 8
+// without the Planning tables (steps 2 and 3 create them, step 8 drops them)
+// and without a `planning.*` default, and opens on the Console. Before the
+// slice it asserted the `planning.*` defaults (`planning.view_filter` = all,
+// `planning.dashboard_view` = kanban).
 #[test]
-fn initialize_database_applies_planning_schema_and_defaults() {
+fn initialize_database_applies_the_schema_and_defaults_without_planning() {
     let test_dir = TestDir::new("storage-init");
     let db_path = test_dir.path().join("native.sqlite3");
 
     let bootstrap = initialize_test_database(&db_path).expect("database should initialize");
     assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
+    assert_eq!(bootstrap.schema_version, 8);
     assert_eq!(bootstrap.integrity_check, "ok");
     assert!(
         newest_snapshot(&test_dir.path().join("backups")).is_none(),
@@ -54,22 +60,28 @@ fn initialize_database_applies_planning_schema_and_defaults() {
     );
 
     let planning_settings =
-        list_settings_by_prefix(&db_path, crate::planning_settings::PLANNING_SETTINGS_PREFIX)
-            .expect("planning settings should load");
-    assert_eq!(
-        planning_settings.get(VIEW_FILTER_KEY).map(String::as_str),
-        Some("all")
+        list_settings_by_prefix(&db_path, "planning.").expect("settings should load");
+    assert!(
+        planning_settings.is_empty(),
+        "no planning.* default is seeded: {planning_settings:?}"
     );
+    assert_eq!(planning_objects(&db_path), Vec::<String>::new());
+    let shell_settings =
+        list_settings_by_prefix(&db_path, "shell.").expect("shell settings should load");
     assert_eq!(
-        planning_settings
-            .get(DASHBOARD_VIEW_KEY)
-            .map(String::as_str),
-        Some("kanban")
+        shell_settings.get(WORKSPACE_KEY).map(String::as_str),
+        Some("audio")
     );
 }
 
+// New pages program, Slice 2 (interim until Slice 2b): the import writes the
+// setup flag and the page to open, and nothing of Planning. Before the slice
+// it asserted the imported rows (1 project, 1 task, 2 checklist items, 1
+// activity entry, 1 running task normalized), the stopped task's timer and
+// labels, and the six imported `planning.*` settings; the page (lighting) and
+// the setup flag (completed, ready) are asserted as before.
 #[test]
-fn import_legacy_db_populates_planning_tables_and_settings() {
+fn import_legacy_db_writes_only_the_setup_flag_and_the_page() {
     let test_dir = TestDir::new("storage-import");
     let db_path = test_dir.path().join("native.sqlite3");
     let source_path = test_dir.path().join("legacy-db.json");
@@ -136,6 +148,8 @@ fn import_legacy_db_populates_planning_tables_and_settings() {
     )
     .expect("legacy db should be written");
 
+    let settings_before = all_settings(&db_path);
+
     let summary = import_legacy_db(
         &db_path,
         &LegacyImportRequest {
@@ -145,79 +159,36 @@ fn import_legacy_db_populates_planning_tables_and_settings() {
     )
     .expect("legacy import should succeed");
 
-    assert_eq!(summary.imported_projects, 1);
-    assert_eq!(summary.imported_tasks, 1);
-    assert_eq!(summary.imported_checklist_items, 2);
-    assert_eq!(summary.imported_activity_entries, 1);
-    assert_eq!(summary.normalized_running_tasks, 1);
+    assert_eq!(summary.updated_settings, 4);
+    assert!(!summary.replaced_existing_data);
+    assert_eq!(summary.source_schema_version, 8);
+    let reply = serde_json::to_value(&summary).expect("the summary serializes");
+    let mut reply_keys = reply
+        .as_object()
+        .expect("the summary is an object")
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    reply_keys.sort();
+    assert_eq!(
+        reply_keys,
+        vec![
+            "replacedExistingData",
+            "sourcePath",
+            "sourceSchemaVersion",
+            "updatedSettings"
+        ],
+        "no Planning counts in the reply"
+    );
 
-    let connection = open_connection(&db_path).expect("sqlite should open");
-
-    let project_count = count_rows(&connection, "projects").expect("project count should load");
-    let task_count = count_rows(&connection, "tasks").expect("task count should load");
-    let checklist_count =
-        count_rows(&connection, "task_checklist_items").expect("checklist count should load");
-    let activity_count =
-        count_rows(&connection, "activity_log").expect("activity count should load");
-
-    assert_eq!(project_count, 1);
-    assert_eq!(task_count, 1);
-    assert_eq!(checklist_count, 2);
-    assert_eq!(activity_count, 1);
-
-    let task_row = connection
-        .query_row(
-            "SELECT is_running, total_seconds, last_started, labels_json FROM tasks WHERE id = 'task-1'",
-            [],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, Option<String>>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            },
-        )
-        .expect("task row should exist");
-
-    assert_eq!(task_row.0, 0);
-    assert!(task_row.1 >= 120);
-    assert_eq!(task_row.2, None);
-    assert_eq!(task_row.3, "[\"frontend\",\"homepage\"]");
-
+    assert_eq!(
+        planning_objects(&db_path),
+        Vec::<String>::new(),
+        "the import creates no Planning table"
+    );
     let planning_settings =
-        list_settings_by_prefix(&db_path, crate::planning_settings::PLANNING_SETTINGS_PREFIX)
-            .expect("planning settings should load");
-    assert_eq!(
-        planning_settings.get(VIEW_FILTER_KEY).map(String::as_str),
-        Some("in-progress")
-    );
-    assert_eq!(
-        planning_settings.get(SORT_BY_KEY).map(String::as_str),
-        Some("priority")
-    );
-    assert_eq!(
-        planning_settings
-            .get(DASHBOARD_VIEW_KEY)
-            .map(String::as_str),
-        Some("lighting")
-    );
-    assert_eq!(
-        planning_settings.get(DECK_MODE_KEY).map(String::as_str),
-        Some("light")
-    );
-    assert_eq!(
-        planning_settings
-            .get(SELECTED_PROJECT_ID_KEY)
-            .map(String::as_str),
-        Some("proj-1")
-    );
-    assert_eq!(
-        planning_settings
-            .get(SELECTED_TASK_ID_KEY)
-            .map(String::as_str),
-        Some("task-1")
-    );
+        list_settings_by_prefix(&db_path, "planning.").expect("settings should load");
+    assert!(planning_settings.is_empty(), "{planning_settings:?}");
 
     let shell_settings =
         list_settings_by_prefix(&db_path, crate::shell_settings::SHELL_SETTINGS_PREFIX)
@@ -241,8 +212,31 @@ fn import_legacy_db_populates_planning_tables_and_settings() {
             .map(String::as_str),
         Some("ready")
     );
+    assert_eq!(
+        app_settings
+            .get(COMMISSIONING_RUNNER_STAGE_KEY)
+            .map(String::as_str),
+        Some("publish")
+    );
+
+    // Nothing else changed: every other setting is as it was.
+    let mut settings_after = all_settings(&db_path);
+    let mut settings_before = settings_before;
+    for key in [
+        WORKSPACE_KEY,
+        COMMISSIONING_COMPLETED_KEY,
+        COMMISSIONING_STAGE_KEY,
+        COMMISSIONING_RUNNER_STAGE_KEY,
+    ] {
+        settings_before.remove(key);
+        settings_after.remove(key);
+    }
+    assert_eq!(settings_after, settings_before);
 }
 
+// New pages program, Slice 2: unchanged, and it still refuses — now because
+// the first import is recorded (its project is not imported any more); until
+// the slice the refusal came from that project's row.
 #[test]
 fn import_legacy_db_requires_force_when_data_already_exists() {
     let test_dir = TestDir::new("storage-force");
@@ -360,33 +354,25 @@ fn migrate_schema_v2_db_loads_on_v3_binary() {
 
     initialize_test_database(&db_path).expect("migration to current schema should succeed");
 
+    // New pages program, Slice 2: schema 8 drops the tasks table the v3 step
+    // alters, so its two new columns can no longer be read after an upgrade
+    // to the current schema (the test read `scheduled_start` and
+    // `scheduled_duration_seconds` of task t1 as NULL). The v3 step still runs
+    // on the v2 table — a failed ALTER fails the whole upgrade — and every
+    // step from 3 on is recorded once.
     let connection = open_connection(&db_path).expect("connection should reopen");
-    let (scheduled_start, scheduled_duration): (Option<String>, Option<i64>) = connection
-        .query_row(
-            "SELECT scheduled_start, scheduled_duration_seconds FROM tasks WHERE id = 't1'",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .expect("row should load");
-    assert!(scheduled_start.is_none());
-    assert!(scheduled_duration.is_none());
-
-    let version_3_count: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = 3",
-            [],
-            |row| row.get(0),
-        )
-        .expect("count should query");
-    assert_eq!(version_3_count, 1);
-    let version_4_count: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM schema_migrations WHERE version = 4",
-            [],
-            |row| row.get(0),
-        )
-        .expect("count should query");
-    assert_eq!(version_4_count, 1);
+    for version in 3..=8 {
+        let version_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = ?1",
+                [version],
+                |row| row.get(0),
+            )
+            .expect("count should query");
+        assert_eq!(version_count, 1, "version {version}");
+    }
+    drop(connection);
+    assert_eq!(planning_objects(&db_path), Vec::<String>::new());
 }
 
 #[test]
@@ -1171,11 +1157,13 @@ fn migrate_v6_to_v7_after_snapshot() {
     )
     .expect("the editor state should write");
 
+    // New pages program, Slice 2: every road now ends at schema 8, one step
+    // further (the test asserted 7 and the versions 1 to 7).
     let bootstrap =
         initialize_database(&v6_path, &v6_backups).expect("the v7 migration should succeed");
-    assert_eq!(bootstrap.schema_version, 7);
+    assert_eq!(bootstrap.schema_version, 8);
     assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
-    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
     the_log_is_there(&v6_path);
     let stored: String = open_connection(&v6_path)
         .expect("connection should open")
@@ -1216,7 +1204,7 @@ fn migrate_v6_to_v7_after_snapshot() {
 
     // A second start changes nothing and writes no copy.
     initialize_database(&v6_path, &v6_backups).expect("second start should succeed");
-    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
     let copies = fs::read_dir(&v6_backups)
         .expect("backups dir should list")
         .filter_map(Result::ok)
@@ -1238,8 +1226,8 @@ fn migrate_v6_to_v7_after_snapshot() {
     .expect("the editor state should write");
     let bootstrap = initialize_database(&v5_path, &v5_dir.path().join("backups"))
         .expect("the v5 database should upgrade");
-    assert_eq!(bootstrap.schema_version, 7);
-    assert_eq!(versions(&v5_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(bootstrap.schema_version, 8);
+    assert_eq!(versions(&v5_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
     the_log_is_there(&v5_path);
     let seeded: String = open_connection(&v5_path)
         .expect("connection should open")
@@ -1257,8 +1245,8 @@ fn migrate_v6_to_v7_after_snapshot() {
     let fresh_path = fresh_dir.path().join("native.sqlite3");
     let bootstrap = initialize_database(&fresh_path, &fresh_dir.path().join("backups"))
         .expect("a new database should initialize");
-    assert_eq!(bootstrap.schema_version, 7);
-    assert_eq!(versions(&fresh_path), vec![1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(bootstrap.schema_version, 8);
+    assert_eq!(versions(&fresh_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
     the_log_is_there(&fresh_path);
     assert!(
         newest_snapshot(&fresh_dir.path().join("backups")).is_none(),
@@ -1449,4 +1437,26 @@ fn kept_read_connection_sees_later_writes_and_blocks_neither_backup_nor_checkpoi
     );
 
     disable_thread_read_connection();
+}
+
+/// The four Planning tables and every index on them, by name.
+pub(super) fn planning_objects(db_path: &Path) -> Vec<String> {
+    let connection = open_connection(db_path).expect("connection should open");
+    let mut statement = connection
+        .prepare(
+            "SELECT name FROM sqlite_master
+             WHERE tbl_name IN ('projects', 'tasks', 'task_checklist_items', 'activity_log')
+             ORDER BY name",
+        )
+        .expect("objects should prepare");
+    let rows = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .expect("objects should query")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("objects should read");
+    rows
+}
+
+pub(super) fn all_settings(db_path: &Path) -> HashMap<String, String> {
+    list_settings_by_prefix(db_path, "").expect("settings should load")
 }

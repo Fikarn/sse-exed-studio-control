@@ -1,6 +1,6 @@
 use crate::bootstrap::RuntimeContext;
 use crate::exports_audio::{
-    audio_controls, deck_asset, generate_companion_custom_variables, AUDIO_LCD_KEYS,
+    audio_controls, deck_asset, generate_companion_custom_variables, AUDIO_LCD_KEYS, LIGHT_LCD_KEYS,
 };
 use serde::Serialize;
 use serde_json::{json, Map, Value};
@@ -16,6 +16,57 @@ const INSTANCE_LABEL: &str = "SSE_Studio_Control";
 const GENERIC_HTTP_MODULE_VERSION: &str = "2.7.0";
 const COMPANION_EXPORT_FORMAT_VERSION: u64 = 9;
 const DEFAULT_COMPANION_URL: &str = "http://127.0.0.1:8000";
+
+/// One page of the exported Stream Deck profile.
+struct DeckPage {
+    /// Companion's id for the page.
+    companion_id: &'static str,
+    /// The control-surface snapshot's page id, which also prefixes its
+    /// control ids (`lights-btn-2`).
+    id: &'static str,
+    label: &'static str,
+    /// The app page (`shell.workspace`) whose page-follow trigger brings the
+    /// deck here.
+    workspace: &'static str,
+    /// The LCDs the page-follow trigger refreshes as the deck arrives: the
+    /// LIGHTS texts are not polled, so they are refreshed here; the AUDIO ones
+    /// by the 1 s poll.
+    arrival_refreshes: &'static [&'static str],
+    controls: fn() -> Vec<ControlDef>,
+}
+
+/// The deck's pages in their Companion order (new pages program, D5: the
+/// pages follow the app's tabs). PROJECTS and TASKS left with Planning in
+/// Slice 2, so LIGHTS is page 1 and AUDIO page 2; CAMERAS and PROMPTER join
+/// with Part C. The page numbers, the page keys' jumps, the page-follow
+/// triggers and the snapshot's page-nav targets all come from this list.
+const DECK_PAGES: [DeckPage; 2] = [
+    DeckPage {
+        companion_id: "sse-page-lights",
+        id: "lights",
+        label: "LIGHTS",
+        workspace: "lighting",
+        arrival_refreshes: LIGHT_LCD_KEYS,
+        controls: light_controls,
+    },
+    DeckPage {
+        companion_id: "sse-page-audio",
+        id: "audio",
+        label: "AUDIO",
+        workspace: "audio",
+        arrival_refreshes: &[],
+        controls: audio_controls,
+    },
+];
+
+/// A page's Companion page number (1-based), 0 for a page the deck lacks.
+fn deck_page_number(page_id: &str) -> i64 {
+    DECK_PAGES
+        .iter()
+        .position(|page| page.id == page_id)
+        .and_then(|index| i64::try_from(index + 1).ok())
+        .unwrap_or(0)
+}
 
 #[derive(Debug)]
 pub enum ExportCommandError {
@@ -186,12 +237,10 @@ fn fetch_companion_export_json(companion_url: &str) -> Option<String> {
 
 pub fn build_control_surface_snapshot() -> ControlSurfaceSnapshot {
     ControlSurfaceSnapshot {
-        pages: vec![
-            control_surface_page("projects", "PROJECTS", "proj", project_controls()),
-            control_surface_page("tasks", "TASKS", "tasks", task_controls()),
-            control_surface_page("lights", "LIGHTS", "lights", light_controls()),
-            control_surface_page("audio", "AUDIO", "audio", audio_controls()),
-        ],
+        pages: DECK_PAGES
+            .iter()
+            .map(|page| control_surface_page(page.id, page.label, (page.controls)()))
+            .collect(),
     }
 }
 
@@ -276,22 +325,12 @@ fn apply_bridge_auth_header(value: &mut Value, header: &str) {
 
 fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Option<&str>) -> Value {
     let mut pages = Map::new();
-    pages.insert(
-        String::from("1"),
-        build_page("sse-page-projects", "PROJECTS", project_controls()),
-    );
-    pages.insert(
-        String::from("2"),
-        build_page("sse-page-tasks", "TASKS", task_controls()),
-    );
-    pages.insert(
-        String::from("3"),
-        build_page("sse-page-lights", "LIGHTS", light_controls()),
-    );
-    pages.insert(
-        String::from("4"),
-        build_page("sse-page-audio", "AUDIO", audio_controls()),
-    );
+    for page in &DECK_PAGES {
+        pages.insert(
+            deck_page_number(page.id).to_string(),
+            build_page(page.companion_id, page.label, (page.controls)()),
+        );
+    }
 
     json!({
         "version": COMPANION_EXPORT_FORMAT_VERSION,
@@ -352,11 +391,29 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
         }),
     );
 
-    for (slug, workspace, page, sort_order) in [
-        ("audio", "audio", 4, 1),
-        ("lighting", "lighting", 3, 2),
-        ("planning", "planning", 1, 3),
-    ] {
+    // The deck follows the app's page: one trigger per deck page, on the page
+    // the app saves (`lcd_workspace`). The app's Setup page has no deck page,
+    // so the deck stays where it is while Setup is open.
+    for (index, deck_page) in DECK_PAGES.iter().enumerate() {
+        let slug = deck_page.workspace;
+        let page = deck_page_number(deck_page.id);
+        let sort_order = index + 1;
+        let mut actions = vec![json!({
+            "id": format!("sse-act-follow-{slug}"),
+            "definitionId": "set_page",
+            "connectionId": "internal",
+            "options": {
+                "controller_from_variable": false,
+                "controller": controller,
+                "controller_variable": "self",
+                "page_from_variable": false,
+                "page": page,
+                "page_variable": "1"
+            },
+            "type": "action",
+            "children": {}
+        })];
+        actions.extend(trigger_lcd_refreshes(deck_page.arrival_refreshes));
         triggers.insert(
             format!("sse-trigger-follow-{slug}"),
             json!({
@@ -366,23 +423,7 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
                     "enabled": true,
                     "sortOrder": sort_order
                 },
-                "actions": [
-                    {
-                        "id": format!("sse-act-follow-{slug}"),
-                        "definitionId": "set_page",
-                        "connectionId": "internal",
-                        "options": {
-                            "controller_from_variable": false,
-                            "controller": controller,
-                            "controller_variable": "self",
-                            "page_from_variable": false,
-                            "page": page,
-                            "page_variable": "1"
-                        },
-                        "type": "action",
-                        "children": {}
-                    }
-                ],
+                "actions": actions,
                 "condition": [
                     {
                         "id": format!("sse-cond-follow-{slug}"),
@@ -391,7 +432,7 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
                         "options": {
                             "variable": "custom:lcd_workspace",
                             "op": "eq",
-                            "value": workspace
+                            "value": slug
                         },
                         "type": "feedback",
                         "style": {
@@ -473,9 +514,9 @@ impl ControlDef {
 fn control_surface_page(
     page_id: &str,
     label: &str,
-    prefix: &str,
     controls: Vec<ControlDef>,
 ) -> ControlSurfacePage {
+    let prefix = page_id;
     let mut buttons = Vec::new();
     let mut dials = Vec::new();
 
@@ -575,13 +616,10 @@ fn extract_page_nav_target(actions: &[Value]) -> Option<&'static str> {
             .and_then(Value::as_object)
             .and_then(|options| options.get("page"))
             .and_then(Value::as_i64)?;
-        return match page {
-            1 => Some("PROJECTS"),
-            2 => Some("TASKS"),
-            3 => Some("LIGHTS"),
-            4 => Some("AUDIO"),
-            _ => None,
-        };
+        return DECK_PAGES
+            .iter()
+            .find(|deck_page| deck_page_number(deck_page.id) == page)
+            .map(|deck_page| deck_page.label);
     }
 
     None
@@ -639,16 +677,6 @@ fn dial_press_label(control: &ControlDef) -> String {
 fn dial_rotation_label(actions: &[Value], direction: &str) -> String {
     if let Some(action) = primary_payload_action(actions) {
         return match (action.as_str(), direction) {
-            ("selectPrevProject", _) => String::from("Prev Project"),
-            ("selectNextProject", _) => String::from("Next Project"),
-            ("selectPrevTask", _) => String::from("Prev Task"),
-            ("selectNextTask", _) => String::from("Next Task"),
-            ("prevStatus", _) => String::from("Prev Status"),
-            ("nextStatus", _) => String::from("Next Status"),
-            ("prevPriority", _) => String::from("Prev Priority"),
-            ("nextPriority", _) => String::from("Next Priority"),
-            ("prevSort", _) => String::from("Prev Sort"),
-            ("nextSort", _) => String::from("Next Sort"),
             ("selectPrevLight", _) => String::from("Prev Light"),
             ("selectNextLight", _) => String::from("Next Light"),
             ("intensityDown", _) => String::from("Intensity Down"),
@@ -686,42 +714,6 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
 
     let value = primary_payload_value(actions);
     match action.as_str() {
-        "setFilter" => format!(
-            "Set view filter to {}.",
-            value
-                .as_deref()
-                .map(format_filter_value)
-                .unwrap_or_else(|| String::from("the selected column"))
-        ),
-        "createProject" => String::from("Create a new project."),
-        "openDetail" => String::from("Open the current project or task detail."),
-        "selectPrevProject" => String::from("Select the previous project."),
-        "selectNextProject" => String::from("Select the next project."),
-        "setStatus" => format!(
-            "Set status to {}.",
-            value
-                .as_deref()
-                .map(format_filter_value)
-                .unwrap_or_else(|| String::from("the selected value"))
-        ),
-        "prevStatus" => String::from("Cycle status backward."),
-        "nextStatus" => String::from("Cycle status forward."),
-        "prevPriority" => String::from("Cycle priority backward."),
-        "nextPriority" => String::from("Cycle priority forward."),
-        "resetSort" => String::from("Reset sort order to manual."),
-        "prevSort" => String::from("Cycle sort order backward."),
-        "nextSort" => String::from("Cycle sort order forward."),
-        "toggleTimer" => String::from("Start or stop the selected task timer."),
-        "toggleTaskComplete" => String::from("Toggle completion on the selected task."),
-        "selectPrevTask" => String::from("Select the previous task."),
-        "selectNextTask" => String::from("Select the next task."),
-        "switchToDeckMode" => format!(
-            "Switch deck mode to {}.",
-            value
-                .as_deref()
-                .map(format_filter_value)
-                .unwrap_or_else(|| String::from("the selected workspace"))
-        ),
         "toggleLight" => String::from("Toggle the selected light."),
         "allOn" => String::from("Turn all lights on."),
         "allOff" => String::from("Turn all lights off."),
@@ -756,7 +748,7 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
             "Make {} the active mix target.",
             value
                 .as_deref()
-                .map(format_filter_value)
+                .map(format_payload_value)
                 .unwrap_or_else(|| String::from("the selected output"))
         ),
         "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
@@ -787,7 +779,7 @@ fn primary_payload_body(actions: &[Value]) -> Option<Value> {
     extract_primary_request(actions).and_then(|(_, _, body)| body)
 }
 
-fn format_filter_value(value: &str) -> String {
+fn format_payload_value(value: &str) -> String {
     value.replace('-', " ")
 }
 
@@ -884,269 +876,12 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
     })
 }
 
-fn project_controls() -> Vec<ControlDef> {
-    vec![
-        button(
-            "0",
-            "0",
-            "All",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setFilter","value":"all"}),
-            ),
-        ),
-        button(
-            "0",
-            "1",
-            "To Do",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setFilter","value":"todo"}),
-            ),
-        ),
-        button(
-            "0",
-            "2",
-            "In Prog",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setFilter","value":"in-progress"}),
-            ),
-        ),
-        button(
-            "0",
-            "3",
-            "TASKS >>",
-            page_jump(2)
-                .into_iter()
-                .chain(lcd_refreshes(&[
-                    "project_nav",
-                    "task_nav",
-                    "project_status",
-                    "project_priority",
-                ]))
-                .collect(),
-        ),
-        button(
-            "1",
-            "0",
-            "Blocked",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setFilter","value":"blocked"}),
-            ),
-        ),
-        button(
-            "1",
-            "1",
-            "Done",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setFilter","value":"done"}),
-            ),
-        ),
-        button(
-            "1",
-            "2",
-            "New Proj",
-            http_post("/api/deck/action", json!({"action":"createProject"})),
-        ),
-        button(
-            "1",
-            "3",
-            "LIGHTS >>",
-            page_jump(3)
-                .into_iter()
-                .chain(http_post(
-                    "/api/deck/light-action",
-                    json!({"action":"switchToDeckMode","value":"light"}),
-                ))
-                .chain(lcd_refreshes(&[
-                    "light_nav",
-                    "light_intensity",
-                    "light_cct",
-                    "scene_nav",
-                ]))
-                .collect(),
-        ),
-        dial(
-            "3",
-            "0",
-            "Project",
-            Some("$(custom:lcd_project_nav)"),
-            http_post("/api/deck/action", json!({"action":"openDetail"}))
-                .into_iter()
-                .chain(lcd_refreshes(&[
-                    "project_nav",
-                    "project_status",
-                    "project_priority",
-                    "task_nav",
-                    "sort_mode",
-                ]))
-                .collect(),
-            http_post("/api/deck/action", json!({"action":"selectPrevProject"})),
-            http_post("/api/deck/action", json!({"action":"selectNextProject"})),
-        ),
-        dial(
-            "3",
-            "1",
-            "Status",
-            Some("$(custom:lcd_project_status)"),
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"in-progress"}),
-            ),
-            http_post("/api/deck/action", json!({"action":"prevStatus"})),
-            http_post("/api/deck/action", json!({"action":"nextStatus"})),
-        ),
-        dial(
-            "3",
-            "2",
-            "Priority",
-            Some("$(custom:lcd_project_priority)"),
-            Vec::new(),
-            http_post("/api/deck/action", json!({"action":"prevPriority"})),
-            http_post("/api/deck/action", json!({"action":"nextPriority"})),
-        ),
-        dial(
-            "3",
-            "3",
-            "Sort",
-            Some("$(custom:lcd_sort_mode)"),
-            http_post("/api/deck/action", json!({"action":"resetSort"})),
-            http_post("/api/deck/action", json!({"action":"prevSort"})),
-            http_post("/api/deck/action", json!({"action":"nextSort"})),
-        ),
-    ]
-}
-
-fn task_controls() -> Vec<ControlDef> {
-    vec![
-        button("0", "0", "<< PROJ", page_jump(1)),
-        button(
-            "0",
-            "1",
-            "Timer",
-            http_post("/api/deck/action", json!({"action":"toggleTimer"})),
-        ),
-        button(
-            "0",
-            "2",
-            "Complete",
-            http_post("/api/deck/action", json!({"action":"toggleTaskComplete"})),
-        ),
-        button(
-            "0",
-            "3",
-            "In Prog",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"in-progress"}),
-            ),
-        ),
-        button(
-            "1",
-            "0",
-            "To Do",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"todo"}),
-            ),
-        ),
-        button(
-            "1",
-            "1",
-            "Blocked",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"blocked"}),
-            ),
-        ),
-        button(
-            "1",
-            "2",
-            "Done",
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"done"}),
-            ),
-        ),
-        button(
-            "1",
-            "3",
-            "New Proj",
-            http_post("/api/deck/action", json!({"action":"createProject"})),
-        ),
-        dial(
-            "3",
-            "0",
-            "Project",
-            Some("$(custom:lcd_project_nav)"),
-            http_post("/api/deck/action", json!({"action":"openDetail"}))
-                .into_iter()
-                .chain(lcd_refreshes(&[
-                    "project_nav",
-                    "project_status",
-                    "project_priority",
-                    "task_nav",
-                ]))
-                .collect(),
-            http_post("/api/deck/action", json!({"action":"selectPrevProject"})),
-            http_post("/api/deck/action", json!({"action":"selectNextProject"})),
-        ),
-        dial(
-            "3",
-            "1",
-            "Task",
-            Some("$(custom:lcd_task_nav)"),
-            http_post("/api/deck/action", json!({"action":"toggleTimer"})),
-            http_post("/api/deck/action", json!({"action":"selectPrevTask"})),
-            http_post("/api/deck/action", json!({"action":"selectNextTask"})),
-        ),
-        dial(
-            "3",
-            "2",
-            "Status",
-            Some("$(custom:lcd_project_status)"),
-            http_post(
-                "/api/deck/action",
-                json!({"action":"setStatus","value":"in-progress"}),
-            ),
-            http_post("/api/deck/action", json!({"action":"prevStatus"})),
-            http_post("/api/deck/action", json!({"action":"nextStatus"})),
-        ),
-        dial(
-            "3",
-            "3",
-            "Priority",
-            Some("$(custom:lcd_project_priority)"),
-            http_post("/api/deck/action", json!({"action":"toggleTaskComplete"})),
-            http_post("/api/deck/action", json!({"action":"prevPriority"})),
-            http_post("/api/deck/action", json!({"action":"nextPriority"})),
-        ),
-    ]
-}
-
+/// The LIGHTS page (page 1). New pages program, Slice 2: its `<< PROJ` key
+/// (row 0, column 0) left with Planning and the slot stays empty, since
+/// LIGHTS is the first page. The page keys post nothing to the bridge any
+/// more: the deck mode they stored was a Planning setting nothing read.
 fn light_controls() -> Vec<ControlDef> {
     vec![
-        button(
-            "0",
-            "0",
-            "<< PROJ",
-            page_jump(1)
-                .into_iter()
-                .chain(http_post(
-                    "/api/deck/light-action",
-                    json!({"action":"switchToDeckMode","value":"project"}),
-                ))
-                .chain(lcd_refreshes(&[
-                    "project_nav",
-                    "project_status",
-                    "project_priority",
-                    "sort_mode",
-                ]))
-                .collect(),
-        ),
         button(
             "0",
             "1",
@@ -1183,24 +918,10 @@ fn light_controls() -> Vec<ControlDef> {
             "Del Scene",
             http_post("/api/deck/light-action", json!({"action":"deleteScene"})),
         ),
-        button(
-            "1",
-            "3",
-            "AUDIO >>",
-            page_jump(4)
-                .into_iter()
-                .chain(http_post(
-                    "/api/deck/audio-action",
-                    json!({"action":"switchToDeckMode","value":"audio"}),
-                ))
-                .chain(lcd_refreshes(&[
-                    "audio_ch_nav",
-                    "audio_gain1",
-                    "audio_gain2",
-                    "audio_gain3",
-                ]))
-                .collect(),
-        ),
+        // The next page. Its LCD refreshes named four keys the audio surface
+        // retired in 2026-09 (`audio_ch_nav`, `audio_gain1`–`3`), which the
+        // bridge refused on every press; the 1 s poll keeps AUDIO current.
+        button("1", "3", "AUDIO >>", page_jump(deck_page_number("audio"))),
         dial(
             "3",
             "0",
@@ -1409,9 +1130,12 @@ pub(crate) fn next_action_id() -> String {
 
 /// The most bridge requests the exported profile can have in flight at one
 /// instant: its once-a-second LCD poll, which sends every request at once,
-/// meeting the one press or turn that sends the most. The bridge's worker pool
-/// is sized to hold them all (`control_surface_http`,
-/// `the_pool_holds_the_decks_worst_instant`).
+/// meeting the page-follow trigger the poll's own answer can set off and the
+/// one press or turn that sends the most. The bridge's worker pool is sized to
+/// hold them all (`control_surface_http`,
+/// `the_pool_holds_the_decks_worst_instant`). New pages program, Slice 2: the
+/// follow triggers sent nothing to the bridge until the lighting one took over
+/// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4).
 #[cfg(test)]
 pub(crate) fn deck_worst_instant_requests() -> usize {
     fn bridge_requests(value: &Value) -> usize {
@@ -1434,6 +1158,11 @@ pub(crate) fn deck_worst_instant_requests() -> usize {
         "token",
     );
     let poll = bridge_requests(&config["triggers"]["sse-trigger-lcd-poll"]["actions"]);
+    let largest_follow = entries(&config["triggers"])
+        .filter(|trigger| trigger["events"][0]["type"] == "condition_true")
+        .map(|trigger| bridge_requests(&trigger["actions"]))
+        .max()
+        .unwrap_or(0);
     let largest_press = entries(&config["pages"])
         .flat_map(|page| entries(&page["controls"]))
         .flat_map(entries)
@@ -1442,13 +1171,14 @@ pub(crate) fn deck_worst_instant_requests() -> usize {
         .map(bridge_requests)
         .max()
         .unwrap_or(0);
-    poll + largest_press
+    poll + largest_follow + largest_press
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK, LEGACY_LCD_KEYS};
+    use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK};
+    use std::collections::BTreeSet;
 
     const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
@@ -1546,11 +1276,13 @@ mod tests {
         let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
         assert_eq!(config["type"], "full");
+        // New pages program, Slice 2 (D5): LIGHTS and AUDIO; PROJECTS and
+        // TASKS left with Planning.
         assert_eq!(
             config["pages"].as_object().map(|pages| pages.len()),
-            Some(4)
+            Some(2)
         );
-        assert!(config["pages"]["4"]["id"].is_string());
+        assert!(config["pages"]["2"]["id"].is_string());
         assert!(config.get("surfaces").is_none());
 
         let custom_variables = config["custom_variables"]
@@ -1558,17 +1290,18 @@ mod tests {
             .expect("custom variables should exist");
         assert_eq!(
             custom_variables.len(),
-            AUDIO_LCD_KEYS.len() + LEGACY_LCD_KEYS.len()
+            AUDIO_LCD_KEYS.len() + LIGHT_LCD_KEYS.len()
         );
-        assert!(custom_variables.contains_key("lcd_project_nav"));
+        assert!(custom_variables.contains_key("lcd_light_nav"));
         assert!(custom_variables.contains_key("lcd_audio_strip_1_level"));
         assert!(
             custom_variables.contains_key("lcd_workspace"),
             "the polled LCD variables must ship with the profile - generic-http stores are silent no-ops without them"
         );
 
+        // LIGHTS' first key sits in column 1: column 0 held `<< PROJ`.
         let sample_action =
-            &config["pages"]["1"]["controls"]["0"]["0"]["steps"]["0"]["action_sets"]["down"][0];
+            &config["pages"]["1"]["controls"]["0"]["1"]["steps"]["0"]["action_sets"]["down"][0];
         assert_eq!(sample_action["connectionId"], INSTANCE_ID);
         assert_eq!(sample_action["definitionId"], "post");
     }
@@ -1576,7 +1309,7 @@ mod tests {
     #[test]
     fn companion_export_audio_page_maps_the_deck_hardware() {
         let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
-        let controls = config["pages"]["4"]["controls"]
+        let controls = config["pages"]["2"]["controls"]
             .as_object()
             .expect("audio controls should exist");
 
@@ -1623,7 +1356,7 @@ mod tests {
     #[test]
     fn companion_export_audio_page_carries_the_visual_language() {
         let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
-        let controls = config["pages"]["4"]["controls"]
+        let controls = config["pages"]["2"]["controls"]
             .as_object()
             .expect("audio controls should exist");
 
@@ -1682,7 +1415,9 @@ mod tests {
         let triggers = config["triggers"]
             .as_object()
             .expect("triggers should exist");
-        assert_eq!(triggers.len(), 4);
+        // New pages program, Slice 2: the poll and a follow trigger per deck
+        // page (the Planning one left with PROJECTS).
+        assert_eq!(triggers.len(), 3);
 
         let poll = &triggers["sse-trigger-lcd-poll"];
         assert_eq!(poll["options"]["enabled"], true);
@@ -1705,7 +1440,7 @@ mod tests {
             follow["actions"][0]["options"]["controller"],
             "streamdeck:TESTSERIAL"
         );
-        assert_eq!(follow["actions"][0]["options"]["page"], 4);
+        assert_eq!(follow["actions"][0]["options"]["page"], 2);
 
         let fallback = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
         assert_eq!(
@@ -1717,40 +1452,41 @@ mod tests {
     #[test]
     fn control_surface_snapshot_matches_the_deck_page_model() {
         let snapshot = build_control_surface_snapshot();
-        assert_eq!(snapshot.pages.len(), 4);
-        assert_eq!(snapshot.pages[0].label, "PROJECTS");
-        assert_eq!(snapshot.pages[0].buttons.len(), 8);
-        assert_eq!(snapshot.pages[0].dials.len(), 12);
-        assert_eq!(snapshot.pages[0].buttons[0].id, "proj-btn-1");
-        assert_eq!(snapshot.pages[0].buttons[0].position, 1);
+        // New pages program, Slice 2 (D5): LIGHTS is page 1, AUDIO page 2.
+        // The PROJECTS page's model (its first key, its `TASKS >>` and
+        // `LIGHTS >>` keys, its project dial) left with it; LIGHTS carries
+        // the same checks.
+        assert_eq!(snapshot.pages.len(), 2);
+        let lights = &snapshot.pages[0];
+        assert_eq!(lights.id, "lights");
+        assert_eq!(lights.label, "LIGHTS");
         assert_eq!(
-            snapshot.pages[0].buttons[0].url.as_deref(),
-            Some("/api/deck/action")
+            lights.buttons.len(),
+            7,
+            "the LIGHTS page's eight keys less `<< PROJ`"
         );
+        assert_eq!(lights.dials.len(), 12);
+        assert_eq!(lights.buttons[0].id, "lights-btn-2");
+        assert_eq!(lights.buttons[0].position, 2);
         assert_eq!(
-            snapshot.pages[0].buttons[3].page_nav_target.as_deref(),
-            Some("TASKS")
+            lights.buttons[0].url.as_deref(),
+            Some("/api/deck/light-action")
         );
-        assert_eq!(snapshot.pages[0].buttons[3].method, None);
+        let audio_key = &lights.buttons[6];
+        assert_eq!(audio_key.label, "AUDIO >>");
+        assert_eq!(audio_key.page_nav_target.as_deref(), Some("AUDIO"));
+        assert_eq!(audio_key.is_page_nav, Some(true));
+        assert_eq!(audio_key.method, None, "a page key posts nothing");
+        assert_eq!(audio_key.lcd_refresh_keys, None);
+        assert_eq!(audio_key.description, "Navigate to the AUDIO page.");
+        assert_eq!(lights.dials[0].id, "lights-dial-1-press");
+        assert_eq!(lights.dials[0].lcd_key.as_deref(), Some("light_nav"));
         assert_eq!(
-            snapshot.pages[0].buttons[3]
-                .lcd_refresh_keys
-                .as_ref()
-                .map(Vec::len),
-            Some(4)
-        );
-        assert_eq!(
-            snapshot.pages[0].buttons[7].page_nav_target.as_deref(),
-            Some("LIGHTS")
-        );
-        assert_eq!(snapshot.pages[0].buttons[7].method.as_deref(), Some("POST"));
-        assert_eq!(snapshot.pages[0].dials[0].id, "proj-dial-1-press");
-        assert_eq!(
-            snapshot.pages[0].dials[0].lcd_key.as_deref(),
-            Some("project_nav")
+            lights.dials[0].lcd_refresh_keys.as_ref().map(Vec::len),
+            Some(3)
         );
 
-        let audio = &snapshot.pages[3];
+        let audio = &snapshot.pages[1];
         assert_eq!(audio.label, "AUDIO");
         assert_eq!(
             audio.buttons.len(),
@@ -1777,5 +1513,257 @@ mod tests {
                 && control.body.as_ref().is_some_and(|body| {
                     body.get("action").and_then(Value::as_str) == Some("dialTurn")
                 })));
+    }
+
+    // -----------------------------------------------------------------
+    // New pages program, Slice 2 (D5): PROJECTS and TASKS leave the deck.
+    // -----------------------------------------------------------------
+
+    fn test_profile() -> Value {
+        generate_companion_config(
+            "http://127.0.0.1:38201",
+            Some("streamdeck:TESTSERIAL"),
+            TEST_TOKEN,
+        )
+    }
+
+    /// Every `set_page` jump in `value`, as (the page it jumps to).
+    fn page_jumps(value: &Value, into: &mut Vec<i64>) {
+        match value {
+            Value::Object(map) => {
+                if map.get("definitionId").and_then(Value::as_str) == Some("set_page") {
+                    into.push(value["options"]["page"].as_i64().unwrap_or(-1));
+                }
+                for child in map.values() {
+                    page_jumps(child, into);
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    page_jumps(item, into);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The LCD keys a profile touches: the ones it shows or tests
+    /// (`custom:lcd_<key>`), the ones it asks the bridge for
+    /// (`/api/deck/lcd?key=<key>`) and the variables those answers are
+    /// stored in (`jsonResultDataVariable`).
+    #[derive(Default)]
+    struct LcdKeys {
+        read: BTreeSet<String>,
+        requested: BTreeSet<String>,
+        stored: BTreeSet<String>,
+    }
+
+    fn collect_lcd_keys(value: &Value, into: &mut LcdKeys) {
+        fn key_after<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
+            text.match_indices(marker)
+                .map(|(at, _)| {
+                    let rest = &text[at + marker.len()..];
+                    let end = rest
+                        .find(|character: char| {
+                            !(character.is_ascii_alphanumeric() || character == '_')
+                        })
+                        .unwrap_or(rest.len());
+                    &rest[..end]
+                })
+                .collect()
+        }
+        match value {
+            Value::String(text) => {
+                into.read
+                    .extend(key_after(text, "custom:lcd_").into_iter().map(String::from));
+                into.requested.extend(
+                    key_after(text, "/api/deck/lcd?key=")
+                        .into_iter()
+                        .map(String::from),
+                );
+            }
+            Value::Object(map) => {
+                if let Some(variable) = map
+                    .get("jsonResultDataVariable")
+                    .and_then(Value::as_str)
+                    .filter(|variable| !variable.is_empty())
+                {
+                    into.stored.insert(
+                        variable
+                            .strip_prefix("lcd_")
+                            .unwrap_or_else(|| panic!("an answer stored outside lcd_: {variable}"))
+                            .to_string(),
+                    );
+                }
+                for child in map.values() {
+                    collect_lcd_keys(child, into);
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    collect_lcd_keys(item, into);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Nothing of Planning is left on the deck: no PROJECTS or TASKS page, no
+    // key on the Planning route (`/api/deck/action`), no deck-mode key (a
+    // Planning setting), no project, task or sort LCD, no Planning follow.
+    #[test]
+    fn the_deck_profile_and_page_model_carry_no_planning() {
+        let profile = test_profile().to_string().to_lowercase();
+        let snapshot = serde_json::to_string(&build_control_surface_snapshot())
+            .expect("the snapshot serializes")
+            .to_lowercase();
+        for (what, text) in [("profile", &profile), ("page model", &snapshot)] {
+            for word in [
+                "projects",
+                "tasks",
+                "project",
+                "task_",
+                "sort_mode",
+                "planning",
+                "/api/deck/action\"",
+                "switchtodeckmode",
+                "deckmode",
+                "<< proj",
+            ] {
+                assert!(!text.contains(word), "the {what} still says {word:?}");
+            }
+        }
+    }
+
+    // generic-http stores an answer only into a custom variable the profile
+    // ships (the lesson of 2026-09-01), so every LCD the deck shows or asks
+    // for must have one; every LCD it shows must be refreshed by something
+    // (the poll, a key or a follow trigger); and every key it asks the bridge
+    // for must be one the bridge answers. At `e8d43c5` the `AUDIO >>` key
+    // asked for four keys the audio surface had retired (refused, with no
+    // variable to land in); taking PROJECTS away took the only refresh of
+    // `scene_nav` with it, until the lighting follow trigger took it over.
+    #[test]
+    fn every_lcd_the_deck_shows_is_shipped_refreshed_and_answered() {
+        let profile = test_profile();
+        let mut keys = LcdKeys::default();
+        collect_lcd_keys(&profile, &mut keys);
+        let variables = profile["custom_variables"]
+            .as_object()
+            .expect("custom variables")
+            .keys()
+            .map(|name| {
+                name.strip_prefix("lcd_")
+                    .unwrap_or_else(|| panic!("a variable outside lcd_: {name}"))
+                    .to_string()
+            })
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            keys.requested, keys.stored,
+            "each LCD request stores into its own key's variable"
+        );
+        assert_eq!(
+            keys.read, variables,
+            "the profile ships a variable for every LCD it shows, and none it does not"
+        );
+        assert_eq!(
+            keys.requested, variables,
+            "every LCD the profile shows is refreshed by something, and it asks for no other"
+        );
+
+        let _preview_guard = crate::lighting::shared_preview_test_guard();
+        let test_dir = crate::control_surface::test_support::ready_audio_test_db("profile-lcds");
+        for key in &keys.requested {
+            if let Err(error) =
+                crate::control_surface::read_control_surface_lcd_text(&test_dir.db_path(), key)
+            {
+                panic!(
+                    "the profile asks for LCD {key:?}, which the bridge refuses: {}",
+                    error.message()
+                );
+            }
+        }
+    }
+
+    // D5: LIGHTS (page 1) and AUDIO (page 2), chained by the page keys and by
+    // the deck following the app. LIGHTS' `AUDIO >>` is the one page key: the
+    // AUDIO page's sixteen places all hold audio controls, so the deck goes
+    // back to LIGHTS by following the app. Setup has no deck page, so nothing
+    // follows it and the deck stays where it is.
+    #[test]
+    fn the_page_keys_and_follow_triggers_chain_lights_and_audio() {
+        let profile = test_profile();
+        let pages = profile["pages"].as_object().expect("pages");
+        let page_names = pages
+            .iter()
+            .map(|(number, page)| {
+                (
+                    number.parse::<i64>().expect("page numbers"),
+                    page["name"].as_str().expect("page names").to_string(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            page_names,
+            vec![(1, String::from("LIGHTS")), (2, String::from("AUDIO"))]
+        );
+
+        let mut all_jumps = Vec::new();
+        page_jumps(&profile, &mut all_jumps);
+        assert!(
+            all_jumps.iter().all(|page| (1..=2).contains(page)),
+            "every jump lands on a page the profile has: {all_jumps:?}"
+        );
+
+        let mut lights_jumps = Vec::new();
+        page_jumps(&pages["1"], &mut lights_jumps);
+        assert_eq!(lights_jumps, vec![2], "LIGHTS' page key goes to AUDIO");
+        let mut audio_jumps = Vec::new();
+        page_jumps(&pages["2"], &mut audio_jumps);
+        assert!(audio_jumps.is_empty(), "{audio_jumps:?}");
+        assert!(
+            pages["1"]["controls"]["0"].get("0").is_none(),
+            "`<< PROJ` left LIGHTS' first place empty"
+        );
+
+        let triggers = profile["triggers"].as_object().expect("triggers");
+        let mut follows = triggers
+            .values()
+            .filter(|trigger| trigger["events"][0]["type"] == "condition_true")
+            .map(|trigger| {
+                let mut jumps = Vec::new();
+                page_jumps(&trigger["actions"], &mut jumps);
+                (
+                    trigger["condition"][0]["options"]["value"]
+                        .as_str()
+                        .expect("a follow trigger tests the saved page")
+                        .to_string(),
+                    jumps,
+                )
+            })
+            .collect::<Vec<_>>();
+        follows.sort();
+        assert_eq!(
+            follows,
+            vec![
+                (String::from("audio"), vec![2]),
+                (String::from("lighting"), vec![1]),
+            ]
+        );
+
+        let mut lighting_keys = LcdKeys::default();
+        collect_lcd_keys(
+            &triggers["sse-trigger-follow-lighting"]["actions"],
+            &mut lighting_keys,
+        );
+        assert_eq!(
+            lighting_keys.requested,
+            LIGHT_LCD_KEYS
+                .iter()
+                .map(|key| key.to_string())
+                .collect::<BTreeSet<_>>(),
+            "arriving on LIGHTS refreshes its LCDs, as the PROJECTS page's `LIGHTS >>` did"
+        );
     }
 }

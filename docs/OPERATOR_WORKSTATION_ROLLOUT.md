@@ -135,6 +135,8 @@ Run these checks from the installed app:
 
 Do not mark the rollout passed if a degraded engine, storage, lighting, audio, or control-surface state is hidden behind a normal dashboard presentation.
 
+Planning left Studio Control in 2026-09 (the new pages program, Slices 1 and 2): this runbook records the `v2.2.1` rollout, which checked Planning persistence. When it is reused for a later build, check persistence with a harmless lighting group instead — create one in Lighting, close, reopen, confirm it is still there, then delete it — and read "Planning" in the evidence list, the stop conditions and the comment template below as that check. The release lanes use the same kind of sentinel.
+
 ## Evidence To Post On Issue #4
 
 Post a comment with:

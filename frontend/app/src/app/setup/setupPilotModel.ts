@@ -109,6 +109,29 @@ export function parseControlSurfacePages(snapshot: SnapshotRecord | null): Contr
   });
 }
 
+/** A Stream Deck + page's keys: four to a row, in the order the deck numbers them. */
+export const DECK_KEYS_PER_ROW = 4;
+
+/**
+ * A page's key cells, each holding the key at its place on the deck or
+ * nothing, in whole rows. A page need not start at place 1: LIGHTS starts at
+ * 2, the place `<< PROJ` held until Planning left the deck (new pages
+ * program, Slice 2), so drawing the keys one after another put every LIGHTS
+ * key one place early. Keys whose places are missing or repeated are drawn
+ * one after another, as before.
+ */
+export function deckKeySlots(buttons: ControlSurfaceControl[]): (ControlSurfaceControl | null)[] {
+  const places = buttons.map((button) => button.position);
+  const placed =
+    places.every((place) => Number.isInteger(place) && place >= 1) && new Set(places).size === places.length;
+  if (!placed || buttons.length === 0) {
+    return buttons;
+  }
+
+  const cells = Math.ceil(Math.max(...places) / DECK_KEYS_PER_ROW) * DECK_KEYS_PER_ROW;
+  return Array.from({ length: cells }, (_, index) => buttons.find((button) => button.position === index + 1) ?? null);
+}
+
 export function normalizeSetupMode(appSnapshot: SnapshotRecord | null): SetupMode {
   const shell = asRecord(appSnapshot?.shell);
   const setup = asRecord(shell?.setup);

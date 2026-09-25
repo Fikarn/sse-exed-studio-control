@@ -13,7 +13,10 @@ pub const WINDOW_HEIGHT_KEY: &str = "shell.window.height";
 pub const WINDOW_MAXIMIZED_KEY: &str = "shell.window.maximized";
 pub const WINDOW_MODE_KEY: &str = "shell.window.mode";
 
-pub const DEFAULT_WORKSPACE: &str = "planning";
+/// The page new saved data opens on, and the one a saved page this build no
+/// longer has reads as: the Console (new pages program, D1 — Planning, the
+/// default until Slice 2, left the app).
+pub const DEFAULT_WORKSPACE: &str = "audio";
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
@@ -181,7 +184,7 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
 
         if !is_valid_workspace(workspace) {
             return Err(String::from(
-                "workspace must be one of: planning, lighting, audio, setup",
+                "workspace must be one of: lighting, audio, setup",
             ));
         }
 
@@ -309,7 +312,7 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
 }
 
 pub fn is_valid_workspace(workspace: &str) -> bool {
-    matches!(workspace, "planning" | "lighting" | "audio" | "setup")
+    matches!(workspace, "lighting" | "audio" | "setup")
 }
 
 pub fn is_valid_setup_active_section(active_section: &str) -> bool {
@@ -466,6 +469,27 @@ mod tests {
         assert_eq!(snapshot.window_height, DEFAULT_WINDOW_HEIGHT);
         assert_eq!(snapshot.window_maximized, DEFAULT_WINDOW_MAXIMIZED);
         assert_eq!(snapshot.window_mode, DEFAULT_WINDOW_MODE);
+    }
+
+    // New pages program, D1: new saved data opens on the Console, and so does
+    // a saved Planning page (the page left the app), which settings.update
+    // now refuses.
+    #[test]
+    fn new_saved_data_and_a_saved_planning_page_open_the_console() {
+        assert_eq!(DEFAULT_WORKSPACE, "audio");
+        assert!(default_settings_entries().contains(&(WORKSPACE_KEY, "audio")));
+        assert_eq!(ShellSettingsSnapshot::default().workspace, "audio");
+
+        let saved_planning =
+            HashMap::from([(String::from(WORKSPACE_KEY), String::from("planning"))]);
+        assert_eq!(
+            ShellSettingsSnapshot::from_settings(&saved_planning).workspace,
+            "audio"
+        );
+        assert!(!is_valid_workspace("planning"));
+        let error = parse_settings_update(&json!({ "workspace": "planning" }))
+            .expect_err("Planning is no longer a page");
+        assert_eq!(error, "workspace must be one of: lighting, audio, setup");
     }
 
     #[test]

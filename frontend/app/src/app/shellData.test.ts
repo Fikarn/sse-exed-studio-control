@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMonitorItems, deriveLightingWorkspaceTone } from "./shellData";
+import { buildMonitorItems, deriveLightingWorkspaceTone, withRestoreDetail } from "./shellData";
+
+// New pages program, Slice 2 (D3): a restore's `detail` (the hardware link's
+// note that a backup's Planning data was not restored) follows the shell's
+// sentence; anything that is not a sentence adds nothing.
+describe("a restore's detail", () => {
+  it("follows the shell's sentence when the reply carries one", () => {
+    expect(withRestoreDetail("Restored.", { detail: "Planning data in this backup was not restored." })).toBe(
+      "Restored. Planning data in this backup was not restored."
+    );
+  });
+
+  it("adds nothing without a sentence", () => {
+    expect(withRestoreDetail("Restored.", null)).toBe("Restored.");
+    expect(withRestoreDetail("Restored.", { restored: true })).toBe("Restored.");
+    expect(withRestoreDetail("Restored.", { detail: "  " })).toBe("Restored.");
+    expect(withRestoreDetail("Restored.", { detail: 4 })).toBe("Restored.");
+  });
+});
 
 // 2026-09 production readiness, Slice 11 (F31): the header's Lighting lamp
 // says `held` while the light outputs are held — on every workspace, because

@@ -1,20 +1,23 @@
-use crate::planning_settings::dashboard_view_to_workspace;
+//! The legacy (pre-2.0) db.json import. New pages program, Slice 2: reduced
+//! to what is not Planning — the setup flag and the page to open. The
+//! projects, tasks, checklists, activity entries and Planning settings a
+//! db.json holds are not read at all. Interim: Slice 2b retires the import
+//! (D3), with `storage.importLegacyDb`, the start-up auto-import and
+//! `SSE_LEGACY_DB_PATH`; until then seven lanes and scripts still seed a test
+//! workstation through it.
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-const DEFAULT_TIMESTAMP: &str = "1970-01-01T00:00:00.000Z";
 
 #[derive(Debug)]
 pub enum ImportLegacyError {
     SourceNotFound(PathBuf),
     SourceReadFailed(String),
     SourceParseFailed(String),
-    InvalidData(String),
     ExistingDataRequiresForce,
     Storage(String),
 }
@@ -35,10 +38,9 @@ impl fmt::Display for ImportLegacyError {
             Self::SourceParseFailed(message) => {
                 write!(f, "Failed to parse legacy database JSON: {message}")
             }
-            Self::InvalidData(message) => write!(f, "Legacy database is invalid: {message}"),
             Self::ExistingDataRequiresForce => write!(
                 f,
-                "Native planning tables already contain data. Re-run with force=true to replace it."
+                "The saved data already holds a completed setup or an earlier db.json import. Re-run with force=true to replace its setup flag and the page it opens on."
             ),
             Self::Storage(message) => write!(f, "Native storage operation failed: {message}"),
         }
@@ -57,74 +59,23 @@ pub struct LegacyImportRequest {
 pub struct LegacyImportPayload {
     pub source_path: PathBuf,
     pub source_schema_version: i64,
-    pub projects: Vec<ImportedProject>,
-    pub tasks: Vec<ImportedTask>,
-    pub activity_log: Vec<ImportedActivityEntry>,
     pub settings: ImportedSettings,
 }
 
-#[derive(Debug, Clone)]
-pub struct ImportedProject {
-    pub id: String,
-    pub title: String,
-    pub description: String,
-    pub status: String,
-    pub priority: String,
-    pub created_at: String,
-    pub last_updated: String,
-    pub order: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImportedChecklistItem {
-    pub id: String,
-    pub text: String,
-    pub done: bool,
-    pub order: i64,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImportedTask {
-    pub id: String,
-    pub project_id: String,
-    pub title: String,
-    pub description: String,
-    pub priority: String,
-    pub due_date: Option<String>,
-    pub labels: Vec<String>,
-    pub checklist: Vec<ImportedChecklistItem>,
-    pub is_running: bool,
-    pub total_seconds: i64,
-    pub last_started: Option<String>,
-    pub completed: bool,
-    pub order: i64,
-    pub created_at: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImportedActivityEntry {
-    pub id: String,
-    pub timestamp: String,
-    pub entity_type: String,
-    pub entity_id: String,
-    pub action: String,
-    pub detail: String,
-}
-
+/// What the import writes: the setup flag (as the three commissioning keys)
+/// and the page to open.
 #[derive(Debug, Clone)]
 pub struct ImportedSettings {
-    pub view_filter: String,
-    pub sort_by: String,
-    pub dashboard_view: String,
-    pub deck_mode: String,
-    pub selected_project_id: Option<String>,
-    pub selected_task_id: Option<String>,
     pub commissioning_completed: bool,
     pub commissioning_runner_stage: String,
     pub commissioning_stage: String,
     pub shell_workspace: String,
 }
 
+/// The reply of `storage.importLegacyDb`. Slice 2: the Planning counts
+/// (`importedProjects`, `importedTasks`, `importedChecklistItems`,
+/// `importedActivityEntries`, `normalizedRunningTasks`) are gone with the
+/// Planning part of the import.
 #[derive(Debug, Serialize)]
 pub struct LegacyImportSummary {
     #[serde(rename = "sourcePath")]
@@ -133,126 +84,25 @@ pub struct LegacyImportSummary {
     pub source_schema_version: i64,
     #[serde(rename = "replacedExistingData")]
     pub replaced_existing_data: bool,
-    #[serde(rename = "importedProjects")]
-    pub imported_projects: usize,
-    #[serde(rename = "importedTasks")]
-    pub imported_tasks: usize,
-    #[serde(rename = "importedChecklistItems")]
-    pub imported_checklist_items: usize,
-    #[serde(rename = "importedActivityEntries")]
-    pub imported_activity_entries: usize,
-    #[serde(rename = "normalizedRunningTasks")]
-    pub normalized_running_tasks: usize,
     #[serde(rename = "updatedSettings")]
     pub updated_settings: usize,
 }
 
+/// Only the parts of a db.json the import still reads; everything else in
+/// the file (its projects, tasks, activity log, Planning settings, lights)
+/// is ignored.
 #[derive(Debug, Deserialize, Default)]
 struct LegacyDbWire {
     #[serde(default, rename = "schemaVersion")]
     schema_version: i64,
     #[serde(default)]
-    projects: Vec<LegacyProjectWire>,
-    #[serde(default)]
-    tasks: Vec<LegacyTaskWire>,
-    #[serde(default, rename = "activityLog")]
-    activity_log: Vec<LegacyActivityEntryWire>,
-    #[serde(default)]
     settings: LegacySettingsWire,
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyProjectWire {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    description: String,
-    #[serde(default)]
-    status: String,
-    #[serde(default)]
-    priority: String,
-    #[serde(default, rename = "createdAt")]
-    created_at: String,
-    #[serde(default, rename = "lastUpdated")]
-    last_updated: String,
-    #[serde(default)]
-    order: Option<i64>,
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct LegacyChecklistItemWire {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    text: String,
-    #[serde(default)]
-    done: bool,
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct LegacyTaskWire {
-    #[serde(default)]
-    id: String,
-    #[serde(default, rename = "projectId")]
-    project_id: String,
-    #[serde(default)]
-    title: String,
-    #[serde(default)]
-    description: String,
-    #[serde(default)]
-    priority: String,
-    #[serde(default, rename = "dueDate")]
-    due_date: Option<String>,
-    #[serde(default)]
-    labels: Vec<String>,
-    #[serde(default)]
-    checklist: Vec<LegacyChecklistItemWire>,
-    #[serde(default, rename = "isRunning")]
-    is_running: bool,
-    #[serde(default, rename = "totalSeconds")]
-    total_seconds: i64,
-    #[serde(default, rename = "lastStarted")]
-    last_started: Option<String>,
-    #[serde(default)]
-    completed: bool,
-    #[serde(default)]
-    order: Option<i64>,
-    #[serde(default, rename = "createdAt")]
-    created_at: String,
-}
-
-#[derive(Debug, Deserialize, Default)]
-struct LegacyActivityEntryWire {
-    #[serde(default)]
-    id: String,
-    #[serde(default)]
-    timestamp: String,
-    #[serde(default, rename = "entityType")]
-    entity_type: String,
-    #[serde(default, rename = "entityId")]
-    entity_id: String,
-    #[serde(default)]
-    action: String,
-    #[serde(default)]
-    detail: String,
-}
-
-#[derive(Debug, Deserialize, Default)]
 struct LegacySettingsWire {
-    #[serde(default, rename = "viewFilter")]
-    view_filter: String,
-    #[serde(default, rename = "sortBy")]
-    sort_by: String,
-    #[serde(default, rename = "selectedProjectId")]
-    selected_project_id: Option<String>,
-    #[serde(default, rename = "selectedTaskId")]
-    selected_task_id: Option<String>,
     #[serde(default, rename = "dashboardView")]
     dashboard_view: String,
-    #[serde(default, rename = "deckMode")]
-    deck_mode: String,
     #[serde(default, rename = "hasCompletedSetup")]
     has_completed_setup: bool,
 }
@@ -290,225 +140,17 @@ pub fn load_legacy_import_payload(
     let wire = serde_json::from_str::<LegacyDbWire>(&contents)
         .map_err(|error| ImportLegacyError::SourceParseFailed(error.to_string()))?;
 
-    normalize_legacy_db(source_path, wire)
-}
-
-fn normalize_legacy_db(
-    source_path: &Path,
-    wire: LegacyDbWire,
-) -> Result<LegacyImportPayload, ImportLegacyError> {
-    let projects = wire
-        .projects
-        .into_iter()
-        .enumerate()
-        .map(|(index, project)| normalize_project(index, project))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let project_ids = projects
-        .iter()
-        .map(|project| project.id.clone())
-        .collect::<HashSet<_>>();
-
-    let tasks = wire
-        .tasks
-        .into_iter()
-        .enumerate()
-        .map(|(index, task)| normalize_task(index, task, &project_ids))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let task_project_map = tasks
-        .iter()
-        .map(|task| (task.id.clone(), task.project_id.clone()))
-        .collect::<HashMap<_, _>>();
-    let task_ids = task_project_map.keys().cloned().collect::<HashSet<_>>();
-
-    let activity_log = wire
-        .activity_log
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, entry)| normalize_activity_entry(index, entry).transpose())
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let settings = normalize_settings(wire.settings, &project_ids, &task_project_map, &task_ids);
-
     Ok(LegacyImportPayload {
         source_path: source_path.to_path_buf(),
         source_schema_version: wire.schema_version,
-        projects,
-        tasks,
-        activity_log,
-        settings,
+        settings: normalize_settings(wire.settings),
     })
 }
 
-fn normalize_project(
-    index: usize,
-    project: LegacyProjectWire,
-) -> Result<ImportedProject, ImportLegacyError> {
-    let id = require_text(project.id, "project.id")?;
-    let title = require_text(project.title, "project.title")?;
-    let created_at = normalize_timestamp(&project.created_at, Some(&project.last_updated));
-    let last_updated = normalize_timestamp(&project.last_updated, Some(&created_at));
-
-    Ok(ImportedProject {
-        id,
-        title,
-        description: project.description.trim().to_string(),
-        status: normalize_project_status(&project.status),
-        priority: normalize_priority(&project.priority),
-        created_at,
-        last_updated,
-        order: project.order.unwrap_or(index as i64).max(0),
-    })
-}
-
-fn normalize_task(
-    index: usize,
-    task: LegacyTaskWire,
-    project_ids: &HashSet<String>,
-) -> Result<ImportedTask, ImportLegacyError> {
-    let id = require_text(task.id, "task.id")?;
-    let project_id = require_text(task.project_id, "task.projectId")?;
-    if !project_ids.contains(&project_id) {
-        return Err(ImportLegacyError::InvalidData(format!(
-            "task {id} references missing project {project_id}"
-        )));
-    }
-
-    let title = require_text(task.title, "task.title")?;
-    let checklist = task
-        .checklist
-        .into_iter()
-        .enumerate()
-        .map(|(checklist_index, item)| normalize_checklist_item(checklist_index, item))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    Ok(ImportedTask {
-        id,
-        project_id,
-        title,
-        description: task.description.trim().to_string(),
-        priority: normalize_priority(&task.priority),
-        due_date: normalize_optional_text(task.due_date),
-        labels: task
-            .labels
-            .into_iter()
-            .filter_map(|label| {
-                let normalized = label.trim().to_string();
-                if normalized.is_empty() {
-                    None
-                } else {
-                    Some(normalized)
-                }
-            })
-            .collect(),
-        checklist,
-        is_running: task.is_running,
-        total_seconds: task.total_seconds.max(0),
-        last_started: normalize_optional_text(task.last_started),
-        completed: task.completed,
-        order: task.order.unwrap_or(index as i64).max(0),
-        created_at: normalize_timestamp(&task.created_at, None),
-    })
-}
-
-fn normalize_checklist_item(
-    index: usize,
-    item: LegacyChecklistItemWire,
-) -> Result<ImportedChecklistItem, ImportLegacyError> {
-    Ok(ImportedChecklistItem {
-        id: require_text(item.id, "task.checklist.id")?,
-        text: require_text(item.text, "task.checklist.text")?,
-        done: item.done,
-        order: index as i64,
-    })
-}
-
-fn normalize_activity_entry(
-    _index: usize,
-    entry: LegacyActivityEntryWire,
-) -> Result<Option<ImportedActivityEntry>, ImportLegacyError> {
-    let id = match normalize_optional_text(Some(entry.id)) {
-        Some(value) => value,
-        None => return Ok(None),
-    };
-    let entity_id = match normalize_optional_text(Some(entry.entity_id)) {
-        Some(value) => value,
-        None => return Ok(None),
-    };
-    let action = match normalize_optional_text(Some(entry.action)) {
-        Some(value) => value,
-        None => return Ok(None),
-    };
-
-    let entity_type = match entry.entity_type.trim() {
-        "project" | "task" | "light" | "scene" | "audio" => entry.entity_type.trim().to_string(),
-        _ => return Ok(None),
-    };
-
-    Ok(Some(ImportedActivityEntry {
-        id,
-        timestamp: normalize_timestamp(&entry.timestamp, None),
-        entity_type,
-        entity_id,
-        action,
-        detail: entry.detail.trim().to_string(),
-    }))
-}
-
-fn normalize_settings(
-    settings: LegacySettingsWire,
-    project_ids: &HashSet<String>,
-    task_project_map: &HashMap<String, String>,
-    task_ids: &HashSet<String>,
-) -> ImportedSettings {
-    let dashboard_view = normalize_dashboard_view(&settings.dashboard_view);
-    let mut selected_project_id = normalize_optional_text(settings.selected_project_id);
-    let mut selected_task_id = normalize_optional_text(settings.selected_task_id);
-
-    if selected_project_id
-        .as_ref()
-        .is_some_and(|project_id| !project_ids.contains(project_id))
-    {
-        selected_project_id = None;
-    }
-
-    if selected_task_id
-        .as_ref()
-        .is_some_and(|task_id| !task_ids.contains(task_id))
-    {
-        selected_task_id = None;
-    }
-
-    if selected_project_id.is_none() {
-        selected_project_id = selected_task_id
-            .as_ref()
-            .and_then(|task_id| task_project_map.get(task_id))
-            .cloned();
-    }
-
-    if selected_task_id.as_ref().is_some_and(|task_id| {
-        selected_project_id
-            .as_ref()
-            .and_then(|project_id| {
-                task_project_map
-                    .get(task_id)
-                    .map(|task_project_id| task_project_id != project_id)
-            })
-            .unwrap_or(false)
-    }) {
-        selected_task_id = None;
-    }
-
+fn normalize_settings(settings: LegacySettingsWire) -> ImportedSettings {
     let commissioning_completed = settings.has_completed_setup;
 
     ImportedSettings {
-        view_filter: normalize_view_filter(&settings.view_filter),
-        sort_by: normalize_sort_by(&settings.sort_by),
-        dashboard_view: dashboard_view.clone(),
-        deck_mode: normalize_deck_mode(&settings.deck_mode),
-        selected_project_id,
-        selected_task_id,
         commissioning_completed,
         commissioning_runner_stage: if commissioning_completed {
             String::from("publish")
@@ -520,87 +162,17 @@ fn normalize_settings(
         } else {
             String::from("setup-required")
         },
-        shell_workspace: String::from(dashboard_view_to_workspace(&dashboard_view)),
+        shell_workspace: String::from(dashboard_view_to_workspace(&settings.dashboard_view)),
     }
 }
 
-fn require_text(value: String, field: &str) -> Result<String, ImportLegacyError> {
-    normalize_optional_text(Some(value)).ok_or_else(|| {
-        ImportLegacyError::InvalidData(format!(
-            "{field} is required and must be a non-empty string"
-        ))
-    })
-}
-
-fn normalize_optional_text(value: Option<String>) -> Option<String> {
-    value
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
-
-fn normalize_timestamp(value: &str, fallback: Option<&str>) -> String {
-    let normalized = value.trim();
-    if !normalized.is_empty() {
-        return normalized.to_string();
-    }
-
-    fallback
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or(DEFAULT_TIMESTAMP)
-        .to_string()
-}
-
-fn normalize_project_status(value: &str) -> String {
+/// The page a legacy db.json opens on, from its dashboard view. Its Planning
+/// board (`kanban`), and anything else that is not Lighting, opens the
+/// Console since Planning left the app (new pages program, D1).
+fn dashboard_view_to_workspace(value: &str) -> &'static str {
     match value.trim() {
-        "in-progress" => String::from("in-progress"),
-        "blocked" => String::from("blocked"),
-        "done" => String::from("done"),
-        _ => String::from("todo"),
-    }
-}
-
-fn normalize_priority(value: &str) -> String {
-    match value.trim() {
-        "p0" => String::from("p0"),
-        "p1" => String::from("p1"),
-        "p3" => String::from("p3"),
-        _ => String::from("p2"),
-    }
-}
-
-fn normalize_view_filter(value: &str) -> String {
-    match value.trim() {
-        "todo" => String::from("todo"),
-        "in-progress" => String::from("in-progress"),
-        "blocked" => String::from("blocked"),
-        "done" => String::from("done"),
-        _ => String::from("all"),
-    }
-}
-
-fn normalize_sort_by(value: &str) -> String {
-    match value.trim() {
-        "priority" => String::from("priority"),
-        "date" => String::from("date"),
-        "name" => String::from("name"),
-        _ => String::from("manual"),
-    }
-}
-
-fn normalize_dashboard_view(value: &str) -> String {
-    match value.trim() {
-        "lighting" => String::from("lighting"),
-        "audio" => String::from("audio"),
-        _ => String::from("kanban"),
-    }
-}
-
-fn normalize_deck_mode(value: &str) -> String {
-    match value.trim() {
-        "light" => String::from("light"),
-        "audio" => String::from("audio"),
-        _ => String::from("project"),
+        "lighting" => "lighting",
+        _ => "audio",
     }
 }
 
@@ -615,22 +187,78 @@ mod tests {
         assert_eq!(error, "path is required and must be a non-empty string");
     }
 
+    // New pages program, Slice 2: the page a db.json opens on is Lighting or
+    // the Console; its Planning board (and any other view) opens the Console
+    // (D1). Before Slice 2 the Planning board opened Planning.
     #[test]
-    fn normalize_settings_derives_project_from_selected_task() {
-        let settings = LegacySettingsWire {
-            selected_task_id: Some(String::from("task-1")),
-            ..LegacySettingsWire::default()
-        };
-        let project_ids = HashSet::from([String::from("proj-1")]);
-        let task_project_map = HashMap::from([(String::from("task-1"), String::from("proj-1"))]);
-        let task_ids = HashSet::from([String::from("task-1")]);
+    fn a_planning_board_opens_the_console() {
+        for (dashboard_view, workspace) in [
+            ("kanban", "audio"),
+            ("planning", "audio"),
+            ("", "audio"),
+            ("audio", "audio"),
+            ("lighting", "lighting"),
+            (" lighting ", "lighting"),
+        ] {
+            let normalized = normalize_settings(LegacySettingsWire {
+                dashboard_view: String::from(dashboard_view),
+                has_completed_setup: false,
+            });
+            assert_eq!(normalized.shell_workspace, workspace, "{dashboard_view:?}");
+            assert_eq!(normalized.commissioning_runner_stage, "import");
+            assert_eq!(normalized.commissioning_stage, "setup-required");
+            assert!(!normalized.commissioning_completed);
+        }
 
-        let normalized = normalize_settings(settings, &project_ids, &task_project_map, &task_ids);
+        let completed = normalize_settings(LegacySettingsWire {
+            dashboard_view: String::from("kanban"),
+            has_completed_setup: true,
+        });
+        assert!(completed.commissioning_completed);
+        assert_eq!(completed.commissioning_runner_stage, "publish");
+        assert_eq!(completed.commissioning_stage, "ready");
+    }
 
-        assert_eq!(normalized.selected_project_id.as_deref(), Some("proj-1"));
-        assert_eq!(normalized.selected_task_id.as_deref(), Some("task-1"));
-        assert_eq!(normalized.shell_workspace, "planning");
-        assert_eq!(normalized.commissioning_runner_stage, "import");
-        assert_eq!(normalized.commissioning_stage, "setup-required");
+    // New pages program, Slice 2: a db.json's Planning part is not read, so
+    // Planning data the old import refused (a task whose project is missing,
+    // a project without an id) no longer stops the setup flag and the page.
+    #[test]
+    fn the_planning_part_of_a_db_json_is_ignored() {
+        let directory = std::env::temp_dir().join(format!(
+            "studio-control-legacy-import-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0)
+        ));
+        fs::create_dir_all(&directory).expect("test dir should be created");
+        let source = directory.join("db.json");
+        fs::write(
+            &source,
+            serde_json::to_vec(&json!({
+                "schemaVersion": 8,
+                "projects": [{ "title": "No id" }],
+                "tasks": [{ "id": "task-1", "projectId": "missing", "title": "Orphan" }],
+                "activityLog": "not even a list",
+                "settings": {
+                    "viewFilter": "done",
+                    "selectedProjectId": "missing",
+                    "deckMode": "project",
+                    "dashboardView": "lighting",
+                    "hasCompletedSetup": true
+                }
+            }))
+            .expect("the db.json should serialize"),
+        )
+        .expect("the db.json should be written");
+
+        let payload = load_legacy_import_payload(&source).expect("the db.json should load");
+        let _ = fs::remove_dir_all(&directory);
+
+        assert_eq!(payload.source_schema_version, 8);
+        assert_eq!(payload.settings.shell_workspace, "lighting");
+        assert!(payload.settings.commissioning_completed);
+        assert_eq!(payload.settings.commissioning_stage, "ready");
     }
 }

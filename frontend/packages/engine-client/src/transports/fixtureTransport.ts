@@ -3,7 +3,14 @@ import { handleFixtureLightingRequest } from "./fixture/lightingRequests";
 import { handleFixtureAudioRequest } from "./fixture/audioRequests";
 import { handleFixtureSetupRequest } from "./fixture/setupRequests";
 import type { FixtureScenario, EngineTransport } from "../types";
-import type { EventEnvelope, EventName, JsonObject, RequestMethod, JsonValue } from "../generated/protocol";
+import {
+  PROTOCOL_VERSION,
+  type EventEnvelope,
+  type EventName,
+  type JsonObject,
+  type RequestMethod,
+  type JsonValue,
+} from "../generated/protocol";
 import { createMutableFixtureState, synchronizeFixtureState } from "./fixture/state";
 import { recordUiActions } from "./fixture/actionLog";
 import { fixtureEvent, asRecord, cloneJson } from "./fixture/json";
@@ -86,7 +93,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
     switch (method) {
       case "engine.ping":
         return {
-          protocol: "1",
+          protocol: PROTOCOL_VERSION,
           engineVersion: "fixture",
         };
       case "health.snapshot":
@@ -131,7 +138,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         emit(
           startupFailure ? "engine.startupFailed" : "engine.ready",
           startupFailure ?? {
-            protocol: "1",
+            protocol: PROTOCOL_VERSION,
             engineVersion: "fixture",
           }
         );

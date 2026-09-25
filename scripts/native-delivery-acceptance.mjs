@@ -4,6 +4,13 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import {
+  assertContinuitySentinel,
+  assertSavedWorkspace,
+  createContinuitySentinel,
+  IMPORTED_WORKSPACE,
+  SAVED_DATA_MARKER_CHANGED,
+} from "./native-parity-acceptance.mjs";
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
@@ -17,6 +24,9 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
+// New pages program, Slice 2: the sentinel is a lighting group; until then it
+// was a Planning project (see createContinuitySentinel).
+const sentinelGroupName = "Delivery Continuity Sentinel";
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
 ];
@@ -227,7 +237,10 @@ async function main() {
   const installedPayloadPath = path.join(acceptanceRoot, "installed", releaseIdentity.payloadNames[target]);
 
   console.log(`Native delivery acceptance root: ${acceptanceRoot}`);
-  console.log("Step 1: install the staged offline-installer payload and import workstation data.");
+  console.log(SAVED_DATA_MARKER_CHANGED);
+  console.log(
+    "Step 1: install the staged offline-installer payload and import workstation data (its setup flag and page)."
+  );
 
   installPayload(installerPayloadPath, installedPayloadPath);
   let installed = resolveInstalledRuntime(target, installedPayloadPath);
@@ -235,7 +248,11 @@ async function main() {
     SSE_LEGACY_DB_PATH: fixturePath,
   });
 
-  console.log("Step 2: unlock dashboard and persist an operator sentinel through the installed runtime.");
+  console.log(
+    "Step 2: unlock dashboard and persist an operator sentinel (a lighting group) through the installed runtime."
+  );
+
+  let sentinel;
 
   const firstRun = new EngineHarness({
     rootDir,
@@ -252,17 +269,19 @@ async function main() {
     await assertSafeBundledSqlite(firstRun, "delivery-installed", `Installed ${installed.label} engine`);
 
     const initialAppSnapshot = await firstRun.request("delivery-app-installed", "app.snapshot");
-    const initialPlanningSnapshot = await firstRun.request("delivery-planning-installed", "planning.snapshot");
 
     assert(
       initialAppSnapshot.startup?.targetSurface === "commissioning",
       `Expected staged installer payload to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    assert(
-      initialPlanningSnapshot.counts?.projectCount === 2,
-      "Expected staged installer payload project count to be 2."
+    // The import is seen by the page it wrote: new saved data opens on the
+    // Console, the fixture on Lighting.
+    assertSavedWorkspace(
+      initialAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Installed ${installed.label} engine`,
+      "after the import"
     );
-    assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected staged installer payload task count to be 3.");
 
     const commissioningUpdate = await firstRun.request("delivery-commissioning-ready", "commissioning.update", {
       stage: "ready",
@@ -272,17 +291,18 @@ async function main() {
       `Expected staged installer payload to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
     );
 
-    await firstRun.request("delivery-planning-project-create", "planning.project.create", {
-      title: "Delivery Continuity Sentinel",
-      description: "Temporary project used to verify staged install/update/reinstall continuity.",
-      status: "todo",
-      priority: "p2",
-    });
-
-    const mutatedPlanningSnapshot = await firstRun.request("delivery-planning-mutated", "planning.snapshot");
-    assert(
-      mutatedPlanningSnapshot.counts?.projectCount === 3,
-      "Expected continuity sentinel mutation to increase project count to 3."
+    sentinel = await createContinuitySentinel(
+      firstRun,
+      "delivery-installed",
+      sentinelGroupName,
+      `Installed ${installed.label} engine`
+    );
+    await assertContinuitySentinel(
+      firstRun,
+      "delivery-installed",
+      sentinel,
+      `Installed ${installed.label} engine`,
+      "after the sentinel was created"
     );
   } finally {
     await firstRun.close().catch((error) => {
@@ -313,7 +333,6 @@ async function main() {
     await assertSafeBundledSqlite(secondRun, "delivery-updated", `Updated ${installed.label} engine`);
 
     const updatedAppSnapshot = await secondRun.request("delivery-app-updated", "app.snapshot");
-    const updatedPlanningSnapshot = await secondRun.request("delivery-planning-updated", "planning.snapshot");
 
     assert(
       updatedAppSnapshot.startup?.targetSurface === "dashboard",
@@ -323,13 +342,18 @@ async function main() {
       updatedAppSnapshot.commissioning?.stage === "ready",
       `Expected staged update payload commissioning stage to remain ready, got '${updatedAppSnapshot.commissioning?.stage}'.`
     );
-    assert(
-      updatedPlanningSnapshot.counts?.projectCount === 3,
-      "Expected staged update payload to preserve project count 3."
+    assertSavedWorkspace(
+      updatedAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Updated ${installed.label} engine`,
+      "after the update"
     );
-    assert(
-      updatedPlanningSnapshot.projects?.some((project) => project.title === "Delivery Continuity Sentinel"),
-      "Expected staged update payload to preserve the continuity sentinel project."
+    await assertContinuitySentinel(
+      secondRun,
+      "delivery-updated",
+      sentinel,
+      `Updated ${installed.label} engine`,
+      "after the update"
     );
   } finally {
     await secondRun.close().catch((error) => {
@@ -360,7 +384,6 @@ async function main() {
     await assertSafeBundledSqlite(thirdRun, "delivery-reinstalled", `Reinstalled ${installed.label} engine`);
 
     const reinstalledAppSnapshot = await thirdRun.request("delivery-app-reinstalled", "app.snapshot");
-    const reinstalledPlanningSnapshot = await thirdRun.request("delivery-planning-reinstalled", "planning.snapshot");
 
     assert(
       reinstalledAppSnapshot.startup?.targetSurface === "dashboard",
@@ -370,13 +393,18 @@ async function main() {
       reinstalledAppSnapshot.commissioning?.stage === "ready",
       `Expected staged reinstall payload commissioning stage to remain ready, got '${reinstalledAppSnapshot.commissioning?.stage}'.`
     );
-    assert(
-      reinstalledPlanningSnapshot.counts?.projectCount === 3,
-      "Expected staged reinstall payload to preserve project count 3."
+    assertSavedWorkspace(
+      reinstalledAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Reinstalled ${installed.label} engine`,
+      "after the reinstall"
     );
-    assert(
-      reinstalledPlanningSnapshot.projects?.some((project) => project.title === "Delivery Continuity Sentinel"),
-      "Expected staged reinstall payload to preserve the continuity sentinel project."
+    await assertContinuitySentinel(
+      thirdRun,
+      "delivery-reinstalled",
+      sentinel,
+      `Reinstalled ${installed.label} engine`,
+      "after the reinstall"
     );
 
     const exportSummary = await thirdRun.request("delivery-support-backup-export", "support.backup.export");

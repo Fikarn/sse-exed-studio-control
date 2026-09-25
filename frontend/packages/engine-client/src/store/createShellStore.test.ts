@@ -146,7 +146,7 @@ function supervisedTransport() {
       // (`null`, which the Slice 9 guards accept as "nothing there yet" — an
       // object without its lists is refused), and every other answer is the
       // smallest object the store accepts (the ping's protocol).
-      return TYPED_SNAPSHOT_REQUESTS.has(method) ? null : { protocol: "1" };
+      return TYPED_SNAPSHOT_REQUESTS.has(method) ? null : { protocol: "2" };
     },
     subscribe: (listener) => {
       listeners.add(listener);
@@ -450,10 +450,6 @@ describe("createShellStore scoped refresh", () => {
       "engine.ready": [],
       "engine.startupFailed": [],
       "lighting.changed": ["lighting.dmxMonitor.snapshot", "lighting.snapshot"],
-      // Planning left the screen (new pages program, Slice 1); until Slice 2 the
-      // hardware link still counts its projects and tasks in the commissioning
-      // snapshot, whose summary Setup prints.
-      "planning.changed": ["commissioning.snapshot"],
       "settings.changed": ["app.snapshot"],
       "support.changed": ["support.snapshot"],
     };
@@ -610,7 +606,8 @@ describe("createShellStore scoped refresh", () => {
     await store.dispose();
   });
 
-  // An applied archive restore raises five events in one reply. Asked for
+  // An applied archive restore raises four events in one reply (five until
+  // planning.changed left with Planning, new pages program Slice 2). Asked for
   // together they go out as one batch — each snapshot once, where five full
   // refreshes used to cost fifty requests.
   it("events raised together are fetched as one batch", async () => {
@@ -619,13 +616,7 @@ describe("createShellStore scoped refresh", () => {
     await store.initialize();
 
     calls.length = 0;
-    for (const event of [
-      "support.changed",
-      "settings.changed",
-      "app.changed",
-      "commissioning.changed",
-      "planning.changed",
-    ] as const) {
+    for (const event of ["support.changed", "settings.changed", "app.changed", "commissioning.changed"] as const) {
       emit(changed(event, "backup-restored"));
     }
     await tick();
@@ -682,7 +673,9 @@ describe("createShellStore scoped refresh", () => {
     const waiting = store.setLightingAllPower(true);
     await tick();
     calls.length = 0;
-    emit(changed("planning.changed", "task-created"));
+    // New pages program, Slice 2: support.changed stands in for planning.changed,
+    // which left the protocol; either names one snapshot the stall does not hold.
+    emit(changed("support.changed", "backup-exported"));
     await tick();
     expect(snapshotRequests()).toEqual([]);
 
@@ -692,9 +685,9 @@ describe("createShellStore scoped refresh", () => {
     await expect(waiting).resolves.toBeDefined();
 
     calls.length = 0;
-    emit(changed("planning.changed", "task-created"));
+    emit(changed("support.changed", "backup-exported"));
     await tick();
-    expect(snapshotRequests()).toEqual(["commissioning.snapshot"]);
+    expect(snapshotRequests()).toEqual(["support.snapshot"]);
     await store.dispose();
   });
 
@@ -710,7 +703,9 @@ describe("createShellStore scoped refresh", () => {
     // that names neither leaves the workspace and the recovery state alone.
     answer("app.snapshot", { shell: { workspace: "audio" }, startup: { targetSurface: "dashboard" } });
     answer("health.snapshot", { status: "attention" });
-    emit(changed("planning.changed", "task-created"));
+    // New pages program, Slice 2: support.changed stands in for planning.changed,
+    // which left the protocol; neither names the app or the health snapshot.
+    emit(changed("support.changed", "backup-exported"));
     await tick();
     expect(store.getSnapshot().activeWorkspace).toBe("lighting");
     expect(store.getSnapshot().appSnapshot).toBe(appSnapshot);

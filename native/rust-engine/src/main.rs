@@ -20,8 +20,6 @@ mod lighting_backend;
 mod lighting_sacn_output;
 #[cfg(feature = "dev-fixtures")]
 mod parity_fixtures;
-mod planning;
-mod planning_settings;
 mod protocol;
 mod rme_console_link;
 mod rme_totalmix_osc;

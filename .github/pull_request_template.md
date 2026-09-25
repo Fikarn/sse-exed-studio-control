@@ -40,7 +40,6 @@ GitHub Actions are merge hygiene, not release acceptance evidence. Record local 
 
 ## Product Areas
 
-- [ ] Planning / dashboard
 - [ ] Lighting
 - [ ] Audio
 - [ ] Setup / commissioning

@@ -15,8 +15,19 @@ import {
   countControls,
   buildFixtureBackupEntry,
   findFixtureBackup,
+  type MutableFixtureState,
 } from "./state";
 import type { CommissioningStage, RunnerStage, CommissioningCheckTarget } from "../../types";
+
+// New pages program, Slice 2 (D3), mirroring `native/rust-engine/src/support.rs`: the
+// hardware link writes backup archives of format 5, which carry no Planning. The archives
+// this double exported are those; any other archive in its backups folder (the scenarios'
+// own, from April 2026) was written before Planning left, as format 4. The double never
+// held Planning data, so neither kind holds any, and Verify and the restore say nothing of
+// a Planning part (the hardware link adds its sentence only for a backup that holds some).
+const exportedArchivePaths = new WeakMap<MutableFixtureState, Set<string>>();
+const ARCHIVE_FORMAT_VERSION = 5;
+const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
 /** Setup / Support's requests: shell settings, commissioning, backups, the Stream Deck profile export. */
 export function handleFixtureSetupRequest(
@@ -206,15 +217,17 @@ export function handleFixtureSetupRequest(
         .filter((entry): entry is JsonObject => entry !== null);
       backups.unshift(backupEntry);
       state.supportSnapshot.backups = backups;
+      const exported = exportedArchivePaths.get(state) ?? new Set<string>();
+      exported.add(backupEntry.path);
+      exportedArchivePaths.set(state, exported);
       synchronizeFixtureState(state);
       emit("support.changed", { reason: "backup-exported" });
-      // New pages program, Slice 1: the double holds no Planning data, so its
-      // replies no longer count projects, tasks, checklist items or activity
-      // (the hardware link still does until Slice 2; nothing on screen reads them).
+      // The hardware link's reply: the file and its format. Since Slice 2 of the new pages
+      // program it counts no projects, tasks or activity entries (the double stopped in
+      // Slice 1); it never carried an `actionCount`.
       return {
-        actionCount: countControls(state),
         fileName: backupEntry.name,
-        formatVersion: 4,
+        formatVersion: ARCHIVE_FORMAT_VERSION,
         path: backupEntry.path,
       };
     }
@@ -232,9 +245,12 @@ export function handleFixtureSetupRequest(
         };
       }
       const exportedAt = new Date(asNumber(match?.modifiedAt, Date.now())).toISOString();
+      const formatVersion = exportedArchivePaths.get(state)?.has(path)
+        ? ARCHIVE_FORMAT_VERSION
+        : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
       return {
-        detail: `Backup archive, format 4, exported ${exportedAt}.`,
-        formatVersion: 4,
+        detail: `Backup archive, format ${formatVersion}, exported ${exportedAt}.`,
+        formatVersion,
         kind,
         ok: true,
         path,
@@ -267,10 +283,13 @@ export function handleFixtureSetupRequest(
         emit("commissioning.changed", { reason: "backup-restored" });
         emit("app.changed", { reason: "backup-restored" });
       }
+      // No Planning counts and no `detail` (the double's backups hold no Planning data).
+      // A legacy db.json restores only whether setup is complete and the page to open —
+      // the three setup keys and the page (interim until Slice 2b retires the import).
       return {
         requiresRestart: databaseRestore,
         rollbackBackupPath: buildFixtureBackupEntry(state).path,
-        settingsRestored: 12,
+        settingsRestored: legacyImport ? 4 : 12,
         sourceFormat: databaseRestore ? "database-backup" : legacyImport ? "legacy-db-json" : "native-support-backup",
         sourcePath: path,
       };

@@ -35,17 +35,15 @@ pub(crate) const AUDIO_LCD_KEYS: &[&str] = &[
     "workspace",
 ];
 
-pub(crate) const LEGACY_LCD_KEYS: &[&str] = &[
-    "project_nav",
-    "project_status",
-    "project_priority",
-    "sort_mode",
-    "task_nav",
-    "light_nav",
-    "light_intensity",
-    "light_cct",
-    "scene_nav",
-];
+// The LIGHTS page's LCD keys: not polled. The lighting page-follow trigger
+// refreshes all four as the deck arrives on LIGHTS, and the Light dial's press
+// refreshes `light_nav`, `light_intensity` and `light_cct`; the dial turns and
+// the scene keys refresh none of them. (New pages program, Slice 2: the
+// Planning keys `project_nav`, `project_status`, `project_priority`,
+// `sort_mode` and `task_nav` left with the PROJECTS and TASKS pages; the list
+// was called `LEGACY_LCD_KEYS` until then.)
+pub(crate) const LIGHT_LCD_KEYS: &[&str] =
+    &["light_nav", "light_intensity", "light_cct", "scene_nav"];
 
 pub(crate) const AUDIO_STRIP_TEXT_KEYS: &[&str] = &[
     "audio_strip_1",
@@ -214,13 +212,15 @@ pub(crate) fn generate_companion_custom_variables() -> Value {
     let mut variables = Map::new();
     for (sort_order, key) in AUDIO_LCD_KEYS
         .iter()
-        .chain(LEGACY_LCD_KEYS.iter())
+        .chain(LIGHT_LCD_KEYS.iter())
         .enumerate()
     {
         variables.insert(
             format!("lcd_{key}"),
             json!({
-                "description": "SSE deck LCD text (engine-owned, polled from the bridge)",
+                // Companion shows this to whoever opens its variables, so it
+                // names the hardware link, not the engine (new pages program).
+                "description": "SSE deck LCD text (kept by the Studio Control hardware link)",
                 "defaultValue": "",
                 "persistCurrentValue": false,
                 "sortOrder": sort_order

@@ -438,6 +438,14 @@
     text-align: left;
   }
 
+  /* A key the page leaves blank, drawn where the deck has it (new pages
+     program, Slice 2: LIGHTS starts at place 2). */
+  .deckSlot {
+    min-height: 92px;
+    border: 1px dashed var(--color-border-default);
+    border-radius: var(--radius-screen);
+  }
+
   .deckButton[data-selected="true"] {
     border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     /* Slice 9 (system §5): a selected key is marked by its edge. */

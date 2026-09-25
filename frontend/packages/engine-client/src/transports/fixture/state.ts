@@ -159,49 +159,53 @@ export function countControls(state: MutableFixtureState) {
   }, 0);
 }
 
+/**
+ * The deck's pages as the hardware link's `build_control_surface_snapshot`
+ * models them (new pages program, Slice 2: PROJECTS and TASKS left with
+ * Planning, so LIGHTS is page 1 and AUDIO page 2). The shape and the counts
+ * are the hardware link's: LIGHTS has seven keys, at places 2–8 (place 1 held
+ * `<< PROJ`); AUDIO has eight keys and four touch-strip cells, at places 1–12;
+ * each page has four dials that are pressed and turned either way, three
+ * controls apiece — 43 controls in all. The labels stay the double's own.
+ */
 export function buildDefaultControlSurfaceSnapshot(): JsonObject {
-  const makeButtons = (pageId: string, prefix: string) =>
-    Array.from({ length: 8 }, (_, index) => ({
-      id: `${pageId}-button-${index + 1}`,
+  const makeButtons = (pageId: string, prefix: string, positions: number[]) =>
+    positions.map((position, index) => ({
+      id: `${pageId}-btn-${position}`,
       type: "button",
-      position: index + 1,
+      position,
       label: `${prefix} ${index + 1}`,
       description: `${prefix} action ${index + 1} is mapped through the native control-surface bridge.`,
     }));
 
+  const dialMotions = [
+    { motion: "press", type: "dial-press", label: "" },
+    { motion: "left", type: "dial-turn-left", label: " left" },
+    { motion: "right", type: "dial-turn-right", label: " right" },
+  ];
   const makeDials = (pageId: string, prefix: string) =>
-    Array.from({ length: 4 }, (_, index) => ({
-      id: `${pageId}-dial-${index + 1}`,
-      type: "dial",
-      position: index + 1,
-      label: `${prefix} ${index + 1}`,
-      description: `${prefix} dial ${index + 1} is available for live verification.`,
-    }));
+    [1, 2, 3, 4].flatMap((position) =>
+      dialMotions.map(({ motion, type, label }) => ({
+        id: `${pageId}-dial-${position}-${motion}`,
+        type,
+        position,
+        label: `${prefix} ${position}${label}`,
+        description: `${prefix} dial ${position} is available for live verification.`,
+      }))
+    );
 
   return {
     pages: [
       {
-        id: "projects",
-        label: "PROJECTS",
-        buttons: makeButtons("projects", "Project"),
-        dials: makeDials("projects", "Navigate"),
-      },
-      {
-        id: "tasks",
-        label: "TASKS",
-        buttons: makeButtons("tasks", "Task"),
-        dials: makeDials("tasks", "Task Dial"),
-      },
-      {
         id: "lights",
         label: "LIGHTS",
-        buttons: makeButtons("lights", "Light"),
+        buttons: makeButtons("lights", "Light", [2, 3, 4, 5, 6, 7, 8]),
         dials: makeDials("lights", "Intensity"),
       },
       {
         id: "audio",
         label: "AUDIO",
-        buttons: makeButtons("audio", "Channel"),
+        buttons: makeButtons("audio", "Channel", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
         dials: makeDials("audio", "Gain"),
       },
     ],

@@ -12,14 +12,18 @@ fn truncate_limits_long_text() {
     assert_eq!(truncate("Very Long Fixture Name", 12), "Very Long Fi");
 }
 
+// A four-value cycle (new pages program, Slice 2: until then the Planning
+// project statuses, which left with the page).
+const FOUR_VALUES: &[&str] = &["one", "two", "three", "four"];
+
 #[test]
 fn cycle_value_wraps_forward() {
-    assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "done", true), "todo");
+    assert_eq!(cycle_value(FOUR_VALUES, "four", true), "one");
 }
 
 #[test]
 fn cycle_value_wraps_backward() {
-    assert_eq!(cycle_value(PROJECT_STATUS_CYCLE, "todo", false), "done");
+    assert_eq!(cycle_value(FOUR_VALUES, "one", false), "four");
 }
 
 #[test]
@@ -144,15 +148,17 @@ fn workspace_lcd_key_reads_shell_workspace() {
         DEFAULT_WORKSPACE
     );
 
+    // New pages program, D1: the default is the Console (`audio`) now, so the
+    // stored page that proves the key reads the setting is Lighting.
     set_settings_owned(
         test_dir.db_path().as_path(),
-        &[(String::from(WORKSPACE_KEY), String::from("audio"))],
+        &[(String::from(WORKSPACE_KEY), String::from("lighting"))],
     )
     .expect("workspace should persist");
     assert_eq!(
         read_control_surface_lcd_text(test_dir.db_path().as_path(), "workspace")
             .expect("workspace key should render"),
-        "audio"
+        "lighting"
     );
 }
 
@@ -178,6 +184,41 @@ fn context_includes_workspace_and_audio_deck_block() {
     assert_eq!(context["audio"]["strips"][3]["kind"], "empty");
 }
 
+// New pages program, Slice 2: the Planning LCD keys and the Planning
+// selection in the deck context left with the page.
+#[test]
+fn planning_lcd_keys_and_context_are_gone() {
+    let test_dir = ready_audio_test_db("lcd-planning");
+    let db_path = test_dir.db_path();
+    for key in [
+        "project_nav",
+        "project_status",
+        "project_priority",
+        "sort_mode",
+        "task_nav",
+    ] {
+        assert!(
+            matches!(
+                read_control_surface_lcd_text(db_path.as_path(), key),
+                Err(ControlSurfaceError::InvalidParams(_))
+            ),
+            "{key} still answers"
+        );
+    }
+    let context = read_control_surface_context(db_path.as_path()).expect("context should load");
+    let mut fields = context
+        .as_object()
+        .expect("the context is an object")
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    fields.sort();
+    assert_eq!(
+        fields,
+        vec![String::from("audio"), String::from("workspace")]
+    );
+}
+
 #[test]
 fn legacy_audio_lcd_keys_are_gone() {
     let test_dir = ready_audio_test_db("lcd-legacy");
@@ -185,6 +226,41 @@ fn legacy_audio_lcd_keys_are_gone() {
         read_control_surface_lcd_text(test_dir.db_path().as_path(), "audio_ch_nav"),
         Err(ControlSurfaceError::InvalidParams(_))
     ));
+}
+
+// New pages program, Slice 2: the page keys posted `switchToDeckMode`, which
+// stored the deck's page as the Planning setting `planning.deck_mode`. Only
+// the Planning snapshot and the app snapshot's Planning block read it, and
+// both left; the deck follows the app through `shell.workspace` (the
+// `workspace` LCD key). The key is refused on both routes now, stores
+// nothing and stamps no event for Setup's echo.
+#[test]
+fn the_deck_mode_key_is_refused_and_stores_nothing() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_audio_test_db("deck-mode");
+    let db_path = test_dir.db_path();
+    let settings_before = list_settings_by_prefix(db_path.as_path(), "").expect("settings");
+
+    for (route, value) in [
+        ("/api/deck/light-action", "project"),
+        ("/api/deck/light-action", "light"),
+        ("/api/deck/audio-action", "audio"),
+    ] {
+        let refused = handle_control_surface_http_action(
+            db_path.as_path(),
+            route,
+            &json!({ "action": "switchToDeckMode", "value": value }),
+        )
+        .expect_err("the deck-mode key left with Planning");
+        assert_eq!(refused.status_code(), 501, "{route}: {}", refused.message());
+    }
+
+    assert_eq!(
+        list_settings_by_prefix(db_path.as_path(), "").expect("settings"),
+        settings_before,
+        "a refused deck-mode key writes nothing"
+    );
+    assert!(control_surface_last_event(db_path.as_path()).is_null());
 }
 
 #[test]
@@ -550,13 +626,14 @@ fn deck_save_scene_never_reuses_a_live_scene_id() {
 }
 
 // The screen follows the deck (Slice 10): a successful lighting key
-// raises lighting.changed, a planning key — and the deck mode, a planning
-// setting on the lighting route — planning.changed, both with the reason
-// `control-surface`. This is the one test that installs the process-wide
-// event sender; other tests' events land in the channel too, so it looks
-// for its own and ignores the rest.
+// raises lighting.changed with the reason `control-surface`. This is the one
+// test that installs the process-wide event sender; other tests' events land
+// in the channel too, so it looks for its own and ignores the rest. (New
+// pages program, Slice 2: the Planning keys and their planning.changed left,
+// and so did the deck-mode key, whose Planning setting raised it too; the
+// deck-mode key is refused now and raises nothing.)
 #[test]
-fn deck_light_and_planning_actions_raise_their_events() {
+fn deck_light_actions_raise_their_events() {
     assert_eq!(
         deck_change_event("/api/deck/light-action", "toggleLight"),
         Some(DeckChange::Lighting)
@@ -565,15 +642,7 @@ fn deck_light_and_planning_actions_raise_their_events() {
         deck_change_event("/api/deck/light-action", "selectNextScene"),
         Some(DeckChange::Lighting)
     );
-    assert_eq!(
-        deck_change_event("/api/deck/light-action", "switchToDeckMode"),
-        Some(DeckChange::Planning)
-    );
-    assert_eq!(
-        deck_change_event("/api/deck/action", "nextStatus"),
-        Some(DeckChange::Planning)
-    );
-    assert_eq!(deck_change_event("/api/deck/action", "openDetail"), None);
+    assert_eq!(deck_change_event("/api/deck/action", "nextStatus"), None);
     assert_eq!(
         deck_change_event("/api/deck/audio-action", "dialPress"),
         None,
@@ -603,21 +672,29 @@ fn deck_light_and_planning_actions_raise_their_events() {
     light_action(db_path, "toggleLight");
     assert!(raised("lighting.changed"));
 
-    handle_control_surface_http_action(
+    let deck_mode_key = handle_control_surface_http_action(
         db_path,
         "/api/deck/light-action",
         &json!({ "action": "switchToDeckMode", "value": "project" }),
     )
-    .expect("the deck mode should switch");
-    assert!(raised("planning.changed"));
+    .expect_err("the deck-mode key left with Planning");
+    assert_eq!(deck_mode_key.status_code(), 501);
+    assert!(
+        !raised("lighting.changed"),
+        "a refused deck-mode key raises nothing"
+    );
 
-    handle_control_surface_http_action(
+    let planning_key = handle_control_surface_http_action(
         db_path,
         "/api/deck/action",
         &json!({ "action": "nextSort" }),
     )
-    .expect("the sort should cycle");
-    assert!(raised("planning.changed"));
+    .expect_err("the Planning keys' route is gone");
+    assert_eq!(planning_key.status_code(), 400);
+    assert_eq!(
+        planning_key.message(),
+        "Unsupported action route: /api/deck/action"
+    );
 }
 
 // ---------------------------------------------------------------------

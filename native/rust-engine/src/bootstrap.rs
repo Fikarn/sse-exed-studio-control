@@ -12,10 +12,10 @@ use crate::legacy_import::LegacyImportRequest;
 use crate::lighting::{
     lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
 };
-use crate::planning::planning_data_present;
 use crate::storage::{
-    checkpoint_database, import_legacy_db, initialize_database, list_settings_by_prefix,
-    set_settings_owned_and, EngineResult, StorageBootstrap, StorageError, STORAGE_SCHEMA_VERSION,
+    checkpoint_database, import_legacy_db, initialize_database, legacy_import_finds_saved_data,
+    list_settings_by_prefix, set_settings_owned_and, EngineResult, StorageBootstrap, StorageError,
+    STORAGE_SCHEMA_VERSION,
 };
 use crate::storage_backups::{newest_snapshot, reserve_snapshot_path, SnapshotReason};
 use crate::support::{inspect_database_backup, prune_exports, RESTORE_PENDING_FILE_NAME};
@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-pub const SUPPORTED_PROTOCOL_VERSION: &str = "1";
+pub const SUPPORTED_PROTOCOL_VERSION: &str = "2";
 
 /// The directory name the Tauri shell uses under the platform app-data base
 /// (`native/tauri-shell/src/engine.rs`), so a bare engine launch and a
@@ -380,45 +380,9 @@ pub(crate) fn bootstrap_runtime_from_paths(
         )?,
     }
 
-    if !planning_data_present(&runtime_paths.db_path)? {
-        if let Some(source_path) = resolve_legacy_import_source(&runtime_paths.app_data_dir) {
-            match import_legacy_db(
-                &runtime_paths.db_path,
-                &LegacyImportRequest {
-                    source_path: source_path.clone(),
-                    force: false,
-                },
-            ) {
-                Ok(summary) => {
-                    append_log(
-                        &runtime_paths.log_file_path,
-                        "INFO",
-                        &format!(
-                            "Auto-imported legacy db from {}: {} projects, {} tasks",
-                            summary.source_path, summary.imported_projects, summary.imported_tasks
-                        ),
-                    )?;
-                }
-                Err(error) => {
-                    append_log(
-                        &runtime_paths.log_file_path,
-                        "WARN",
-                        &format!(
-                            "Legacy auto-import skipped or failed for {}: {}",
-                            source_path.display(),
-                            error
-                        ),
-                    )?;
-                }
-            }
-        } else {
-            append_log(
-                &runtime_paths.log_file_path,
-                "INFO",
-                "No legacy db.json source discovered for auto-import.",
-            )?;
-        }
-    }
+    auto_import_legacy_db(&runtime_paths, || {
+        resolve_legacy_import_source(&runtime_paths.app_data_dir)
+    })?;
 
     let control_surface_token =
         load_or_create_bridge_token(&runtime_paths.app_data_dir).map_err(std::io::Error::other)?;
@@ -781,6 +745,53 @@ fn storage_startup_failure(
     Box::new(failure)
 }
 
+/// The one-way db.json import at a start. It runs only into saved data it
+/// would not replace — no completed setup and no earlier import (new pages
+/// program, Slice 2: the gate was an empty Planning projects table, which
+/// schema 8 drops) — and only when there is a source. Slice 2b retires it.
+fn auto_import_legacy_db(
+    runtime_paths: &RuntimePaths,
+    resolve_source: impl FnOnce() -> Option<PathBuf>,
+) -> EngineResult<()> {
+    if legacy_import_finds_saved_data(&runtime_paths.db_path)? {
+        return Ok(());
+    }
+    let Some(source_path) = resolve_source() else {
+        append_log(
+            &runtime_paths.log_file_path,
+            "INFO",
+            "No legacy db.json source discovered for auto-import.",
+        )?;
+        return Ok(());
+    };
+    match import_legacy_db(
+        &runtime_paths.db_path,
+        &LegacyImportRequest {
+            source_path: source_path.clone(),
+            force: false,
+        },
+    ) {
+        Ok(summary) => append_log(
+            &runtime_paths.log_file_path,
+            "INFO",
+            &format!(
+                "Auto-imported legacy db from {}: {} settings (the setup flag and the page to open)",
+                summary.source_path, summary.updated_settings
+            ),
+        )?,
+        Err(error) => append_log(
+            &runtime_paths.log_file_path,
+            "WARN",
+            &format!(
+                "Legacy auto-import skipped or failed for {}: {}",
+                source_path.display(),
+                error
+            ),
+        )?,
+    }
+    Ok(())
+}
+
 fn resolve_legacy_import_source(app_data_dir: &Path) -> Option<PathBuf> {
     resolve_legacy_import_source_from(app_data_dir, |name| env::var_os(name))
 }
@@ -815,8 +826,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
-        current_runtime_platform, default_app_data_dir_for_platform,
+        acquire_instance_lock, apply_pending_restore, auto_import_legacy_db,
+        bootstrap_runtime_from_paths, current_runtime_platform, default_app_data_dir_for_platform,
         resolve_legacy_import_source_from, resolve_runtime_paths_from, safe_start_requested,
         startup_failure_code, storage_startup_failure, validate_protocol_version, RuntimePaths,
         RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME,
@@ -1071,6 +1082,95 @@ mod tests {
             resolve_legacy_import_source_from(app_data.path(), env_fixture(&[])),
             Some(staged.join("db.json"))
         );
+    }
+
+    // New pages program, Slice 2 (interim until Slice 2b): the start-up
+    // import writes the setup flag and the page, so it runs only into saved
+    // data it would not replace. New saved data takes it once; a later start
+    // with the same source leaves what the operator did since; a set-up desk
+    // never takes it. Before the slice the gate was an empty Planning projects
+    // table, so a set-up desk without Planning rows was imported over.
+    #[test]
+    fn the_start_up_import_never_replaces_saved_data() {
+        let staged = |test_dir: &TestDir, has_completed_setup: bool| {
+            let source = test_dir.path().join("import").join("db.json");
+            fs::create_dir_all(source.parent().expect("a parent")).expect("import dir");
+            fs::write(
+                &source,
+                format!(
+                    r#"{{"projects":[{{"id":"proj-1","title":"Old"}}],"settings":{{"dashboardView":"lighting","hasCompletedSetup":{has_completed_setup}}}}}"#
+                ),
+            )
+            .expect("the staged db.json should be written");
+            source
+        };
+        let page_and_setup = |paths: &RuntimePaths| {
+            let settings = list_settings_by_prefix(&paths.db_path, "").expect("settings");
+            (
+                settings.get("shell.workspace").cloned(),
+                settings.get("app.commissioning.completed").cloned(),
+            )
+        };
+
+        // New saved data: imported once.
+        let fresh = TestDir::new("auto-import-fresh");
+        let paths = runtime_paths_for(&fresh);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
+        let source = staged(&fresh, true);
+        auto_import_legacy_db(&paths, || Some(source.clone())).expect("the import runs");
+        assert_eq!(
+            page_and_setup(&paths),
+            (Some(String::from("lighting")), Some(String::from("true")))
+        );
+        // The operator moves on; the next start with the same source (now
+        // saying the setup is not done) changes nothing.
+        set_settings_owned(
+            &paths.db_path,
+            &[(String::from("shell.workspace"), String::from("audio"))],
+        )
+        .expect("the page should write");
+        let source = staged(&fresh, false);
+        auto_import_legacy_db(&paths, || Some(source.clone())).expect("the start goes on");
+        assert_eq!(
+            page_and_setup(&paths),
+            (Some(String::from("audio")), Some(String::from("true")))
+        );
+
+        // A set-up desk that never imported: the source is not even looked for.
+        let desk = TestDir::new("auto-import-desk");
+        let paths = runtime_paths_for(&desk);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
+        set_settings_owned(
+            &paths.db_path,
+            &[
+                (
+                    String::from("app.commissioning.completed"),
+                    String::from("true"),
+                ),
+                (
+                    String::from("app.commissioning.stage"),
+                    String::from("ready"),
+                ),
+                (String::from("shell.workspace"), String::from("audio")),
+            ],
+        )
+        .expect("the desk should be set up");
+        let source = staged(&desk, false);
+        let mut looked = false;
+        auto_import_legacy_db(&paths, || {
+            looked = true;
+            Some(source.clone())
+        })
+        .expect("the start goes on");
+        assert!(!looked, "a set-up desk does not look for a source");
+        assert_eq!(
+            page_and_setup(&paths),
+            (Some(String::from("audio")), Some(String::from("true")))
+        );
+        let log = fs::read_to_string(&paths.log_file_path).unwrap_or_default();
+        assert!(!log.contains("Auto-imported"), "{log}");
     }
 
     fn runtime_paths_for(test_dir: &TestDir) -> RuntimePaths {

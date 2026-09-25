@@ -21,7 +21,7 @@ vi.mock("@tauri-apps/api/core", () => ({
       if (calls.includes("fail:engine_start")) {
         throw new Error("engine_start refused");
       }
-      return { binary_path: "engine", generation: 3, pid: 4242, protocol: "1", running: true };
+      return { binary_path: "engine", generation: 3, pid: 4242, protocol: "2", running: true };
     }
     if (command === "engine_request") {
       const { request } = args as { request: { id: string; method: string } };

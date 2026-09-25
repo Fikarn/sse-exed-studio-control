@@ -4,24 +4,17 @@ use crate::app_state::{
 };
 use crate::bootstrap::RuntimeContext;
 use crate::commissioning::{
-    read_commissioning_snapshot, AUDIO_RECEIVE_PORT_KEY, AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY,
-    LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
+    read_commissioning_snapshot, retire_planning_probe_message, AUDIO_RECEIVE_PORT_KEY,
+    AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY, LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
 };
 use crate::diagnostics::append_log;
 use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
 use crate::lighting::{LIGHTING_OUTPUT_ARMED_KEY, LIGHTING_SELECTED_FIXTURE_ID_KEY};
-use crate::planning::{
-    read_planning_snapshot, PlanningActivityEntry, PlanningChecklistItem, PlanningProject,
-    PlanningTask,
-};
-use crate::planning_settings::{
-    DASHBOARD_VIEW_KEY, DECK_MODE_KEY, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY,
-    VIEW_FILTER_KEY,
-};
 use crate::shell_settings::{
-    ShellSettingsSnapshot, LIGHTING_CURRENT_SECTION_ID_KEY, LIGHTING_SCENE_THUMBS_KEY,
-    LIGHTING_TALENT_MARKS_KEY, SETUP_ACTIVE_SECTION_KEY, SHELL_SETTINGS_PREFIX, WINDOW_HEIGHT_KEY,
-    WINDOW_MAXIMIZED_KEY, WINDOW_MODE_KEY, WINDOW_WIDTH_KEY, WORKSPACE_KEY,
+    ShellSettingsSnapshot, DEFAULT_WORKSPACE, LIGHTING_CURRENT_SECTION_ID_KEY,
+    LIGHTING_SCENE_THUMBS_KEY, LIGHTING_TALENT_MARKS_KEY, SETUP_ACTIVE_SECTION_KEY,
+    SHELL_SETTINGS_PREFIX, WINDOW_HEIGHT_KEY, WINDOW_MAXIMIZED_KEY, WINDOW_MODE_KEY,
+    WINDOW_WIDTH_KEY, WORKSPACE_KEY,
 };
 use crate::storage::{
     import_legacy_db, list_settings_by_prefix, open_connection, run_integrity_check, EngineResult,
@@ -42,7 +35,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// mode and the deck's bank, dial mode and selections come back with a
 /// restore. A reader refuses an archive newer than itself
 /// (`SUPPORT_RESTORE_UNSUPPORTED_VERSION`); formats 2 and 3 still read.
-pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 4;
+///
+/// Format 5 (new pages program, Slice 2 — D3): Planning left Studio Control,
+/// and the archive no longer carries its `planning` part (projects, tasks and
+/// their checklists, the activity log, the `planning.*` settings). An archive
+/// of format 4 or older still restores; its Planning part is skipped, and
+/// Verify and the restore say so when it held any Planning data. A build
+/// before this one refuses a format-5 archive, by the rule above.
+pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 5;
 const SUPPORT_BACKUP_ARCHIVE_TYPE: &str = "native-support-backup";
 /// The two JSON archive names in the backups directory: the operator's
 /// exports and the rollback copies a restore writes first.
@@ -69,6 +69,20 @@ const LIGHTING_SETTINGS_PREFIX: &str = "app.lighting.";
 const AUDIO_SETTINGS_PREFIX: &str = "app.audio.";
 #[cfg(test)]
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
+/// Planning's four tables, which a database backup from before schema 8
+/// still holds (the schema-8 upgrade at the next start drops them), and its
+/// settings prefix. New pages program, Slice 2 (D2, D3).
+const PLANNING_TABLES: [&str; 4] = ["projects", "tasks", "task_checklist_items", "activity_log"];
+const PLANNING_SETTINGS_PATTERN: &str = "planning.%";
+/// The page Planning was, which a backup from before Slice 2 may have saved;
+/// it opens the Console, as schema 8 does for the saved data (D1, D2).
+const PLANNING_WORKSPACE: &str = "planning";
+/// What Verify adds, and what a restore says, for a backup written before
+/// Planning left that holds Planning data (D3).
+const PLANNING_WILL_NOT_BE_RESTORED: &str =
+    "Its Planning data will not be restored; Planning is no longer part of Studio Control.";
+const PLANNING_WAS_NOT_RESTORED: &str =
+    "Planning data in this backup was not restored; Planning is no longer part of Studio Control.";
 
 #[derive(Debug)]
 pub enum SupportCommandError {
@@ -138,6 +152,9 @@ pub struct SupportFileEntry {
     pub kind: SupportBackupKind,
 }
 
+/// The reply of `support.backup.export`. Slice 2 of the new pages program took
+/// the Planning counts out (`projectCount`, `taskCount`,
+/// `activityEntryCount`): the archive carries no Planning since format 5.
 #[derive(Debug, Serialize)]
 pub struct SupportBackupExportSummary {
     pub path: String,
@@ -145,12 +162,6 @@ pub struct SupportBackupExportSummary {
     pub file_name: String,
     #[serde(rename = "formatVersion")]
     pub format_version: i64,
-    #[serde(rename = "projectCount")]
-    pub project_count: usize,
-    #[serde(rename = "taskCount")]
-    pub task_count: usize,
-    #[serde(rename = "activityEntryCount")]
-    pub activity_entry_count: usize,
 }
 
 #[derive(Debug, Serialize)]
@@ -165,20 +176,21 @@ pub struct SupportBackupRestoreSummary {
     /// (a database restore from the recovery surface).
     #[serde(rename = "rollbackBackupPath")]
     pub rollback_backup_path: Option<String>,
-    #[serde(rename = "projectCount")]
-    pub project_count: usize,
-    #[serde(rename = "taskCount")]
-    pub task_count: usize,
-    #[serde(rename = "checklistItemCount")]
-    pub checklist_item_count: usize,
-    #[serde(rename = "activityEntryCount")]
-    pub activity_entry_count: usize,
+    // Slice 2 of the new pages program took the Planning counts out
+    // (`projectCount`, `taskCount`, `checklistItemCount`,
+    // `activityEntryCount`): no restore brings Planning back.
     #[serde(rename = "settingsRestored")]
     pub settings_restored: usize,
     /// A database backup is staged, not applied: it takes effect when the
     /// engine is started again (the shell restarts it on this flag).
     #[serde(rename = "requiresRestart")]
     pub requires_restart: bool,
+    /// One operator sentence on what the backup held that was not restored,
+    /// for the shell to print after its own: since Slice 2 of the new pages
+    /// program, the Planning data of a backup written before Planning left
+    /// (D3). Absent when nothing was left out.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 /// The answer to `support.backup.verify`: whether the file can be restored
@@ -207,43 +219,16 @@ struct SupportBackupArchive {
     engine_version: String,
     #[serde(default, rename = "storageFormatVersion")]
     storage_format_version: Option<String>,
-    planning: SupportPlanningArchive,
+    // Formats 2 to 4 carried a `planning` part here (projects, tasks, the
+    // activity log, the Planning settings). Format 5 has none, and reading
+    // an older archive ignores it (serde skips a field this struct does not
+    // name); `json_holds_planning_rows` looks at it in the raw JSON first, so the
+    // restore can say it was left out (new pages program, Slice 2 — D3).
     commissioning: SupportCommissioningArchive,
     shell: ShellSettingsSnapshot,
     /// Format 4: every setting under `RESTORE_KEY_PREFIXES`, verbatim.
     #[serde(default)]
     settings: HashMap<String, String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct SupportPlanningArchive {
-    pub projects: Vec<PlanningProject>,
-    pub tasks: Vec<PlanningTask>,
-    #[serde(rename = "activityLog")]
-    pub activity_log: Vec<PlanningActivityEntry>,
-    pub settings: SupportPlanningSettingsArchive,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-struct SupportPlanningSettingsArchive {
-    #[serde(rename = "viewFilter")]
-    pub view_filter: String,
-    #[serde(rename = "sortBy")]
-    pub sort_by: String,
-    #[serde(rename = "dashboardView")]
-    pub dashboard_view: String,
-    #[serde(rename = "deckMode")]
-    pub deck_mode: String,
-    #[serde(default, rename = "modeSection")]
-    pub mode_section: Option<String>,
-    #[serde(default, rename = "timelineStartHour")]
-    pub timeline_start_hour: Option<i64>,
-    #[serde(default, rename = "timelineEndHour")]
-    pub timeline_end_hour: Option<i64>,
-    #[serde(rename = "selectedProjectId")]
-    pub selected_project_id: Option<String>,
-    #[serde(rename = "selectedTaskId")]
-    pub selected_task_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -291,15 +276,18 @@ struct SupportCommissioningCheckArchive {
 }
 
 /// What a database backup holds, read from a read-only connection: the
-/// schema version and the counts the restore summary reports.
+/// schema version, the settings the restore summary counts and whether it
+/// holds Planning data. New pages program, Slice 2: a backup from before
+/// schema 8 still has Planning's tables and settings, which the upgrade at
+/// the next start removes, so they are neither counted nor required (a
+/// schema-8 backup has no such tables).
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct DatabaseBackupFacts {
     pub schema_version: i64,
-    pub project_count: usize,
-    pub task_count: usize,
-    pub checklist_item_count: usize,
-    pub activity_entry_count: usize,
+    /// Every setting but the `planning.*` ones.
     pub settings_count: usize,
+    /// Whether any of Planning's four tables holds a row.
+    pub holds_planning_rows: bool,
 }
 
 /// `support.backup.restore` and `support.backup.verify` take `{ path }`. The
@@ -434,6 +422,10 @@ pub fn export_support_backup(
 /// export); a database backup must open read-only, pass `integrity_check`
 /// and carry a schema this app can upgrade from. Never an error: a junk file
 /// is `ok: false` with the reason.
+///
+/// New pages program, Slice 2 (D3): the sentence no longer counts projects
+/// and tasks, and a backup written before Planning left that holds Planning
+/// data says it will not be restored.
 pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVerification {
     let path = request.source_path.display().to_string();
     match request.kind {
@@ -441,18 +433,16 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
             Ok(ArchiveFacts::Native {
                 format_version,
                 exported_at,
-                project_count,
-                task_count,
+                holds_planning_rows,
             }) if format_version <= SUPPORT_BACKUP_FORMAT_VERSION => SupportBackupVerification {
                 ok: true,
                 kind: request.kind,
                 path,
                 format_version: Some(format_version),
                 schema_version: None,
-                detail: format!(
-                    "Backup archive, format {format_version}, exported {exported_at}: {} and {}.",
-                    plural(project_count, "project"),
-                    plural(task_count, "task")
+                detail: with_planning_note(
+                    format!("Backup archive, format {format_version}, exported {exported_at}."),
+                    holds_planning_rows,
                 ),
             },
             Ok(ArchiveFacts::Native { format_version, .. }) => SupportBackupVerification {
@@ -463,14 +453,23 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                 schema_version: None,
                 detail: newer_archive_sentence(format_version),
             },
-            Ok(ArchiveFacts::Legacy { schema_version }) => SupportBackupVerification {
+            // Slice 2 (interim until Slice 2b retires the db.json import):
+            // only whether setup is complete and the page to open are read
+            // from the file.
+            Ok(ArchiveFacts::Legacy {
+                schema_version,
+                holds_planning_rows,
+            }) => SupportBackupVerification {
                 ok: true,
                 kind: request.kind,
                 path,
                 format_version: None,
                 schema_version: Some(schema_version),
-                detail: format!(
-                    "Legacy db.json export (schema {schema_version}); planning data and settings are imported from it."
+                detail: with_planning_note(
+                    format!(
+                        "Legacy db.json export (schema {schema_version}); only whether setup is complete and the page to open are restored from it."
+                    ),
+                    holds_planning_rows,
                 ),
             },
             Err(detail) => SupportBackupVerification {
@@ -490,12 +489,13 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                     path,
                     format_version: None,
                     schema_version: Some(facts.schema_version),
-                    detail: format!(
-                        "Database backup, schema {}, integrity ok: {}, {} and {}.",
-                        facts.schema_version,
-                        plural(facts.project_count, "project"),
-                        plural(facts.task_count, "task"),
-                        plural(facts.settings_count, "setting")
+                    detail: with_planning_note(
+                        format!(
+                            "Database backup, schema {}, integrity ok: {}.",
+                            facts.schema_version,
+                            plural(facts.settings_count, "setting")
+                        ),
+                        facts.holds_planning_rows,
                     ),
                 }
             }
@@ -531,15 +531,43 @@ fn newer_database_sentence(schema_version: i64) -> String {
     )
 }
 
+/// Verify's sentence, and the note it ends with when the backup holds
+/// Planning data that will not be restored (new pages program, D3).
+fn with_planning_note(sentence: String, holds_planning_rows: bool) -> String {
+    if holds_planning_rows {
+        format!("{sentence} {PLANNING_WILL_NOT_BE_RESTORED}")
+    } else {
+        sentence
+    }
+}
+
+/// Whether a JSON backup's Planning part holds any Planning data: a project,
+/// a task (its checklist lives inside it) or an activity entry. `section` is
+/// the archive's `planning` object (formats 2 to 4) or a legacy db.json's top
+/// level. Its Planning settings alone are view preferences, not data, and
+/// every archive before format 5 carries them, so they are skipped without a
+/// word (new pages program, Slice 2 — D3).
+fn json_holds_planning_rows(section: Option<&Value>) -> bool {
+    let Some(section) = section else {
+        return false;
+    };
+    ["projects", "tasks", "activityLog"].iter().any(|key| {
+        section
+            .get(*key)
+            .and_then(Value::as_array)
+            .is_some_and(|entries| !entries.is_empty())
+    })
+}
+
 enum ArchiveFacts {
     Native {
         format_version: i64,
         exported_at: String,
-        project_count: usize,
-        task_count: usize,
+        holds_planning_rows: bool,
     },
     Legacy {
         schema_version: i64,
+        holds_planning_rows: bool,
     },
 }
 
@@ -568,14 +596,6 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
                     path.display()
                 )
             })?;
-        let count = |section: &str, key: &str| {
-            object
-                .get(section)
-                .and_then(|value| value.get(key))
-                .and_then(Value::as_array)
-                .map(Vec::len)
-                .unwrap_or(0)
-        };
         return Ok(ArchiveFacts::Native {
             format_version,
             exported_at: object
@@ -583,8 +603,7 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
                 .and_then(Value::as_str)
                 .unwrap_or("at an unknown time")
                 .to_string(),
-            project_count: count("planning", "projects"),
-            task_count: count("planning", "tasks"),
+            holds_planning_rows: json_holds_planning_rows(object.get("planning")),
         });
     }
     if object.get("projects").is_some_and(Value::is_array)
@@ -595,6 +614,7 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
                 .get("schemaVersion")
                 .and_then(Value::as_i64)
                 .unwrap_or(0),
+            holds_planning_rows: json_holds_planning_rows(Some(&parsed)),
         });
     }
     Err(format!(
@@ -604,9 +624,14 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
 }
 
 /// Opens a database backup read-only and checks it: SQLite must accept the
-/// file, `PRAGMA integrity_check` must answer `ok`, and the schema table must
-/// be there. The bootstrap runs the same check on the pending file before it
-/// replaces the live database.
+/// file, `PRAGMA integrity_check` must answer `ok`, and the schema and
+/// settings tables must be there. The bootstrap runs the same check on the
+/// pending file before it replaces the live database.
+///
+/// New pages program, Slice 2: Planning's tables are looked at only where
+/// they exist. A schema-8 backup has none, and requiring them would refuse
+/// every backup this build writes ("no such table: projects") in Verify, the
+/// database restore and the restore staged for the next start.
 pub(crate) fn inspect_database_backup(path: &Path) -> Result<DatabaseBackupFacts, String> {
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .map_err(|error| format!("{} could not be opened: {error}", path.display()))?;
@@ -631,13 +656,33 @@ pub(crate) fn inspect_database_backup(path: &Path) -> Result<DatabaseBackupFacts
             })
     };
     let schema_version = count("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")? as i64;
+    let settings_count = count(&format!(
+        "SELECT COUNT(*) FROM app_settings WHERE key NOT LIKE '{PLANNING_SETTINGS_PATTERN}'"
+    ))?;
+    let mut holds_planning_rows = false;
+    for table in PLANNING_TABLES {
+        let exists = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?1",
+                [table],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(|error| {
+                format!(
+                    "{} is not a Studio Control database: {error}",
+                    path.display()
+                )
+            })?
+            > 0;
+        // The names come from `PLANNING_TABLES`, never from the file.
+        if exists && count(&format!("SELECT EXISTS(SELECT 1 FROM {table})"))? > 0 {
+            holds_planning_rows = true;
+        }
+    }
     Ok(DatabaseBackupFacts {
         schema_version,
-        project_count: count("SELECT COUNT(*) FROM projects")?,
-        task_count: count("SELECT COUNT(*) FROM tasks")?,
-        checklist_item_count: count("SELECT COUNT(*) FROM task_checklist_items")?,
-        activity_entry_count: count("SELECT COUNT(*) FROM activity_log")?,
-        settings_count: count("SELECT COUNT(*) FROM app_settings")?,
+        settings_count,
+        holds_planning_rows,
     })
 }
 
@@ -653,8 +698,10 @@ pub fn restore_support_backup(
 
 /// A JSON archive is applied in place: parsed and checked first (a newer
 /// format is refused before anything is written), then a rollback archive
-/// is written, then the planning tables and the archive's settings replace
-/// what is there in one transaction.
+/// is written, then the archive's settings replace what is there in one
+/// transaction. New pages program, Slice 2 (D3): the Planning part of an
+/// archive of format 4 or older is skipped, and the reply's `detail` says
+/// so when it held Planning data.
 fn restore_archive_backup(
     runtime: &RuntimeContext,
     request: &SupportRestoreRequest,
@@ -684,10 +731,11 @@ fn restore_archive_backup(
                 newer_archive_sentence(format_version),
             ));
         }
+        let skipped_planning_rows = json_holds_planning_rows(parsed.get("planning"));
         let archive: SupportBackupArchive = serde_json::from_value(parsed)
             .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
         let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
-        let summary = restore_native_support_archive(&runtime.db_path, &archive)
+        let settings_restored = restore_native_support_archive(&runtime.db_path, &archive)
             .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
         prune_pre_restore_archives(runtime);
 
@@ -695,15 +743,15 @@ fn restore_archive_backup(
             source_path: request.source_path.display().to_string(),
             source_format: String::from("native-support-backup"),
             rollback_backup_path: Some(rollback.path),
-            project_count: summary.project_count,
-            task_count: summary.task_count,
-            checklist_item_count: summary.checklist_item_count,
-            activity_entry_count: summary.activity_entry_count,
-            settings_restored: summary.settings_restored,
+            settings_restored,
             requires_restart: false,
+            detail: planning_not_restored(skipped_planning_rows),
         });
     }
 
+    // A legacy db.json (interim until Slice 2b retires the import): only
+    // whether setup is complete and the page to open are restored.
+    let skipped_planning_rows = json_holds_planning_rows(Some(&parsed));
     let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
     let legacy_summary = import_legacy_db(
         &runtime.db_path,
@@ -718,8 +766,9 @@ fn restore_archive_backup(
             path.display()
         )),
         ImportLegacyError::SourceReadFailed(message)
-        | ImportLegacyError::SourceParseFailed(message)
-        | ImportLegacyError::InvalidData(message) => SupportCommandError::InvalidParams(message),
+        | ImportLegacyError::SourceParseFailed(message) => {
+            SupportCommandError::InvalidParams(message)
+        }
         ImportLegacyError::ExistingDataRequiresForce | ImportLegacyError::Storage(_) => {
             SupportCommandError::Storage(error.to_string())
         }
@@ -730,20 +779,24 @@ fn restore_archive_backup(
         source_path: request.source_path.display().to_string(),
         source_format: String::from("legacy-db-json"),
         rollback_backup_path: Some(rollback.path),
-        project_count: legacy_summary.imported_projects,
-        task_count: legacy_summary.imported_tasks,
-        checklist_item_count: legacy_summary.imported_checklist_items,
-        activity_entry_count: legacy_summary.imported_activity_entries,
         settings_restored: legacy_summary.updated_settings,
         requires_restart: false,
+        detail: planning_not_restored(skipped_planning_rows),
     })
+}
+
+/// The restore's `detail` for a backup that held Planning data (D3).
+fn planning_not_restored(skipped_planning_rows: bool) -> Option<String> {
+    skipped_planning_rows.then(|| String::from(PLANNING_WAS_NOT_RESTORED))
 }
 
 /// A database backup is never applied to an open database: it is checked,
 /// the live database is copied as a `pre-restore` backup (when it can be
 /// opened at all — from the recovery surface it cannot, and the bootstrap
 /// keeps the replaced file instead), and the backup is copied to
-/// `restore-pending.sqlite3`, which the next start moves into place.
+/// `restore-pending.sqlite3`, which the next start moves into place. A backup
+/// from before schema 8 is upgraded there like any older saved data, and the
+/// upgrade removes its Planning data (new pages program, D2 and D3).
 fn restore_database_backup(
     runtime: &RuntimeContext,
     request: &SupportRestoreRequest,
@@ -781,12 +834,9 @@ fn restore_database_backup(
         source_path: request.source_path.display().to_string(),
         source_format: String::from("database-backup"),
         rollback_backup_path,
-        project_count: facts.project_count,
-        task_count: facts.task_count,
-        checklist_item_count: facts.checklist_item_count,
-        activity_entry_count: facts.activity_entry_count,
         settings_restored: facts.settings_count,
         requires_restart: true,
+        detail: planning_not_restored(facts.holds_planning_rows),
     })
 }
 
@@ -846,18 +896,10 @@ fn write_support_backup_archive(
         path: path.display().to_string(),
         file_name,
         format_version: archive.format_version,
-        project_count: archive.planning.projects.len(),
-        task_count: archive.planning.tasks.len(),
-        activity_entry_count: archive.planning.activity_log.len(),
     })
 }
 
 fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<SupportBackupArchive> {
-    let planning_settings = list_settings_by_prefix(
-        &runtime.db_path,
-        crate::planning_settings::PLANNING_SETTINGS_PREFIX,
-    )?;
-    let planning_snapshot = read_planning_snapshot(&runtime.db_path, &planning_settings)?;
     let commissioning_snapshot = read_commissioning_snapshot(&runtime.db_path)?;
     let shell_settings_map = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)?;
     // Whether the light outputs are armed is the state of this workstation
@@ -887,22 +929,6 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
         exported_at,
         engine_version: String::from(env!("CARGO_PKG_VERSION")),
         storage_format_version,
-        planning: SupportPlanningArchive {
-            projects: planning_snapshot.projects,
-            tasks: planning_snapshot.tasks,
-            activity_log: planning_snapshot.activity_log,
-            settings: SupportPlanningSettingsArchive {
-                view_filter: planning_snapshot.settings.view_filter,
-                sort_by: planning_snapshot.settings.sort_by,
-                dashboard_view: planning_snapshot.settings.dashboard_view,
-                deck_mode: planning_snapshot.settings.deck_mode,
-                mode_section: Some(planning_snapshot.settings.mode_section),
-                timeline_start_hour: Some(planning_snapshot.settings.timeline_start_hour),
-                timeline_end_hour: Some(planning_snapshot.settings.timeline_end_hour),
-                selected_project_id: planning_snapshot.settings.selected_project_id,
-                selected_task_id: planning_snapshot.settings.selected_task_id,
-            },
-        },
         commissioning: SupportCommissioningArchive {
             has_completed_setup: commissioning_snapshot.has_completed_setup,
             stage: commissioning_snapshot.stage,
@@ -938,21 +964,20 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
     })
 }
 
+/// Replaces the saved settings with the archive's in one transaction and
+/// returns how many were written. New pages program, Slice 2: no Planning
+/// table is cleared or written (schema 8 has none) and no `planning.*`
+/// setting (D2 removed them all).
 fn restore_native_support_archive(
     db_path: &Path,
     archive: &SupportBackupArchive,
-) -> EngineResult<NativeRestoreSummary> {
+) -> EngineResult<usize> {
     let mut connection = open_connection(db_path)?;
     let transaction = connection.transaction()?;
 
-    clear_planning_data(&transaction)?;
     clear_support_settings(&transaction)?;
-    write_projects(&transaction, &archive.planning.projects)?;
-    let checklist_item_count = write_tasks(&transaction, &archive.planning.tasks)?;
-    write_activity_log(&transaction, &archive.planning.activity_log)?;
     let settings_restored = write_support_settings(
         &transaction,
-        &archive.planning.settings,
         &archive.commissioning,
         &archive.shell,
         &archive.settings,
@@ -960,34 +985,11 @@ fn restore_native_support_archive(
 
     transaction.commit()?;
 
-    Ok(NativeRestoreSummary {
-        project_count: archive.planning.projects.len(),
-        task_count: archive.planning.tasks.len(),
-        checklist_item_count,
-        activity_entry_count: archive.planning.activity_log.len(),
-        settings_restored,
-    })
-}
-
-fn clear_planning_data(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
-    transaction.execute("DELETE FROM task_checklist_items", [])?;
-    transaction.execute("DELETE FROM tasks", [])?;
-    transaction.execute("DELETE FROM projects", [])?;
-    transaction.execute("DELETE FROM activity_log", [])?;
-    Ok(())
+    Ok(settings_restored)
 }
 
 fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
     for key in [
-        VIEW_FILTER_KEY,
-        SORT_BY_KEY,
-        DASHBOARD_VIEW_KEY,
-        DECK_MODE_KEY,
-        crate::planning_settings::MODE_SECTION_KEY,
-        crate::planning_settings::TIMELINE_START_HOUR_KEY,
-        crate::planning_settings::TIMELINE_END_HOUR_KEY,
-        SELECTED_PROJECT_ID_KEY,
-        SELECTED_TASK_ID_KEY,
         COMMISSIONING_COMPLETED_KEY,
         COMMISSIONING_STAGE_KEY,
         HARDWARE_PROFILE_KEY,
@@ -1028,164 +1030,31 @@ fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite:
     Ok(())
 }
 
-fn write_projects(
-    transaction: &Transaction<'_>,
-    projects: &[PlanningProject],
-) -> Result<(), rusqlite::Error> {
-    for project in projects {
-        transaction.execute(
-            "INSERT INTO projects(
-                id, title, description, status, priority, created_at, last_updated, sort_order
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                project.id,
-                project.title,
-                project.description,
-                project.status,
-                project.priority,
-                project.created_at,
-                project.last_updated,
-                project.order,
-            ],
-        )?;
+/// A saved page an archive of format 4 or older may name that this build no
+/// longer has: Planning, the default page until Slice 2 of the new pages
+/// program, opens the Console, as the schema-8 upgrade does for the saved
+/// data (D1, D2). Every other page is restored as it is.
+fn restored_workspace(workspace: &str) -> &str {
+    if workspace == PLANNING_WORKSPACE {
+        DEFAULT_WORKSPACE
+    } else {
+        workspace
     }
-
-    Ok(())
-}
-
-fn write_tasks(
-    transaction: &Transaction<'_>,
-    tasks: &[PlanningTask],
-) -> Result<usize, rusqlite::Error> {
-    let mut checklist_item_count = 0usize;
-
-    for task in tasks {
-        transaction.execute(
-            "INSERT INTO tasks(
-                id, project_id, title, description, priority, due_date, labels_json,
-                is_running, total_seconds, last_started, completed, sort_order, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                task.id,
-                task.project_id,
-                task.title,
-                task.description,
-                task.priority,
-                task.due_date,
-                serde_json::to_string(&task.labels).unwrap_or_else(|_| String::from("[]")),
-                bool_to_int(task.is_running),
-                task.total_seconds,
-                task.last_started,
-                bool_to_int(task.completed),
-                task.order,
-                task.created_at,
-            ],
-        )?;
-
-        for item in &task.checklist {
-            write_checklist_item(transaction, &task.id, item)?;
-            checklist_item_count += 1;
-        }
-    }
-
-    Ok(checklist_item_count)
-}
-
-fn write_checklist_item(
-    transaction: &Transaction<'_>,
-    task_id: &str,
-    item: &PlanningChecklistItem,
-) -> Result<(), rusqlite::Error> {
-    transaction.execute(
-        "INSERT INTO task_checklist_items(id, task_id, text, done, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5)",
-        params![
-            item.id,
-            task_id,
-            item.text,
-            bool_to_int(item.done),
-            item.order
-        ],
-    )?;
-    Ok(())
-}
-
-fn write_activity_log(
-    transaction: &Transaction<'_>,
-    entries: &[PlanningActivityEntry],
-) -> Result<(), rusqlite::Error> {
-    for entry in entries {
-        transaction.execute(
-            "INSERT INTO activity_log(id, timestamp, entity_type, entity_id, action, detail)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                entry.id,
-                entry.timestamp,
-                entry.entity_type,
-                entry.entity_id,
-                entry.action,
-                entry.detail,
-            ],
-        )?;
-    }
-
-    Ok(())
 }
 
 fn write_support_settings(
     transaction: &Transaction<'_>,
-    planning: &SupportPlanningSettingsArchive,
     commissioning: &SupportCommissioningArchive,
     shell: &ShellSettingsSnapshot,
     settings: &HashMap<String, String>,
 ) -> Result<usize, rusqlite::Error> {
     let mut settings_restored = 0usize;
 
-    upsert_setting(transaction, VIEW_FILTER_KEY, &planning.view_filter)?;
-    settings_restored += 1;
-    upsert_setting(transaction, SORT_BY_KEY, &planning.sort_by)?;
-    settings_restored += 1;
-    upsert_setting(transaction, DASHBOARD_VIEW_KEY, &planning.dashboard_view)?;
-    settings_restored += 1;
-    upsert_setting(transaction, DECK_MODE_KEY, &planning.deck_mode)?;
-    settings_restored += 1;
-
-    if let Some(mode_section) = &planning.mode_section {
-        upsert_setting(
-            transaction,
-            crate::planning_settings::MODE_SECTION_KEY,
-            mode_section,
-        )?;
-        settings_restored += 1;
-    }
-    if let Some(hour) = planning.timeline_start_hour {
-        upsert_setting(
-            transaction,
-            crate::planning_settings::TIMELINE_START_HOUR_KEY,
-            &hour.to_string(),
-        )?;
-        settings_restored += 1;
-    }
-    if let Some(hour) = planning.timeline_end_hour {
-        upsert_setting(
-            transaction,
-            crate::planning_settings::TIMELINE_END_HOUR_KEY,
-            &hour.to_string(),
-        )?;
-        settings_restored += 1;
-    }
-
-    if let Some(project_id) = &planning.selected_project_id {
-        upsert_setting(transaction, SELECTED_PROJECT_ID_KEY, project_id)?;
-        settings_restored += 1;
-    }
-
-    if let Some(task_id) = &planning.selected_task_id {
-        upsert_setting(transaction, SELECTED_TASK_ID_KEY, task_id)?;
-        settings_restored += 1;
-    }
-
-    upsert_setting(transaction, WORKSPACE_KEY, &shell.workspace)?;
+    upsert_setting(
+        transaction,
+        WORKSPACE_KEY,
+        restored_workspace(&shell.workspace),
+    )?;
     settings_restored += 1;
     upsert_setting(
         transaction,
@@ -1295,10 +1164,11 @@ fn write_support_settings(
         let key_prefix = format!("app.commissioning.check.{}", check.id);
         upsert_setting(transaction, &format!("{key_prefix}.status"), &check.status)?;
         settings_restored += 1;
+        // An archive from before Slice 2 can carry a line about Planning.
         upsert_setting(
             transaction,
             &format!("{key_prefix}.message"),
-            &check.message,
+            retire_planning_probe_message(&check.message),
         )?;
         settings_restored += 1;
         if let Some(checked_at) = &check.checked_at {
@@ -1341,6 +1211,11 @@ fn write_support_settings(
     raw_keys.sort();
     for key in raw_keys {
         if let Some(value) = settings.get(&key) {
+            let value = if key == WORKSPACE_KEY {
+                restored_workspace(value)
+            } else {
+                value
+            };
             upsert_setting(transaction, &key, value)?;
             settings_restored += 1;
         }
@@ -1482,23 +1357,6 @@ fn unix_millis(time: SystemTime) -> Option<i64> {
 
 fn sanitize_for_file_name(value: &str) -> String {
     value.replace([':', '.'], "-")
-}
-
-fn bool_to_int(value: bool) -> i64 {
-    if value {
-        1
-    } else {
-        0
-    }
-}
-
-#[derive(Debug)]
-struct NativeRestoreSummary {
-    project_count: usize,
-    task_count: usize,
-    checklist_item_count: usize,
-    activity_entry_count: usize,
-    settings_restored: usize,
 }
 
 #[cfg(test)]

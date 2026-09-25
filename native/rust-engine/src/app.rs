@@ -22,8 +22,7 @@ use crate::commissioning::{
     evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
 };
 use crate::commissioning::{
-    parse_commissioning_check_request, parse_commissioning_seed_request,
-    read_commissioning_snapshot, run_commissioning_check, seed_sample_planning_data,
+    parse_commissioning_check_request, read_commissioning_snapshot, run_commissioning_check,
     CommissioningCommandError,
 };
 use crate::diagnostics::{append_log, configured_log_level, request_log_line};
@@ -62,28 +61,10 @@ use crate::lighting::{
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
 };
-use crate::planning::{
-    apply_planning_project_create, apply_planning_project_delete, apply_planning_project_reorder,
-    apply_planning_project_update, apply_planning_selection, apply_planning_task_checklist_add,
-    apply_planning_task_checklist_delete, apply_planning_task_checklist_update,
-    apply_planning_task_create, apply_planning_task_delete, apply_planning_task_reschedule,
-    apply_planning_task_timer, apply_planning_task_toggle_complete, apply_planning_task_update,
-    parse_planning_project_create_request, parse_planning_project_delete_request,
-    parse_planning_project_reorder_request, parse_planning_project_update_request,
-    parse_planning_selection_request, parse_planning_settings_update,
-    parse_planning_task_checklist_add_request, parse_planning_task_checklist_delete_request,
-    parse_planning_task_checklist_update_request, parse_planning_task_create_request,
-    parse_planning_task_delete_request, parse_planning_task_reschedule_request,
-    parse_planning_task_timer_request, parse_planning_task_toggle_complete_request,
-    parse_planning_task_update_request, parse_planning_time_report_request, read_planning_context,
-    read_planning_snapshot, read_planning_time_report, update_planning_settings,
-    PlanningCommandError,
-};
-use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
     EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_COMMISSIONING_CHANGED, EVENT_ENGINE_READY,
-    EVENT_LIGHTING_CHANGED, EVENT_PLANNING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
+    EVENT_LIGHTING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{import_legacy_db, list_settings_by_prefix, set_settings, EngineResult};
@@ -292,17 +273,6 @@ impl EngineApp {
                 self.dispatch_read(request.id, Self::read_control_surface_snapshot)
             }
             "settings.get" => self.dispatch_read(request.id, Self::read_shell_settings),
-            "planning.snapshot" => self.dispatch_read(request.id, Self::read_planning_snapshot),
-            "planning.context" => self.dispatch_read(request.id, Self::read_planning_context),
-
-            // -------------------------------------------------------------
-            // Read with parsed params (R-args)
-            // -------------------------------------------------------------
-            "planning.report.time" => self.dispatch_read_with_params(
-                request,
-                parse_planning_time_report_request,
-                |s, project_id| s.read_planning_time_report(project_id.as_deref()),
-            ),
 
             // -------------------------------------------------------------
             // Lighting mutations (M-1event)
@@ -554,186 +524,6 @@ impl EngineApp {
             "audio.talkback.hold" => self.dispatch_audio_talkback_hold(request),
 
             // -------------------------------------------------------------
-            // Planning mutations (M-1event with derived event payload)
-            // -------------------------------------------------------------
-            "planning.settings.update" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_settings_update,
-                update_planning_settings,
-                "settings-updated",
-                |result| {
-                    (
-                        result.settings.selected_project_id.as_deref(),
-                        result.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.select" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_selection_request,
-                apply_planning_selection,
-                "selection-updated",
-                |result| {
-                    (
-                        result.settings.selected_project_id.as_deref(),
-                        result.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.project.create" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_project_create_request,
-                apply_planning_project_create,
-                "project-created",
-                |result| {
-                    (
-                        Some(result.project.id.as_str()),
-                        result.context.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.project.update" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_project_update_request,
-                apply_planning_project_update,
-                "project-updated",
-                |result| {
-                    (
-                        Some(result.project.id.as_str()),
-                        result.context.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.project.delete" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_project_delete_request,
-                apply_planning_project_delete,
-                "project-deleted",
-                |result| {
-                    (
-                        result.context.settings.selected_project_id.as_deref(),
-                        result.context.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.project.reorder" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_project_reorder_request,
-                apply_planning_project_reorder,
-                "project-reordered",
-                |result| {
-                    (
-                        Some(result.project.id.as_str()),
-                        result.context.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.task.create" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_create_request,
-                apply_planning_task_create,
-                "task-created",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.update" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_update_request,
-                apply_planning_task_update,
-                "task-updated",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.reschedule" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_reschedule_request,
-                apply_planning_task_reschedule,
-                "task-rescheduled",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.delete" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_delete_request,
-                apply_planning_task_delete,
-                "task-deleted",
-                |result| {
-                    (
-                        result.context.settings.selected_project_id.as_deref(),
-                        result.context.settings.selected_task_id.as_deref(),
-                    )
-                },
-            ),
-            "planning.task.checklist.add" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_checklist_add_request,
-                apply_planning_task_checklist_add,
-                "task-checklist-added",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.checklist.update" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_checklist_update_request,
-                apply_planning_task_checklist_update,
-                "task-checklist-updated",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.checklist.delete" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_checklist_delete_request,
-                apply_planning_task_checklist_delete,
-                "task-checklist-deleted",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-            "planning.task.timer" => self.dispatch_planning_mutate_dynamic_reason(
-                request,
-                parse_planning_task_timer_request,
-                apply_planning_task_timer,
-                |result| format!("task-timer-{}", result.resolved_action),
-                |result| Some(result.task.project_id.as_str()),
-                |result| Some(result.task.id.as_str()),
-            ),
-            "planning.task.toggleComplete" => self.dispatch_planning_mutate(
-                request,
-                parse_planning_task_toggle_complete_request,
-                apply_planning_task_toggle_complete,
-                "task-completion-toggled",
-                |result| {
-                    (
-                        Some(result.task.project_id.as_str()),
-                        Some(result.task.id.as_str()),
-                    )
-                },
-            ),
-
-            // -------------------------------------------------------------
             // Commissioning mutations (M-1event + multi-event variants)
             // -------------------------------------------------------------
             "commissioning.check.run" => {
@@ -761,12 +551,6 @@ impl EngineApp {
                 }
                 reply
             }
-            "commissioning.seedPlanningDemo" => self.dispatch_commissioning_seed(
-                request,
-                parse_commissioning_seed_request,
-                seed_sample_planning_data,
-                "sample-planning-seeded",
-            ),
 
             // -------------------------------------------------------------
             // Dev parity fixture (M-multievent). Compiled only with the
@@ -935,10 +719,8 @@ impl EngineApp {
                                 &self.runtime.log_file_path,
                                 "INFO",
                                 &format!(
-                                    "Imported legacy planning data from {}: {} projects, {} tasks",
-                                    summary.source_path,
-                                    summary.imported_projects,
-                                    summary.imported_tasks
+                                    "Imported legacy db from {}: {} settings (the setup flag and the page to open)",
+                                    summary.source_path, summary.updated_settings
                                 ),
                             );
                             Self::reply(ok_response(
@@ -953,8 +735,7 @@ impl EngineApp {
                                 }
                                 ImportLegacyError::SourceNotFound(_) => "IMPORT_SOURCE_NOT_FOUND",
                                 ImportLegacyError::SourceReadFailed(_)
-                                | ImportLegacyError::SourceParseFailed(_)
-                                | ImportLegacyError::InvalidData(_) => "IMPORT_FAILED",
+                                | ImportLegacyError::SourceParseFailed(_) => "IMPORT_FAILED",
                                 ImportLegacyError::Storage(_) => "STORAGE_ERROR",
                             };
                             let _ = append_log(
@@ -985,42 +766,11 @@ impl EngineApp {
     fn read_app_snapshot(&self) -> EngineResult<serde_json::Value> {
         let shell_settings = list_settings_by_prefix(&self.runtime.db_path, SHELL_SETTINGS_PREFIX)?;
         let app_settings = list_settings_by_prefix(&self.runtime.db_path, APP_SETTINGS_PREFIX)?;
-        let planning_settings =
-            list_settings_by_prefix(&self.runtime.db_path, PLANNING_SETTINGS_PREFIX)?;
         Ok(build_app_snapshot(
             &self.runtime,
             &shell_settings,
             &app_settings,
-            &planning_settings,
         ))
-    }
-
-    fn read_planning_snapshot(&self) -> EngineResult<serde_json::Value> {
-        let planning_settings =
-            list_settings_by_prefix(&self.runtime.db_path, PLANNING_SETTINGS_PREFIX)?;
-        Ok(serde_json::to_value(read_planning_snapshot(
-            &self.runtime.db_path,
-            &planning_settings,
-        )?)?)
-    }
-
-    fn read_planning_context(&self) -> EngineResult<serde_json::Value> {
-        let planning_settings =
-            list_settings_by_prefix(&self.runtime.db_path, PLANNING_SETTINGS_PREFIX)?;
-        Ok(serde_json::to_value(read_planning_context(
-            &self.runtime.db_path,
-            &planning_settings,
-        )?)?)
-    }
-
-    fn read_planning_time_report(
-        &self,
-        project_id: Option<&str>,
-    ) -> EngineResult<serde_json::Value> {
-        Ok(serde_json::to_value(read_planning_time_report(
-            &self.runtime.db_path,
-            project_id,
-        )?)?)
     }
 
     fn read_commissioning_snapshot(&self) -> EngineResult<serde_json::Value> {
@@ -1098,9 +848,8 @@ impl EngineApp {
     //
     // The match arms in `handle_request` previously expanded the same parse →
     // call → reply scaffolding for every method. The helpers below capture
-    // the four uniform shapes (read-no-params, read-with-params, mutate with
-    // single event, mutate with derived planning event payload) so the match
-    // body collapses to one-liners. Custom arms with non-uniform error enums
+    // the uniform shapes (read-no-params, mutate with a single event) so the
+    // match body collapses to one-liners. Custom arms with non-uniform error enums
     // or chained read-snapshot calls (`commissioning.update`, `settings.update`,
     // `support.backup.*`, `exports.companion.export`, `storage.importLegacyDb`)
     // stay as hand-written branches.
@@ -1121,33 +870,6 @@ impl EngineApp {
                 "STORAGE_ERROR",
                 error.to_string(),
             )),
-        }
-    }
-
-    fn dispatch_read_with_params<P, T, F, R>(
-        &self,
-        request: RequestEnvelope,
-        parse: F,
-        read: R,
-    ) -> EngineReply
-    where
-        T: serde::Serialize,
-        F: FnOnce(&serde_json::Value) -> Result<P, String>,
-        R: FnOnce(&Self, &P) -> EngineResult<T>,
-    {
-        match parse(&request.params) {
-            Ok(parsed) => match read(self, &parsed) {
-                Ok(result) => Self::reply(ok_response(
-                    request.id,
-                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                )),
-                Err(error) => Self::reply(error_response(
-                    request.id,
-                    "STORAGE_ERROR",
-                    error.to_string(),
-                )),
-            },
-            Err(message) => Self::reply(invalid_params(request.id, message)),
         }
     }
 
@@ -1319,87 +1041,6 @@ impl EngineApp {
         }
     }
 
-    fn dispatch_planning_mutate<P, R, F, H, K>(
-        &self,
-        request: RequestEnvelope,
-        parse: F,
-        handler: H,
-        reason: &str,
-        keys: K,
-    ) -> EngineReply
-    where
-        R: serde::Serialize,
-        F: FnOnce(&serde_json::Value) -> Result<P, String>,
-        H: FnOnce(&std::path::Path, &P) -> Result<R, PlanningCommandError>,
-        K: for<'a> FnOnce(&'a R) -> (Option<&'a str>, Option<&'a str>),
-    {
-        match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
-                Ok(result) => {
-                    let (project_id, task_id) = keys(&result);
-                    Self::reply_with_planning_change(
-                        ok_response(
-                            request.id,
-                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                        ),
-                        reason,
-                        project_id,
-                        task_id,
-                    )
-                }
-                Err(PlanningCommandError::InvalidParams(message)) => {
-                    Self::reply(invalid_params(request.id, message))
-                }
-                Err(PlanningCommandError::Storage(message)) => {
-                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                }
-            },
-            Err(message) => Self::reply(invalid_params(request.id, message)),
-        }
-    }
-
-    fn dispatch_planning_mutate_dynamic_reason<P, R, F, H, RFn>(
-        &self,
-        request: RequestEnvelope,
-        parse: F,
-        handler: H,
-        reason: RFn,
-        project_id: impl for<'a> FnOnce(&'a R) -> Option<&'a str>,
-        task_id: impl for<'a> FnOnce(&'a R) -> Option<&'a str>,
-    ) -> EngineReply
-    where
-        R: serde::Serialize,
-        F: FnOnce(&serde_json::Value) -> Result<P, String>,
-        H: FnOnce(&std::path::Path, &P) -> Result<R, PlanningCommandError>,
-        RFn: FnOnce(&R) -> String,
-    {
-        match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime.db_path, &parsed) {
-                Ok(result) => {
-                    let event_reason = reason(&result);
-                    let pid = project_id(&result);
-                    let tid = task_id(&result);
-                    Self::reply_with_planning_change(
-                        ok_response(
-                            request.id,
-                            serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                        ),
-                        &event_reason,
-                        pid,
-                        tid,
-                    )
-                }
-                Err(PlanningCommandError::InvalidParams(message)) => {
-                    Self::reply(invalid_params(request.id, message))
-                }
-                Err(PlanningCommandError::Storage(message)) => {
-                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                }
-            },
-            Err(message) => Self::reply(invalid_params(request.id, message)),
-        }
-    }
-
     fn dispatch_commissioning_mutate<P, R, F, H>(
         &self,
         request: RequestEnvelope,
@@ -1437,38 +1078,6 @@ impl EngineApp {
         }
     }
 
-    fn dispatch_commissioning_seed<P, R, F, H>(
-        &self,
-        request: RequestEnvelope,
-        parse: F,
-        handler: H,
-        reason: &str,
-    ) -> EngineReply
-    where
-        R: serde::Serialize,
-        F: FnOnce(&serde_json::Value) -> Result<P, String>,
-        H: FnOnce(&RuntimeContext, &P) -> Result<R, CommissioningCommandError>,
-    {
-        match parse(&request.params) {
-            Ok(parsed) => match handler(&self.runtime, &parsed) {
-                Ok(result) => Self::reply_with_commissioning_and_planning_change(
-                    ok_response(
-                        request.id,
-                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                    ),
-                    reason,
-                ),
-                Err(CommissioningCommandError::InvalidParams(message)) => {
-                    Self::reply(invalid_params(request.id, message))
-                }
-                Err(CommissioningCommandError::Storage(message)) => {
-                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                }
-            },
-            Err(message) => Self::reply(invalid_params(request.id, message)),
-        }
-    }
-
     #[cfg(feature = "dev-fixtures")]
     fn dispatch_parity_fixture<P, R, F, H>(
         &self,
@@ -1484,7 +1093,7 @@ impl EngineApp {
     {
         match parse(&request.params) {
             Ok(parsed) => match with_lighting_state(|| handler(&self.runtime, &parsed)) {
-                Ok(result) => Self::reply_with_app_commissioning_and_planning_change(
+                Ok(result) => Self::reply_with_app_and_commissioning_change(
                     ok_response(
                         request.id,
                         serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
@@ -1506,25 +1115,6 @@ impl EngineApp {
         EngineReply {
             response,
             events: Vec::new(),
-        }
-    }
-
-    fn reply_with_planning_change(
-        response: ResponseEnvelope,
-        reason: &str,
-        project_id: Option<&str>,
-        task_id: Option<&str>,
-    ) -> EngineReply {
-        EngineReply {
-            response,
-            events: vec![event_message(
-                EVENT_PLANNING_CHANGED,
-                json!({
-                    "reason": reason,
-                    "projectId": project_id,
-                    "taskId": task_id
-                }),
-            )],
         }
     }
 
@@ -1557,63 +1147,6 @@ impl EngineApp {
                     EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
-                    }),
-                ),
-            ],
-        }
-    }
-
-    fn reply_with_commissioning_and_planning_change(
-        response: ResponseEnvelope,
-        reason: &str,
-    ) -> EngineReply {
-        EngineReply {
-            response,
-            events: vec![
-                event_message(
-                    EVENT_COMMISSIONING_CHANGED,
-                    json!({
-                        "reason": reason,
-                    }),
-                ),
-                event_message(
-                    EVENT_PLANNING_CHANGED,
-                    json!({
-                        "reason": reason,
-                        "projectId": serde_json::Value::Null,
-                        "taskId": serde_json::Value::Null,
-                    }),
-                ),
-            ],
-        }
-    }
-
-    #[cfg(feature = "dev-fixtures")]
-    fn reply_with_app_commissioning_and_planning_change(
-        response: ResponseEnvelope,
-        reason: &str,
-    ) -> EngineReply {
-        EngineReply {
-            response,
-            events: vec![
-                event_message(
-                    EVENT_APP_CHANGED,
-                    json!({
-                        "reason": reason,
-                    }),
-                ),
-                event_message(
-                    EVENT_COMMISSIONING_CHANGED,
-                    json!({
-                        "reason": reason,
-                    }),
-                ),
-                event_message(
-                    EVENT_PLANNING_CHANGED,
-                    json!({
-                        "reason": reason,
-                        "projectId": serde_json::Value::Null,
-                        "taskId": serde_json::Value::Null,
                     }),
                 ),
             ],
@@ -1658,14 +1191,6 @@ impl EngineApp {
                     EVENT_COMMISSIONING_CHANGED,
                     json!({
                         "reason": reason,
-                    }),
-                ),
-                event_message(
-                    EVENT_PLANNING_CHANGED,
-                    json!({
-                        "reason": reason,
-                        "projectId": serde_json::Value::Null,
-                        "taskId": serde_json::Value::Null,
                     }),
                 ),
             ],

@@ -8,9 +8,6 @@ use serde_json::Value;
 use std::fmt;
 use std::fs;
 
-const PLANNING_POPULATED_DB_JSON: &str =
-    include_str!("../fixtures/parity-planning-populated-db.json");
-const PLANNING_EMPTY_DB_JSON: &str = include_str!("../fixtures/parity-planning-empty-db.json");
 const LIGHTING_POPULATED_DB_JSON: &str =
     include_str!("../fixtures/parity-lighting-populated-db.json");
 const AUDIO_POPULATED_DB_JSON: &str = include_str!("../fixtures/parity-audio-populated-db.json");
@@ -34,8 +31,6 @@ impl fmt::Display for ParityFixtureError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParityFixtureId {
-    PlanningEmpty,
-    PlanningPopulated,
     LightingPopulated,
     AudioPopulated,
     SetupRequired,
@@ -45,8 +40,6 @@ pub enum ParityFixtureId {
 impl ParityFixtureId {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::PlanningEmpty => "planning-empty",
-            Self::PlanningPopulated => "planning-populated",
             Self::LightingPopulated => "lighting-populated",
             Self::AudioPopulated => "audio-populated",
             Self::SetupRequired => "setup-required",
@@ -56,10 +49,6 @@ impl ParityFixtureId {
 
     fn summary(&self) -> &'static str {
         match self {
-            Self::PlanningEmpty => "Empty planning workspace fixture ready for operator parity verification.",
-            Self::PlanningPopulated => {
-                "Populated planning workspace fixture aligned with the legacy parity reference."
-            }
             Self::LightingPopulated => {
                 "Populated lighting workspace fixture aligned with the legacy operator console reference."
             }
@@ -78,18 +67,12 @@ impl ParityFixtureId {
     fn target_surface(&self) -> &'static str {
         match self {
             Self::SetupRequired => "commissioning",
-            Self::PlanningEmpty
-            | Self::PlanningPopulated
-            | Self::LightingPopulated
-            | Self::AudioPopulated
-            | Self::SetupReady => "dashboard",
+            Self::LightingPopulated | Self::AudioPopulated | Self::SetupReady => "dashboard",
         }
     }
 
     fn bundled_payload(&self) -> &'static str {
         match self {
-            Self::PlanningEmpty => PLANNING_EMPTY_DB_JSON,
-            Self::PlanningPopulated => PLANNING_POPULATED_DB_JSON,
             Self::LightingPopulated => LIGHTING_POPULATED_DB_JSON,
             Self::AudioPopulated => AUDIO_POPULATED_DB_JSON,
             Self::SetupRequired => SETUP_REQUIRED_DB_JSON,
@@ -113,31 +96,28 @@ pub struct ParityFixtureSummary {
     #[serde(rename = "targetSurface")]
     pub target_surface: String,
     pub summary: String,
-    #[serde(rename = "importedProjects")]
-    pub imported_projects: usize,
-    #[serde(rename = "importedTasks")]
-    pub imported_tasks: usize,
 }
 
 pub fn parse_parity_fixture_request(params: &Value) -> Result<ParityFixtureRequest, String> {
     let fixture_id = match params.get("fixtureId").and_then(Value::as_str) {
-        Some("planning-empty") => ParityFixtureId::PlanningEmpty,
-        Some("planning-populated") => ParityFixtureId::PlanningPopulated,
         Some("lighting-populated") => ParityFixtureId::LightingPopulated,
         Some("audio-populated") => ParityFixtureId::AudioPopulated,
         Some("setup-required") => ParityFixtureId::SetupRequired,
         Some("setup-ready") => ParityFixtureId::SetupReady,
         Some(_) => {
             return Err(String::from(
-                "fixtureId must be one of: planning-empty, planning-populated, lighting-populated, audio-populated, setup-required, setup-ready",
+                "fixtureId must be one of: lighting-populated, audio-populated, setup-required, setup-ready",
             ))
         }
         None => return Err(String::from("fixtureId is required")),
     };
 
-    // Default is a merge: a fixture load never replaces existing planning
+    // Default is a merge: a fixture load never replaces existing saved
     // data unless the caller says so (2026-09 production readiness, Slice 1
-    // — finding F04). `import_legacy_db` refuses the merge when data exists.
+    // — finding F04). `import_legacy_db` refuses the merge when the saved
+    // data holds a completed setup or an earlier import, an earlier fixture
+    // load included (new pages program, Slice 2; until then, when Planning's
+    // tables held rows).
     let replace_existing_data = params
         .get("replaceExistingData")
         .map(|value| {
@@ -165,7 +145,7 @@ pub fn load_parity_fixture(
     fs::write(&fixture_path, request.fixture_id.bundled_payload())
         .map_err(|error| ParityFixtureError::Storage(error.to_string()))?;
 
-    let import_summary = import_legacy_db(
+    import_legacy_db(
         &runtime.db_path,
         &LegacyImportRequest {
             source_path: fixture_path.clone(),
@@ -190,16 +170,12 @@ pub fn load_parity_fixture(
         source_path: fixture_path.display().to_string(),
         target_surface: request.fixture_id.target_surface().to_string(),
         summary: request.fixture_id.summary().to_string(),
-        imported_projects: import_summary.imported_projects,
-        imported_tasks: import_summary.imported_tasks,
     })
 }
 
 fn parity_app_setting_overrides(fixture_id: ParityFixtureId) -> Vec<(String, String)> {
     match fixture_id {
-        ParityFixtureId::PlanningEmpty
-        | ParityFixtureId::PlanningPopulated
-        | ParityFixtureId::LightingPopulated
+        ParityFixtureId::LightingPopulated
         | ParityFixtureId::SetupRequired
         | ParityFixtureId::SetupReady => vec![(
             String::from("app.audio.osc_enabled"),
@@ -280,21 +256,71 @@ fn map_import_error(error: ImportLegacyError) -> ParityFixtureError {
 #[cfg(test)]
 mod tests {
     use super::{parse_parity_fixture_request, ParityFixtureId};
-    use serde_json::json;
+    use serde_json::{json, Value};
 
     // 2026-09 production readiness, Slice 1 (finding F04): a fixture load
-    // merges by default; replacing the operator's planning data takes an
-    // explicit `replaceExistingData: true`.
+    // merges by default; replacing the operator's saved data takes an
+    // explicit `replaceExistingData: true`. (New pages program, Slice 2: the
+    // Planning fixtures left, so the case loads Lighting.)
     #[test]
     fn load_defaults_to_merge() {
-        let request = parse_parity_fixture_request(&json!({ "fixtureId": "planning-empty" }))
+        let request = parse_parity_fixture_request(&json!({ "fixtureId": "lighting-populated" }))
             .expect("a fixture id alone should parse");
 
-        assert_eq!(request.fixture_id, ParityFixtureId::PlanningEmpty);
+        assert_eq!(request.fixture_id, ParityFixtureId::LightingPopulated);
         assert!(
             !request.replace_existing_data,
-            "a fixture load must not replace existing planning data unless asked to"
+            "a fixture load must not replace existing saved data unless asked to"
         );
+    }
+
+    // New pages program, Slice 2: the two Planning fixtures left with the page.
+    #[test]
+    fn planning_fixtures_are_refused() {
+        for fixture_id in ["planning-empty", "planning-populated"] {
+            let error = parse_parity_fixture_request(&json!({ "fixtureId": fixture_id }))
+                .expect_err("a Planning fixture is no longer a fixture");
+            assert_eq!(
+                error,
+                "fixtureId must be one of: lighting-populated, audio-populated, setup-required, setup-ready"
+            );
+        }
+    }
+
+    // New pages program, Slice 2: the import reads only a db.json's
+    // `schemaVersion`, `settings.dashboardView` and `settings.hasCompletedSetup`,
+    // so the bundled fixtures carry no Planning part (projects, tasks, the
+    // activity log, the Planning view settings and selection, the deck mode)
+    // and no Planning board (`kanban`). Until then the four held one, which
+    // the import then wrote into the Planning tables.
+    #[test]
+    fn the_bundled_fixtures_carry_no_planning() {
+        for fixture_id in [
+            ParityFixtureId::LightingPopulated,
+            ParityFixtureId::AudioPopulated,
+            ParityFixtureId::SetupRequired,
+            ParityFixtureId::SetupReady,
+        ] {
+            let name = fixture_id.as_str();
+            let payload: Value = serde_json::from_str(fixture_id.bundled_payload())
+                .unwrap_or_else(|error| panic!("{name}: {error}"));
+            for key in ["projects", "tasks", "activityLog"] {
+                assert!(payload.get(key).is_none(), "{name} still carries `{key}`");
+            }
+            let settings = payload
+                .get("settings")
+                .and_then(Value::as_object)
+                .unwrap_or_else(|| panic!("{name} has no settings"));
+            let mut keys = settings.keys().map(String::as_str).collect::<Vec<_>>();
+            keys.sort_unstable();
+            assert_eq!(keys, ["dashboardView", "hasCompletedSetup"], "{name}");
+            let expected_view = if fixture_id == ParityFixtureId::LightingPopulated {
+                "lighting"
+            } else {
+                "audio"
+            };
+            assert_eq!(settings["dashboardView"], expected_view, "{name}");
+        }
     }
 
     #[test]

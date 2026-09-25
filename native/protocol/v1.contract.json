@@ -1,5 +1,5 @@
 {
-  "version": "1",
+  "version": "2",
   "transport": {
     "mode": "jsonl-over-stdin-stdout",
     "requestKind": "request",
@@ -15,14 +15,7 @@
     "ready",
     "failed"
   ],
-  "devParityFixtures": [
-    "planning-empty",
-    "planning-populated",
-    "lighting-populated",
-    "audio-populated",
-    "setup-required",
-    "setup-ready"
-  ],
+  "devParityFixtures": ["lighting-populated", "audio-populated", "setup-required", "setup-ready"],
   "snapshotShapes": {
     "lightingFixtureVisual": {
       "additiveFields": ["symbolKind", "symbolVariant", "emitterLayout", "output", "visualConfidence"],
@@ -49,7 +42,6 @@
     "audio.sync",
     "audio.talkback.hold",
     "commissioning.check.run",
-    "commissioning.seedPlanningDemo",
     "commissioning.snapshot",
     "commissioning.update",
     "controlSurface.snapshot",
@@ -88,24 +80,6 @@
     "lighting.scene.update",
     "lighting.settings.update",
     "lighting.snapshot",
-    "planning.context",
-    "planning.project.create",
-    "planning.project.delete",
-    "planning.project.reorder",
-    "planning.project.update",
-    "planning.report.time",
-    "planning.select",
-    "planning.settings.update",
-    "planning.snapshot",
-    "planning.task.checklist.add",
-    "planning.task.checklist.delete",
-    "planning.task.checklist.update",
-    "planning.task.create",
-    "planning.task.delete",
-    "planning.task.reschedule",
-    "planning.task.timer",
-    "planning.task.toggleComplete",
-    "planning.task.update",
     "settings.get",
     "settings.update",
     "storage.importLegacyDb",
@@ -123,7 +97,6 @@
     "engine.ready",
     "engine.startupFailed",
     "lighting.changed",
-    "planning.changed",
     "settings.changed",
     "support.changed"
   ]

@@ -2,7 +2,7 @@
   "setup-required": {
     "appSnapshot": {
       "runtime": {
-        "protocol": "1",
+        "protocol": "2",
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
@@ -89,7 +89,7 @@
   "setup-ready": {
     "appSnapshot": {
       "runtime": {
-        "protocol": "1",
+        "protocol": "2",
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,
@@ -265,7 +265,7 @@
   "setup-degraded": {
     "appSnapshot": {
       "runtime": {
-        "protocol": "1",
+        "protocol": "2",
         "engineVersion": "0.1.0",
         "controlSurface": {
           "available": true,

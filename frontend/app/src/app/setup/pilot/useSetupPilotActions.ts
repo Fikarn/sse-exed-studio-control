@@ -1,6 +1,6 @@
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import { startTransition, useMemo } from "react";
-import { asRecord, getCommissioningChecks } from "../../shellData";
+import { asRecord, getCommissioningChecks, withRestoreDetail } from "../../shellData";
 import { openShellPath, exportShellDiagnostics } from "../../shellCommands";
 import type { JsonValue } from "@sse/engine-client";
 import {
@@ -201,10 +201,12 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     // (2026-09 production readiness, Slice 7 — F20); the restored data is
     // what comes back on screen.
     return {
-      message:
+      message: withRestoreDetail(
         result?.requiresRestart === true
           ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
           : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
+        result
+      ),
       tone: "ok" as const,
     };
   };

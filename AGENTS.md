@@ -13,7 +13,7 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 ## What this product is
 
-`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. Planning, DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
+`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Planning was removed in 2026-09 by the new pages program (`docs/plans/new-pages-2026-09.md`: from the screen in Slice 1, from the hardware link, the contract and the saved data in Slice 2), which then removes the keyboard shortcuts and adds Cameras and Teleprompter pages. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
 
 Checkpoint D is complete: the Qt/QML fallback shell, Qt-specific shell automation, and historical Qt parity assets are retired. Do not reintroduce a Qt shell path without a new architecture decision and replacement release plan.
 
@@ -152,7 +152,7 @@ When the selected Tauri shell is open for user inspection, that exact running sh
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Each workspace is a chunk of its own: a spec whose first step after `openFixture` is a key or a one-shot DOM read calls `expectWorkspaceMounted(page, workspace)` first. A value that depends on the page's clock is pinned or driven with `page.clock`, never waited out with a fixed window; a Rust test that drives the shared console link waits on the link's state (`settle_console_link`), never on a sleep (`docs/DEVELOPMENT.md §2c` and "Engine changes").
 - `npm run file:health` fails any source file over 2,000 lines and has no allowlist for source files (production readiness S14): split before a file gets there.
-- **Never start an engine from this branch against the operator's app-data directory.** `npm run tauri:dev`, a release exe or `studio-control-engine.exe` started by hand need `SSE_APP_DATA_DIR` pointing at a scratch directory; the lanes, `native:test` and `rust:coverage` use temporary directories already. A newer build migrates the saved data (schema 7 since production readiness S11) and older builds then refuse it.
+- **Never start an engine from this branch against the operator's app-data directory.** `npm run tauri:dev`, a release exe or `studio-control-engine.exe` started by hand need `SSE_APP_DATA_DIR` pointing at a scratch directory; the lanes, `native:test` and `rust:coverage` use temporary directories already. A newer build migrates the saved data (schema 7 since production readiness S11, schema 8 — Planning's tables and settings gone — since the new pages program's Slice 2) and older builds then refuse it.
 - Target-host lanes: macOS and Windows native verification are both blocking release gates. Treat a Windows target-host failure the same as a macOS failure.
 
 ### CI validation lanes (`.github/workflows/dev-checks.yml`)
@@ -188,7 +188,7 @@ Authoritative source: `docs/RELEASE.md` and `docs/PRODUCTIZATION_PLAN.md`.
 
 Only one piece of pre-v2.0.0 code is intentionally retained:
 
-- `native/rust-engine/src/legacy_import.rs` — one-way importer that reads a legacy Electron `db.json` on first native launch (env var `SSE_LEGACY_DB_PATH`). Do not touch it as part of new feature work; do not extend it; do not mirror it elsewhere.
+- `native/rust-engine/src/legacy_import.rs` — one-way importer that reads a legacy Electron `db.json` on first native launch (env var `SSE_LEGACY_DB_PATH`). Do not touch it as part of new feature work; do not extend it; do not mirror it elsewhere. Since the new pages program's Slice 2 it carries only whether setup is complete and the page to open (the rest of a `db.json`, its Planning data included, is ignored), and the start-up auto-import runs only when the saved data holds no completed setup and no earlier import (an explicit `storage.importLegacyDb` over them needs `force`). It stays until that program's Slice 2b retires it together with `storage.importLegacyDb`, the start-up auto-import and `SSE_LEGACY_DB_PATH`, once the seven lanes and scripts that seed a test engine through it are seeded through the app's own requests.
 
 ## Generated and local-only files
 

@@ -471,11 +471,9 @@ fn deck_keys_leave_rows_for_discrete_changes_only() {
             "saveScene",
             json!({ "scene": { "id": "s", "name": "Scene 4" } }),
         ),
-        (
-            "/api/deck/light-action",
-            "switchToDeckMode",
-            json!({ "deckMode": "light" }),
-        ),
+        // New pages program, Slice 2: `switchToDeckMode` (the page keys' deck
+        // mode, a Planning setting) is refused with 501 on both routes since,
+        // and a refused key never reaches this table; its entry went.
         (
             "/api/deck/audio-action",
             "dialTurn",
@@ -500,11 +498,6 @@ fn deck_keys_leave_rows_for_discrete_changes_only() {
             "/api/deck/audio-action",
             "soloClearAll",
             json!({ "cleared": 0 }),
-        ),
-        (
-            "/api/deck/action",
-            "toggleTimer",
-            json!({ "running": true }),
         ),
     ] {
         assert!(

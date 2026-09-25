@@ -25,14 +25,16 @@ test("supports shell keyboard overlays and workspace switching", async ({ page }
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
 
   await page.keyboard.press("Tab");
+  // New pages program, Slice 2: the deck's pages are LIGHTS and AUDIO (PROJECTS and
+  // TASKS left with Planning), so page 1 opens on "Light 1" and page 2 is AUDIO.
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
-  await expect(page.getByText("Project 1").last()).toBeVisible();
+  await expect(page.getByText("Light 1").last()).toBeVisible();
 
   await page.keyboard.press("Digit2");
-  await expect(page.getByText("Task 1").last()).toBeVisible();
+  await expect(page.getByText("Channel 1").last()).toBeVisible();
 
   await page.keyboard.press("KeyK");
-  await expect(page.getByText("Task 2").last()).toBeVisible();
+  await expect(page.getByText("Channel 2").last()).toBeVisible();
 
   await page.keyboard.press("Shift+Tab");
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
