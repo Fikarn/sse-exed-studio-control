@@ -11,7 +11,8 @@
   "scripts": {
     "build": "style-dictionary build --config ./style-dictionary.config.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit && node ./src/validate-generated.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "style-dictionary": "^5.5.0"

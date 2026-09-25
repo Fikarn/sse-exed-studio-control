@@ -1,13 +1,15 @@
 name: dev-checks
 
 on:
-  pull_request:
-  # Production readiness 2026-09, Slice 0 (finding F03): run on every branch
-  # push, not only on `main`, so a pushed slice is checked before a pull
-  # request exists. Dependabot branches are excluded because they already get
-  # a `pull_request` run and would otherwise run twice.
+  # One run per commit (new pages program, faster checks, 2026-09-25; the
+  # operator's ruling). A push run puts its ten checks on the commit, and a
+  # pull request's required checks read the checks on its head commit, so a
+  # `pull_request` run only tested the same commit again (the branch is kept
+  # up to date with `main`). Every branch runs, Dependabot's included; before
+  # this, Dependabot branches ran on `pull_request` only (production
+  # readiness Slice 0, F03). A pull request from a fork gets no run.
   push:
-    branches: ["**", "!dependabot/**"]
+    branches: ["**"]
 
 permissions:
   contents: read
@@ -68,9 +70,11 @@ jobs:
       - run: npm run frontend:typecheck
 
   # Vitest unit + component tests across the frontend workspaces (app, design
-  # system, engine client, tokens, shared graphics), then the coverage floors
-  # of the app, the design system and the engine client (production
-  # readiness Slice 13).
+  # system, engine client, tokens, shared graphics), run once with coverage:
+  # the floors of the app, the design system and the engine client
+  # (production readiness Slice 13); tokens and shared graphics have none
+  # yet. Until 2026-09-25 the tests ran twice, without and then with coverage
+  # (scripts/frontend-test-gate.test.mjs keeps every workspace in).
   frontend-test:
     runs-on: ubuntu-latest
     steps:
@@ -80,7 +84,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run frontend:test
       # Production readiness S13 (finding F25): the Vitest coverage floors of the
       # app, the design system and the engine client (measured minus two points;
       # each workspace's vitest.config.ts).
@@ -214,17 +217,23 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      # native/rust-toolchain.toml's version, installed as the default, so the
+      # rust-cache key (which hashes the default rustc) does not change when a
+      # new stable ships. The same pin in every Rust job below.
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.95.0"
           components: rustfmt, clippy
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
+          # Saved from `main` only: a branch reads main's cache, and the
+          # 10 GB limit is not spent on copies no other run can read.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
       - run: npm run rust:fmt:check
       - run: npm run rust:clippy
-      - run: npm run native:check
       - run: npm run native:test
       # The development build's parity-fixture method and its F04 guards
       # (`parity_fixture_loads_with_feature`, `load_defaults_to_merge`) exist
@@ -247,12 +256,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
           key: llvm-cov
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
       # native/rust-toolchain.toml pins the toolchain cargo uses under native/;
       # the component has to be added to that one, so rustup runs from there.
@@ -275,7 +287,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
@@ -284,6 +298,7 @@ jobs:
           # `studio-control-engine` profile, this one builds the full Tauri
           # shell. Sharing the cache key would thrash the smaller scope.
           shared-key: tauri-foundation
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
       - run: npm run tauri:foundation
 
@@ -306,11 +321,11 @@ jobs:
   #   xvfb-only runners with a misleading 30s-ish hang during init).
   qualification:
     runs-on: ubuntu-latest
-    # `tauri-foundation` builds the full Tauri shell crate from cold cache.
-    # We reuse its `rust-cache` via the same `shared-key` so the qualification
-    # scripts' `tauri dev` invocation finds a populated target dir. `needs:`
-    # enforces the cache-write/read ordering.
-    needs: tauri-foundation
+    # Starts with the others (faster checks, 2026-09-25). It used to wait for
+    # `tauri-foundation` and share its cache, but that cache holds the release
+    # shell, not the debug `test-bridge` one the lanes run, so the pre-build
+    # compiled about 300 crates on every run anyway (96 s) after a 2.4-minute
+    # wait. It has a cache of its own now.
     env:
       # Persist the qualification evidence inside the workspace so the
       # upload-artifact step can grab it (the default temp-dir behavior
@@ -336,7 +351,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.95.0"
       - uses: ./.github/actions/setup-tauri-linux
       - name: Install xvfb
         run: |
@@ -345,19 +362,20 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
-          # Share `tauri-foundation`'s populated cache (see `needs:`
-          # comment above).
-          shared-key: tauri-foundation
+          # Its own: the debug shell with `test-bridge` and the engine, as
+          # the lanes build them. Saved from `main` only.
+          shared-key: qualification
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
       - name: Pre-build the Tauri shell binary
         # `tauri dev` would otherwise cold-compile the shell crate inside
         # the qualification script's waitForStatus window. Pre-building
         # means `tauri dev` finds an up-to-date binary and reaches
-        # "initial ready state" well inside the timeout. The `--features
-        # test-bridge` flag mirrors what
-        # `frontend/app/package.json:tauri:dev` invokes.
+        # "initial ready state" well inside the timeout. The flags are the
+        # ones `tauri dev --features test-bridge`
+        # (`frontend/app/package.json:tauri:dev`) runs cargo with.
         working-directory: native/tauri-shell
-        run: cargo build --features test-bridge
+        run: cargo build --no-default-features --features test-bridge
       - name: Tauri Setup/Support qualification
         run: xvfb-run -a npm run tauri:setup-support:qualify
       - name: Tauri workspace qualification

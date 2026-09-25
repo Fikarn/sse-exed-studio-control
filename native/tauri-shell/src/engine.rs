@@ -719,11 +719,14 @@ mod tests {
         }
     }
 
-    /// A process that ignores its stdin and lives for half a minute.
+    /// A process that ignores its stdin and lives for half a minute. On
+    /// Windows it is `ping` itself, not `cmd /C ping`: killing `cmd` left
+    /// PING.EXE running with the test run's output handles, so a piped
+    /// `cargo test` sat 20 s after its last test (2026-09-25).
     fn lingering_process() -> std::process::Command {
         if cfg!(windows) {
-            let mut command = std::process::Command::new("cmd");
-            command.args(["/C", "ping -n 30 127.0.0.1 > nul"]);
+            let mut command = std::process::Command::new("ping");
+            command.args(["-n", "30", "127.0.0.1"]);
             command
         } else {
             let mut command = std::process::Command::new("sleep");
