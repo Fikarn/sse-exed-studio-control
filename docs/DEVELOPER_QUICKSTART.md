@@ -77,7 +77,7 @@ Run the fast local gate while working:
 npm run dev:check
 ```
 
-`dev:check` is the normal all-around local code-health gate. It runs Prettier check, ESLint, repository script tests, the tracked-file health guard, Rust format check, clippy, protocol artifact check, frontend typecheck, frontend tests (Vitest), native check, and native tests.
+`dev:check` is the normal all-around local code-health gate. It runs the protocol artifact check, Prettier check, ESLint, repository script tests, the tracked-file health guard, Rust format check, clippy, frontend typecheck, the frontend tests with their coverage floors (Vitest, once) and native tests — side by side, at below-normal priority (`scripts/dev-check.mjs`). `npm run dev:check:serial` runs the same steps one after another at the normal priority; re-run a timing failure there before believing it.
 
 Launch the selected app for visual review:
 

@@ -155,14 +155,17 @@ test("keeps the audio workspace stable during meter-only ticks", async ({ page }
     .toBeGreaterThan(0);
   const initialCanvas = await readMeterCanvasSample(page, "audio-strip-audio-input-9");
 
+  // 2026-09-25: the poll's own move is the proof the canvas repainted. Old: a
+  // fresh read after the poll had to differ from the first read too. Reason:
+  // the meter is live, so its bar can stand on the first read's pixels again —
+  // at 8 workers the poll saw the checksum change and the read after it
+  // matched the first one (the trace of the failure shows both).
   await expect
     .poll(async () => (await readMeterCanvasSample(page, "audio-strip-audio-input-9")).checksum, { timeout: 1_800 })
     .not.toBe(initialCanvas.checksum);
 
-  const finalCanvas = await readMeterCanvasSample(page, "audio-strip-audio-input-9");
   const finalCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_RENDER_COUNTS__ }));
 
-  expect(finalCanvas.checksum).not.toBe(initialCanvas.checksum);
   for (const key of ["audioWorkspace", "audioRail", "audioSignalCanvas", "audioInspector"] as const) {
     expect((finalCounts[key] ?? 0) - (initialCounts[key] ?? 0), key).toBeLessThanOrEqual(1);
   }

@@ -12,7 +12,7 @@
 
 ## Validation
 
-> Required PR CI runs format/lint/typecheck/cargo plus the `frontend-e2e`, `frontend-test`, `tauri-foundation`, and `qualification` jobs on every PR. **Target-host evidence below remains the release acceptance gate** — CI does not replace release-host verification.
+> Required CI runs the ten `dev-checks` jobs (format/lint/typecheck/cargo plus `frontend-e2e`, `frontend-test`, `tauri-foundation`, `qualification` and the rest) once per pushed commit; the PR reads the checks on its head commit. **Target-host evidence below remains the release acceptance gate** — CI does not replace release-host verification.
 
 - [ ] `npm run doctor`
 - [ ] `npm run dev:check`

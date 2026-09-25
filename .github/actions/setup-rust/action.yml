@@ -1,0 +1,28 @@
+name: Set up the project's Rust
+description: |
+  Install the toolchain native/rust-toolchain.toml names (with clippy and
+  rustfmt), make it the default, and remove every other toolchain the runner
+  image carries. Swatinem/rust-cache hashes every installed toolchain into its
+  cache key, so with the image's stable left in place the key changed whenever
+  the image moved to a new Rust, and every branch then built cold until main
+  saved again (the caches are saved from main only). Faster checks, review of
+  2026-09-25. rustup comes with the runner image; no third-party action.
+
+runs:
+  using: composite
+  steps:
+    - name: Install the toolchain rust-toolchain.toml names
+      shell: bash
+      run: |
+        channel="$(sed -n 's/^channel *= *"\(.*\)"$/\1/p' native/rust-toolchain.toml)"
+        if [ -z "$channel" ]; then
+          echo "::error::native/rust-toolchain.toml names no channel"
+          exit 1
+        fi
+        rustup toolchain install "$channel" --profile minimal --component clippy,rustfmt
+        rustup default "$channel"
+        for other in $(rustup toolchain list --quiet | grep -v "^${channel}-"); do
+          rustup toolchain uninstall "$other"
+        done
+        rustup toolchain list
+        rustc --version

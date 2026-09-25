@@ -8,6 +8,7 @@ import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
+import { shellStillRunning } from "./tauri-shell-running.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -240,7 +241,9 @@ async function dispatchCommand(session, child, action, payload = {}) {
 }
 
 async function closeTauriShell(child) {
-  if (child.exitCode !== null) {
+  // Gone means the whole group on Linux, not the npm leader: a leader that
+  // has exited can leave vite or the shell behind, and they are signalled too.
+  if (!shellStillRunning(child)) {
     return;
   }
 
@@ -261,12 +264,15 @@ async function closeTauriShell(child) {
     return;
   }
 
+  // Until the shell's whole process group has gone (`tauri-shell-running.mjs`):
+  // the leader's exitCode stays null after a signal, so waiting on it alone
+  // ran out the deadline on every close.
   const deadline = Date.now() + 5_000;
-  while (child.exitCode === null && Date.now() < deadline) {
+  while (shellStillRunning(child) && Date.now() < deadline) {
     await delay(100);
   }
 
-  if (child.exitCode === null) {
+  if (shellStillRunning(child)) {
     try {
       if (process.platform === "win32") {
         if (child.pid) {
