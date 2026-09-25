@@ -241,7 +241,9 @@ async function dispatchCommand(session, child, action, payload = {}) {
 }
 
 async function closeTauriShell(child) {
-  if (child.exitCode !== null) {
+  // Gone means the whole group on Linux, not the npm leader: a leader that
+  // has exited can leave vite or the shell behind, and they are signalled too.
+  if (!shellStillRunning(child)) {
     return;
   }
 

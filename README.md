@@ -196,7 +196,7 @@ npm run tauri:cutover:candidate
 npm run ci
 ```
 
-Beyond `dev:check`, which also enforces the Vitest coverage floors, three gates need the network or a long build and run as CI jobs: `npm run supply-chain:check` (npm audit for every lockfile and `cargo deny`, against dated exceptions), `npm run rust:coverage` (the Rust line-coverage floor) and the Playwright suite (`npm run frontend:playwright:test`; CI fails on its `default` project, and the quarantine project for wall-clock cases is empty since 2026-09-21). The `dev-checks` workflow runs ten jobs on every push and pull request; `docs/DEVELOPMENT.md §4` explains each.
+Beyond `dev:check`, which also enforces the Vitest coverage floors, three gates need the network or a long build and run as CI jobs: `npm run supply-chain:check` (npm audit for every lockfile and `cargo deny`, against dated exceptions), `npm run rust:coverage` (the Rust line-coverage floor) and the Playwright suite (`npm run frontend:playwright:test`; CI fails on its `default` project, and the quarantine project for wall-clock cases is empty since 2026-09-21). The `dev-checks` workflow runs ten jobs once per pushed commit, on every branch; a pull request reads the checks on its head commit. `docs/DEVELOPMENT.md §4` explains each.
 
 `tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) or Playwright preview.
 

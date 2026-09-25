@@ -217,19 +217,16 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      # native/rust-toolchain.toml's version, installed as the default, so the
-      # rust-cache key (which hashes the default rustc) does not change when a
-      # new stable ships. The same pin in every Rust job below.
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.95.0"
-          components: rustfmt, clippy
+      # native/rust-toolchain.toml's Rust and nothing else, so the rust-cache
+      # key follows the project's toolchain, not the runner image's. The same
+      # action in every Rust job below.
+      - uses: ./.github/actions/setup-rust
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
-          # Saved from `main` only: a branch reads main's cache, and the
-          # 10 GB limit is not spent on copies no other run can read.
+          # Saved from `main` only: every branch reads main's cache, and the
+          # 10 GB limit is not spent on copies only one branch can read.
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
       - run: npm run rust:fmt:check
@@ -256,9 +253,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.95.0"
+      - uses: ./.github/actions/setup-rust
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
@@ -287,9 +282,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.95.0"
+      - uses: ./.github/actions/setup-rust
       - uses: ./.github/actions/setup-tauri-linux
       - uses: Swatinem/rust-cache@v2
         with:
@@ -351,9 +344,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: "1.95.0"
+      - uses: ./.github/actions/setup-rust
       - uses: ./.github/actions/setup-tauri-linux
       - name: Install xvfb
         run: |
@@ -362,8 +353,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native -> target
-          # Its own: the debug shell with `test-bridge` and the engine, as
-          # the lanes build them. Saved from `main` only.
+          # Its own: the dependencies of the debug `test-bridge` shell and of
+          # the engine, as the lanes build them (rust-cache keeps dependencies,
+          # not the workspace's own crates). Saved from `main` only.
           shared-key: qualification
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: npm ci
@@ -373,7 +365,11 @@ jobs:
         # means `tauri dev` finds an up-to-date binary and reaches
         # "initial ready state" well inside the timeout. The flags are the
         # ones `tauri dev --features test-bridge`
-        # (`frontend/app/package.json:tauri:dev`) runs cargo with.
+        # (`frontend/app/package.json:tauri:dev`) runs cargo with; with
+        # `default = []` in the shell's Cargo.toml `--no-default-features`
+        # changes nothing today. The first launch still rebuilds the shell
+        # crate itself for a few seconds: the Tauri CLI's environment
+        # re-runs its build script.
         working-directory: native/tauri-shell
         run: cargo build --no-default-features --features test-bridge
       - name: Tauri Setup/Support qualification

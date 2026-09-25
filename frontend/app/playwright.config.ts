@@ -59,7 +59,10 @@ const QUARANTINE =
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
-  workers: 3,
+  // Faster checks, 2026-09-25: eight on the studio workstation (32 threads;
+  // the full lane 188 s -> about 94 s), at below-normal priority
+  // (scripts/frontend/run-playwright.mjs); CI's four-core runner keeps 3.
+  workers: process.env.CI ? 3 : 8,
   use: {
     baseURL: "http://127.0.0.1:4173",
     viewport: { width: 2560, height: 1440 },
