@@ -1,6 +1,6 @@
 # SSE ExEd Studio Control
 
-SSE ExEd Studio Control is a local-first desktop control application for a fixed studio workstation. It combines production planning, lighting control, audio control, and Stream Deck commissioning into one operator-facing surface designed to stay open full-time on a dedicated second monitor.
+SSE ExEd Studio Control is a local-first desktop control application for a fixed studio workstation. It combines lighting control, audio control, and Stream Deck commissioning into one operator-facing surface designed to stay open full-time on a dedicated second monitor.
 
 This repository is intentionally optimized for a specific deployment profile rather than a generic SaaS dashboard:
 
@@ -14,7 +14,7 @@ This repository is intentionally optimized for a specific deployment profile rat
 - selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
-- one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators
+- one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators; since the new pages program's Slice 2 it carries only whether setup is complete and the page to open, and that program's Slice 2b retires it
 
 The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipping runtime passed macOS and Windows target-host evidence. QtIFW remains the installer and update-repository wrapper.
 
@@ -41,18 +41,18 @@ Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.m
 
 All captures below are deterministic Tauri native renders at the target `2560x1440` operator-monitor resolution. Current visual review is produced through the local evidence lanes described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-| Planning                                                                                             | Lighting                                                                                                    |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| ![Planning workspace with populated projects and tasks](docs/release-assets/screenshot-planning.png) | ![Lighting workspace with populated fixtures and spatial plot](docs/release-assets/screenshot-lighting.png) |
+| Lighting                                                                                                    | Audio                                                                                             |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| ![Lighting workspace with populated fixtures and spatial plot](docs/release-assets/screenshot-lighting.png) | ![Audio workspace with the RME UFX III control surface](docs/release-assets/screenshot-audio.png) |
 
-| Audio                                                                                             | Setup / Commissioning                                                                                            |
-| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| ![Audio workspace with the RME UFX III control surface](docs/release-assets/screenshot-audio.png) | ![Setup control-surface commissioning with a selected control](docs/release-assets/screenshot-setup-control.png) |
+| Setup / Commissioning                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------- |
+| ![Setup control-surface commissioning with a selected control](docs/release-assets/screenshot-setup-control.png) |
 
 ## Operator Lifecycle
 
 - First launch starts the selected native shell, launches the bundled Rust engine, and waits for engine readiness before routing into commissioning or the dashboard
-- First-run commissioning is available from inside the app for planning, lighting, and Companion setup
+- First-run commissioning is available from inside the app for lighting, audio, and Companion setup
 - Closing the main window shows a warning and then fully quits the app if confirmed
 - Restored workspace and shell state come from the engine snapshot, not shell-local browser state
 - User data stays local on the workstation and survives reinstall/update flows unless manually removed
@@ -65,7 +65,7 @@ Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
 ## Product Surface
 
-Every workspace reads as one instrument. The shell is the same on all four —
+Every workspace reads as one instrument. The shell is the same on all three —
 header, a fixed cluster down the left that says what the subsystem is and carries
 the take-time keys, the bay in the middle, the plate on the right showing the
 whole selected thing at once, and one footer along the bottom. Nothing scrolls
@@ -75,11 +75,7 @@ reported. The visual system is specified in
 measured on every board by the UI contract — see
 [docs/DEVELOPMENT.md §2c](docs/DEVELOPMENT.md).
 
-### Planning
-
-- dense Kanban workspace for always-visible production tracking
-- keyboard-first project and task operations
-- timer, status, and priority visibility without consuming the whole console
+The Planning workspace was removed in 2026-09 at the operator's request (the new pages program, [docs/plans/new-pages-2026-09.md](docs/plans/new-pages-2026-09.md)); the same program is to add a Cameras and a Teleprompter workspace.
 
 ### Lighting
 

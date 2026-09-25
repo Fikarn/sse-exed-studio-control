@@ -85,8 +85,8 @@ Repo commands for the native release path:
 - `npm run native:sign:win:release`
 
 The prepare commands stage QtIFW metadata and payload layout for the selected release runtime. The local commands run `binarycreator` or `repogen` when QtIFW is installed and the tools are available on `PATH` or via `SSE_QT_IFW_BINARYCREATOR` / `SSE_QT_IFW_REPOGEN`.
-The packaged acceptance commands verify that the packaged shell selected by `scripts/native-release-runtime.json` and the bundled engine can import data, reopen against the same app-data directory, restore a support backup, and relaunch without losing operator state.
-The control-surface bridge qualification commands run the packaged engine on a dedicated localhost port, fail if the bundled bridge cannot bind, verify real HTTP behavior for `/api/deck/context`, `/api/deck/lcd`, `/api/deck/action`, `/api/deck/light-action`, and `/api/deck/audio-action` with the bridge token the engine wrote, prove the refusals (`401` / `403` / `400` / `413` / `408`) and the percent-decoded LCD key, and check that the exported Stream Deck profile carries the token on every request.
+The packaged acceptance commands verify that the packaged shell selected by `scripts/native-release-runtime.json` and the bundled engine can import data, reopen against the same app-data directory, restore a support backup, and relaunch without losing operator state. Since the new pages program's Slice 2 the imported data is the legacy workstation file's setup flag and page to open (Slice 2b retires that import), and the backup is a format-5 archive with no Planning.
+The control-surface bridge qualification commands run the packaged engine on a dedicated localhost port, fail if the bundled bridge cannot bind, verify real HTTP behavior for `/api/deck/context`, `/api/deck/lcd`, `/api/deck/light-action`, and `/api/deck/audio-action` with the bridge token the engine wrote, prove the refusals (`401` / `403` / `400` / `413` / `408`) and the percent-decoded LCD key, and check that the exported Stream Deck profile carries the token on every request, holds the pages LIGHTS and AUDIO with a page-follow trigger for each, posts only to the lighting and audio routes, and reads only LCDs the bridge answers. (`/api/deck/action`, the PROJECTS and TASKS keys' route, left with Planning in Slice 2.)
 The checksum commands write per-platform SHA256 manifests for the native release artifacts. Full mode covers the packaged bundle, installer, and update-repository archive; staged mode covers the packaged bundle when QtIFW tools are not present locally.
 The artifact verification commands assert the expected package identity, staged payload names, final installer/update archive outputs, checksum-manifest integrity, and payload consistency across the packaged bundle plus installer/update staging after those builds complete.
 The continuity verification commands compare the current native installer/update metadata against the previous lower `v*` tag and fail if the native package identity changes or the version does not advance.
@@ -312,7 +312,7 @@ Test on a clean machine or VM when possible:
 1. Install the app from the offline installer.
 2. Launch and confirm commissioning or dashboard routing is correct for that machine state.
 3. Verify restart and shutdown behavior remain deterministic.
-4. Reopen and confirm planning data is still present.
+4. Reopen and confirm the saved data is still present — a harmless lighting group created before closing, for example (Planning, which this step used to check, left Studio Control in 2026-09).
 5. Trigger a manual support backup export.
 6. Download the Companion profile and import it.
 7. Apply a newer tagged release through the maintenance-tool repository or a newer offline installer and verify user data is preserved.

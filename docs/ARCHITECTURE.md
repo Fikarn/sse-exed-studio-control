@@ -7,7 +7,8 @@ This application is a local-first studio workstation. The primary jobs are:
 - lighting control
 - audio control
 - Stream Deck / Companion control-surface support
-- production planning as a secondary workspace
+
+Production planning was a secondary workspace until the new pages program (`docs/plans/new-pages-2026-09.md`) removed it: from the screen in Slice 1, from the engine, the contract and the saved data (schema 8) in Slice 2. The same program later adds two workspaces, Cameras and Teleprompter (its Part C).
 
 Everything assumes a single trusted machine with no cloud dependency. Supported hardware assumptions are documented in [HARDWARE_PROFILE.md](HARDWARE_PROFILE.md).
 
@@ -24,7 +25,7 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 ### Rust engine
 
 - owns persisted state, schema migrations, and legacy import
-- owns planning, commissioning, dashboard, support, lighting, audio, and control-surface contracts
+- owns commissioning, dashboard, support, lighting, audio, and control-surface contracts
 - owns device-facing safety rules, diagnostics, and recovery behavior
 - exposes snapshots and commands over the native protocol in `native/protocol/v1.md`
 
@@ -37,6 +38,8 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 ## Legacy Import
 
 The Electron/Next.js runtime was removed in `v2.1.0`. A one-way import path in `native/rust-engine/src/legacy_import.rs` remains so that operators migrating from a pre-`v2.0.0` installation can bring their old `db.json` forward on first native launch. The legacy runtime itself is no longer in the repository.
+
+Since the new pages program's Slice 2 the import carries only what is not Planning — whether setup is complete and the page to open — and ignores the rest of a `db.json`. It is interim: Slice 2b retires it (`storage.importLegacyDb`, the start-up auto-import and `SSE_LEGACY_DB_PATH`) once the lanes that seed a test engine through it are seeded through the app's own requests.
 
 ## Studio Module Pattern
 
@@ -74,12 +77,11 @@ Any native studio domain should follow the same shape:
 
 ## Current Module Ownership
 
-- `native/rust-engine/src/planning/`: planning storage, snapshots, and mutations
 - `native/rust-engine/src/commissioning.rs`: commissioning state and probe flows
 - `native/rust-engine/src/lighting/`: lighting snapshot, recall, fixture catalog, DMX mapping/validation, scene serialization, and simulated backend boundary
 - `native/rust-engine/src/audio/`: audio snapshot, sync, recall, and simulated backend boundary
 - `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
-- `native/rust-engine/src/control_surface.rs`: Stream Deck bridge and Companion export generation
+- `native/rust-engine/src/control_surface.rs`, `exports.rs`: Stream Deck bridge and Companion export generation (the deck's pages, their order and the page-follow triggers come from one list, `DECK_PAGES` in `exports.rs`)
 - `native/rust-engine/src/control_surface_http.rs`: the bridge's HTTP reader, bearer-token authorization and worker pool (2026-09 production readiness, Slice 2)
 - `native/rust-engine/src/storage.rs`, `storage_backups.rs`: SQLite storage, schema migrations, the integrity check at start and the verified database backups (Slice 3)
 - `native/rust-engine/src/health.rs`: the health registry `health.snapshot` derives its status from (Slice 8)

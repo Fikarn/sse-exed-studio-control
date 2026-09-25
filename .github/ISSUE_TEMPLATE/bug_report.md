@@ -20,7 +20,6 @@ What you expected to happen.
 
 **Affected surface**
 
-- [ ] Planning / dashboard
 - [ ] Lighting
 - [ ] Audio
 - [ ] Setup / commissioning

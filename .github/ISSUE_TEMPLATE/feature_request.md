@@ -14,7 +14,6 @@ What you'd like to see added or changed.
 
 **Affected surface**
 
-- [ ] Planning / dashboard
 - [ ] Lighting
 - [ ] Audio
 - [ ] Setup / commissioning
