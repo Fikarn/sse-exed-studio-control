@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 // plan PR 6 / workstream D3 (fixture schema piece): hand-rolled invariant
 // checks for the fixtures consumed by Playwright + Vitest. Previously this
 // script only asserted KEY PRESENCE — a fixture with the right id but the
-// wrong shape (missing appSnapshot, planning with no projects array, etc.)
+// wrong shape (missing appSnapshot, lighting with no fixtures array, etc.)
 // would still pass. The audit called this out as a silent-drift risk.
 // Adding a dedicated Zod dep felt heavy for one consumer, so we use simple
 // hand-rolled invariants instead.
@@ -14,14 +14,7 @@ const packageDir = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.join(packageDir, "fixtures.json");
 const fixtures = JSON.parse(readFileSync(fixturePath, "utf8"));
 
-const required = [
-  "setup-required",
-  "setup-ready",
-  "lighting-populated",
-  "audio-populated",
-  "planning-empty",
-  "planning-populated",
-];
+const required = ["setup-required", "setup-ready", "lighting-populated", "audio-populated"];
 
 function fail(scenario, message) {
   throw new Error(`Fixture '${scenario}' invariant failed: ${message}`);
@@ -117,16 +110,6 @@ function validateFixture(scenario, entry) {
       requireBoolean(scenario, entry.audioSnapshot.verified, "audioSnapshot.verified");
     }
     requireWord(scenario, entry.audioSnapshot.status, CONSOLE_WORDS, "audioSnapshot.status");
-  }
-
-  if (entry.planningSnapshot !== undefined && entry.planningSnapshot !== null) {
-    requireObject(scenario, entry.planningSnapshot, "planningSnapshot");
-    if (entry.planningSnapshot.projects !== undefined) {
-      requireArray(scenario, entry.planningSnapshot.projects, "planningSnapshot.projects");
-    }
-    if (entry.planningSnapshot.tasks !== undefined) {
-      requireArray(scenario, entry.planningSnapshot.tasks, "planningSnapshot.tasks");
-    }
   }
 
   if (entry.lightingSnapshot !== undefined && entry.lightingSnapshot !== null) {

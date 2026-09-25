@@ -10,7 +10,7 @@ import styles from "./AppShellFrame.module.css";
 
 // Visual overhaul A, Slice 2 (plan D1, D4; system §2): the shell is one grid
 // on every surface — header · cluster | bay | plate · footer. The header
-// carries the crest, the product with its owner's eyebrow, the four tabs,
+// carries the crest, the product with its owner's eyebrow, the workspace tabs,
 // the subsystem lamps, the latches and the clock; the cluster and the plate
 // are slots a workspace fills (Slices 4–7), the bay is the recessed floor its
 // picture sits on. Every region declares `data-region` so the UI contract

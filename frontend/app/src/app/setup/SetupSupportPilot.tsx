@@ -41,7 +41,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
           steps={clusterSteps}
           onExportBackup={() => void performAction("support-export", exportSupportBackup)}
           onOpenEngineLog={openEngineLog}
-          onReturnToConsole={() => void store.setWorkspace("planning")}
+          onReturnToConsole={() => void store.setWorkspace("audio")}
           onRunAllProbes={() => {
             persistMode("runner");
             void activateStep("probe");

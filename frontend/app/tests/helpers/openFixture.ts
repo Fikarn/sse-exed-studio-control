@@ -4,10 +4,7 @@ import { readFileSync } from "node:fs";
 
 // plan PR 4 / workstream D4: shared fixture-loading helper. Every per-surface
 // spec uses this to navigate to a fixture-backed instance of the operator
-// shell. Planning fixtures freeze `page.clock` so relative-time labels
-// stay stable across runs (mirrors what visual-review.spec.ts does).
-
-export const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
+// shell.
 
 export const fixtureMap = JSON.parse(
   readFileSync(new URL("../../../packages/test-fixtures/src/fixtures.json", import.meta.url), "utf-8")
@@ -18,14 +15,11 @@ export async function openFixture(
   fixtureId: string,
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
-    crash?: "setup" | "lighting" | "audio" | "planning";
+    crash?: "setup" | "lighting" | "audio";
     operatorReview?: "studio";
     theme?: "graphite" | "bone";
   }
 ) {
-  if (fixtureId.startsWith("planning-")) {
-    await page.clock.setFixedTime(FIXTURE_NOW);
-  }
   const params = new URLSearchParams({
     fixture: fixtureId,
     transport: "fixture",
@@ -56,7 +50,6 @@ const WORKSPACE_MARKS = {
   setup: "setup-workspace",
   lighting: "lighting-stage",
   audio: "audio-monitor-bar",
-  planning: "planning-screen",
 } as const;
 
 export async function expectWorkspaceMounted(

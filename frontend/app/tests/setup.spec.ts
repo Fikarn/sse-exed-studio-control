@@ -52,7 +52,8 @@ test("walks the fixture-backed commissioning runner and support actions", async 
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
 
   await page.getByRole("button", { name: "Publish setup" }).click();
-  await expect(page.getByTestId("planning-workspace")).toBeVisible();
+  // New pages program, Slice 1 (D1): Publish opens the Console. Old: Planning.
+  await expectWorkspaceMounted(page, "audio");
 });
 
 test("publish refuses failing probes until the operator overrides explicitly", async ({ page }) => {
@@ -93,14 +94,16 @@ test("publish refuses failing probes until the operator overrides explicitly", a
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
-  await expect(page.getByTestId("planning-workspace")).toHaveCount(0);
+  // New pages program, Slice 1 (D1): Publish opens the Console, so the Console
+  // is what must not have opened. Old: the Planning workspace.
+  await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
 
   await page.getByTestId("setup-step-primary").click();
   await page
     .getByRole("dialog", { name: "Publish with failing probes?" })
     .getByRole("button", { name: "Publish anyway" })
     .click();
-  await expect(page.getByTestId("planning-workspace")).toBeVisible();
+  await expectWorkspaceMounted(page, "audio");
 });
 
 test("opens support mode and exercises backup workflows", async ({ page }) => {
@@ -203,30 +206,6 @@ test("the step screen needs no scroll at 1280x800 (SET-11)", async ({ page }) =>
     expect(controlBox, testId).not.toBeNull();
     expect(controlBox!.y + controlBox!.height, testId).toBeLessThanOrEqual(800);
   }
-});
-
-// 2026-09 audit remediation, Slice 12: seeding demo planning data is a
-// confirmed action (it used to fire on a single click next to the profile
-// download).
-test("loading sample planning asks for confirmation first", async ({ page }) => {
-  await openFixture(page, "setup-required");
-  await page.getByRole("tab", { name: /Import profile/i }).click();
-
-  // Slice 7: the sample data lives on the Support plate, which is always on
-  // screen — the import step no longer carries it next to the profile download.
-  await page.getByTestId("support-load-sample-planning").click();
-  const dialog = page.getByRole("dialog", { name: "Load sample planning data?" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText(/adds the bundled sample projects/)).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel" }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText(/Loaded the bundled sample planning data/)).toHaveCount(0);
-
-  await page.getByTestId("support-load-sample-planning").click();
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Load sample planning" }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText(/Loaded the bundled sample planning data/)).toBeVisible();
 });
 
 // ---------------------------------------------------------------------------

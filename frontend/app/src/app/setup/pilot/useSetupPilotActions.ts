@@ -96,14 +96,6 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     };
   };
 
-  const loadSamplePlanning = async () => {
-    await store.seedPlanningDemo(false);
-    return {
-      message: "Loaded the bundled sample planning data for commissioning support.",
-      tone: "info" as const,
-    };
-  };
-
   const runSingleProbe = async (target: "control-surface" | "lighting" | "audio") => {
     const params =
       target === "lighting"
@@ -185,7 +177,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
       ...(overrideProbes ? { overrideProbes: true } : {}),
     });
     const backup = asRecord(await store.exportSupportBackup());
-    await store.setWorkspace("planning");
+    await store.setWorkspace("audio");
 
     return {
       message: overrideProbes
@@ -282,7 +274,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     if (activeStepId === "verify") {
       return "Continue to publish";
     }
-    return isReady ? "Open planning" : "Publish setup";
+    return isReady ? "Open the Console" : "Publish setup";
   }, [activeStepId, isReady]);
 
   const invokePrimaryAction = useLiveCallback(() => {
@@ -318,10 +310,10 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     }
 
     if (isReady) {
-      void performAction("open-planning", async () => {
-        await store.setWorkspace("planning");
+      void performAction("open-console", async () => {
+        await store.setWorkspace("audio");
         return {
-          message: "Opened the Planning workspace.",
+          message: "Opened the Console.",
           tone: "info" as const,
         };
       });
@@ -358,7 +350,6 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     activateStep,
     persistMode,
     saveImportProfile,
-    loadSamplePlanning,
     runSingleProbe,
     runAllProbes,
     publishSetup,

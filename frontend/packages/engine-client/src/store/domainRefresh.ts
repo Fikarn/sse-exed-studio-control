@@ -14,7 +14,6 @@ export type DomainKey =
   | "lighting"
   | "lightingDmxMonitor"
   | "audio"
-  | "planning"
   | "support"
   | "controlSurface";
 
@@ -26,7 +25,6 @@ export const DOMAIN_REQUESTS = {
   lighting: "lighting.snapshot",
   lightingDmxMonitor: "lighting.dmxMonitor.snapshot",
   audio: "audio.snapshot",
-  planning: "planning.snapshot",
   support: "support.snapshot",
   controlSurface: "controlSurface.snapshot",
 } as const satisfies Record<DomainKey, RequestMethod>;
@@ -59,11 +57,6 @@ const LIGHTING_DOMAINS = ["lighting", "lightingDmxMonitor"] as const;
 // found the monitor half of this on the live hardware link.)
 const COMMISSIONING_DOMAINS = ["commissioning", "app", "health", ...LIGHTING_DOMAINS, "audio"] as const;
 
-// The commissioning snapshot carries the planning store's project and task
-// counts (Setup prints them and offers the sample seed by them), so a planning
-// change moves it too. (The setup-support qualification lane found this one.)
-const PLANNING_DOMAINS = ["planning", "commissioning"] as const;
-
 /**
  * The snapshots each event can change. `satisfies` keeps the list complete:
  * an event added to the protocol fails the typecheck here until it is mapped.
@@ -80,7 +73,12 @@ export const EVENT_DOMAIN_REFRESH = {
   "engine.ready": [],
   "engine.startupFailed": [],
   "lighting.changed": LIGHTING_DOMAINS,
-  "planning.changed": PLANNING_DOMAINS,
+  // New pages program, Slice 1: Planning left the screen, and nothing asks for
+  // its snapshot. Until Slice 2 the hardware link still raises this event (the
+  // Stream Deck's project and task keys) and still counts projects and tasks in
+  // the commissioning snapshot, whose summary Setup prints — so that one
+  // snapshot is still refreshed. Slice 2 removes the event.
+  "planning.changed": ["commissioning"],
   "settings.changed": ["app"],
   "support.changed": ["support"],
 } as const satisfies Record<EventName, readonly DomainKey[]>;
@@ -99,8 +97,6 @@ export function domainsForEvent(eventName: string): { domains: readonly DomainKe
 // so the specific methods stand before their prefix.
 const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: readonly DomainKey[]]> = [
   ["settings.update", ["app"]],
-  // Seeds planning data and publishes commissioning in one request.
-  ["commissioning.seedPlanningDemo", [...COMMISSIONING_DOMAINS, "planning"]],
   ["commissioning.", COMMISSIONING_DOMAINS],
   // The armed switch is an action-log row of its own, and Setup / Support
   // lists those rows beside the switch: the list moves with it. (Recording
@@ -111,7 +107,6 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   // selection and the grand master only (`LightingSettingsUpdateRequest`),
   // never the bridge address whose change would reset the lighting probe.
   ["lighting.", LIGHTING_DOMAINS],
-  ["planning.", PLANNING_DOMAINS],
   // An applied archive rewrites lighting and audio settings as well, and no
   // lighting or audio event says so.
   ["support.backup.restore", CHANGEABLE_DOMAINS],
@@ -125,14 +120,13 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
 // backups folder unannounced, the health sentences describe lighting and
 // audio state that moves without a health event, and a recorded action
 // raises no `support.changed`. (The Stream Deck's keys raise lighting.changed
-// and planning.changed since production readiness Slice 10.) Scoped refreshes no longer sweep those up
+// since production readiness Slice 10.) Scoped refreshes no longer sweep those up
 // by accident, so the moment the operator looks is when they are fetched —
 // two to five requests where every switch used to cost ten.
 const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
   setup: ["health", "commissioning", "support", "controlSurface"],
   lighting: LIGHTING_DOMAINS,
   audio: ["audio"],
-  planning: PLANNING_DOMAINS,
 };
 
 /**

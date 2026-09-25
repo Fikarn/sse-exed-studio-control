@@ -1,16 +1,5 @@
 import { useState } from "react";
-import {
-  Bell,
-  Calendar,
-  Check,
-  Download,
-  Mic,
-  Plus,
-  Sliders,
-  SlidersHorizontal,
-  Sun,
-  WandSparkles,
-} from "lucide-react";
+import { Bell, Check, Download, Mic, Plus, Sliders, SlidersHorizontal, Sun, WandSparkles } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
@@ -210,7 +199,7 @@ function PrimitiveConsoleBoard() {
               tone="ready"
             />
             <DenseListRow detail="Engine diagnostic available" meta="2 notes" title="Lighting patch" tone="warning" />
-            <DenseListRow detail="No scheduled task selected" meta="Idle" title="Planning board" tone="muted" />
+            <DenseListRow detail="No channel selected" meta="Idle" title="Audio console" tone="muted" />
           </DenseList>
         </InspectorSection>
 
@@ -218,7 +207,7 @@ function PrimitiveConsoleBoard() {
           <EmptyState
             actions={<Button size="compact">Create placeholder</Button>}
             message="The operator can continue; no engine state is synthesized here."
-            title="No task selected"
+            title="No channel selected"
           />
           <DegradedState
             actions={
@@ -269,7 +258,6 @@ export const DirectionDNavItem: StoryObj<typeof meta> = {
     <div style={dStage}>
       <div style={{ ...dRow, gap: "4px" }}>
         <NavItem id="setup" label="Setup" icon={<Sliders size={16} />} />
-        <NavItem id="planning" label="Planning" icon={<Calendar size={16} />} />
         <NavItem id="lighting" label="Lighting" icon={<Sun size={16} />} active />
         <NavItem id="audio" label="Audio" icon={<Mic size={16} />} />
       </div>
@@ -517,7 +505,6 @@ export const AShellTabs: StoryObj<typeof meta> = {
       <Tab id="setup" label="Setup / Support" hint="Ctrl+1" />
       <Tab id="lighting" label="Lighting" hint="Ctrl+2" />
       <Tab id="audio" label="Audio" hint="Ctrl+3" active />
-      <Tab id="planning" label="Planning" hint="Ctrl+4" disabled />
     </div>
   ),
 };

@@ -48,10 +48,9 @@ const stories: StoryEntry[] = Object.values(index.entries).map((entry) => ({
 }));
 
 function shouldFreezeClock(storyId: string) {
-  // Planning stories render relative time labels ("in 5 minutes"), and every
-  // shell story prints the header clock (visual overhaul A, Slice 2). Freeze
-  // the clock so the captures are stable.
-  return storyId.includes("planning") || storyId.includes("operatorshell");
+  // Every shell story prints the header clock (visual overhaul A, Slice 2).
+  // Freeze the clock so the captures are stable.
+  return storyId.includes("operatorshell");
 }
 
 function shouldAwaitAudioHydration(storyId: string) {

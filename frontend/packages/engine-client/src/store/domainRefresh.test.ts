@@ -17,7 +17,7 @@ describe("domainRefresh", () => {
   const everyMapping: Array<[string, readonly DomainKey[]]> = [
     ...EVENT_NAMES.map((event): [string, readonly DomainKey[]] => [event, EVENT_DOMAIN_REFRESH[event]]),
     ...REQUEST_METHODS.map((method): [string, readonly DomainKey[]] => [method, domainsForMethod(method)]),
-    ...(["setup", "lighting", "audio", "planning"] as const).map((workspace): [string, readonly DomainKey[]] => [
+    ...(["setup", "lighting", "audio"] as const).map((workspace): [string, readonly DomainKey[]] => [
       `opening ${workspace}`,
       domainsForMethod("settings.update", { workspace }),
     ]),
@@ -48,14 +48,14 @@ describe("domainRefresh", () => {
     for (const domain of ALL_DOMAINS) {
       expect(REQUEST_METHODS).toContain(DOMAIN_REQUESTS[domain]);
     }
-    expect(ALL_DOMAINS).toHaveLength(10);
+    expect(ALL_DOMAINS).toHaveLength(9);
   });
 
   it("maps a request by its own name before its prefix", () => {
     expect(domainsForMethod("settings.update")).toEqual(["app"]);
-    // The commissioning snapshot carries the planning store's counts — the
-    // setup-support qualification lane failed on a project count left at 2.
-    expect(domainsForMethod("planning.task.create")).toEqual(["planning", "commissioning"]);
+    // New pages program, Slice 1: nothing on screen sends a Planning request
+    // any more, so none is mapped; the hardware link answers them until Slice 2.
+    expect(domainsForMethod("planning.task.create")).toEqual(CHANGEABLE_DOMAINS);
     expect(domainsForMethod("lighting.scene.recall")).toEqual(["lighting", "lightingDmxMonitor"]);
     // Slice 11: the armed switch sits beside the Recent actions list and is a
     // row in it, so the list moves with the switch. No other lighting request
@@ -69,8 +69,9 @@ describe("domainRefresh", () => {
     }
     expect(domainsForMethod("support.backup.export")).toEqual(["support"]);
     expect(domainsForMethod("support.backup.restore")).toEqual(CHANGEABLE_DOMAINS);
-    expect(domainsForMethod("commissioning.seedPlanningDemo")).toContain("planning");
-    expect(domainsForMethod("commissioning.check.run")).not.toContain("planning");
+    // The sample Planning seed left Setup / Support with the page: it is no
+    // longer mapped apart from the other commissioning requests.
+    expect(domainsForMethod("commissioning.seedPlanningDemo")).toEqual(domainsForMethod("commissioning.check.run"));
     expect(domainsForMethod("exports.companion.export")).toEqual([]);
     // Not a prefix match on a name that merely starts the same.
     expect(domainsForMethod("settings.updateAll")).toEqual(CHANGEABLE_DOMAINS);
@@ -92,10 +93,14 @@ describe("domainRefresh", () => {
       "controlSurface",
     ]);
     expect(domainsForMethod("settings.update", { workspace: "somewhere new" })).toEqual(["app"]);
+    // A page the front end no longer has adds nothing either (new pages program, Slice 1).
+    expect(domainsForMethod("settings.update", { workspace: "planning" })).toEqual(["app"]);
   });
 
   it("says whether it knew the event", () => {
-    expect(domainsForEvent("planning.changed")).toEqual({ domains: ["planning", "commissioning"], known: true });
+    // Until Slice 2 the hardware link still raises it, and still counts projects
+    // and tasks in the commissioning snapshot whose summary Setup prints.
+    expect(domainsForEvent("planning.changed")).toEqual({ domains: ["commissioning"], known: true });
     expect(domainsForEvent("rig.changed")).toEqual({ domains: CHANGEABLE_DOMAINS, known: false });
   });
 });

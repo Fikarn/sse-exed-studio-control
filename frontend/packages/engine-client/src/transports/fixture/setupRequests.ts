@@ -14,11 +14,9 @@ import {
   validatePort,
   countControls,
   buildFixtureBackupEntry,
-  countPlanningActivity,
   findFixtureBackup,
 } from "./state";
 import type { CommissioningStage, RunnerStage, CommissioningCheckTarget } from "../../types";
-import { buildSeededPlanningSnapshot } from "./planning";
 
 /** Setup / Support's requests: shell settings, commissioning, backups, the Stream Deck profile export. */
 export function handleFixtureSetupRequest(
@@ -201,13 +199,6 @@ export function handleFixtureSetupRequest(
       }
       return cloneJson(state.commissioningSnapshot);
     }
-    case "commissioning.seedPlanningDemo": {
-      state.planningSnapshot = buildSeededPlanningSnapshot();
-      synchronizeFixtureState(state);
-      emit("planning.changed", { reason: "sample-planning-seeded" });
-      emit("commissioning.changed", { reason: "sample-planning-seeded" });
-      return cloneJson(state.commissioningSnapshot);
-    }
     case "support.backup.export": {
       const backupEntry = buildFixtureBackupEntry(state);
       const backups = asArray(state.supportSnapshot.backups)
@@ -217,25 +208,23 @@ export function handleFixtureSetupRequest(
       state.supportSnapshot.backups = backups;
       synchronizeFixtureState(state);
       emit("support.changed", { reason: "backup-exported" });
+      // New pages program, Slice 1: the double holds no Planning data, so its
+      // replies no longer count projects, tasks, checklist items or activity
+      // (the hardware link still does until Slice 2; nothing on screen reads them).
       return {
         actionCount: countControls(state),
-        activityEntryCount: countPlanningActivity(state),
         fileName: backupEntry.name,
         formatVersion: 4,
         path: backupEntry.path,
-        projectCount: asNumber(state.commissioningSnapshot.planningProjectCount, 0),
-        taskCount: asNumber(state.commissioningSnapshot.planningTaskCount, 0),
       };
     }
     case "support.backup.verify": {
       const path = asString(params.path);
       const match = findFixtureBackup(state, path);
       const kind = path.endsWith(".sqlite3") ? "database" : "archive";
-      const projectCount = asNumber(state.commissioningSnapshot.planningProjectCount, 0);
-      const taskCount = asNumber(state.commissioningSnapshot.planningTaskCount, 0);
       if (kind === "database") {
         return {
-          detail: `Database backup, schema 6, integrity ok: ${projectCount} projects, ${taskCount} tasks and 40 settings.`,
+          detail: "Database backup, schema 6, integrity ok: 40 settings.",
           kind,
           ok: true,
           path,
@@ -244,7 +233,7 @@ export function handleFixtureSetupRequest(
       }
       const exportedAt = new Date(asNumber(match?.modifiedAt, Date.now())).toISOString();
       return {
-        detail: `Backup archive, format 4, exported ${exportedAt}: ${projectCount} projects and ${taskCount} tasks.`,
+        detail: `Backup archive, format 4, exported ${exportedAt}.`,
         formatVersion: 4,
         kind,
         ok: true,
@@ -259,7 +248,6 @@ export function handleFixtureSetupRequest(
       // store restarts the link on `requiresRestart` (Slice 7 — F20).
       const databaseRestore = path.endsWith(".sqlite3");
 
-      state.planningSnapshot = buildSeededPlanningSnapshot();
       state.commissioningSnapshot.runnerStage = "publish";
       state.commissioningSnapshot.stage = "ready";
       state.commissioningSnapshot.hasCompletedSetup = true;
@@ -277,19 +265,14 @@ export function handleFixtureSetupRequest(
       } else {
         emit("support.changed", { reason: "backup-restored" });
         emit("commissioning.changed", { reason: "backup-restored" });
-        emit("planning.changed", { reason: "backup-restored" });
         emit("app.changed", { reason: "backup-restored" });
       }
       return {
-        activityEntryCount: countPlanningActivity(state),
-        checklistItemCount: Math.max(1, Math.floor(asNumber(state.commissioningSnapshot.planningTaskCount, 0) / 2)),
-        projectCount: asNumber(state.commissioningSnapshot.planningProjectCount, 0),
         requiresRestart: databaseRestore,
         rollbackBackupPath: buildFixtureBackupEntry(state).path,
         settingsRestored: 12,
         sourceFormat: databaseRestore ? "database-backup" : legacyImport ? "legacy-db-json" : "native-support-backup",
         sourcePath: path,
-        taskCount: asNumber(state.commissioningSnapshot.planningTaskCount, 0),
       };
     }
     case "exports.companion.export": {

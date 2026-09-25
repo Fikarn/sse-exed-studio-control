@@ -451,7 +451,6 @@ test("switches audio output targets without a full-domain refresh", async ({ pag
     "app.snapshot",
     "commissioning.snapshot",
     "lighting.snapshot",
-    "planning.snapshot",
     "support.snapshot",
     "controlSurface.snapshot",
   ]) {

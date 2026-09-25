@@ -198,7 +198,7 @@ export function useLightingSceneEditor({
   const modifiedSceneId = !previewMode && isSceneModified && activeSceneId ? activeSceneId : null;
 
   // Unsaved-changes guard. When the active scene is drifted, intercept any
-  // workspace switch (including ⌘1-4, A, ⇧S keyboard shortcuts) with a
+  // workspace switch (including ⌘1-3, A, ⇧S keyboard shortcuts) with a
   // confirmation dialog. The guard fn returns a Promise resolved by the
   // user's click on the dialog.
   const pendingLeaveResolveRef = useRef<((allowed: boolean) => void) | null>(null);

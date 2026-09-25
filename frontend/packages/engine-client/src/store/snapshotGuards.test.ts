@@ -7,7 +7,7 @@ import { SnapshotShapeError, snapshotProblem } from "./snapshotGuards";
 // and at nothing deeper.
 describe("snapshotProblem", () => {
   it("accepts an absent typed snapshot and refuses an absent loose one", () => {
-    for (const domain of ["lighting", "lightingFixtureCatalog", "lightingDmxMonitor", "audio", "planning"] as const) {
+    for (const domain of ["lighting", "lightingFixtureCatalog", "lightingDmxMonitor", "audio"] as const) {
       expect(snapshotProblem(domain, null), domain).toBeNull();
     }
     for (const domain of ["health", "app", "commissioning", "support", "controlSurface"] as const) {
@@ -29,7 +29,7 @@ describe("snapshotProblem", () => {
     expect(snapshotProblem("audio", { channels: [{ id: "audio-input-1" }, { id: "" }], mixTargets: [] })).toBe(
       "channels[1] has no id"
     );
-    expect(snapshotProblem("planning", { projects: [], tasks: [null] })).toBe("tasks[0] has no id");
+    expect(snapshotProblem("lighting", { fixtures: [], groups: [null], scenes: [] })).toBe("groups[0] has no id");
     expect(snapshotProblem("lightingFixtureCatalog", { definitions: [{ id: "astra" }] })).toBeNull();
     // DMX channels are numbered, not keyed.
     expect(snapshotProblem("lightingDmxMonitor", { channels: [{ channel: 1, value: 0 }] })).toBeNull();
@@ -38,7 +38,6 @@ describe("snapshotProblem", () => {
 
   it("leaves optional lists optional", () => {
     expect(snapshotProblem("lighting", { fixtures: [], groups: [], scenes: [] })).toBeNull();
-    expect(snapshotProblem("planning", { projects: [], tasks: [] })).toBeNull();
     expect(snapshotProblem("audio", { channels: [], mixTargets: [] })).toBeNull();
   });
 });

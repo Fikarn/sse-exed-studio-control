@@ -1090,7 +1090,7 @@
       },
       "name": {
         "$value": "{font.base.name}",
-        "$description": "list names: snapshots, projects, steps"
+        "$description": "list names: snapshots, scenes, steps"
       },
       "value": {
         "$value": "{font.base.value}",

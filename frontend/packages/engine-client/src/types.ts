@@ -11,9 +11,8 @@ import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingD
 import type { LightingFixtureCatalogSnapshot } from "./generated/snapshots/LightingFixtureCatalogSnapshot";
 import type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
 import type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
-import type { PlanningSnapshot } from "./generated/snapshots/PlanningSnapshot";
 
-export type WorkspaceId = "setup" | "lighting" | "audio" | "planning";
+export type WorkspaceId = "setup" | "lighting" | "audio";
 export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";
@@ -46,31 +45,6 @@ export interface LightingSettingsUpdateRequest {
   selectedFixtureId?: string | null;
   /** 0–100 multiplier applied to every fixture's intensity in DMX output. */
   grandMaster?: number;
-}
-
-export interface PlanningSettingsUpdateRequest {
-  modeSection?: "timeline" | "board";
-  timelineStartHour?: number;
-  timelineEndHour?: number;
-  viewFilter?: "all" | "todo" | "in-progress" | "blocked" | "done";
-  selectedProjectId?: string | null;
-  selectedTaskId?: string | null;
-}
-
-export interface PlanningTaskRescheduleRequest {
-  projectId?: string;
-  taskId: string;
-  scheduledDurationSeconds?: number | null;
-  scheduledStart?: string | null;
-}
-
-export interface PlanningTaskCreateRequest {
-  projectId: string;
-  title: string;
-  description?: string;
-  priority?: "p0" | "p1" | "p2" | "p3";
-  dueDate?: string | null;
-  labels?: string[];
 }
 
 export interface AudioSettingsUpdateRequest {
@@ -174,19 +148,6 @@ export interface AudioMixTargetUpdateRequest {
 export interface AudioTalkbackHoldRequest {
   mixTargetId?: string;
   engaged: boolean;
-}
-
-export interface PlanningProjectCreateRequest {
-  title: string;
-  description?: string;
-  priority?: "p0" | "p1" | "p2" | "p3";
-  status?: "todo" | "in-progress" | "blocked" | "done";
-}
-
-export interface PlanningProjectReorderRequest {
-  projectId: string;
-  newStatus?: "todo" | "in-progress" | "blocked" | "done";
-  newIndex?: number;
 }
 
 export interface LightingFixtureUpdateRequest {
@@ -329,7 +290,6 @@ export interface FixtureScenario {
   lightingSnapshot?: JsonObject;
   audioSnapshot?: JsonObject | null;
   audioMeteringActive?: boolean;
-  planningSnapshot?: JsonObject | null;
   supportSnapshot?: JsonObject;
   controlSurfaceSnapshot?: JsonObject;
   startupDelayMs?: number;
@@ -397,13 +357,12 @@ export interface ShellState {
   supportSnapshot: JsonObject | null;
   controlSurfaceSnapshot: JsonObject | null;
   // Snapshots backed by typed Rust structs (see ts-rs annotations in
-  // native/rust-engine/src/{lighting,audio,planning}). Regenerated via
+  // native/rust-engine/src/{lighting,audio}). Regenerated via
   // `npm run protocol:generate`.
   lightingSnapshot: LightingSnapshot | null;
   lightingFixtureCatalogSnapshot: LightingFixtureCatalogSnapshot | null;
   lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
   audioSnapshot: AudioSnapshot | null;
-  planningSnapshot: PlanningSnapshot | null;
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
@@ -475,20 +434,6 @@ export interface ShellStore {
    *  Held, nothing is sent to the rig; everything else keeps working. */
   setLightingOutputArmed(armed: boolean): Promise<JsonValue>;
   recallLightingScene(sceneId: string, fadeMs?: number): Promise<JsonValue>;
-  seedPlanningDemo(replaceExistingData?: boolean): Promise<JsonValue>;
-  createPlanningProject(request: PlanningProjectCreateRequest): Promise<JsonValue>;
-  reorderPlanningProject(request: PlanningProjectReorderRequest): Promise<JsonValue>;
-  createPlanningTask(request: PlanningTaskCreateRequest): Promise<JsonValue>;
-  addPlanningChecklistItem(taskId: string, text: string): Promise<JsonValue>;
-  setPlanningChecklistItemDone(taskId: string, itemId: string, done: boolean): Promise<JsonValue>;
-  readPlanningTimeReport(projectId?: string): Promise<JsonValue>;
-  updatePlanningSettings(request: PlanningSettingsUpdateRequest): Promise<JsonValue>;
-  reschedulePlanningTask(request: PlanningTaskRescheduleRequest): Promise<JsonValue>;
-  togglePlanningTaskComplete(taskId: string): Promise<JsonValue>;
-  /** Visual overhaul A, Slice 6: the running-timer keys on the cluster and the
-   *  plate drive `planning.task.timer`, which the engine has always answered. */
-  setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle"): Promise<JsonValue>;
-  deletePlanningTask(taskId: string): Promise<JsonValue>;
   exportSupportBackup(): Promise<JsonValue>;
   /** 2026-09 production readiness, Slice 7 (F20): a database backup answers
    *  `requiresRestart`, and the store restarts the hardware link into it. */

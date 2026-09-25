@@ -56,10 +56,6 @@ export const AudioStateAssumed: Story = {
   render: () => renderFixtureStory("audio-state-assumed"),
 };
 
-export const PlanningPopulated: Story = {
-  render: () => renderFixtureStory("planning-populated"),
-};
-
 export const StartupLoading: Story = {
   render: () => renderFixtureStory("startup-loading"),
 };

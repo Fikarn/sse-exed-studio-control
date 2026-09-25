@@ -327,7 +327,7 @@ jobs:
       # have no RME TotalMix on 127.0.0.1, so the workspace qualification's
       # `audioSnapshot.verified === true` assertion (and the post-restart
       # audio-state checks) would always fail. Skipping that block keeps
-      # the lighting + planning + restart parity assertions intact. Local
+      # the lighting + restart parity assertions intact. Local
       # runs without this env var still require live TotalMix.
       SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE: "1"
     steps:

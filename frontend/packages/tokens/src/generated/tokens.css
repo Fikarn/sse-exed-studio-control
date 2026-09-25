@@ -382,7 +382,7 @@
   --font-size-tick: var(--font-base-tick); /** the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act */
   --font-size-label: var(--font-base-label); /** labels and rows read to act, hints */
   --font-size-body: var(--font-base-body); /** body, command keys, table rows, the engine's sentences */
-  --font-size-name: var(--font-base-name); /** list names: snapshots, projects, steps */
+  --font-size-name: var(--font-base-name); /** list names: snapshots, scenes, steps */
   --font-size-value: var(--font-base-value); /** strip names, printed values, section titles, the clock */
   --font-size-word: var(--font-base-word); /** take-time words: caps on big keys, the strip dB */
   --font-size-state: var(--font-base-state); /** the state word, plate titles */

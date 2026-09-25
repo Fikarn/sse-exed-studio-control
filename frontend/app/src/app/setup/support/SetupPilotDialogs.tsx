@@ -2,39 +2,13 @@ import { ConfirmDialog, Surface, Button } from "@sse/design-system";
 import styles from "../SetupSupportPilot.module.css";
 import type { SetupPilot } from "../useSetupPilot";
 
-/** The pilot's confirmations: sample planning data, publishing over probes that
- *  are not green, and leaving a step. */
+/** The pilot's confirmations: publishing over probes that are not green, and
+ *  leaving a step. */
 export function SetupPilotDialogs({ editor }: { editor: SetupPilot }) {
-  const {
-    seedPlanningPrompt,
-    setSeedPlanningPrompt,
-    publishOverridePrompt,
-    setPublishOverridePrompt,
-    pendingStepId,
-    setPendingStepId,
-  } = editor.state;
-  const { performAction, loadSamplePlanning, publishSetup, activateStep } = editor.actions;
+  const { publishOverridePrompt, setPublishOverridePrompt, pendingStepId, setPendingStepId } = editor.state;
+  const { performAction, publishSetup, activateStep } = editor.actions;
   return (
     <>
-      {seedPlanningPrompt ? (
-        <ConfirmDialog
-          body={
-            <p>
-              This adds the bundled sample projects, tasks and schedule blocks to Planning, next to anything already
-              there. Use it for commissioning and training only.
-            </p>
-          }
-          cancelLabel="Cancel"
-          confirmLabel="Load sample planning"
-          onCancel={() => setSeedPlanningPrompt(false)}
-          onConfirm={() => {
-            setSeedPlanningPrompt(false);
-            void performAction("seed-planning-inline", loadSamplePlanning);
-          }}
-          title="Load sample planning data?"
-        />
-      ) : null}
-
       {publishOverridePrompt ? (
         <ConfirmDialog
           body={

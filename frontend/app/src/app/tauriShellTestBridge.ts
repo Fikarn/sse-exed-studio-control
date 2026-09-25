@@ -57,7 +57,6 @@ function buildDiagnosticsReport(shellState: ShellState) {
     controlSurfaceSnapshot: toJsonValue(shellState.controlSurfaceSnapshot),
     healthSnapshot: toJsonValue(shellState.healthSnapshot),
     lifecycle: shellState.lifecycle,
-    planningSnapshot: toJsonValue(shellState.planningSnapshot),
     recovery: shellState.recovery,
     startupFailure: toJsonValue(shellState.startupFailure),
     supportSnapshot: toJsonValue(shellState.supportSnapshot),
@@ -103,18 +102,6 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("runCommissioningCheck requires a request object.");
       }
       return store.runCommissioningCheck(command.request as never);
-    case "createPlanningProject":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("createPlanningProject requires a request object.");
-      }
-      return store.createPlanningProject(command.request as never);
-    case "createPlanningTask":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("createPlanningTask requires a request object.");
-      }
-      return store.createPlanningTask(command.request as never);
-    case "readPlanningTimeReport":
-      return store.readPlanningTimeReport(typeof command.projectId === "string" ? command.projectId : undefined);
     case "recallAudioSnapshot":
       if (typeof command.snapshotId !== "string" || !command.snapshotId.trim()) {
         throw new Error("recallAudioSnapshot requires snapshotId.");
@@ -147,25 +134,13 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
             ? Math.round(command.fadeDurationSeconds * 1000)
             : undefined
       );
-    case "reschedulePlanningTask":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("reschedulePlanningTask requires a request object.");
-      }
-      return store.reschedulePlanningTask(command.request as never);
-    case "seedPlanningDemo":
-      return store.seedPlanningDemo(command.replaceExistingData === true);
     case "setSetupSection":
       if (command.section !== "commissioning" && command.section !== "support") {
         throw new Error("setSetupSection requires section 'commissioning' or 'support'.");
       }
       return store.setSetupSection(command.section);
     case "setWorkspace":
-      if (
-        command.workspaceId !== "setup" &&
-        command.workspaceId !== "lighting" &&
-        command.workspaceId !== "audio" &&
-        command.workspaceId !== "planning"
-      ) {
+      if (command.workspaceId !== "setup" && command.workspaceId !== "lighting" && command.workspaceId !== "audio") {
         throw new Error("setWorkspace requires a supported workspaceId.");
       }
       return store.setWorkspace(command.workspaceId);
@@ -184,11 +159,6 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
       return store.setLightingOutputArmed(command.armed);
     case "syncAudio":
       return store.syncAudio();
-    case "togglePlanningTaskComplete":
-      if (typeof command.taskId !== "string" || !command.taskId.trim()) {
-        throw new Error("togglePlanningTaskComplete requires taskId.");
-      }
-      return store.togglePlanningTaskComplete(command.taskId);
     case "updateAudioChannel":
       if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
         throw new Error("updateAudioChannel requires a request object.");
@@ -214,11 +184,6 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("updateLightingFixture requires a request object.");
       }
       return store.updateLightingFixture(command.request as never);
-    case "updatePlanningSettings":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("updatePlanningSettings requires a request object.");
-      }
-      return store.updatePlanningSettings(command.request as never);
     default:
       throw new Error(`Unsupported shell test action '${action}'.`);
   }

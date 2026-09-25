@@ -45,12 +45,7 @@ import type {
   LightingPreviewModeRequest,
   LightingSceneCreateRequest,
   LightingSceneUpdateRequest,
-  PlanningProjectCreateRequest,
-  PlanningProjectReorderRequest,
   LightingSettingsUpdateRequest,
-  PlanningSettingsUpdateRequest,
-  PlanningTaskCreateRequest,
-  PlanningTaskRescheduleRequest,
   ShellState,
   ShellStore,
   StartupFailure,
@@ -68,7 +63,6 @@ const initialState: ShellState = {
   lightingFixtureCatalogSnapshot: null,
   lightingDmxMonitorSnapshot: null,
   audioSnapshot: null,
-  planningSnapshot: null,
   supportSnapshot: null,
   controlSurfaceSnapshot: null,
   startupFailure: null,
@@ -87,7 +81,6 @@ const DOMAIN_STATE_KEYS = {
   lighting: "lightingSnapshot",
   lightingDmxMonitor: "lightingDmxMonitorSnapshot",
   audio: "audioSnapshot",
-  planning: "planningSnapshot",
   support: "supportSnapshot",
   controlSurface: "controlSurfaceSnapshot",
 } as const satisfies Record<DomainKey, keyof ShellState>;
@@ -171,8 +164,15 @@ function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
   const value =
     typeof workspace === "object" && workspace && "workspace" in workspace ? (workspace.workspace as string) : "setup";
 
-  if (value === "lighting" || value === "audio" || value === "planning") {
+  if (value === "lighting" || value === "audio") {
     return value;
+  }
+
+  // New pages program, D1: Planning left the screen, and a page saved while it
+  // was open reads as the Console. (The hardware link rewrites the saved value
+  // itself in Slice 2.)
+  if (value === "planning") {
+    return "audio";
   }
 
   return "setup";
@@ -1470,42 +1470,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async recallLightingScene(sceneId: string, fadeMs?: number) {
       return performRequest("lighting.scene.recall", fadeMs === undefined ? { sceneId } : { sceneId, fadeMs });
-    },
-    async seedPlanningDemo(replaceExistingData = false) {
-      return performRequest("commissioning.seedPlanningDemo", { replaceExistingData });
-    },
-    async createPlanningProject(request: PlanningProjectCreateRequest) {
-      return performRequest("planning.project.create", request as unknown as JsonObject);
-    },
-    async reorderPlanningProject(request: PlanningProjectReorderRequest) {
-      return performRequest("planning.project.reorder", request as unknown as JsonObject);
-    },
-    async createPlanningTask(request: PlanningTaskCreateRequest) {
-      return performRequest("planning.task.create", request as unknown as JsonObject);
-    },
-    async addPlanningChecklistItem(taskId: string, text: string) {
-      return performRequest("planning.task.checklist.add", { taskId, text });
-    },
-    async setPlanningChecklistItemDone(taskId: string, itemId: string, done: boolean) {
-      return performRequest("planning.task.checklist.update", { done, itemId, taskId });
-    },
-    async readPlanningTimeReport(projectId?: string) {
-      return performRequest("planning.report.time", projectId ? ({ projectId } as JsonObject) : {});
-    },
-    async updatePlanningSettings(request: PlanningSettingsUpdateRequest) {
-      return performRequest("planning.settings.update", request as unknown as JsonObject);
-    },
-    async reschedulePlanningTask(request: PlanningTaskRescheduleRequest) {
-      return performRequest("planning.task.reschedule", request as unknown as JsonObject);
-    },
-    async togglePlanningTaskComplete(taskId: string) {
-      return performRequest("planning.task.toggleComplete", { taskId });
-    },
-    async setPlanningTaskTimer(taskId: string, action: "start" | "stop" | "toggle") {
-      return performRequest("planning.task.timer", { action, taskId });
-    },
-    async deletePlanningTask(taskId: string) {
-      return performRequest("planning.task.delete", { taskId });
     },
     async exportSupportBackup() {
       return performRequest("support.backup.export");

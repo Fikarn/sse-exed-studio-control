@@ -12,13 +12,6 @@ import type {
   LightingSceneFixtureSnapshot,
   LightingSceneSnapshot,
   LightingSnapshot,
-  PlanningActivityEntry as PlanningActivitySnapshot,
-  PlanningChecklistItem as PlanningChecklistSnapshot,
-  PlanningCounts,
-  PlanningProject as PlanningProjectSnapshot,
-  PlanningSettingsSnapshot,
-  PlanningSnapshot,
-  PlanningTask as PlanningTaskSnapshot,
   ShellState,
 } from "@sse/engine-client";
 // Runtime import through the asset-free subpath: the specs that import app
@@ -179,69 +172,6 @@ export interface AudioSnapshotEntry {
   order: number;
   oscIndex: number;
   preview: AudioSceneSnapshot["preview"];
-}
-
-export interface PlanningProjectEntry {
-  description: string;
-  id: string;
-  lastUpdated?: string;
-  order: number;
-  priority: string;
-  status: string;
-  title: string;
-}
-
-export interface PlanningChecklistEntry {
-  done: boolean;
-  id: string;
-  text: string;
-}
-
-export interface PlanningTaskEntry {
-  checklist: PlanningChecklistEntry[];
-  completed: boolean;
-  createdAt?: string;
-  description: string;
-  dueDate?: string;
-  id: string;
-  isRunning: boolean;
-  labels: string[];
-  lastStarted?: string;
-  order: number;
-  priority: string;
-  projectId: string;
-  scheduledDurationSeconds?: number;
-  scheduledStart?: string;
-  title: string;
-  totalSeconds: number;
-}
-
-export interface PlanningActivityEntry {
-  action: string;
-  detail: string;
-  entityId: string;
-  entityType: string;
-  id: string;
-  timestamp?: string;
-}
-
-export interface PlanningSettingsEntry {
-  dashboardView: string;
-  deckMode: string;
-  modeSection: "board" | "timeline";
-  selectedProjectId?: string;
-  selectedTaskId?: string;
-  sortBy: string;
-  timelineEndHour: number;
-  timelineStartHour: number;
-  viewFilter: string;
-}
-
-export interface PlanningCountsEntry {
-  completedTaskCount: number;
-  projectCount: number;
-  runningTaskCount: number;
-  taskCount: number;
 }
 
 // Coercion helpers retained only for the loose JsonObject snapshots
@@ -525,90 +455,6 @@ export function getAudioSnapshots(snapshot: AudioSnapshot | null): AudioSnapshot
       preview: s.preview,
     }))
     .sort((left, right) => left.order - right.order);
-}
-
-// Planning helpers: thin pass-throughs over typed snapshot.
-export function getPlanningProjects(snapshot: PlanningSnapshot | null): PlanningProjectEntry[] {
-  return [...(snapshot?.projects ?? [])]
-    .map((p: PlanningProjectSnapshot): PlanningProjectEntry => ({
-      description: p.description,
-      id: p.id,
-      lastUpdated: p.lastUpdated || undefined,
-      order: p.order,
-      priority: p.priority,
-      status: p.status,
-      title: p.title,
-    }))
-    .sort((left, right) => left.order - right.order);
-}
-
-export function getPlanningTasks(snapshot: PlanningSnapshot | null): PlanningTaskEntry[] {
-  return [...(snapshot?.tasks ?? [])]
-    .map((t: PlanningTaskSnapshot): PlanningTaskEntry => ({
-      checklist: t.checklist.map((item: PlanningChecklistSnapshot): PlanningChecklistEntry => ({
-        done: item.done,
-        id: item.id,
-        text: item.text,
-      })),
-      completed: t.completed,
-      createdAt: t.createdAt || undefined,
-      description: t.description,
-      dueDate: t.dueDate ?? undefined,
-      id: t.id,
-      isRunning: t.isRunning,
-      labels: [...t.labels],
-      lastStarted: t.lastStarted ?? undefined,
-      order: t.order,
-      priority: t.priority,
-      projectId: t.projectId,
-      scheduledDurationSeconds: t.scheduledDurationSeconds ?? undefined,
-      scheduledStart: t.scheduledStart ?? undefined,
-      title: t.title,
-      totalSeconds: t.totalSeconds,
-    }))
-    .sort((left, right) => left.order - right.order);
-}
-
-export function getPlanningActivityLog(snapshot: PlanningSnapshot | null): PlanningActivityEntry[] {
-  return [...(snapshot?.activityLog ?? [])]
-    .map((a: PlanningActivitySnapshot): PlanningActivityEntry => ({
-      action: a.action,
-      detail: a.detail,
-      entityId: a.entityId,
-      entityType: a.entityType,
-      id: a.id,
-      timestamp: a.timestamp || undefined,
-    }))
-    .sort((left, right) => {
-      const leftTime = left.timestamp ? Date.parse(left.timestamp) : 0;
-      const rightTime = right.timestamp ? Date.parse(right.timestamp) : 0;
-      return rightTime - leftTime;
-    });
-}
-
-export function getPlanningSettings(snapshot: PlanningSnapshot | null): PlanningSettingsEntry {
-  const settings: PlanningSettingsSnapshot | null = snapshot?.settings ?? null;
-  return {
-    dashboardView: settings?.dashboardView ?? "kanban",
-    deckMode: settings?.deckMode ?? "project",
-    modeSection: settings?.modeSection === "board" ? "board" : "timeline",
-    selectedProjectId: settings?.selectedProjectId ?? undefined,
-    selectedTaskId: settings?.selectedTaskId ?? undefined,
-    sortBy: settings?.sortBy ?? "manual",
-    timelineEndHour: settings?.timelineEndHour ?? 22,
-    timelineStartHour: settings?.timelineStartHour ?? 9,
-    viewFilter: settings?.viewFilter ?? "all",
-  };
-}
-
-export function getPlanningCounts(snapshot: PlanningSnapshot | null): PlanningCountsEntry {
-  const counts: PlanningCounts | null = snapshot?.counts ?? null;
-  return {
-    completedTaskCount: counts?.completedTaskCount ?? 0,
-    projectCount: counts?.projectCount ?? 0,
-    runningTaskCount: counts?.runningTaskCount ?? 0,
-    taskCount: counts?.taskCount ?? 0,
-  };
 }
 
 // Map the long engine summary to a short status word for the shell header

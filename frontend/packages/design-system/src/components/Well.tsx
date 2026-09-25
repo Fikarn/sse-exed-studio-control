@@ -97,7 +97,7 @@ export interface ScreenProps extends HTMLAttributes<HTMLDivElement> {
   testId?: string;
 }
 
-// The bay's picture: the plot, the timeline, the step, the EQ.
+// The bay's picture: the plot, the step, the EQ.
 export function Screen({ children, head, info = false, className, testId, ...rest }: ScreenProps) {
   return (
     <div

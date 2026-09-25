@@ -51,7 +51,7 @@ const LOOSE_DOMAINS: ReadonlySet<DomainKey> = new Set(["health", "app", "commiss
 
 /**
  * What is wrong with `value` as the snapshot of `domain`, or `null`. A typed
- * snapshot may be absent (`null`: no console, no planning data yet) and the
+ * snapshot may be absent (`null`: no console yet) and the
  * workspace renders its empty state; a loose one is always an object.
  */
 export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined): string | null {
@@ -80,12 +80,6 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
         listProblem(value, "channels", { ids: true }),
         listProblem(value, "mixTargets", { ids: true }),
         listProblem(value, "snapshots", { ids: true, optional: true })
-      );
-    case "planning":
-      return firstProblem(
-        listProblem(value, "projects", { ids: true }),
-        listProblem(value, "tasks", { ids: true }),
-        listProblem(value, "activityLog", { ids: false, optional: true })
       );
     default:
       return null;

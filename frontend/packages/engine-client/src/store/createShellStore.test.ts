@@ -114,7 +114,6 @@ const TYPED_SNAPSHOT_REQUESTS = new Set([
   "lighting.snapshot",
   "lighting.fixtureCatalog.snapshot",
   "lighting.dmxMonitor.snapshot",
-  "planning.snapshot",
 ]);
 
 function supervisedTransport() {
@@ -143,7 +142,7 @@ function supervisedTransport() {
       if (answers.has(method)) {
         return answers.get(method) ?? null;
       }
-      // No console, rig or plan in this double: the typed snapshots are absent
+      // No console or rig in this double: the typed snapshots are absent
       // (`null`, which the Slice 9 guards accept as "nothing there yet" — an
       // object without its lists is refused), and every other answer is the
       // smallest object the store accepts (the ping's protocol).
@@ -451,8 +450,10 @@ describe("createShellStore scoped refresh", () => {
       "engine.ready": [],
       "engine.startupFailed": [],
       "lighting.changed": ["lighting.dmxMonitor.snapshot", "lighting.snapshot"],
-      // The commissioning snapshot carries the planning store's counts.
-      "planning.changed": ["commissioning.snapshot", "planning.snapshot"],
+      // Planning left the screen (new pages program, Slice 1); until Slice 2 the
+      // hardware link still counts its projects and tasks in the commissioning
+      // snapshot, whose summary Setup prints.
+      "planning.changed": ["commissioning.snapshot"],
       "settings.changed": ["app.snapshot"],
       "support.changed": ["support.snapshot"],
     };
@@ -516,7 +517,6 @@ describe("createShellStore scoped refresh", () => {
       "health.snapshot",
       "lighting.dmxMonitor.snapshot",
       "lighting.snapshot",
-      "planning.snapshot",
       "support.snapshot",
     ]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("rig.changed"));
@@ -550,7 +550,7 @@ describe("createShellStore scoped refresh", () => {
     calls.length = 0;
     await store.refresh();
     expect(catalogRequests()).toBe(1);
-    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(10);
+    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(9);
     await store.dispose();
   });
 
@@ -578,16 +578,11 @@ describe("createShellStore scoped refresh", () => {
     answer("app.snapshot", { shell: { workspace: "audio" }, startup: { targetSurface: "dashboard" } });
     expect(await after(() => store.setLightingSection("patch"))).toEqual(["app.snapshot"]);
     // Opening a workspace also fetches what that workspace shows: the Stream
-    // Deck changes lights and tasks without an event, and the backups folder
-    // and the health sentences move without one too.
+    // Deck changes lights without an event, and the backups folder and the
+    // health sentences move without one too.
     expect(await after(() => store.setWorkspace("audio"))).toEqual(["app.snapshot", "audio.snapshot"]);
     expect(store.getSnapshot().activeWorkspace).toBe("audio");
     expect(await after(() => store.setWorkspace("lighting"))).toEqual(["app.snapshot", ...lighting]);
-    expect(await after(() => store.setWorkspace("planning"))).toEqual([
-      "app.snapshot",
-      "commissioning.snapshot",
-      "planning.snapshot",
-    ]);
     expect(await after(() => store.setWorkspace("setup"))).toEqual([
       "app.snapshot",
       "commissioning.snapshot",
@@ -602,21 +597,16 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.setLightingOutputArmed(false))).toEqual([...lighting, "support.snapshot"]);
     // Selecting a fixture is the hot path of the Lighting workspace.
     expect(await after(() => store.updateLightingSettings({ selectedFixtureId: "fixture-key" }))).toEqual(lighting);
-    expect(await after(() => store.togglePlanningTaskComplete("task-1"))).toEqual([
-      "commissioning.snapshot",
-      "planning.snapshot",
-    ]);
     expect(
       await after(() => store.runCommissioningCheck({ target: "lighting", bridgeIp: "10.0.0.9", universe: 1 }))
     ).toEqual(commissioning);
-    expect(await after(() => store.seedPlanningDemo())).toEqual([...commissioning, "planning.snapshot"].sort());
     expect(await after(() => store.exportSupportBackup())).toEqual(["support.snapshot"]);
     // Writes the Stream Deck profile to a file; no snapshot reads it.
     expect(await after(() => store.exportCompanionConfig())).toEqual([]);
     // An applied archive rewrites lighting and audio settings too, and no
     // lighting or audio event says so.
     answer("support.backup.restore", { requiresRestart: false });
-    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(8);
+    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(7);
     await store.dispose();
   });
 
@@ -646,7 +636,6 @@ describe("createShellStore scoped refresh", () => {
       "health.snapshot",
       "lighting.dmxMonitor.snapshot",
       "lighting.snapshot",
-      "planning.snapshot",
       "support.snapshot",
     ]);
     await store.dispose();
@@ -705,7 +694,7 @@ describe("createShellStore scoped refresh", () => {
     calls.length = 0;
     emit(changed("planning.changed", "task-created"));
     await tick();
-    expect(snapshotRequests()).toEqual(["commissioning.snapshot", "planning.snapshot"]);
+    expect(snapshotRequests()).toEqual(["commissioning.snapshot"]);
     await store.dispose();
   });
 
@@ -756,14 +745,57 @@ describe("createShellStore scoped refresh", () => {
     await store.initialize();
 
     refuse("health.snapshot");
-    answer("app.snapshot", { shell: { workspace: "planning" }, startup: { targetSurface: "dashboard" } });
+    answer("app.snapshot", { shell: { workspace: "lighting" }, startup: { targetSurface: "dashboard" } });
     emit(changed("app.changed", "commissioning-updated"));
     await tick();
-    expect(store.getSnapshot().activeWorkspace).toBe("planning");
+    expect(store.getSnapshot().activeWorkspace).toBe("lighting");
     expect(store.getSnapshot().backgroundFailures).toEqual([
       expect.objectContaining({ context: "refresh after app.changed", message: "health.snapshot refused" }),
     ]);
     expect(store.getSnapshot().lifecycle).toBe("ready");
+    await store.dispose();
+  });
+});
+
+// New pages program, D1: Studio Control keeps opening on the page last used.
+// Planning left the screen in Slice 1, and a page saved while it was open reads
+// as the Console until the hardware link rewrites the saved value (Slice 2).
+describe("createShellStore landing page", () => {
+  const savedPage = (workspace: string, targetSurface = "dashboard") => ({
+    shell: { workspace },
+    startup: { targetSurface },
+  });
+
+  it("reads a saved Planning page as the Console", async () => {
+    const { answer, transport } = supervisedTransport();
+    answer("app.snapshot", savedPage("planning"));
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(store.getSnapshot().activeWorkspace).toBe("audio");
+    await store.dispose();
+  });
+
+  it("keeps the pages it has, reads anything else as Setup, and holds an uncommissioned desk on Setup", async () => {
+    const { answer, transport } = supervisedTransport();
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    for (const [saved, expected] of [
+      ["lighting", "lighting"],
+      ["audio", "audio"],
+      ["setup", "setup"],
+      ["somewhere new", "setup"],
+    ] as const) {
+      answer("app.snapshot", savedPage(saved));
+      await store.refresh();
+      expect(store.getSnapshot().activeWorkspace, saved).toBe(expected);
+    }
+
+    // Commissioning outranks the saved page, a Planning one included.
+    answer("app.snapshot", savedPage("planning", "commissioning"));
+    await store.refresh();
+    expect(store.getSnapshot().activeWorkspace).toBe("setup");
     await store.dispose();
   });
 });
@@ -784,14 +816,14 @@ describe("createShellStore snapshot guards", () => {
     expect(store.getSnapshot().snapshotFault).toBeNull();
 
     answer("lighting.snapshot", { fixtures: "none", groups: [], scenes: [] });
-    answer("planning.snapshot", { projects: [], tasks: [{ id: "task-1" }] });
+    answer("audio.snapshot", { channels: [{ id: "audio-input-1" }], mixTargets: [] });
     await expect(store.refresh()).rejects.toThrow("lighting.snapshot: fixtures is not a list");
 
     const state = store.getSnapshot();
     expect(state.lightingSnapshot).toEqual(goodLighting);
     expect(state.snapshotFault).toBe("lighting.snapshot: fixtures is not a list");
     // The rest of the batch arrived.
-    expect(state.planningSnapshot?.tasks).toHaveLength(1);
+    expect(state.audioSnapshot?.channels).toHaveLength(1);
     await store.dispose();
   });
 
@@ -799,8 +831,8 @@ describe("createShellStore snapshot guards", () => {
     const { answer, transport } = supervisedTransport();
     const store = createShellStore(transport, { development: true });
     await store.initialize();
-    answer("planning.snapshot", { projects: [{ id: "project-1" }, { title: "no id" }], tasks: [] });
-    await expect(store.refresh()).rejects.toThrow("planning.snapshot: projects[1] has no id");
+    answer("audio.snapshot", { channels: [{ id: "audio-input-1" }, { name: "no id" }], mixTargets: [] });
+    await expect(store.refresh()).rejects.toThrow("audio.snapshot: channels[1] has no id");
     answer("app.snapshot", null);
     await expect(store.refresh()).rejects.toThrow("app.snapshot: the reply is empty");
     await store.dispose();

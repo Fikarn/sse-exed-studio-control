@@ -175,10 +175,19 @@ const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEO
 // the audio-mutation block + the post-restart audio-state assertions because
 // `audioSnapshot?.verified` only flips true after real RME TotalMix OSC
 // packets arrive on the receive port, and stock GitHub runners have no
-// TotalMix. Lighting + planning round-trips still execute. The CI
+// TotalMix. The lighting round-trips still execute. The CI
 // qualification job sets this; local laptop runs without the env var
 // continue to require live TotalMix exactly as before.
 const SKIP_AUDIO_PROBE = process.env.SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE === "1";
+
+// New pages program, Slice 1: Planning has left the screen, and with it this
+// lane's Planning round-trips and the Planning page it restarted on. The page
+// the lane leaves on is Lighting: a page never saved, and a saved Planning
+// page, read as the Console (the program's D1), so only a page that was saved
+// and came back reads as Lighting.
+const SAVED_WORKSPACE = "lighting";
+const SCOPE_CHANGED =
+  "New pages program, Slice 1: the saved page is Lighting and no Planning project is checked; until then the page was Planning and a created Planning project had to survive the restart.";
 
 async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS }) {
   const deadline = Date.now() + timeoutMs;
@@ -342,7 +351,6 @@ async function runWorkspaceQualification() {
   let audioChannelId;
   let audioMixTargetId;
   let audioSnapshotId;
-  let planningProjectTitle = null;
 
   console.log("Tauri workspace qualification: step 1/2 live migrated workspace flows.");
 
@@ -401,9 +409,6 @@ async function runWorkspaceQualification() {
         stage: "ready",
         ...(overrideProbes ? { overrideProbes: true } : {}),
       },
-    });
-    await dispatchCommand(firstSession, firstRun, "seedPlanningDemo", {
-      replaceExistingData: true,
     });
     evidence.recordCheck("commissioning-probes-and-publish-complete", {
       audioReceivePort,
@@ -543,77 +548,12 @@ async function runWorkspaceQualification() {
       });
     }
 
-    const planningWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
-      workspaceId: "planning",
+    // The page the operator leaves on is saved: the lane ends on it, and the
+    // restart below proves it came back.
+    const finalWorkspace = await dispatchCommand(firstSession, firstRun, "setWorkspace", {
+      workspaceId: SAVED_WORKSPACE,
     });
-    assertWorkspaceReady(planningWorkspace.status, "planning");
-    const planningSnapshot = planningWorkspace.status.shellState.planningSnapshot;
-    const project = asArray(planningSnapshot?.projects)[0];
-    const task =
-      asArray(planningSnapshot?.tasks).find((entry) => entry?.projectId === project?.id) ??
-      asArray(planningSnapshot?.tasks)[0];
-    assert(project?.id, "Expected live planning snapshot to expose a seeded project.");
-    assert(task?.id, "Expected live planning snapshot to expose a seeded task.");
-
-    planningProjectTitle = `Live Tauri Qualification ${Date.now()}`;
-    const projectCreate = await dispatchCommand(firstSession, firstRun, "createPlanningProject", {
-      request: {
-        priority: "p2",
-        status: "in-progress",
-        title: planningProjectTitle,
-      },
-    });
-    const createdProject = asArray(projectCreate.status.shellState.planningSnapshot?.projects).find(
-      (entry) => entry?.title === planningProjectTitle
-    );
-    assert(createdProject?.id, "Expected live planning project creation to round-trip.");
-
-    const taskCreate = await dispatchCommand(firstSession, firstRun, "createPlanningTask", {
-      request: {
-        labels: ["qualification"],
-        priority: "p1",
-        projectId: createdProject.id,
-        title: "Live shell acceptance task",
-      },
-    });
-    const createdTask = asArray(taskCreate.status.shellState.planningSnapshot?.tasks).find(
-      (entry) => entry?.title === "Live shell acceptance task"
-    );
-    assert(createdTask?.id, "Expected live planning task creation to round-trip.");
-
-    const reschedule = await dispatchCommand(firstSession, firstRun, "reschedulePlanningTask", {
-      request: {
-        scheduledDurationSeconds: 1800,
-        scheduledStart: "2026-04-23T09:30:00Z",
-        taskId: createdTask.id,
-      },
-    });
-    const rescheduledTask = findById(reschedule.status.shellState.planningSnapshot?.tasks, createdTask.id);
-    assert(
-      rescheduledTask?.scheduledStart === "2026-04-23T09:30:00Z",
-      "Expected live planning task reschedule to persist scheduledStart."
-    );
-
-    const completed = await dispatchCommand(firstSession, firstRun, "togglePlanningTaskComplete", {
-      taskId: createdTask.id,
-    });
-    const completedTask = findById(completed.status.shellState.planningSnapshot?.tasks, createdTask.id);
-    assert(
-      completedTask?.completed === true,
-      "Expected live planning task completion toggle to mark the task completed."
-    );
-
-    const timeReport = await dispatchCommand(firstSession, firstRun, "readPlanningTimeReport", {
-      projectId: createdProject.id,
-    });
-    assert(
-      timeReport.result && typeof timeReport.result === "object",
-      "Expected live planning time report to return an object."
-    );
-    evidence.recordCheck("planning-live-mutations-round-trip", {
-      projectTitle: planningProjectTitle,
-      taskTitle: "Live shell acceptance task",
-    });
+    assertWorkspaceReady(finalWorkspace.status, SAVED_WORKSPACE);
 
     // 2026-09 production readiness, Slice 11 (F30): what this lane did on
     // screen is in the action log with the screen as its source. The scene
@@ -657,7 +597,7 @@ async function runWorkspaceQualification() {
     restartSession = await launchRestartReadySession(runtime);
     const restartStatus = restartSession.status;
 
-    assertWorkspaceReady(restartStatus, "planning");
+    assertWorkspaceReady(restartStatus, SAVED_WORKSPACE);
     assert(
       restartStatus.shellState.appSnapshot?.startup?.targetSurface === "dashboard",
       "Expected restarted Tauri runtime to route to the dashboard after workspace qualification."
@@ -684,15 +624,10 @@ async function runWorkspaceQualification() {
         "Expected restarted Tauri runtime to preserve last recalled audio snapshot."
       );
     }
-    assert(
-      asArray(restartStatus.shellState.planningSnapshot?.projects).some(
-        (entry) => entry?.title === planningProjectTitle
-      ),
-      "Expected restarted Tauri runtime to preserve the created planning project."
-    );
     evidence.recordCheck("restart-preserves-migrated-workspace-state", {
       lastRecalledSceneId: restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId,
       activeWorkspace: restartStatus.shellState.activeWorkspace,
+      scopeChanged: SCOPE_CHANGED,
       selectedAudioChannelId: restartStatus.shellState.audioSnapshot?.selectedChannelId,
     });
   } finally {
