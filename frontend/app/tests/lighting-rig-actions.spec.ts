@@ -21,9 +21,16 @@ function marker(page: Page, name: string) {
   return page.getByRole("button", { name: new RegExp(`^Fixture ${name}, `) });
 }
 
+// A selection lands a render after the key: the store asks the double, the
+// reply comes back and the page draws it. A click sent at once can reach the
+// page first (a browser handles input before pending work), and Identify or
+// Find then act on the selection before it — so wait for the marker to say it
+// is selected (2026-09-25: "each flash start and end" failed 4 runs in 30 on
+// the workstation, Find running over Key alone; the ledger's Found, fixed).
 async function selectFixture(page: Page, name: string, options: { additive?: boolean } = {}) {
   await marker(page, name).focus();
   await page.keyboard.press(options.additive ? "Shift+Enter" : "Enter");
+  await expect(marker(page, name)).toHaveAttribute("aria-pressed", "true");
 }
 
 async function openPopulatedRig(page: Page, options: { stopClock?: boolean } = {}) {
