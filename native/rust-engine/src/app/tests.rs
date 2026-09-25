@@ -40,7 +40,7 @@ impl Drop for TestDir {
 
 fn app_for(test_dir: &TestDir) -> EngineApp {
     let runtime = RuntimeContext {
-        protocol_version: String::from("1"),
+        protocol_version: String::from("2"),
         app_data_dir: test_dir.path().to_path_buf(),
         backups_dir: test_dir.path().join("backups"),
         logs_dir: test_dir.path().join("logs"),
@@ -88,7 +88,7 @@ fn parity_fixture_unavailable_without_feature() {
     let app = app_for(&test_dir);
 
     let reply = app.handle_request(parity_fixture_request(
-        json!({ "fixtureId": "planning-empty" }),
+        json!({ "fixtureId": "setup-ready" }),
     ));
 
     assert!(!reply.response.ok, "release engines must refuse the method");
@@ -105,7 +105,7 @@ fn parity_fixture_unavailable_without_feature() {
     assert!(
         !test_dir
             .path()
-            .join("parity-fixture-planning-empty.json")
+            .join("parity-fixture-setup-ready.json")
             .exists(),
         "a refused load writes no fixture file"
     );
@@ -118,7 +118,7 @@ fn parity_fixture_loads_with_feature() {
     let app = app_for(&test_dir);
 
     let reply = app.handle_request(parity_fixture_request(
-        json!({ "fixtureId": "planning-empty" }),
+        json!({ "fixtureId": "setup-ready" }),
     ));
 
     assert!(
@@ -133,13 +133,45 @@ fn parity_fixture_loads_with_feature() {
             .as_ref()
             .and_then(|result| result.get("fixtureId"))
             .and_then(Value::as_str),
-        Some("planning-empty")
+        Some("setup-ready")
     );
-    assert_eq!(
-        reply.events.len(),
-        3,
-        "app, commissioning and planning change events"
-    );
+    // New pages program, Slice 2: planning.changed left the contract.
+    assert_eq!(reply.events.len(), 2, "app and commissioning change events");
+}
+
+// New pages program, Slice 2: Planning left the hardware link. Its requests
+// and the sample seed are unknown methods now, and answer nothing else.
+#[test]
+fn planning_requests_are_unknown_methods() {
+    let test_dir = TestDir::new("planning-gone");
+    let app = app_for(&test_dir);
+
+    for (method, params) in [
+        ("planning.snapshot", json!({})),
+        ("planning.context", json!({})),
+        ("planning.project.create", json!({ "title": "Show prep" })),
+        ("planning.settings.update", json!({ "deckMode": "light" })),
+        ("commissioning.seedPlanningDemo", json!({})),
+    ] {
+        let reply = app.handle_request(RequestEnvelope {
+            kind: String::from("request"),
+            id: json!(method),
+            method: String::from(method),
+            params,
+        });
+        assert!(!reply.response.ok, "{method} must be refused");
+        assert_eq!(
+            reply
+                .response
+                .error
+                .as_ref()
+                .and_then(|error| error.get("code"))
+                .and_then(Value::as_str),
+            Some("UNKNOWN_METHOD"),
+            "{method}"
+        );
+        assert!(reply.events.is_empty(), "{method} raised events");
+    }
 }
 
 // Finding F27: at the default level a request leaves no line in the log

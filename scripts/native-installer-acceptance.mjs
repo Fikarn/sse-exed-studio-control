@@ -13,6 +13,13 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  assertContinuitySentinel,
+  assertSavedWorkspace,
+  createContinuitySentinel,
+  IMPORTED_WORKSPACE,
+  SAVED_DATA_MARKER_CHANGED,
+} from "./native-parity-acceptance.mjs";
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
@@ -26,7 +33,9 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
-const sentinelProjectTitle = "Installer Continuity Sentinel";
+// New pages program, Slice 2: the sentinel is a lighting group; until then it
+// was a Planning project (see createContinuitySentinel).
+const sentinelGroupName = "Installer Continuity Sentinel";
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
 ];
@@ -750,7 +759,9 @@ async function main() {
 
   let teardown;
   let mainError = null;
+  let sentinel;
   try {
+    console.log(SAVED_DATA_MARKER_CHANGED);
     console.log("Step 1: install the actual offline installer into a clean target root.");
 
     runCliStep(
@@ -767,7 +778,9 @@ async function main() {
     assert(existsSync(installed.shellPath), `Installed shell missing at ${installed.shellPath}.`);
     assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
 
-    console.log("Step 2: import workstation data through the installed shell and persist a continuity sentinel.");
+    console.log(
+      "Step 2: import workstation data (its setup flag and page) through the installed shell and persist a continuity sentinel (a lighting group)."
+    );
     runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-import", "commissioning", {
       SSE_LEGACY_DB_PATH: fixturePath,
     });
@@ -787,17 +800,19 @@ async function main() {
       await assertSafeBundledSqlite(firstRun, "installer-installed", `Installed ${installed.label} engine`);
 
       const initialAppSnapshot = await firstRun.request("installer-app-installed", "app.snapshot");
-      const initialPlanningSnapshot = await firstRun.request("installer-planning-installed", "planning.snapshot");
 
       assert(
         initialAppSnapshot.startup?.targetSurface === "commissioning",
         `Expected installer acceptance import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
       );
-      assert(
-        initialPlanningSnapshot.counts?.projectCount === 2,
-        "Expected installer acceptance project count to be 2."
+      // The import is seen by the page it wrote: new saved data opens on the
+      // Console, the fixture on Lighting.
+      assertSavedWorkspace(
+        initialAppSnapshot,
+        IMPORTED_WORKSPACE,
+        `Installed ${installed.label} engine`,
+        "after the import"
       );
-      assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected installer acceptance task count to be 3.");
 
       const commissioningUpdate = await firstRun.request("installer-commissioning-ready", "commissioning.update", {
         stage: "ready",
@@ -807,17 +822,18 @@ async function main() {
         `Expected installer acceptance to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
       );
 
-      await firstRun.request("installer-planning-project-create", "planning.project.create", {
-        title: sentinelProjectTitle,
-        description: "Temporary project used to verify actual installer reinstall continuity.",
-        status: "todo",
-        priority: "p2",
-      });
-
-      const mutatedPlanningSnapshot = await firstRun.request("installer-planning-mutated", "planning.snapshot");
-      assert(
-        mutatedPlanningSnapshot.counts?.projectCount === 3,
-        "Expected installer continuity sentinel mutation to increase project count to 3."
+      sentinel = await createContinuitySentinel(
+        firstRun,
+        "installer-installed",
+        sentinelGroupName,
+        `Installed ${installed.label} engine`
+      );
+      await assertContinuitySentinel(
+        firstRun,
+        "installer-installed",
+        sentinel,
+        `Installed ${installed.label} engine`,
+        "after the sentinel was created"
       );
     } finally {
       await firstRun.close().catch((error) => {
@@ -899,10 +915,6 @@ async function main() {
       await assertSafeBundledSqlite(secondRun, "installer-reinstalled", `Reinstalled ${installed.label} engine`);
 
       const reinstalledAppSnapshot = await secondRun.request("installer-app-reinstalled", "app.snapshot");
-      const reinstalledPlanningSnapshot = await secondRun.request(
-        "installer-planning-reinstalled",
-        "planning.snapshot"
-      );
 
       assert(
         reinstalledAppSnapshot.startup?.targetSurface === "dashboard",
@@ -912,14 +924,18 @@ async function main() {
         reinstalledAppSnapshot.commissioning?.stage === "ready",
         `Expected commissioning stage to remain ready after reinstall, got '${reinstalledAppSnapshot.commissioning?.stage}'.`
       );
-      assert(
-        reinstalledPlanningSnapshot.counts?.projectCount === 3,
-        "Expected installer reinstall to preserve the continuity sentinel project."
+      assertSavedWorkspace(
+        reinstalledAppSnapshot,
+        IMPORTED_WORKSPACE,
+        `Reinstalled ${installed.label} engine`,
+        "after the reinstall"
       );
-      assert(
-        Array.isArray(reinstalledPlanningSnapshot.projects) &&
-          reinstalledPlanningSnapshot.projects.some((project) => project?.title === sentinelProjectTitle),
-        `Expected reinstall to preserve project '${sentinelProjectTitle}'.`
+      await assertContinuitySentinel(
+        secondRun,
+        "installer-reinstalled",
+        sentinel,
+        `Reinstalled ${installed.label} engine`,
+        "after the reinstall"
       );
 
       const backupExport = await secondRun.request("installer-support-backup-export", "support.backup.export");

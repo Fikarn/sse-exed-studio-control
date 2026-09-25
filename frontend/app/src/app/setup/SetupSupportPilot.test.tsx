@@ -119,6 +119,44 @@ describe("SetupSupportPilot backup verification", () => {
     expect(screen.getByTestId("setup-feedback").getAttribute("data-tone")).toBe("error");
     await store.dispose();
   });
+
+  // New pages program, Slice 2 (D3): a backup written before Planning left
+  // restores without its Planning data, and the hardware link's reply says so
+  // in `detail`. The banner prints it after the shell's own sentence; a reply
+  // without it (nothing was left out) adds nothing.
+  it("restore prints what the hardware link left out, and nothing more without it", async () => {
+    const store = await renderPilot();
+    const note = "Planning data in this backup was not restored; Planning is no longer part of Studio Control.";
+    const restore = vi
+      .spyOn(store, "restoreSupportBackup")
+      .mockResolvedValueOnce({
+        detail: note,
+        restored: true,
+        sourceFormat: "native-support-backup",
+        sourcePath: "C:/app-data/backups/native-backup-2026-04.json",
+      })
+      .mockResolvedValueOnce({
+        restored: true,
+        sourceFormat: "native-support-backup",
+        sourcePath: "C:/app-data/backups/native-backup-2026-09.json",
+      });
+
+    fireEvent.click(screen.getByTestId("support-restore-latest"));
+    await waitFor(() => {
+      expect(screen.getByTestId("setup-feedback").textContent).toContain(
+        `Restored native-support-backup from C:/app-data/backups/native-backup-2026-04.json. ${note}`
+      );
+    });
+    expect(screen.getByTestId("setup-feedback").getAttribute("data-tone")).toBe("ok");
+
+    fireEvent.click(screen.getByTestId("support-restore-latest"));
+    await waitFor(() => {
+      expect(screen.getByTestId("setup-feedback").textContent).toContain("native-backup-2026-09.json.");
+    });
+    expect(screen.getByTestId("setup-feedback").textContent).not.toContain("Planning");
+    expect(restore).toHaveBeenCalledTimes(2);
+    await store.dispose();
+  });
 });
 
 // 2026-09 production readiness, Slice 11 (F30, F31): the Armed / Held switch

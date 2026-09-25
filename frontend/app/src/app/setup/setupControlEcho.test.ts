@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { findEchoControlId, parseControlSurfaceLastEvent, type EchoPage } from "./setupControlEcho";
 
+// New pages program, Slice 2: the deck's pages are LIGHTS and AUDIO (PROJECTS and TASKS
+// left with Planning), so the first page here is LIGHTS.
 const pages: EchoPage[] = [
   {
-    id: "projects",
-    buttons: [{ id: "proj-btn-1", body: { action: "setFilter", value: "all" } }],
+    id: "lights",
+    buttons: [{ id: "lights-btn-2", body: { action: "toggleLight" } }],
     dials: [],
   },
   {
@@ -58,14 +60,17 @@ describe("findEchoControlId", () => {
     expect(findEchoControlId(withValueless, event, null)).toBe("audio-btn-4");
   });
 
+  // New pages program, Slice 2: the same key on two pages, as PROJECTS and TASKS both had
+  // (their route left with them). The route's home page comes second here, so the second
+  // expectation shows the route preference, not the first match.
   it("prefers the selected page, then the route's home page", () => {
     const ambiguous: EchoPage[] = [
-      { id: "projects", buttons: [{ id: "proj-a", body: { action: "setFilter", value: "all" } }], dials: [] },
-      { id: "tasks", buttons: [{ id: "tasks-a", body: { action: "setFilter", value: "all" } }], dials: [] },
+      { id: "audio", buttons: [{ id: "audio-a", body: { action: "toggleLight" } }], dials: [] },
+      { id: "lights", buttons: [{ id: "lights-a", body: { action: "toggleLight" } }], dials: [] },
     ];
-    const event = { route: "/api/deck/action", action: "setFilter", value: "all", at: 3 };
-    expect(findEchoControlId(ambiguous, event, "tasks")).toBe("tasks-a");
-    expect(findEchoControlId(ambiguous, event, null)).toBe("proj-a");
+    const event = { route: "/api/deck/light-action", action: "toggleLight", value: null, at: 3 };
+    expect(findEchoControlId(ambiguous, event, "audio")).toBe("audio-a");
+    expect(findEchoControlId(ambiguous, event, null)).toBe("lights-a");
   });
 
   it("returns null when nothing matches", () => {

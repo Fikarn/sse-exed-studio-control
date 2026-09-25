@@ -53,9 +53,6 @@ describe("domainRefresh", () => {
 
   it("maps a request by its own name before its prefix", () => {
     expect(domainsForMethod("settings.update")).toEqual(["app"]);
-    // New pages program, Slice 1: nothing on screen sends a Planning request
-    // any more, so none is mapped; the hardware link answers them until Slice 2.
-    expect(domainsForMethod("planning.task.create")).toEqual(CHANGEABLE_DOMAINS);
     expect(domainsForMethod("lighting.scene.recall")).toEqual(["lighting", "lightingDmxMonitor"]);
     // Slice 11: the armed switch sits beside the Recent actions list and is a
     // row in it, so the list moves with the switch. No other lighting request
@@ -69,9 +66,6 @@ describe("domainRefresh", () => {
     }
     expect(domainsForMethod("support.backup.export")).toEqual(["support"]);
     expect(domainsForMethod("support.backup.restore")).toEqual(CHANGEABLE_DOMAINS);
-    // The sample Planning seed left Setup / Support with the page: it is no
-    // longer mapped apart from the other commissioning requests.
-    expect(domainsForMethod("commissioning.seedPlanningDemo")).toEqual(domainsForMethod("commissioning.check.run"));
     expect(domainsForMethod("exports.companion.export")).toEqual([]);
     // Not a prefix match on a name that merely starts the same.
     expect(domainsForMethod("settings.updateAll")).toEqual(CHANGEABLE_DOMAINS);
@@ -98,9 +92,11 @@ describe("domainRefresh", () => {
   });
 
   it("says whether it knew the event", () => {
-    // Until Slice 2 the hardware link still raises it, and still counts projects
-    // and tasks in the commissioning snapshot whose summary Setup prints.
-    expect(domainsForEvent("planning.changed")).toEqual({ domains: ["commissioning"], known: true });
+    expect(domainsForEvent("settings.changed")).toEqual({ domains: ["app"], known: true });
+    // New pages program, Slice 2: planning.changed left the protocol with
+    // Planning. An older hardware link that still raised it is an event this
+    // build does not know, and refreshes everything that can change.
+    expect(domainsForEvent("planning.changed")).toEqual({ domains: CHANGEABLE_DOMAINS, known: false });
     expect(domainsForEvent("rig.changed")).toEqual({ domains: CHANGEABLE_DOMAINS, known: false });
   });
 });

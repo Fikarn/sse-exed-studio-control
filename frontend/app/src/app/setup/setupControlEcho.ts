@@ -32,8 +32,9 @@ export function parseControlSurfaceLastEvent(candidate: unknown): ControlSurface
   };
 }
 
+// The deck page each bridge route's keys live on. New pages program, Slice 2: the
+// PROJECTS and TASKS pages and their route (`/api/deck/action`) left with Planning.
 const routePagePreference: Record<string, string[]> = {
-  "/api/deck/action": ["projects", "tasks"],
   "/api/deck/audio-action": ["audio"],
   "/api/deck/light-action": ["lights"],
 };

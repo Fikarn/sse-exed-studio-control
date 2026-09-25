@@ -12,6 +12,7 @@ import {
   healthCheckTone,
   statusToneLabel,
   type SnapshotRecord,
+  withRestoreDetail,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath } from "../shellCommands";
 import { useLiveCallback } from "../shared/useLiveCallback";
@@ -157,10 +158,12 @@ export function SetupRecoverySurface({
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
     return {
-      message:
+      message: withRestoreDetail(
         result?.requiresRestart === true
           ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
           : `Restore requested from ${String(result?.sourcePath ?? path)}.`,
+        result
+      ),
       tone: "ok" as const,
     };
   };

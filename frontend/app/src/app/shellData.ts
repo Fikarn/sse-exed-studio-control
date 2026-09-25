@@ -51,6 +51,15 @@ export function describeBackupKind(kind: SupportBackupKind) {
   return kind === "database" ? "database backup" : "backup archive";
 }
 
+// New pages program, Slice 2 (D3): a restore's reply carries `detail` only when
+// the backup held something the hardware link did not restore — the Planning
+// data of a backup written before Planning left. It follows the shell's own
+// sentence, so the operator reads what was left out.
+export function withRestoreDetail(message: string, result: Record<string, unknown> | null) {
+  const detail = typeof result?.detail === "string" ? result.detail.trim() : "";
+  return detail ? `${message} ${detail}` : message;
+}
+
 function backupKindOf(record: Record<string, unknown>, name: string): SupportBackupKind {
   if (record.kind === "database" || record.kind === "archive") {
     return record.kind;

@@ -8,10 +8,14 @@ import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-har
 import {
   acceptanceEngineEnv,
   assertAudioWorkflowParity,
+  assertBackupArchiveWithoutPlanning,
   assertCoreParityContracts,
   assertLightingWorkflowParity,
-  assertPlanningWorkflowParity,
+  assertSavedWorkspace,
   awaitConsoleLinkQuiet,
+  IMPORTED_WORKSPACE,
+  moveSavedWorkspace,
+  SAVED_DATA_MARKER_CHANGED,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
@@ -211,7 +215,10 @@ async function main() {
   mkdirSync(runtime.logsDir, { recursive: true });
 
   console.log(`Packaged native acceptance root: ${acceptanceRoot}`);
-  console.log("Step 1: import legacy workstation data through the packaged shell.");
+  console.log(SAVED_DATA_MARKER_CHANGED);
+  console.log(
+    "Step 1: import the legacy workstation file (its setup flag and the page it opens on) through the packaged shell."
+  );
   runPackagedSmoke(
     packaged,
     acceptanceRoot,
@@ -242,14 +249,19 @@ async function main() {
     await assertCoreParityContracts(firstRun, "packaged-installed", `Packaged native ${packaged.label} engine`);
 
     const initialAppSnapshot = await firstRun.request("packaged-app-snapshot-initial", "app.snapshot");
-    const initialPlanningSnapshot = await firstRun.request("packaged-planning-snapshot-initial", "planning.snapshot");
 
     assert(
       initialAppSnapshot.startup?.targetSurface === "commissioning",
       `Expected packaged import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    assert(initialPlanningSnapshot.counts?.projectCount === 2, "Expected packaged import project count to be 2.");
-    assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected packaged import task count to be 3.");
+    // The import is seen by the page it wrote: new saved data opens on the
+    // Console, the fixture on Lighting.
+    assertSavedWorkspace(
+      initialAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Packaged native ${packaged.label} engine`,
+      "after the import"
+    );
 
     // No hardware on this host: explicit probe override (2026-09 audit Slice 8).
     const commissioningUpdate = await firstRun.request("packaged-commissioning-ready", "commissioning.update", {
@@ -265,6 +277,7 @@ async function main() {
     const exportSummary = await firstRun.request("packaged-support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected packaged backup export to create an archive.");
+    assertBackupArchiveWithoutPlanning(exportSummary, IMPORTED_WORKSPACE, `Packaged native ${packaged.label} engine`);
   } finally {
     await firstRun.close().catch((error) => {
       throw error;
@@ -284,7 +297,7 @@ async function main() {
   );
 
   console.log(
-    "Step 4: verify planning workflow parity, restore the backup, and verify rollback through the packaged engine."
+    "Step 4: verify lighting and audio workflow parity, save another page, restore the backup, and verify rollback through the packaged engine."
   );
   const secondRun = new EngineHarness({
     rootDir,
@@ -301,10 +314,6 @@ async function main() {
     await assertSafeBundledSqlite(secondRun, "packaged-restarted", `Packaged native ${packaged.label} engine`);
 
     const restartedAppSnapshot = await secondRun.request("packaged-app-snapshot-restart", "app.snapshot");
-    const restartedPlanningSnapshot = await secondRun.request(
-      "packaged-planning-snapshot-restart",
-      "planning.snapshot"
-    );
 
     assert(
       restartedAppSnapshot.startup?.targetSurface === "dashboard",
@@ -314,22 +323,18 @@ async function main() {
       restartedAppSnapshot.commissioning?.stage === "ready",
       `Expected packaged commissioning stage to remain ready, got '${restartedAppSnapshot.commissioning?.stage}'.`
     );
-    assert(
-      restartedPlanningSnapshot.counts?.projectCount === 2,
-      "Expected packaged restart project count to remain 2."
+    assertSavedWorkspace(
+      restartedAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Packaged native ${packaged.label} engine`,
+      "after the restart"
     );
-    assert(restartedPlanningSnapshot.counts?.taskCount === 3, "Expected packaged restart task count to remain 3.");
     const restartedLightingSnapshot = await secondRun.request(
       "packaged-lighting-snapshot-restart",
       "lighting.snapshot"
     );
     const restartedAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "packaged-restart-audio-quiet");
 
-    const workflowMutations = await assertPlanningWorkflowParity(
-      secondRun,
-      "packaged-restarted",
-      `Packaged native ${packaged.label} engine`
-    );
     const lightingMutations = await assertLightingWorkflowParity(
       secondRun,
       "packaged-restarted",
@@ -341,17 +346,9 @@ async function main() {
       `Packaged native ${packaged.label} engine`
     );
 
-    const mutatedPlanningSnapshot = await secondRun.request("packaged-planning-snapshot-mutated", "planning.snapshot");
-    assert(
-      mutatedPlanningSnapshot.counts?.projectCount === 4,
-      `Expected packaged planning workflow mutations to increase project count to 4, got ${mutatedPlanningSnapshot.counts?.projectCount}.`
-    );
-    assert(
-      workflowMutations.temporaryProjectIds.every((projectId) =>
-        mutatedPlanningSnapshot.projects?.some((project) => project.id === projectId)
-      ),
-      "Expected packaged planning workflow mutations to leave temporary parity projects in the mutated snapshot."
-    );
+    // The saved data the restore must roll back besides lighting and audio:
+    // the page, saved after the backup was exported.
+    await moveSavedWorkspace(secondRun, "packaged-restarted", `Packaged native ${packaged.label} engine`);
 
     const restoreSummary = await secondRun.request("packaged-support-backup-restore", "support.backup.restore", {
       path: backupPath,
@@ -364,11 +361,11 @@ async function main() {
       restoreSummary.rollbackBackupPath && existsSync(restoreSummary.rollbackBackupPath),
       "Expected packaged restore to generate a rollback archive."
     );
-
-    const restoredPlanningSnapshot = await secondRun.request(
-      "packaged-planning-snapshot-restored",
-      "planning.snapshot"
+    assert(
+      restoreSummary.detail === undefined,
+      `Expected a format-5 archive to restore without leaving anything out, got: ${restoreSummary.detail}`
     );
+
     const restoredLightingSnapshot = await secondRun.request(
       "packaged-lighting-snapshot-restored",
       "lighting.snapshot"
@@ -376,21 +373,11 @@ async function main() {
     const restoredAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "packaged-restored-audio-quiet");
     const restoredAppSnapshot = await secondRun.request("packaged-app-snapshot-restored", "app.snapshot");
 
-    assert(
-      restoredPlanningSnapshot.counts?.projectCount === 2,
-      "Expected packaged restore to roll project count back to 2."
-    );
-    assert(
-      workflowMutations.temporaryProjectIds.every(
-        (projectId) => !restoredPlanningSnapshot.projects?.some((project) => project.id === projectId)
-      ),
-      "Expected packaged restore to remove the temporary planning parity projects."
-    );
-    assert(
-      workflowMutations.temporaryTaskIds.every(
-        (taskId) => !restoredPlanningSnapshot.tasks?.some((task) => task.id === taskId)
-      ),
-      "Expected packaged restore to remove the temporary planning parity tasks."
+    assertSavedWorkspace(
+      restoredAppSnapshot,
+      IMPORTED_WORKSPACE,
+      `Packaged native ${packaged.label} engine`,
+      "after the restore"
     );
     assert(
       restoredLightingSnapshot.fixtures?.length === restartedLightingSnapshot.fixtures?.length,
@@ -502,7 +489,9 @@ async function main() {
     })
   );
 
-  console.log("Packaged native acceptance passed: import, restart, restore, and relaunch are deterministic.");
+  console.log(
+    "Packaged native acceptance passed: import, restart, restore, and relaunch are deterministic (saved page, lighting and audio followed)."
+  );
 }
 
 main().catch((error) => {

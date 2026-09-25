@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+
 import { assert } from "./native-runtime-harness.mjs";
 
 // "Parity" here means dev-engine vs packaged-engine parity: this module holds
@@ -72,59 +74,45 @@ export async function awaitConsoleLinkQuiet(harness, requestIdPrefix, { timeoutM
   }
 }
 
+// New pages program, Slice 2 (D5): the Stream Deck's pages follow the app's
+// tabs, LIGHTS (page 1) then AUDIO (page 2); PROJECTS and TASKS left with
+// Planning, and so did the Planning time report (`planning.report.time`)
+// this contract check opened with until then.
+export const DECK_PAGE_LABELS = ["LIGHTS", "AUDIO"];
+
+// New pages program, Slice 2: the saved data these lanes follow through the
+// import, a restart and a backup's restore is the page the app opens on
+// (`shell.workspace`). Until then it was the imported Planning projects and
+// tasks, which the db.json import no longer reads and schema 8 no longer
+// holds. `commissioning-sample-db.json` opens on Lighting so that its import
+// can be seen: new saved data opens on the Console (`audio`, D1).
+export const IMPORTED_WORKSPACE = "lighting";
+/** The page a lane saves after the backup, which the restore must undo. */
+export const MOVED_WORKSPACE = "audio";
+export const SAVED_DATA_MARKER_CHANGED =
+  "New pages program, Slice 2: the saved data followed is the page the app opens on, imported as Lighting from the db.json; until then it was the imported Planning projects and tasks.";
+
+/** Backup archive format 5 (new pages program, Slice 2 — D3): no Planning part. */
+export const SUPPORT_BACKUP_FORMAT_VERSION = 5;
+
 export async function assertCoreParityContracts(harness, requestIdPrefix, runtimeLabel) {
-  const planningTimeReport = await harness.request(`${requestIdPrefix}-planning-time-report`, "planning.report.time");
+  const controlSurfaceSnapshot = await harness.request(`${requestIdPrefix}-control-surface`, "controlSurface.snapshot");
+  const pages = Array.isArray(controlSurfaceSnapshot.pages) ? controlSurfaceSnapshot.pages : [];
+  const pageLabels = pages.map((page) => page?.label);
   assert(
-    typeof planningTimeReport.totalSeconds === "number",
-    `${runtimeLabel} planning.report.time is missing totalSeconds.`
+    JSON.stringify(pageLabels) === JSON.stringify(DECK_PAGE_LABELS),
+    `${runtimeLabel} controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(pageLabels)}.`
   );
-  assert(
-    Array.isArray(planningTimeReport.byProject) && planningTimeReport.byProject.length > 0,
-    `${runtimeLabel} planning.report.time must expose at least one project aggregate.`
-  );
-  assert(Array.isArray(planningTimeReport.byTask), `${runtimeLabel} planning.report.time is missing byTask.`);
-  assert(Array.isArray(planningTimeReport.timerEvents), `${runtimeLabel} planning.report.time is missing timerEvents.`);
-
-  const firstProject = planningTimeReport.byProject[0];
-  assert(
-    typeof firstProject.projectId === "string" &&
-      typeof firstProject.title === "string" &&
-      typeof firstProject.totalSeconds === "number" &&
-      typeof firstProject.taskCount === "number",
-    `${runtimeLabel} planning.report.time returned an invalid byProject entry.`
-  );
-
-  if (planningTimeReport.byTask.length > 0) {
-    const firstTask = planningTimeReport.byTask[0];
+  for (const page of pages) {
     assert(
-      typeof firstTask.taskId === "string" &&
-        typeof firstTask.taskTitle === "string" &&
-        typeof firstTask.projectId === "string" &&
-        typeof firstTask.projectTitle === "string" &&
-        typeof firstTask.totalSeconds === "number",
-      `${runtimeLabel} planning.report.time returned an invalid byTask entry.`
+      Array.isArray(page.buttons) && page.buttons.length > 0 && Array.isArray(page.dials) && page.dials.length > 0,
+      `${runtimeLabel} controlSurface.snapshot must expose ${page.label} buttons and dials.`
     );
   }
-
-  const controlSurfaceSnapshot = await harness.request(`${requestIdPrefix}-control-surface`, "controlSurface.snapshot");
+  const [lightsPage, audioPage] = pages;
   assert(
-    Array.isArray(controlSurfaceSnapshot.pages) && controlSurfaceSnapshot.pages.length === 4,
-    `${runtimeLabel} controlSurface.snapshot must expose the four legacy page groups.`
-  );
-  assert(
-    controlSurfaceSnapshot.pages.some((page) => page.label === "PROJECTS") &&
-      controlSurfaceSnapshot.pages.some((page) => page.label === "AUDIO"),
-    `${runtimeLabel} controlSurface.snapshot is missing expected page labels.`
-  );
-
-  const projectsPage = controlSurfaceSnapshot.pages.find((page) => page.label === "PROJECTS");
-  assert(
-    projectsPage && Array.isArray(projectsPage.buttons) && Array.isArray(projectsPage.dials),
-    `${runtimeLabel} controlSurface.snapshot returned an invalid PROJECTS page.`
-  );
-  assert(
-    projectsPage.buttons.length > 0 && projectsPage.dials.length > 0,
-    `${runtimeLabel} controlSurface.snapshot must expose PROJECTS buttons and dials.`
+    lightsPage.buttons.some((control) => control.isPageNav === true && control.pageNavTarget === audioPage.label),
+    `${runtimeLabel} controlSurface.snapshot: the LIGHTS page has no page key to the AUDIO page.`
   );
 
   const lightingDmxMonitor = await harness.request(
@@ -148,18 +136,78 @@ export async function assertCoreParityContracts(harness, requestIdPrefix, runtim
   }
 }
 
-function projectById(snapshot, projectId) {
-  return (snapshot.projects ?? []).find((project) => project.id === projectId) ?? null;
+/** Asserts the page an `app.snapshot` (or a `settings.update` reply) says the app opens on. */
+export function assertSavedWorkspace(appSnapshot, expected, runtimeLabel, when) {
+  assert(
+    appSnapshot?.shell?.workspace === expected,
+    `${runtimeLabel} ${when}: expected the saved page '${expected}', got '${appSnapshot?.shell?.workspace}'.`
+  );
 }
 
-function taskById(snapshot, taskId) {
-  return (snapshot.tasks ?? []).find((task) => task.id === taskId) ?? null;
+/**
+ * Saves another page after the backup was exported (`settings.update`), so
+ * the restore has something of the saved data to roll back. Until Slice 2 of
+ * the new pages program the lanes created Planning projects and tasks here.
+ */
+export async function moveSavedWorkspace(harness, requestIdPrefix, runtimeLabel) {
+  const moved = await harness.request(`${requestIdPrefix}-shell-workspace-moved`, "settings.update", {
+    workspace: MOVED_WORKSPACE,
+  });
+  assertSavedWorkspace(moved, MOVED_WORKSPACE, runtimeLabel, "after settings.update");
+  return moved;
 }
 
-function projectsForStatus(snapshot, status) {
-  return (snapshot.projects ?? [])
-    .filter((project) => project.status === status)
-    .sort((left, right) => left.order - right.order);
+/**
+ * The exported backup archive is format 5, carries no Planning part (D3) and
+ * holds the saved page, which is what lets a restore roll the page back.
+ */
+export function assertBackupArchiveWithoutPlanning(exportSummary, expectedWorkspace, runtimeLabel) {
+  assert(
+    exportSummary?.path && existsSync(exportSummary.path),
+    `${runtimeLabel} support.backup.export did not create an archive.`
+  );
+  assert(
+    exportSummary.formatVersion === SUPPORT_BACKUP_FORMAT_VERSION,
+    `${runtimeLabel} support.backup.export reported format ${exportSummary.formatVersion}, expected ${SUPPORT_BACKUP_FORMAT_VERSION}.`
+  );
+  const text = readFileSync(exportSummary.path, "utf8");
+  const archive = JSON.parse(text);
+  assert(
+    archive.archiveType === "native-support-backup" && archive.formatVersion === SUPPORT_BACKUP_FORMAT_VERSION,
+    `${runtimeLabel} backup archive is '${archive.archiveType}' format ${archive.formatVersion}, expected native-support-backup format ${SUPPORT_BACKUP_FORMAT_VERSION}.`
+  );
+  assert(
+    !Object.hasOwn(archive, "planning") && !/"planning\./.test(text),
+    `${runtimeLabel} backup archive still carries a Planning part or a planning.* setting.`
+  );
+  assert(
+    archive.shell?.workspace === expectedWorkspace && archive.settings?.["shell.workspace"] === expectedWorkspace,
+    `${runtimeLabel} backup archive does not hold the saved page '${expectedWorkspace}' (shell ${archive.shell?.workspace}, setting ${archive.settings?.["shell.workspace"]}).`
+  );
+}
+
+/**
+ * The installer and delivery lanes' continuity sentinel: a lighting group,
+ * made by the app's own request and kept in the saved data. Until Slice 2 of
+ * the new pages program it was a Planning project.
+ */
+export async function createContinuitySentinel(harness, requestIdPrefix, name, runtimeLabel) {
+  const created = await harness.request(`${requestIdPrefix}-continuity-sentinel-create`, "lighting.group.create", {
+    name,
+  });
+  assert(
+    typeof created?.group?.id === "string" && created.group.name === name,
+    `${runtimeLabel} lighting.group.create did not create the continuity sentinel '${name}'.`
+  );
+  return { id: created.group.id, name };
+}
+
+export async function assertContinuitySentinel(harness, requestIdPrefix, sentinel, runtimeLabel, when) {
+  const lightingSnapshot = await harness.request(`${requestIdPrefix}-continuity-sentinel-check`, "lighting.snapshot");
+  assert(
+    (lightingSnapshot.groups ?? []).some((group) => group.id === sentinel.id && group.name === sentinel.name),
+    `${runtimeLabel} ${when}: the continuity sentinel lighting group '${sentinel.name}' (${sentinel.id}) is missing.`
+  );
 }
 
 function lightingFixtureById(snapshot, fixtureId) {
@@ -180,248 +228,6 @@ function audioChannelById(snapshot, channelId) {
 
 function audioMixTargetById(snapshot, mixTargetId) {
   return (snapshot.mixTargets ?? []).find((target) => target.id === mixTargetId) ?? null;
-}
-
-export async function assertPlanningWorkflowParity(harness, requestIdPrefix, runtimeLabel) {
-  const prioritySettings = await harness.request(
-    `${requestIdPrefix}-planning-settings-priority`,
-    "planning.settings.update",
-    {
-      viewFilter: "todo",
-      sortBy: "priority",
-    }
-  );
-  assert(
-    prioritySettings.settings?.viewFilter === "todo" && prioritySettings.settings?.sortBy === "priority",
-    `${runtimeLabel} planning.settings.update did not persist the todo/priority board view.`
-  );
-
-  const manualSettings = await harness.request(
-    `${requestIdPrefix}-planning-settings-manual`,
-    "planning.settings.update",
-    {
-      viewFilter: "all",
-      sortBy: "manual",
-    }
-  );
-  assert(
-    manualSettings.settings?.viewFilter === "all" && manualSettings.settings?.sortBy === "manual",
-    `${runtimeLabel} planning.settings.update did not restore the all/manual board view.`
-  );
-
-  const blockedProject = await harness.request(
-    `${requestIdPrefix}-planning-project-reorder-blocked`,
-    "planning.project.reorder",
-    {
-      projectId: "sample-proj-2",
-      newStatus: "blocked",
-      newIndex: 0,
-    }
-  );
-  assert(
-    blockedProject.project?.status === "blocked" && blockedProject.project?.order === 0,
-    `${runtimeLabel} planning.project.reorder did not move the sample todo project into the blocked lane.`
-  );
-
-  const todoProjectA = await harness.request(`${requestIdPrefix}-planning-project-a`, "planning.project.create", {
-    title: "Parity Flow A",
-    description: "First temporary project used to verify board ordering parity.",
-    status: "todo",
-    priority: "p2",
-  });
-  const todoProjectB = await harness.request(`${requestIdPrefix}-planning-project-b`, "planning.project.create", {
-    title: "Parity Flow B",
-    description: "Second temporary project used to verify board ordering parity.",
-    status: "todo",
-    priority: "p2",
-  });
-
-  const sameLaneReorder = await harness.request(
-    `${requestIdPrefix}-planning-project-reorder-manual`,
-    "planning.project.reorder",
-    {
-      projectId: todoProjectB.project.id,
-      newStatus: "todo",
-      newIndex: 0,
-    }
-  );
-  assert(
-    sameLaneReorder.project?.id === todoProjectB.project.id && sameLaneReorder.project?.order === 0,
-    `${runtimeLabel} planning.project.reorder did not move the temporary todo project to the top of its lane.`
-  );
-
-  const selectProject = await harness.request(
-    `${requestIdPrefix}-planning-select-project`,
-    "planning.settings.update",
-    {
-      selectedProjectId: todoProjectB.project.id,
-    }
-  );
-  assert(
-    selectProject.settings?.selectedProjectId === todoProjectB.project.id,
-    `${runtimeLabel} planning.settings.update did not select the temporary project for detail work.`
-  );
-
-  const taskOne = await harness.request(`${requestIdPrefix}-planning-task-one`, "planning.task.create", {
-    projectId: todoProjectB.project.id,
-    title: "Parity Task 1",
-    description: "Initial task created through the native planning parity gate.",
-    priority: "p1",
-    dueDate: "2026-04-30",
-    labels: ["planning", "native"],
-  });
-  const taskTwo = await harness.request(`${requestIdPrefix}-planning-task-two`, "planning.task.create", {
-    projectId: todoProjectB.project.id,
-    title: "Parity Task 2",
-    description: "Secondary task used to verify manual task ordering.",
-    priority: "p2",
-    labels: ["board"],
-  });
-
-  assert(
-    taskOne.context?.settings?.selectedTaskId === taskOne.task.id &&
-      taskTwo.context?.settings?.selectedTaskId === taskTwo.task.id,
-    `${runtimeLabel} planning.task.create did not advance selection to the newly created task.`
-  );
-
-  const updatedTask = await harness.request(`${requestIdPrefix}-planning-task-update`, "planning.task.update", {
-    taskId: taskOne.task.id,
-    title: "Parity Task 1 Updated",
-    description: "Updated through the native parity acceptance lane.",
-    priority: "p0",
-    dueDate: "2026-05-01",
-    labels: ["planning", "native", "accepted"],
-  });
-  assert(
-    updatedTask.task?.title === "Parity Task 1 Updated" &&
-      updatedTask.task?.priority === "p0" &&
-      updatedTask.task?.dueDate === "2026-05-01" &&
-      Array.isArray(updatedTask.task?.labels) &&
-      updatedTask.task.labels.includes("accepted"),
-    `${runtimeLabel} planning.task.update did not persist the expected task edits.`
-  );
-
-  const reorderedTask = await harness.request(`${requestIdPrefix}-planning-task-reorder`, "planning.task.update", {
-    taskId: taskTwo.task.id,
-    order: 0,
-  });
-  assert(
-    reorderedTask.task?.id === taskTwo.task.id && reorderedTask.task?.order === 0,
-    `${runtimeLabel} planning.task.update did not move the secondary task to the top of the task list.`
-  );
-
-  const checklistAdded = await harness.request(
-    `${requestIdPrefix}-planning-checklist-add`,
-    "planning.task.checklist.add",
-    {
-      taskId: taskOne.task.id,
-      text: "Verify task checklist parity",
-    }
-  );
-  const checklistItem = checklistAdded.task?.checklist?.find((item) => item.text === "Verify task checklist parity");
-  assert(checklistItem, `${runtimeLabel} planning.task.checklist.add did not append the new checklist item.`);
-
-  const checklistUpdated = await harness.request(
-    `${requestIdPrefix}-planning-checklist-update`,
-    "planning.task.checklist.update",
-    {
-      taskId: taskOne.task.id,
-      itemId: checklistItem.id,
-      done: true,
-    }
-  );
-  assert(
-    checklistUpdated.task?.checklist?.some((item) => item.id === checklistItem.id && item.done),
-    `${runtimeLabel} planning.task.checklist.update did not persist checklist completion.`
-  );
-
-  const checklistDeleted = await harness.request(
-    `${requestIdPrefix}-planning-checklist-delete`,
-    "planning.task.checklist.delete",
-    {
-      taskId: taskOne.task.id,
-      itemId: checklistItem.id,
-    }
-  );
-  assert(
-    !checklistDeleted.task?.checklist?.some((item) => item.id === checklistItem.id),
-    `${runtimeLabel} planning.task.checklist.delete did not remove the checklist item.`
-  );
-
-  const timerStarted = await harness.request(`${requestIdPrefix}-planning-task-timer-start`, "planning.task.timer", {
-    taskId: taskOne.task.id,
-    action: "toggle",
-  });
-  assert(
-    timerStarted.resolvedAction === "start" && timerStarted.task?.isRunning,
-    `${runtimeLabel} planning.task.timer did not start the selected task timer.`
-  );
-
-  const timerStopped = await harness.request(`${requestIdPrefix}-planning-task-timer-stop`, "planning.task.timer", {
-    taskId: taskOne.task.id,
-    action: "toggle",
-  });
-  assert(
-    timerStopped.resolvedAction === "stop" && !timerStopped.task?.isRunning,
-    `${runtimeLabel} planning.task.timer did not stop the selected task timer.`
-  );
-
-  const taskCompleted = await harness.request(
-    `${requestIdPrefix}-planning-task-toggle-complete`,
-    "planning.task.toggleComplete",
-    {
-      taskId: taskOne.task.id,
-    }
-  );
-  assert(
-    taskCompleted.task?.completed === true,
-    `${runtimeLabel} planning.task.toggleComplete did not mark the selected task complete.`
-  );
-
-  const taskDeleted = await harness.request(`${requestIdPrefix}-planning-task-delete`, "planning.task.delete", {
-    taskId: taskTwo.task.id,
-  });
-  assert(taskDeleted.deleted === true, `${runtimeLabel} planning.task.delete did not report a successful delete.`);
-
-  const planningSnapshot = await harness.request(
-    `${requestIdPrefix}-planning-snapshot-operator-flow`,
-    "planning.snapshot"
-  );
-  const blockedSnapshotProject = projectById(planningSnapshot, "sample-proj-2");
-  const temporaryProject = projectById(planningSnapshot, todoProjectB.project.id);
-  const updatedSnapshotTask = taskById(planningSnapshot, taskOne.task.id);
-  const deletedSnapshotTask = taskById(planningSnapshot, taskTwo.task.id);
-  const todoProjectIds = projectsForStatus(planningSnapshot, "todo").map((project) => project.id);
-
-  assert(
-    blockedSnapshotProject?.status === "blocked",
-    `${runtimeLabel} planning snapshot did not retain the cross-lane project move.`
-  );
-  assert(
-    temporaryProject &&
-      todoProjectIds[0] === todoProjectB.project.id &&
-      todoProjectIds.includes(todoProjectA.project.id),
-    `${runtimeLabel} planning snapshot did not retain the temporary todo lane ordering.`
-  );
-  assert(
-    updatedSnapshotTask?.title === "Parity Task 1 Updated" &&
-      updatedSnapshotTask?.completed === true &&
-      updatedSnapshotTask?.isRunning === false &&
-      updatedSnapshotTask?.projectId === todoProjectB.project.id,
-    `${runtimeLabel} planning snapshot did not retain the updated selected task state.`
-  );
-  assert(deletedSnapshotTask === null, `${runtimeLabel} planning snapshot still contains the deleted temporary task.`);
-  assert(
-    planningSnapshot.settings?.selectedProjectId === todoProjectB.project.id &&
-      planningSnapshot.settings?.sortBy === "manual" &&
-      planningSnapshot.settings?.viewFilter === "all",
-    `${runtimeLabel} planning snapshot did not retain the expected board settings and selection.`
-  );
-
-  return {
-    temporaryProjectIds: [todoProjectA.project.id, todoProjectB.project.id],
-    temporaryTaskIds: [taskOne.task.id, taskTwo.task.id],
-  };
 }
 
 export async function assertLightingWorkflowParity(harness, requestIdPrefix, runtimeLabel) {

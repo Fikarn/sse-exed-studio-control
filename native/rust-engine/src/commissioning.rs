@@ -1,23 +1,13 @@
 use crate::app_state::{CommissioningSnapshot, APP_SETTINGS_PREFIX};
-use crate::bootstrap::RuntimeContext;
-use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
-use crate::planning::{read_planning_context, PlanningContextSnapshot};
-use crate::planning_settings::PLANNING_SETTINGS_PREFIX;
 use crate::rme_totalmix_osc;
-use crate::shell_settings::{SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
-use crate::storage::{
-    import_legacy_db, list_settings_by_prefix, open_connection, set_settings_owned, EngineResult,
-};
+use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned, EngineResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::fs;
 use std::net::{Ipv4Addr, SocketAddr, TcpStream, UdpSocket};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
-
-const SAMPLE_LEGACY_DB_JSON: &str = include_str!("../fixtures/commissioning-sample-db.json");
 
 pub const LIGHTING_BRIDGE_IP_KEY: &str = "app.commissioning.lighting.bridge_ip";
 pub const LIGHTING_UNIVERSE_KEY: &str = "app.commissioning.lighting.universe";
@@ -84,12 +74,6 @@ pub struct CommissioningSnapshotPayload {
     /// clean publish or before any publish).
     #[serde(rename = "publishOverrideAt", default)]
     pub publish_override_at: Option<String>,
-    #[serde(rename = "planningProjectCount")]
-    pub planning_project_count: usize,
-    #[serde(rename = "planningTaskCount")]
-    pub planning_task_count: usize,
-    #[serde(rename = "sampleSeedAvailable")]
-    pub sample_seed_available: bool,
     pub steps: Vec<CommissioningStepSnapshot>,
     pub checks: Vec<CommissioningCheckSnapshot>,
     pub lighting: CommissioningLightingConfig,
@@ -128,11 +112,6 @@ pub enum CommissioningCheckTarget {
     ControlSurface,
     Lighting,
     Audio,
-}
-
-#[derive(Debug, Clone)]
-pub struct CommissioningSeedRequest {
-    pub replace_existing_data: bool,
 }
 
 pub fn default_settings_entries() -> Vec<(&'static str, &'static str)> {
@@ -213,28 +192,9 @@ pub fn parse_commissioning_check_request(
     })
 }
 
-pub fn parse_commissioning_seed_request(
-    params: &Value,
-) -> Result<CommissioningSeedRequest, String> {
-    let replace_existing_data = params
-        .get("replaceExistingData")
-        .map(|value| {
-            value
-                .as_bool()
-                .ok_or_else(|| String::from("replaceExistingData must be a boolean"))
-        })
-        .transpose()?
-        .unwrap_or(false);
-
-    Ok(CommissioningSeedRequest {
-        replace_existing_data,
-    })
-}
-
 pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<CommissioningSnapshotPayload> {
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)?;
     let commissioning = CommissioningSnapshot::from_settings(&app_settings);
-    let planning_counts = read_planning_counts(db_path)?;
 
     let checks = vec![
         read_check_snapshot(
@@ -282,10 +242,8 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             .unwrap_or(DEFAULT_AUDIO_RECEIVE_PORT),
     };
     let summary = format!(
-        "Stage '{}', {} projects, {} tasks, {} probe records.",
+        "Stage '{}', {} probe records.",
         commissioning.runner_stage,
-        planning_counts.0,
-        planning_counts.1,
         checks.len()
     );
     let config_summary = format!(
@@ -311,17 +269,9 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             completed_checks,
             checks.len()
         )
-    } else if planning_counts.0 > 0 || planning_counts.1 > 0 || completed_checks > 0 {
-        format!(
-            "{} of {} commissioning probes passed. Planning store has {} projects and {} tasks. Startup still routes to the commissioning surface until the engine-owned stage is marked ready.",
-            completed_checks,
-            checks.len(),
-            planning_counts.0,
-            planning_counts.1
-        )
     } else {
         format!(
-            "{} of {} commissioning probes passed. Planning seed is still empty. Startup routes to the commissioning surface until the engine-owned stage is marked ready.",
+            "{} of {} commissioning probes passed. Startup remains on Setup until publish.",
             completed_checks,
             checks.len()
         )
@@ -345,11 +295,7 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             } else {
                 String::from("current")
             },
-            summary: if planning_counts.0 > 0 {
-                String::from("Profile export and sample planning data are ready for commissioning.")
-            } else {
-                String::from("Export the Companion profile and seed sample planning data before probing hardware.")
-            },
+            summary: String::from("Export the Companion profile before probing hardware."),
         },
         CommissioningStepSnapshot {
             id: String::from("probe"),
@@ -384,14 +330,9 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             } else {
                 String::from("pending")
             },
-            summary: if planning_counts.0 > 0 {
-                format!(
-                    "Review {} projects and {} tasks across the mapped control-surface pages.",
-                    planning_counts.0, planning_counts.1
-                )
-            } else {
-                String::from("Review the engine-owned control-surface pages before moving to live verification.")
-            },
+            summary: String::from(
+                "Review the engine-owned control-surface pages before moving to live verification.",
+            ),
         },
         CommissioningStepSnapshot {
             id: String::from("verify"),
@@ -428,7 +369,7 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             summary: if commissioning.has_completed_setup {
                 String::from("Startup is routed directly into the dashboard surface and the publish backup can be restored.")
             } else {
-                String::from("Commit setup, export a support backup, and return to Planning.")
+                String::from("Commit setup, export a support backup, and return to the Console.")
             },
         },
     ];
@@ -446,9 +387,6 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             commissioning.has_completed_setup,
         ),
         publish_override_at,
-        planning_project_count: planning_counts.0,
-        planning_task_count: planning_counts.1,
-        sample_seed_available: true,
         steps,
         checks,
         lighting,
@@ -462,8 +400,6 @@ pub fn run_commissioning_check(
 ) -> Result<CommissioningSnapshotPayload, CommissioningCommandError> {
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-    let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
 
     let mut updates = Vec::new();
     let connection = open_connection(db_path)
@@ -472,15 +408,11 @@ pub fn run_commissioning_check(
         .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
 
     let (check_id, status, message) = match request.target {
-        CommissioningCheckTarget::ControlSurface => {
-            let context = read_planning_context(db_path, &planning_settings)
-                .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-            (
-                CONTROL_SURFACE_CHECK_ID,
-                String::from("passed"),
-                summarize_control_surface_probe(&context),
-            )
-        }
+        CommissioningCheckTarget::ControlSurface => (
+            CONTROL_SURFACE_CHECK_ID,
+            String::from("passed"),
+            summarize_control_surface_probe(),
+        ),
         CommissioningCheckTarget::Lighting => {
             let bridge_ip = request
                 .lighting_bridge_ip
@@ -618,70 +550,20 @@ pub fn run_commissioning_check(
         .map_err(|error| CommissioningCommandError::Storage(error.to_string()))
 }
 
-pub fn seed_sample_planning_data(
-    runtime: &RuntimeContext,
-    request: &CommissioningSeedRequest,
-) -> Result<CommissioningSnapshotPayload, CommissioningCommandError> {
-    let app_settings = list_settings_by_prefix(&runtime.db_path, APP_SETTINGS_PREFIX)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-    let shell_settings = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-    let sample_path = runtime.app_data_dir.join("commissioning-sample-db.json");
-
-    fs::write(&sample_path, SAMPLE_LEGACY_DB_JSON)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: sample_path.clone(),
-            force: request.replace_existing_data,
-        },
-    )
-    .map_err(map_import_error)?;
-
-    let mut restore_settings = app_settings
+/// The deck's pages as the exported profile maps them (the fixture double
+/// says the same sentence); Planning's selection, which it used to describe,
+/// left with the page (new pages program, Slice 2).
+fn summarize_control_surface_probe() -> String {
+    let snapshot = crate::exports::build_control_surface_snapshot();
+    let controls = snapshot
+        .pages
         .iter()
-        .map(|(key, value)| (key.clone(), value.clone()))
-        .collect::<Vec<_>>();
-
-    if let Some(workspace) = shell_settings.get(WORKSPACE_KEY) {
-        restore_settings.push((String::from(WORKSPACE_KEY), workspace.clone()));
-    }
-
-    set_settings_owned(&runtime.db_path, &restore_settings)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
-
-    read_commissioning_snapshot(&runtime.db_path)
-        .map_err(|error| CommissioningCommandError::Storage(error.to_string()))
-}
-
-fn summarize_control_surface_probe(context: &PlanningContextSnapshot) -> String {
-    if context.project_count == 0 {
-        return String::from(
-            "Planning context is reachable. No projects are loaded yet, so the deck surface would start empty.",
-        );
-    }
-
-    match &context.selected_project {
-        Some(project) => format!(
-            "Planning context is reachable. Selected project '{}' exposes {} tasks for operator navigation.",
-            project.title, context.task_count
-        ),
-        None => format!(
-            "Planning context is reachable with {} projects in native storage.",
-            context.project_count
-        ),
-    }
-}
-
-fn read_planning_counts(db_path: &Path) -> EngineResult<(usize, usize)> {
-    let connection = open_connection(db_path)?;
-    let project_count: i64 =
-        connection.query_row("SELECT COUNT(*) FROM projects", [], |row| row.get(0))?;
-    let task_count: i64 =
-        connection.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get(0))?;
-    Ok((project_count.max(0) as usize, task_count.max(0) as usize))
+        .map(|page| page.buttons.len() + page.dials.len())
+        .sum::<usize>();
+    format!(
+        "Control surface bridge exposes {controls} mapped controls across {} pages.",
+        snapshot.pages.len()
+    )
 }
 
 fn current_timestamp(connection: &rusqlite::Connection) -> Result<String, rusqlite::Error> {
@@ -792,15 +674,6 @@ fn check_checked_at_key(check_id: &str) -> String {
     format!("app.commissioning.check.{check_id}.checked_at")
 }
 
-fn map_import_error(error: ImportLegacyError) -> CommissioningCommandError {
-    match error {
-        ImportLegacyError::ExistingDataRequiresForce => CommissioningCommandError::InvalidParams(
-            String::from("Sample planning data already exists. Re-run with replaceExistingData=true to replace it."),
-        ),
-        other => CommissioningCommandError::Storage(other.to_string()),
-    }
-}
-
 fn probe_bridge_reachable(ip: &str) -> bool {
     let Some(parsed_ip) = parse_ipv4(ip) else {
         return false;
@@ -877,11 +750,9 @@ fn is_valid_port(port: i64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_state::{
-        COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
-    };
+    use crate::bootstrap::RuntimeContext;
     use crate::control_surface::ControlSurfaceBridgeInfo;
-    use crate::storage::{initialize_test_database, set_settings};
+    use crate::storage::initialize_test_database;
     use std::fs;
     use std::path::PathBuf;
     use std::process;
@@ -944,22 +815,17 @@ mod tests {
         }
     }
 
+    // New pages program, Slice 2: Planning left the commissioning snapshot —
+    // its counts, the sample seed and every sentence that named them.
     #[test]
-    fn commissioning_snapshot_reflects_seeded_planning_counts() {
+    fn commissioning_snapshot_says_nothing_of_planning() {
         let test_dir = TestDir::new("commissioning-snapshot");
         let runtime = runtime_for(&test_dir);
         initialize_test_database(&runtime.db_path).expect("database should initialize");
 
-        let snapshot = seed_sample_planning_data(
-            &runtime,
-            &CommissioningSeedRequest {
-                replace_existing_data: false,
-            },
-        )
-        .expect("sample seed should succeed");
+        let snapshot = read_commissioning_snapshot(&runtime.db_path).expect("snapshot should read");
 
-        assert_eq!(snapshot.planning_project_count, 2);
-        assert_eq!(snapshot.planning_task_count, 3);
+        assert_eq!(snapshot.summary, "Stage 'import', 3 probe records.");
         assert_eq!(
             snapshot
                 .steps
@@ -968,9 +834,28 @@ mod tests {
                 .map(|step| step.status.as_str()),
             Some("current")
         );
-        assert!(snapshot.summary.contains("2 projects"));
         assert!(snapshot.config_summary.contains("Lighting bridge"));
-        assert!(snapshot.readiness_summary.contains("Startup still routes"));
+        assert_eq!(
+            snapshot.readiness_summary,
+            "0 of 3 commissioning probes passed. Startup remains on Setup until publish."
+        );
+        let wire = serde_json::to_value(&snapshot).expect("snapshot serializes");
+        for field in [
+            "planningProjectCount",
+            "planningTaskCount",
+            "sampleSeedAvailable",
+        ] {
+            assert!(wire.get(field).is_none(), "{field} is still on the wire");
+        }
+        let sentences = [&snapshot.summary, &snapshot.readiness_summary]
+            .into_iter()
+            .chain(snapshot.steps.iter().map(|step| &step.summary));
+        for sentence in sentences {
+            assert!(
+                !sentence.to_lowercase().contains("planning"),
+                "\"{sentence}\" names Planning"
+            );
+        }
     }
 
     #[test]
@@ -1072,14 +957,6 @@ mod tests {
         let runtime = runtime_for(&test_dir);
         initialize_test_database(&runtime.db_path).expect("database should initialize");
 
-        seed_sample_planning_data(
-            &runtime,
-            &CommissioningSeedRequest {
-                replace_existing_data: false,
-            },
-        )
-        .expect("sample seed should succeed");
-
         let snapshot = run_commissioning_check(
             &runtime.db_path,
             &CommissioningCheckRequest {
@@ -1101,6 +978,19 @@ mod tests {
                 .map(|check| check.status.as_str()),
             Some("passed")
         );
+        // New pages program, Slice 2: the probe describes the deck's pages,
+        // not a Planning selection (it said "Planning context is reachable").
+        let message = snapshot
+            .checks
+            .iter()
+            .find(|check| check.id == CONTROL_SURFACE_CHECK_ID)
+            .map(|check| check.message.as_str())
+            .unwrap_or_default();
+        assert!(
+            message.starts_with("Control surface bridge exposes "),
+            "{message}"
+        );
+        assert!(!message.to_lowercase().contains("planning"), "{message}");
     }
 
     #[test]
@@ -1230,53 +1120,5 @@ mod tests {
         assert_eq!(audio.status, "ready");
         assert!(audio.capabilities.can_edit_mixer_state);
         assert!(audio.capabilities.can_sync);
-    }
-
-    #[test]
-    fn sample_seed_preserves_commissioning_stage_and_workspace() {
-        let test_dir = TestDir::new("commissioning-seed-preserve");
-        let runtime = runtime_for(&test_dir);
-        initialize_test_database(&runtime.db_path).expect("database should initialize");
-
-        set_settings(
-            &runtime.db_path,
-            &[
-                (COMMISSIONING_STAGE_KEY, String::from("in-progress")),
-                (COMMISSIONING_RUNNER_STAGE_KEY, String::from("probe")),
-                (COMMISSIONING_COMPLETED_KEY, String::from("false")),
-                (WORKSPACE_KEY, String::from("audio")),
-            ],
-        )
-        .expect("pre-seed settings should persist");
-
-        seed_sample_planning_data(
-            &runtime,
-            &CommissioningSeedRequest {
-                replace_existing_data: false,
-            },
-        )
-        .expect("sample seed should succeed");
-
-        let app_settings = list_settings_by_prefix(&runtime.db_path, APP_SETTINGS_PREFIX)
-            .expect("app settings should load");
-        let shell_settings = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)
-            .expect("shell settings should load");
-
-        assert_eq!(
-            app_settings
-                .get(COMMISSIONING_STAGE_KEY)
-                .map(String::as_str),
-            Some("in-progress")
-        );
-        assert_eq!(
-            app_settings
-                .get(COMMISSIONING_RUNNER_STAGE_KEY)
-                .map(String::as_str),
-            Some("probe")
-        );
-        assert_eq!(
-            shell_settings.get(WORKSPACE_KEY).map(String::as_str),
-            Some("audio")
-        );
     }
 }

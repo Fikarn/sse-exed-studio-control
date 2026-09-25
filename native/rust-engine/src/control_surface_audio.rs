@@ -8,9 +8,8 @@ use crate::audio::{
     AudioSettingsUpdateRequest, AudioSnapshot, AudioTalkbackHoldRequest,
 };
 use crate::control_surface::{
-    clamp_i64, cycle_value, emit_audio_changed, map_planning_error, truncate, ControlSurfaceError,
+    clamp_i64, cycle_value, emit_audio_changed, truncate, ControlSurfaceError,
 };
-use crate::planning::{parse_planning_settings_update, update_planning_settings};
 use crate::storage::{list_settings_by_prefix, set_settings_owned};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -309,17 +308,10 @@ pub(crate) fn handle_audio_action(
     action: &str,
     value: Option<&str>,
 ) -> Result<Value, ControlSurfaceError> {
+    // New pages program, Slice 2: `switchToDeckMode` left with Planning (it
+    // stored the Planning setting `planning.deck_mode`, which nothing read);
+    // the page keys only turn Companion's page now.
     match action {
-        "switchToDeckMode" => {
-            let deck_mode = value.unwrap_or("audio");
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "deckMode": result.settings.deck_mode }))
-        }
         "recallSnapshot" => {
             let (_, audio_snapshot) = current_audio_snapshot(db_path)?;
             let Some(snapshot) = audio_snapshot.snapshots.first() else {

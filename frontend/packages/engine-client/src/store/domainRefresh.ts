@@ -73,12 +73,6 @@ export const EVENT_DOMAIN_REFRESH = {
   "engine.ready": [],
   "engine.startupFailed": [],
   "lighting.changed": LIGHTING_DOMAINS,
-  // New pages program, Slice 1: Planning left the screen, and nothing asks for
-  // its snapshot. Until Slice 2 the hardware link still raises this event (the
-  // Stream Deck's project and task keys) and still counts projects and tasks in
-  // the commissioning snapshot, whose summary Setup prints — so that one
-  // snapshot is still refreshed. Slice 2 removes the event.
-  "planning.changed": ["commissioning"],
   "settings.changed": ["app"],
   "support.changed": ["support"],
 } as const satisfies Record<EventName, readonly DomainKey[]>;

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-pub const PROTOCOL_VERSION: &str = "1";
+pub const PROTOCOL_VERSION: &str = "2";
 
 pub const EVENT_APP_CHANGED: &str = "app.changed";
 pub const EVENT_AUDIO_CHANGED: &str = "audio.changed";
@@ -14,7 +14,6 @@ pub const EVENT_ENGINE_EXITED: &str = "engine.exited";
 pub const EVENT_ENGINE_READY: &str = "engine.ready";
 pub const EVENT_ENGINE_STARTUP_FAILED: &str = "engine.startupFailed";
 pub const EVENT_LIGHTING_CHANGED: &str = "lighting.changed";
-pub const EVENT_PLANNING_CHANGED: &str = "planning.changed";
 pub const EVENT_SETTINGS_CHANGED: &str = "settings.changed";
 pub const EVENT_SUPPORT_CHANGED: &str = "support.changed";
 
@@ -27,7 +26,6 @@ pub const EVENT_NAMES: &[&str] = &[
     EVENT_ENGINE_READY,
     EVENT_ENGINE_STARTUP_FAILED,
     EVENT_LIGHTING_CHANGED,
-    EVENT_PLANNING_CHANGED,
     EVENT_SETTINGS_CHANGED,
     EVENT_SUPPORT_CHANGED,
 ];

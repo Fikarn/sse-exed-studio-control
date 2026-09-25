@@ -1,6 +1,12 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+// The protocol version the engine is asked for is the contract's own.
+export function contractProtocolVersion(rootDir) {
+  const contract = JSON.parse(readFileSync(path.join(rootDir, "native", "protocol", "v1.contract.json"), "utf8"));
+  return contract.version;
+}
 
 export function resolvePathFromRoot(rootDir, value) {
   if (!value) {
@@ -65,7 +71,7 @@ export class EngineHarness {
       cwd: this.rootDir,
       env: {
         ...process.env,
-        SSE_PROTOCOL_VERSION: "1",
+        SSE_PROTOCOL_VERSION: contractProtocolVersion(this.rootDir),
         SSE_APP_DATA_DIR: this.appDataDir,
         SSE_LOG_DIR: this.logsDir,
         ...this.env,

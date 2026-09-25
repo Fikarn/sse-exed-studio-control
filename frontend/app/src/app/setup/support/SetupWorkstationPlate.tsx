@@ -23,7 +23,7 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
       lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "no backup exported yet"}
       lightOutputsArmed={lightOutputsArmed}
-      protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "1")}
+      protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "2")}
       recentActions={recentActions}
       restoreDisabled={!lastBackup}
       theme={theme}

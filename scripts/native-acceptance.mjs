@@ -7,10 +7,16 @@ import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-har
 import {
   acceptanceEngineEnv,
   assertAudioWorkflowParity,
+  assertBackupArchiveWithoutPlanning,
+  assertContinuitySentinel,
   assertCoreParityContracts,
   assertLightingWorkflowParity,
-  assertPlanningWorkflowParity,
+  assertSavedWorkspace,
   awaitConsoleLinkQuiet,
+  createContinuitySentinel,
+  IMPORTED_WORKSPACE,
+  moveSavedWorkspace,
+  SAVED_DATA_MARKER_CHANGED,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
@@ -29,7 +35,10 @@ async function main() {
   const logsDir = path.join(acceptanceRoot, "logs");
 
   console.log(`Native acceptance root: ${acceptanceRoot}`);
-  console.log("Step 1: import legacy workstation data and export a native backup.");
+  console.log(SAVED_DATA_MARKER_CHANGED);
+  console.log(
+    "Step 1: import the legacy workstation file (its setup flag and the page it opens on) and export a native backup."
+  );
 
   const firstRun = new EngineHarness({
     rootDir,
@@ -41,6 +50,7 @@ async function main() {
   });
 
   let backupPath;
+  let sentinel;
 
   try {
     await firstRun.start();
@@ -48,14 +58,23 @@ async function main() {
     await assertCoreParityContracts(firstRun, "native-acceptance-installed", "Native acceptance engine");
 
     const initialAppSnapshot = await firstRun.request("app-snapshot-initial", "app.snapshot");
-    const initialPlanningSnapshot = await firstRun.request("planning-snapshot-initial", "planning.snapshot");
 
     assert(
       initialAppSnapshot.startup?.targetSurface === "commissioning",
       `Expected imported workstation to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    assert(initialPlanningSnapshot.counts?.projectCount === 2, "Expected imported project count to be 2.");
-    assert(initialPlanningSnapshot.counts?.taskCount === 3, "Expected imported task count to be 3.");
+    // The import is seen by the page it wrote: new saved data opens on the
+    // Console, the fixture on Lighting.
+    assertSavedWorkspace(initialAppSnapshot, IMPORTED_WORKSPACE, "Native acceptance engine", "after the import");
+    // The continuity sentinel the installer and delivery lanes use, made here
+    // on the same fresh, unconfigured lighting, so the one lane CI runs on
+    // every push proves it survives a restart and comes back with a restore.
+    sentinel = await createContinuitySentinel(
+      firstRun,
+      "native-acceptance-installed",
+      "Acceptance Continuity Sentinel",
+      "Native acceptance engine"
+    );
 
     // No hardware on this host: publish with the explicit probe override the
     // engine now requires (2026-09 audit Slice 8) instead of pretending the
@@ -74,6 +93,7 @@ async function main() {
     const exportSummary = await firstRun.request("support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected native backup export to create an archive.");
+    assertBackupArchiveWithoutPlanning(exportSummary, IMPORTED_WORKSPACE, "Native acceptance engine");
   } finally {
     await firstRun.close().catch((error) => {
       throw error;
@@ -81,7 +101,7 @@ async function main() {
   }
 
   console.log(
-    "Step 2: restart the engine against the same runtime, verify planning workflow parity, and then verify rollback."
+    "Step 2: restart the engine against the same runtime, verify lighting and audio workflow parity, save another page, and then verify rollback."
   );
 
   const secondRun = new EngineHarness({
@@ -98,7 +118,6 @@ async function main() {
     await assertSafeBundledSqlite(secondRun, "native-acceptance-restarted", "Restarted native acceptance engine");
 
     const restartedAppSnapshot = await secondRun.request("app-snapshot-restart", "app.snapshot");
-    const restartedPlanningSnapshot = await secondRun.request("planning-snapshot-restart", "planning.snapshot");
 
     assert(
       restartedAppSnapshot.startup?.targetSurface === "dashboard",
@@ -108,16 +127,22 @@ async function main() {
       restartedAppSnapshot.commissioning?.stage === "ready",
       `Expected persisted commissioning stage to remain ready, got '${restartedAppSnapshot.commissioning?.stage}'.`
     );
-    assert(restartedPlanningSnapshot.counts?.projectCount === 2, "Expected restarted project count to remain 2.");
-    assert(restartedPlanningSnapshot.counts?.taskCount === 3, "Expected restarted task count to remain 3.");
+    assertSavedWorkspace(
+      restartedAppSnapshot,
+      IMPORTED_WORKSPACE,
+      "Restarted native acceptance engine",
+      "after the restart"
+    );
+    await assertContinuitySentinel(
+      secondRun,
+      "native-acceptance-restarted",
+      sentinel,
+      "Restarted native acceptance engine",
+      "after the restart"
+    );
     const restartedLightingSnapshot = await secondRun.request("lighting-snapshot-restart", "lighting.snapshot");
     const restartedAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "native-acceptance-restart-audio-quiet");
 
-    const workflowMutations = await assertPlanningWorkflowParity(
-      secondRun,
-      "native-acceptance-restarted",
-      "Restarted native acceptance engine"
-    );
     const lightingMutations = await assertLightingWorkflowParity(
       secondRun,
       "native-acceptance-restarted",
@@ -129,17 +154,9 @@ async function main() {
       "Restarted native acceptance engine"
     );
 
-    const mutatedPlanningSnapshot = await secondRun.request("planning-snapshot-mutated", "planning.snapshot");
-    assert(
-      mutatedPlanningSnapshot.counts?.projectCount === 4,
-      `Expected planning workflow mutations to increase project count to 4, got ${mutatedPlanningSnapshot.counts?.projectCount}.`
-    );
-    assert(
-      workflowMutations.temporaryProjectIds.every((projectId) =>
-        mutatedPlanningSnapshot.projects?.some((project) => project.id === projectId)
-      ),
-      "Expected planning workflow mutations to leave temporary parity projects in the mutated snapshot."
-    );
+    // The saved data the restore must roll back besides lighting and audio:
+    // the page, saved after the backup was exported.
+    await moveSavedWorkspace(secondRun, "native-acceptance-restarted", "Restarted native acceptance engine");
 
     const restoreSummary = await secondRun.request("support-backup-restore", "support.backup.restore", {
       path: backupPath,
@@ -152,23 +169,26 @@ async function main() {
       restoreSummary.rollbackBackupPath && existsSync(restoreSummary.rollbackBackupPath),
       "Expected restore to generate a rollback archive."
     );
+    assert(
+      restoreSummary.detail === undefined,
+      `Expected a format-5 archive to restore without leaving anything out, got: ${restoreSummary.detail}`
+    );
 
-    const restoredPlanningSnapshot = await secondRun.request("planning-snapshot-restored", "planning.snapshot");
     const restoredLightingSnapshot = await secondRun.request("lighting-snapshot-restored", "lighting.snapshot");
     const restoredAudioSnapshot = await awaitConsoleLinkQuiet(secondRun, "native-acceptance-restored-audio-quiet");
     const restoredAppSnapshot = await secondRun.request("app-snapshot-restored", "app.snapshot");
-    assert(restoredPlanningSnapshot.counts?.projectCount === 2, "Expected restore to roll project count back to 2.");
-    assert(
-      workflowMutations.temporaryProjectIds.every(
-        (projectId) => !restoredPlanningSnapshot.projects?.some((project) => project.id === projectId)
-      ),
-      "Expected restore to remove the temporary planning parity projects."
+    assertSavedWorkspace(
+      restoredAppSnapshot,
+      IMPORTED_WORKSPACE,
+      "Restored native acceptance engine",
+      "after the restore"
     );
-    assert(
-      workflowMutations.temporaryTaskIds.every(
-        (taskId) => !restoredPlanningSnapshot.tasks?.some((task) => task.id === taskId)
-      ),
-      "Expected restore to remove the temporary planning parity tasks."
+    await assertContinuitySentinel(
+      secondRun,
+      "native-acceptance-restored",
+      sentinel,
+      "Restored native acceptance engine",
+      "after the restore"
     );
     assert(
       restoredLightingSnapshot.fixtures?.length === restartedLightingSnapshot.fixtures?.length,
@@ -269,7 +289,9 @@ async function main() {
     });
   }
 
-  console.log("Native acceptance passed: import, restart, and rollback are deterministic.");
+  console.log(
+    "Native acceptance passed: import, restart, and rollback are deterministic (saved page, lighting and audio followed)."
+  );
 }
 
 main().catch((error) => {

@@ -1,15 +1,7 @@
 {
   "schemaVersion": 1,
-  "projects": [],
-  "tasks": [],
-  "activityLog": [],
   "settings": {
-    "viewFilter": "all",
-    "sortBy": "manual",
-    "selectedProjectId": null,
-    "selectedTaskId": null,
-    "dashboardView": "kanban",
-    "deckMode": "project",
+    "dashboardView": "audio",
     "hasCompletedSetup": false
   }
 }

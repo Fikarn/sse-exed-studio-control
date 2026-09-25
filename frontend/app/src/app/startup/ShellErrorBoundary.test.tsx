@@ -103,7 +103,7 @@ describe("ShellErrorBoundary", () => {
           "lighting.fixtureCatalog.snapshot": null,
           "lighting.snapshot": { fixtures: [], groups: "none", scenes: [] },
         };
-        return method in typed ? (typed[method] ?? null) : { protocol: "1" };
+        return method in typed ? (typed[method] ?? null) : { protocol: "2" };
       },
       subscribe: () => () => {},
     };

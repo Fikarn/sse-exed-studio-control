@@ -20,6 +20,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use studio_control_protocol::PROTOCOL_VERSION;
 
 fn engine_binary_path() -> PathBuf {
     // Cargo sets this env var for integration tests of crates that
@@ -250,10 +251,14 @@ fn commissioning_publish_is_refused_until_probes_pass_or_the_operator_overrides(
     engine.shutdown();
 }
 
+/// A legacy db.json whose setup was completed. New pages program, Slice 2:
+/// the import is seen by the setup flag it carries, because the Planning
+/// counts it was once seen by left the commissioning snapshot (until then this
+/// was `commissioning-sample-db.json`, two projects, setup not completed).
 fn legacy_fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("fixtures")
-        .join("commissioning-sample-db.json")
+        .join("dashboard-ready-db.json")
 }
 
 fn wait_for_ready(engine: &mut EngineProcess) {
@@ -263,7 +268,7 @@ fn wait_for_ready(engine: &mut EngineProcess) {
     });
 }
 
-fn planning_project_count(engine: &mut EngineProcess, id: &'static str) -> u64 {
+fn has_completed_setup(engine: &mut EngineProcess, id: &'static str) -> bool {
     engine.send(&json!({
         "type": "request",
         "id": id,
@@ -272,10 +277,10 @@ fn planning_project_count(engine: &mut EngineProcess, id: &'static str) -> u64 {
     }));
     let snapshot = engine.wait_for("commissioning snapshot", response_with_id(id));
     snapshot
-        .pointer("/result/planningProjectCount")
-        .and_then(Value::as_u64)
+        .pointer("/result/hasCompletedSetup")
+        .and_then(Value::as_bool)
         .unwrap_or_else(|| {
-            panic!("commissioning.snapshot must report planningProjectCount ({snapshot})")
+            panic!("commissioning.snapshot must report hasCompletedSetup ({snapshot})")
         })
 }
 
@@ -302,9 +307,8 @@ fn auto_import_ignores_cwd() {
     });
     wait_for_ready(&mut engine);
 
-    assert_eq!(
-        planning_project_count(&mut engine, "cwd-snapshot"),
-        0,
+    assert!(
+        !has_completed_setup(&mut engine, "cwd-snapshot"),
         "a db.json under the engine's working directory must not be imported"
     );
 
@@ -325,10 +329,9 @@ fn auto_import_reads_the_staged_app_data_file() {
     });
     wait_for_ready(&mut engine);
 
-    assert_eq!(
-        planning_project_count(&mut engine, "staged-snapshot"),
-        2,
-        "the staged <app-data>/import/db.json (commissioning-sample-db.json, two projects) must be imported"
+    assert!(
+        has_completed_setup(&mut engine, "staged-snapshot"),
+        "the staged <app-data>/import/db.json (dashboard-ready-db.json, setup completed) must be imported"
     );
 
     engine.shutdown();
@@ -345,8 +348,8 @@ fn engine_boots_dispatches_a_request_and_exits_cleanly() {
     });
     assert_eq!(
         ready.pointer("/payload/protocol").and_then(Value::as_str),
-        Some("1"),
-        "engine.ready payload should declare protocol 1"
+        Some(PROTOCOL_VERSION),
+        "engine.ready payload should declare the current protocol"
     );
 
     // 2. engine.ping round-trip — the simplest dispatch arm.
@@ -369,8 +372,8 @@ fn engine_boots_dispatches_a_request_and_exits_cleanly() {
         ping_response
             .pointer("/result/protocol")
             .and_then(Value::as_str),
-        Some("1"),
-        "engine.ping result should echo protocol 1"
+        Some(PROTOCOL_VERSION),
+        "engine.ping result should echo the current protocol"
     );
 
     // 3. app.snapshot — exercises the read dispatcher + storage layer.

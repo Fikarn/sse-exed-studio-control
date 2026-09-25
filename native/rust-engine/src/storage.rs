@@ -1,19 +1,15 @@
 use crate::app_state::{
-    default_app_settings_entries, COMMISSIONING_COMPLETED_KEY, COMMISSIONING_RUNNER_STAGE_KEY,
-    COMMISSIONING_STAGE_KEY,
+    default_app_settings_entries, CommissioningSnapshot, COMMISSIONING_COMPLETED_KEY,
+    COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
 };
 use crate::commissioning::default_settings_entries as default_commissioning_settings_entries;
 use crate::legacy_import::{
     load_legacy_import_payload, ImportLegacyError, LegacyImportRequest, LegacyImportSummary,
 };
-use crate::planning_settings::{
-    default_settings_entries as default_planning_settings_entries, DASHBOARD_VIEW_KEY,
-    DECK_MODE_KEY, SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, VIEW_FILTER_KEY,
-};
 use crate::shell_settings::{default_settings_entries, WORKSPACE_KEY};
 use crate::storage_backups::{snapshot_database_with, SnapshotReason};
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension, Transaction};
-use serde_json::{json, to_string, Value};
+use serde_json::{json, Value};
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::error::Error;
@@ -25,10 +21,14 @@ pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 /// The newest schema `migrate_schema` knows. Every step there names its own
 /// version as a literal; raising this goes with a new `if schema_version < N`
 /// block, never with a change to the last one.
-pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 7;
+pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 8;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
+
+/// When the legacy db.json import last wrote this database. The import's
+/// "existing data" gate reads it (new pages program, Slice 2).
+const LEGACY_IMPORT_IMPORTED_AT_KEY: &str = "legacy_import.imported_at_unix";
 
 /// `PRAGMA integrity_check` stops after this many findings; the first one is
 /// what the operator reads, the rest go to the log.
@@ -282,11 +282,12 @@ pub fn initialize_database(db_path: &Path, backups_dir: &Path) -> EngineResult<S
         &[("storage.bootstrap", String::from("initialized"))],
     )?;
 
+    // New pages program, Slice 2: no `planning.*` defaults any more — seeded
+    // here, schema 8's drop would come back at every start.
     for (key, value) in default_settings_entries()
         .into_iter()
         .chain(default_app_settings_entries())
         .chain(default_commissioning_settings_entries())
-        .chain(default_planning_settings_entries())
     {
         connection.execute(
             "INSERT INTO app_settings(key, value) VALUES (?1, ?2)
@@ -346,6 +347,11 @@ fn read_format_version(connection: &Connection) -> Result<String, rusqlite::Erro
         })
 }
 
+/// The legacy db.json import, reduced to what is not Planning (new pages
+/// program, Slice 2 — interim until Slice 2b retires the import): it writes
+/// the setup flag and the page to open, and nothing else. The projects,
+/// tasks, checklists, activity entries and Planning settings a db.json holds
+/// are ignored.
 pub fn import_legacy_db(
     db_path: &Path,
     request: &LegacyImportRequest,
@@ -357,116 +363,10 @@ pub fn import_legacy_db(
         .transaction()
         .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
 
-    let had_existing_data = has_existing_planning_data(&transaction)
+    let had_existing_data = legacy_import_would_replace(&transaction)
         .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
     if had_existing_data && !request.force {
         return Err(ImportLegacyError::ExistingDataRequiresForce);
-    }
-
-    clear_planning_data(&transaction)
-        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-    for project in &payload.projects {
-        transaction
-            .execute(
-                "INSERT INTO projects(
-                    id, title, description, status, priority, created_at, last_updated, sort_order
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                params![
-                    project.id,
-                    project.title,
-                    project.description,
-                    project.status,
-                    project.priority,
-                    project.created_at,
-                    project.last_updated,
-                    project.order,
-                ],
-            )
-            .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-    }
-
-    let mut checklist_items_imported = 0usize;
-    let mut normalized_running_tasks = 0usize;
-
-    for task in &payload.tasks {
-        let mut total_seconds = task.total_seconds;
-        let mut is_running = task.is_running;
-        let mut last_started = task.last_started.clone();
-
-        if task.is_running {
-            let recovered_seconds = task
-                .last_started
-                .as_deref()
-                .map(|value| recover_elapsed_seconds(&transaction, value))
-                .transpose()
-                .map_err(|error| ImportLegacyError::Storage(error.to_string()))?
-                .unwrap_or(0);
-
-            total_seconds = total_seconds.saturating_add(recovered_seconds);
-            is_running = false;
-            last_started = None;
-            normalized_running_tasks += 1;
-        }
-
-        transaction
-            .execute(
-                "INSERT INTO tasks(
-                    id, project_id, title, description, priority, due_date, labels_json,
-                    is_running, total_seconds, last_started, completed, sort_order, created_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-                params![
-                    task.id,
-                    task.project_id,
-                    task.title,
-                    task.description,
-                    task.priority,
-                    task.due_date,
-                    to_string(&task.labels)
-                        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?,
-                    bool_to_int(is_running),
-                    total_seconds,
-                    last_started,
-                    bool_to_int(task.completed),
-                    task.order,
-                    task.created_at,
-                ],
-            )
-            .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-        for item in &task.checklist {
-            transaction
-                .execute(
-                    "INSERT INTO task_checklist_items(id, task_id, text, done, sort_order)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![
-                        item.id,
-                        task.id,
-                        item.text,
-                        bool_to_int(item.done),
-                        item.order,
-                    ],
-                )
-                .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-            checklist_items_imported += 1;
-        }
-    }
-
-    for entry in &payload.activity_log {
-        transaction
-            .execute(
-                "INSERT INTO activity_log(id, timestamp, entity_type, entity_id, action, detail)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                params![
-                    entry.id,
-                    entry.timestamp,
-                    entry.entity_type,
-                    entry.entity_id,
-                    entry.action,
-                    entry.detail,
-                ],
-            )
-            .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
     }
 
     let updated_settings = write_imported_settings(&transaction, &payload)
@@ -476,11 +376,6 @@ pub fn import_legacy_db(
         source_path: payload.source_path.display().to_string(),
         source_schema_version: payload.source_schema_version,
         replaced_existing_data: had_existing_data,
-        imported_projects: payload.projects.len(),
-        imported_tasks: payload.tasks.len(),
-        imported_checklist_items: checklist_items_imported,
-        imported_activity_entries: payload.activity_log.len(),
-        normalized_running_tasks,
         updated_settings,
     };
 
@@ -493,24 +388,7 @@ pub fn import_legacy_db(
                 summary.source_schema_version.to_string(),
             ),
             (
-                "legacy_import.projects",
-                summary.imported_projects.to_string(),
-            ),
-            ("legacy_import.tasks", summary.imported_tasks.to_string()),
-            (
-                "legacy_import.checklist_items",
-                summary.imported_checklist_items.to_string(),
-            ),
-            (
-                "legacy_import.activity_entries",
-                summary.imported_activity_entries.to_string(),
-            ),
-            (
-                "legacy_import.normalized_running_tasks",
-                summary.normalized_running_tasks.to_string(),
-            ),
-            (
-                "legacy_import.imported_at_unix",
+                LEGACY_IMPORT_IMPORTED_AT_KEY,
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .map(|duration| duration.as_secs().to_string())
@@ -525,6 +403,34 @@ pub fn import_legacy_db(
         .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
 
     Ok(summary)
+}
+
+/// Whether a legacy db.json import would replace saved data here: the setup
+/// is already complete, or a db.json was imported before. Until Slice 2 the
+/// gate was "the Planning tables hold rows"; the import now writes only the
+/// setup flag and the page to open, so these are what it could replace. The
+/// start-up auto-import runs only while this is false, and an explicit
+/// import (or a development fixture load) then needs `force`.
+pub fn legacy_import_finds_saved_data(db_path: &Path) -> EngineResult<bool> {
+    let connection = open_connection(db_path)?;
+    Ok(legacy_import_would_replace(&connection)?)
+}
+
+fn legacy_import_would_replace(connection: &Connection) -> Result<bool, rusqlite::Error> {
+    let imported_before = connection
+        .query_row(
+            "SELECT 1 FROM app_metadata WHERE key = ?1",
+            [LEGACY_IMPORT_IMPORTED_AT_KEY],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    let setup_completed = CommissioningSnapshot::from_settings(&query_settings_by_prefix(
+        connection,
+        "app.commissioning.",
+    )?)
+    .has_completed_setup;
+    Ok(imported_before || setup_completed)
 }
 
 pub(crate) fn open_connection(db_path: &Path) -> Result<Connection, rusqlite::Error> {
@@ -790,6 +696,42 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
         schema_version = 7;
     }
 
+    if schema_version < 8 {
+        // v7 -> v8 (new pages program, Slice 2 — D2): Planning left the app.
+        // Its four tables go (children first; their indexes go with them),
+        // every `planning.*` setting goes, the Planning counts an earlier
+        // db.json import recorded go, and a saved Planning page opens the
+        // Console. The pre-migration copy written above keeps all of it: it
+        // is the way back to an older build, which refuses schema 8. A new
+        // database takes this step too, so it ends without the tables that
+        // steps 2 and 3 created.
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            r#"
+            DROP TABLE IF EXISTS task_checklist_items;
+            DROP TABLE IF EXISTS tasks;
+            DROP TABLE IF EXISTS projects;
+            DROP TABLE IF EXISTS activity_log;
+
+            DELETE FROM app_settings WHERE key LIKE 'planning.%';
+
+            DELETE FROM app_metadata WHERE key IN
+                ('legacy_import.projects',
+                 'legacy_import.tasks',
+                 'legacy_import.checklist_items',
+                 'legacy_import.activity_entries',
+                 'legacy_import.normalized_running_tasks');
+
+            UPDATE app_settings
+               SET value = 'audio', updated_at = CURRENT_TIMESTAMP
+             WHERE key = 'shell.workspace' AND value = 'planning';
+            "#,
+        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (8)", [])?;
+        transaction.commit()?;
+        schema_version = 8;
+    }
+
     Ok(schema_version)
 }
 
@@ -944,27 +886,12 @@ fn upsert_metadata(
     Ok(())
 }
 
+/// The setup flag and the page to open — all a legacy db.json still gives.
 fn write_imported_settings(
     transaction: &Transaction<'_>,
     payload: &crate::legacy_import::LegacyImportPayload,
 ) -> Result<usize, rusqlite::Error> {
-    delete_settings_keys(
-        transaction,
-        &[
-            SELECTED_PROJECT_ID_KEY,
-            SELECTED_TASK_ID_KEY,
-            WORKSPACE_KEY,
-            COMMISSIONING_COMPLETED_KEY,
-            COMMISSIONING_RUNNER_STAGE_KEY,
-            COMMISSIONING_STAGE_KEY,
-        ],
-    )?;
-
-    let mut updates = vec![
-        (VIEW_FILTER_KEY, payload.settings.view_filter.clone()),
-        (SORT_BY_KEY, payload.settings.sort_by.clone()),
-        (DASHBOARD_VIEW_KEY, payload.settings.dashboard_view.clone()),
-        (DECK_MODE_KEY, payload.settings.deck_mode.clone()),
+    let updates = [
         (WORKSPACE_KEY, payload.settings.shell_workspace.clone()),
         (
             COMMISSIONING_COMPLETED_KEY,
@@ -980,57 +907,11 @@ fn write_imported_settings(
         ),
     ];
 
-    if let Some(project_id) = &payload.settings.selected_project_id {
-        updates.push((SELECTED_PROJECT_ID_KEY, project_id.clone()));
-    }
-
-    if let Some(task_id) = &payload.settings.selected_task_id {
-        updates.push((SELECTED_TASK_ID_KEY, task_id.clone()));
-    }
-
     upsert_settings(transaction, &updates)?;
     Ok(updates.len())
 }
 
-fn has_existing_planning_data(transaction: &Transaction<'_>) -> Result<bool, rusqlite::Error> {
-    Ok(count_rows(transaction, "projects")? > 0
-        || count_rows(transaction, "tasks")? > 0
-        || count_rows(transaction, "activity_log")? > 0)
-}
-
-fn clear_planning_data(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
-    transaction.execute("DELETE FROM task_checklist_items", [])?;
-    transaction.execute("DELETE FROM tasks", [])?;
-    transaction.execute("DELETE FROM projects", [])?;
-    transaction.execute("DELETE FROM activity_log", [])?;
-    Ok(())
-}
-
-fn count_rows(connection: &Connection, table_name: &str) -> Result<i64, rusqlite::Error> {
-    let sql = format!("SELECT COUNT(*) FROM {table_name}");
-    connection.query_row(&sql, [], |row| row.get(0))
-}
-
-fn recover_elapsed_seconds(
-    transaction: &Transaction<'_>,
-    last_started: &str,
-) -> Result<i64, rusqlite::Error> {
-    let elapsed_seconds = transaction.query_row(
-        "SELECT CAST((julianday('now') - julianday(?1)) * 86400 AS INTEGER)",
-        [last_started],
-        |row| row.get::<_, Option<i64>>(0),
-    )?;
-
-    Ok(elapsed_seconds.unwrap_or(0).max(0))
-}
-
-fn bool_to_int(value: bool) -> i64 {
-    if value {
-        1
-    } else {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_schema_8;

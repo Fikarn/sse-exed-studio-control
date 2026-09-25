@@ -1,9 +1,4 @@
 use crate::bootstrap::{RuntimeContext, EXPORTS_DIR_NAME};
-use crate::planning_settings::{
-    DASHBOARD_VIEW_KEY, DECK_MODE_KEY, MODE_SECTION_KEY, PLANNING_SETTINGS_PREFIX,
-    SELECTED_PROJECT_ID_KEY, SELECTED_TASK_ID_KEY, SORT_BY_KEY, TIMELINE_END_HOUR_KEY,
-    TIMELINE_START_HOUR_KEY, VIEW_FILTER_KEY,
-};
 use crate::shell_settings::ShellSettingsSnapshot;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -117,7 +112,6 @@ pub fn build_app_snapshot(
     runtime: &RuntimeContext,
     shell_settings: &HashMap<String, String>,
     app_settings: &HashMap<String, String>,
-    planning_settings: &HashMap<String, String>,
 ) -> Value {
     let shell = ShellSettingsSnapshot::from_settings(shell_settings);
     let commissioning = CommissioningSnapshot::from_settings(app_settings);
@@ -192,24 +186,6 @@ pub fn build_app_snapshot(
             "stage": commissioning.stage,
             "hardwareProfile": commissioning.hardware_profile,
             "summary": commissioning_summary,
-        },
-        "planning": {
-            "settingsPrefix": PLANNING_SETTINGS_PREFIX,
-            "viewFilter": planning_settings.get(VIEW_FILTER_KEY).cloned().unwrap_or_else(|| String::from("all")),
-            "sortBy": planning_settings.get(SORT_BY_KEY).cloned().unwrap_or_else(|| String::from("manual")),
-            "dashboardView": planning_settings.get(DASHBOARD_VIEW_KEY).cloned().unwrap_or_else(|| String::from("kanban")),
-            "deckMode": planning_settings.get(DECK_MODE_KEY).cloned().unwrap_or_else(|| String::from("project")),
-            "modeSection": planning_settings.get(MODE_SECTION_KEY).cloned().unwrap_or_else(|| String::from("timeline")),
-            "timelineStartHour": planning_settings
-                .get(TIMELINE_START_HOUR_KEY)
-                .and_then(|value| value.parse::<i64>().ok())
-                .unwrap_or(9),
-            "timelineEndHour": planning_settings
-                .get(TIMELINE_END_HOUR_KEY)
-                .and_then(|value| value.parse::<i64>().ok())
-                .unwrap_or(22),
-            "selectedProjectId": planning_settings.get(SELECTED_PROJECT_ID_KEY).cloned(),
-            "selectedTaskId": planning_settings.get(SELECTED_TASK_ID_KEY).cloned(),
         },
         "startup": {
             "targetSurface": commissioning.startup_surface(),
@@ -461,7 +437,7 @@ mod tests {
             log_file_path: PathBuf::from("/tmp/logs/engine.log"),
             backups_dir: PathBuf::from("/tmp/backups"),
             update_repository_path: None,
-            protocol_version: String::from("1"),
+            protocol_version: String::from("2"),
             storage_ready: true,
             storage_bootstrap: StorageBootstrap {
                 schema_version: 4,
@@ -501,8 +477,7 @@ mod tests {
             ),
         ]);
 
-        let snapshot =
-            build_app_snapshot(&runtime, &shell_settings, &app_settings, &HashMap::new());
+        let snapshot = build_app_snapshot(&runtime, &shell_settings, &app_settings);
 
         assert_eq!(
             snapshot["shell"]["summary"],
@@ -520,5 +495,7 @@ mod tests {
             snapshot["commissioning"]["runnerStage"],
             Value::String(String::from("publish"))
         );
+        // New pages program, Slice 2: Planning left the app snapshot.
+        assert!(snapshot.get("planning").is_none(), "{snapshot}");
     }
 }

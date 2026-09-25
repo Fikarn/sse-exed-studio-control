@@ -15,7 +15,7 @@
 //! the lighting preview (it never touched the rig; the recall that later puts
 //! it there is a row), a refused action (nothing reached a device; the last
 //! action status and the log carry it), or bookkeeping — selections, scene
-//! and group edits, planning.
+//! and group edits.
 //!
 //! **Who knows the source.** The entry points, not the functions they share:
 //! `EngineApp::handle_request` (the screen), the bridge's
@@ -206,7 +206,7 @@ pub(crate) fn list_recent_actions(
 pub(crate) enum UiMethodClass {
     /// Can produce rows — `ui_actions` says which requests do.
     Recorded,
-    /// Reads, selections, editor bookkeeping, planning, files: no device sees it.
+    /// Reads, selections, editor bookkeeping, files: no device sees it.
     NotAnAction,
 }
 
@@ -249,9 +249,6 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "lighting.fixtureCatalog.snapshot",
     "lighting.palette.list",
     "lighting.snapshot",
-    "planning.context",
-    "planning.report.time",
-    "planning.snapshot",
     "settings.get",
     "support.backup.verify",
     "support.snapshot",
@@ -280,26 +277,10 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "lighting.scene.pin",
     "lighting.scene.reorder",
     "lighting.scene.update",
-    // Planning, the shell's own settings, files.
-    "commissioning.seedPlanningDemo",
+    // The shell's own settings, files.
     "commissioning.update",
     "dev.parityFixture.load",
     "exports.companion.export",
-    "planning.project.create",
-    "planning.project.delete",
-    "planning.project.reorder",
-    "planning.project.update",
-    "planning.select",
-    "planning.settings.update",
-    "planning.task.checklist.add",
-    "planning.task.checklist.delete",
-    "planning.task.checklist.update",
-    "planning.task.create",
-    "planning.task.delete",
-    "planning.task.reschedule",
-    "planning.task.timer",
-    "planning.task.toggleComplete",
-    "planning.task.update",
     "settings.update",
     "storage.importLegacyDb",
     "support.backup.export",
@@ -765,7 +746,7 @@ pub(crate) fn ui_actions(
 
 /// The rows a successful Stream Deck key leaves, from the route, the key, its
 /// value and the bridge's reply (which says whether the key was staged in the
-/// preview). Dial detents, selections, the bank and the deck mode leave none.
+/// preview). Dial detents, selections and the bank leave none.
 pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<ActionRecord> {
     let staged = flag(reply, "preview") == Some(true);
     let lighting = |action: &'static str, target: &str, detail: String| {

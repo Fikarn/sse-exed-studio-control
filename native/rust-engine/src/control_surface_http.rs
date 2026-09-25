@@ -44,7 +44,9 @@ const WORKER_COUNT: usize = 4;
 /// Sized for the deck's worst instant: the exported profile's once-a-second
 /// LCD poll sends one request per audio LCD key, all at once, and the control
 /// with the most LCD refreshes sends its own burst on one press (25 + 17 on
-/// 2026-09-22). All of them must fit the workers and the queue together, with
+/// 2026-09-22; since the new pages program's Slice 2 the lighting page-follow
+/// trigger the poll can set off adds the four LIGHTS LCDs: 25 + 4 + 17). All
+/// of them must fit the workers and the queue together, with
 /// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
 /// of 16 turned the poll's last five requests away every second on the studio
 /// workstation. The thread count stays fixed whatever the queue holds.
@@ -712,10 +714,12 @@ fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpR
             });
             key.and_then(|key| read_control_surface_lcd_text(db_path, &key).map(Value::String))
         }
-        ("POST", "/api/deck/action")
-        | ("POST", "/api/deck/light-action")
-        | ("POST", "/api/deck/audio-action") => parse_json_body(&request.body)
-            .and_then(|body| handle_control_surface_http_action(db_path, path, &body)),
+        // New pages program, Slice 2: `POST /api/deck/action`, the PROJECTS
+        // and TASKS keys' route, left with Planning.
+        ("POST", "/api/deck/light-action") | ("POST", "/api/deck/audio-action") => {
+            parse_json_body(&request.body)
+                .and_then(|body| handle_control_surface_http_action(db_path, path, &body))
+        }
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported bridge endpoint: {} {}",
             request.method, path
@@ -1120,9 +1124,12 @@ mod tests {
             38201,
         );
 
+        // New pages program, Slice 2: on the lighting route, which parses its
+        // body; the Planning route this used (`/api/deck/action`) left, and a
+        // route the bridge does not have is refused before any body is read.
         let anonymous = request_with(
             "POST",
-            "/api/deck/action",
+            "/api/deck/light-action",
             &[("host", "127.0.0.1:38201")],
             b"not json at all",
         );
@@ -1135,14 +1142,19 @@ mod tests {
         let bearer = format!("Bearer {TEST_TOKEN}");
         let authenticated = request_with(
             "POST",
-            "/api/deck/action",
+            "/api/deck/light-action",
             &[("host", "127.0.0.1:38201"), ("authorization", &bearer)],
             b"not json at all",
         );
+        let malformed = respond(&context, Ok(authenticated));
         assert_eq!(
-            respond(&context, Ok(authenticated)).status_code,
-            400,
+            malformed.status_code, 400,
             "with the token the same body is parsed and refused as malformed"
+        );
+        let malformed_body = String::from_utf8_lossy(&malformed.body);
+        assert!(
+            !malformed_body.contains("Unsupported bridge endpoint"),
+            "the body was refused, not the route: {malformed_body}"
         );
 
         assert_eq!(
@@ -1150,6 +1162,42 @@ mod tests {
             408,
             "a read failure keeps its own status"
         );
+        assert!(control_surface_last_event(test_dir.db_path().as_path()).is_null());
+    }
+
+    // New pages program, Slice 2: `POST /api/deck/action` carried the PROJECTS
+    // and TASKS keys (filters, statuses, the task timer, new projects). It is
+    // not a bridge endpoint any more, with or without the token, and a key an
+    // old profile still sends there changes nothing.
+    #[test]
+    fn the_planning_keys_route_is_not_a_bridge_endpoint() {
+        let test_dir = ready_audio_test_db("planning-route");
+        let context = BridgeContext::new(
+            test_dir.db_path(),
+            test_dir.path().join("engine.log"),
+            TEST_TOKEN.to_string(),
+            38201,
+        );
+        let bearer = format!("Bearer {TEST_TOKEN}");
+        for body in [
+            &b"{\"action\":\"nextSort\"}"[..],
+            b"{\"action\":\"createProject\"}",
+            b"{\"action\":\"toggleTimer\"}",
+        ] {
+            let request = request_with(
+                "POST",
+                "/api/deck/action",
+                &[("host", "127.0.0.1:38201"), ("authorization", &bearer)],
+                body,
+            );
+            let response = respond(&context, Ok(request));
+            let text = String::from_utf8_lossy(&response.body);
+            assert_eq!(response.status_code, 400, "{text}");
+            assert!(
+                text.contains("Unsupported bridge endpoint: POST /api/deck/action"),
+                "{text}"
+            );
+        }
         assert!(control_surface_last_event(test_dir.db_path().as_path()).is_null());
     }
 
@@ -1168,8 +1216,8 @@ mod tests {
             Some("a b c")
         );
         assert_eq!(
-            query_parameter("k%65y=project_nav", "key").as_deref(),
-            Some("project_nav"),
+            query_parameter("k%65y=light_nav", "key").as_deref(),
+            Some("light_nav"),
             "the parameter name decodes too"
         );
         assert_eq!(
@@ -1294,10 +1342,12 @@ mod tests {
         let port = start_test_bridge(&test_dir, 2, 4);
         let host = format!("127.0.0.1:{port}");
 
+        // A key the bridge would serve with the token (new pages program,
+        // Slice 2: it was the Planning route's `deleteProject`, which left).
         let anonymous = raw_request(
             port,
             &format!(
-                "POST /api/deck/action HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: 26\r\n\r\n{{\"action\":\"deleteProject\"}}"
+                "POST /api/deck/light-action HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: 28\r\n\r\n{{\"action\":\"selectNextScene\"}}"
             ),
         );
         assert_eq!(status_of(&anonymous), 401, "{anonymous}");
@@ -1359,7 +1409,9 @@ mod tests {
             ),
         );
         assert_eq!(status_of(&context), 200, "{context}");
-        assert!(context.contains("\"projectCount\""), "{context}");
+        // New pages program, Slice 2: the context's Planning selection (and its
+        // `projectCount`) left; the audio deck block's strips mark the body.
+        assert!(context.contains("\"strips\""), "{context}");
 
         let decoded = raw_request(
             port,

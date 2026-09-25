@@ -17,17 +17,6 @@ use crate::lighting::{
     with_lighting_state_and_preview, LightingCommandError, LightingEditorState,
     LightingFixtureLevels, LightingPreviewRuntimeState,
 };
-use crate::planning::{
-    apply_planning_project_create, apply_planning_project_delete, apply_planning_project_reorder,
-    apply_planning_project_update, apply_planning_selection, apply_planning_task_timer,
-    apply_planning_task_toggle_complete, parse_planning_project_create_request,
-    parse_planning_project_delete_request, parse_planning_project_reorder_request,
-    parse_planning_project_update_request, parse_planning_selection_request,
-    parse_planning_settings_update, parse_planning_task_timer_request,
-    parse_planning_task_toggle_complete_request, read_planning_context, update_planning_settings,
-    PlanningCommandError, PlanningContextSnapshot,
-};
-use crate::planning_settings::{PLANNING_SETTINGS_PREFIX, SORT_BY_KEY};
 use crate::shell_settings::{DEFAULT_WORKSPACE, SHELL_SETTINGS_PREFIX, WORKSPACE_KEY};
 use crate::storage::{
     list_settings_by_prefix, open_connection, set_settings_owned, set_settings_owned_and,
@@ -44,10 +33,6 @@ pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
 const SELECTED_LIGHT_ID_KEY: &str = "app.control_surface.selected_light_id";
 const SELECTED_SCENE_ID_KEY: &str = "app.control_surface.selected_scene_id";
 const LAST_EVENT_KEY: &str = "app.control_surface.last_event";
-
-const PROJECT_STATUS_CYCLE: &[&str] = &["todo", "in-progress", "blocked", "done"];
-const PROJECT_PRIORITY_CYCLE: &[&str] = &["p0", "p1", "p2", "p3"];
-const SORT_CYCLE: &[&str] = &["manual", "priority", "date", "name"];
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ControlSurfaceBridgeInfo {
@@ -138,10 +123,6 @@ pub(crate) fn emit_audio_changed() {
 // in `control_surface_http`; this module owns what a request does.
 
 pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurfaceError> {
-    let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let context = read_planning_context(db_path, &planning_settings)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let (app_settings, audio_snapshot) = current_audio_snapshot(db_path)?;
     let bank = audio_deck_bank(&app_settings);
     let strips = (1..=4)
@@ -180,17 +161,6 @@ pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurf
             "selectedChannelId": audio_snapshot.selected_channel_id,
             "strips": strips,
         },
-        "selectedProject": context.selected_project,
-        "projectIndex": context.project_index,
-        "projectCount": context.project_count,
-        "selectedTaskId": context.selected_task_id,
-        "selectedTask": context.selected_task,
-        "taskIndex": context.task_index,
-        "tasks": context.tasks,
-        "taskCount": context.task_count,
-        "runningTask": context.running_task,
-        "viewFilter": context.settings.view_filter,
-        "sortBy": context.settings.sort_by,
     }))
 }
 
@@ -198,55 +168,12 @@ pub fn read_control_surface_lcd_text(
     db_path: &Path,
     key: &str,
 ) -> Result<String, ControlSurfaceError> {
-    let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let context = read_planning_context(db_path, &planning_settings)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let audio_snapshot = read_audio_snapshot(&app_settings);
     let lighting_state = load_lighting_editor_state(&app_settings);
 
     match key {
-        "project_nav" => {
-            if let Some(project) = &context.selected_project {
-                Ok(format!(
-                    "PROJECT\\n{}\\n{}/{}",
-                    truncate(&project.title, 12),
-                    context.project_index + 1,
-                    context.project_count
-                ))
-            } else {
-                Ok(String::from("PROJECT\\n(none)\\n--"))
-            }
-        }
-        "project_status" => {
-            if let Some(project) = &context.selected_project {
-                Ok(format!("STATUS\\n{}", status_label(&project.status)))
-            } else {
-                Ok(String::from("STATUS\\n--"))
-            }
-        }
-        "project_priority" => {
-            if let Some(project) = &context.selected_project {
-                Ok(format!("PRIORITY\\n{}", priority_label(&project.priority)))
-            } else {
-                Ok(String::from("PRIORITY\\n--"))
-            }
-        }
-        "sort_mode" => Ok(format!("SORT\\n{}", sort_label(&context.settings.sort_by))),
-        "task_nav" => {
-            if let Some(task) = &context.selected_task {
-                Ok(format!(
-                    "TASK\\n{}\\n{}/{}",
-                    truncate(&task.title, 12),
-                    context.task_index + 1,
-                    context.task_count
-                ))
-            } else {
-                Ok(String::from("TASK\\n(none)\\n--"))
-            }
-        }
         "light_nav" => {
             let selected_light_id = resolve_selected_inventory_id(
                 &app_settings,
@@ -417,8 +344,7 @@ pub fn handle_control_surface_http_action(
     let value = body.get("value").and_then(Value::as_str);
 
     let response = match path {
-        "/api/deck/action" => handle_planning_action(db_path, action, value),
-        "/api/deck/light-action" => handle_light_action(db_path, action, value),
+        "/api/deck/light-action" => handle_light_action(db_path, action),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported action route: {path}"
@@ -442,14 +368,8 @@ pub fn handle_control_surface_http_action(
                 ),
             );
         }
-        match deck_change_event(path, action) {
-            Some(DeckChange::Lighting) => {
-                crate::engine_events::emit_lighting_changed("control-surface")
-            }
-            Some(DeckChange::Planning) => {
-                crate::engine_events::emit_planning_changed("control-surface")
-            }
-            None => {}
+        if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
+            crate::engine_events::emit_lighting_changed("control-surface")
         }
     }
     response
@@ -459,19 +379,17 @@ pub fn handle_control_surface_http_action(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DeckChange {
     Lighting,
-    Planning,
 }
 
 /// The event a successful deck action raises (2026-09 production readiness,
 /// Slice 10), so an open workspace follows the deck instead of waiting for
-/// its next request. The audio route announces itself (`emit_audio_changed`);
-/// the deck mode is a planning setting although its key sits on the lighting
-/// route; `openDetail` changes nothing.
+/// its next request. The audio route announces itself (`emit_audio_changed`).
+/// New pages program, Slice 2: the PROJECTS and TASKS keys, their route
+/// (`/api/deck/action`) and their `planning.changed` left with Planning, and
+/// so did the deck-mode key (`switchToDeckMode`), which stored a Planning
+/// setting nothing read.
 fn deck_change_event(path: &str, action: &str) -> Option<DeckChange> {
     match (path, action) {
-        ("/api/deck/action", "openDetail") => None,
-        ("/api/deck/action", _) => Some(DeckChange::Planning),
-        ("/api/deck/light-action", "switchToDeckMode") => Some(DeckChange::Planning),
         ("/api/deck/light-action", _) => Some(DeckChange::Lighting),
         _ => None,
     }
@@ -510,225 +428,7 @@ pub fn control_surface_last_event(db_path: &Path) -> Value {
         .unwrap_or(Value::Null)
 }
 
-fn handle_planning_action(
-    db_path: &Path,
-    action: &str,
-    value: Option<&str>,
-) -> Result<Value, ControlSurfaceError> {
-    match action {
-        "selectNextProject" | "selectPrevProject" => {
-            let direction = if action == "selectNextProject" {
-                "next"
-            } else {
-                "prev"
-            };
-            let result = apply_planning_selection(
-                db_path,
-                &parse_planning_selection_request(&json!({ "projectDirection": direction }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({
-                "selectedProjectId": result.settings.selected_project_id,
-                "selectedTaskId": result.settings.selected_task_id,
-            }))
-        }
-        "selectNextTask" | "selectPrevTask" => {
-            let direction = if action == "selectNextTask" {
-                "next"
-            } else {
-                "prev"
-            };
-            let result = apply_planning_selection(
-                db_path,
-                &parse_planning_selection_request(&json!({ "taskDirection": direction }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({
-                "selectedTaskId": result.settings.selected_task_id,
-            }))
-        }
-        "setStatus" => {
-            let status = value.ok_or_else(|| {
-                ControlSurfaceError::InvalidParams(String::from("setStatus requires value"))
-            })?;
-            let context = current_planning_context(db_path)?;
-            let project = require_selected_project(&context)?;
-            let result = apply_planning_project_reorder(
-                db_path,
-                &parse_planning_project_reorder_request(&json!({
-                    "projectId": project.id,
-                    "newStatus": status
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "project": result.project }))
-        }
-        "nextStatus" | "prevStatus" => {
-            let context = current_planning_context(db_path)?;
-            let project = require_selected_project(&context)?;
-            let next_status = cycle_value(
-                PROJECT_STATUS_CYCLE,
-                &project.status,
-                action == "nextStatus",
-            );
-            let result = apply_planning_project_reorder(
-                db_path,
-                &parse_planning_project_reorder_request(&json!({
-                    "projectId": project.id,
-                    "newStatus": next_status
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "project": result.project }))
-        }
-        "setPriority" => {
-            let priority = value.ok_or_else(|| {
-                ControlSurfaceError::InvalidParams(String::from("setPriority requires value"))
-            })?;
-            let context = current_planning_context(db_path)?;
-            let project = require_selected_project(&context)?;
-            let result = apply_planning_project_update(
-                db_path,
-                &parse_planning_project_update_request(&json!({
-                    "projectId": project.id,
-                    "priority": priority
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "project": result.project }))
-        }
-        "nextPriority" | "prevPriority" => {
-            let context = current_planning_context(db_path)?;
-            let project = require_selected_project(&context)?;
-            let next_priority = cycle_value(
-                PROJECT_PRIORITY_CYCLE,
-                &project.priority,
-                action == "nextPriority",
-            );
-            let result = apply_planning_project_update(
-                db_path,
-                &parse_planning_project_update_request(&json!({
-                    "projectId": project.id,
-                    "priority": next_priority
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "project": result.project }))
-        }
-        "nextSort" | "prevSort" => {
-            let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let current_sort = planning_settings
-                .get(SORT_BY_KEY)
-                .cloned()
-                .unwrap_or_else(|| String::from("manual"));
-            let next_sort = cycle_value(SORT_CYCLE, &current_sort, action == "nextSort");
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "sortBy": next_sort }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "sortBy": result.settings.sort_by }))
-        }
-        "resetSort" => {
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "sortBy": "manual" }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "sortBy": result.settings.sort_by }))
-        }
-        "toggleTimer" => {
-            let context = current_planning_context(db_path)?;
-            let task_id = resolve_timer_task_id(&context)?;
-            let result = apply_planning_task_timer(
-                db_path,
-                &parse_planning_task_timer_request(&json!({
-                    "taskId": task_id,
-                    "action": "toggle"
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "task": result.task }))
-        }
-        "toggleTaskComplete" => {
-            let context = current_planning_context(db_path)?;
-            let task_id = resolve_completion_task_id(&context)?;
-            let result = apply_planning_task_toggle_complete(
-                db_path,
-                &parse_planning_task_toggle_complete_request(&json!({
-                    "taskId": task_id
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "task": result.task }))
-        }
-        "createProject" => {
-            let title = value.unwrap_or("New Project");
-            let result = apply_planning_project_create(
-                db_path,
-                &parse_planning_project_create_request(&json!({ "title": title }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "project": result.project }))
-        }
-        "deleteProject" => {
-            let context = current_planning_context(db_path)?;
-            let project = require_selected_project(&context)?;
-            let result = apply_planning_project_delete(
-                db_path,
-                &parse_planning_project_delete_request(&json!({ "projectId": project.id }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "deleted": result.deleted, "projectId": project.id }))
-        }
-        "setFilter" => {
-            let filter = value.ok_or_else(|| {
-                ControlSurfaceError::InvalidParams(String::from("setFilter requires value"))
-            })?;
-            let result = update_planning_settings(
-                db_path,
-                &parse_planning_settings_update(&json!({ "viewFilter": filter }))
-                    .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_planning_error)?;
-            Ok(json!({ "viewFilter": result.settings.view_filter }))
-        }
-        "openDetail" => Ok(json!({ "action": "openDetail" })),
-        _ => Err(ControlSurfaceError::Unsupported(format!(
-            "Unsupported planning deck action: {action}"
-        ))),
-    }
-}
-
-fn handle_light_action(
-    db_path: &Path,
-    action: &str,
-    value: Option<&str>,
-) -> Result<Value, ControlSurfaceError> {
-    if action == "switchToDeckMode" {
-        let deck_mode = value.unwrap_or("light");
-        let result = update_planning_settings(
-            db_path,
-            &parse_planning_settings_update(&json!({ "deckMode": deck_mode }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-        )
-        .map_err(map_planning_error)?;
-        return Ok(json!({ "deckMode": result.settings.deck_mode }));
-    }
-
+fn handle_light_action(db_path: &Path, action: &str) -> Result<Value, ControlSurfaceError> {
     // Every lighting key reads, decides and writes under the lighting state
     // lock, with the preview the IPC loop uses, and changes lighting state
     // only through the functions the screen's requests run (2026-09
@@ -911,72 +611,6 @@ fn locked_light_action(
     }
 }
 
-fn current_planning_context(
-    db_path: &Path,
-) -> Result<PlanningContextSnapshot, ControlSurfaceError> {
-    let planning_settings = list_settings_by_prefix(db_path, PLANNING_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    read_planning_context(db_path, &planning_settings)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
-}
-
-fn require_selected_project(
-    context: &PlanningContextSnapshot,
-) -> Result<crate::planning::PlanningProjectContext, ControlSurfaceError> {
-    context.selected_project.clone().ok_or_else(|| {
-        ControlSurfaceError::Rejected(String::from("No project is currently selected."))
-    })
-}
-
-fn resolve_timer_task_id(context: &PlanningContextSnapshot) -> Result<String, ControlSurfaceError> {
-    if let Some(task_id) = context.selected_task_id.clone() {
-        return Ok(task_id);
-    }
-
-    if let Some(running_task) = &context.running_task {
-        return Ok(running_task.id.clone());
-    }
-
-    context
-        .tasks
-        .first()
-        .map(|task| task.id.clone())
-        .ok_or_else(|| {
-            ControlSurfaceError::Rejected(String::from(
-                "No tasks are available for the selected project.",
-            ))
-        })
-}
-
-fn resolve_completion_task_id(
-    context: &PlanningContextSnapshot,
-) -> Result<String, ControlSurfaceError> {
-    if let Some(task_id) = context.selected_task_id.clone() {
-        return Ok(task_id);
-    }
-
-    if let Some(task) = context.tasks.iter().find(|task| !task.completed) {
-        return Ok(task.id.clone());
-    }
-
-    context
-        .tasks
-        .last()
-        .map(|task| task.id.clone())
-        .ok_or_else(|| {
-            ControlSurfaceError::Rejected(String::from(
-                "No tasks are available for the selected project.",
-            ))
-        })
-}
-
-pub(crate) fn map_planning_error(error: PlanningCommandError) -> ControlSurfaceError {
-    match error {
-        PlanningCommandError::InvalidParams(message) => ControlSurfaceError::InvalidParams(message),
-        PlanningCommandError::Storage(message) => ControlSurfaceError::Storage(message),
-    }
-}
-
 fn map_lighting_error(error: LightingCommandError) -> ControlSurfaceError {
     match error {
         LightingCommandError::Rejected(_, message) => ControlSurfaceError::Rejected(message),
@@ -1093,36 +727,6 @@ pub(crate) fn truncate(value: &str, max_chars: usize) -> String {
     }
     chars.truncate(max_chars);
     chars.into_iter().collect()
-}
-
-fn status_label(value: &str) -> &'static str {
-    match value {
-        "todo" => "To Do",
-        "in-progress" => "In Progress",
-        "blocked" => "Blocked",
-        "done" => "Done",
-        _ => "--",
-    }
-}
-
-fn priority_label(value: &str) -> &'static str {
-    match value {
-        "p0" => "P0 Critical",
-        "p1" => "P1 High",
-        "p2" => "P2 Medium",
-        "p3" => "P3 Low",
-        _ => "--",
-    }
-}
-
-fn sort_label(value: &str) -> &'static str {
-    match value {
-        "manual" => "Manual",
-        "priority" => "Priority",
-        "date" => "Date",
-        "name" => "Name",
-        _ => "Manual",
-    }
 }
 
 pub(crate) fn cycle_value(values: &[&str], current: &str, forward: bool) -> String {

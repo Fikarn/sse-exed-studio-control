@@ -4,12 +4,26 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DECK_PAGE_LABELS, IMPORTED_WORKSPACE } from "./native-parity-acceptance.mjs";
 import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const controlSurfaceHost = "127.0.0.1";
+// New pages program, Slice 2 (D5): the deck lost its PROJECTS and TASKS pages,
+// their route (`POST /api/deck/action`) and the deck mode with Planning. The
+// checks that went through them now go through the LIGHTS page and its route;
+// each changed step says so in summary.json.
+const DECK_ROUTES_CHANGED =
+  "New pages program, Slice 2: the deck key followed into the hardware link's own snapshot is the LIGHTS page's next-light key (lighting.snapshot) and the imported page is read back through the deck; until then it was the PROJECTS page's filter key (planning.snapshot) and the deck mode.";
+const REFUSALS_CHANGED =
+  "New pages program, Slice 2: the refused requests go to the LIGHTS route (/api/deck/light-action) and the deck's last event and selected light prove nothing got through; until then they went to the PROJECTS and TASKS pages' route and the project count proved it.";
+const PROFILE_CHANGED =
+  "New pages program, Slice 2: the profile has two pages, LIGHTS and AUDIO, a page-follow trigger for each, and every LCD it reads is answered by this bridge; until then it had four pages, PROJECTS and TASKS first.";
+/** The two routes a key of the exported profile may post to. */
+const DECK_ACTION_ROUTES = ["/api/deck/light-action", "/api/deck/audio-action"];
+const FOLLOW_TRIGGER_PREFIX = "sse-trigger-follow-";
 // The bridge answers only requests that carry the per-install token the engine
 // writes into <app-data>/control-surface.token (2026-09 production readiness,
 // Slice 2 — F01). The positive checks send it; the negatives below prove the
@@ -397,84 +411,82 @@ async function main() {
       `Packaged control-surface bridge qualification failed: app.snapshot reported baseUrl '${appSnapshot?.runtime?.controlSurface?.baseUrl}' instead of '${expectedBaseUrl}'.`
     );
     assert(
-      Array.isArray(controlSurfaceSnapshot?.pages) && controlSurfaceSnapshot.pages.length === 4,
-      "Packaged control-surface bridge qualification failed: controlSurface.snapshot must expose the four legacy deck pages."
-    );
-    assert(
-      ["PROJECTS", "TASKS", "LIGHTS", "AUDIO"].every((label) =>
-        controlSurfaceSnapshot.pages.some((page) => page.label === label)
-      ),
-      "Packaged control-surface bridge qualification failed: controlSurface.snapshot is missing one or more expected page labels."
+      JSON.stringify(summary.controlSurfacePages) === JSON.stringify(DECK_PAGE_LABELS),
+      `Packaged control-surface bridge qualification failed: controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(summary.controlSurfacePages)}.`
     );
 
     summary.steps.push({
       name: "bridge-snapshot-contract",
       status: "passed",
-      message: "Packaged engine exposed a live bridge and the expected control-surface page model.",
+      message: `Packaged engine exposed a live bridge and the control-surface page model ${DECK_PAGE_LABELS.join(", ")}.`,
+      scopeChanged:
+        "New pages program, Slice 2: the page model is LIGHTS and AUDIO in that order; until then it was four pages, PROJECTS and TASKS included.",
     });
 
     console.log("Step 2: verify live HTTP bind, LCD, and action endpoints against the packaged bridge.");
 
     const contextBefore = await fetchJson(`${expectedBaseUrl}/api/deck/context`);
-    const lcdProjectNav = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=project_nav`);
     const lcdAudioBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
     const lcdWorkspace = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=workspace`);
 
+    // The page the imported db.json opens on reaches the deck: the context and
+    // the `workspace` LCD, which the profile's page-follow triggers read.
     assert(
-      typeof contextBefore.projectCount === "number" &&
-        typeof contextBefore.viewFilter === "string" &&
-        typeof contextBefore.sortBy === "string",
-      "Packaged control-surface bridge qualification failed: GET /api/deck/context returned an invalid planning context payload."
-    );
-    assert(
-      typeof contextBefore.workspace === "string" &&
+      contextBefore.workspace === IMPORTED_WORKSPACE &&
         typeof contextBefore.audio?.bank === "string" &&
         Array.isArray(contextBefore.audio?.strips) &&
         contextBefore.audio.strips.length === 4,
-      "Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the workspace or audio deck block."
-    );
-    assert(
-      typeof lcdProjectNav === "string" && lcdProjectNav.includes("PROJECT"),
-      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=project_nav did not return the expected LCD text."
+      `Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the imported page '${IMPORTED_WORKSPACE}' (got '${contextBefore.workspace}') or the audio deck block.`
     );
     assert(
       typeof lcdAudioBefore === "string" && lcdAudioBefore.length > 0,
       "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio_strip_1 did not return audio strip text."
     );
     assert(
-      typeof lcdWorkspace === "string" && lcdWorkspace.length > 0,
-      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace did not return the active workspace."
+      lcdWorkspace === IMPORTED_WORKSPACE,
+      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the imported page '${IMPORTED_WORKSPACE}'.`
     );
 
-    const filterResponse = await postJson(`${expectedBaseUrl}/api/deck/action`, {
-      action: "setFilter",
-      value: "todo",
-    });
-    assert(
-      filterResponse?.viewFilter === "todo",
-      "Packaged control-surface bridge qualification failed: POST /api/deck/action did not persist the todo filter."
-    );
+    // New saved data holds no lights, so the lane adds two through the app's
+    // own requests for the LIGHTS page's next-light key to move between.
+    const qualificationLights = [];
+    for (const [index, dmxStartAddress] of [481, 489].entries()) {
+      const created = await harness.request(`bridge-qualification-light-${index + 1}`, "lighting.fixture.create", {
+        name: `Qualification Light ${index + 1}`,
+        type: "astra-bicolor",
+        dmxStartAddress,
+        groupId: null,
+      });
+      assert(
+        typeof created?.fixture?.id === "string",
+        `Packaged control-surface bridge qualification failed: lighting.fixture.create did not add qualification light ${index + 1}.`
+      );
+      qualificationLights.push(created.fixture.id);
+    }
 
-    const contextAfterFilter = await fetchJson(`${expectedBaseUrl}/api/deck/context`);
-    const planningAfterFilter = await harness.request("bridge-qualification-planning-filter", "planning.snapshot");
+    const lcdLightNavBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=light_nav`);
     assert(
-      contextAfterFilter.viewFilter === "todo" && planningAfterFilter?.settings?.viewFilter === "todo",
-      "Packaged control-surface bridge qualification failed: planning filter changes did not round-trip through the bridge and engine snapshot."
+      typeof lcdLightNavBefore === "string" &&
+        lcdLightNavBefore.startsWith("LIGHT") &&
+        lcdLightNavBefore.includes("1/2"),
+      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=light_nav did not show the first of the two lights: ${JSON.stringify(lcdLightNavBefore)}.`
     );
 
     const lightResponse = await postJson(`${expectedBaseUrl}/api/deck/light-action`, {
-      action: "switchToDeckMode",
-      value: "light",
+      action: "selectNextLight",
     });
     assert(
-      lightResponse?.deckMode === "light",
-      "Packaged control-surface bridge qualification failed: POST /api/deck/light-action did not switch the deck mode to light."
+      lightResponse?.selectedLightId === qualificationLights[1],
+      `Packaged control-surface bridge qualification failed: POST /api/deck/light-action selectNextLight selected '${lightResponse?.selectedLightId}' instead of the second light '${qualificationLights[1]}'.`
     );
 
-    const planningAfterDeckMode = await harness.request("bridge-qualification-planning-deck-mode", "planning.snapshot");
+    const lightingAfterKey = await harness.request("bridge-qualification-lighting-select", "lighting.snapshot");
+    const lcdLightNavAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=light_nav`);
     assert(
-      planningAfterDeckMode?.settings?.deckMode === "light",
-      "Packaged control-surface bridge qualification failed: lighting deck-mode changes did not persist into planning.snapshot."
+      lightingAfterKey?.selectedFixtureId === qualificationLights[1] &&
+        typeof lcdLightNavAfter === "string" &&
+        lcdLightNavAfter.includes("2/2"),
+      "Packaged control-surface bridge qualification failed: the deck's next-light key did not round-trip through the bridge LCD and lighting.snapshot."
     );
 
     const mixTargetResponse = await postJson(`${expectedBaseUrl}/api/deck/audio-action`, {
@@ -543,18 +555,15 @@ async function main() {
 
     summary.httpChecks = {
       contextBefore,
-      lcdProjectNav,
       lcdAudioBefore,
       lcdWorkspace,
-      filterResponse,
-      contextAfterFilter,
-      planningAfterFilter: {
-        viewFilter: planningAfterFilter?.settings?.viewFilter ?? null,
-      },
+      qualificationLights,
+      lcdLightNavBefore,
       lightResponse,
-      planningAfterDeckMode: {
-        deckMode: planningAfterDeckMode?.settings?.deckMode ?? null,
+      lightingAfterKey: {
+        selectedFixtureId: lightingAfterKey?.selectedFixtureId ?? null,
       },
+      lcdLightNavAfter,
       mixTargetResponse,
       audioVerified,
       audioResponse,
@@ -563,21 +572,34 @@ async function main() {
     summary.steps.push({
       name: "bridge-http-routes",
       status: "passed",
-      message: "Packaged bridge accepted live HTTP requests and round-tripped planning, lighting, and audio actions.",
+      message:
+        "Packaged bridge accepted live HTTP requests, showed the imported page to the deck, and round-tripped lighting and audio actions.",
+      scopeChanged: DECK_ROUTES_CHANGED,
     });
 
     console.log(
       "Step 3: verify the bridge refuses requests without the workstation token, browser origins, foreign hosts, oversized bodies and bodies that never finish, and decodes percent-encoded LCD keys."
     );
 
-    const projectCountBefore = (await fetchJson(`${expectedBaseUrl}/api/deck/context`)).projectCount;
-    const deleteProjectBody = JSON.stringify({ action: "deleteProject" });
+    // What a refused key would have changed: the deck's last event (every
+    // key that gets through stamps it) and the selected light (the refused
+    // key below is the next-light key).
+    const readDeckState = async (id) => ({
+      lastEvent: (await harness.request(`${id}-control-surface`, "controlSurface.snapshot"))?.lastEvent ?? null,
+      selectedLightId: (await harness.request(`${id}-lighting`, "lighting.snapshot"))?.selectedFixtureId ?? null,
+    });
+    const deckStateBefore = await readDeckState("bridge-qualification-refusals-before");
+    assert(
+      deckStateBefore.lastEvent !== null && deckStateBefore.selectedLightId === qualificationLights[1],
+      "Packaged control-surface bridge qualification failed: the deck state before the refusals holds no last event or not the selected second light."
+    );
+    const refusedKeyBody = JSON.stringify({ action: "selectNextLight" });
     const jsonHeaders = { "Content-Type": "application/json" };
 
-    const noToken = await fetchStatus(`${expectedBaseUrl}/api/deck/action`, {
+    const noToken = await fetchStatus(`${expectedBaseUrl}/api/deck/light-action`, {
       method: "POST",
       headers: jsonHeaders,
-      body: deleteProjectBody,
+      body: refusedKeyBody,
       authorization: null,
     });
     assert(
@@ -589,10 +611,10 @@ async function main() {
       "Packaged control-surface bridge qualification failed: the 401 did not carry a WWW-Authenticate: Bearer challenge."
     );
 
-    const wrongToken = await fetchStatus(`${expectedBaseUrl}/api/deck/action`, {
+    const wrongToken = await fetchStatus(`${expectedBaseUrl}/api/deck/light-action`, {
       method: "POST",
       headers: jsonHeaders,
-      body: deleteProjectBody,
+      body: refusedKeyBody,
       authorization: `Bearer ${bridgeToken.replace(/[0-9a-f]/g, (digit) => (digit === "0" ? "1" : "0"))}`,
     });
     assert(
@@ -621,12 +643,12 @@ async function main() {
       `Packaged control-surface bridge qualification failed: a request with a foreign Host returned ${foreignHost.status} instead of 400: ${foreignHost.text}`
     );
 
-    const oversizedBody = `{"action":"setFilter","value":"${"x".repeat(17 * 1024)}"}`;
+    const oversizedBody = `{"action":"selectNextLight","value":"${"x".repeat(17 * 1024)}"}`;
     const oversized = await rawHttp(
       reservedPort,
       rawRequestLines(
         "POST",
-        "/api/deck/action",
+        "/api/deck/light-action",
         reservedPort,
         [
           `Authorization: ${bridgeAuthorization}`,
@@ -645,7 +667,7 @@ async function main() {
       reservedPort,
       rawRequestLines(
         "POST",
-        "/api/deck/action",
+        "/api/deck/light-action",
         reservedPort,
         [`Authorization: ${bridgeAuthorization}`, "Content-Type: application/json", "Content-Length: 99999999"],
         '{"action":'
@@ -660,7 +682,7 @@ async function main() {
       reservedPort,
       rawRequestLines(
         "POST",
-        "/api/deck/action",
+        "/api/deck/light-action",
         reservedPort,
         [`Authorization: ${bridgeAuthorization}`, "Content-Type: application/json", "Content-Length: 4000"],
         '{"action":'
@@ -688,10 +710,10 @@ async function main() {
       "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio%5Fstrip%5F1 did not decode to the audio_strip_1 text."
     );
 
-    const projectCountAfter = (await fetchJson(`${expectedBaseUrl}/api/deck/context`)).projectCount;
+    const deckStateAfter = await readDeckState("bridge-qualification-refusals-after");
     assert(
-      projectCountAfter === projectCountBefore,
-      `Packaged control-surface bridge qualification failed: a refused deleteProject changed the project count (${projectCountBefore} → ${projectCountAfter}).`
+      JSON.stringify(deckStateAfter) === JSON.stringify(deckStateBefore),
+      `Packaged control-surface bridge qualification failed: a refused request changed the deck state (${JSON.stringify(deckStateBefore)} → ${JSON.stringify(deckStateAfter)}).`
     );
 
     summary.refusalChecks = {
@@ -703,17 +725,20 @@ async function main() {
       absurdContentLength: absurdLength.status,
       stalledBody: { status: stalled.status, firstByteMs: stalled.firstByteMs },
       decodedKey: decodedKey.status,
-      projectCountBefore,
-      projectCountAfter,
+      deckStateBefore,
+      deckStateAfter,
     };
     summary.steps.push({
       name: "bridge-request-refusals",
       status: "passed",
       message:
-        "Packaged bridge refused requests without the token (401), with a browser Origin (403), with a foreign Host (400), with an oversized body (413) and with a stalled body (408), and decoded percent-encoded LCD keys.",
+        "Packaged bridge refused requests without the token (401), with a browser Origin (403), with a foreign Host (400), with an oversized body (413) and with a stalled body (408), none of them changed the deck state, and it decoded percent-encoded LCD keys.",
+      markerChanged: REFUSALS_CHANGED,
     });
 
-    console.log("Step 4: verify the exported Stream Deck profile carries the bridge token on every request.");
+    console.log(
+      "Step 4: verify the exported Stream Deck profile carries the bridge token on every request and holds the two-page deck (LIGHTS, AUDIO)."
+    );
 
     const exportSummary = await harness.request("bridge-qualification-export", "exports.companion.export");
     assert(
@@ -766,6 +791,95 @@ async function main() {
       message: `Exported Stream Deck profile carries the bridge token on all ${bridgeActions.length} bridge requests, the LCD poll included.`,
     });
 
+    // The two-page profile (new pages program, D5): LIGHTS then AUDIO, a
+    // page-follow trigger for each, and nothing it sends that this bridge no
+    // longer answers. Every LCD the profile reads is asked of the bridge
+    // (reads only); the keys it posts are checked by route, never pressed.
+    const profilePages = Object.entries(profile.pages ?? {})
+      .sort(([left], [right]) => Number(left) - Number(right))
+      .map(([number, page]) => `${number}:${page?.name}`);
+    const expectedProfilePages = DECK_PAGE_LABELS.map((label, index) => `${index + 1}:${label}`);
+    assert(
+      exportSummary.pageCount === DECK_PAGE_LABELS.length &&
+        JSON.stringify(profilePages) === JSON.stringify(expectedProfilePages),
+      `Packaged control-surface bridge qualification failed: the exported profile's pages are ${JSON.stringify(profilePages)} (pageCount ${exportSummary.pageCount}) instead of ${JSON.stringify(expectedProfilePages)}.`
+    );
+
+    const followTriggers = Object.entries(profile.triggers ?? {})
+      .filter(([id]) => id.startsWith(FOLLOW_TRIGGER_PREFIX))
+      .map(([id, trigger]) => ({
+        workspace: id.slice(FOLLOW_TRIGGER_PREFIX.length),
+        condition: trigger?.condition?.[0]?.options ?? null,
+        page: trigger?.actions?.find((action) => action?.definitionId === "set_page")?.options?.page ?? null,
+      }));
+    const followTargets = followTriggers.map(({ workspace, page }) => `${workspace}:${page}`).sort();
+    assert(
+      JSON.stringify(followTargets) === JSON.stringify(["audio:2", "lighting:1"]) &&
+        followTriggers.every(
+          ({ workspace, condition }) =>
+            condition?.variable === "custom:lcd_workspace" && condition?.op === "eq" && condition?.value === workspace
+        ),
+      `Packaged control-surface bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of lighting to page 1 and audio to page 2 on custom:lcd_workspace.`
+    );
+    const importedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
+    assert(
+      importedFollow && profile.pages?.[String(importedFollow.page)]?.name === "LIGHTS",
+      `Packaged control-surface bridge qualification failed: the imported page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
+    );
+
+    const lcdKeys = new Set();
+    const strayRequests = [];
+    for (const action of bridgeActions) {
+      const url = action.options?.url ?? "";
+      if (action.definitionId === "get" && url.startsWith("/api/deck/lcd?key=")) {
+        lcdKeys.add(url.slice("/api/deck/lcd?key=".length));
+        continue;
+      }
+      let body = null;
+      try {
+        body = JSON.parse(action.options?.body ?? "");
+      } catch {
+        body = null;
+      }
+      if (
+        action.definitionId !== "post" ||
+        !DECK_ACTION_ROUTES.includes(url) ||
+        typeof body?.action !== "string" ||
+        body.action === "switchToDeckMode"
+      ) {
+        strayRequests.push(`${action.definitionId} ${url} ${action.options?.body ?? ""}`.trim());
+      }
+    }
+    assert(
+      strayRequests.length === 0,
+      `Packaged control-surface bridge qualification failed: the exported profile sends requests this bridge no longer answers: ${strayRequests.join("; ")}.`
+    );
+    const unansweredLcds = [];
+    for (const key of [...lcdKeys].sort()) {
+      const answer = await fetchStatus(`${expectedBaseUrl}/api/deck/lcd?key=${key}`);
+      if (answer.status !== 200 || typeof answer.body !== "string") {
+        unansweredLcds.push(`${key} (${answer.status})`);
+      }
+    }
+    assert(
+      lcdKeys.size > 0 && unansweredLcds.length === 0,
+      `Packaged control-surface bridge qualification failed: the bridge did not answer the profile's LCDs: ${unansweredLcds.join(", ") || "none read"}.`
+    );
+
+    summary.profilePages = {
+      pages: profilePages,
+      pageCount: exportSummary.pageCount,
+      triggerCount: exportSummary.triggerCount,
+      followTargets,
+      lcdKeysAnswered: lcdKeys.size,
+    };
+    summary.steps.push({
+      name: "profile-two-pages",
+      status: "passed",
+      message: `Exported Stream Deck profile holds the pages ${profilePages.join(", ")}, follows the app's page to them, posts only to ${DECK_ACTION_ROUTES.join(" and ")}, and the bridge answered all ${lcdKeys.size} LCDs it reads.`,
+      scopeChanged: PROFILE_CHANGED,
+    });
+
     summary.success = true;
     summary.completedAt = new Date().toISOString();
   } catch (error) {
@@ -803,7 +917,7 @@ async function main() {
   }
 
   console.log(
-    `Packaged control-surface bridge qualification passed: ${packaged.label} bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a profile that carries the token.`
+    `Packaged control-surface bridge qualification passed: ${packaged.label} bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a two-page profile that carries the token and reads only LCDs the bridge answers.`
   );
 }
 

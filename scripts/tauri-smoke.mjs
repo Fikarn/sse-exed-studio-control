@@ -153,8 +153,10 @@ async function verifyReadyHandshake(engineBinaryPath) {
       },
       onResponse(message, sendRequest, finish) {
         if (message.id === "ping-1") {
-          if (message.result?.protocol !== "1") {
-            throw new Error(`Expected ping protocol 1, received ${String(message.result?.protocol)}`);
+          if (message.result?.protocol !== protocolContract.version) {
+            throw new Error(
+              `Expected ping protocol ${protocolContract.version}, received ${String(message.result?.protocol)}`
+            );
           }
           sendRequest("health-1", "health.snapshot");
           return;
@@ -175,7 +177,7 @@ async function verifyReadyHandshake(engineBinaryPath) {
           finish();
         }
       },
-      requestedProtocol: "1",
+      requestedProtocol: protocolContract.version,
     });
   } finally {
     runtime.cleanup();
@@ -215,7 +217,7 @@ async function verifyBootstrapFailure(engineBinaryPath) {
       },
       label: "bootstrap-failure",
       logsDir: runtime.logsDir,
-      requestedProtocol: "1",
+      requestedProtocol: protocolContract.version,
     });
   } finally {
     runtime.cleanup();
@@ -292,8 +294,12 @@ function runScenario({
           return;
         }
 
-        if (message.payload?.protocol !== "1") {
-          fail(new Error(`Expected engine.ready protocol 1 but received ${String(message.payload?.protocol)}.`));
+        if (message.payload?.protocol !== protocolContract.version) {
+          fail(
+            new Error(
+              `Expected engine.ready protocol ${protocolContract.version} but received ${String(message.payload?.protocol)}.`
+            )
+          );
           return;
         }
 
