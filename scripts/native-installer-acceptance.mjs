@@ -17,10 +17,18 @@ import {
   assertContinuitySentinel,
   assertSavedWorkspace,
   createContinuitySentinel,
-  IMPORTED_WORKSPACE,
+  publishWithOverride,
   SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import {
+  assert,
+  EngineHarness,
+  hardenedLaneEnv,
+  laneProcessEnv,
+  resolvePathFromRoot,
+} from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
   nativeReleaseRequiresOperatorUiReady,
@@ -30,7 +38,6 @@ import {
 } from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 // New pages program, Slice 2: the sentinel is a lighting group; until then it
@@ -418,6 +425,29 @@ function safeRunCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   };
 }
 
+/**
+ * The environment of an install or a reinstall. QtIFW runs the installed
+ * app's first-launch check (`native/installer-templates/tauri-installscript.qs`)
+ * as soon as the files are in place, with the installer's own environment;
+ * the lane gave that no app data of its own, so on Windows the check opened
+ * the real one (%APPDATA%, which the lane's HOME does not move). It gets a
+ * scratch folder and the lanes' hardening (new pages program, Slice 2b).
+ */
+async function installerRunEnv(acceptanceRoot) {
+  const homeDir = path.join(acceptanceRoot, "home");
+  const firstLaunchRoot = path.join(acceptanceRoot, "installer-first-launch");
+  return laneProcessEnv(
+    await hardenedLaneEnv(),
+    {
+      HOME: homeDir,
+      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
+      SSE_APP_DATA_DIR: path.join(firstLaunchRoot, "app-data"),
+      SSE_LOG_DIR: path.join(firstLaunchRoot, "logs"),
+    },
+    { label: "The installer's first-launch check" }
+  );
+}
+
 function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expectedTarget, env = {}) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const smokeStatusPath = path.join(stepRoot, "smoke-status.json");
@@ -430,14 +460,18 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
   const result = spawnSync(installed.shellPath, installed.commandArgs(smokeStatusPath), {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      HOME: homeDir,
-      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
-      ...env,
-      SSE_APP_DATA_DIR: runtime.appDataDir,
-      SSE_LOG_DIR: runtime.logsDir,
-    },
+    env: laneProcessEnv(
+      {
+        HOME: homeDir,
+        XDG_CACHE_HOME: path.join(homeDir, ".cache"),
+        ...env,
+      },
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+      },
+      { label: `Installed ${installed.label} acceptance step '${stepName}'` }
+    ),
   });
 
   writeFileSync(path.join(stepRoot, "stdout.log"), result.stdout ?? "", "utf8");
@@ -711,8 +745,6 @@ async function main() {
     throw new Error(`native-installer-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const installerExecutable = resolveInstallerExecutable(target, runtimeKind);
   const repositoryPath = resolveRepositoryPath(target, runtimeKind);
 
@@ -768,7 +800,8 @@ async function main() {
       installerExecutable,
       ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
       acceptanceRoot,
-      "installer-install"
+      "installer-install",
+      await installerRunEnv(acceptanceRoot)
     );
     probeInstallRootAfterInstall(installRoot, "Step 1 install");
     assertInstallTimeSmokePassed(installRoot, runtimeKind, "install");
@@ -779,20 +812,23 @@ async function main() {
     assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
 
     console.log(
-      "Step 2: import workstation data (its setup flag and page) through the installed shell and persist a continuity sentinel (a lighting group)."
+      "Step 2: start the installed shell on fresh saved data, save the page it opens on, publish the setup and persist a continuity sentinel (a lighting group)."
     );
-    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-import", "commissioning", {
-      SSE_LEGACY_DB_PATH: fixturePath,
-    });
+    runInstalledSmoke(
+      installed,
+      acceptanceRoot,
+      runtime,
+      "installed-first-launch",
+      "commissioning",
+      await hardenedLaneEnv()
+    );
 
     const firstRun = new EngineHarness({
       rootDir,
       appDataDir: runtime.appDataDir,
       logsDir: runtime.logsDir,
       engineExecutable: installed.enginePath,
-      env: {
-        SSE_DISABLE_AUTO_IMPORT: "1",
-      },
+      env: await hardenedLaneEnv(),
     });
 
     try {
@@ -803,24 +839,15 @@ async function main() {
 
       assert(
         initialAppSnapshot.startup?.targetSurface === "commissioning",
-        `Expected installer acceptance import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+        `Expected installer acceptance's fresh saved data to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
       );
-      // The import is seen by the page it wrote: new saved data opens on the
-      // Console, the fixture on Lighting.
-      assertSavedWorkspace(
-        initialAppSnapshot,
-        IMPORTED_WORKSPACE,
-        `Installed ${installed.label} engine`,
-        "after the import"
-      );
+      // The page is seeded through the app's own request: new saved data
+      // opens on the Console, and Lighting is saved instead.
+      await seedSavedWorkspace(firstRun, "installer-installed", `Installed ${installed.label} engine`);
 
-      const commissioningUpdate = await firstRun.request("installer-commissioning-ready", "commissioning.update", {
-        stage: "ready",
-      });
-      assert(
-        commissioningUpdate.startup?.targetSurface === "dashboard",
-        `Expected installer acceptance to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-      );
+      // No hardware on this host: the explicit probe override (2026-09 audit
+      // Slice 8), without which a fresh hardware link refuses the publish.
+      await publishWithOverride(firstRun, "installer-installed", `Installed ${installed.label} engine`);
 
       sentinel = await createContinuitySentinel(
         firstRun,
@@ -885,7 +912,8 @@ async function main() {
       installerExecutable,
       ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
       acceptanceRoot,
-      "installer-reinstall"
+      "installer-reinstall",
+      await installerRunEnv(acceptanceRoot)
     );
     probeInstallRootAfterInstall(installRoot, "Step 4 reinstall");
     assertInstallTimeSmokePassed(installRoot, runtimeKind, "reinstall");
@@ -896,18 +924,14 @@ async function main() {
     assert(existsSync(installed.enginePath), `Reinstalled engine missing at ${installed.enginePath}.`);
 
     console.log("Step 5: relaunch the reinstalled application and verify operator state survived the reinstall.");
-    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    });
+    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", await hardenedLaneEnv());
 
     const secondRun = new EngineHarness({
       rootDir,
       appDataDir: runtime.appDataDir,
       logsDir: runtime.logsDir,
       engineExecutable: installed.enginePath,
-      env: {
-        SSE_DISABLE_AUTO_IMPORT: "1",
-      },
+      env: await hardenedLaneEnv(),
     });
 
     try {
@@ -926,7 +950,7 @@ async function main() {
       );
       assertSavedWorkspace(
         reinstalledAppSnapshot,
-        IMPORTED_WORKSPACE,
+        SEEDED_WORKSPACE,
         `Reinstalled ${installed.label} engine`,
         "after the reinstall"
       );

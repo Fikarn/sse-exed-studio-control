@@ -942,9 +942,11 @@ export function buildFixtureBackupEntry(state: MutableFixtureState) {
 }
 
 // 2026-09 production readiness, Slice 7 (F29): only a file inside the backups
-// folder can be named, and it must be one the fixture lists (a legacy
-// `db.json` inside the folder counts, as the engine's importer accepts it).
-// The sentences mirror the engine's.
+// folder can be named, and it must be one the fixture lists. The sentences
+// mirror the engine's. New pages program, Slice 2b (2026-09-25): a `db.json`
+// the fixture does not list is no longer let through for the importer, which
+// is retired; like the hardware link, the double finds one only when it is in
+// the folder, and then refuses it at Verify and Restore (`setupRequests.ts`).
 export function findFixtureBackup(state: MutableFixtureState, path: string) {
   const backupDir = asString(state.supportSnapshot.backupDir);
   if (!path.startsWith(backupDir)) {
@@ -956,8 +958,8 @@ export function findFixtureBackup(state: MutableFixtureState, path: string) {
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null)
     .find((entry) => entry.path === path);
-  if (!match && !path.endsWith("db.json")) {
+  if (!match) {
     throw new Error(`Backup file was not found: ${path}`);
   }
-  return match ?? null;
+  return match;
 }

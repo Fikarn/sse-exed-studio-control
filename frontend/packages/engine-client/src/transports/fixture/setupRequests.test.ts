@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { getFixtureScenario } from "@sse/test-fixtures";
+import { fixtureIds, getFixtureScenario } from "@sse/test-fixtures";
 
-import type { JsonObject, RequestMethod } from "../../generated/protocol";
+import type { EventName, JsonObject, RequestMethod } from "../../generated/protocol";
+import type { FixtureScenario } from "../../types";
 import { createFixtureTransport } from "../fixtureTransport";
+import { cloneJson } from "./json";
 
 // New pages program, Slice 2 (D3): the fixture double's backup replies say what the
 // hardware link says (`native/rust-engine/src/support.rs`). A new archive is format 5 and
@@ -62,5 +64,77 @@ describe("the fixture double's backup replies", () => {
       expect(restored).not.toHaveProperty(key);
     }
     expect(restored).toMatchObject({ requiresRestart: false, sourceFormat: "native-support-backup" });
+  });
+});
+
+// New pages program, Slice 2b (D3): the db.json import is retired. The hardware link lists
+// every `.json` in the backups folder, an export from the old Studio Control included, and
+// refuses one at Verify (ok: false) and at Restore (INVALID_PARAMS, before anything is
+// written, a rollback archive included), in the words the double uses too. The double
+// recognizes the file by its name; the hardware link reads what is inside.
+
+const OLD_EXPORT_REFUSAL =
+  "db.json is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead.";
+
+/** A set-up-required double whose backups folder holds an export from the old Studio Control. */
+function openDoubleWithOldExport() {
+  const scenario = cloneJson(getFixtureScenario("setup-required") as JsonObject) as FixtureScenario;
+  const support = scenario.supportSnapshot as JsonObject;
+  const path = `${String(support.backupDir)}/db.json`;
+  support.backups = [{ kind: "archive", name: "db.json", path, sizeBytes: 2048, modifiedAt: 1776841920000 }];
+  const transport = createFixtureTransport(scenario);
+  const events: EventName[] = [];
+  transport.subscribe((envelope) => events.push(envelope.event));
+  const request = (method: RequestMethod, params: JsonObject = {}) =>
+    transport.request(method, params) as Promise<JsonObject>;
+  const readEverything = async () =>
+    Promise.all(
+      (["app.snapshot", "commissioning.snapshot", "health.snapshot", "support.snapshot"] as const).map((method) =>
+        request(method)
+      )
+    );
+  return { request, events, path, readEverything };
+}
+
+describe("the fixture double and an export from the old Studio Control (db.json)", () => {
+  it("lists it, and Verify says it is not restored any more", async () => {
+    const { request, path } = openDoubleWithOldExport();
+    const listed = (await request("support.snapshot")).backups as JsonObject[];
+    expect(listed.map((entry) => entry.path)).toEqual([path]);
+
+    const verified = await request("support.backup.verify", { path });
+    expect(verified).toEqual({ detail: OLD_EXPORT_REFUSAL, kind: "archive", ok: false, path });
+  });
+
+  it("refuses to restore it and writes nothing, a rollback backup included", async () => {
+    const { request, events, path, readEverything } = openDoubleWithOldExport();
+    const before = await readEverything();
+    expect((before[1] as JsonObject).hasCompletedSetup).toBe(false);
+
+    await expect(request("support.backup.restore", { path })).rejects.toThrow(OLD_EXPORT_REFUSAL);
+
+    expect(await readEverything()).toEqual(before);
+    expect(events).toEqual([]);
+    expect(((await request("support.snapshot")).backups as JsonObject[]).map((entry) => entry.path)).toEqual([path]);
+  });
+
+  it("answers a db.json that is not in the backups folder as any file not found", async () => {
+    const { request } = openDouble();
+    const backupDir = String((await request("support.snapshot")).backupDir);
+    const missing = `${backupDir}/db.json`;
+
+    for (const method of ["support.backup.verify", "support.backup.restore"] as const) {
+      await expect(request(method, { path: missing })).rejects.toThrow(`Backup file was not found: ${missing}`);
+    }
+  });
+
+  it("gives every scenario the hardware link's restore sentence, which names no db.json", async () => {
+    const hardwareLinkSentence =
+      "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.";
+    for (const id of fixtureIds) {
+      const transport = createFixtureTransport(getFixtureScenario(id));
+      const support = (await transport.request("support.snapshot", {})) as JsonObject;
+      expect(support.restoreSummary, id).toBe(hardwareLinkSentence);
+    }
   });
 });

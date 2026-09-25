@@ -16,6 +16,7 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 import { carriesLaunchNumber, launchNumberOf } from "./tauri-launch-number.mjs";
 import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 import { shellStillRunning } from "./tauri-shell-running.mjs";
@@ -150,23 +151,38 @@ function readJson(pathname) {
   }
 }
 
-function launchTauriShell({ appDataDir, commandPath, extraEnv = {}, logsDir, statusPath, updateRepoDir }) {
-  const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
-    // Windows: npm is npm.cmd, and Node >= 18.20 refuses to spawn .cmd files
-    // without a shell (EINVAL, CVE-2024-27980 hardening).
-    shell: process.platform === "win32",
-    cwd: rootDir,
-    detached: process.platform !== "win32",
-    env: {
-      ...process.env,
+// Every shell gets the lanes' hardening (native-runtime-harness.mjs, new pages
+// program, Slice 2b): a bridge port of its own, the light outputs held and the
+// simulated console. `envCheck` names the one launch that may leave the safe
+// start out (step 8).
+async function launchTauriShell({
+  appDataDir,
+  commandPath,
+  envCheck = {},
+  extraEnv = {},
+  logsDir,
+  statusPath,
+  updateRepoDir,
+}) {
+  const env = laneProcessEnv(
+    await hardenedLaneEnv(),
+    {
       SSE_APP_DATA_DIR: appDataDir,
-      SSE_DISABLE_AUTO_IMPORT: "1",
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
       SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
       ...extraEnv,
     },
+    { label: "The Setup/Support qualification's shell", ...envCheck }
+  );
+  const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
+    // Windows: npm is npm.cmd, and Node >= 18.20 refuses to spawn .cmd files
+    // without a shell (EINVAL, CVE-2024-27980 hardening).
+    shell: process.platform === "win32",
+    cwd: rootDir,
+    detached: process.platform !== "win32",
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -390,21 +406,24 @@ function debugShellBinaryPath() {
 // Vite serves. `tauri dev` itself cannot be the second copy — its Vite
 // would refuse port 4173 before the shell ever ran, proving nothing about
 // the shell.
-function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
+async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
   const binaryPath = debugShellBinaryPath();
   assert(existsSync(binaryPath), `Expected the debug shell binary at ${binaryPath} after the first tauri dev run.`);
-  const child = spawn(binaryPath, [], {
-    cwd: rootDir,
-    detached: process.platform !== "win32",
-    env: {
-      ...process.env,
+  const env = laneProcessEnv(
+    await hardenedLaneEnv(),
+    {
       SSE_APP_DATA_DIR: appDataDir,
-      SSE_DISABLE_AUTO_IMPORT: "1",
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
       SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
     },
+    { label: "The Setup/Support qualification's second shell" }
+  );
+  const child = spawn(binaryPath, [], {
+    cwd: rootDir,
+    detached: process.platform !== "win32",
+    env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -482,7 +501,7 @@ async function runSetupSupportQualification() {
 
   console.log("Tauri Setup/Support qualification: step 1/8 clean startup and support workflow.");
 
-  const firstRun = launchTauriShell({
+  const firstRun = await launchTauriShell({
     appDataDir: runtime.appDataDir,
     commandPath: firstSession.commandPath,
     logsDir: runtime.logsDir,
@@ -676,7 +695,7 @@ async function runSetupSupportQualification() {
   // corrupt-database scenario, which restores it from the recovery surface.
   let databaseBackupBytes;
   const secondSession = createSessionFiles("sse-tauri-session-");
-  const secondRun = launchTauriShell({
+  const secondRun = await launchTauriShell({
     appDataDir: runtime.appDataDir,
     commandPath: secondSession.commandPath,
     logsDir: runtime.logsDir,
@@ -865,7 +884,7 @@ async function runSetupSupportQualification() {
 
   const blockedRuntime = createBlockedRuntimeDirs("sse-tauri-bootstrap-failure-");
   const recoverySession = createSessionFiles("sse-tauri-session-");
-  const recoveryRun = launchTauriShell({
+  const recoveryRun = await launchTauriShell({
     appDataDir: blockedRuntime.appDataDir,
     commandPath: recoverySession.commandPath,
     logsDir: blockedRuntime.logsDir,
@@ -922,7 +941,7 @@ async function runSetupSupportQualification() {
   );
   writeFileSync(recoveryBackupPath, databaseBackupBytes);
   const corruptSession = createSessionFiles("sse-tauri-session-");
-  const corruptRun = launchTauriShell({
+  const corruptRun = await launchTauriShell({
     appDataDir: corruptRuntime.appDataDir,
     commandPath: corruptSession.commandPath,
     logsDir: corruptRuntime.logsDir,
@@ -1044,7 +1063,7 @@ async function runSetupSupportQualification() {
 
   const crashRuntime = createRuntimeDirs("sse-tauri-engine-crash-");
   const crashSession = createSessionFiles("sse-tauri-session-");
-  const crashRun = launchTauriShell({
+  const crashRun = await launchTauriShell({
     appDataDir: crashRuntime.appDataDir,
     commandPath: crashSession.commandPath,
     logsDir: crashRuntime.logsDir,
@@ -1126,7 +1145,7 @@ async function runSetupSupportQualification() {
     // the plugin's refusal is accepted on Windows and macOS.
     console.log("Tauri Setup/Support qualification: step 6/8 a second copy of the shell is refused.");
     const secondSession = createSessionFiles("sse-tauri-second-instance-");
-    const secondRun = launchSecondShellInstance({
+    const secondRun = await launchSecondShellInstance({
       appDataDir: crashRuntime.appDataDir,
       commandPath: secondSession.commandPath,
       logsDir: crashRuntime.logsDir,
@@ -1206,7 +1225,8 @@ async function runSetupSupportQualification() {
   // the bridge, the app snapshot reports the bridge unavailable on that
   // port, and the store derives its degraded recovery state — where before
   // the slice health read `ok` whatever had failed. A throwaway listener
-  // holds the port the shell is told to use; the engine scans for no other.
+  // holds the port the shell is told to use (in place of the lane's own); the
+  // engine scans for no other.
   console.log("Tauri Setup/Support qualification: step 7/8 a taken Stream Deck bridge port reads as health attention.");
 
   const portHolder = net.createServer();
@@ -1216,7 +1236,7 @@ async function runSetupSupportQualification() {
   });
   const portRuntime = createRuntimeDirs("sse-tauri-bridge-port-");
   const portSession = createSessionFiles("sse-tauri-session-");
-  const portRun = launchTauriShell({
+  const portRun = await launchTauriShell({
     appDataDir: portRuntime.appDataDir,
     commandPath: portSession.commandPath,
     extraEnv: { SSE_CONTROL_SURFACE_PORT: String(takenPort) },
@@ -1305,7 +1325,7 @@ async function runSetupSupportQualification() {
   let safeEvidence;
 
   const safeSession = createSessionFiles("sse-tauri-session-");
-  const safeRun = launchTauriShell({
+  const safeRun = await launchTauriShell({
     appDataDir: safeRuntime.appDataDir,
     commandPath: safeSession.commandPath,
     extraEnv: { SSE_SAFE_START: "1" },
@@ -1337,10 +1357,16 @@ async function runSetupSupportQualification() {
   await delay(1_500);
   await assertTcpPortAvailable(devServerPort);
 
+  // The one launch of any lane without the lanes' safe start (new pages
+  // program, Slice 2b): with it, this launch would hold the outputs itself and
+  // prove nothing about the hold outliving the launch that made it. The rest
+  // of the hardening stays, and this runtime has no lighting bridge to arm.
   const armSession = createSessionFiles("sse-tauri-session-");
-  const armRun = launchTauriShell({
+  const armRun = await launchTauriShell({
     appDataDir: safeRuntime.appDataDir,
     commandPath: armSession.commandPath,
+    envCheck: { safeStart: false },
+    extraEnv: { SSE_SAFE_START: "0" },
     logsDir: safeRuntime.logsDir,
     statusPath: armSession.statusPath,
     updateRepoDir: safeRuntime.updateRepoDir,
@@ -1372,8 +1398,9 @@ async function runSetupSupportQualification() {
       },
       statusPath: armSession.statusPath,
     });
-    // Found by its action, not by its place: on the workstation the lane's
-    // engine also hears the real TotalMix, and a console row can land after it.
+    // Found by its action, not by its place: a console row can land after it
+    // (the lane's engine heard the real TotalMix on the workstation until it
+    // ran the simulated console, new pages program Slice 2b).
     const armedRow = rowsOf(armed).find((row) => row?.action === "outputs-armed");
     assert(armedRow.source === "ui", `Expected the switch's row to be the screen's, got ${JSON.stringify(armedRow)}.`);
     evidence.recordCheck("safe-start-holds-the-light-outputs-until-armed", {

@@ -1,15 +1,18 @@
-//! The storage layer's tests: schema and migrations, the legacy import,
-//! the integrity check at start (2026-09 production readiness, Slice 3).
+//! The storage layer's tests: schema and migrations, the integrity check at
+//! start (2026-09 production readiness, Slice 3). The legacy db.json import
+//! they also covered was retired in the new pages program's Slice 2b.
 //! Split out of `storage.rs` under the 2,000-line file-health guard; the
 //! backup tests live with the backups in `storage_backups.rs`.
 
 use super::*;
+use crate::shell_settings::WORKSPACE_KEY;
 use crate::storage_backups::{newest_snapshot, snapshot_reason_of};
 use rusqlite::OpenFlags;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) struct TestDir {
     path: PathBuf,
@@ -72,212 +75,6 @@ fn initialize_database_applies_the_schema_and_defaults_without_planning() {
         shell_settings.get(WORKSPACE_KEY).map(String::as_str),
         Some("audio")
     );
-}
-
-// New pages program, Slice 2 (interim until Slice 2b): the import writes the
-// setup flag and the page to open, and nothing of Planning. Before the slice
-// it asserted the imported rows (1 project, 1 task, 2 checklist items, 1
-// activity entry, 1 running task normalized), the stopped task's timer and
-// labels, and the six imported `planning.*` settings; the page (lighting) and
-// the setup flag (completed, ready) are asserted as before.
-#[test]
-fn import_legacy_db_writes_only_the_setup_flag_and_the_page() {
-    let test_dir = TestDir::new("storage-import");
-    let db_path = test_dir.path().join("native.sqlite3");
-    let source_path = test_dir.path().join("legacy-db.json");
-    initialize_test_database(&db_path).expect("database should initialize");
-
-    fs::write(
-        &source_path,
-        serde_json::to_vec_pretty(&json!({
-            "schemaVersion": 8,
-            "projects": [
-                {
-                    "id": "proj-1",
-                    "title": "Website Redesign",
-                    "description": "Marketing refresh",
-                    "status": "in-progress",
-                    "priority": "p1",
-                    "createdAt": "2026-04-01T10:00:00.000Z",
-                    "lastUpdated": "2026-04-10T10:00:00.000Z",
-                    "order": 0
-                }
-            ],
-            "tasks": [
-                {
-                    "id": "task-1",
-                    "projectId": "proj-1",
-                    "title": "Implement hero section",
-                    "description": "",
-                    "priority": "p1",
-                    "dueDate": "2026-04-20",
-                    "labels": ["frontend", "homepage"],
-                    "checklist": [
-                        {"id": "check-1", "text": "Wire layout", "done": true},
-                        {"id": "check-2", "text": "Tune spacing", "done": false}
-                    ],
-                    "isRunning": true,
-                    "totalSeconds": 120,
-                    "lastStarted": "2026-04-15T00:00:00.000Z",
-                    "completed": false,
-                    "order": 0,
-                    "createdAt": "2026-04-11T10:00:00.000Z"
-                }
-            ],
-            "activityLog": [
-                {
-                    "id": "act-1",
-                    "timestamp": "2026-04-12T10:00:00.000Z",
-                    "entityType": "task",
-                    "entityId": "task-1",
-                    "action": "created",
-                    "detail": "Task created"
-                }
-            ],
-            "settings": {
-                "viewFilter": "in-progress",
-                "sortBy": "priority",
-                "selectedProjectId": "proj-1",
-                "selectedTaskId": "task-1",
-                "dashboardView": "lighting",
-                "deckMode": "light",
-                "hasCompletedSetup": true
-            }
-        }))
-        .expect("legacy payload should serialize"),
-    )
-    .expect("legacy db should be written");
-
-    let settings_before = all_settings(&db_path);
-
-    let summary = import_legacy_db(
-        &db_path,
-        &LegacyImportRequest {
-            source_path: source_path.clone(),
-            force: false,
-        },
-    )
-    .expect("legacy import should succeed");
-
-    assert_eq!(summary.updated_settings, 4);
-    assert!(!summary.replaced_existing_data);
-    assert_eq!(summary.source_schema_version, 8);
-    let reply = serde_json::to_value(&summary).expect("the summary serializes");
-    let mut reply_keys = reply
-        .as_object()
-        .expect("the summary is an object")
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>();
-    reply_keys.sort();
-    assert_eq!(
-        reply_keys,
-        vec![
-            "replacedExistingData",
-            "sourcePath",
-            "sourceSchemaVersion",
-            "updatedSettings"
-        ],
-        "no Planning counts in the reply"
-    );
-
-    assert_eq!(
-        planning_objects(&db_path),
-        Vec::<String>::new(),
-        "the import creates no Planning table"
-    );
-    let planning_settings =
-        list_settings_by_prefix(&db_path, "planning.").expect("settings should load");
-    assert!(planning_settings.is_empty(), "{planning_settings:?}");
-
-    let shell_settings =
-        list_settings_by_prefix(&db_path, crate::shell_settings::SHELL_SETTINGS_PREFIX)
-            .expect("shell settings should load");
-    assert_eq!(
-        shell_settings.get(WORKSPACE_KEY).map(String::as_str),
-        Some("lighting")
-    );
-
-    let app_settings = list_settings_by_prefix(&db_path, crate::app_state::APP_SETTINGS_PREFIX)
-        .expect("app settings should load");
-    assert_eq!(
-        app_settings
-            .get(COMMISSIONING_COMPLETED_KEY)
-            .map(String::as_str),
-        Some("true")
-    );
-    assert_eq!(
-        app_settings
-            .get(COMMISSIONING_STAGE_KEY)
-            .map(String::as_str),
-        Some("ready")
-    );
-    assert_eq!(
-        app_settings
-            .get(COMMISSIONING_RUNNER_STAGE_KEY)
-            .map(String::as_str),
-        Some("publish")
-    );
-
-    // Nothing else changed: every other setting is as it was.
-    let mut settings_after = all_settings(&db_path);
-    let mut settings_before = settings_before;
-    for key in [
-        WORKSPACE_KEY,
-        COMMISSIONING_COMPLETED_KEY,
-        COMMISSIONING_STAGE_KEY,
-        COMMISSIONING_RUNNER_STAGE_KEY,
-    ] {
-        settings_before.remove(key);
-        settings_after.remove(key);
-    }
-    assert_eq!(settings_after, settings_before);
-}
-
-// New pages program, Slice 2: unchanged, and it still refuses — now because
-// the first import is recorded (its project is not imported any more); until
-// the slice the refusal came from that project's row.
-#[test]
-fn import_legacy_db_requires_force_when_data_already_exists() {
-    let test_dir = TestDir::new("storage-force");
-    let db_path = test_dir.path().join("native.sqlite3");
-    let source_path = test_dir.path().join("legacy-db.json");
-    initialize_test_database(&db_path).expect("database should initialize");
-
-    fs::write(
-        &source_path,
-        serde_json::to_vec_pretty(&json!({
-            "projects": [{"id": "proj-1", "title": "Imported", "status": "todo", "lastUpdated": "2026-04-10T10:00:00.000Z"}],
-            "tasks": [],
-            "activityLog": [],
-            "settings": {}
-        }))
-        .expect("legacy payload should serialize"),
-    )
-    .expect("legacy db should be written");
-
-    import_legacy_db(
-        &db_path,
-        &LegacyImportRequest {
-            source_path: source_path.clone(),
-            force: false,
-        },
-    )
-    .expect("initial import should succeed");
-
-    let error = import_legacy_db(
-        &db_path,
-        &LegacyImportRequest {
-            source_path,
-            force: false,
-        },
-    )
-    .expect_err("second import without force should fail");
-
-    assert!(matches!(
-        error,
-        ImportLegacyError::ExistingDataRequiresForce
-    ));
 }
 
 #[test]

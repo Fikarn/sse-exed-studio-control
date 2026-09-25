@@ -1,15 +1,9 @@
-use crate::app_state::{
-    default_app_settings_entries, CommissioningSnapshot, COMMISSIONING_COMPLETED_KEY,
-    COMMISSIONING_RUNNER_STAGE_KEY, COMMISSIONING_STAGE_KEY,
-};
+use crate::app_state::default_app_settings_entries;
 use crate::commissioning::{
     default_settings_entries as default_commissioning_settings_entries,
     CONTROL_SURFACE_MESSAGE_KEY, PLANNING_ERA_PROBE_PREFIX, PROBE_CHECKED_BEFORE_THIS_VERSION,
 };
-use crate::legacy_import::{
-    load_legacy_import_payload, ImportLegacyError, LegacyImportRequest, LegacyImportSummary,
-};
-use crate::shell_settings::{default_settings_entries, WORKSPACE_KEY};
+use crate::shell_settings::default_settings_entries;
 use crate::storage_backups::{snapshot_database_with, SnapshotReason};
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension, Transaction};
 use serde_json::{json, Value};
@@ -18,7 +12,6 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 /// The newest schema `migrate_schema` knows. Every step there names its own
@@ -28,10 +21,6 @@ pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 8;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
-
-/// When the legacy db.json import last wrote this database. The import's
-/// "existing data" gate reads it (new pages program, Slice 2).
-const LEGACY_IMPORT_IMPORTED_AT_KEY: &str = "legacy_import.imported_at_unix";
 
 /// `PRAGMA integrity_check` stops after this many findings; the first one is
 /// what the operator reads, the rest go to the log.
@@ -348,92 +337,6 @@ fn read_format_version(connection: &Connection) -> Result<String, rusqlite::Erro
             rusqlite::Error::QueryReturnedNoRows => Ok(String::from("0")),
             other => Err(other),
         })
-}
-
-/// The legacy db.json import, reduced to what is not Planning (new pages
-/// program, Slice 2 — interim until Slice 2b retires the import): it writes
-/// the setup flag and the page to open, and nothing else. The projects,
-/// tasks, checklists, activity entries and Planning settings a db.json holds
-/// are ignored.
-pub fn import_legacy_db(
-    db_path: &Path,
-    request: &LegacyImportRequest,
-) -> Result<LegacyImportSummary, ImportLegacyError> {
-    let payload = load_legacy_import_payload(&request.source_path)?;
-    let mut connection =
-        open_connection(db_path).map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-    let transaction = connection
-        .transaction()
-        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-    let had_existing_data = legacy_import_would_replace(&transaction)
-        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-    if had_existing_data && !request.force {
-        return Err(ImportLegacyError::ExistingDataRequiresForce);
-    }
-
-    let updated_settings = write_imported_settings(&transaction, &payload)
-        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-    let summary = LegacyImportSummary {
-        source_path: payload.source_path.display().to_string(),
-        source_schema_version: payload.source_schema_version,
-        replaced_existing_data: had_existing_data,
-        updated_settings,
-    };
-
-    upsert_metadata(
-        &transaction,
-        &[
-            ("legacy_import.source_path", summary.source_path.clone()),
-            (
-                "legacy_import.source_schema_version",
-                summary.source_schema_version.to_string(),
-            ),
-            (
-                LEGACY_IMPORT_IMPORTED_AT_KEY,
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|duration| duration.as_secs().to_string())
-                    .unwrap_or_else(|_| String::from("0")),
-            ),
-        ],
-    )
-    .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-    transaction
-        .commit()
-        .map_err(|error| ImportLegacyError::Storage(error.to_string()))?;
-
-    Ok(summary)
-}
-
-/// Whether a legacy db.json import would replace saved data here: the setup
-/// is already complete, or a db.json was imported before. Until Slice 2 the
-/// gate was "the Planning tables hold rows"; the import now writes only the
-/// setup flag and the page to open, so these are what it could replace. The
-/// start-up auto-import runs only while this is false, and an explicit
-/// import (or a development fixture load) then needs `force`.
-pub fn legacy_import_finds_saved_data(db_path: &Path) -> EngineResult<bool> {
-    let connection = open_connection(db_path)?;
-    Ok(legacy_import_would_replace(&connection)?)
-}
-
-fn legacy_import_would_replace(connection: &Connection) -> Result<bool, rusqlite::Error> {
-    let imported_before = connection
-        .query_row(
-            "SELECT 1 FROM app_metadata WHERE key = ?1",
-            [LEGACY_IMPORT_IMPORTED_AT_KEY],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
-    let setup_completed = CommissioningSnapshot::from_settings(&query_settings_by_prefix(
-        connection,
-        "app.commissioning.",
-    )?)
-    .has_completed_setup;
-    Ok(imported_before || setup_completed)
 }
 
 pub(crate) fn open_connection(db_path: &Path) -> Result<Connection, rusqlite::Error> {
@@ -897,31 +800,6 @@ fn upsert_metadata(
     }
 
     Ok(())
-}
-
-/// The setup flag and the page to open — all a legacy db.json still gives.
-fn write_imported_settings(
-    transaction: &Transaction<'_>,
-    payload: &crate::legacy_import::LegacyImportPayload,
-) -> Result<usize, rusqlite::Error> {
-    let updates = [
-        (WORKSPACE_KEY, payload.settings.shell_workspace.clone()),
-        (
-            COMMISSIONING_COMPLETED_KEY,
-            payload.settings.commissioning_completed.to_string(),
-        ),
-        (
-            COMMISSIONING_RUNNER_STAGE_KEY,
-            payload.settings.commissioning_runner_stage.clone(),
-        ),
-        (
-            COMMISSIONING_STAGE_KEY,
-            payload.settings.commissioning_stage.clone(),
-        ),
-    ];
-
-    upsert_settings(transaction, &updates)?;
-    Ok(updates.len())
 }
 
 #[cfg(test)]

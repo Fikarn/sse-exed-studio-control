@@ -14,18 +14,17 @@ import {
   assertSavedWorkspace,
   awaitConsoleLinkQuiet,
   createContinuitySentinel,
-  IMPORTED_WORKSPACE,
   moveSavedWorkspace,
+  publishWithOverride,
   SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 async function main() {
-  const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_ACCEPTANCE_DIR);
   const acceptanceRoot = explicitRoot ?? mkdtempSync(path.join(os.tmpdir(), "sse-native-acceptance-"));
   rmSync(acceptanceRoot, { force: true, recursive: true });
@@ -37,16 +36,14 @@ async function main() {
   console.log(`Native acceptance root: ${acceptanceRoot}`);
   console.log(SAVED_DATA_MARKER_CHANGED);
   console.log(
-    "Step 1: import the legacy workstation file (its setup flag and the page it opens on) and export a native backup."
+    "Step 1: start on fresh saved data, save the page it opens on, publish the setup and export a native backup."
   );
 
   const firstRun = new EngineHarness({
     rootDir,
     appDataDir,
     logsDir,
-    env: acceptanceEngineEnv({
-      SSE_LEGACY_DB_PATH: fixturePath,
-    }),
+    env: await acceptanceEngineEnv(),
   });
 
   let backupPath;
@@ -61,11 +58,11 @@ async function main() {
 
     assert(
       initialAppSnapshot.startup?.targetSurface === "commissioning",
-      `Expected imported workstation to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+      `Expected fresh saved data to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    // The import is seen by the page it wrote: new saved data opens on the
-    // Console, the fixture on Lighting.
-    assertSavedWorkspace(initialAppSnapshot, IMPORTED_WORKSPACE, "Native acceptance engine", "after the import");
+    // The page is seeded through the app's own request: new saved data opens
+    // on the Console, and Lighting is saved instead.
+    await seedSavedWorkspace(firstRun, "native-acceptance-installed", "Native acceptance engine");
     // The continuity sentinel the installer and delivery lanes use, made here
     // on the same fresh, unconfigured lighting, so the one lane CI runs on
     // every push proves it survives a restart and comes back with a restore.
@@ -79,21 +76,14 @@ async function main() {
     // No hardware on this host: publish with the explicit probe override the
     // engine now requires (2026-09 audit Slice 8) instead of pretending the
     // probes ran.
-    const commissioningUpdate = await firstRun.request("commissioning-ready", "commissioning.update", {
-      stage: "ready",
-      overrideProbes: true,
-    });
-    assert(
-      commissioningUpdate.startup?.targetSurface === "dashboard",
-      `Expected commissioning update to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-    );
+    await publishWithOverride(firstRun, "native-acceptance-installed", "Native acceptance engine");
 
     // The backup must carry the console's settled state, not a half-ingested one.
     await awaitConsoleLinkQuiet(firstRun, "native-acceptance-installed-audio-quiet");
     const exportSummary = await firstRun.request("support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected native backup export to create an archive.");
-    assertBackupArchiveWithoutPlanning(exportSummary, IMPORTED_WORKSPACE, "Native acceptance engine");
+    assertBackupArchiveWithoutPlanning(exportSummary, SEEDED_WORKSPACE, "Native acceptance engine");
   } finally {
     await firstRun.close().catch((error) => {
       throw error;
@@ -108,9 +98,7 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
-    env: acceptanceEngineEnv({
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    }),
+    env: await acceptanceEngineEnv(),
   });
 
   try {
@@ -129,7 +117,7 @@ async function main() {
     );
     assertSavedWorkspace(
       restartedAppSnapshot,
-      IMPORTED_WORKSPACE,
+      SEEDED_WORKSPACE,
       "Restarted native acceptance engine",
       "after the restart"
     );
@@ -179,7 +167,7 @@ async function main() {
     const restoredAppSnapshot = await secondRun.request("app-snapshot-restored", "app.snapshot");
     assertSavedWorkspace(
       restoredAppSnapshot,
-      IMPORTED_WORKSPACE,
+      SEEDED_WORKSPACE,
       "Restored native acceptance engine",
       "after the restore"
     );
@@ -290,7 +278,7 @@ async function main() {
   }
 
   console.log(
-    "Native acceptance passed: import, restart, and rollback are deterministic (saved page, lighting and audio followed)."
+    "Native acceptance passed: seeding, restart, and rollback are deterministic (saved page, lighting and audio followed)."
   );
 }
 

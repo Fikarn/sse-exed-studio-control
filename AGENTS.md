@@ -13,7 +13,7 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 ## What this product is
 
-`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Planning was removed in 2026-09 by the new pages program (`docs/plans/new-pages-2026-09.md`: from the screen in Slice 1, from the hardware link, the contract and the saved data in Slice 2), which then removes the keyboard shortcuts and adds Cameras and Teleprompter pages. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`; there is no browser path.
+`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Planning was removed in 2026-09 by the new pages program (`docs/plans/new-pages-2026-09.md`: from the screen in Slice 1, from the hardware link, the contract and the saved data in Slice 2), which then removes the keyboard shortcuts and adds Cameras and Teleprompter pages. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`, and its last piece, the one-way `db.json` import, in the new pages program's Slice 2b (a `db.json` is neither imported nor restored; no pre-v2.0.0 code is retained); there is no browser path.
 
 Checkpoint D is complete: the Qt/QML fallback shell, Qt-specific shell automation, and historical Qt parity assets are retired. Do not reintroduce a Qt shell path without a new architecture decision and replacement release plan.
 
@@ -120,7 +120,7 @@ Native and release:
 - `npm run native:engine:build:dev-fixtures` — the engine with the `dev-fixtures` cargo feature, the only build that answers `dev.parityFixture.load`; release engines and every lane but `native:test:dev-fixtures` (its own tests) run without it.
 - `npm run native:package:win:local` / `native:package:mac:local` — rebuilds `release/native/<platform>/` from the built binaries, deleting what is there. On a workstation that runs the app from that folder (the studio workstation does) it is the installed app: move the folder aside first and put it back afterwards (the procedure is in `docs/plans/production-readiness-2026-09.md`). `npm run clean` keeps `release/native` whenever a packaged app is inside it; never pass `-- --include-release` there.
 - `npm run native:foundation` — native shipping foundation lane.
-- `npm run native:acceptance` — native acceptance lane. Runs the engine in simulated audio input mode, so it never writes to a console; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` is the workstation-only live lane (unused surfaces only, restored afterwards) — run it only when the studio is idle.
+- `npm run native:acceptance` — native acceptance lane. Runs the engine in simulated audio input mode, so it never writes to a console; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` is the workstation-only live lane (unused surfaces only, restored afterwards) — run it only when the studio is idle. Since the new pages program's Slice 2b every engine and shell a lane starts gets its scratch app-data folder and its hardening in one place (`laneProcessEnv` in `scripts/native-runtime-harness.mjs`): a bridge port of its own (never the live app's 38201), `SSE_SAFE_START=1` and, outside that live lane, the simulated console; an environment without them is refused before anything starts, and `scripts/native-lanes.test.mjs` fails a lane that hands app data to a process any other way.
 - `npm run release:preflight` — pre-12-stage-chain credential, tooling, disk, and network reachability check (run before `release:verify`).
 - `npm run release:check` / `npm run release:verify` — release metadata and release verification (`release:verify` chains `release:preflight`).
 - `npm run release:manifest` — write the chain-of-custody release manifest for a tag. Called from `release:publish`; standalone for evidence regeneration.
@@ -183,12 +183,6 @@ These jobs are required merge hygiene on `main`. They are **not** the release ga
 - Persistence compatibility: rollback to a prior tag must remain a reinstall-away. Do not change on-disk formats without an explicit migration plan.
 
 Authoritative source: `docs/RELEASE.md` and `docs/PRODUCTIZATION_PLAN.md`.
-
-## Retained legacy surface
-
-Only one piece of pre-v2.0.0 code is intentionally retained:
-
-- `native/rust-engine/src/legacy_import.rs` — one-way importer that reads a legacy Electron `db.json` on first native launch (env var `SSE_LEGACY_DB_PATH`). Do not touch it as part of new feature work; do not extend it; do not mirror it elsewhere. Since the new pages program's Slice 2 it carries only whether setup is complete and the page to open (the rest of a `db.json`, its Planning data included, is ignored), and the start-up auto-import runs only when the saved data holds no completed setup and no earlier import (an explicit `storage.importLegacyDb` over them needs `force`). It stays until that program's Slice 2b retires it together with `storage.importLegacyDb`, the start-up auto-import and `SSE_LEGACY_DB_PATH`, once the seven lanes and scripts that seed a test engine through it are seeded through the app's own requests.
 
 ## Generated and local-only files
 

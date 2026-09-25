@@ -7,7 +7,7 @@
 //! but in Rust so the engine's public contract is exercised in
 //! `cargo test`, not only in the Node harness.
 //!
-//! Scope is deliberately small: the larger workflow (import → mutate →
+//! Scope is deliberately small: the larger workflow (seed → mutate →
 //! backup → restart → restore → verify rollback) already runs under
 //! `npm run native:acceptance` + the CI `rust` job's `native-acceptance`
 //! step (B3). This test gives the same lane Rust-side coverage of the
@@ -50,20 +50,26 @@ struct EngineProcess {
 
 impl EngineProcess {
     fn spawn(label: &str) -> Self {
-        Self::spawn_with(label, |command, _runtime_dir| {
-            command.env("SSE_DISABLE_AUTO_IMPORT", "1");
-        })
+        Self::spawn_with(label, |_command, _runtime_dir| {})
     }
 
     /// Spawns the engine against a fresh runtime dir (`SSE_APP_DATA_DIR` and
     /// `SSE_LOG_DIR` set) and lets the caller stage files in that dir or
-    /// adjust the command before the process starts.
+    /// adjust the command before the process starts. New pages program,
+    /// Slice 2b (2026-09-25): hardened as the lanes are — a Stream Deck
+    /// bridge port the system picks (never the live app's 38201), the light
+    /// outputs held (`SSE_SAFE_START`) and the simulated console
+    /// (`SSE_AUDIO_SIMULATED_INPUT_MODE`). `SSE_DISABLE_AUTO_IMPORT`, which
+    /// every spawn set until then, went with the db.json import.
     fn spawn_with<F: FnOnce(&mut Command, &PathBuf)>(label: &str, configure: F) -> Self {
         let runtime_dir = unique_runtime_dir(label);
         let mut command = Command::new(engine_binary_path());
         command
             .env("SSE_APP_DATA_DIR", &runtime_dir)
             .env("SSE_LOG_DIR", runtime_dir.join("logs"))
+            .env("SSE_CONTROL_SURFACE_PORT", "0")
+            .env("SSE_SAFE_START", "1")
+            .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -251,16 +257,6 @@ fn commissioning_publish_is_refused_until_probes_pass_or_the_operator_overrides(
     engine.shutdown();
 }
 
-/// A legacy db.json whose setup was completed. New pages program, Slice 2:
-/// the import is seen by the setup flag it carries, because the Planning
-/// counts it was once seen by left the commissioning snapshot (until then this
-/// was `commissioning-sample-db.json`, two projects, setup not completed).
-fn legacy_fixture_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("fixtures")
-        .join("dashboard-ready-db.json")
-}
-
 fn wait_for_ready(engine: &mut EngineProcess) {
     engine.wait_for("engine.ready event", |value| {
         value.get("type").and_then(Value::as_str) == Some("event")
@@ -284,57 +280,90 @@ fn has_completed_setup(engine: &mut EngineProcess, id: &'static str) -> bool {
         })
 }
 
-// 2026-09 production readiness, Slice 1 (finding F23): the engine used to
-// auto-import `<cwd>/data/db.json` whenever its planning tables were empty,
-// so whatever directory a packaged engine happened to be launched from
-// could seed the operator's database. The only sources now are
-// `SSE_LEGACY_DB_PATH` and `<app-data>/import/db.json`.
+/// An export from the old Studio Control whose setup was completed and
+/// whose page was Lighting: what the retired import would have written is
+/// plain to see on new saved data (setup not completed, the Console).
+const OLD_STUDIO_CONTROL_EXPORT: &str = r#"{"schemaVersion":8,"projects":[],"settings":{"dashboardView":"lighting","hasCompletedSetup":true}}"#;
+
+// New pages program, Slice 2b (D3): the db.json import is retired. A start
+// with a db.json staged at `<app-data>/import/db.json`, another named by
+// `SSE_LEGACY_DB_PATH` and a third under its working directory (the old
+// repo-local `data/db.json`, never a source since 2026-09 production
+// readiness, Slice 1 — finding F23) imports none of them: setup stays not
+// completed and the page stays the Console, each file is byte for byte as it
+// was, and the log names the one the retired import would have read, in one
+// warning line. Until the slice such a start imported the variable's file (the
+// staged one without it); these replace `auto_import_ignores_cwd` and
+// `auto_import_reads_the_staged_app_data_file`.
 #[test]
-fn auto_import_ignores_cwd() {
-    let working_dir = unique_runtime_dir("auto-import-cwd");
-    fs::create_dir_all(working_dir.join("data")).expect("cwd data dir");
-    fs::copy(
-        legacy_fixture_path(),
-        working_dir.join("data").join("db.json"),
-    )
-    .expect("legacy fixture should copy under the working directory");
+fn a_left_over_db_json_is_named_in_the_log_and_never_imported() {
+    let elsewhere = unique_runtime_dir("left-over-db-json-elsewhere");
+    let named = elsewhere.join("db.json");
+    fs::write(&named, OLD_STUDIO_CONTROL_EXPORT).expect("the named db.json should be written");
+    fs::create_dir_all(elsewhere.join("data")).expect("cwd data dir");
+    let in_working_dir = elsewhere.join("data").join("db.json");
+    fs::write(&in_working_dir, OLD_STUDIO_CONTROL_EXPORT)
+        .expect("the working directory's db.json should be written");
+    let mut staged = PathBuf::new();
 
-    let mut engine = EngineProcess::spawn_with("auto-import-ignores-cwd", |command, _| {
-        command
-            .current_dir(&working_dir)
-            .env_remove("SSE_DISABLE_AUTO_IMPORT")
-            .env_remove("SSE_LEGACY_DB_PATH");
-    });
-    wait_for_ready(&mut engine);
-
-    assert!(
-        !has_completed_setup(&mut engine, "cwd-snapshot"),
-        "a db.json under the engine's working directory must not be imported"
-    );
-
-    engine.shutdown();
-    let _ = fs::remove_dir_all(&working_dir);
-}
-
-#[test]
-fn auto_import_reads_the_staged_app_data_file() {
-    let mut engine = EngineProcess::spawn_with("auto-import-staged", |command, runtime_dir| {
+    let mut engine = EngineProcess::spawn_with("left-over-db-json", |command, runtime_dir| {
         let import_dir = runtime_dir.join("import");
         fs::create_dir_all(&import_dir).expect("app-data import dir");
-        fs::copy(legacy_fixture_path(), import_dir.join("db.json"))
-            .expect("legacy fixture should copy into app-data/import");
+        staged = import_dir.join("db.json");
+        fs::write(&staged, OLD_STUDIO_CONTROL_EXPORT)
+            .expect("the staged db.json should be written");
         command
-            .env_remove("SSE_DISABLE_AUTO_IMPORT")
-            .env_remove("SSE_LEGACY_DB_PATH");
+            .current_dir(&elsewhere)
+            .env("SSE_LEGACY_DB_PATH", &named);
     });
     wait_for_ready(&mut engine);
 
     assert!(
-        has_completed_setup(&mut engine, "staged-snapshot"),
-        "the staged <app-data>/import/db.json (dashboard-ready-db.json, setup completed) must be imported"
+        !has_completed_setup(&mut engine, "left-over-snapshot"),
+        "no db.json may be imported"
+    );
+    engine.send(&json!({
+        "type": "request",
+        "id": "left-over-settings",
+        "method": "settings.get",
+        "params": {}
+    }));
+    let settings = engine.wait_for("settings.get", response_with_id("left-over-settings"));
+    assert_eq!(
+        settings
+            .pointer("/result/shell/workspace")
+            .and_then(Value::as_str),
+        Some("audio"),
+        "new saved data opens on the Console ({settings})"
+    );
+
+    for path in [&named, &staged, &in_working_dir] {
+        assert_eq!(
+            fs::read_to_string(path).expect("the db.json is still there"),
+            OLD_STUDIO_CONTROL_EXPORT,
+            "{} was changed",
+            path.display()
+        );
+    }
+    let log = fs::read_to_string(engine.runtime_dir.join("logs").join("engine.log"))
+        .expect("the engine log");
+    let lines = log
+        .lines()
+        .filter(|line| line.contains("db.json"))
+        .collect::<Vec<_>>();
+    assert_eq!(lines.len(), 1, "{log}");
+    assert!(lines[0].contains("WARN"), "{}", lines[0]);
+    assert!(
+        lines[0].ends_with(&format!(
+            "A db.json at {} was left alone: Studio Control no longer imports db.json files.",
+            named.display()
+        )),
+        "{}",
+        lines[0]
     );
 
     engine.shutdown();
+    let _ = fs::remove_dir_all(&elsewhere);
 }
 
 #[test]
@@ -413,7 +442,6 @@ fn second_engine_on_the_same_app_data_dir_is_refused() {
 
     let mut second = EngineProcess::spawn_with("single-instance-second", |command, _| {
         command
-            .env("SSE_DISABLE_AUTO_IMPORT", "1")
             .env("SSE_APP_DATA_DIR", &shared_dir)
             .env("SSE_LOG_DIR", shared_dir.join("logs"));
     });
@@ -439,7 +467,6 @@ fn second_engine_on_the_same_app_data_dir_is_refused() {
 
     let mut third = EngineProcess::spawn_with("single-instance-third", |command, _| {
         command
-            .env("SSE_DISABLE_AUTO_IMPORT", "1")
             .env("SSE_APP_DATA_DIR", &shared_dir)
             .env("SSE_LOG_DIR", shared_dir.join("logs"));
     });

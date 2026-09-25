@@ -61,7 +61,6 @@ export const REQUEST_METHODS = [
   "lighting.snapshot",
   "settings.get",
   "settings.update",
-  "storage.importLegacyDb",
   "support.backup.export",
   "support.backup.restore",
   "support.backup.verify",

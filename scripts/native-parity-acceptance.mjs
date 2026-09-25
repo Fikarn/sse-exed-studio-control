@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import { assert } from "./native-runtime-harness.mjs";
+import { assert, hardenedLaneEnv, LIVE_CONSOLE } from "./native-runtime-harness.mjs";
 
 // "Parity" here means dev-engine vs packaged-engine parity: this module holds
 // the shared contract assertions that `native-acceptance.mjs` (dev-built
@@ -20,12 +20,18 @@ import { assert } from "./native-runtime-harness.mjs";
 // are written (Phones 2, playback 7/8), and everything is restored in a
 // `finally`. Before this the plain lane pushed test values to the live desk
 // (main volume / dim / mono / talkback, preamp 12 gain + 48V, a solo on the
-// main mix) and left them there.
-export const LIVE_CONSOLE = process.env.SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE === "1";
+// main mix) and left them there. The opt-in is read in
+// native-runtime-harness.mjs, which holds every lane's hardening (new pages
+// program, Slice 2b).
+export { LIVE_CONSOLE };
 
-/** Engine environment for an acceptance run: simulated console unless live. */
-export function acceptanceEngineEnv(extra = {}) {
-  return LIVE_CONSOLE ? { ...extra } : { SSE_AUDIO_SIMULATED_INPUT_MODE: "1", ...extra };
+/**
+ * Engine environment for an acceptance run: the lanes' hardening (a bridge
+ * port of its own, the light outputs held), with the simulated console
+ * unless live.
+ */
+export async function acceptanceEngineEnv(extra = {}) {
+  return { ...(await hardenedLaneEnv({ simulatedAudio: !LIVE_CONSOLE })), ...extra };
 }
 
 function sleep(ms) {
@@ -80,17 +86,21 @@ export async function awaitConsoleLinkQuiet(harness, requestIdPrefix, { timeoutM
 // this contract check opened with until then.
 export const DECK_PAGE_LABELS = ["LIGHTS", "AUDIO"];
 
-// New pages program, Slice 2: the saved data these lanes follow through the
-// import, a restart and a backup's restore is the page the app opens on
-// (`shell.workspace`). Until then it was the imported Planning projects and
-// tasks, which the db.json import no longer reads and schema 8 no longer
-// holds. `commissioning-sample-db.json` opens on Lighting so that its import
-// can be seen: new saved data opens on the Console (`audio`, D1).
-export const IMPORTED_WORKSPACE = "lighting";
+// New pages program, Slices 2 and 2b: the saved data these lanes follow
+// through a restart, an update or reinstall and a backup's restore is the page
+// the app opens on (`shell.workspace`). Until Slice 2 it was the imported
+// Planning projects and tasks, which schema 8 no longer holds; until Slice 2b
+// the page came from a db.json fixture through the import, which is retired.
+// Now a lane saves it through the app's own request on fresh saved data,
+// which opens on the Console (D1), so the seeded page can be seen.
+/** The page new saved data opens on (`DEFAULT_WORKSPACE`, shell_settings.rs). */
+export const NEW_DATA_WORKSPACE = "audio";
+/** The page a lane saves on fresh saved data (`seedSavedWorkspace`). */
+export const SEEDED_WORKSPACE = "lighting";
 /** The page a lane saves after the backup, which the restore must undo. */
 export const MOVED_WORKSPACE = "audio";
 export const SAVED_DATA_MARKER_CHANGED =
-  "New pages program, Slice 2: the saved data followed is the page the app opens on, imported as Lighting from the db.json; until then it was the imported Planning projects and tasks.";
+  "New pages program, Slices 2 and 2b: the saved data followed is the page the app opens on, saved as Lighting through settings.update on fresh saved data (which opens on the Console); until Slice 2b it was imported from a db.json fixture, and until Slice 2 it was the imported Planning projects and tasks.";
 
 /** Backup archive format 5 (new pages program, Slice 2 — D3): no Planning part. */
 export const SUPPORT_BACKUP_FORMAT_VERSION = 5;
@@ -142,6 +152,42 @@ export function assertSavedWorkspace(appSnapshot, expected, runtimeLabel, when) 
     appSnapshot?.shell?.workspace === expected,
     `${runtimeLabel} ${when}: expected the saved page '${expected}', got '${appSnapshot?.shell?.workspace}'.`
   );
+}
+
+/**
+ * Seeds the saved data a lane follows on fresh saved data: the app opens on
+ * the Console, and `settings.update` saves Lighting instead (new pages
+ * program, Slice 2b; until then the page came from a db.json fixture through
+ * the import, which is retired).
+ */
+export async function seedSavedWorkspace(harness, requestIdPrefix, runtimeLabel) {
+  const fresh = await harness.request(`${requestIdPrefix}-app-snapshot-fresh`, "app.snapshot");
+  assertSavedWorkspace(fresh, NEW_DATA_WORKSPACE, runtimeLabel, "on fresh saved data");
+  const seeded = await harness.request(`${requestIdPrefix}-shell-workspace-seeded`, "settings.update", {
+    workspace: SEEDED_WORKSPACE,
+  });
+  assertSavedWorkspace(seeded, SEEDED_WORKSPACE, runtimeLabel, "after settings.update");
+  return seeded;
+}
+
+/**
+ * Publishes the setup on a host without the studio's hardware, the way the
+ * qualification lanes publish: `commissioning.update` to `ready` with the
+ * explicit probe override the hardware link requires while a probe has not
+ * passed (2026-09 audit Slice 8). The installer and delivery lanes published
+ * without it until Slice 2b of the new pages program, which a fresh hardware
+ * link refuses (COMMISSIONING_PROBES_INCOMPLETE).
+ */
+export async function publishWithOverride(harness, requestIdPrefix, runtimeLabel) {
+  const published = await harness.request(`${requestIdPrefix}-commissioning-ready`, "commissioning.update", {
+    stage: "ready",
+    overrideProbes: true,
+  });
+  assert(
+    published.startup?.targetSurface === "dashboard",
+    `${runtimeLabel}: expected the publish to unlock the dashboard, got '${published.startup?.targetSurface}'.`
+  );
+  return published;
 }
 
 /**

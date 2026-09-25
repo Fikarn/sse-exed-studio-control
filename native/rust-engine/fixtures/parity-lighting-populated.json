@@ -1,9 +1,4 @@
 {
-  "schemaVersion": 1,
-  "settings": {
-    "dashboardView": "lighting",
-    "hasCompletedSetup": true
-  },
   "lights": [
     {
       "id": "light-1",
@@ -14,11 +9,6 @@
       "cct": 4400,
       "on": true,
       "order": 0,
-      "red": 0,
-      "green": 0,
-      "blue": 0,
-      "colorMode": "cct",
-      "gmTint": 0,
       "groupId": "group-key",
       "effect": null,
       "spatialX": 0.3,
@@ -34,11 +24,6 @@
       "cct": 4400,
       "on": true,
       "order": 1,
-      "red": 0,
-      "green": 0,
-      "blue": 0,
-      "colorMode": "cct",
-      "gmTint": 0,
       "groupId": "group-key",
       "effect": null,
       "spatialX": 0.7,
@@ -54,11 +39,6 @@
       "cct": 5000,
       "on": true,
       "order": 2,
-      "red": 0,
-      "green": 0,
-      "blue": 0,
-      "colorMode": "cct",
-      "gmTint": 0,
       "groupId": "group-fill",
       "effect": null,
       "spatialX": 0.5,
@@ -74,11 +54,6 @@
       "cct": 5600,
       "on": true,
       "order": 3,
-      "red": 0,
-      "green": 0,
-      "blue": 0,
-      "colorMode": "cct",
-      "gmTint": 0,
       "groupId": "group-background",
       "effect": null,
       "spatialX": 0.5,
@@ -94,11 +69,6 @@
       "cct": 5600,
       "on": true,
       "order": 4,
-      "red": 0,
-      "green": 100,
-      "blue": 200,
-      "colorMode": "rgb",
-      "gmTint": 0,
       "groupId": "group-bars",
       "effect": null,
       "spatialX": 0.2,
@@ -114,11 +84,6 @@
       "cct": 5600,
       "on": true,
       "order": 5,
-      "red": 0,
-      "green": 100,
-      "blue": 200,
-      "colorMode": "rgb",
-      "gmTint": 0,
       "groupId": "group-bars",
       "effect": null,
       "spatialX": 0.4,
@@ -134,11 +99,6 @@
       "cct": 5600,
       "on": true,
       "order": 6,
-      "red": 100,
-      "green": 0,
-      "blue": 150,
-      "colorMode": "rgb",
-      "gmTint": 0,
       "groupId": "group-bars",
       "effect": null,
       "spatialX": 0.6,
@@ -154,11 +114,6 @@
       "cct": 5600,
       "on": true,
       "order": 7,
-      "red": 100,
-      "green": 0,
-      "blue": 150,
-      "colorMode": "rgb",
-      "gmTint": 0,
       "groupId": "group-bars",
       "effect": null,
       "spatialX": 0.8,
@@ -167,299 +122,192 @@
     }
   ],
   "lightGroups": [
-    { "id": "group-key", "name": "Key", "order": 0 },
-    { "id": "group-fill", "name": "Fill", "order": 1 },
-    { "id": "group-background", "name": "Background", "order": 2 },
-    { "id": "group-bars", "name": "Bars", "order": 3 }
+    {
+      "id": "group-key",
+      "name": "Key",
+      "order": 0
+    },
+    {
+      "id": "group-fill",
+      "name": "Fill",
+      "order": 1
+    },
+    {
+      "id": "group-background",
+      "name": "Background",
+      "order": 2
+    },
+    {
+      "id": "group-bars",
+      "name": "Bars",
+      "order": 3
+    }
   ],
   "lightScenes": [
     {
       "id": "scene-1",
       "name": "Interview",
+      "order": 0,
       "lightStates": [
         {
           "lightId": "light-1",
           "intensity": 85,
           "cct": 4400,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-2",
           "intensity": 75,
           "cct": 4400,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-3",
           "intensity": 50,
           "cct": 5000,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-4",
           "intensity": 40,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-5",
           "intensity": 60,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 100,
-          "blue": 200,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-6",
           "intensity": 60,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 100,
-          "blue": 200,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-7",
           "intensity": 50,
           "cct": 5600,
-          "on": true,
-          "red": 100,
-          "green": 0,
-          "blue": 150,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-8",
           "intensity": 50,
           "cct": 5600,
-          "on": true,
-          "red": 100,
-          "green": 0,
-          "blue": 150,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         }
-      ],
-      "createdAt": "2026-04-18T08:00:00.000Z",
-      "order": 0
+      ]
     },
     {
       "id": "scene-2",
       "name": "Product Shot",
+      "order": 1,
       "lightStates": [
         {
           "lightId": "light-1",
           "intensity": 100,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-2",
           "intensity": 100,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-3",
           "intensity": 70,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-4",
           "intensity": 50,
           "cct": 5600,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-5",
           "intensity": 80,
           "cct": 5600,
-          "on": true,
-          "red": 255,
-          "green": 255,
-          "blue": 255,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-6",
           "intensity": 80,
           "cct": 5600,
-          "on": true,
-          "red": 255,
-          "green": 255,
-          "blue": 255,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-7",
           "intensity": 80,
           "cct": 5600,
-          "on": true,
-          "red": 255,
-          "green": 255,
-          "blue": 255,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-8",
           "intensity": 80,
           "cct": 5600,
-          "on": true,
-          "red": 255,
-          "green": 255,
-          "blue": 255,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         }
-      ],
-      "createdAt": "2026-04-18T08:10:00.000Z",
-      "order": 1
+      ]
     },
     {
       "id": "scene-3",
       "name": "Moody",
+      "order": 2,
       "lightStates": [
         {
           "lightId": "light-1",
           "intensity": 60,
           "cct": 3200,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-2",
           "intensity": 0,
           "cct": 3200,
-          "on": false,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": false
         },
         {
           "lightId": "light-3",
           "intensity": 30,
           "cct": 3200,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-4",
           "intensity": 20,
           "cct": 3000,
-          "on": true,
-          "red": 0,
-          "green": 0,
-          "blue": 0,
-          "colorMode": "cct",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-5",
           "intensity": 40,
           "cct": 2000,
-          "on": true,
-          "red": 150,
-          "green": 0,
-          "blue": 200,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-6",
           "intensity": 40,
           "cct": 2000,
-          "on": true,
-          "red": 150,
-          "green": 0,
-          "blue": 200,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-7",
           "intensity": 30,
           "cct": 2000,
-          "on": true,
-          "red": 100,
-          "green": 0,
-          "blue": 150,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         },
         {
           "lightId": "light-8",
           "intensity": 30,
           "cct": 2000,
-          "on": true,
-          "red": 100,
-          "green": 0,
-          "blue": 150,
-          "colorMode": "rgb",
-          "gmTint": 0
+          "on": true
         }
-      ],
-      "createdAt": "2026-04-18T08:20:00.000Z",
-      "order": 2
+      ]
     }
   ],
   "lightingSettings": {
@@ -469,7 +317,15 @@
     "selectedLightId": "light-1",
     "selectedSceneId": "scene-1",
     "grandMaster": 100,
-    "cameraMarker": { "x": 0.5, "y": 0.84, "rotation": 0 },
-    "subjectMarker": { "x": 0.5, "y": 0.46, "rotation": 180 }
+    "cameraMarker": {
+      "x": 0.5,
+      "y": 0.84,
+      "rotation": 0
+    },
+    "subjectMarker": {
+      "x": 0.5,
+      "y": 0.46,
+      "rotation": 180
+    }
   }
 }

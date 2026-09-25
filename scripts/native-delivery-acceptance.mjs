@@ -8,10 +8,18 @@ import {
   assertContinuitySentinel,
   assertSavedWorkspace,
   createContinuitySentinel,
-  IMPORTED_WORKSPACE,
+  publishWithOverride,
   SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import {
+  assert,
+  EngineHarness,
+  hardenedLaneEnv,
+  laneProcessEnv,
+  resolvePathFromRoot,
+} from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
   nativeReleaseRequiresOperatorUiReady,
@@ -21,7 +29,6 @@ import {
 } from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 // New pages program, Slice 2: the sentinel is a lighting group; until then it
@@ -148,12 +155,14 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
   const result = spawnSync(installed.shellPath, installed.commandArgs(smokeStatusPath), {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      ...env,
-      SSE_APP_DATA_DIR: runtime.appDataDir,
-      SSE_LOG_DIR: runtime.logsDir,
-    },
+    env: laneProcessEnv(
+      env,
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+      },
+      { label: `Installed ${installed.label} delivery step '${stepName}'` }
+    ),
   });
 
   emitCapturedOutput(result.stdout, result.stderr, {
@@ -208,8 +217,6 @@ async function main() {
     throw new Error(`native-delivery-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const installerPayloadPath = resolveStagedPayloadPath(target, "installer");
   const updatePayloadPath = resolveStagedPayloadPath(target, "update");
 
@@ -238,18 +245,21 @@ async function main() {
 
   console.log(`Native delivery acceptance root: ${acceptanceRoot}`);
   console.log(SAVED_DATA_MARKER_CHANGED);
-  console.log(
-    "Step 1: install the staged offline-installer payload and import workstation data (its setup flag and page)."
-  );
+  console.log("Step 1: install the staged offline-installer payload and start it on fresh saved data.");
 
   installPayload(installerPayloadPath, installedPayloadPath);
   let installed = resolveInstalledRuntime(target, installedPayloadPath);
-  runInstalledSmoke(installed, acceptanceRoot, runtime, "install-import", "commissioning", {
-    SSE_LEGACY_DB_PATH: fixturePath,
-  });
+  runInstalledSmoke(
+    installed,
+    acceptanceRoot,
+    runtime,
+    "install-first-launch",
+    "commissioning",
+    await hardenedLaneEnv()
+  );
 
   console.log(
-    "Step 2: unlock dashboard and persist an operator sentinel (a lighting group) through the installed runtime."
+    "Step 2: save the page the app opens on, unlock dashboard and persist an operator sentinel (a lighting group) through the installed runtime."
   );
 
   let sentinel;
@@ -259,9 +269,7 @@ async function main() {
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: installed.enginePath,
-    env: {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    env: await hardenedLaneEnv(),
   });
 
   try {
@@ -274,22 +282,13 @@ async function main() {
       initialAppSnapshot.startup?.targetSurface === "commissioning",
       `Expected staged installer payload to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    // The import is seen by the page it wrote: new saved data opens on the
-    // Console, the fixture on Lighting.
-    assertSavedWorkspace(
-      initialAppSnapshot,
-      IMPORTED_WORKSPACE,
-      `Installed ${installed.label} engine`,
-      "after the import"
-    );
+    // The page is seeded through the app's own request: new saved data opens
+    // on the Console, and Lighting is saved instead.
+    await seedSavedWorkspace(firstRun, "delivery-installed", `Installed ${installed.label} engine`);
 
-    const commissioningUpdate = await firstRun.request("delivery-commissioning-ready", "commissioning.update", {
-      stage: "ready",
-    });
-    assert(
-      commissioningUpdate.startup?.targetSurface === "dashboard",
-      `Expected staged installer payload to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-    );
+    // No hardware on this host: the explicit probe override (2026-09 audit
+    // Slice 8), without which a fresh hardware link refuses the publish.
+    await publishWithOverride(firstRun, "delivery-installed", `Installed ${installed.label} engine`);
 
     sentinel = await createContinuitySentinel(
       firstRun,
@@ -314,18 +313,14 @@ async function main() {
 
   installPayload(updatePayloadPath, installedPayloadPath);
   installed = resolveInstalledRuntime(target, installedPayloadPath);
-  runInstalledSmoke(installed, acceptanceRoot, runtime, "update-relaunch", "dashboard", {
-    SSE_DISABLE_AUTO_IMPORT: "1",
-  });
+  runInstalledSmoke(installed, acceptanceRoot, runtime, "update-relaunch", "dashboard", await hardenedLaneEnv());
 
   const secondRun = new EngineHarness({
     rootDir,
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: installed.enginePath,
-    env: {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    env: await hardenedLaneEnv(),
   });
 
   try {
@@ -342,12 +337,7 @@ async function main() {
       updatedAppSnapshot.commissioning?.stage === "ready",
       `Expected staged update payload commissioning stage to remain ready, got '${updatedAppSnapshot.commissioning?.stage}'.`
     );
-    assertSavedWorkspace(
-      updatedAppSnapshot,
-      IMPORTED_WORKSPACE,
-      `Updated ${installed.label} engine`,
-      "after the update"
-    );
+    assertSavedWorkspace(updatedAppSnapshot, SEEDED_WORKSPACE, `Updated ${installed.label} engine`, "after the update");
     await assertContinuitySentinel(
       secondRun,
       "delivery-updated",
@@ -365,18 +355,14 @@ async function main() {
 
   installPayload(installerPayloadPath, installedPayloadPath);
   installed = resolveInstalledRuntime(target, installedPayloadPath);
-  runInstalledSmoke(installed, acceptanceRoot, runtime, "reinstall-relaunch", "dashboard", {
-    SSE_DISABLE_AUTO_IMPORT: "1",
-  });
+  runInstalledSmoke(installed, acceptanceRoot, runtime, "reinstall-relaunch", "dashboard", await hardenedLaneEnv());
 
   const thirdRun = new EngineHarness({
     rootDir,
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: installed.enginePath,
-    env: {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    },
+    env: await hardenedLaneEnv(),
   });
 
   try {
@@ -395,7 +381,7 @@ async function main() {
     );
     assertSavedWorkspace(
       reinstalledAppSnapshot,
-      IMPORTED_WORKSPACE,
+      SEEDED_WORKSPACE,
       `Reinstalled ${installed.label} engine`,
       "after the reinstall"
     );

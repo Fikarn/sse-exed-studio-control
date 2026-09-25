@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import { assert, EngineHarness, laneProcessEnv, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import {
   acceptanceEngineEnv,
   assertAudioWorkflowParity,
@@ -13,9 +13,11 @@ import {
   assertLightingWorkflowParity,
   assertSavedWorkspace,
   awaitConsoleLinkQuiet,
-  IMPORTED_WORKSPACE,
   moveSavedWorkspace,
+  publishWithOverride,
   SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
@@ -26,7 +28,6 @@ import {
 } from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 const qtFontAliasWarningPatterns = [
   /^qt\.qpa\.fonts: Populating font family aliases took .*missing font family "Sans Serif" with one that exists to avoid this cost\.\s*$/,
@@ -128,12 +129,14 @@ function runPackagedSmoke(packaged, acceptanceRoot, runtime, stepName, expectedT
   const result = spawnSync(packaged.shellPath, packaged.commandArgs(smokeStatusPath), {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      ...env,
-      SSE_APP_DATA_DIR: runtime.appDataDir,
-      SSE_LOG_DIR: runtime.logsDir,
-    },
+    env: laneProcessEnv(
+      env,
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+      },
+      { label: `Packaged ${packaged.label} acceptance step '${stepName}'` }
+    ),
   });
 
   emitCapturedOutput(result.stdout, result.stderr, {
@@ -190,8 +193,6 @@ async function main() {
     throw new Error(`native-packaged-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const packaged = resolvePackagedRuntime(target);
   assert(
     existsSync(packaged.shellPath),
@@ -216,29 +217,18 @@ async function main() {
 
   console.log(`Packaged native acceptance root: ${acceptanceRoot}`);
   console.log(SAVED_DATA_MARKER_CHANGED);
-  console.log(
-    "Step 1: import the legacy workstation file (its setup flag and the page it opens on) through the packaged shell."
-  );
-  runPackagedSmoke(
-    packaged,
-    acceptanceRoot,
-    runtime,
-    "import",
-    "commissioning",
-    acceptanceEngineEnv({
-      SSE_LEGACY_DB_PATH: fixturePath,
-    })
-  );
+  console.log("Step 1: start the packaged shell on fresh saved data.");
+  runPackagedSmoke(packaged, acceptanceRoot, runtime, "first-launch", "commissioning", await acceptanceEngineEnv());
 
-  console.log("Step 2: verify imported state and export a backup through the packaged engine.");
+  console.log(
+    "Step 2: save the page the app opens on, publish the setup and export a backup through the packaged engine."
+  );
   const firstRun = new EngineHarness({
     rootDir,
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: packaged.enginePath,
-    env: acceptanceEngineEnv({
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    }),
+    env: await acceptanceEngineEnv(),
   });
 
   let backupPath;
@@ -252,32 +242,20 @@ async function main() {
 
     assert(
       initialAppSnapshot.startup?.targetSurface === "commissioning",
-      `Expected packaged import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+      `Expected packaged fresh saved data to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
     );
-    // The import is seen by the page it wrote: new saved data opens on the
-    // Console, the fixture on Lighting.
-    assertSavedWorkspace(
-      initialAppSnapshot,
-      IMPORTED_WORKSPACE,
-      `Packaged native ${packaged.label} engine`,
-      "after the import"
-    );
+    // The page is seeded through the app's own request: new saved data opens
+    // on the Console, and Lighting is saved instead.
+    await seedSavedWorkspace(firstRun, "packaged-installed", `Packaged native ${packaged.label} engine`);
 
     // No hardware on this host: explicit probe override (2026-09 audit Slice 8).
-    const commissioningUpdate = await firstRun.request("packaged-commissioning-ready", "commissioning.update", {
-      stage: "ready",
-      overrideProbes: true,
-    });
-    assert(
-      commissioningUpdate.startup?.targetSurface === "dashboard",
-      `Expected packaged commissioning update to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-    );
+    await publishWithOverride(firstRun, "packaged-installed", `Packaged native ${packaged.label} engine`);
 
     await awaitConsoleLinkQuiet(firstRun, "packaged-installed-audio-quiet");
     const exportSummary = await firstRun.request("packaged-support-backup-export", "support.backup.export");
     backupPath = exportSummary.path;
     assert(backupPath && existsSync(backupPath), "Expected packaged backup export to create an archive.");
-    assertBackupArchiveWithoutPlanning(exportSummary, IMPORTED_WORKSPACE, `Packaged native ${packaged.label} engine`);
+    assertBackupArchiveWithoutPlanning(exportSummary, SEEDED_WORKSPACE, `Packaged native ${packaged.label} engine`);
   } finally {
     await firstRun.close().catch((error) => {
       throw error;
@@ -285,16 +263,7 @@ async function main() {
   }
 
   console.log("Step 3: relaunch the packaged shell against the same app-data directory.");
-  runPackagedSmoke(
-    packaged,
-    acceptanceRoot,
-    runtime,
-    "restart",
-    "dashboard",
-    acceptanceEngineEnv({
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    })
-  );
+  runPackagedSmoke(packaged, acceptanceRoot, runtime, "restart", "dashboard", await acceptanceEngineEnv());
 
   console.log(
     "Step 4: verify lighting and audio workflow parity, save another page, restore the backup, and verify rollback through the packaged engine."
@@ -304,9 +273,7 @@ async function main() {
     appDataDir: runtime.appDataDir,
     logsDir: runtime.logsDir,
     engineExecutable: packaged.enginePath,
-    env: acceptanceEngineEnv({
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    }),
+    env: await acceptanceEngineEnv(),
   });
 
   try {
@@ -325,7 +292,7 @@ async function main() {
     );
     assertSavedWorkspace(
       restartedAppSnapshot,
-      IMPORTED_WORKSPACE,
+      SEEDED_WORKSPACE,
       `Packaged native ${packaged.label} engine`,
       "after the restart"
     );
@@ -375,7 +342,7 @@ async function main() {
 
     assertSavedWorkspace(
       restoredAppSnapshot,
-      IMPORTED_WORKSPACE,
+      SEEDED_WORKSPACE,
       `Packaged native ${packaged.label} engine`,
       "after the restore"
     );
@@ -478,19 +445,10 @@ async function main() {
   }
 
   console.log("Step 5: relaunch the packaged shell after restore against preserved app data.");
-  runPackagedSmoke(
-    packaged,
-    acceptanceRoot,
-    runtime,
-    "post-restore",
-    "dashboard",
-    acceptanceEngineEnv({
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    })
-  );
+  runPackagedSmoke(packaged, acceptanceRoot, runtime, "post-restore", "dashboard", await acceptanceEngineEnv());
 
   console.log(
-    "Packaged native acceptance passed: import, restart, restore, and relaunch are deterministic (saved page, lighting and audio followed)."
+    "Packaged native acceptance passed: seeding, restart, restore, and relaunch are deterministic (saved page, lighting and audio followed)."
   );
 }
 

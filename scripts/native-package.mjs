@@ -3,6 +3,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, s
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { publishWithOverride } from "./native-parity-acceptance.mjs";
 import {
   nativeReleaseAppIdentifier,
   nativeReleaseRuntimeLabel,
@@ -10,12 +11,12 @@ import {
   nativeReleaseSmokeArgs,
   resolveNativeReleaseRuntime,
 } from "./native-release-runtime.mjs";
+import { EngineHarness, hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = new Set(process.argv.slice(2));
 const smokeTest = args.has("--smoke-test");
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
-const smokeFixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "dashboard-ready-db.json");
 
 function readFlag(name) {
   const prefix = `${name}=`;
@@ -185,19 +186,37 @@ function verifySmokeStatus(smokeStatus, scenario, packaged, statusPath) {
   }
 }
 
+// The `dashboard` scenario's saved data is a published setup, seeded through
+// the packaged hardware link's own request before the shell starts (new pages
+// program, Slice 2b; until then it came from a db.json fixture through the
+// import, which is retired).
+async function seedPublishedSetup(packaged, runtime) {
+  const harness = new EngineHarness({
+    rootDir,
+    appDataDir: runtime.appDataDir,
+    logsDir: runtime.logsDir,
+    engineExecutable: packaged.packagedEnginePath,
+    env: await hardenedLaneEnv(),
+  });
+  try {
+    await harness.start();
+    await publishWithOverride(harness, "package-smoke-seed", `Packaged native ${packaged.label} engine`);
+  } finally {
+    await harness.close();
+  }
+}
+
 function smokeScenarioConfig(name) {
   switch (name) {
     case "dashboard":
       return {
         expectedTarget: "dashboard",
-        env: existsSync(smokeFixturePath) ? { SSE_LEGACY_DB_PATH: smokeFixturePath } : {},
+        seed: seedPublishedSetup,
       };
     case "clean-start":
       return {
         expectedTarget: "commissioning",
-        env: {
-          SSE_DISABLE_AUTO_IMPORT: "1",
-        },
+        seed: null,
       };
     default:
       throw new Error(`Unsupported packaged smoke scenario: ${name}`);
@@ -224,7 +243,6 @@ function packageMacLocal() {
     engineExecutablePath,
     `Native engine executable not found at ${engineExecutablePath}. Run \`npm run native:engine:build\`.`
   );
-  assertExists(smokeFixturePath, `Dashboard-ready smoke fixture not found at ${smokeFixturePath}.`);
 
   rmSync(outputRoot, { force: true, recursive: true });
   mkdirSync(packagedMacOsDir, { recursive: true });
@@ -270,7 +288,6 @@ function packageWindowsLocal() {
     engineExecutablePath,
     `Native engine executable not found at ${engineExecutablePath}. Run \`npm run native:engine:build\`.`
   );
-  assertExists(smokeFixturePath, `Dashboard-ready smoke fixture not found at ${smokeFixturePath}.`);
 
   rmSync(outputRoot, { force: true, recursive: true });
   mkdirSync(packagedDirPath, { recursive: true });
@@ -294,21 +311,31 @@ function packageWindowsLocal() {
   };
 }
 
-function smokePackagedBundle(packaged, scenarioName) {
+async function smokePackagedBundle(packaged, scenarioName) {
   const scenario = smokeScenarioConfig(scenarioName);
   rmSync(packaged.smokeRuntimeDir, { force: true, recursive: true });
   mkdirSync(packaged.smokeRuntimeDir, { recursive: true });
   const smokeStatusPath = path.join(packaged.smokeRuntimeDir, "smoke-status.json");
+  const runtime = {
+    appDataDir: path.join(packaged.smokeRuntimeDir, "app-data"),
+    logsDir: path.join(packaged.smokeRuntimeDir, "logs"),
+  };
+
+  if (scenario.seed) {
+    await scenario.seed(packaged, runtime);
+  }
 
   const commandArgs = nativeReleaseSmokeArgs(packaged.target, packaged.runtime, smokeStatusPath);
   run(packaged.packagedShellPath, commandArgs, {
     captureOutput: true,
-    env: {
-      ...process.env,
-      ...scenario.env,
-      SSE_APP_DATA_DIR: path.join(packaged.smokeRuntimeDir, "app-data"),
-      SSE_LOG_DIR: path.join(packaged.smokeRuntimeDir, "logs"),
-    },
+    env: laneProcessEnv(
+      await hardenedLaneEnv(),
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+      },
+      { label: `Packaged native ${packaged.label} smoke '${scenarioName}'` }
+    ),
   });
 
   const smokeStatus = readSmokeStatus(smokeStatusPath);
@@ -329,5 +356,5 @@ if (targetPlatform === "darwin") {
 console.log(`Native release packaging runtime: ${nativeReleaseRuntimeLabel(releaseRuntime)}.`);
 
 if (smokeTest) {
-  smokePackagedBundle(packaged, readFlag("--scenario") ?? "dashboard");
+  await smokePackagedBundle(packaged, readFlag("--scenario") ?? "dashboard");
 }

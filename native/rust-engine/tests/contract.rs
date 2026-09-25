@@ -205,3 +205,34 @@ fn the_planning_guard_finds_a_method_an_event_and_a_fixture() {
         ]
     );
 }
+
+/// The contract's methods that import a file from outside the saved data:
+/// `storage.importLegacyDb`, the db.json import the new pages program's
+/// Slice 2b retired (D3), or any other `storage.import*`.
+fn import_methods(contract: &Value) -> Vec<String> {
+    contract["methods"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|name| name.starts_with("storage.import"))
+        .map(str::to_string)
+        .collect()
+}
+
+// Slice 2b (D3, 2026-09-25): the db.json import left the contract in protocol
+// 2, and a request for it answers `UNKNOWN_METHOD`. The planted contract
+// proves the guard would find it.
+#[test]
+fn the_contract_has_no_db_json_import() {
+    let contract: Value = serde_json::from_str(CONTRACT_JSON).expect("contract JSON must parse");
+    assert_eq!(import_methods(&contract), Vec::<String>::new());
+
+    let planted = serde_json::json!({
+        "methods": ["engine.ping", "storage.importLegacyDb", "support.backup.restore"],
+    });
+    assert_eq!(
+        import_methods(&planted),
+        vec![String::from("storage.importLegacyDb")]
+    );
+}

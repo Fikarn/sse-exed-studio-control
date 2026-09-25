@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredPaths = [
@@ -224,7 +225,7 @@ async function verifyBootstrapFailure(engineBinaryPath) {
   }
 }
 
-function runScenario({
+async function runScenario({
   appDataDir,
   engineBinaryPath,
   expectFailure = null,
@@ -234,14 +235,21 @@ function runScenario({
   onResponse,
   requestedProtocol,
 }) {
+  // Hardened like every lane (new pages program, Slice 2b): a bridge port of
+  // its own, the light outputs held and the simulated console.
+  const env = laneProcessEnv(
+    {
+      ...(await hardenedLaneEnv()),
+      SSE_APP_DATA_DIR: appDataDir,
+      SSE_LOG_DIR: logsDir,
+      SSE_PROTOCOL_VERSION: requestedProtocol,
+    },
+    {},
+    { label: `Tauri smoke scenario '${label}'` }
+  );
   return new Promise((resolve, reject) => {
     const child = spawn(engineBinaryPath, {
-      env: {
-        ...process.env,
-        SSE_APP_DATA_DIR: appDataDir,
-        SSE_LOG_DIR: logsDir,
-        SSE_PROTOCOL_VERSION: requestedProtocol,
-      },
+      env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

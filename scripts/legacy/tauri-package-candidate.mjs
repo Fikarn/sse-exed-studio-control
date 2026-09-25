@@ -15,12 +15,14 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { publishWithOverride } from "../native-parity-acceptance.mjs";
+import { EngineHarness, hardenedLaneEnv, laneProcessEnv } from "../native-runtime-harness.mjs";
+
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const args = process.argv.slice(2);
 const smokeTest = args.includes("--smoke-test");
 const keepSmokeRuntime = process.env.SSE_TAURI_KEEP_SMOKE_RUNTIME === "1";
-const dashboardFixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "dashboard-ready-db.json");
 
 function readFlag(name) {
   const prefix = `${name}=`;
@@ -278,21 +280,36 @@ function createSmokeRuntime() {
   };
 }
 
+// The `dashboard` scenario's saved data is a published setup, seeded through
+// the packaged hardware link's own request before the shell starts (new pages
+// program, Slice 2b; until then it came from a db.json fixture through the
+// import, which is retired).
+async function seedPublishedSetup(packaged, runtime) {
+  const harness = new EngineHarness({
+    rootDir,
+    appDataDir: runtime.appDataDir,
+    logsDir: runtime.logsDir,
+    engineExecutable: packaged.packagedEnginePath,
+    env: await hardenedLaneEnv(),
+  });
+  try {
+    await harness.start();
+    await publishWithOverride(harness, "tauri-candidate-smoke-seed", `Packaged Tauri ${packaged.label} engine`);
+  } finally {
+    await harness.close();
+  }
+}
+
 function smokeScenarioConfig(name) {
   switch (name) {
     case "dashboard":
-      assertExists(dashboardFixturePath, `Dashboard-ready smoke fixture not found at ${dashboardFixturePath}.`);
       return {
-        env: {
-          SSE_LEGACY_DB_PATH: dashboardFixturePath,
-        },
+        seed: seedPublishedSetup,
         expectedTargetSurface: "dashboard",
       };
     case "clean-start":
       return {
-        env: {
-          SSE_DISABLE_AUTO_IMPORT: "1",
-        },
+        seed: null,
         expectedTargetSurface: "commissioning",
       };
     default:
@@ -300,7 +317,7 @@ function smokeScenarioConfig(name) {
   }
 }
 
-function smokePackagedCandidate(packaged, scenarioName) {
+async function smokePackagedCandidate(packaged, scenarioName) {
   const runtime = createSmokeRuntime();
   const scenario = smokeScenarioConfig(scenarioName);
   mkdirSync(runtime.appDataDir, { recursive: true });
@@ -308,16 +325,22 @@ function smokePackagedCandidate(packaged, scenarioName) {
   mkdirSync(runtime.updateRepoDir, { recursive: true });
   console.log(`Packaged Tauri smoke runtime: ${runtime.root}`);
 
+  if (scenario.seed) {
+    await scenario.seed(packaged, runtime);
+  }
+
   const result = spawnSync(packaged.packagedShellPath, ["--smoke-test", `--smoke-status-path=${runtime.statusPath}`], {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      ...scenario.env,
-      SSE_APP_DATA_DIR: runtime.appDataDir,
-      SSE_LOG_DIR: runtime.logsDir,
-      SSE_UPDATE_REPOSITORY_PATH: runtime.updateRepoDir,
-    },
+    env: laneProcessEnv(
+      await hardenedLaneEnv(),
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+        SSE_UPDATE_REPOSITORY_PATH: runtime.updateRepoDir,
+      },
+      { label: `Packaged Tauri ${packaged.label} smoke '${scenarioName}'` }
+    ),
   });
 
   if (result.stdout) {
@@ -382,6 +405,6 @@ console.log(`Tauri candidate manifest: ${manifestPath}`);
 
 if (smokeTest) {
   for (const scenarioName of readSmokeScenarios()) {
-    smokePackagedCandidate(packaged, scenarioName);
+    await smokePackagedCandidate(packaged, scenarioName);
   }
 }

@@ -1,6 +1,140 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import path from "node:path";
+
+// New pages program, Slice 2b (2026-09-25): the program's hardware-safety
+// rule, held here for every lane instead of by each lane remembering it.
+// Every engine and every shell a lane starts gets a bridge port of its own
+// (never the live app's), holds the light outputs from its first instant
+// (`SSE_SAFE_START`) and runs the simulated console, so no lane can take the
+// studio's Stream Deck port, stream to a lighting bridge or write to a real
+// TotalMix. The one exception is the workstation-only live console lane
+// (`SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1`, native-parity-acceptance.mjs),
+// which keeps the real console and nothing else. Until then only the bridge
+// lane chose its port, only the acceptance engines simulated the console and
+// no lane held the light outputs.
+
+/** The port the live app's Stream Deck bridge holds on the studio workstation. */
+export const LIVE_APP_CONTROL_SURFACE_PORT = 38201;
+
+/** The workstation-only live console lane's opt-in. */
+export const LIVE_CONSOLE = process.env.SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE === "1";
+
+/**
+ * A free localhost port for a lane's bridge: the system hands one out and it
+ * is released again for the engine to bind. Never the live app's port.
+ */
+export async function reserveLocalPort(host = "127.0.0.1") {
+  for (;;) {
+    const port = await new Promise((resolve, reject) => {
+      const server = createServer();
+      server.unref();
+      server.on("error", reject);
+      server.listen(0, host, () => {
+        const address = server.address();
+        if (!address || typeof address === "string") {
+          server.close(() => {
+            reject(new Error("Failed to resolve a dedicated control-surface port for the lane."));
+          });
+          return;
+        }
+
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve(address.port);
+        });
+      });
+    });
+    if (port !== LIVE_APP_CONTROL_SURFACE_PORT) {
+      return port;
+    }
+  }
+}
+
+/**
+ * The variables that harden a process a lane starts: a reserved bridge port,
+ * a safe start and, unless `simulatedAudio` is false (the live console lane
+ * only), the simulated console.
+ */
+export async function hardenedLaneEnv({ simulatedAudio = true } = {}) {
+  return {
+    SSE_CONTROL_SURFACE_PORT: String(await reserveLocalPort()),
+    SSE_SAFE_START: "1",
+    ...(simulatedAudio ? { SSE_AUDIO_SIMULATED_INPUT_MODE: "1" } : {}),
+  };
+}
+
+// The engine's own readings of the three variables (control_surface.rs
+// `resolve_control_surface_port`, bootstrap.rs `safe_start_requested`,
+// audio/helpers.rs `resolve_audio_config`): a port the engine cannot parse
+// falls back to the live app's.
+function bridgePortOf(value) {
+  const text = String(value ?? "").trim();
+  if (!/^\d{1,5}$/.test(text)) {
+    return null;
+  }
+  const port = Number(text);
+  return port >= 1 && port <= 65535 ? port : null;
+}
+
+function safeStartRequested(value) {
+  return !["", "0", "false", "off", "no"].includes(
+    String(value ?? "")
+      .trim()
+      .toLowerCase()
+  );
+}
+
+function simulatedConsoleRequested(value) {
+  return ["1", "true", "TRUE", "yes", "YES"].includes(value);
+}
+
+/**
+ * Why a lane process's environment is not hardened, or null when it is.
+ * `safeStart: false` is for the one launch that proves a hold outlives the
+ * launch that made it (tauri-setup-support-qualification.mjs, step 8).
+ */
+export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSOLE } = {}) {
+  const port = bridgePortOf(env.SSE_CONTROL_SURFACE_PORT);
+  if (port === null) {
+    return `SSE_CONTROL_SURFACE_PORT must name a port of the lane's own (got '${env.SSE_CONTROL_SURFACE_PORT ?? ""}'); without one the bridge takes the live app's ${LIVE_APP_CONTROL_SURFACE_PORT}.`;
+  }
+  if (port === LIVE_APP_CONTROL_SURFACE_PORT) {
+    return `SSE_CONTROL_SURFACE_PORT is ${LIVE_APP_CONTROL_SURFACE_PORT}, the live app's bridge port.`;
+  }
+  if (safeStart && !safeStartRequested(env.SSE_SAFE_START)) {
+    return `SSE_SAFE_START must hold the light outputs (got '${env.SSE_SAFE_START ?? ""}').`;
+  }
+  if (!liveConsole && !simulatedConsoleRequested(env.SSE_AUDIO_SIMULATED_INPUT_MODE)) {
+    return `SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane (got '${env.SSE_AUDIO_SIMULATED_INPUT_MODE ?? ""}').`;
+  }
+  return null;
+}
+
+export function assertHardenedLaneEnv(env, label, options = {}) {
+  const refusal = laneEnvRefusal(env, options);
+  if (refusal) {
+    throw new Error(`${label} was not started: ${refusal}`);
+  }
+}
+
+/**
+ * The environment of a process a lane starts — this process's, then `base`,
+ * then `overrides`, a later layer winning — held to the hardening before
+ * anything is spawned. A lane passes its hardening as `base` and the
+ * scenario's own variables and scratch folders as `overrides`; the harness
+ * passes the folders first and the lane's environment last, as it always did.
+ */
+export function laneProcessEnv(base, overrides = {}, { label = "A lane process", ...options } = {}) {
+  const env = { ...process.env, ...base, ...overrides };
+  assertHardenedLaneEnv(env, label, options);
+  return env;
+}
 
 // The protocol version the engine is asked for is the contract's own.
 export function contractProtocolVersion(rootDir) {
@@ -55,6 +189,17 @@ export class EngineHarness {
   }
 
   async start() {
+    // Refused before anything is looked for or made (new pages program,
+    // Slice 2b): an engine a lane starts is always hardened.
+    const env = laneProcessEnv(
+      {
+        SSE_PROTOCOL_VERSION: contractProtocolVersion(this.rootDir),
+        SSE_APP_DATA_DIR: this.appDataDir,
+        SSE_LOG_DIR: this.logsDir,
+      },
+      this.env,
+      { label: "The lane's engine" }
+    );
     const engineExecutable = this.engineExecutable ?? resolveDebugEngineExecutable(this.rootDir);
     if (!existsSync(engineExecutable)) {
       throw new Error(
@@ -69,13 +214,7 @@ export class EngineHarness {
 
     this.child = spawn(engineExecutable, [], {
       cwd: this.rootDir,
-      env: {
-        ...process.env,
-        SSE_PROTOCOL_VERSION: contractProtocolVersion(this.rootDir),
-        SSE_APP_DATA_DIR: this.appDataDir,
-        SSE_LOG_DIR: this.logsDir,
-        ...this.env,
-      },
+      env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 

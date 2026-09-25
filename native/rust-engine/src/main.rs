@@ -14,7 +14,6 @@ mod engine_events;
 mod exports;
 mod exports_audio;
 mod health;
-mod legacy_import;
 mod lighting;
 mod lighting_backend;
 mod lighting_sacn_output;
