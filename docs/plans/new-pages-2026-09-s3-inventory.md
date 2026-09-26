@@ -15,6 +15,8 @@ The command palette (Ctrl+K) holds 40 kinds of command: 12 from the shell, 19 fr
 
 ## 2. Decisions for you
 
+**Decided 2026-09-26: the operator accepted all twelve recommendations** ("I would like to go with your recommendations").
+
 | #   | Decision                                             | Recommendation                                                                                                    |
 | --- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | 1   | The command palette, and its Studio Preview commands | Drop the palette (D6). Studio Preview opens only from its address, and the app stops remembering it.              |
