@@ -54,7 +54,8 @@ const ARCHIVE_EXTENSION: &str = "json";
 const DATABASE_BACKUP_EXTENSION: &str = "sqlite3";
 /// How the old Studio Control's database export was named: `db.json`, and
 /// the copies kept as `<something>-db.json`. New pages program, Slice 2b
-/// (D3): such a file is refused by name (`is_old_studio_control_export`).
+/// (D3): such a file is refused by name, unless it is a support archive
+/// (`is_old_studio_control_export`).
 const OLD_STUDIO_CONTROL_EXPORT_SUFFIX: &str = "db.json";
 /// The verified database backup a restore copies here, under the app-data
 /// directory; the bootstrap moves it into place at the next start (Slice 7
@@ -552,9 +553,9 @@ struct ArchiveFacts {
 }
 
 fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
-    let raw = fs::read_to_string(path)
-        .map_err(|error| format!("{} could not be read: {error}", path.display()))?;
-    let parsed = parse_support_archive(path, &raw)?;
+    let bytes =
+        fs::read(path).map_err(|error| format!("{} could not be read: {error}", path.display()))?;
+    let parsed = parse_support_archive(path, &bytes)?;
     let format_version = parsed
         .get("formatVersion")
         .and_then(Value::as_i64)
@@ -581,8 +582,17 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
 /// support archive is applied — an export from the old Studio Control is
 /// named as one, and any other JSON is not a backup archive. Until then both
 /// went to the import, and a restore of a stray `{}` reset the setup flag.
-fn parse_support_archive(path: &Path, raw: &str) -> Result<Value, String> {
-    match serde_json::from_str::<Value>(raw) {
+///
+/// 2026-09-25: the file comes as bytes, so one that is not UTF-8 (a db.json
+/// re-saved as UTF-16, say) is told apart the same way as one that is not
+/// JSON. Until then Verify said it "could not be read" and a restore
+/// answered STORAGE_ERROR with the bare io text, before the name was looked
+/// at.
+fn parse_support_archive(path: &Path, bytes: &[u8]) -> Result<Value, String> {
+    let parsed = std::str::from_utf8(bytes)
+        .map_err(|error| error.to_string())
+        .and_then(|raw| serde_json::from_str::<Value>(raw).map_err(|error| error.to_string()));
+    match parsed {
         Ok(parsed) if is_support_archive(&parsed) => Ok(parsed),
         Ok(parsed) if is_old_studio_control_export(path, Some(&parsed)) => {
             Err(old_studio_control_export_sentence(path))
@@ -606,10 +616,13 @@ fn is_support_archive(parsed: &Value) -> bool {
 }
 
 /// An export from the old Studio Control, known by its name (it ends in
-/// `db.json`, as the screen's own check does) or by what it holds (the old
-/// export's `schemaVersion` beside a `projects` list). A support archive is
-/// never taken for one: `parse_support_archive` asks this only of a file
-/// that is not.
+/// `db.json`) or by what it holds (the old export's `schemaVersion` beside a
+/// `projects` list). A support archive is never taken for one:
+/// `parse_support_archive` asks this only of a file that is not. The fixture
+/// double (`setupRequests.ts`) has only the name to go by: it refuses every
+/// name ending in `db.json`, a support archive named so included, and takes
+/// every other listed `.json` for an archive (2026-09-25; this said "as the
+/// screen's own check does", and the screen has no such check).
 fn is_old_studio_control_export(path: &Path, parsed: Option<&Value>) -> bool {
     let named = path
         .file_name()
@@ -722,12 +735,14 @@ fn restore_archive_backup(
             "The saved data could not be opened, so a backup archive cannot be applied to it. Restore a database backup first; an archive can be applied once Studio Control is back.",
         )));
     }
-    let raw = fs::read_to_string(&request.source_path)
+    // STORAGE_ERROR only when the file cannot be read at all; one that is not
+    // UTF-8 is refused below (2026-09-25).
+    let bytes = fs::read(&request.source_path)
         .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
     // Slice 2b (D3): anything but a support archive — an export from the old
     // Studio Control, any other JSON — is refused here, before the rollback
     // archive or anything else is written.
-    let parsed = parse_support_archive(&request.source_path, &raw)
+    let parsed = parse_support_archive(&request.source_path, &bytes)
         .map_err(SupportCommandError::InvalidParams)?;
 
     let format_version = parsed

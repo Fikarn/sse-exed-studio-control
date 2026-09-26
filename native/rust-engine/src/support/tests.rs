@@ -162,6 +162,15 @@ fn write_old_studio_control_export(path: &Path) {
     .expect("the old export should be written");
 }
 
+/// `text` as Windows Notepad's "Unicode" and a PowerShell 5 `>` save it:
+/// UTF-16 LE after the bytes FF FE, which are never UTF-8.
+fn utf16_with_bom(text: &str) -> Vec<u8> {
+    [0xFF, 0xFE]
+        .into_iter()
+        .chain(text.encode_utf16().flat_map(u16::to_le_bytes))
+        .collect()
+}
+
 #[test]
 fn export_support_backup_writes_archive_and_lists_it() {
     let test_dir = TestDir::new("export");
@@ -524,6 +533,15 @@ fn an_old_studio_control_export_is_refused_by_name_and_writes_nothing() {
     fs::write(&named_only, b"{}").expect("the named file should be written");
     let unreadable = runtime.backups_dir.join("broken-db.json");
     fs::write(&unreadable, b"{ not json").expect("the broken file should be written");
+    // 2026-09-25: one re-saved as UTF-16 is not UTF-8, and its name is enough
+    // all the same. Until then Verify said it "could not be read" and a
+    // restore answered STORAGE_ERROR with the bare io text, the name unread.
+    let not_utf8 = runtime.backups_dir.join("x-db.json");
+    fs::write(
+        &not_utf8,
+        utf16_with_bom(r#"{"schemaVersion":9,"projects":[]}"#),
+    )
+    .expect("the UTF-16 file should be written");
 
     let files_before = backup_file_names(&runtime);
     let rows_before = settings_rows(&runtime);
@@ -533,6 +551,7 @@ fn an_old_studio_control_export_is_refused_by_name_and_writes_nothing() {
         (&renamed, "studio-2025-backup.json"),
         (&named_only, "stray-db.json"),
         (&unreadable, "broken-db.json"),
+        (&not_utf8, "x-db.json"),
     ] {
         let sentence = format!(
             "{file_name} is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead."
@@ -607,6 +626,11 @@ fn a_restore_of_json_that_is_not_a_backup_archive_changes_nothing() {
         fs::write(&path, contents).expect("the stray file should be written");
         strays.push(path);
     }
+    // 2026-09-25: a file that is not UTF-8 is not a JSON backup, and is
+    // refused as one (INVALID_PARAMS); a restore answered STORAGE_ERROR until
+    // then, with the bare io text.
+    let not_utf8 = runtime.backups_dir.join("unicode.json");
+    fs::write(&not_utf8, utf16_with_bom("{}")).expect("the UTF-16 file should be written");
 
     let files_before = backup_file_names(&runtime);
     let rows_before = settings_rows(&runtime);
@@ -621,6 +645,19 @@ fn a_restore_of_json_that_is_not_a_backup_archive_changes_nothing() {
         assert!(!checked.ok);
         assert_eq!(checked.detail, sentence);
     }
+    let request = request_for(&runtime, &not_utf8);
+    let refusal = match restore_support_backup(&runtime, &request) {
+        Err(SupportCommandError::InvalidParams(message)) => message,
+        other => panic!("unicode.json: expected INVALID_PARAMS, got {other:?}"),
+    };
+    let prefix = format!("{} is not a JSON backup: ", not_utf8.display());
+    assert!(
+        refusal.starts_with(&prefix) && refusal.contains("utf-8"),
+        "{refusal}"
+    );
+    let checked = verify_support_backup(&request);
+    assert!(!checked.ok);
+    assert_eq!(checked.detail, refusal);
     assert_eq!(
         settings_rows(&runtime),
         rows_before,

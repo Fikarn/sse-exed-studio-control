@@ -243,7 +243,7 @@ Setup / Support lists the newest eight rows of the action log under **Recent act
 - `engine.log` in the logs folder (`SSE_LOG_DIR`, `<app-data>/logs` by default; the Diagnostics keys open it). It rotates at 5 MiB into `engine.log.1` … `engine.log.5`, newest first; the recovery surface and the diagnostics export carry its last 12 lines.
 - `shell.log` beside it keeps everything the hardware link wrote to its standard error stream — the failures before its own log exists, a crash — with the same rotation. A release build has no console, so this file is the only place those lines go.
 - `SSE_ENGINE_LOG_LEVEL` (`DEBUG`, `INFO`, `WARN`, `ERROR`; default `INFO`) sets what the engine writes; `DEBUG` adds one line per request with its timing, for a support session only.
-- A warning at a start, "A db.json at <path> was left alone: Studio Control no longer imports db.json files." (new pages program, Slice 2b), means an old `db.json` is still staged at `<app-data>/import/db.json` or named by `SSE_LEGACY_DB_PATH`. Nothing was read from it and the saved data is as it was; move the file out of the `import` folder, or clear the variable, and the line goes.
+- A warning at a start, "A db.json at <path> was left alone: Studio Control no longer imports db.json files." (new pages program, Slice 2b), means an old `db.json` is still staged at `<app-data>/import/db.json`, or is the file `SSE_LEGACY_DB_PATH` names (a variable naming no file is not mentioned); when both are there the one line names both ("A db.json at <a> and at <b> was left alone: …"). Nothing was read from either and the saved data is as it was; move the file out of the `import` folder, or delete the file or clear the variable, and the line goes.
 
 ### Engine snapshots
 

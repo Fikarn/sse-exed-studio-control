@@ -1,3 +1,7 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { fixtureIds, getFixtureScenario } from "@sse/test-fixtures";
@@ -72,16 +76,51 @@ describe("the fixture double's backup replies", () => {
 // refuses one at Verify (ok: false) and at Restore (INVALID_PARAMS, before anything is
 // written, a rollback archive included), in the words the double uses too. The double
 // recognizes the file by its name; the hardware link reads what is inside.
+//
+// The two sentences the double shares with the hardware link, that refusal and the Support
+// snapshot's restore summary, are read from `support.rs` itself (as actionLog.test.ts reads
+// `action_log.rs`), so a sentence reworded on one side only fails here. The hardware link
+// builds the refusal with `format!` and the file's name; the double's is compared with that
+// format string, the name filled in.
 
-const OLD_EXPORT_REFUSAL =
-  "db.json is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead.";
+const SUPPORT_RS = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../native/rust-engine/src/support.rs"),
+  "utf-8"
+);
+
+/** The plain string literal `pattern` captures in `support.rs`; loud when it is gone or holds an escape. */
+function supportRsString(pattern: RegExp, what: string): string {
+  const literal = SUPPORT_RS.match(pattern)?.[1];
+  if (literal === undefined) {
+    throw new Error(`${what} is not in support.rs any more as one plain string literal; update this test with it`);
+  }
+  return literal;
+}
+
+/** The hardware link's `restoreSummary` (`let restore_summary = String::from("…")` in `support_snapshot`). */
+function hardwareLinkRestoreSummary(): string {
+  return supportRsString(/\blet restore_summary = String::from\(\s*"([^"\\]*)",?\s*\);/, "The restore summary");
+}
+
+/** The hardware link's refusal of an old export: `old_studio_control_export_sentence`'s format string, filled in. */
+function hardwareLinkOldExportRefusal(fileName: string): string {
+  const format = supportRsString(
+    /\bfn old_studio_control_export_sentence\(path: &Path\) -> String \{(?:(?!\r?\n\})[\s\S])*?\bformat!\(\s*"([^"\\]*)"\s*,?\s*\)/,
+    "old_studio_control_export_sentence's format string"
+  );
+  const parts = format.split("{file_name}");
+  if (parts.length !== 2 || /[{}]/.test(parts.join(""))) {
+    throw new Error(`old_studio_control_export_sentence's format string is not "…{file_name}…" any more: ${format}`);
+  }
+  return parts.join(fileName);
+}
 
 /** A set-up-required double whose backups folder holds an export from the old Studio Control. */
-function openDoubleWithOldExport() {
+function openDoubleWithOldExport(fileName = "db.json") {
   const scenario = cloneJson(getFixtureScenario("setup-required") as JsonObject) as FixtureScenario;
   const support = scenario.supportSnapshot as JsonObject;
-  const path = `${String(support.backupDir)}/db.json`;
-  support.backups = [{ kind: "archive", name: "db.json", path, sizeBytes: 2048, modifiedAt: 1776841920000 }];
+  const path = `${String(support.backupDir)}/${fileName}`;
+  support.backups = [{ kind: "archive", name: fileName, path, sizeBytes: 2048, modifiedAt: 1776841920000 }];
   const transport = createFixtureTransport(scenario);
   const events: EventName[] = [];
   transport.subscribe((envelope) => events.push(envelope.event));
@@ -103,7 +142,7 @@ describe("the fixture double and an export from the old Studio Control (db.json)
     expect(listed.map((entry) => entry.path)).toEqual([path]);
 
     const verified = await request("support.backup.verify", { path });
-    expect(verified).toEqual({ detail: OLD_EXPORT_REFUSAL, kind: "archive", ok: false, path });
+    expect(verified).toEqual({ detail: hardwareLinkOldExportRefusal("db.json"), kind: "archive", ok: false, path });
   });
 
   it("refuses to restore it and writes nothing, a rollback backup included", async () => {
@@ -111,7 +150,7 @@ describe("the fixture double and an export from the old Studio Control (db.json)
     const before = await readEverything();
     expect((before[1] as JsonObject).hasCompletedSetup).toBe(false);
 
-    await expect(request("support.backup.restore", { path })).rejects.toThrow(OLD_EXPORT_REFUSAL);
+    await expect(request("support.backup.restore", { path })).rejects.toThrow(hardwareLinkOldExportRefusal("db.json"));
 
     expect(await readEverything()).toEqual(before);
     expect(events).toEqual([]);
@@ -128,13 +167,33 @@ describe("the fixture double and an export from the old Studio Control (db.json)
     }
   });
 
+  it("refuses Verify and Restore in the hardware link's own words, with the file's own name", async () => {
+    const fileName = "studio-control-2024-db.json";
+    const refusal = hardwareLinkOldExportRefusal(fileName);
+    const { request, path } = openDoubleWithOldExport(fileName);
+
+    expect(await request("support.backup.verify", { path })).toEqual({
+      detail: refusal,
+      kind: "archive",
+      ok: false,
+      path,
+    });
+    await expect(request("support.backup.restore", { path })).rejects.toHaveProperty("message", refusal);
+  });
+
   it("gives every scenario the hardware link's restore sentence, which names no db.json", async () => {
-    const hardwareLinkSentence =
-      "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.";
+    const hardwareLinkSentence = hardwareLinkRestoreSummary();
+    expect(hardwareLinkSentence).not.toMatch(/db\.json/);
     for (const id of fixtureIds) {
       const transport = createFixtureTransport(getFixtureScenario(id));
       const support = (await transport.request("support.snapshot", {})) as JsonObject;
       expect(support.restoreSummary, id).toBe(hardwareLinkSentence);
     }
+
+    // A scenario that brings no sentence of its own gets the double's (`state.ts`).
+    const bare = cloneJson(getFixtureScenario("setup-ready") as JsonObject) as FixtureScenario;
+    delete (bare.supportSnapshot as JsonObject).restoreSummary;
+    const support = (await createFixtureTransport(bare).request("support.snapshot", {})) as JsonObject;
+    expect(support.restoreSummary).toBe(hardwareLinkSentence);
   });
 });

@@ -291,10 +291,11 @@ const OLD_STUDIO_CONTROL_EXPORT: &str = r#"{"schemaVersion":8,"projects":[],"set
 // repo-local `data/db.json`, never a source since 2026-09 production
 // readiness, Slice 1 — finding F23) imports none of them: setup stays not
 // completed and the page stays the Console, each file is byte for byte as it
-// was, and the log names the one the retired import would have read, in one
-// warning line. Until the slice such a start imported the variable's file (the
-// staged one without it); these replace `auto_import_ignores_cwd` and
-// `auto_import_reads_the_staged_app_data_file`.
+// was, and the log names the two where the retired import looked, the
+// variable's first, in one warning line (2026-09-25; it named only the
+// variable's until then). Until the slice such a start imported the variable's
+// file (the staged one without it); these replace `auto_import_ignores_cwd`
+// and `auto_import_reads_the_staged_app_data_file`.
 #[test]
 fn a_left_over_db_json_is_named_in_the_log_and_never_imported() {
     let elsewhere = unique_runtime_dir("left-over-db-json-elsewhere");
@@ -355,8 +356,9 @@ fn a_left_over_db_json_is_named_in_the_log_and_never_imported() {
     assert!(lines[0].contains("WARN"), "{}", lines[0]);
     assert!(
         lines[0].ends_with(&format!(
-            "A db.json at {} was left alone: Studio Control no longer imports db.json files.",
-            named.display()
+            "A db.json at {} and at {} was left alone: Studio Control no longer imports db.json files.",
+            named.display(),
+            staged.display()
         )),
         "{}",
         lines[0]

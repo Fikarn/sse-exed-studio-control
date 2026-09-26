@@ -122,9 +122,31 @@ struct ParityLightingSettingsWire {
     #[serde(default, rename = "grandMaster")]
     grand_master: i64,
     #[serde(default, rename = "cameraMarker")]
-    camera_marker: Option<LightingSpatialMarker>,
+    camera_marker: Option<ParitySpatialMarkerWire>,
     #[serde(default, rename = "subjectMarker")]
-    subject_marker: Option<LightingSpatialMarker>,
+    subject_marker: Option<ParitySpatialMarkerWire>,
+}
+
+/// The camera or subject marker. Its own wire struct, so that it refuses a
+/// field it does not read like every other part of the payload: the shared
+/// `LightingSpatialMarker` ignores one, and it stays so, because it also
+/// reads the markers in the saved settings.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ParitySpatialMarkerWire {
+    x: f64,
+    y: f64,
+    rotation: f64,
+}
+
+impl From<ParitySpatialMarkerWire> for LightingSpatialMarker {
+    fn from(marker: ParitySpatialMarkerWire) -> Self {
+        Self {
+            x: marker.x,
+            y: marker.y,
+            rotation: marker.rotation,
+        }
+    }
 }
 
 /// The lighting settings a parity fixture's payload stands for. Slice 2b:
@@ -345,11 +367,21 @@ pub fn parity_lighting_settings(
         ),
         (
             String::from(LIGHTING_CAMERA_MARKER_KEY),
-            serialize_optional_marker(wire.lighting_settings.camera_marker.as_ref())?,
+            serialize_optional_marker(
+                wire.lighting_settings
+                    .camera_marker
+                    .map(LightingSpatialMarker::from)
+                    .as_ref(),
+            )?,
         ),
         (
             String::from(LIGHTING_SUBJECT_MARKER_KEY),
-            serialize_optional_marker(wire.lighting_settings.subject_marker.as_ref())?,
+            serialize_optional_marker(
+                wire.lighting_settings
+                    .subject_marker
+                    .map(LightingSpatialMarker::from)
+                    .as_ref(),
+            )?,
         ),
         (
             String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
@@ -367,15 +399,37 @@ pub fn parity_lighting_settings(
 
 #[cfg(test)]
 mod tests {
-    use super::parity_lighting_settings;
+    use super::{
+        parity_lighting_settings, LIGHTING_CAMERA_MARKER_KEY, LIGHTING_SUBJECT_MARKER_KEY,
+    };
 
     // New pages program, Slice 2b: the bundled payload holds only what the
     // fixture load reads. A field no part of it reads — the old db.json's
     // `schemaVersion` and `settings`, a light's colour, a scene's creation
-    // time — is refused instead of being carried along unread.
+    // time, a marker's height or label — is refused instead of being carried
+    // along unread. A marker that holds only what is read is written as it
+    // was.
     #[test]
     fn a_field_the_payload_reader_does_not_read_is_refused() {
         assert!(parity_lighting_settings(r#"{ "lights": [{ "id": "light-1" }] }"#).is_ok());
+        let updates = parity_lighting_settings(
+            r#"{ "lightingSettings": { "cameraMarker": { "x": 0.5, "y": 0.84, "rotation": 0 }, "subjectMarker": { "x": 0.5, "y": 0.46, "rotation": 180 } } }"#,
+        )
+        .expect("a payload with both markers loads");
+        let written = |key: &str| {
+            updates
+                .iter()
+                .find(|(name, _)| name == key)
+                .and_then(|(_, value)| serde_json::from_str::<serde_json::Value>(value).ok())
+        };
+        assert_eq!(
+            written(LIGHTING_CAMERA_MARKER_KEY),
+            Some(serde_json::json!({ "x": 0.5, "y": 0.84, "rotation": 0.0 }))
+        );
+        assert_eq!(
+            written(LIGHTING_SUBJECT_MARKER_KEY),
+            Some(serde_json::json!({ "x": 0.5, "y": 0.46, "rotation": 180.0 }))
+        );
         for payload in [
             r#"{ "schemaVersion": 1 }"#,
             r#"{ "settings": { "hasCompletedSetup": true } }"#,
@@ -385,6 +439,8 @@ mod tests {
             r#"{ "lightScenes": [{ "id": "scene-1", "lightStates": [{ "lightId": "light-1", "gmTint": 0 }] }] }"#,
             r#"{ "lights": [{ "id": "light-1", "effect": { "type": "pulse", "depth": 3 } }] }"#,
             r#"{ "lightingSettings": { "dmxEnabled": false, "sacnPriority": 100 } }"#,
+            r#"{ "lightingSettings": { "cameraMarker": { "x": 0.5, "y": 0.84, "rotation": 0, "z": 1 } } }"#,
+            r#"{ "lightingSettings": { "subjectMarker": { "x": 0.5, "y": 0.46, "rotation": 180, "label": "Host" } } }"#,
         ] {
             assert!(
                 parity_lighting_settings(payload).is_err(),
