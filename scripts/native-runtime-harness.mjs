@@ -104,14 +104,16 @@ function scratchFolderRefusal(env, name) {
       name === "SSE_LOG_DIR"
         ? "without one the app writes its log inside its app-data folder"
         : `without one the app opens the real app data ('${DEFAULT_APP_DATA_DIR_NAME}' in the platform's app-data folder)`;
-    return `${name} must name an absolute scratch folder of the lane's own (got '${value ?? ""}'); ${fallback}.`;
+    // The refusals name the variable and the rule, never its value: what the
+    // environment holds is not echoed into a log (CodeQL js/clear-text-logging).
+    return `${name} must name an absolute scratch folder of the lane's own; ${fallback}.`;
   }
   // The child's own variables and this process's: a lane that moves APPDATA
   // or HOME still may not point into the real one.
   const real = [...defaultAppDataDirs(env), ...defaultAppDataDirs(process.env)].find((folder) =>
     isSameOrInside(value, folder)
   );
-  return real ? `${name} is ${value}, inside the real app data ${real}.` : null;
+  return real ? `${name} is inside the real app data (the platform's '${DEFAULT_APP_DATA_DIR_NAME}' folder).` : null;
 }
 
 /**
@@ -203,16 +205,16 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
   }
   const port = bridgePortOf(env.SSE_CONTROL_SURFACE_PORT);
   if (port === null) {
-    return `SSE_CONTROL_SURFACE_PORT must name a port of the lane's own (got '${env.SSE_CONTROL_SURFACE_PORT ?? ""}'); without one the bridge takes the live app's ${LIVE_APP_CONTROL_SURFACE_PORT}.`;
+    return `SSE_CONTROL_SURFACE_PORT must name a port of the lane's own; without one the bridge takes the live app's ${LIVE_APP_CONTROL_SURFACE_PORT}.`;
   }
   if (port === LIVE_APP_CONTROL_SURFACE_PORT) {
     return `SSE_CONTROL_SURFACE_PORT is ${LIVE_APP_CONTROL_SURFACE_PORT}, the live app's bridge port.`;
   }
   if (safeStart && !safeStartRequested(env.SSE_SAFE_START)) {
-    return `SSE_SAFE_START must hold the light outputs (got '${env.SSE_SAFE_START ?? ""}').`;
+    return "SSE_SAFE_START must hold the light outputs.";
   }
   if (!liveConsole && !simulatedConsoleRequested(env.SSE_AUDIO_SIMULATED_INPUT_MODE)) {
-    return `SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane (got '${env.SSE_AUDIO_SIMULATED_INPUT_MODE ?? ""}').`;
+    return "SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane.";
   }
   return null;
 }

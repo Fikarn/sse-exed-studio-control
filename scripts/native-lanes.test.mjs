@@ -1497,7 +1497,7 @@ test("a script that does work is imported only by tests and by the entry points 
   // file that names no listed script cannot import one by a path.
   const sameFile = (a, b) => (process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b);
   const namePattern = (script) =>
-    new RegExp(`(?<![\\w-])${path.posix.basename(script, ".mjs").replace(/[.-]/g, "\\$&")}(?![\\w-])`);
+    new RegExp(`(?<![\\w-])${path.posix.basename(script, ".mjs").replace(/[.*+?^${}()|[\]\\-]/g, "\\$&")}(?![\\w-])`);
   const importers = new Map(DESTRUCTIVE_SCRIPTS.map((script) => [script, []]));
   for (const file of sourceFiles()) {
     const source = readFileSync(path.join(repoRoot, file), "utf8");
