@@ -6,7 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // key instead; Escape or `timeoutMs` disarms. Only one key is armed at a time
 // and a held key never repeats into an apply. The numbers are the Console's
 // (350 ms dwell, 4.5 s window); the Console keeps its own `useAudioArming`
-// until Slice 4 moves it onto this hook.
+// until Slice 4 moves it onto this hook. New pages program, Slice 3 (D6): Esc
+// is plain keyboard operation and stays — the window listener below lives
+// only while a key is armed — but nothing on screen advertises it any more.
 
 export const ARM_DWELL_MS = 350;
 export const ARM_TIMEOUT_MS = 4500;

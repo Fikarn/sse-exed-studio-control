@@ -23,16 +23,16 @@ export interface ScrubLabelProps {
   /** Min / max clamps. */
   min?: number;
   max?: number;
-  /** Step per pixel of horizontal drag at the default modifier (Logic Pro
-   *  convention is ~0.1 unit per px). Defaults to 0.1. */
+  /** Value per pixel of horizontal drag (Logic Pro convention is ~0.1 unit per
+   *  px). Defaults to 0.1. */
   pixelsPerStep?: number;
   /** Snap step. Defaults to the same as `pixelsPerStep`. */
   step?: number;
-  /** Reset target. Double-click (the 360ms time-based guard) and Backspace/Delete
-   *  when focused reset to this value — mirrors ScrubSlider/AudioKnob. Because the
-   *  paired `<input>`, not the label, owns typed entry, the label has no
-   *  typed-entry gesture to reserve, so a bare double-click resets (matching
-   *  ScrubSlider's no-typed-entry fallback). Unset = no reset gesture. */
+  /** Reset target. A plain double-click (the 360ms time-based guard) resets to
+   *  this value. Because the paired `<input>`, not the label, owns typed entry,
+   *  the label has no typed-entry gesture to reserve, so a plain double-click
+   *  resets (matching ScrubSlider's no-typed-entry fallback). Unset = no reset
+   *  gesture. */
   resetValue?: number;
   /** Disabled state. */
   disabled?: boolean;
@@ -56,15 +56,6 @@ interface DragState {
   startValue: number;
 }
 
-function modifierFactor(event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }): number {
-  // CONTROLS-01: align to the Audio fader contract — Cmd/Ctrl = ×0.1 FINE
-  // (was inverted vs Audio). Mirrors the ScrubSlider flip so the two scrub
-  // primitives agree.
-  if (event.metaKey || event.ctrlKey) return 0.1;
-  if (event.shiftKey) return 10;
-  return 1;
-}
-
 function clampValue(value: number, min: number | undefined, max: number | undefined): number {
   if (min !== undefined && value < min) return min;
   if (max !== undefined && value > max) return max;
@@ -84,15 +75,17 @@ const DEFAULT_FORMAT = (value: number): string => String(value);
  * the value while still allowing keyboard editing of the input itself.
  *
  * CONTROLS-06: exposes `role="slider"` with arrow / Home / End / PageUp-Down
- * keyboard nudges (raw step — fine/coarse stay a pointer-only affordance,
- * mirroring `ScrubSlider`, which avoids a snap-grid no-op). The paired input
- * remains the typed-entry surface; give the slider a distinct `ariaLabel` so
- * the two announce as separate affordances rather than double-reading the value.
+ * keyboard nudges (raw step, so the result always lands on the snap grid). The
+ * paired input remains the typed-entry surface; give the slider a distinct
+ * `ariaLabel` so the two announce as separate affordances rather than
+ * double-reading the value.
  *
- * Modifiers (mid-drag): Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
+ * New pages program, Slice 3 (decisions 8–10): no key held while dragging
+ * changes the scrub rate, and no key reads Shift, Ctrl or Alt — the fine and
+ * coarse scrubs and the Backspace / Delete reset are gone.
  *
- * Reset (LGS-06, when `resetValue` is set): double-click the label (360ms guard)
- * or press Backspace/Delete while it is focused — mirrors ScrubSlider/AudioKnob.
+ * Reset (LGS-06, when `resetValue` is set): a plain double-click on the label
+ * (360ms guard), or type the value in the paired input.
  *
  * Pair with a matching `<input>` inside a plain wrapper — NOT a `<label>`, since
  * a focusable `role="slider"` is interactive content and must not live inside a
@@ -189,8 +182,7 @@ export function ScrubLabel({
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
       const dx = event.clientX - drag.startClientX;
-      const factor = modifierFactor(event);
-      const next = clampValue(snapToStep(drag.startValue + dx * pixelsPerStep * factor, effectiveStep), min, max);
+      const next = clampValue(snapToStep(drag.startValue + dx * pixelsPerStep, effectiveStep), min, max);
       if (next !== value) scheduleChange(next);
     },
     [effectiveStep, max, min, pixelsPerStep, scheduleChange, value]
@@ -215,21 +207,15 @@ export function ScrubLabel({
     [onChange, onCommit, value]
   );
 
-  // Keyboard nudge mirrors ScrubSlider: RAW step (no fine/coarse modifier), so
-  // the result always lands on the snap grid. onCommit fires per committed key
-  // like finishDrag does on pointerup.
+  // Keyboard nudge mirrors ScrubSlider (decision 9): the arrows move one RAW
+  // step, Page Up / Page Down ten, Home and End go to the ends, so the result
+  // always lands on the snap grid; nothing reads Shift, Ctrl or Alt. onCommit
+  // fires per committed key like finishDrag does on pointerup.
   const onKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLSpanElement>) => {
       if (disabled) return;
       let next: number;
       switch (event.key) {
-        case "Backspace":
-        case "Delete":
-          // Reset to default (mirrors ScrubSlider/AudioKnob). Falls through to the
-          // shared clamp/snap + commit tail below.
-          if (resetValue === undefined) return;
-          next = resetValue;
-          break;
         case "ArrowLeft":
         case "ArrowDown":
           next = value - effectiveStep;
@@ -262,7 +248,7 @@ export function ScrubLabel({
         onCommit?.(next);
       }
     },
-    [disabled, effectiveStep, max, min, onChange, onCommit, resetValue, value]
+    [disabled, effectiveStep, max, min, onChange, onCommit, value]
   );
 
   return (

@@ -21,7 +21,7 @@ export type { DrawerProps } from "./components/Drawer";
 export { ShellRegion, useShellRegion } from "./components/shellRegions";
 export type { ShellRegionElements, ShellRegionName, ShellRegionProps } from "./components/shellRegions";
 export { Footer } from "./components/Footer";
-export type { FooterHint, FooterItem, FooterProps } from "./components/Footer";
+export type { FooterItem, FooterProps } from "./components/Footer";
 export { Lamp } from "./components/Lamp";
 export type { LampProps, LampTone } from "./components/Lamp";
 export { LampChip } from "./components/LampChip";
@@ -43,8 +43,6 @@ export type {
 } from "./components/DenseRows";
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
-export { CommandPalette } from "./components/CommandPalette";
-export type { CommandPaletteProps, PaletteAction } from "./components/CommandPalette";
 export { ConfirmDialog } from "./components/ConfirmDialog";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
 export { NumberEntryDialog } from "./components/NumberEntryDialog";
@@ -65,13 +63,7 @@ export type {
   LoadingStateProps,
 } from "./components/OperationalState";
 export { HealthBar, HealthItem } from "./components/HealthBar";
-export type {
-  HealthBarHint,
-  HealthBarItemData,
-  HealthBarProps,
-  HealthBarVariant,
-  HealthItemProps,
-} from "./components/HealthBar";
+export type { HealthBarItemData, HealthBarProps, HealthBarVariant, HealthItemProps } from "./components/HealthBar";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
 export { InlineRename } from "./components/InlineRename";
@@ -91,7 +83,7 @@ export type { PlotPillProps, PlotPillState } from "./components/PlotPill";
 export { ScrubLabel } from "./components/ScrubLabel";
 export type { ScrubLabelProps } from "./components/ScrubLabel";
 export { ScrubSlider } from "./components/ScrubSlider";
-export type { ScrubModifier, ScrubSliderProps } from "./components/ScrubSlider";
+export type { ScrubSliderProps } from "./components/ScrubSlider";
 export { MultiValueSlider, parseDeltaExpression } from "./components/MultiValueSlider";
 export type { MultiValueSliderProps } from "./components/MultiValueSlider";
 export { SegmentedControl } from "./components/SegmentedControl";

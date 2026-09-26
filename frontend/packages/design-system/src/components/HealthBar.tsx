@@ -15,51 +15,28 @@ export interface HealthBarItemData {
   icon?: ReactNode;
 }
 
-export interface HealthBarHint {
-  kbd: string;
-  label: string;
-  /** Render the `kbd` chip *after* the label instead of before (used by the
-   *  caption variant for paired shortcuts like "Bank next ]"). */
-  kbdAfter?: boolean;
-}
-
 export type HealthBarVariant = "full" | "caption";
 
+// New pages program, Slice 3 (D6): the retired bar keeps its items and its
+// actions slot; the key hints it could print are gone with the keys.
 export interface HealthBarProps {
   items: readonly HealthBarItemData[];
-  /** One or more keyboard-shortcut discoverability hints rendered after the
-   *  health items. Multiple hints separate with thin spacing. */
-  hints?: readonly HealthBarHint[];
-  /** Optional trailing slot for clickable controls (e.g. visibility toggles).
-   *  Hints are read-only by design; use `actions` when an interactive control
-   *  belongs in the bar. Renders right of the hint group. */
+  /** Optional trailing slot for clickable controls (e.g. visibility toggles),
+   *  at the bar's right edge. */
   actions?: ReactNode;
   className?: string;
   /** `full` (default) — the 64px rich-item status bar (Lighting, Setup).
-   *  `caption` — the thin telemetry+shortcut footer strip (Audio). The two
-   *  share the `--hb-*` theming hooks; the caption variant renders a
-   *  `<footer>` element. */
+   *  `caption` — the thin telemetry footer strip (Audio). The two share the
+   *  `--hb-*` theming hooks; the caption variant renders a `<footer>`
+   *  element. */
   variant?: HealthBarVariant;
   /** data-testid forwarded to the root element. */
   testId?: string;
   /** data-testid forwarded to the items/telemetry container. */
   itemsTestId?: string;
-  /** data-testid forwarded to the hints/shortcuts container. */
-  hintsTestId?: string;
 }
 
-export const HealthBar = ({
-  items,
-  hints,
-  actions,
-  className,
-  variant = "full",
-  testId,
-  itemsTestId,
-  hintsTestId,
-}: HealthBarProps) => {
-  const allHints: readonly HealthBarHint[] = hints ?? [];
-
+export const HealthBar = ({ items, actions, className, variant = "full", testId, itemsTestId }: HealthBarProps) => {
   if (variant === "caption") {
     const classes = [styles.caption, className].filter(Boolean).join(" ");
     return (
@@ -75,25 +52,6 @@ export const HealthBar = ({
             </div>
           ))}
         </div>
-        {allHints.length > 0 ? (
-          <div className={styles.captionShortcuts} data-testid={hintsTestId}>
-            {allHints.map((entry, idx) => (
-              <span key={`${entry.kbd}:${idx}`} className={styles.captionShortcut}>
-                {entry.kbdAfter ? (
-                  <>
-                    {entry.label}
-                    <kbd>{entry.kbd}</kbd>
-                  </>
-                ) : (
-                  <>
-                    <kbd>{entry.kbd}</kbd>
-                    {entry.label}
-                  </>
-                )}
-              </span>
-            ))}
-          </div>
-        ) : null}
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </footer>
     );
@@ -113,16 +71,6 @@ export const HealthBar = ({
           last={idx === items.length - 1}
         />
       ))}
-      {allHints.length > 0 ? (
-        <div className={styles.hintGroup} data-testid={hintsTestId}>
-          {allHints.map((entry, idx) => (
-            <div key={`${entry.kbd}:${idx}`} className={styles.hint}>
-              <kbd className={styles.kbd}>{entry.kbd}</kbd>
-              <span>{entry.label}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
   );

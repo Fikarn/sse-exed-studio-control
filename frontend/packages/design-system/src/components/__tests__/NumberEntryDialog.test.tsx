@@ -84,4 +84,113 @@ describe("NumberEntryDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  // New pages program, Slice 3 (decision 8): with the Backspace / Delete /
+  // Alt+double-click resets gone, the typed-entry dialog carries the way back
+  // to a control's default as a key of its own.
+  describe("the Reset key", () => {
+    it("shows only when the control has a default", () => {
+      render(
+        <NumberEntryDialog
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.queryByRole("button", { name: /^Reset to/ })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Cancel", "Set value"]);
+    });
+
+    it("names the default with its unit and confirms exactly that value", () => {
+      const onConfirm = vi.fn();
+      const onCancel = vi.fn();
+      render(
+        <NumberEntryDialog
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          resetValue={0}
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      );
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      // It sits beside Cancel and Set value, in the dialog's own key row.
+      expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+        "Reset to 0 dB",
+        "Cancel",
+        "Set value",
+      ]);
+      // The typed draft does not matter: Reset confirms the default.
+      fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "37" } });
+      fireEvent.click(reset);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalledWith(0);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("reads a percentage default and takes a label of its own", () => {
+      const { unmount } = render(
+        <NumberEntryDialog
+          title="Set Fixture intensity"
+          fieldLabel="Intensity"
+          initialValue={40}
+          min={0}
+          max={100}
+          suffix="%"
+          resetValue={100}
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.getByRole("button", { name: "Reset to 100 %" })).toBeInTheDocument();
+      unmount();
+
+      render(
+        <NumberEntryDialog
+          title="Set Host send"
+          fieldLabel="Send"
+          initialValue={-12}
+          min={-65}
+          max={6}
+          suffix="dB"
+          resetValue={0}
+          resetLabel="unity"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.getByRole("button", { name: "Reset to unity" })).toBeInTheDocument();
+    });
+
+    it("is disabled while a commit is in flight", () => {
+      const onConfirm = vi.fn();
+      render(
+        <NumberEntryDialog
+          busy
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          resetValue={0}
+          onConfirm={onConfirm}
+          onCancel={() => {}}
+        />
+      );
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      expect(reset).toBeDisabled();
+      fireEvent.click(reset);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+  });
 });

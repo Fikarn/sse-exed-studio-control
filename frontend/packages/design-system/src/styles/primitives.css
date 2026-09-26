@@ -33,7 +33,6 @@ p {
 }
 
 code,
-kbd,
 pre {
   font-family: var(--font-family-mono);
 }

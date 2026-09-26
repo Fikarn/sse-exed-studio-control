@@ -18,8 +18,16 @@ export interface NumberEntryDialogProps {
   min: number;
   /** Fired on Escape / Cancel / backdrop dismiss. */
   onCancel: () => void;
-  /** Fired with the snapped, clamped value on confirm. */
+  /** Fired with the snapped, clamped value on confirm, and with `resetValue`
+   *  when the Reset key is pressed. */
   onConfirm: (value: number) => void;
+  /** The control's default. When given, a "Reset to <label>" key sits beside
+   *  Cancel and Set value and confirms this value (new pages program, Slice 3,
+   *  decision 8: the one way back to a default once the reset keys went). */
+  resetValue?: number;
+  /** What the Reset key names after "Reset to"; defaults to the value and the
+   *  suffix (`0 dB`, `100 %`). */
+  resetLabel?: string;
   /** Field step. Typed values snap to it. Defaults to 1. */
   step?: number;
   /** Optional unit shown after the field (e.g. "%", "K", "dB"). */
@@ -33,6 +41,7 @@ export interface NumberEntryDialogProps {
  * (the consumer owns the open state; see ScrubSlider / AudioSliderControl
  * `onRequestNumericValue`). Snaps + clamps the typed value to the field's step
  * before confirming, so an integer-step field never emits a fractional value.
+ * With `resetValue` it also offers "Reset to <default>".
  *
  * Styled on global DS tokens, so it themes correctly anywhere it portals
  * (the DS `Dialog` portals to `document.body`, outside any workspace shell).
@@ -46,6 +55,8 @@ export function NumberEntryDialog({
   min,
   onCancel,
   onConfirm,
+  resetLabel,
+  resetValue,
   step = 1,
   suffix,
   title,
@@ -74,12 +85,19 @@ export function NumberEntryDialog({
     onConfirm(commitValue);
   };
 
+  const resetName = resetLabel ?? `${resetValue}${suffix ? ` ${suffix}` : ""}`;
+
   return (
     <Dialog
       title={title}
       onClose={onCancel}
       actions={
         <>
+          {resetValue !== undefined ? (
+            <Button onClick={() => onConfirm(resetValue)} disabled={busy} size="compact">
+              {`Reset to ${resetName}`}
+            </Button>
+          ) : null}
           <Button onClick={onCancel} disabled={busy} variant="ghost" size="compact">
             Cancel
           </Button>

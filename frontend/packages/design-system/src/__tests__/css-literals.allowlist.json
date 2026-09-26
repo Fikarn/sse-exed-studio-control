@@ -62,66 +62,42 @@
   "app/src/app/audio/components/AudioSliderControl.module.css": {
     "colour": 12,
     "fontSize": 0,
-    "radius": 7,
+    "radius": 1,
     "shadow": 9
   },
   "app/src/app/audio/components/AudioStereoMeter.module.css": {
     "colour": 5,
     "fontSize": 0,
-    "radius": 2,
+    "radius": 0,
     "shadow": 5
-  },
-  "app/src/app/audio/components/AudioTieredMixer.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 1,
-    "shadow": 0
   },
   "app/src/app/lighting/LightingWorkspace.module.css": {
     "colour": 0,
-    "fontSize": 3,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/ColumnResizer.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/DMXCompactStrip.module.css": {
-    "colour": 0,
-    "fontSize": 4,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/DMXMonitorDialog.module.css": {
-    "colour": 0,
-    "fontSize": 3,
+    "fontSize": 2,
     "radius": 0,
     "shadow": 0
   },
   "app/src/app/lighting/components/LightingInspector.module.css": {
-    "colour": 2,
-    "fontSize": 43,
-    "radius": 5,
+    "colour": 1,
+    "fontSize": 15,
+    "radius": 3,
     "shadow": 1
   },
   "app/src/app/lighting/components/LightingRail.module.css": {
     "colour": 5,
-    "fontSize": 21,
-    "radius": 6,
+    "fontSize": 8,
+    "radius": 5,
     "shadow": 6
   },
   "app/src/app/lighting/components/RenameDialog.module.css": {
     "colour": 0,
-    "fontSize": 4,
+    "fontSize": 2,
     "radius": 0,
     "shadow": 2
   },
   "app/src/app/lighting/components/SelectionChipStrip.module.css": {
     "colour": 0,
-    "fontSize": 2,
+    "fontSize": 0,
     "radius": 1,
     "shadow": 0
   },
@@ -137,22 +113,16 @@
     "radius": 1,
     "shadow": 3
   },
-  "app/src/app/shared/ShortcutOverlay.module.css": {
-    "colour": 0,
-    "fontSize": 7,
-    "radius": 0,
-    "shadow": 0
-  },
   "packages/design-system/src/components/ChipStrip.module.css": {
     "colour": 1,
-    "fontSize": 2,
-    "radius": 2,
+    "fontSize": 0,
+    "radius": 1,
     "shadow": 0
   },
   "packages/design-system/src/components/ColorPicker.module.css": {
     "colour": 5,
     "fontSize": 0,
-    "radius": 2,
+    "radius": 0,
     "shadow": 3
   },
   "packages/design-system/src/components/ContextMenu.module.css": {
@@ -162,12 +132,6 @@
     "shadow": 0
   },
   "packages/design-system/src/components/HealthBar.module.css": {
-    "colour": 0,
-    "fontSize": 3,
-    "radius": 0,
-    "shadow": 0
-  },
-  "packages/design-system/src/components/IconButton.module.css": {
     "colour": 0,
     "fontSize": 1,
     "radius": 0,
@@ -181,14 +145,14 @@
   },
   "packages/design-system/src/components/MultiValueSlider.module.css": {
     "colour": 0,
-    "fontSize": 1,
+    "fontSize": 0,
     "radius": 0,
     "shadow": 1
   },
   "packages/design-system/src/components/NavItem.module.css": {
     "colour": 0,
     "fontSize": 1,
-    "radius": 1,
+    "radius": 0,
     "shadow": 0
   },
   "packages/design-system/src/components/NumberEntryDialog.module.css": {
@@ -196,12 +160,6 @@
     "fontSize": 0,
     "radius": 0,
     "shadow": 1
-  },
-  "packages/design-system/src/components/PlotMeta.module.css": {
-    "colour": 0,
-    "fontSize": 1,
-    "radius": 0,
-    "shadow": 0
   },
   "packages/design-system/src/components/PlotPill.module.css": {
     "colour": 0,
@@ -211,14 +169,14 @@
   },
   "packages/design-system/src/components/ScrubSlider.module.css": {
     "colour": 0,
-    "fontSize": 2,
+    "fontSize": 0,
     "radius": 3,
     "shadow": 0
   },
   "packages/design-system/src/components/SegmentedControl.module.css": {
     "colour": 1,
     "fontSize": 0,
-    "radius": 1,
+    "radius": 0,
     "shadow": 0
   },
   "packages/design-system/src/components/StatusDot.module.css": {
@@ -229,19 +187,13 @@
   },
   "packages/design-system/src/components/StatusPill.module.css": {
     "colour": 0,
-    "fontSize": 1,
+    "fontSize": 0,
     "radius": 2,
     "shadow": 1
   },
   "packages/design-system/src/components/Surface.module.css": {
     "colour": 8,
     "fontSize": 0,
-    "radius": 0,
-    "shadow": 0
-  },
-  "packages/design-system/src/components/Tooltip.module.css": {
-    "colour": 0,
-    "fontSize": 1,
     "radius": 0,
     "shadow": 0
   }

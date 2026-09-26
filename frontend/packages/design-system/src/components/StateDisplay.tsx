@@ -13,7 +13,7 @@ export type StateDisplayTone = "ok" | "attention" | "error" | "info";
 export interface StateDisplayArmed {
   /** The armed word, mono (`ARMED`). */
   word?: string;
-  /** What is armed and how to apply (`Recall Interview block · press again to apply · Esc cancels`). */
+  /** What is armed and how to apply (`Recall Interview block · press again to apply`). */
   text: ReactNode;
   /** Seconds left, printed mono (`3.9 s`). */
   secondsLeft?: number;

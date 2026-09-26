@@ -6,10 +6,11 @@ import { ScrubLabel } from "../ScrubLabel";
 // CONTROLS-06 (Slice 8b): ScrubLabel was a pointer-only role=presentation
 // affordance; it is now a real role=slider with arrow / Home / End / PageUp-Down
 // keyboard nudges. These tests lock the ARIA contract + the RAW-step keyboard
-// behaviour (fine/coarse stay pointer-only, mirroring ScrubSlider) so a future
-// edit can't silently reintroduce the snap-grid no-op / float-drift bug or
-// regress the accessible-name distinction that keeps it from double-announcing
-// against its paired <input>.
+// behaviour so a future edit can't silently reintroduce the snap-grid no-op /
+// float-drift bug or regress the accessible-name distinction that keeps it from
+// double-announcing against its paired <input>. New pages program, Slice 3
+// (decisions 8–10): no key held while scrubbing changes the rate, and
+// Backspace / Delete no longer reset.
 
 describe("ScrubLabel", () => {
   it("exposes the role=slider ARIA contract from its props", () => {
@@ -67,7 +68,7 @@ describe("ScrubLabel", () => {
     expect(onCommit).toHaveBeenCalled();
   });
 
-  it("ignores fine/coarse modifiers on the keyboard (raw step only)", () => {
+  it("moves one raw step on an arrow whatever modifier is held", () => {
     const onChange = vi.fn();
     render(
       <ScrubLabel value={5} min={0} max={10} step={1} ariaLabel="Stage X" onChange={onChange}>
@@ -75,10 +76,48 @@ describe("ScrubLabel", () => {
       </ScrubLabel>
     );
     const slider = screen.getByRole("slider", { name: "Stage X" });
-    fireEvent.keyDown(slider, { key: "ArrowRight", metaKey: true });
+    fireEvent.keyDown(slider, { key: "ArrowRight", ctrlKey: true });
     expect(onChange).toHaveBeenLastCalledWith(6); // not a ×0.1 fine nudge
     fireEvent.keyDown(slider, { key: "ArrowRight", shiftKey: true });
     expect(onChange).toHaveBeenLastCalledWith(6); // not a ×10 coarse nudge
+    fireEvent.keyDown(slider, { key: "ArrowLeft", altKey: true });
+    expect(onChange).toHaveBeenLastCalledWith(4);
+  });
+
+  // Decision 10: Shift (×10) and Ctrl (×0.1) held while scrubbing used to
+  // change the rate; the scrub now moves `pixelsPerStep` per pixel whatever is
+  // held.
+  it.each([
+    ["Shift", { shiftKey: true }],
+    ["Ctrl", { ctrlKey: true }],
+  ] as const)("scrubs at the plain rate with %s held", (_name, held) => {
+    const onCommit = vi.fn();
+    render(
+      <ScrubLabel
+        value={5}
+        min={0}
+        max={100}
+        step={0.1}
+        pixelsPerStep={0.1}
+        ariaLabel="Stage X"
+        onChange={() => {}}
+        onCommit={onCommit}
+      >
+        Stage X (m)
+      </ScrubLabel>
+    );
+    const slider = screen.getByRole("slider", { name: "Stage X" });
+    slider.setPointerCapture = () => {};
+    slider.releasePointerCapture = () => {};
+    const Ctor = window.PointerEvent ?? MouseEvent;
+    const send = (type: string, init: Record<string, unknown>) =>
+      slider.dispatchEvent(new Ctor(type, { bubbles: true, cancelable: true, button: 0, ...init }));
+    send("pointerdown", { clientX: 0 });
+    send("pointermove", { clientX: 10, ...held });
+    send("pointerup", { clientX: 10, ...held });
+    // 10 px × 0.1 per px = +1, snapped to the 0.1 grid.
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0]![0]).toBeCloseTo(6, 10);
   });
 
   it("is inert and untabbable when disabled", () => {
@@ -112,15 +151,16 @@ describe("ScrubLabel", () => {
     );
   });
 
-  // LGS-06 (Slice 9c): resetValue — double-click (timed 360ms guard, two
-  // pointerdowns; event.detail is 0 on pointerdown so it can't be used) and
-  // Backspace/Delete reset to the default, mirroring ScrubSlider/AudioKnob.
+  // LGS-06 (Slice 9c): resetValue — a plain double-click (timed 360ms guard,
+  // two pointerdowns; event.detail is 0 on pointerdown so it can't be used)
+  // resets to the default. New pages program, Slice 3 (decision 8):
+  // Backspace / Delete no longer reset.
   function pointerDown(slider: HTMLElement) {
     const Ctor = window.PointerEvent ?? MouseEvent;
     slider.dispatchEvent(new Ctor("pointerdown", { bubbles: true, cancelable: true, button: 0 }));
   }
 
-  it("resets to resetValue on Backspace and Delete", () => {
+  it("does nothing on Backspace and Delete, even with a reset target", () => {
     const onChange = vi.fn();
     const onCommit = vi.fn();
     render(
@@ -139,24 +179,9 @@ describe("ScrubLabel", () => {
     );
     const slider = screen.getByRole("slider", { name: "Stage X" });
     fireEvent.keyDown(slider, { key: "Backspace" });
-    expect(onChange).toHaveBeenLastCalledWith(0);
-    expect(onCommit).toHaveBeenLastCalledWith(0);
-    onChange.mockClear();
-    fireEvent.keyDown(slider, { key: "Delete" });
-    expect(onChange).toHaveBeenLastCalledWith(0);
-  });
-
-  it("ignores Backspace/Delete when no resetValue is wired", () => {
-    const onChange = vi.fn();
-    render(
-      <ScrubLabel value={5} min={0} max={10} step={1} ariaLabel="Stage X" onChange={onChange}>
-        Stage X (m)
-      </ScrubLabel>
-    );
-    const slider = screen.getByRole("slider", { name: "Stage X" });
-    fireEvent.keyDown(slider, { key: "Backspace" });
     fireEvent.keyDown(slider, { key: "Delete" });
     expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   it("resets on a timed double-click (two pointerdowns within 360ms)", () => {

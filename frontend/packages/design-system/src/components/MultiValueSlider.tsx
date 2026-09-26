@@ -13,14 +13,14 @@ export interface MultiValueSliderProps {
   max: number;
   step?: number;
   /** Called whenever the user shifts via slider drag, types a delta
-   *  expression, or resets (Alt+double-click / Backspace / Delete). Returns the
+   *  expression, or resets (a plain double-click on the slider). Returns the
    *  per-value array with the same length and order as `values`. */
   onValuesChange: (next: number[]) => void;
   /** Optional commit callback (debounce-friendly). Receives the same array
    *  shape as `onValuesChange`. */
   onValuesCommit?: (next: number[]) => void;
-  /** Reset target. Alt+double-click — or Backspace/Delete when focused — resets
-   *  ALL values to this (inherited from ScrubSlider). */
+  /** Reset target. A plain double-click on the slider resets ALL values to
+   *  this (inherited from ScrubSlider, which has no typed entry here). */
   resetValue?: number;
   /** Disabled state. */
   disabled?: boolean;

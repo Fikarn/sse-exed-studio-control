@@ -12,8 +12,6 @@ import {
 
 import styles from "./ScrubSlider.module.css";
 
-export type ScrubModifier = "fine" | "coarse" | "default";
-
 export interface ScrubSliderProps {
   /** Required label for screen readers + the optional inline label slot. */
   ariaLabel: string;
@@ -32,9 +30,11 @@ export interface ScrubSliderProps {
   /** Fires once when the user finishes a continuous interaction (pointerup,
    *  blur, Enter). Use for debounced/expensive commits. */
   onCommit?: (next: number) => void;
-  /** Reset target. Alt+double-click — and Backspace/Delete when focused — reset
-   *  value to this and fire onChange + onCommit. Defaults disabled. (Bare
-   *  double-click is reserved for typed entry; see onRequestNumericValue.) */
+  /** Reset target. A plain double-click resets the value to this and fires
+   *  onChange + onCommit — only when no typed entry is wired, because a plain
+   *  double-click opens typed entry then (see onRequestNumericValue; the
+   *  consumer's typed-entry dialog carries the Reset key instead). Defaults
+   *  disabled. */
   resetValue?: number;
   /** When provided, a bare double-click (or Enter when focused) requests typed
    *  numeric entry. The consumer owns the dialog and commits via onChange/
@@ -62,26 +62,6 @@ export interface ScrubSliderProps {
 
 const DEFAULT_FORMAT = (value: number) => String(Math.round(value));
 
-function modifierForEvent(event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }): ScrubModifier {
-  // CONTROLS-01: align to the Audio fader contract — Cmd/Ctrl = FINE adjust
-  // (the modifier was previously inverted vs Audio: Cmd/Ctrl gave coarse). Shift
-  // keeps a coarse affordance, which Audio's linear fader does not contradict.
-  if (event.metaKey || event.ctrlKey) return "fine";
-  if (event.shiftKey) return "coarse";
-  return "default";
-}
-
-function modifierFactor(modifier: ScrubModifier): number {
-  switch (modifier) {
-    case "fine":
-      return 0.1;
-    case "coarse":
-      return 10;
-    default:
-      return 1;
-  }
-}
-
 function snapToStep(value: number, step: number, min: number): number {
   if (step <= 0) return value;
   return Math.round((value - min) / step) * step + min;
@@ -100,16 +80,20 @@ interface DragState {
 
 /**
  * Continuous numeric slider with pointer + keyboard input. Replaces native
- * `<input type="range">` with custom track + thumb so we can intercept the
- * pointer-delta calculation and apply fine/coarse modifiers. Matches the Audio
- * fader contract: Cmd/Ctrl = ×0.1 fine, Shift = ×10 coarse, plain = ×1.
+ * `<input type="range">` with custom track + thumb so the pointer-delta
+ * calculation stays ours: a drag moves the value by the distance travelled
+ * across the track.
  *
- * Gesture map (mirrors AudioSliderControl + AudioKnob): bare double-click / Enter
- * open typed numeric entry when `onRequestNumericValue` is wired (else bare
- * double-click falls back to reset); Alt+double-click and Backspace/Delete reset
- * to `resetValue`. Keyboard nudges retain native semantics (arrows, Home/End,
- * PageUp/Down). ARIA shape mirrors `role="slider"` requirements so screen readers
- * announce the value range + current value text.
+ * Gesture map: a plain double-click or Enter opens typed numeric entry when
+ * `onRequestNumericValue` is wired (else a plain double-click falls back to
+ * resetting to `resetValue`). A focused slider takes the arrows (one step),
+ * Page Up / Page Down (ten steps), Home and End (min, max) and nothing else. New
+ * pages program, Slice 3 (decisions 8–10): no key is held while pointing and no
+ * key is read with Shift, Ctrl or Alt — the fine and coarse drags, the reset on
+ * a double-click with Alt held and the Backspace / Delete reset are gone; the
+ * consumer's typed-entry dialog carries "Reset to <default>" instead. ARIA shape
+ * mirrors `role="slider"` requirements so screen readers announce the value
+ * range + current value text.
  */
 export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function ScrubSlider(
   {
@@ -168,13 +152,12 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
   const fillPercent = max > min ? ((clampValue(value, min, max) - min) / (max - min)) * 100 : 0;
 
   const updateFromClientX = useCallback(
-    (clientX: number, modifier: ScrubModifier) => {
+    (clientX: number) => {
       const drag = dragRef.current;
       if (!drag) return;
-      const factor = modifierFactor(modifier);
       const dx = clientX - drag.startClientX;
       const range = max - min;
-      const valueDelta = drag.trackWidthPx > 0 ? (dx / drag.trackWidthPx) * range * factor : 0;
+      const valueDelta = drag.trackWidthPx > 0 ? (dx / drag.trackWidthPx) * range : 0;
       const next = clampValue(snapToStep(drag.startValue + valueDelta, step, min), min, max);
       if (next !== value) scheduleChange(next);
     },
@@ -205,16 +188,11 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (disabled || event.button !== 0) return;
       // Double-tap gesture map (mirrors AudioSliderControl's 360ms guard): on the
-      // SECOND tap, before click-to-jump, Alt+double-click resets; bare
-      // double-click opens typed entry when wired, otherwise falls back to reset.
+      // SECOND tap, before click-to-jump, a plain double-click opens typed entry
+      // when wired, otherwise falls back to reset.
       const now = performance.now();
       if (now - lastPointerDownAtRef.current <= 360) {
         lastPointerDownAtRef.current = Number.NEGATIVE_INFINITY;
-        if (event.altKey) {
-          event.preventDefault();
-          resetToValue();
-          return;
-        }
         if (onRequestNumericValue) {
           event.preventDefault();
           requestNumericEntry();
@@ -253,7 +231,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const drag = dragRef.current;
       if (!drag || drag.pointerId !== event.pointerId) return;
-      updateFromClientX(event.clientX, modifierForEvent(event));
+      updateFromClientX(event.clientX);
     },
     [updateFromClientX]
   );
@@ -280,6 +258,9 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
     [onChange, onCommit, value]
   );
 
+  // A focused slider's keys (decision 9): Enter presses it (typed entry), the
+  // arrows move one step, Page Up / Page Down ten, Home and End go to the ends.
+  // No key reads Shift, Ctrl or Alt: a modified arrow moves one plain step.
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (disabled) return;
@@ -293,13 +274,6 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
             requestNumericEntry();
           }
           return;
-        case "Backspace":
-        case "Delete":
-          // Reset to default (mirrors AudioKnob). Falls through to the shared
-          // clamp/snap + commit tail below.
-          if (resetValue === undefined) return;
-          next = resetValue;
-          break;
         case "ArrowLeft":
         case "ArrowDown":
           next = value - step;
@@ -330,7 +304,7 @@ export const ScrubSlider = forwardRef<HTMLDivElement, ScrubSliderProps>(function
         onCommit?.(next);
       }
     },
-    [disabled, max, min, onChange, onCommit, onRequestNumericValue, requestNumericEntry, resetValue, step, value]
+    [disabled, max, min, onChange, onCommit, onRequestNumericValue, requestNumericEntry, step, value]
   );
 
   // Release the captured pointer if the component unmounts mid-drag — keeps

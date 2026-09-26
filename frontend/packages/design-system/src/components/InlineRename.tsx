@@ -41,8 +41,8 @@ export interface InlineRenameProps {
 }
 
 export interface InlineRenameHandle {
-  /** Open the editor programmatically. Used by external pencil buttons or
-   *  keyboard shortcuts (F2). No-op while disabled or already editing. */
+  /** Open the editor programmatically. Used by external Rename keys and
+   *  right-click menu items. No-op while disabled or already editing. */
   beginEdit: () => void;
 }
 
