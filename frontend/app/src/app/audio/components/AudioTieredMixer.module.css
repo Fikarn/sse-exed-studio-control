@@ -80,6 +80,23 @@
   flex: none;
 }
 
+/* New pages program, Slice 3 (decision 3): the Inputs heading's Previous bank
+   and Next bank keys (the design system's 24 px icon buttons). They never
+   shrink, and the heading that carries them centres its line instead of
+   aligning baselines, so the 24 px keys and the 24 px chips both fill the
+   24 px head without being cut at the top or the bottom. */
+.tierBankKeys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.tierLabel[data-bank-keys],
+.tierLabel[data-bank-keys] .tierHeaderLead {
+  align-items: center;
+}
+
 .tierDetail {
   font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   color: var(--text-text2);

@@ -1,15 +1,17 @@
-import { useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState } from "react";
 import { Key, NumberEntryDialog } from "@sse/design-system";
 
 import styles from "./AudioStripGainKey.module.css";
 import { PREAMP_GAIN_DEFAULT_DB, PREAMP_GAIN_MAX_DB } from "../audioConstants";
 
 // Visual overhaul A, Slice 4b (system §7 "Strip"): preamp gain on the strip is
-// a key that prints what the desk reports and opens typed entry when pressed;
-// the arrows nudge it a whole dB at a time (Shift five). Riding the gain by
-// hand stays on the plate's knob, where there is room for a control that
-// answers a drag. The engine rejects fractional gain, so every value the key
-// sends is a whole dB.
+// a key that prints what the desk reports and opens typed entry when pressed.
+// Riding the gain by hand stays on the plate's knob, where there is room for a
+// control that answers a drag and the arrows. The engine rejects fractional
+// gain, so every value the key sends is a whole dB.
+// New pages program, Slice 3 (decisions 8 and 9): the key is a button, so the
+// arrows (and Shift for five), Home / End and Backspace / Delete no longer
+// nudge or reset it; typed entry offers "Reset to 24 dB" instead.
 export interface AudioStripGainKeyProps {
   channelId: string;
   disabled?: boolean;
@@ -37,41 +39,10 @@ export function AudioStripGainKey({
   const [dialogOpen, setDialogOpen] = useState(false);
   const current = clampGain(gain);
 
-  const nudge = (next: number) => {
+  const commit = (next: number) => {
     const value = clampGain(next);
     onPreview(value);
     onCommit(value);
-  };
-
-  const onKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    const step = event.shiftKey ? 5 : 1;
-    switch (event.key) {
-      case "ArrowUp":
-      case "ArrowRight":
-        event.preventDefault();
-        nudge(current + step);
-        return;
-      case "ArrowDown":
-      case "ArrowLeft":
-        event.preventDefault();
-        nudge(current - step);
-        return;
-      case "Home":
-        event.preventDefault();
-        nudge(0);
-        return;
-      case "End":
-        event.preventDefault();
-        nudge(PREAMP_GAIN_MAX_DB);
-        return;
-      case "Backspace":
-      case "Delete":
-        event.preventDefault();
-        nudge(PREAMP_GAIN_DEFAULT_DB);
-        return;
-      default:
-    }
   };
 
   return (
@@ -87,12 +58,11 @@ export function AudioStripGainKey({
         take
         testId={`audio-lane-gain-${channelId}`}
         aria-label={label}
-        title={`${label} — press to type a value, arrows to nudge`}
+        title={`${label} — press to type a value`}
         onClick={(event) => {
           event.stopPropagation();
           if (!disabled) setDialogOpen(true);
         }}
-        onKeyDown={onKeyDown}
       >
         {current} dB
       </Key>
@@ -105,8 +75,9 @@ export function AudioStripGainKey({
           onCancel={() => setDialogOpen(false)}
           onConfirm={(next) => {
             setDialogOpen(false);
-            nudge(next);
+            commit(next);
           }}
+          resetValue={PREAMP_GAIN_DEFAULT_DB}
           step={1}
           suffix="dB"
           title={`Set ${label}`}

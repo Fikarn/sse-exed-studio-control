@@ -15,8 +15,11 @@ import { FADER_MAX_DB, FADER_OFF_DB } from "@sse/engine-client";
 // Visual overhaul A, Slice 4b (system §7, "Strip"): the strip's fader is the
 // design system's groove — the 44 px target column the cap rides in, the 18 px
 // slot, the unity notch — and this wrapper keeps what the desk expects of it:
-// unity by Shift, typed entry by double-click or Enter, and the dB the engine
-// speaks translated to and from the groove's 0..1 travel.
+// a drag that settles on unity near 0 dB, typed entry by double-click or Enter,
+// and the dB the engine speaks translated to and from the groove's 0..1 travel.
+// New pages program, Slice 3 (decisions 8 and 10): Shift+click to unity went;
+// typed entry's "Reset to 0 dB" and the strip's right-click "Reset to unity"
+// put the fader back on unity.
 export function AudioFader({
   disabled = false,
   label,
@@ -67,6 +70,8 @@ export function AudioFader({
             onPreview?.(faderDbToNormalized(nextDb));
             onCommit(faderDbToNormalized(nextDb));
           }}
+          // Unity: 0 dB lands exactly on AUDIO_FADER_UNITY (faderDbToLin).
+          resetValue={0}
           step={0.1}
           suffix="dB"
           title={`Set ${label}`}

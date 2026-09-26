@@ -45,6 +45,11 @@ export interface UseAudioArmingResult {
  * before kicking off an async store call. Direct callers should always use
  * the canonical `armOrApplyAction` + `cancelArmedAction` pair so the toast is
  * raised consistently.
+ *
+ * Esc cancels the arm (new pages program, Slice 3 — D6 keeps Esc on an armed
+ * action). The hook listens for it only while something is armed, as the
+ * design system's `useArm` does; it used to live in the Console's page-wide
+ * key handler, which went with the keyboard shortcuts.
  */
 export function useAudioArming({
   now = () => performance.now(),
@@ -109,6 +114,22 @@ export function useAudioArming({
     setFeedback({ message: "Armed audio action canceled.", tone: "info" });
     return true;
   });
+
+  // Why: Esc cancels an armed 48 V change, snapshot recall or snapshot save.
+  // Registered only while something is armed, so an idle Console binds no key.
+  // An Esc a dialog or a menu already took (`defaultPrevented`, or stopped
+  // before it reached the window) closes that and leaves the arm alone, as the
+  // old page-wide handler did.
+  const armed = armedAction !== null;
+  useEffect(() => {
+    if (!armed) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (cancelArmedAction()) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [armed, cancelArmedAction]);
 
   const clearArmedAction = useLiveCallback(() => {
     setArmedAction(null);

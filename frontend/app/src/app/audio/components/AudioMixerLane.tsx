@@ -195,7 +195,7 @@ export function AudioChannelLane({
       </div>
 
       <div className={styles.stripKeys}>
-        <Tooltip content={`Mute ${channel.name} (M)`}>
+        <Tooltip content={`Mute ${channel.name}`}>
           <Key
             mode="toggle"
             cap="M"
@@ -214,7 +214,7 @@ export function AudioChannelLane({
             }}
           />
         </Tooltip>
-        <Tooltip content={`Solo ${channel.name} (S)`}>
+        <Tooltip content={`Solo ${channel.name}`}>
           <Key
             mode="toggle"
             cap="S"

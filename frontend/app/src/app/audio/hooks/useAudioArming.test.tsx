@@ -6,7 +6,7 @@ import { useAudioArming } from "./useAudioArming";
 
 // 2026-09 audit remediation, Slice 7: arm-then-apply needs a minimum dwell.
 // Before this the second activation applied no matter how soon it came, so a
-// double-click on 48V or a bounced Shift+digit armed and applied in one go.
+// double-click on 48V or a bounced key press armed and applied in one go.
 
 const candidate = {
   key: "phantom:audio-input-9:true",
@@ -94,5 +94,58 @@ describe("useAudioArming dwell", () => {
   it("pins the dwell inside the arm window", () => {
     expect(AUDIO_ARM_MIN_DWELL_MS).toBe(350);
     expect(AUDIO_ARM_MIN_DWELL_MS).toBeLessThan(AUDIO_ARM_TIMEOUT_MS);
+  });
+});
+
+// New pages program, Slice 3 (D6): Esc still cancels an armed action. It used
+// to be one branch of the Console's page-wide key handler, which went with the
+// keyboard shortcuts; the arm hook listens for it now, and only while armed.
+describe("useAudioArming Esc", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  function pressEscape(init: KeyboardEventInit = {}) {
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape", ...init });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    return event;
+  }
+
+  it("cancels an armed action and says so", () => {
+    const { apply, hook, setFeedback, trigger } = setup();
+    trigger();
+    expect(hook.result.current.armedAction?.key).toBe(candidate.key);
+
+    const escape = pressEscape();
+    expect(hook.result.current.armedAction).toBeNull();
+    expect(escape.defaultPrevented).toBe(true);
+    expect(setFeedback).toHaveBeenLastCalledWith({ message: "Armed audio action canceled.", tone: "info" });
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("binds nothing while nothing is armed", () => {
+    const { setFeedback } = setup();
+    const escape = pressEscape();
+    expect(escape.defaultPrevented).toBe(false);
+    expect(setFeedback).not.toHaveBeenCalled();
+  });
+
+  it("leaves the arm alone when a dialog already took the Esc", () => {
+    const { hook, setFeedback, trigger } = setup();
+    trigger();
+    const dialogEscape = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Escape" });
+    dialogEscape.preventDefault();
+    act(() => {
+      window.dispatchEvent(dialogEscape);
+    });
+    expect(hook.result.current.armedAction?.key).toBe(candidate.key);
+    expect(setFeedback).toHaveBeenCalledTimes(1);
   });
 });

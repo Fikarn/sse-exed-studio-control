@@ -11,9 +11,9 @@
  * the engine source.
  */
 
-// Why: arm-then-apply safety window for 48V, snapshot recall, snapshot
-// overwrite, palette recall, and shortcut recall. After this window the armed
-// candidate clears and the operator must arm again.
+// Why: arm-then-apply safety window for 48V, snapshot recall and snapshot
+// overwrite. After this window the armed candidate clears and the operator
+// must arm again.
 // Source: previously inline at AudioWorkspace.tsx:103.
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
@@ -101,8 +101,9 @@ export const AUDIO_DRAFT_CLEAR_MS = 250;
 // Source: previously inline at AudioPreampControl.tsx:98,116,163,164.
 export const PREAMP_GAIN_MAX_DB = 75;
 
-// Why: default preamp gain in dB — the reset target for Backspace/Delete on the
-// preamp surfaces (inspector hero AudioKnob + channel-strip AudioStripPreamp).
+// Why: default preamp gain in dB — what typed entry's Reset key sets on the
+// preamp surfaces (the plate's AudioKnob and the strip's AudioStripGainKey;
+// new pages program, Slice 3, decision 8 — it used to be Backspace/Delete).
 // Consolidated so both surfaces reset to the same value (C13 preamp unification).
 // Source: previously inline at AudioInspectorChannelHardwareCard.tsx:32.
 export const PREAMP_GAIN_DEFAULT_DB = 24;

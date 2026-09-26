@@ -21,15 +21,22 @@ test.describe("audio formatting unification", () => {
   });
 });
 
-test("tier bank pill renders the tier description on bank 1 and is testid-addressable", async ({ page }) => {
-  // The audio-populated fixture has only one bank per tier, so the rendered
-  // pill collapses to `tier.meta`. The implementation extends the pill with
-  // a channel-range fragment on bank 2+; we assert the testid wiring so any
-  // future multi-bank fixture surfaces the range without extra plumbing.
+test("tier bank pill prints the Inputs bank and the Playback description, and is testid-addressable", async ({
+  page,
+}) => {
+  // New pages program, Slice 3. The audio-populated fixture has three input
+  // banks (12 inputs, 4 a bank at 2560, Line 1–8 on banks 2 and 3), which the
+  // Inputs heading's bank keys page (audio-onscreen-twins.spec.ts); that
+  // heading prints the bank and the channel range on every bank, bank 1
+  // included, and the Playback heading its description (`tier.meta`) until it
+  // is paged. Old title: "renders the tier description on bank 1"; old
+  // comment: the fixture "has only one bank per tier" — wrong (the S3
+  // inventory, decision 3).
   await openFixture(page, "audio-populated");
   const pill = page.getByTestId("audio-tier-bank-pill-hardware-inputs");
   await expect(pill).toBeVisible();
-  await expect(pill).toContainText(/ch/);
+  await expect(pill).toHaveText("Bank 1 / 3 · ch 1-4 of 12");
+  await expect(page.getByTestId("audio-tier-bank-pill-software-playback")).toContainText("post · stereo pairs");
 });
 
 test("the footer carries the console link, the metering source, the last sync and the bank", async ({ page }) => {
@@ -98,6 +105,8 @@ test("mute / solo buttons carry design-system tooltips", async ({ page }) => {
   // The Tooltip primitive wraps the trigger inside <span class="wrapper"><span
   // class="trigger">…</span><span role="tooltip">…</span></span>. Assert
   // the role="tooltip" sibling exists and carries the expected text.
+  // New pages program, Slice 3 (D6). Old: "Mute Host (M)". New: "Mute Host".
+  // Reason: the M key went, and its hint with it.
   const tooltip = muteButton.locator('xpath=ancestor::span[1]/following-sibling::*[@role="tooltip"]').first();
-  await expect(tooltip).toHaveText(/Mute Host \(M\)/);
+  await expect(tooltip).toHaveText("Mute Host");
 });

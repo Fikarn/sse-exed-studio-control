@@ -31,17 +31,21 @@ import {
   readRequiredBox,
 } from "./helpers/geometry";
 import { expectDbfsScaleLabelsInsideMeters } from "./helpers/meter-canvas";
-import { modifierShortcut } from "./helpers/modifier-shortcut";
 import { expectWorkspaceMounted, fixtureMap, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
 // plan PR 4 / workstream D4: audio workspace specs split out of
 // operator-shell.spec.ts. Covers rendering, meters, snapshots, EQ +
-// dynamics, hardware preamps, command palette, layout, and the pure-logic
+// dynamics, hardware preamps, layout, and the pure-logic
 // formatter/view-model assertions. Describe-block organization
 // (snapshots / meters / EQ-dynamics / hardware-preamp) is a follow-up
 // once D3 has migrated the pure-logic cases out to Vitest.
 // Production readiness S15: the metering cases moved to audio-metering.spec.ts.
+// New pages program, Slice 3 (D6): the Console binds no key of its own. The
+// cases that drove it by key now click the control that does the same; the
+// palette cases went with the palette; the on-screen controls S3 added (the
+// bank keys, the plain-click chips, typed entry's Reset key) and the keys a
+// focused fader keeps are in audio-onscreen-twins.spec.ts.
 
 test("renders the audio workspace from an engine-backed snapshot and supports key desk actions", async ({ page }) => {
   test.slow();
@@ -115,14 +119,13 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // OSC / Metering live in the AudioTopBar stat cluster (no testid on the
   // cluster itself yet; assert via topbar text).
   await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Command palette");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Shortcuts");
-  // Old: "Bank prev" / "Bank next" as two hints; the A footer prints one
-  // `[ ] Bank` hint pair and the talkback hold (system §2).
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Bank");
-  await expect(page.getByTestId("audio-footer-shortcuts")).toContainText("Hold to talk");
-  await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Shift 1-8 recall");
-  await expect(page.getByTestId("audio-footer-shortcuts")).not.toContainText("Esc clear");
+  // New pages program, Slice 3 (D6). Old: the footer's hint slot printed
+  // "Command palette", "Shortcuts", the `[ ] Bank` pair and "Hold to talk".
+  // New: the footer has no hint slot. Reason: every key those hints named is
+  // gone; the bank is paged with the keys on the Inputs heading, and the
+  // "Bank" readout stays in the telemetry (checked above).
+  await expect(page.getByTestId("audio-footer-shortcuts")).toHaveCount(0);
+  await expect(page.getByTestId("audio-health-bar").locator("kbd")).toHaveCount(0);
   // 2026-05-27 redesign: monitor controls moved from the rail card to the
   // new AudioMonitorBar (footer). The master-meter dB readout is on
   // `audio-monitor-master-meter`; assert visibility of the bar itself.
@@ -215,21 +218,29 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-output").getByRole("button", { name: "PFL" })).toHaveCount(0);
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
 
-  await page.keyboard.press("BracketRight");
-  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
+  // New pages program, Slice 3 (D6, decision 3). Old: `]` paged to bank 2, `1`
+  // selected its first strip, `M` muted it and Shift+3 armed then recalled
+  // snapshot 3. New: the Inputs heading's Next bank key, a click on the strip,
+  // a click on its M key and two presses of snapshot key 3. Reason: the Console
+  // binds no key of its own; each of these is the on-screen control that did
+  // the same thing all along (the bank key is new with this slice).
+  await page.getByTestId("audio-bank-next").click();
+  await expect(page.getByTestId("audio-footer-telemetry")).toContainText("2 of 3");
 
-  await page.keyboard.press("Digit1");
   const selectedStrip = page.getByTestId("audio-strip-audio-input-1");
+  // On the strip's name, clear of its fader, which a click mid-strip would move.
+  await selectedStrip.click({ position: { x: 12, y: 12 } });
   await expect(selectedStrip).toHaveAttribute("data-selected", "true");
 
-  await page.keyboard.press("KeyM");
+  await selectedStrip.getByRole("button", { name: /Mute/ }).click();
   await expect(selectedStrip.getByRole("button", { name: /Mute/ })).toHaveAttribute("data-active", "true");
   await expect(selectedStrip.getByRole("button", { name: /Mute/ })).toHaveAttribute("aria-pressed", "true");
 
-  await page.keyboard.press("Shift+Digit3");
+  const interviewRecall = page.getByTestId("audio-snapshot-recall-snapshot-interview-block");
+  await interviewRecall.click();
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
   await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // the confirm must come after the arm dwell (Slice 7)
-  await page.keyboard.press("Shift+Digit3");
+  await interviewRecall.click();
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
 
@@ -295,35 +306,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await preFader.click();
   await expect(preFader).toHaveAttribute("data-active", "true");
 
-  // Visual overhaul A, Slice 4c. Old: E/D/R/P switched the plate's tabs and the
-  // test read `aria-selected` / `aria-keyshortcuts`. New: the same keys bring
-  // the section into view, and the test reads where the plate is scrolled to.
-  // Reason: with every section present there is nothing to select — the keys
-  // take the operator to the part of the plate they want.
-  const plateSectionAtTop = async () => {
-    return page.evaluate(() => {
-      const plate = document.querySelector('[data-testid="audio-inspector"]');
-      if (!plate) return null;
-      const top = plate.getBoundingClientRect().top;
-      let best: { id: string; delta: number } | null = null;
-      for (const section of plate.querySelectorAll<HTMLElement>("[data-plate-section]")) {
-        const delta = Math.abs(section.getBoundingClientRect().top - top);
-        if (!best || delta < best.delta) best = { id: section.dataset.plateSection ?? "", delta };
-      }
-      return best?.id ?? null;
-    });
-  };
-  await page.keyboard.press("KeyE");
-  await expect.poll(plateSectionAtTop).toBe("eq");
-  await page.keyboard.press("KeyD");
-  await expect.poll(plateSectionAtTop).toBe("dynamics");
-  await page.keyboard.press("KeyR");
-  await expect.poll(plateSectionAtTop).toBe("send");
-  await page.keyboard.press("KeyP");
-  await expect.poll(plateSectionAtTop).toBe("preamp");
-
-  // Escape lets the strip go (old: it first backed out of the open tab).
-  await page.keyboard.press("Escape");
+  // New pages program, Slice 3 (decisions 4 and 6). Old: E / D / R / P brought
+  // a plate section into view, then Esc let the strip go. New: the section
+  // keys are gone with no replacement (the plate shows every section and
+  // scrolls), and a click on the row's heading lets the strip go. Reason: the
+  // Console binds no key; the heading (or the empty floor) was the on-screen
+  // way all along. The click lands on the heading's name, clear of the bank
+  // keys and the group chips.
+  await page.getByTestId("audio-tier-label-hardware-inputs").click({ position: { x: 8, y: 12 } });
   await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
 });
 
@@ -458,7 +448,13 @@ test("switches audio output targets without a full-domain refresh", async ({ pag
   }
 });
 
-test("supports audio warning-band sync and keyboard mix-target changes", async ({ page }) => {
+// New pages program, Slice 3 (D6). Old name: "supports audio warning-band sync
+// and keyboard mix-target changes"; a page-wide ArrowRight then walked the
+// selection to the next strip. New: that step is gone and the name says what
+// is left. Reason: the arrows only move a focused slider or list now; a click
+// on the strip selects it. Enter on the focused Sync key stays (it presses the
+// control).
+test("supports audio warning-band sync", async ({ page }) => {
   await openFixture(page, "audio-state-assumed");
 
   // Visual overhaul A, Slice 4 (plan D8): the way out is a key inside the
@@ -471,8 +467,6 @@ test("supports audio warning-band sync and keyboard mix-target changes", async (
   await page.getByTestId("audio-state-sync").press("Enter");
   await expect(stateDisplay).not.toContainText("ASSUMED");
 
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("audio-strip-audio-playback-5-6")).toHaveAttribute("data-selected", "true");
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toHaveCount(0);
 
   await openFixture(page, "audio-osc-disabled");
@@ -500,7 +494,10 @@ test("supports audio group filtering and source/output selection flow", async ({
   await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toHaveCount(0);
-  await page.getByTestId("audio-tier-chip-playback-bed").click({ modifiers: ["Shift"] });
+  // New pages program, Slice 3 (decision 10). Old: Shift+click on Bed added it
+  // beside FX. New: a plain click does. Reason: a key held while pointing is a
+  // shortcut too; a plain click switches a chip on or off and several can be lit.
+  await page.getByTestId("audio-tier-chip-playback-bed").click();
   await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "true");
   await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toBeVisible();
@@ -512,21 +509,21 @@ test("supports audio group filtering and source/output selection flow", async ({
   await page.getByTestId("audio-strip-audio-input-9").click();
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "true");
-  await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  });
-
-  for (let index = 0; index < 30; index += 1) {
-    await page.keyboard.press("ArrowRight");
-    await page.waitForTimeout(20);
-  }
-  await expect(page.getByTestId("audio-output-audio-mix-phones-b")).toHaveAttribute("data-selected", "true");
-  await expect(page.getByTestId("audio-strip-audio-input-9")).toHaveAttribute("data-selected", "false");
+  // New pages program, Slice 3 (D6). Old: thirty page-wide ArrowRight presses
+  // walked the selection past every strip to the last output, Phones 2. New:
+  // gone; the output is selected by a click on it below. Reason: the arrows only
+  // move a focused slider or list now.
 
   await page.getByTestId("audio-tier-chip-inputs-talent").click();
+  // Old: one plain click on the lit FX chip cleared the row's filter. New: a
+  // plain click turns only that chip off, so FX and then Bed are clicked, and
+  // with no chip lit the row shows every strip again (decision 10).
   await page.getByTestId("audio-tier-chip-playback-fx").click();
+  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "false");
+  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "true");
+  await page.getByTestId("audio-tier-chip-playback-bed").click();
+  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "false");
+  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
   // 2026-05-27 redesign: the channel name moved into the inspector's slimmed
   // sticky identity header (an <h2>), outside the audio-inspector-channel
@@ -708,7 +705,10 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
   const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
   await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
-  await faderDialog.getByRole("button", { name: "Set" }).click();
+  // New pages program, Slice 3 (decision 8). Old: the key was found by "Set".
+  // New: by its whole name, "Set value". Reason: typed entry now also offers
+  // "Reset to 0 dB", which a name search for "Set" matches too.
+  await faderDialog.getByRole("button", { name: "Set value" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
@@ -788,7 +788,8 @@ test("shows numeric snapshot before and after preview text", async ({ page }) =>
   const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
   await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
-  await faderDialog.getByRole("button", { name: "Set" }).click();
+  // "Set value" by its whole name: "Reset to 0 dB" matches "Set" too (S3, decision 8).
+  await faderDialog.getByRole("button", { name: "Set value" }).click();
 
   await currentSnapshot.hover();
   await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
@@ -953,45 +954,9 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
   await expect(link).toHaveAttribute("aria-pressed", "false");
 });
 
-test("supports audio command palette and shortcut overlay parity", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-
-  await expectWorkspaceMounted(page, "audio");
-  await page.keyboard.press(modifierShortcut("K"));
-  const palette = page.getByRole("dialog", { name: "Command palette" });
-  const commandInput = page.getByPlaceholder(/Type a command/i);
-  await commandInput.fill("fx");
-  await expect(palette.getByText("Results", { exact: true })).toHaveCount(0);
-  await expect(palette.getByText("Channels", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Actions", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Select FX 3/4", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Solo FX 3/4", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Mute FX 3/4", { exact: true })).toBeVisible();
-  await commandInput.fill("main out");
-  await expect(palette.getByText("Outputs", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Switch active mix to Main Out", { exact: true })).toBeVisible();
-  await commandInput.fill("snapshot 1");
-  await expect(palette.getByText("Snapshots", { exact: true })).toBeVisible();
-  await expect(palette.getByText("Recall snapshot 1", { exact: true })).toBeVisible();
-  await commandInput.fill("rename selected audio");
-  await expect(page.getByText("Rename selected channel")).toBeVisible();
-  await commandInput.fill("toggle selected polarity");
-  await expect(page.getByText("Toggle polarity on the selected channel")).toBeVisible();
-  await commandInput.fill("clear selected channel clip");
-  await expect(page.getByText("Clear selected channel clip")).toBeVisible();
-  await commandInput.fill("toggle master submix");
-  await expect(page.getByText("Toggle Master/Submix view")).toHaveCount(0);
-  await page.keyboard.press("Escape");
-
-  await page.keyboard.press("Shift+/");
-  const shortcuts = page.getByRole("dialog", { name: "Keyboard shortcuts" });
-  await expect(shortcuts).toBeVisible();
-  await shortcuts.getByPlaceholder(/Filter shortcuts/i).fill("audio");
-  await expect(shortcuts).not.toContainText("Toggle Audio Master / Submix view");
-  await expect(shortcuts).toContainText("Clear held audio clip indicators");
-  await expect(shortcuts).toContainText("Arm or apply current audio snapshot save");
-  await expect(shortcuts).toContainText("Open strip actions");
-});
+// New pages program, Slice 3 (D6): "supports audio command palette and
+// shortcut overlay parity" went with the palette and the shortcut guide. Every
+// command it listed has an on-screen control (the inventory, section 3).
 
 test("snapshot recall reports the push and lists 48V differences without touching them", async ({ page }) => {
   // 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to the
@@ -1007,10 +972,14 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   const hostPhantom = hostStrip.getByTestId("audio-lane-phantom-audio-input-9");
   await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
-  await page.keyboard.press("Shift+Digit3");
+  // New pages program, Slice 3 (D6). Old: Shift+3 armed, Shift+3 again
+  // recalled. New: snapshot key 3 is pressed twice. Reason: the Console binds
+  // no key; the snapshot key is the recall's on-screen control.
+  const interviewRecall = page.getByTestId("audio-snapshot-recall-snapshot-interview-block");
+  await interviewRecall.click();
   await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
   await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
-  await page.keyboard.press("Shift+Digit3");
+  await interviewRecall.click();
 
   const report = page.getByTestId("audio-recall-report");
   await expect(report).toBeVisible();
@@ -1033,21 +1002,9 @@ test("snapshot recall reports the push and lists 48V differences without touchin
   await expect(report).toHaveCount(0);
 });
 
-test("audio command palette snapshot recall arms before applying", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-
-  await expectWorkspaceMounted(page, "audio");
-  await page.keyboard.press(modifierShortcut("K"));
-  await page.getByPlaceholder(/Type a command/i).fill("snapshot 1");
-  await page.getByRole("option", { name: /Recall snapshot 1/ }).click();
-  await expect(page.locator('[data-snapshot-slot][data-armed="true"]')).toHaveCount(1);
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
-
-  await page.keyboard.press(modifierShortcut("K"));
-  await page.getByPlaceholder(/Type a command/i).fill("snapshot 1");
-  await page.getByRole("option", { name: /Recall snapshot 1/ }).click();
-  await expect(page.locator('[data-snapshot-slot][data-armed="true"]')).toHaveCount(0);
-});
+// New pages program, Slice 3 (D6): "audio command palette snapshot recall arms
+// before applying" went with the palette. The snapshot key arms before it
+// applies, which audio-arm-countdown.spec.ts proves.
 
 test("formats audio faders with RME's TotalMix fader curve", () => {
   // 2026-09 audit Slice 5: RME's published curve, unity at step 836 of 1023.
@@ -1066,11 +1023,10 @@ test("formats audio faders with RME's TotalMix fader curve", () => {
 test("audio workspace custom faders drag and accept numeric dB entry", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  // New pages program, Slice 3 (D6). Old: the case first found "Reset selected
+  // fader" in the command palette. New: that step is gone. Reason: the palette
+  // went; the strip's right-click "Reset to unity" is checked at the end.
   await expectWorkspaceMounted(page, "audio");
-  await page.keyboard.press(modifierShortcut("K"));
-  await page.getByPlaceholder(/Type a command/i).fill("reset selected audio");
-  await expect(page.getByText(/Reset selected fader/i)).toBeVisible();
-  await page.keyboard.press("Escape");
 
   const fxFader = page.getByRole("slider", { name: "FX 3/4 send level" });
   await expect(fxFader).toBeVisible();
@@ -1089,7 +1045,8 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   let faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
   await faderDialog.getByLabel("Fader level").fill("0");
-  await faderDialog.getByRole("button", { name: "Set" }).click();
+  // "Set value" by its whole name: "Reset to 0 dB" matches "Set" too (S3, decision 8).
+  await faderDialog.getByRole("button", { name: "Set value" }).click();
   // Visual overhaul A, Slice 4b. Old: "0.0dB". New: "0.0 dB". Reason: the
   // strip's value is the design system's readout, which prints the unit the way
   // every other printed value in the program does.
@@ -1100,38 +1057,42 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
   await expect(faderDialog).toBeVisible();
   await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
-  await faderDialog.getByRole("button", { name: "Set" }).click();
+  await faderDialog.getByRole("button", { name: "Set value" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
 
-  await page.keyboard.press("KeyU");
+  // New pages program, Slice 3 (D6). Old: `U` put the selected strip's send
+  // back on unity. New: right-click the strip, then "Reset to unity". Reason:
+  // the Console binds no key; the strip's menu was the on-screen way all along.
+  await page.getByTestId("audio-strip-audio-playback-3-4").click({ button: "right", position: { x: 12, y: 12 } });
+  await page.getByRole("menuitem", { name: "Reset to unity" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0 dB");
 });
 
-test("audio preamp gain on the strip is a key that types and nudges", async ({ page }) => {
+// New pages program, Slice 3 (decision 9). Old name: "audio preamp gain on the
+// strip is a key that types and nudges"; the case pressed ArrowUp on the
+// focused key and read a new gain. New: that step is gone and the name says the
+// key types. Reason: the Gain key is a button, and a button takes no arrows;
+// the plate's gain knob takes them (its whole-dB case below presses one).
+test("audio preamp gain on the strip is a key that types", async ({ page }) => {
   // Visual overhaul A, Slice 4b. Old: "audio preamp gain control responds to
   // pointer drag" — the strip carried a 32 px knob and the test dragged it.
-  // New: the strip carries a key that prints the gain the desk reports, opens
-  // typed entry when pressed and nudges a whole dB with the arrows. Reason:
-  // system §7 gives the strip a gain key; riding the gain by hand stays on the
-  // plate's knob, which keeps its own drag test
-  // ("inspector preamp gain knob only reports whole-dB values") — so no way of
-  // setting gain was lost.
+  // New: the strip carries a key that prints the gain the desk reports and
+  // opens typed entry when pressed. Reason: system §7 gives the strip a gain
+  // key; riding the gain by hand stays on the plate's knob, which keeps its own
+  // drag test ("inspector preamp gain knob only reports whole-dB values") — so
+  // no way of setting gain was lost.
   await openFixture(page, "audio-populated");
 
   const hostGain = page.getByTestId("audio-lane-gain-audio-input-9");
   await expect(hostGain).toBeVisible();
   await expect(hostGain).toContainText("dB");
-  const beforeGain = (await hostGain.textContent())?.trim();
-
-  await hostGain.focus();
-  await page.keyboard.press("ArrowUp");
-  await expect.poll(async () => (await hostGain.textContent())?.trim()).not.toBe(beforeGain);
 
   await hostGain.click();
   const gainDialog = page.getByRole("dialog", { name: /Set Host preamp gain/i });
   await expect(gainDialog).toBeVisible();
   await gainDialog.getByLabel("Preamp gain").fill("12");
-  await gainDialog.getByRole("button", { name: "Set" }).click();
+  // "Set value" by its whole name: "Reset to 24 dB" matches "Set" too (S3, decision 8).
+  await gainDialog.getByRole("button", { name: "Set value" }).click();
   await expect(hostGain).toContainText("12 dB");
 });
 
@@ -1291,12 +1252,15 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   // sideways. The 2560×1440 deliverable (D4) is unchanged.
   const inspectorBox = await readRequiredBox(page, "audio-inspector");
   expect(Math.abs(inspectorBox.width - 360), "1920 plate width should be 360 px").toBeLessThanOrEqual(1);
-  // The other two playback pairs are one bank away and come back with "[".
+  // The other two playback pairs are one bank away. New pages program, Slice 3
+  // (decision 3). Old: `]` paged there and `[` came back. New: the Inputs
+  // heading's Next bank and Previous bank keys. Reason: the Console binds no
+  // key; the bank keys are the on-screen twin this slice added.
   await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toHaveCount(0);
-  await page.keyboard.press("BracketRight");
+  await page.getByTestId("audio-bank-next").click();
   await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toBeVisible();
   await expectNoHorizontalOverflow(page.getByTestId("audio-tier-lanes-software-playback"), "1920 playback bank 2");
-  await page.keyboard.press("BracketLeft");
+  await page.getByTestId("audio-bank-previous").click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
   await expectAudioWorkspaceGeometry(page);

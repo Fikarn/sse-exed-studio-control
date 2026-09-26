@@ -144,7 +144,8 @@ export function AudioCluster({
   );
 
   // Talkback is a hold, never a toggle (2026-09 audit Slice 6): the hook owns
-  // engage / heartbeat / release for the key and for the page-wide T key.
+  // engage / heartbeat / release for the key (the page-wide T key went in the
+  // new pages program's Slice 3, D7).
   const talkback = useMomentaryTalkback({
     enabled: Boolean(selectedMixTarget) && actionsAllowed,
     hold: (engaged) => {
@@ -185,7 +186,7 @@ export function AudioCluster({
         armed={
           armedAction
             ? {
-                text: `${armedAction.label} · press again to apply · Esc cancels`,
+                text: `${armedAction.label} · press again to apply`,
                 timeoutMs: armedAction.timeoutMs,
               }
             : null
@@ -231,7 +232,7 @@ export function AudioCluster({
         <Key
           mode="momentary"
           cap="Talkback"
-          hint={talkbackRefused ? "refused · set a talkback channel in TotalMix" : "Hold · T"}
+          hint={talkbackRefused ? "refused · set a talkback channel in TotalMix" : "Hold"}
           layout="stack"
           size="tall"
           live={selectedMixTarget?.talkback ?? false}
@@ -244,7 +245,7 @@ export function AudioCluster({
           data-active={selectedMixTarget?.talkback ?? false}
           data-control="talk"
           data-holding={talkback.holding ? "true" : undefined}
-          title="Hold to talk to the monitor output; release to stop. Or hold T."
+          title="Hold to talk to the monitor output; release to stop."
           {...talkback.buttonProps}
         />
         <div className={styles.monitorToggles}>
