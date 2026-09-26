@@ -177,8 +177,8 @@
     "husky": "^9.1.7",
     "jsdom": "^25.0.1",
     "lint-staged": "^17.5.1",
-    "prettier": "^3.9.8",
-    "typescript-eslint": "^8.70.0",
+    "prettier": "^3.9.9",
+    "typescript-eslint": "^8.70.1",
     "vitest": "^4.1.11"
   },
   "allowScripts": {
