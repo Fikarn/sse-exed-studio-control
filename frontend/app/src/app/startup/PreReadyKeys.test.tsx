@@ -32,7 +32,11 @@ const FAILURE: StartupFailure = {
   message: "The hardware link stopped unexpectedly (exit status 1).",
 };
 
-const REFUSAL = "No monitor is available for studio fullscreen.";
+// The one sentence the shell refuses a reset with, whatever went wrong
+// (`window_command_refusal` in native/tauri-shell/src/main.rs, held by its
+// `window_command_refusals_are_the_operators_sentences` test): the detail goes
+// to shell.log, and the missing-monitor sentence is Studio fullscreen's alone.
+const REFUSAL = "The window layout was not reset.";
 
 const keysOn = (displayTestId: string) =>
   within(screen.getByTestId(displayTestId))
@@ -80,8 +84,15 @@ describe("the recovery screen: Reset the window layout beside Retry startup", ()
     fireEvent.click(screen.getByTestId("recovery-window-reset"));
     const band = await screen.findByTestId("recovery-window-refusal");
     expect(band.textContent).toContain(REFUSAL);
-    expect(band.textContent).toContain("Next: retry startup");
     expect(within(band).getByRole("status").textContent).toContain(REFUSAL);
+    // What did not happen is said once (review finding 23: the band's detail
+    // said "the layout was not reset" above the same sentence), and the way on
+    // names where the key is in a window as well as at the studio surface
+    // (review finding 22).
+    expect(band.textContent?.match(/not reset/gi)).toHaveLength(1);
+    expect(band.textContent).toContain(
+      "Next: retry startup, then open Setup / Support and press Support: Reset the window layout is under Workstation."
+    );
 
     // A reset that works clears the band.
     fireEvent.click(screen.getByTestId("recovery-window-reset"));

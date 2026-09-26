@@ -18,10 +18,13 @@
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
 // Why: arm-then-apply minimum dwell. A second activation of the same armed
-// key inside this window is ignored and the arm stays, so a double-click, a
-// bounced pointer or a held key's auto-repeat can never arm and apply a 48V
-// change, a snapshot recall or a snapshot overwrite in one motion. 350 ms is
-// past any double-click interval and well inside AUDIO_ARM_TIMEOUT_MS.
+// key inside this window is ignored and the arm stays, so a double-click or a
+// bounced pointer can never arm and apply a 48V change, a snapshot recall or a
+// snapshot overwrite in one motion. 350 ms is past any double-click interval
+// and well inside AUDIO_ARM_TIMEOUT_MS. The dwell does not stop a held key: its
+// auto-repeat goes on past it (Windows starts repeating after about 500 ms by
+// default), so `useAudioArming` cancels a held Enter's repeats while something
+// is armed (new pages program, Slice 3).
 // 2026-09 audit remediation, Slice 7.
 export const AUDIO_ARM_MIN_DWELL_MS = 350;
 

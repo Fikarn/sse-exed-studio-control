@@ -91,10 +91,16 @@ export function RecoverySurface({
       }
       testId="recovery-surface"
     >
+      {/* The shell's sentence says what did not happen, once; the band adds
+          only the way on. With Setup / Support in Support mode the window keys
+          are on screen at any window size, under Workstation: on the plate at
+          the studio surface, under the Support screen in a window (review
+          findings 22, 23). */}
       {windowRefusal ? (
-        <Section title="Window" detail="the layout was not reset" testId="recovery-window-refusal">
+        <Section title="Window" testId="recovery-window-refusal">
           <p className={recoveryStyles.nextStep} role="status">
-            {windowRefusal} Next: retry startup, then reset the window from Setup / Support.
+            {windowRefusal} Next: retry startup, then open Setup / Support and press Support: Reset the window layout is
+            under Workstation.
           </p>
         </Section>
       ) : null}

@@ -584,7 +584,68 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
   expect(dangerBox).not.toBeNull();
   expect(dangerBox!.y + dangerBox!.height).toBeLessThanOrEqual(1440);
   expect(windowBox!.y + windowBox!.height).toBeLessThan(dangerBox!.y);
+
+  // Review finding 22: the Support screen has a copy of the row for a window
+  // too narrow for the plate (the next cases). At the studio surface it is
+  // not drawn: Support shows one Window row, the plate's.
+  await page.getByTestId("setup-mode-support").click();
+  await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Window" })).toHaveCount(1);
+  await expect(windowKeys).toBeVisible();
+  await expect(page.getByTestId("support-bay-workstation")).toBeHidden();
 });
+
+// Review finding 22. Below the studio surface (a layout under 2200 px) the
+// Support plate is not drawn. That is the window the Windowed key itself makes
+// (1600 × 960, centred; also Reset with no studio monitor and the launch
+// fallback) and display 2 (2560 × 1440 at 125 %: 2048 × 1152). The keys that
+// bring the studio surface back went with the plate, so the Support screen
+// draws Workstation's window row under it: one press of Support on the
+// cluster, nothing to scroll.
+for (const size of [
+  { width: 1600, height: 960, label: "the windowed layout" },
+  { width: 2048, height: 1152, label: "display 2 at 125 %" },
+]) {
+  test(`in ${size.label} (${size.width}x${size.height}) the window keys are on the Support screen (S3, decision 2)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await openFixture(page, "setup-ready");
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("support-plate")).toBeHidden();
+
+    await page.getByTestId("setup-mode-support").click();
+    await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
+    const windowKeys = page.getByRole("group", { name: "Window" });
+    await expect(windowKeys).toHaveCount(1);
+    await expect(windowKeys.getByRole("button")).toHaveText([
+      "Studio fullscreen",
+      "Windowed",
+      "Reset the window layout",
+    ]);
+    await expect(page.getByTestId("support-bay-workstation")).toContainText("kept for the next launch");
+
+    // On screen as Support opens, each a full-size key. Outside the installed
+    // app the native shell is not there: a press moves nothing and says
+    // nothing.
+    for (const testId of [
+      "support-bay-window-studio-fullscreen",
+      "support-bay-window-windowed",
+      "support-bay-window-reset",
+    ]) {
+      const key = page.getByTestId(testId);
+      await expect(key).toBeVisible();
+      await expect(key).toBeEnabled();
+      await expect(key).toBeInViewport({ ratio: 1 });
+      const box = await key.boundingBox();
+      expect(box, testId).not.toBeNull();
+      expect(Math.min(box!.width, box!.height), testId).toBeGreaterThanOrEqual(24);
+      await key.click();
+      await expect(key).toBeEnabled();
+      await expect(page.getByTestId("setup-feedback")).toHaveCount(0);
+    }
+  });
+}
 
 test("Setup prints no key hints: the footer, the Console key, the bay head (S3)", async ({ page }) => {
   await openFixture(page, "setup-ready");

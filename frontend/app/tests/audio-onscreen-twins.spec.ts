@@ -9,7 +9,8 @@ import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 //     page both rows as `[` and `]` did (without them Line 1–8 could not be
 //     reached on screen);
 //   - decision 10: a plain click switches a group chip on or off, several can
-//     be lit, and a key held while clicking changes nothing;
+//     be lit, a lit chip stays in the heading on every bank, and a key held
+//     while clicking changes nothing;
 //   - decision 8: typed entry's "Reset to <default>" key, which replaces
 //     Backspace / Delete and Alt+double-click;
 //   - decision 9: a focused fader takes the arrows (one step, Shift or not),
@@ -147,6 +148,57 @@ test("a plain click lights two group chips at once, a second click turns one off
   await expect(bed).toHaveAttribute("data-active", "false");
   await fx.click();
   await expect(fx).toHaveAttribute("data-active", "false");
+});
+
+// Found on the slice's review: an Inputs bank holds one group here, so with
+// Talent and Line both lit, a lit chip's strips can all be on another bank. The
+// heading drew no chip for it there, and a click on the other chip switched
+// both off (Talent then Line lit ended with nothing lit and all 12 inputs).
+test("a lit Inputs chip stays in the heading on a bank without its strips, and a click turns off only that chip", async ({
+  page,
+}) => {
+  await openFixture(page, "audio-populated");
+  await expectWorkspaceMounted(page, "audio");
+
+  const talent = page.getByTestId("audio-tier-chip-inputs-talent");
+  const line = page.getByTestId("audio-tier-chip-inputs-line");
+  const bankReadout = page.getByTestId("audio-tier-bank-pill-hardware-inputs");
+  const next = page.getByTestId("audio-bank-next");
+
+  // Bank 2 has Line 1 and Line 2: light Line there, and the rows go back to bank 1.
+  await next.click();
+  await expect(bankReadout).toContainText("Bank 2 / 3");
+  await line.click();
+  await expect(line).toHaveAttribute("data-active", "true");
+  await expect(bankReadout).toHaveText("Bank 1 / 2 · ch 1-4 of 6");
+
+  // Talent lights beside Line. Bank 1 holds no Line strip, and the lit Line
+  // chip stays in its heading.
+  await talent.click();
+  await expect(talent).toHaveAttribute("data-active", "true");
+  await expect(line).toHaveAttribute("data-active", "true");
+  await expect(bankReadout).toHaveText("Bank 1 / 3 · ch 1-4 of 10");
+
+  // A second click on Talent turns Talent off, and Line stays lit.
+  await talent.click();
+  await expect(talent).toHaveAttribute("data-active", "false");
+  await expect(line).toHaveAttribute("data-active", "true");
+  await expect(bankReadout).toHaveText("Bank 1 / 2 · ch 1-4 of 6");
+
+  // Both lit again, then bank 2, which holds no Talent strip: the lit Talent
+  // chip stays, and a click on Line leaves Talent lit.
+  await talent.click();
+  await expect(bankReadout).toHaveText("Bank 1 / 3 · ch 1-4 of 10");
+  await next.click();
+  await expect(bankReadout).toHaveText("Bank 2 / 3 · ch 5-8 of 10");
+  await expect(talent).toHaveAttribute("data-active", "true");
+  await line.click();
+  await expect(talent).toHaveAttribute("data-active", "true");
+  await expect(line).toHaveCount(0);
+  // Talent alone fits one bank, so there is nothing to page.
+  await expect(page.getByTestId("audio-bank-keys")).toHaveCount(0);
+  await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
+  await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
 });
 
 test("typed entry offers Reset to the default on a knob, the strip's Gain key and a fader", async ({ page }) => {

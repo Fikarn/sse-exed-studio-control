@@ -1,8 +1,8 @@
 import { SupportPlate } from "../components/SupportPlate";
 import { describeBackupKind, formatBackupTimestamp } from "../../shellData";
-import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "../../shellCommands";
 import { APP_VERSION } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
+import { windowKeyActions } from "./windowKeyActions";
 
 /** The plate's wiring: the workstation's facts, the light outputs switch, the
  *  recent actions, theme, scale and the window, and the backup and diagnostics
@@ -40,12 +40,10 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       }}
       onSelectTheme={setTheme}
       onSelectUiScale={setUiScale}
-      // New pages program, Slice 3 (decision 2): a window key says nothing when
-      // the window moves; a refusal carries the native shell's sentence to the
-      // message line, as every other Setup / Support failure does.
-      onEnterStudioFullscreen={() => void performAction("window-studio-fullscreen", enterStudioFullscreen)}
-      onUseWindowedLayout={() => void performAction("window-windowed", switchToWindowedLayout)}
-      onResetWindowLayout={() => void performAction("window-reset", resetWindowLayout)}
+      // New pages program, Slice 3 (decision 2): the window keys, wired as the
+      // bay's copy of them is (SetupSupportScreen), so a refusal lands in the
+      // message line from either.
+      {...windowKeyActions(performAction)}
       onSetLightOutputsArmed={(armed) => {
         if (armed === lightOutputsArmed) return;
         void performAction("light-outputs", () => setLightOutputsArmed(armed));

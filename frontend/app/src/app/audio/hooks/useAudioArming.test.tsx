@@ -149,3 +149,54 @@ describe("useAudioArming Esc", () => {
     expect(setFeedback).toHaveBeenCalledTimes(1);
   });
 });
+
+// New pages program, Slice 3, on review: Enter presses the focused key again on
+// every auto-repeat of a held Enter, and the repeats run on past the dwell, so
+// a held Enter on a focused arm key armed it and then applied it. While
+// something is armed the hook cancels a repeated Enter's keydown, and in the
+// browser a cancelled keydown presses nothing (audio-arm-countdown.spec.ts
+// holds Enter on the real keys).
+describe("useAudioArming held Enter", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  function pressEnter(init: KeyboardEventInit = {}) {
+    const event = new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter", ...init });
+    act(() => {
+      window.dispatchEvent(event);
+    });
+    return event;
+  }
+
+  it("cancels a held Enter's repeats while armed, and leaves a fresh Enter to press the key", () => {
+    const { advance, apply, hook, setFeedback, trigger } = setup();
+    trigger();
+    advance(AUDIO_ARM_MIN_DWELL_MS + 50);
+
+    expect(pressEnter({ repeat: true }).defaultPrevented).toBe(true);
+    expect(pressEnter({ repeat: true }).defaultPrevented).toBe(true);
+    expect(pressEnter().defaultPrevented).toBe(false);
+    // Neither applies nor cancels the arm by itself.
+    expect(hook.result.current.armedAction?.key).toBe(candidate.key);
+    expect(apply).not.toHaveBeenCalled();
+    expect(setFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("binds nothing while nothing is armed, before the arm and after its apply", () => {
+    const { advance, apply, hook, trigger } = setup();
+    expect(pressEnter({ repeat: true }).defaultPrevented).toBe(false);
+
+    trigger();
+    advance(AUDIO_ARM_MIN_DWELL_MS + 50);
+    trigger();
+    expect(apply).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.armedAction).toBeNull();
+    expect(pressEnter({ repeat: true }).defaultPrevented).toBe(false);
+  });
+});

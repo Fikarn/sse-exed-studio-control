@@ -82,14 +82,30 @@
   }
 
   /* Below the studio surface the Support plate gives the bay its width back;
-     Support is one press away on the cluster, and the bay shows it in full
-     (A-setup.html's 1280 board hides the inspector for the same reason). */
+     Support is one press away on the cluster, and the bay's Support screen
+     has the backups and Workstation's window keys (A-setup.html's 1280 board
+     hides the inspector for the same reason). */
   :global([data-operator-layout-root][data-chrome="compact"]) .body {
     grid-template-columns: minmax(0, 1fr);
   }
 
   :global([data-operator-layout-root][data-chrome="compact"]) .plateColumn {
     display: none;
+  }
+
+  /* New pages program, Slice 3 (review finding 22): the mirror of the rule
+     above. The bay's copy of Workstation's window keys is drawn only while the
+     plate is not, so exactly one Window row is ever on screen: the plate's at
+     the studio surface (no studio board moves), the bay's below it, where
+     "Windowed" puts the window. It keeps the plate's width. */
+  .compactWorkstation {
+    display: none;
+  }
+
+  :global([data-operator-layout-root][data-chrome="compact"]) .compactWorkstation {
+    display: block;
+    flex: none;
+    max-width: var(--chrome-studio-plate);
   }
 
   :global([data-operator-layout-root][data-chrome="compact"]) .bay {

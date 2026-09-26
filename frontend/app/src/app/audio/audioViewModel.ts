@@ -129,14 +129,17 @@ function meteringSourceLabel(source: unknown) {
  * A click on a row's group chip. New pages program, Slice 3 (decision 10): a
  * plain click switches the chip on or off, and several chips can be lit at
  * once — Shift+click (add) and Alt+click (invert) went with the other keys
- * held while pointing. No chip lit means the row shows every strip. The row
- * keeps only the groups its current bank offers (`availableGroups`, in the
- * row's own order); the other row is left as it was.
+ * held while pointing. No chip lit means the row shows every strip. Only the
+ * clicked chip changes: the row's other lit chips stay lit, in the fixed group
+ * order, whichever bank their strips are on (a lit chip shows on every bank,
+ * `visibleTierGroups`); the other row is left as it was. The click used to keep
+ * only the groups the current bank's chips offered, so on the Inputs row, where
+ * a bank at 2560 holds one group, it also switched off a lit chip whose strips
+ * were on another bank.
  */
 export function toggleChannelGroupSelection(
   current: AudioChannelGroupSelections,
-  { group, tierId }: AudioChannelGroupSelectionRequest,
-  availableGroups: readonly AudioChannelGroup[]
+  { group, tierId }: AudioChannelGroupSelectionRequest
 ): AudioChannelGroupSelections {
   const lit = new Set(current[tierId]);
   if (lit.has(group)) {
@@ -146,7 +149,7 @@ export function toggleChannelGroupSelection(
   }
   return {
     ...current,
-    [tierId]: availableGroups.filter((availableGroup) => lit.has(availableGroup)),
+    [tierId]: AUDIO_GROUP_ORDER.filter((groupId) => lit.has(groupId)),
   };
 }
 
@@ -325,9 +328,16 @@ function orderedGroupsForChannels(channels: AudioChannelEntry[]) {
   return AUDIO_GROUP_ORDER.filter((groupId) => present.has(groupId));
 }
 
+// The chips a row's heading draws, in the fixed group order: the groups of this
+// bank's strips (filtered or not) and every lit group of the row, whichever
+// bank its strips are on. So the heading always says what the row is filtered
+// to, and a lit chip can be switched off from any bank (new pages program,
+// Slice 3, decision 10); it used to draw this bank's groups only. Remote has a
+// chip only while it is lit.
 function visibleTierGroups(channels: AudioChannelEntry[], activeGroups: readonly AudioChannelGroup[]) {
+  const onBank = new Set(channels.map((entry) => getAudioChannelGroup(entry)));
   const active = new Set(activeGroups);
-  return orderedGroupsForChannels(channels).filter((groupId) => groupId !== "remote" || active.has(groupId));
+  return AUDIO_GROUP_ORDER.filter((groupId) => active.has(groupId) || (groupId !== "remote" && onBank.has(groupId)));
 }
 
 function activeGroupsForTier(

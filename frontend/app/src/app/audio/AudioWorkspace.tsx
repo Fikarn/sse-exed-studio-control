@@ -20,7 +20,6 @@ import {
   audioChannelSupportsPhase,
   buildAudioViewModel,
   toggleChannelGroupSelection,
-  type AudioChannelGroup,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
 } from "./audioViewModel";
@@ -369,13 +368,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   // New pages program, Slice 3 (decision 10): a plain click switches a chip on
   // or off, and several chips can be lit at once (Shift+click and Alt+click
-  // went with the other keys held while pointing).
+  // went with the other keys held while pointing). Only the clicked chip
+  // changes; a lit chip whose strips are on another bank stays lit.
   const selectChannelGroup = useLiveCallback((request: AudioChannelGroupSelectionRequest) => {
-    const availableGroups = (request.tierId === "hardware-inputs"
-      ? viewModel?.hardwareInputs.chips
-      : viewModel?.softwarePlayback.chips
-    )?.map((chip) => chip.id as AudioChannelGroup) ?? [request.group];
-    setActiveChannelGroups((current) => toggleChannelGroupSelection(current, request, availableGroups));
+    setActiveChannelGroups((current) => toggleChannelGroupSelection(current, request));
     setBankIndex(0);
   });
 
