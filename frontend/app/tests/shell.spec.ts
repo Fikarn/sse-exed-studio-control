@@ -15,9 +15,19 @@ import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 // guide went with the keys it listed. The palette's two cases and "shortcut
 // labels follow the host platform" went with the palette and the hints.
 
+// Slice 3 review (#6): the dialog hides on a restart too, and the fixture's
+// restart is back on the same Setup step within milliseconds, so the screen
+// alone cannot tell a kept link from a restarted one. The startup handshake
+// can: it asks `engine.ping` once per start, and nothing else asks it.
 test("Restart the hardware link… in Setup / Support asks first; Esc and Cancel keep the link", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
+  });
   await openFixture(page, "setup-required");
   await expectWorkspaceMounted(page, "setup");
+  const pings = () => page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["engine.ping"] ?? 0);
+  const pingsAtStart = await pings();
+  expect(pingsAtStart, "the startup handshake is counted").toBeGreaterThan(0);
   const restartKey = page.getByTestId("support-restart-bridge");
   const dialog = page.getByRole("dialog", { name: "Restart the hardware link?" });
 
@@ -29,12 +39,14 @@ test("Restart the hardware link… in Setup / Support asks first; Esc and Cancel
   await page.mouse.click(8, 8);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+  expect(await pings(), "Esc must not restart the hardware link").toBe(pingsAtStart);
 
   await restartKey.click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+  expect(await pings(), "Cancel must not restart the hardware link").toBe(pingsAtStart);
 });
 
 test("Setup's modes, steps and the Map's pages and deck keys answer clicks", async ({ page }) => {

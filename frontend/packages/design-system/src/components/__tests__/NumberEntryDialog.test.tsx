@@ -192,5 +192,45 @@ describe("NumberEntryDialog", () => {
       fireEvent.click(reset);
       expect(onConfirm).not.toHaveBeenCalled();
     });
+
+    // Slice 3 review (#9, #25): the Dialog used to move focus in again whenever
+    // its close handler changed. Every typed-entry caller passes an inline
+    // onCancel and the shell draws again at least every 15 s (its clock), so a
+    // Tab to "Reset to …" was undone before the Enter, and the Enter then set
+    // the typed value instead of the default.
+    it("keeps focus on the Reset key when the consumer draws again", () => {
+      // The control the typed entry opened from; focus goes back to it on close.
+      const knob = document.createElement("button");
+      knob.textContent = "Host preamp gain";
+      document.body.appendChild(knob);
+      knob.focus();
+
+      const props = {
+        title: "Set Host preamp gain",
+        fieldLabel: "Gain",
+        initialValue: 32,
+        min: 0,
+        max: 60,
+        suffix: "dB",
+        resetValue: 0,
+        onConfirm: () => {},
+      };
+      const firstCancel = vi.fn();
+      const { rerender } = render(<NumberEntryDialog {...props} onCancel={() => firstCancel()} />);
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      reset.focus();
+      expect(reset).toHaveFocus();
+
+      // The consumer draws again with a new inline onCancel: focus stays put.
+      const latestCancel = vi.fn();
+      rerender(<NumberEntryDialog {...props} onCancel={() => latestCancel()} />);
+      expect(reset).toHaveFocus();
+
+      // And Esc reaches the onCancel of the latest render, once.
+      fireEvent.keyDown(reset, { key: "Escape" });
+      expect(latestCancel).toHaveBeenCalledTimes(1);
+      expect(firstCancel).not.toHaveBeenCalled();
+      knob.remove();
+    });
   });
 });

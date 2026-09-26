@@ -16,6 +16,13 @@ import { useLiveCallback } from "./useLiveCallback";
 // on the window itself while it is up: Escape closes it wherever focus is, and
 // Tab brings focus back inside. Escape is plain keyboard operation — it closes
 // a dialog — and binds no function of its own.
+//
+// It listens in the capture phase, so it takes a key before anything beneath it
+// that listens on the window. "Close Studio Control?" can open over a Console
+// with an armed 48 V change, recall or save, whose Esc listener was added first
+// and so would run first in the bubble phase: the Esc that closes the dialog
+// would cancel the arm too. Taken first and default-prevented, it closes only
+// the dialog; the arm's listener passes over a prevented Esc.
 const FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
@@ -95,9 +102,9 @@ export function ShellDialog({
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, true);
       previouslyFocused?.focus();
     };
   }, [cancel]);

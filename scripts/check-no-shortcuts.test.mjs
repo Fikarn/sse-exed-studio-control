@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -161,6 +161,14 @@ test("copy that names a key is a hit", () => {
     "key-hint",
   ]);
   assert.deepEqual(rules(scanSource("const t = `Undid ${label} · Ctrl+Shift+Z to redo`;", APP, none)), ["key-hint"]);
+  // The shapes the program's own code used, with the key interpolated (the review of Slice 3).
+  for (const source of [
+    "export const S = () => <button title={`Recall view ${n} · Shift+${n}. Right-click for options.`} />;",
+    "toast.push({ message: `Saved view ${n}. Shift+${n} recalls it.` });",
+    "const t = `Save view ${n} · Ctrl + Shift + ${n}`;",
+  ]) {
+    assert.deepEqual(rules(scanSource(source, APP, none)), ["key-hint"], source);
+  }
 });
 
 test("a key alone is a hit where it can only be a key: a combination, a glyph, a key's small print", () => {
@@ -176,7 +184,7 @@ test("the words the program keeps are not hits", () => {
   const kept = [
     "Press Patch to leave patch mode.",
     "Press Stop again.",
-    "Press the lit key again.",
+    "Could not clear Highlight and Solo. Open Lighting and press the lit Highlight or Solo key.",
     "press twice",
     "ARMED · press again",
     "Press Sync from TotalMix to read the desk.",
@@ -194,6 +202,15 @@ test("the words the program keeps are not hits", () => {
   ];
   for (const words of kept) {
     assert.deepEqual(scanSource(`const t = ${JSON.stringify(words)};`, APP, none), [], words);
+  }
+  // Templates whose placeholders are not keys: an id, SVG geometry, a test id, a control's name.
+  for (const source of [
+    "const a = `not in the catalog (${id})`;",
+    "const b = `translate(${x} ${y}) scale(${z})`;",
+    "export const C = () => <div data-testid={`audio-snapshot-meta-${id}`} />;",
+    "const d = `Press ${label} again.`;",
+  ]) {
+    assert.deepEqual(scanSource(source, APP, none), [], source);
   }
   // The strip keys' caps, and key names the code compares against.
   assert.deepEqual(
@@ -223,12 +240,27 @@ test("the native shell switches the web view's own keys off, with one exception 
     /switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
     "setup switches the browser keys off before it routes the window"
   );
-  // `unsafe` is lifted for the one function that makes the COM calls, and nowhere else in the shell.
-  const shellSources = ["main.rs", "engine.rs", "shell_log.rs"].map((file) =>
-    readFileSync(path.join(repoRoot, "native/tauri-shell/src", file), "utf8")
-  );
-  const allowances = shellSources.join("\n").match(/#\[allow\(unsafe_code\)\]/g) ?? [];
-  assert.equal(allowances.length, 1, "one #[allow(unsafe_code)] in the shell");
+  // `unsafe` is lifted for the one function that makes the COM calls, and nowhere else in the shell:
+  // every Rust file of the crate (its sources, their folders, build.rs) names the lint once, in any
+  // form (allow, expect, warn, a crate-wide #![…], a list, cfg_attr), and holds one unsafe block.
+  const rustFiles = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? rustFiles(path.join(dir, entry.name))
+        : entry.name.endsWith(".rs")
+          ? [path.join(dir, entry.name)]
+          : []
+    );
+  const shellSources = [
+    ...rustFiles(path.join(repoRoot, "native/tauri-shell/src")),
+    path.join(repoRoot, "native/tauri-shell/build.rs"),
+  ]
+    .filter((file) => existsSync(file))
+    .map((file) => readFileSync(file, "utf8"));
+  const lintNames = shellSources.join("\n").match(/\bunsafe_code\b/g) ?? [];
+  assert.equal(lintNames.length, 1, "the shell names unsafe_code once");
+  const unsafeItems = shellSources.join("\n").match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? [];
+  assert.equal(unsafeItems.length, 1, "the shell holds one unsafe block");
   assert.ok(
     /#\[allow\(unsafe_code\)\]\s*\nfn set_browser_accelerator_keys_off\(/.test(shell),
     "the one #[allow(unsafe_code)] sits on set_browser_accelerator_keys_off"
@@ -250,6 +282,34 @@ test("the native shell switches the web view's own keys off, with one exception 
   assert.deepEqual(lintTable(workspace, "workspace.lints.rust"), ['unsafe_code = "forbid"']);
   assert.deepEqual(lintTable(crate, "lints.rust"), ['unsafe_code = "deny"']);
   assert.deepEqual(lintTable(crate, "lints.clippy"), lintTable(workspace, "workspace.lints.clippy"));
+});
+
+test("the shell's windows and webview2-com are the ones Tauri's wry uses (the COM code compiles only on Windows)", () => {
+  // `set_browser_accelerator_keys_off` takes wry's ICoreWebView2Controller and returns
+  // windows::core::Result, and no CI job compiles cfg(windows) code: a second version of
+  // either crate in the lock file would break the Windows build unseen. Cargo.lock names a
+  // dependency with its version only when two versions of it are locked.
+  const lock = readFileSync(path.join(repoRoot, "native/Cargo.lock"), "utf8");
+  const packages = lock.split(/\n(?=\[\[package\]\])/);
+  const named = (name) => packages.filter((block) => block.includes(`\nname = "${name}"\n`));
+  for (const crateName of ["windows", "webview2-com"]) {
+    assert.equal(named(crateName).length, 1, `one ${crateName} in Cargo.lock`);
+  }
+  const dependencies = (name) => {
+    const [block] = named(name);
+    assert.ok(block, `${name} is in Cargo.lock`);
+    const list = block.match(/dependencies = \[\n([\s\S]*?)\n\]/);
+    return list ? list[1].split("\n").map((line) => line.trim().replace(/^"|",?$/g, "")) : [];
+  };
+  for (const user of ["sse-exed-tauri-shell", "wry"]) {
+    const deps = dependencies(user);
+    assert.ok(deps.includes("windows"), `${user} depends on the one windows`);
+    assert.ok(deps.includes("webview2-com"), `${user} depends on the one webview2-com`);
+  }
+  // Dependabot leaves them alone; they move by hand, with a Tauri update.
+  const dependabot = readFileSync(path.join(repoRoot, ".github/dependabot.yml"), "utf8");
+  assert.match(dependabot, /- dependency-name: "windows"/);
+  assert.match(dependabot, /- dependency-name: "webview2-com"/);
 });
 
 test("identifiers, module specifiers and test ids are not copy", () => {

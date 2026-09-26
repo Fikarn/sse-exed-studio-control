@@ -239,6 +239,28 @@ describe("useArm", () => {
     expect(result.current.armed).toBeNull();
     expect(onDisarm).toHaveBeenLastCalledWith(expect.objectContaining({ key: "k" }), "escape");
   });
+
+  // Slice 3 review (#27): Enter held on the focused arm key repeats, and the
+  // browser presses the key again on every repeat, so the first repeat after the
+  // dwell (Windows repeats after about 500 ms) would confirm the arm. While a
+  // key is armed a repeated Enter is cancelled, which keeps the key from being
+  // pressed; a fresh Enter is left alone, so it can still confirm.
+  it("cancels a held Enter's repeats while a key is armed, and not a fresh Enter", () => {
+    const { result } = renderHook(() => useArm({ now: () => 0 }));
+    const armKey = document.createElement("button");
+    document.body.appendChild(armKey);
+    armKey.focus();
+    // fireEvent answers false when the keydown was cancelled.
+    const enter = (repeat: boolean) => fireEvent.keyDown(armKey, { key: "Enter", repeat });
+
+    expect(enter(true)).toBe(true);
+
+    act(() => result.current.armOrApply("recall:3", "Recall Interview block", () => {}));
+    expect(enter(true)).toBe(false);
+    expect(enter(false)).toBe(true);
+    expect(result.current.armed?.key).toBe("recall:3");
+    armKey.remove();
+  });
 });
 
 describe("LampWord and Latch", () => {

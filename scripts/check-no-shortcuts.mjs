@@ -62,11 +62,11 @@ export const KEY_LISTENERS = {
     "Esc closes the dialog and Tab stays inside it, while focus is in the dialog (D6)",
   "frontend/packages/design-system/src/components/Drawer.tsx": "Esc closes the open drawer (D6)",
   "frontend/packages/design-system/src/components/useArm.ts":
-    "Esc cancels the armed key, registered only while a key is armed (D6)",
+    "Esc cancels the armed key, and a held Enter's repeats never confirm it, registered only while a key is armed (D6)",
   "frontend/app/src/app/shared/ShellDialog.tsx":
-    "Esc closes the shell's dialog (Close Studio Control?, Restart the hardware link?) wherever focus is, and Tab stays inside it (D6)",
+    "Esc closes the shell's dialog (Close Studio Control?, Restart the hardware link?) wherever focus is, first in the capture phase so an armed key under it stays armed, and Tab stays inside it (D6)",
   "frontend/app/src/app/audio/hooks/useAudioArming.ts":
-    "Esc cancels the Console's armed key (48 V, snapshot recall and save), registered only while one is armed (D6)",
+    "Esc cancels the Console's armed key (48 V, snapshot recall and save), and a held Enter's repeats never confirm it, registered only while one is armed (D6)",
 };
 
 // Where a JSX key handler is plain keyboard operation on the focused control.
@@ -157,6 +157,10 @@ export const HINT_PATTERNS = [
   { name: "shortcut", re: /\bshortcuts?\b|\bhot ?keys?\b|\bkey ?bindings?\b/i },
   { name: "the command palette", re: /\bcommand palette\b/i },
 ];
+
+// A template part that ends in a modifier and a plus, before a placeholder:
+// "+" only, so a test id such as `audio-snapshot-meta-${id}` is not one.
+const INTERPOLATED_MODIFIER = /\b(?:ctrl|cmd|shift|alt|meta|mod)\s*\+\s*$/i;
 
 // Copy of one word: only what cannot be anything but a key.
 export const TOKEN_PATTERNS = [
@@ -356,11 +360,19 @@ export function scanSource(text, relativeFile, allowed = {}) {
     else if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) && isOperatorFacing(node)) {
       checkCopy(node.text, node, slotOf(node));
     } else if (ts.isTemplateExpression(node)) {
-      checkCopy(
-        [node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join(" … "),
-        node,
-        slotOf(node)
-      );
+      // A placeholder never reads as a key (" … "), but a part that ends in a
+      // modifier and a plus right before one is a key with its name
+      // interpolated: `Shift+${n}` (the view slots' old "Recall view 2 · Shift+2").
+      const beforePlaceholders = [node.head.text, ...node.templateSpans.slice(0, -1).map((span) => span.literal.text)];
+      if (beforePlaceholders.some((part) => INTERPOLATED_MODIFIER.test(part))) {
+        hit(node, "key-hint", `a modifier combination with the key interpolated: ${node.getText(source)}`);
+      } else {
+        checkCopy(
+          [node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join(" … "),
+          node,
+          slotOf(node)
+        );
+      }
     }
     ts.forEachChild(node, visit);
   };
