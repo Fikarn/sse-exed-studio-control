@@ -135,6 +135,31 @@ test("Highlight and Solo hold as the hardware link reports them (lighting.fixtur
   await expect(marker(page, "Fill")).toHaveAccessibleName(/^Fixture Fill, 58 percent, /);
 });
 
+// Slice 3 review, finding 16. The page-wide Esc cleared Highlight and Solo in
+// any mode, Preview included, and its twin is the lit key; but the Highlight
+// and Solo keys were disabled all through Preview, so a live Solo could not be
+// ended from the page while previewing. The plot shows the preview buffer then,
+// which the Solo does not touch; the live rig shows it again once Preview ends.
+test("In Preview the lit Solo key switches Solo off on the rig (lighting.fixture.highlight)", async ({ page }) => {
+  await openPopulatedRig(page);
+  const solo = page.getByTestId("lighting-solo-toggle");
+  const preview = page.getByTestId("lighting-preview-toggle");
+  await solo.click();
+  await expect(solo).toHaveAttribute("aria-pressed", "true");
+  await expect(marker(page, "Fill")).toHaveAccessibleName(/^Fixture Fill, off, /);
+
+  await preview.click();
+  await expect(preview).toHaveAttribute("aria-pressed", "true");
+  await expect(solo).toBeEnabled();
+  await solo.click();
+  await expect(solo).toHaveAttribute("aria-pressed", "false");
+  await expect(preview).toHaveAttribute("aria-pressed", "true");
+
+  await preview.click();
+  await expect(preview).toHaveAttribute("aria-pressed", "false");
+  await expect(marker(page, "Fill")).toHaveAccessibleName(/^Fixture Fill, 58 percent, /);
+});
+
 test("Find flashes the selected lights one after another (lighting.fixture.identifySequence)", async ({ page }) => {
   await openPopulatedRig(page, { stopClock: true });
   // Key is selected when the rig opens; Back joins it, and flashes first.
@@ -335,6 +360,45 @@ test("The Undo key names the step it will undo and undoes it; with nothing to un
   await undo.click();
   await expect(page.getByText("Undid ‘Delete scene Interview’.")).toBeVisible();
   await expect(interview).toBeVisible();
+  await expect(undo).toBeDisabled();
+  await expect(undo).toContainText("nothing to undo");
+});
+
+// Slice 3 review, finding 17. An undo step acted on the id its scene or fixture
+// had when the step was taken. Undoing Delete fixture brings Back back under a
+// new id, so the older step, Delete scene Interview, whose saved states name
+// fixture-back, was refused on every press ("Undo failed for ‘Delete scene
+// Interview’. The step is still in place.") and the Undo key stuck on it.
+test("Undo brings back a fixture, then a scene that held it, under the fixture's new id", async ({ page }) => {
+  await openPopulatedRig(page);
+  const undo = page.getByTestId("lighting-undo");
+  const interview = page.getByRole("button", { name: /^Recall scene Interview/ });
+  await expect(interview).toContainText("4 on");
+
+  await interview.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
+  await page.getByRole("dialog", { name: "Delete scene?" }).getByRole("button", { name: "Delete scene" }).click();
+  await expect(interview).toHaveCount(0);
+
+  await selectFixture(page, "Back");
+  await page.getByRole("button", { name: "Delete fixture", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Delete fixture?" })
+    .getByRole("button", { name: "Delete fixture", exact: true })
+    .click();
+  await expect(marker(page, "Back")).toHaveCount(0);
+  await expect(undo).toHaveAccessibleName("Undo Delete fixture Back");
+
+  await undo.click();
+  await expect(page.getByText("Undid ‘Delete fixture Back’.")).toBeVisible();
+  await expect(marker(page, "Back")).toBeVisible();
+  await expect(undo).toHaveAccessibleName("Undo Delete scene Interview");
+
+  // Interview comes back with Back in it, lit as it was saved: 4 on.
+  await undo.click();
+  await expect(page.getByText("Undid ‘Delete scene Interview’.")).toBeVisible();
+  await expect(interview).toBeVisible();
+  await expect(interview).toContainText("4 on");
   await expect(undo).toBeDisabled();
   await expect(undo).toContainText("nothing to undo");
 });

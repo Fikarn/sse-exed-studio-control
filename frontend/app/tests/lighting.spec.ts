@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
@@ -529,8 +529,35 @@ test("surfaces patch collisions and auto-fixes them in lighting patch mode", asy
   await expect(workspace.getByText("Patch collision")).toHaveCount(0);
 });
 
+// The plot frames itself as Lighting opens, in a 200 ms animation that draws
+// over a zoom made while it runs. The view has settled once the zoom readout
+// holds still for longer than that.
+async function settledZoom(readout: Locator): Promise<string> {
+  // The readout always reads "N %", so the first read never matches this.
+  let last = "";
+  await expect
+    .poll(
+      async () => {
+        const now = await readout.innerText();
+        const held = now === last;
+        last = now;
+        return held;
+      },
+      { intervals: [300] }
+    )
+    .toBe(true);
+  return last;
+}
+
 test("persists lighting view bookmark slots through workspace changes", async ({ page }) => {
   await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  // Slice 3 review, finding 20. Old: after the click on the slot the case read
+  // its aria-pressed, which says only that the slot is filled — true before the
+  // click as after it — so a recall that moved nothing passed. New: the plot
+  // toolbar's zoom readout, saved with the view, moved away from it, and back
+  // after the recall.
+  const readout = page.getByRole("toolbar", { name: "Stage plot view" }).locator("[aria-live='polite']");
 
   // New pages program, Slice 3 (D6). Old: Ctrl+Shift+1 saved view 1, with the
   // message "Saved view 1. Shift+1 recalls it.", the header's Ctrl+3 / Ctrl+2
@@ -538,11 +565,15 @@ test("persists lighting view bookmark slots through workspace changes", async ({
   // slot's right-click menu saves the view (the message went with the key), the
   // header's tabs switch workspaces, and a click on the slot recalls it. Reason:
   // the keyboard shortcuts are gone; these are their twins (the inventory,
-  // section 3).
+  // section 3). The zoom waits for the framing, so the saved view is not the
+  // framed one that opening Lighting shows anyway.
+  const framed = await settledZoom(readout);
   await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(readout).not.toHaveText(framed);
   await page.getByRole("button", { name: /Empty slot 1/ }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Save current view to 1" }).click();
   await expect(page.getByRole("button", { name: /Recall view 1/ })).toHaveAttribute("aria-pressed", "true");
+  const saved = await readout.innerText();
 
   // New pages program, Slice 1: Planning has left the screen, so the way out
   // and back is the Console. Old: the Planning workspace.
@@ -550,10 +581,17 @@ test("persists lighting view bookmark slots through workspace changes", async ({
   await nav.getByRole("button", { name: "Audio", exact: true }).click();
   await expectWorkspaceMounted(page, "audio");
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
-
   await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
+
+  // Lighting is drawn afresh and framed again. Move the view away from the
+  // saved one with a zoom key — a mode key would re-frame over the recall — and
+  // again if the click landed in the framing animation, which draws over it.
+  await expect(async () => {
+    await page.getByRole("button", { name: "Zoom out" }).click();
+    await expect(readout).not.toHaveText(saved, { timeout: 250 });
+  }).toPass();
   await page.getByRole("button", { name: /Recall view 1/ }).click();
-  await expect(page.getByRole("button", { name: /Recall view 1/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(readout).toHaveText(saved);
 });
 
 test("supports lighting drag-lasso multi-select and group save", async ({ page }) => {

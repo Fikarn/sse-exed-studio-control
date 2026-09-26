@@ -76,3 +76,122 @@ describe("scenesSavedWithAddedFixture", () => {
     expect(scenesSavedWithAddedFixture(scenes, "fixture-new", atAdd, added)).toBe(3);
   });
 });
+
+// Slice 3 review, finding 15: the cases above use one shape on both sides, as
+// the fixture double does. The hardware link does not. Its reply to the add
+// (`lighting_fixture_snapshot_from_state`) carries the fixture's control values
+// with `intensity` in them and, for a fixture with colour temperature, `cct`
+// (`effective_fixture_control_values`), and a cct of 0 for a fixture without
+// one (`fixture_default_cct`). The scene states it reads back
+// (`normalize_lighting_editor_state`) carry neither key in their control values
+// and hold a cct clamped to 2000–10000. Before the fix every scene at the add
+// counted on the link, so the undo was refused whenever a scene existed.
+describe("scenesSavedWithAddedFixture with the hardware link's shapes", () => {
+  const atAdd = new Set(["scene-wide", "scene-interview", "scene-close"]);
+  type SceneState = LightingSceneSnapshot["fixtureStates"][number];
+  const scene = (id: string, state: SceneState): LightingSceneSnapshot => ({
+    id,
+    name: id,
+    fixtureCount: 2,
+    fixtureStates: [{ fixtureId: "fixture-key", intensity: 76, cct: 3200, on: true, controlValues: {} }, state],
+    lastRecalled: false,
+    lastRecalledAt: null,
+    fadeProgress: null,
+    fadeDurationMs: null,
+    pinned: false,
+    colorIndex: null,
+  });
+  // The hook keeps these four fields of the reply's `fixture`.
+  const addedFrom = (fixture: {
+    intensity: number;
+    cct: number;
+    on: boolean;
+    controlValues: Record<string, number>;
+  }) => ({
+    intensity: fixture.intensity,
+    cct: fixture.cct,
+    on: fixture.on,
+    controlValues: fixture.controlValues,
+  });
+
+  it("an Astra Bi-Color: no scene counts until one is saved with it changed, or after the add", () => {
+    // `lighting.fixture.create`'s reply: the Astra's default cct is 4400.
+    const reply = {
+      id: "fixture-custom-1",
+      name: "Stand 4",
+      type: "astra-bicolor",
+      definitionId: "litepanels-astra-bicolor",
+      modeId: "default",
+      universe: 1,
+      dmxStartAddress: 81,
+      kind: "profile",
+      groupId: null,
+      spatialX: null,
+      spatialY: null,
+      spatialRotation: 0,
+      rigZ: null,
+      beamAngleDegrees: null,
+      on: false,
+      intensity: 100,
+      cct: 4400,
+      controlValues: { intensity: 100, cct: 4400 },
+      effect: null,
+    };
+    // `append_fixture_to_scenes`, as `lighting.snapshot` reads it back.
+    const asRead: SceneState = { fixtureId: reply.id, intensity: 100, cct: 4400, on: false, controlValues: {} };
+    const scenes = [scene("scene-wide", asRead), scene("scene-interview", asRead), scene("scene-close", asRead)];
+    expect(scenesSavedWithAddedFixture(scenes, reply.id, atAdd, addedFrom(reply))).toBe(0);
+
+    // Its cct still counts: saved again at 5000 K, and a scene saved after the add.
+    const later = [
+      ...scenes.slice(0, 2),
+      scene("scene-close", { ...asRead, cct: 5000 }),
+      scene("scene-custom-1", asRead),
+    ];
+    expect(scenesSavedWithAddedFixture(later, reply.id, atAdd, addedFrom(reply))).toBe(2);
+  });
+
+  it("an INFINIBAR PB12 in its RGB pixel mode, which has no colour temperature: the same", () => {
+    // No cct control, so the reply's cct is 0 and its control values have no `cct`.
+    const reply = {
+      id: "fixture-custom-2",
+      name: "Bar 2",
+      type: "infinibar-pb12",
+      definitionId: "aputure-infinibar-pb12",
+      modeId: "pixel-rgb-48",
+      universe: 1,
+      dmxStartAddress: 101,
+      kind: "practical",
+      groupId: null,
+      spatialX: null,
+      spatialY: null,
+      spatialRotation: 0,
+      rigZ: null,
+      beamAngleDegrees: null,
+      on: false,
+      intensity: 100,
+      cct: 0,
+      controlValues: { red: 0, green: 0, blue: 0, intensity: 100 },
+      effect: null,
+    };
+    const asRead: SceneState = {
+      fixtureId: reply.id,
+      intensity: 100,
+      cct: 2000,
+      on: false,
+      controlValues: { red: 0, green: 0, blue: 0 },
+    };
+    // Saved again with the fixture as it was: the link has given the fixture its
+    // type's default cct (5600) once it read it back, and the scene takes that.
+    const resaved: SceneState = { ...asRead, cct: 5600 };
+    const scenes = [scene("scene-wide", asRead), scene("scene-interview", asRead), scene("scene-close", resaved)];
+    expect(scenesSavedWithAddedFixture(scenes, reply.id, atAdd, addedFrom(reply))).toBe(0);
+
+    // Its other controls still count: saved again with red at 200.
+    const later = [
+      ...scenes.slice(0, 2),
+      scene("scene-close", { ...resaved, controlValues: { red: 200, green: 0, blue: 0 } }),
+    ];
+    expect(scenesSavedWithAddedFixture(later, reply.id, atAdd, addedFrom(reply))).toBe(1);
+  });
+});

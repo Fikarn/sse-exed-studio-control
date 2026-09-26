@@ -360,14 +360,17 @@ export function LightingCluster(props: LightingClusterProps) {
           ) : null}
         </div>
         {/* What the selection can be asked to do: hold it lit, dim everything
-            else, or pulse it so the operator can find it in the room. */}
+            else, or pulse it so the operator can find it in the room. A lit
+            Highlight or Solo key switches it off, in Preview too: with the
+            page-wide Esc gone it is the only way to end it on the page (Slice 3
+            review, finding 16). Only switching one on waits for the live rig. */}
         <div className={styles.actionRow}>
           <Key
             size="small"
             mode="toggle"
             engaged={highlightActive}
             aria-pressed={highlightActive}
-            disabled={previewMode || (!hasSelection && !highlightActive)}
+            disabled={!highlightActive && (previewMode || !hasSelection)}
             title={
               hasSelection ? "Hold the selection at full white at neutral CCT" : "Select fixtures to enable Highlight"
             }
@@ -381,7 +384,7 @@ export function LightingCluster(props: LightingClusterProps) {
             mode="toggle"
             engaged={soloActive}
             aria-pressed={soloActive}
-            disabled={previewMode || (!hasSelection && !soloActive)}
+            disabled={!soloActive && (previewMode || !hasSelection)}
             title={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
             testId="lighting-solo-toggle"
             onClick={onToggleSolo}

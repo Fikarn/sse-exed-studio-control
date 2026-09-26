@@ -26,13 +26,19 @@ function identitySvg() {
   } as unknown as SVGSVGElement;
 }
 
-// A plain pointer: no key is held, and none is read.
-function pointer(clientX: number, clientY: number) {
+// A pointer as a browser sends it, `shiftKey` always set: false for a plain
+// drag, true for one made with Shift held. The hook reads no key, so the
+// result must not depend on it. (Slice 3 review, finding 21: the pointer had no
+// `shiftKey` at all, and the old hook's `additive: event.shiftKey` gave
+// `undefined`, so the off case failed on the old hook only for that, and passed
+// there with a real plain drag.)
+function pointer(clientX: number, clientY: number, shiftKey: boolean) {
   return {
     button: 0,
     pointerId: 1,
     clientX,
     clientY,
+    shiftKey,
     currentTarget: { setPointerCapture: () => {}, releasePointerCapture: () => {} },
   } as unknown as ReactPointerEvent<SVGSVGElement>;
 }
@@ -52,10 +58,10 @@ function setup(additive: boolean) {
       ],
     })
   );
-  const drag = (from: [number, number], to: [number, number]) => {
-    act(() => hook.result.current.onPointerDown(pointer(...from)));
-    act(() => hook.result.current.onPointerMove(pointer(...to)));
-    act(() => hook.result.current.onPointerUp(pointer(...to)));
+  const drag = (from: [number, number], to: [number, number], { shiftKey = false } = {}) => {
+    act(() => hook.result.current.onPointerDown(pointer(...from, shiftKey)));
+    act(() => hook.result.current.onPointerMove(pointer(...to, shiftKey)));
+    act(() => hook.result.current.onPointerUp(pointer(...to, shiftKey)));
   };
   return { drag, hook, onBackgroundClick, onCommit };
 }
@@ -73,9 +79,10 @@ describe("useMarqueeSelection", () => {
     expect(lit.onCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("a box replaces the selection while Add to selection is off", () => {
+  // Shift held all through the drag: the old hook made that box add.
+  it("a box replaces the selection while Add to selection is off, even with Shift held", () => {
     const off = setup(false);
-    off.drag([0, 0], [600, 600]);
+    off.drag([0, 0], [600, 600], { shiftKey: true });
     expect(off.onCommit).toHaveBeenCalledWith(["fixture-key", "fixture-back"], { additive: false });
   });
 });

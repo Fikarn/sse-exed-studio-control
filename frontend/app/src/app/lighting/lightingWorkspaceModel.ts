@@ -127,19 +127,31 @@ export interface AddedFixtureState {
  *  and it does not stop the undo. A scene saved after the fixture was added, or
  *  saved again with the fixture changed, does: the delete would take the
  *  fixture out of that saved state. (New pages program, Slice 3: before this,
- *  every scene counted, so the undo was refused whenever a scene existed.) */
+ *  every scene counted, so the undo was refused whenever a scene existed.)
+ *
+ *  `added` is the add's reply, and the hardware link shapes it unlike the
+ *  scene states it reads back: the reply's control values carry `intensity`
+ *  and, for a fixture with colour temperature, `cct`, and its cct is 0 for a
+ *  fixture without one; a scene state carries neither key in its control
+ *  values (`normalize_fixture_control_values`) and holds a cct clamped to
+ *  2000–10000. So intensity and cct are compared by their own fields, cct only
+ *  for a fixture with colour temperature, as the drift check does
+ *  (`lightingDrift.ts`). (Slice 3 review, finding 15: the undo was refused on
+ *  the link whenever a scene existed.) */
 export function scenesSavedWithAddedFixture(
   scenes: readonly LightingSceneSnapshot[],
   fixtureId: string,
   sceneIdsAtAdd: ReadonlySet<string>,
   added: AddedFixtureState
 ): number {
+  const hasCct = Object.prototype.hasOwnProperty.call(added.controlValues, "cct");
   const changed = (state: LightingSceneSnapshot["fixtureStates"][number]) => {
     if (state.on !== added.on) return true;
     if (Math.abs(state.intensity - added.intensity) > 0.5) return true;
-    if (Math.abs(state.cct - added.cct) > 25) return true;
+    if (hasCct && Math.abs(state.cct - added.cct) > 25) return true;
     const keys = new Set([...Object.keys(state.controlValues ?? {}), ...Object.keys(added.controlValues)]);
     for (const key of keys) {
+      if (key === "intensity" || key === "cct") continue;
       if (Math.abs((state.controlValues?.[key] ?? 0) - (added.controlValues[key] ?? 0)) > 0.5) return true;
     }
     return false;

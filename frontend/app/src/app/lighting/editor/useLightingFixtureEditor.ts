@@ -5,6 +5,7 @@ import { useLiveCallback } from "../../shared/useLiveCallback";
 import { useStagePlotViewport } from "../useStagePlotViewport";
 import { asRecord } from "../../shellData";
 import { UndoRefusedError } from "../useUndoStack";
+import { rigNow } from "../undoTargets";
 import { lightingFixtureChannelCount } from "../lightingPatch";
 import {
   type FixtureValuePreviewFields,
@@ -49,7 +50,7 @@ export function useLightingFixtureEditor({
     startBusy,
     finishBusy,
     undoStack,
-    scenesRef,
+    undoTargets,
     toast,
     setUiMode,
     reportError,
@@ -395,13 +396,19 @@ export function useLightingFixtureEditor({
         const createdFixture = asRecord(result?.fixture);
         const createdFixtureId = typeof createdFixture?.id === "string" ? createdFixture.id : null;
         if (createdFixtureId) {
+          const fixtureTarget = undoTargets.created("fixture", createdFixtureId);
           await store.updateLightingSettings({ selectedFixtureId: createdFixtureId });
 
           // Push undo: deleting the just-created fixture. Refuses if a scene
           // saved after the add holds the fixture (`scenesSavedWithAddedFixture`:
           // the fixture the hardware link put into every scene on the add does
           // not count), since the delete would take it out of that saved state.
-          const sceneIdsAtAdd = new Set(scenesRef.current.map((scene) => scene.id));
+          // The fixture and the scenes of the add are followed through the ids
+          // an undo gives them, and the undo is refused once the fixture is
+          // gone (Slice 3 review, finding 17).
+          const scenesAtAdd = (store.getSnapshot().lightingSnapshot?.scenes ?? []).map((scene) =>
+            undoTargets.of("scene", scene.id)
+          );
           const addedControlValues = asRecord(createdFixture?.controlValues) ?? {};
           const added: AddedFixtureState = {
             intensity: Number(createdFixture?.intensity),
@@ -416,13 +423,20 @@ export function useLightingFixtureEditor({
           undoStack.push({
             label: `Add fixture ${fixtureSpec.name}`,
             undo: async () => {
-              const refs = scenesSavedWithAddedFixture(scenesRef.current, createdFixtureId, sceneIdsAtAdd, added);
+              const rig = rigNow(store);
+              const fixtureId = fixtureTarget.id;
+              if (fixtureId === null || !rig.fixtures.some((fixture) => fixture.id === fixtureId)) {
+                throw new UndoRefusedError("the fixture has been deleted");
+              }
+              const sceneIdsAtAdd = new Set(scenesAtAdd.flatMap((scene) => (scene.id === null ? [] : [scene.id])));
+              const refs = scenesSavedWithAddedFixture(rig.scenes, fixtureId, sceneIdsAtAdd, added);
               if (refs > 0) {
                 throw new UndoRefusedError(
                   `fixture is referenced by ${refs} scene${refs === 1 ? "" : "s"} saved after it was added`
                 );
               }
-              await store.deleteLightingFixture(createdFixtureId);
+              await store.deleteLightingFixture(fixtureId);
+              undoTargets.deleted(fixtureTarget);
             },
           });
         }
@@ -572,12 +586,10 @@ export function useLightingFixtureEditor({
 
   // Wave 29 — Highlight toggle. Selection-driven; pre-clears any active
   // Solo so the engine's mutual-exclusion guard doesn't reject the request.
-  // Operator press while highlight is active = clear (toggle).
+  // Operator press while highlight is active = clear (toggle), in preview too:
+  // the lit key is the way to end it now the page-wide Esc is gone (Slice 3
+  // review, finding 16). Only switching it on waits for the live rig.
   const handleToggleHighlight = useLiveCallback(async () => {
-    if (previewMode) {
-      toast.push({ message: "Exit preview to use live Highlight.", tone: "attention" });
-      return;
-    }
     if (highlightActive) {
       startBusy("highlight");
       try {
@@ -587,6 +599,10 @@ export function useLightingFixtureEditor({
       } finally {
         finishBusy("highlight");
       }
+      return;
+    }
+    if (previewMode) {
+      toast.push({ message: "Exit preview to use live Highlight.", tone: "attention" });
       return;
     }
     if (selectedFixtureIds.size === 0) {
@@ -611,12 +627,9 @@ export function useLightingFixtureEditor({
     }
   });
 
-  // Wave 29 — Solo toggle. Symmetric to Highlight.
+  // Wave 29 — Solo toggle. Symmetric to Highlight, the switch off in preview
+  // included.
   const handleToggleSolo = useLiveCallback(async () => {
-    if (previewMode) {
-      toast.push({ message: "Exit preview to use live Solo.", tone: "attention" });
-      return;
-    }
     if (soloActive) {
       startBusy("solo");
       try {
@@ -626,6 +639,10 @@ export function useLightingFixtureEditor({
       } finally {
         finishBusy("solo");
       }
+      return;
+    }
+    if (previewMode) {
+      toast.push({ message: "Exit preview to use live Solo.", tone: "attention" });
       return;
     }
     if (selectedFixtureIds.size === 0) {
@@ -746,7 +763,12 @@ export function useLightingFixtureEditor({
       try {
         await store.highlightLightingFixtures([], "off");
       } catch (error) {
-        reportError(error, "Could not clear Highlight and Solo. Press the lit key again.");
+        // The Lighting page is gone, and with it the lit key (Slice 3 review,
+        // finding 19); the overlay stays on the rig until it is switched off.
+        reportError(
+          error,
+          "Could not clear Highlight and Solo. Open Lighting and press the lit Highlight or Solo key."
+        );
       }
     }
     if (findWasRunning) {
@@ -774,10 +796,13 @@ export function useLightingFixtureEditor({
     // groupId / spatial / beam-angle are restored via a follow-up update IPC
     // because createLightingFixture only takes the create-time fields.
     const target = fixtures.find((fixture) => fixture.id === fixtureId);
+    // Followed through the id the undo gives it back (Slice 3 review, finding 17).
+    const fixtureTarget = undoTargets.of("fixture", fixtureId);
     const busyKey = `fixture-delete:${fixtureId}`;
     startBusy(busyKey);
     try {
       await store.deleteLightingFixture(fixtureId);
+      undoTargets.deleted(fixtureTarget);
       // Clear the selection if we just deleted the selected fixture so the
       // inspector falls back to the scene tab.
       if (persistedSelectedFixtureId === fixtureId) {
@@ -788,6 +813,12 @@ export function useLightingFixtureEditor({
         undoStack.push({
           label: `Delete fixture ${snapshot.name}`,
           undo: async () => {
+            // A group deleted since would make the hardware link refuse the
+            // fixture every time; it comes back without one.
+            const groupId =
+              snapshot.groupId && rigNow(store).groups.some((group) => group.id === snapshot.groupId)
+                ? snapshot.groupId
+                : undefined;
             const result = asRecord(
               await store.createLightingFixture({
                 name: snapshot.name,
@@ -796,12 +827,13 @@ export function useLightingFixtureEditor({
                 modeId: snapshot.modeId,
                 universe: snapshot.universe,
                 dmxStartAddress: snapshot.dmxStartAddress > 0 ? snapshot.dmxStartAddress : 1,
-                groupId: snapshot.groupId ?? undefined,
+                groupId,
               })
             );
             const created = asRecord(result?.fixture);
             const newId = typeof created?.id === "string" ? created.id : null;
             if (newId) {
+              undoTargets.restored(fixtureTarget, newId);
               await store.updateLightingFixture({
                 fixtureId: newId,
                 intensity: snapshot.intensity,

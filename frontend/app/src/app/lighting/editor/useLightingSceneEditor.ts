@@ -6,6 +6,8 @@ import type { LightingSceneSnapshot, LightingSceneFixtureSnapshot } from "@sse/e
 import { formatLightingRelativeTime } from "../lightingHelpers";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import { renderSceneThumbnailDataUri, withSceneThumbUpserted, withSceneThumbRemoved } from "../sceneThumbnails";
+import { UndoRefusedError } from "../useUndoStack";
+import { rigNow } from "../undoTargets";
 import {
   RECENT_SCENE_LIMIT,
   pushUndoOutcomeToast,
@@ -45,6 +47,7 @@ export function useLightingSceneEditor({
     finishBusy,
     uiMode,
     undoStack,
+    undoTargets,
     operatorLayout,
     setInspectorDrawerOpen,
     busyActions,
@@ -380,6 +383,7 @@ export function useLightingSceneEditor({
       const created = asRecord(result?.scene);
       const createdId = typeof created?.id === "string" ? created.id : null;
       if (createdId) {
+        const sceneTarget = undoTargets.created("scene", createdId);
         // I6 — the newly-saved scene heads the search field's Recent list.
         pushRecentScene(createdId);
         // Pull the fresh scene from the result so we render its true saved
@@ -394,11 +398,18 @@ export function useLightingSceneEditor({
         setLastSavedAt(new Date());
         // Push undo: deleting the just-created scene. Once undone the entry
         // is gone; there is no redo (new pages program, Slice 3, decision 5).
+        // It deletes the scene under the id it has now, and is refused once
+        // the scene is gone (Slice 3 review, finding 17).
         undoStack.push({
           label: `Save scene ${name}`,
           undo: async () => {
-            await store.deleteLightingScene(createdId);
-            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, createdId);
+            const sceneId = sceneTarget.id;
+            if (sceneId === null || !rigNow(store).scenes.some((scene) => scene.id === sceneId)) {
+              throw new UndoRefusedError("the scene has been deleted");
+            }
+            await store.deleteLightingScene(sceneId);
+            undoTargets.deleted(sceneTarget);
+            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
             await persistSceneThumbs(cleared);
           },
         });
@@ -479,25 +490,44 @@ export function useLightingSceneEditor({
             }),
         }
       : null;
+    // The scene and the fixtures its states name, followed through the ids an
+    // undo gives them (Slice 3 review, finding 17).
+    const sceneTarget = undoTargets.of("scene", sceneId);
+    const fixtureTargets = (targetSnapshot?.fixtureStates ?? []).map((state) =>
+      undoTargets.of("fixture", state.fixtureId)
+    );
     startBusy("scene-delete");
     try {
       await store.deleteLightingScene(sceneId);
+      undoTargets.deleted(sceneTarget);
       const next = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
       await persistSceneThumbs(next);
       if (targetSnapshot) {
         undoStack.push({
           label: `Delete scene ${targetSnapshot.name}`,
           undo: async () => {
+            // A fixture brought back since is named by its new id; one deleted
+            // since leaves the scene, which the hardware link would otherwise
+            // refuse whole. With none of them left there is nothing to restore.
+            const onRig = new Set(rigNow(store).fixtures.map((fixture) => fixture.id));
+            const fixtureStates = targetSnapshot.fixtureStates.flatMap((state, index) => {
+              const fixtureId = fixtureTargets[index]?.id ?? null;
+              return fixtureId !== null && onRig.has(fixtureId) ? [{ ...state, fixtureId }] : [];
+            });
+            if (fixtureStates.length === 0) {
+              throw new UndoRefusedError("every fixture it held has been deleted");
+            }
             const result = asRecord(
               await store.createLightingScene({
                 name: targetSnapshot.name,
-                fixtureStates: targetSnapshot.fixtureStates,
+                fixtureStates,
                 colorIndex: targetSnapshot.colorIndex,
               })
             );
             const created = asRecord(result?.scene);
             const restoredId = typeof created?.id === "string" ? created.id : null;
             if (restoredId) {
+              undoTargets.restored(sceneTarget, restoredId);
               if (targetSnapshot.pinned) {
                 await store.pinLightingScene(restoredId, true);
               }

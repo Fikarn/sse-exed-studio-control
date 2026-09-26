@@ -116,6 +116,42 @@ describe("LightingCluster", () => {
     expect(long.textContent).toBe(`Undo${longName.slice(0, 39)}…`);
   });
 
+  // Slice 3 review, finding 16: the page-wide Esc cleared Highlight and Solo in
+  // any mode; its twin is the lit key. In Preview both keys were disabled, lit
+  // or not, so nothing on the page could switch a live Highlight or Solo off.
+  it("a lit Highlight or Solo key can be pressed in Preview, with or without a selection; unlit, both wait", () => {
+    for (const hasSelection of [true, false]) {
+      const onToggleHighlight = vi.fn();
+      renderCluster({ previewMode: true, highlightActive: true, hasSelection, onToggleHighlight });
+      const highlight = screen.getByTestId("lighting-highlight-toggle") as HTMLButtonElement;
+      expect(highlight.getAttribute("aria-pressed")).toBe("true");
+      expect(highlight.disabled).toBe(false);
+      fireEvent.click(highlight);
+      expect(onToggleHighlight).toHaveBeenCalledTimes(1);
+      cleanup();
+
+      const onToggleSolo = vi.fn();
+      renderCluster({ previewMode: true, soloActive: true, hasSelection, onToggleSolo });
+      const solo = screen.getByTestId("lighting-solo-toggle") as HTMLButtonElement;
+      expect(solo.getAttribute("aria-pressed")).toBe("true");
+      expect(solo.disabled).toBe(false);
+      fireEvent.click(solo);
+      expect(onToggleSolo).toHaveBeenCalledTimes(1);
+      cleanup();
+    }
+
+    const onToggleHighlight = vi.fn();
+    const onToggleSolo = vi.fn();
+    renderCluster({ previewMode: true, hasSelection: true, onToggleHighlight, onToggleSolo });
+    for (const testId of ["lighting-highlight-toggle", "lighting-solo-toggle"]) {
+      const key = screen.getByTestId(testId) as HTMLButtonElement;
+      expect(key.disabled).toBe(true);
+      fireEvent.click(key);
+    }
+    expect(onToggleHighlight).not.toHaveBeenCalled();
+    expect(onToggleSolo).not.toHaveBeenCalled();
+  });
+
   it("says Press Patch, not a key, while patch mode holds the rig", () => {
     renderCluster({ patchMode: true });
     expect(screen.getByTestId("lighting-power-toggle").getAttribute("title")).toBe(
