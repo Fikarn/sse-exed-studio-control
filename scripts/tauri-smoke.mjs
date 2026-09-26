@@ -1,8 +1,9 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredPaths = [
@@ -15,33 +16,39 @@ const requiredPaths = [
   "native/protocol/generated/v1.schema.json",
 ];
 
-for (const relativePath of requiredPaths) {
-  const absolutePath = path.join(rootDir, relativePath);
-  if (!existsSync(absolutePath)) {
-    throw new Error(`Missing required Tauri foundation file: ${relativePath}`);
+// The protocol contract the checks below hold the engine to; main() reads it
+// once the required files are known to be there.
+let protocolContract = null;
+
+async function main() {
+  for (const relativePath of requiredPaths) {
+    const absolutePath = path.join(rootDir, relativePath);
+    if (!existsSync(absolutePath)) {
+      throw new Error(`Missing required Tauri foundation file: ${relativePath}`);
+    }
   }
+
+  const config = JSON.parse(readFileSync(path.join(rootDir, "native", "tauri-shell", "tauri.conf.json"), "utf8"));
+  protocolContract = JSON.parse(readFileSync(path.join(rootDir, "native", "protocol", "v1.contract.json"), "utf8"));
+
+  if (!config.app?.windows?.length || config.app.windows.length !== 1) {
+    throw new Error("Tauri shell must remain single-window during the migration foundation phase.");
+  }
+
+  if (!protocolContract.devParityFixtures.includes("setup-required")) {
+    throw new Error("Protocol contract must include the setup-required parity fixture.");
+  }
+
+  verifyContentSecurityPolicy(config);
+
+  const engineBinary = resolveEngineBinary();
+
+  await verifyReadyHandshake(engineBinary);
+  await verifyProtocolMismatch(engineBinary);
+  await verifyBootstrapFailure(engineBinary);
+
+  console.log("Tauri foundation smoke checks passed.");
 }
-
-const config = JSON.parse(readFileSync(path.join(rootDir, "native", "tauri-shell", "tauri.conf.json"), "utf8"));
-const protocolContract = JSON.parse(readFileSync(path.join(rootDir, "native", "protocol", "v1.contract.json"), "utf8"));
-
-if (!config.app?.windows?.length || config.app.windows.length !== 1) {
-  throw new Error("Tauri shell must remain single-window during the migration foundation phase.");
-}
-
-if (!protocolContract.devParityFixtures.includes("setup-required")) {
-  throw new Error("Protocol contract must include the setup-required parity fixture.");
-}
-
-verifyContentSecurityPolicy(config);
-
-const engineBinary = resolveEngineBinary();
-
-await verifyReadyHandshake(engineBinary);
-await verifyProtocolMismatch(engineBinary);
-await verifyBootstrapFailure(engineBinary);
-
-console.log("Tauri foundation smoke checks passed.");
 
 // 2026-09 production readiness, Slice 4 (finding F15): the shell ships a
 // Content Security Policy. Tauri injects `app.security.csp` into every HTML
@@ -224,7 +231,7 @@ async function verifyBootstrapFailure(engineBinaryPath) {
   }
 }
 
-function runScenario({
+async function runScenario({
   appDataDir,
   engineBinaryPath,
   expectFailure = null,
@@ -234,14 +241,21 @@ function runScenario({
   onResponse,
   requestedProtocol,
 }) {
+  // Hardened like every lane (new pages program, Slice 2b): a bridge port of
+  // its own, the light outputs held and the simulated console.
+  const env = laneProcessEnv(
+    {
+      ...(await hardenedLaneEnv()),
+      SSE_APP_DATA_DIR: appDataDir,
+      SSE_LOG_DIR: logsDir,
+      SSE_PROTOCOL_VERSION: requestedProtocol,
+    },
+    {},
+    { label: `Tauri smoke scenario '${label}'` }
+  );
   return new Promise((resolve, reject) => {
     const child = spawn(engineBinaryPath, {
-      env: {
-        ...process.env,
-        SSE_APP_DATA_DIR: appDataDir,
-        SSE_LOG_DIR: logsDir,
-        SSE_PROTOCOL_VERSION: requestedProtocol,
-      },
+      env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -409,4 +423,32 @@ function runScenario({
       succeed();
     });
   });
+}
+
+// Runs only as `node scripts/tauri-smoke.mjs`: an import does nothing
+// (2026-09-26; the run starts the engine three times). The two paths are
+// compared as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }

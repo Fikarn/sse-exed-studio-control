@@ -14,7 +14,7 @@ This repository is intentionally optimized for a specific deployment profile rat
 - selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
 - separate `Rust` engine (persistence, safety, device logic)
 - offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
-- one-way importer for legacy `db.json` data, invoked once on first native launch for migrating operators; since the new pages program's Slice 2 it carries only whether setup is complete and the page to open, and that program's Slice 2b retires it
+- no legacy code: the one-way importer for the pre-`v2.0.0` `db.json` was retired in the new pages program's Slice 2b (2026-09), so a `db.json` is neither imported nor restored
 
 The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipping runtime passed macOS and Windows target-host evidence. QtIFW remains the installer and update-repository wrapper.
 

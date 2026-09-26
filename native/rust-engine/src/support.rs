@@ -8,7 +8,6 @@ use crate::commissioning::{
     AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY, LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
 };
 use crate::diagnostics::append_log;
-use crate::legacy_import::{ImportLegacyError, LegacyImportRequest};
 use crate::lighting::{LIGHTING_OUTPUT_ARMED_KEY, LIGHTING_SELECTED_FIXTURE_ID_KEY};
 use crate::shell_settings::{
     ShellSettingsSnapshot, DEFAULT_WORKSPACE, LIGHTING_CURRENT_SECTION_ID_KEY,
@@ -17,7 +16,7 @@ use crate::shell_settings::{
     WINDOW_WIDTH_KEY, WORKSPACE_KEY,
 };
 use crate::storage::{
-    import_legacy_db, list_settings_by_prefix, open_connection, run_integrity_check, EngineResult,
+    list_settings_by_prefix, open_connection, run_integrity_check, EngineResult,
     STORAGE_SCHEMA_VERSION,
 };
 use crate::storage_backups::{snapshot_database, SnapshotReason};
@@ -53,6 +52,11 @@ const PRE_RESTORE_ARCHIVE_PREFIX: &str = "native-pre-restore";
 const PRE_RESTORE_ARCHIVE_RETENTION: usize = 5;
 const ARCHIVE_EXTENSION: &str = "json";
 const DATABASE_BACKUP_EXTENSION: &str = "sqlite3";
+/// How the old Studio Control's database export was named: `db.json`, and
+/// the copies kept as `<something>-db.json`. New pages program, Slice 2b
+/// (D3): such a file is refused by name, unless it is a support archive
+/// (`is_old_studio_control_export`).
+const OLD_STUDIO_CONTROL_EXPORT_SUFFIX: &str = "db.json";
 /// The verified database backup a restore copies here, under the app-data
 /// directory; the bootstrap moves it into place at the next start (Slice 7
 /// — F20), after the instance lock and before the database is opened.
@@ -418,19 +422,20 @@ pub fn export_support_backup(
 
 /// `support.backup.verify`: reads the file without changing anything and
 /// says whether this app can restore it. A JSON archive must parse as a
-/// support archive of a format this reader knows (or as a legacy `db.json`
-/// export); a database backup must open read-only, pass `integrity_check`
-/// and carry a schema this app can upgrade from. Never an error: a junk file
-/// is `ok: false` with the reason.
+/// support archive of a format this reader knows; a database backup must
+/// open read-only, pass `integrity_check` and carry a schema this app can
+/// upgrade from. Never an error: a junk file is `ok: false` with the reason.
 ///
 /// New pages program, Slice 2 (D3): the sentence no longer counts projects
 /// and tasks, and a backup written before Planning left that holds Planning
-/// data says it will not be restored.
+/// data says it will not be restored. Slice 2b (D3): an export from the old
+/// Studio Control (a `db.json`) is `ok: false` and named as one; until then
+/// it was `ok: true`, restored through the retired import.
 pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVerification {
     let path = request.source_path.display().to_string();
     match request.kind {
         SupportBackupKind::Archive => match inspect_archive(&request.source_path) {
-            Ok(ArchiveFacts::Native {
+            Ok(ArchiveFacts {
                 format_version,
                 exported_at,
                 holds_planning_rows,
@@ -445,32 +450,13 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                     holds_planning_rows,
                 ),
             },
-            Ok(ArchiveFacts::Native { format_version, .. }) => SupportBackupVerification {
+            Ok(ArchiveFacts { format_version, .. }) => SupportBackupVerification {
                 ok: false,
                 kind: request.kind,
                 path,
                 format_version: Some(format_version),
                 schema_version: None,
                 detail: newer_archive_sentence(format_version),
-            },
-            // Slice 2 (interim until Slice 2b retires the db.json import):
-            // only whether setup is complete and the page to open are read
-            // from the file.
-            Ok(ArchiveFacts::Legacy {
-                schema_version,
-                holds_planning_rows,
-            }) => SupportBackupVerification {
-                ok: true,
-                kind: request.kind,
-                path,
-                format_version: None,
-                schema_version: Some(schema_version),
-                detail: with_planning_note(
-                    format!(
-                        "Legacy db.json export (schema {schema_version}); only whether setup is complete and the page to open are restored from it."
-                    ),
-                    holds_planning_rows,
-                ),
             },
             Err(detail) => SupportBackupVerification {
                 ok: false,
@@ -543,8 +529,8 @@ fn with_planning_note(sentence: String, holds_planning_rows: bool) -> String {
 
 /// Whether a JSON backup's Planning part holds any Planning data: a project,
 /// a task (its checklist lives inside it) or an activity entry. `section` is
-/// the archive's `planning` object (formats 2 to 4) or a legacy db.json's top
-/// level. Its Planning settings alone are view preferences, not data, and
+/// the archive's `planning` object (formats 2 to 4). Its Planning settings
+/// alone are view preferences, not data, and
 /// every archive before format 5 carries them, so they are skipped without a
 /// word (new pages program, Slice 2 — D3).
 fn json_holds_planning_rows(section: Option<&Value>) -> bool {
@@ -559,68 +545,104 @@ fn json_holds_planning_rows(section: Option<&Value>) -> bool {
     })
 }
 
-enum ArchiveFacts {
-    Native {
-        format_version: i64,
-        exported_at: String,
-        holds_planning_rows: bool,
-    },
-    Legacy {
-        schema_version: i64,
-        holds_planning_rows: bool,
-    },
+/// What a support archive says of itself, for Verify.
+struct ArchiveFacts {
+    format_version: i64,
+    exported_at: String,
+    holds_planning_rows: bool,
 }
 
 fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
-    let raw = fs::read_to_string(path)
-        .map_err(|error| format!("{} could not be read: {error}", path.display()))?;
-    let parsed: Value = serde_json::from_str(&raw)
-        .map_err(|error| format!("{} is not a JSON backup: {error}", path.display()))?;
-    let Some(object) = parsed.as_object() else {
-        return Err(format!(
+    let bytes =
+        fs::read(path).map_err(|error| format!("{} could not be read: {error}", path.display()))?;
+    let parsed = parse_support_archive(path, &bytes)?;
+    let format_version = parsed
+        .get("formatVersion")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| {
+            format!(
+                "{} is a backup archive without a format version.",
+                path.display()
+            )
+        })?;
+    Ok(ArchiveFacts {
+        format_version,
+        exported_at: parsed
+            .get("exportedAt")
+            .and_then(Value::as_str)
+            .unwrap_or("at an unknown time")
+            .to_string(),
+        holds_planning_rows: json_holds_planning_rows(parsed.get("planning")),
+    })
+}
+
+/// A `.json` file's JSON when it is a support archive; otherwise the one
+/// sentence Verify answers with and a restore refuses with. New pages
+/// program, Slice 2b (D3): the db.json import is retired, so nothing but a
+/// support archive is applied — an export from the old Studio Control is
+/// named as one, and any other JSON is not a backup archive. Until then both
+/// went to the import, and a restore of a stray `{}` reset the setup flag.
+///
+/// 2026-09-25: the file comes as bytes, so one that is not UTF-8 (a db.json
+/// re-saved as UTF-16, say) is told apart the same way as one that is not
+/// JSON. Until then Verify said it "could not be read" and a restore
+/// answered STORAGE_ERROR with the bare io text, before the name was looked
+/// at.
+fn parse_support_archive(path: &Path, bytes: &[u8]) -> Result<Value, String> {
+    let parsed = std::str::from_utf8(bytes)
+        .map_err(|error| error.to_string())
+        .and_then(|raw| serde_json::from_str::<Value>(raw).map_err(|error| error.to_string()));
+    match parsed {
+        Ok(parsed) if is_support_archive(&parsed) => Ok(parsed),
+        Ok(parsed) if is_old_studio_control_export(path, Some(&parsed)) => {
+            Err(old_studio_control_export_sentence(path))
+        }
+        Ok(_) => Err(format!(
             "{} is not a Studio Control backup archive.",
             path.display()
-        ));
-    };
-    if object
+        )),
+        Err(_) if is_old_studio_control_export(path, None) => {
+            Err(old_studio_control_export_sentence(path))
+        }
+        Err(error) => Err(format!("{} is not a JSON backup: {error}", path.display())),
+    }
+}
+
+fn is_support_archive(parsed: &Value) -> bool {
+    parsed
         .get("archiveType")
         .and_then(Value::as_str)
         .is_some_and(|value| value == SUPPORT_BACKUP_ARCHIVE_TYPE)
-    {
-        let format_version = object
-            .get("formatVersion")
-            .and_then(Value::as_i64)
-            .ok_or_else(|| {
-                format!(
-                    "{} is a backup archive without a format version.",
-                    path.display()
-                )
-            })?;
-        return Ok(ArchiveFacts::Native {
-            format_version,
-            exported_at: object
-                .get("exportedAt")
-                .and_then(Value::as_str)
-                .unwrap_or("at an unknown time")
-                .to_string(),
-            holds_planning_rows: json_holds_planning_rows(object.get("planning")),
-        });
-    }
-    if object.get("projects").is_some_and(Value::is_array)
-        && object.get("schemaVersion").is_some_and(Value::is_number)
-    {
-        return Ok(ArchiveFacts::Legacy {
-            schema_version: object
-                .get("schemaVersion")
-                .and_then(Value::as_i64)
-                .unwrap_or(0),
-            holds_planning_rows: json_holds_planning_rows(Some(&parsed)),
-        });
-    }
-    Err(format!(
-        "{} is not a Studio Control backup archive.",
-        path.display()
-    ))
+}
+
+/// An export from the old Studio Control, known by its name (it ends in
+/// `db.json`) or by what it holds (the old export's `schemaVersion` beside a
+/// `projects` list). A support archive is never taken for one:
+/// `parse_support_archive` asks this only of a file that is not. The fixture
+/// double (`setupRequests.ts`) has only the name to go by: it refuses every
+/// name ending in `db.json`, a support archive named so included, and takes
+/// every other listed `.json` for an archive (2026-09-25; this said "as the
+/// screen's own check does", and the screen has no such check).
+fn is_old_studio_control_export(path: &Path, parsed: Option<&Value>) -> bool {
+    let named = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(OLD_STUDIO_CONTROL_EXPORT_SUFFIX));
+    let shaped = parsed.and_then(Value::as_object).is_some_and(|object| {
+        object.get("projects").is_some_and(Value::is_array)
+            && object.get("schemaVersion").is_some_and(Value::is_number)
+    });
+    named || shaped
+}
+
+fn old_studio_control_export_sentence(path: &Path) -> String {
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string());
+    format!(
+        "{file_name} is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead."
+    )
 }
 
 /// Opens a database backup read-only and checks it: SQLite must accept the
@@ -697,11 +719,13 @@ pub fn restore_support_backup(
 }
 
 /// A JSON archive is applied in place: parsed and checked first (a newer
-/// format is refused before anything is written), then a rollback archive
-/// is written, then the archive's settings replace what is there in one
-/// transaction. New pages program, Slice 2 (D3): the Planning part of an
-/// archive of format 4 or older is skipped, and the reply's `detail` says
-/// so when it held Planning data.
+/// format, and a file that is not a support archive, are refused before
+/// anything is written), then a rollback archive is written, then the
+/// archive's settings replace what is there in one transaction. New pages
+/// program, Slice 2 (D3): the Planning part of an archive of format 4 or
+/// older is skipped, and the reply's `detail` says so when it held Planning
+/// data. Slice 2b (D3): a legacy db.json is no longer restored through the
+/// import, which is retired.
 fn restore_archive_backup(
     runtime: &RuntimeContext,
     request: &SupportRestoreRequest,
@@ -711,75 +735,38 @@ fn restore_archive_backup(
             "The saved data could not be opened, so a backup archive cannot be applied to it. Restore a database backup first; an archive can be applied once Studio Control is back.",
         )));
     }
-    let raw = fs::read_to_string(&request.source_path)
+    // STORAGE_ERROR only when the file cannot be read at all; one that is not
+    // UTF-8 is refused below (2026-09-25).
+    let bytes = fs::read(&request.source_path)
         .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
-    let parsed: Value = serde_json::from_str(&raw)
-        .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
+    // Slice 2b (D3): anything but a support archive — an export from the old
+    // Studio Control, any other JSON — is refused here, before the rollback
+    // archive or anything else is written.
+    let parsed = parse_support_archive(&request.source_path, &bytes)
+        .map_err(SupportCommandError::InvalidParams)?;
 
-    if parsed
-        .get("archiveType")
-        .and_then(Value::as_str)
-        .map(|value| value == SUPPORT_BACKUP_ARCHIVE_TYPE)
-        .unwrap_or(false)
-    {
-        let format_version = parsed
-            .get("formatVersion")
-            .and_then(Value::as_i64)
-            .unwrap_or(0);
-        if format_version > SUPPORT_BACKUP_FORMAT_VERSION {
-            return Err(SupportCommandError::UnsupportedVersion(
-                newer_archive_sentence(format_version),
-            ));
-        }
-        let skipped_planning_rows = json_holds_planning_rows(parsed.get("planning"));
-        let archive: SupportBackupArchive = serde_json::from_value(parsed)
-            .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
-        let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
-        let settings_restored = restore_native_support_archive(&runtime.db_path, &archive)
-            .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
-        prune_pre_restore_archives(runtime);
-
-        return Ok(SupportBackupRestoreSummary {
-            source_path: request.source_path.display().to_string(),
-            source_format: String::from("native-support-backup"),
-            rollback_backup_path: Some(rollback.path),
-            settings_restored,
-            requires_restart: false,
-            detail: planning_not_restored(skipped_planning_rows),
-        });
+    let format_version = parsed
+        .get("formatVersion")
+        .and_then(Value::as_i64)
+        .unwrap_or(0);
+    if format_version > SUPPORT_BACKUP_FORMAT_VERSION {
+        return Err(SupportCommandError::UnsupportedVersion(
+            newer_archive_sentence(format_version),
+        ));
     }
-
-    // A legacy db.json (interim until Slice 2b retires the import): only
-    // whether setup is complete and the page to open are restored.
-    let skipped_planning_rows = json_holds_planning_rows(Some(&parsed));
+    let skipped_planning_rows = json_holds_planning_rows(parsed.get("planning"));
+    let archive: SupportBackupArchive = serde_json::from_value(parsed)
+        .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
     let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
-    let legacy_summary = import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: request.source_path.clone(),
-            force: true,
-        },
-    )
-    .map_err(|error| match error {
-        ImportLegacyError::SourceNotFound(path) => SupportCommandError::InvalidParams(format!(
-            "Backup file was not found: {}",
-            path.display()
-        )),
-        ImportLegacyError::SourceReadFailed(message)
-        | ImportLegacyError::SourceParseFailed(message) => {
-            SupportCommandError::InvalidParams(message)
-        }
-        ImportLegacyError::ExistingDataRequiresForce | ImportLegacyError::Storage(_) => {
-            SupportCommandError::Storage(error.to_string())
-        }
-    })?;
+    let settings_restored = restore_native_support_archive(&runtime.db_path, &archive)
+        .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
     prune_pre_restore_archives(runtime);
 
     Ok(SupportBackupRestoreSummary {
         source_path: request.source_path.display().to_string(),
-        source_format: String::from("legacy-db-json"),
+        source_format: String::from("native-support-backup"),
         rollback_backup_path: Some(rollback.path),
-        settings_restored: legacy_summary.updated_settings,
+        settings_restored,
         requires_restart: false,
         detail: planning_not_restored(skipped_planning_rows),
     })

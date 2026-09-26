@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const MAX_SOURCE_LINES = 2_000;
 const MAX_TRACKED_FILE_BYTES = 1_500_000;
@@ -36,59 +38,89 @@ function lineCount(filePath) {
   return content.length === 0 ? 0 : content.split("\n").length;
 }
 
-const sourceViolations = [];
-const largeFileViolations = [];
-const allowedLargeFiles = [];
+function main() {
+  const sourceViolations = [];
+  const largeFileViolations = [];
+  const allowedLargeFiles = [];
 
-for (const filePath of gitTrackedFiles()) {
-  if (!existsSync(filePath)) {
-    continue;
+  for (const filePath of gitTrackedFiles()) {
+    if (!existsSync(filePath)) {
+      continue;
+    }
+
+    const size = statSync(filePath).size;
+
+    if (size > MAX_TRACKED_FILE_BYTES) {
+      const reason = largeFileAllowlist.get(filePath);
+      if (reason) {
+        allowedLargeFiles.push({ filePath, size, reason });
+      } else {
+        largeFileViolations.push({ filePath, size });
+      }
+    }
+
+    if (!sourceExtensions.has(extensionFor(filePath))) {
+      continue;
+    }
+
+    const lines = lineCount(filePath);
+    if (lines <= MAX_SOURCE_LINES) {
+      continue;
+    }
+
+    sourceViolations.push({ filePath, lines });
   }
 
-  const size = statSync(filePath).size;
-
-  if (size > MAX_TRACKED_FILE_BYTES) {
-    const reason = largeFileAllowlist.get(filePath);
-    if (reason) {
-      allowedLargeFiles.push({ filePath, size, reason });
-    } else {
-      largeFileViolations.push({ filePath, size });
+  if (allowedLargeFiles.length > 0) {
+    console.log("Allowed large tracked artifacts:");
+    for (const entry of allowedLargeFiles) {
+      const mib = (entry.size / 1024 / 1024).toFixed(1);
+      console.log(`- ${entry.filePath}: ${mib} MiB (${entry.reason})`);
     }
   }
 
-  if (!sourceExtensions.has(extensionFor(filePath))) {
-    continue;
+  if (sourceViolations.length > 0 || largeFileViolations.length > 0) {
+    for (const violation of sourceViolations) {
+      console.error(
+        `Source file exceeds ${MAX_SOURCE_LINES} lines: ${violation.filePath} (${violation.lines} lines). Split it; there is no allowlist for source files.`
+      );
+    }
+    for (const violation of largeFileViolations) {
+      const mib = (violation.size / 1024 / 1024).toFixed(1);
+      console.error(
+        `Tracked file exceeds ${MAX_TRACKED_FILE_BYTES} bytes and is not allowlisted: ${violation.filePath} (${mib} MiB)`
+      );
+    }
+    process.exit(1);
   }
 
-  const lines = lineCount(filePath);
-  if (lines <= MAX_SOURCE_LINES) {
-    continue;
-  }
-
-  sourceViolations.push({ filePath, lines });
+  console.log("File health guard passed.");
 }
 
-if (allowedLargeFiles.length > 0) {
-  console.log("Allowed large tracked artifacts:");
-  for (const entry of allowedLargeFiles) {
-    const mib = (entry.size / 1024 / 1024).toFixed(1);
-    console.log(`- ${entry.filePath}: ${mib} MiB (${entry.reason})`);
+// Runs only as `node scripts/file-health.mjs`: an import does nothing
+// (2026-09-26; the run reads git ls-files and ends the process when a file
+// fails the guard). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
   }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
 }
 
-if (sourceViolations.length > 0 || largeFileViolations.length > 0) {
-  for (const violation of sourceViolations) {
-    console.error(
-      `Source file exceeds ${MAX_SOURCE_LINES} lines: ${violation.filePath} (${violation.lines} lines). Split it; there is no allowlist for source files.`
-    );
-  }
-  for (const violation of largeFileViolations) {
-    const mib = (violation.size / 1024 / 1024).toFixed(1);
-    console.error(
-      `Tracked file exceeds ${MAX_TRACKED_FILE_BYTES} bytes and is not allowlisted: ${violation.filePath} (${mib} MiB)`
-    );
-  }
-  process.exit(1);
+if (isMainModule()) {
+  main();
 }
-
-console.log("File health guard passed.");

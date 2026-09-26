@@ -8,14 +8,12 @@ use crate::health::{
     report as report_health, report_at as report_health_at, SubsystemState, SUBSYSTEM_BACKUPS,
     SUBSYSTEM_RESTORE, SUBSYSTEM_SACN, SUBSYSTEM_STORAGE,
 };
-use crate::legacy_import::LegacyImportRequest;
 use crate::lighting::{
     lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
 };
 use crate::storage::{
-    checkpoint_database, import_legacy_db, initialize_database, legacy_import_finds_saved_data,
-    list_settings_by_prefix, set_settings_owned_and, EngineResult, StorageBootstrap, StorageError,
-    STORAGE_SCHEMA_VERSION,
+    checkpoint_database, initialize_database, list_settings_by_prefix, set_settings_owned_and,
+    EngineResult, StorageBootstrap, StorageError, STORAGE_SCHEMA_VERSION,
 };
 use crate::storage_backups::{newest_snapshot, reserve_snapshot_path, SnapshotReason};
 use crate::support::{inspect_database_backup, prune_exports, RESTORE_PENDING_FILE_NAME};
@@ -35,11 +33,15 @@ pub const SUPPORTED_PROTOCOL_VERSION: &str = "2";
 /// shell-started engine agree on where the operator's data lives.
 const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 
-/// The only legacy `db.json` the engine imports on its own, relative to the
-/// app-data directory. The process working directory is never scanned
-/// (2026-09 production readiness, Slice 1 — finding F23).
+/// Where a legacy `db.json` was staged for the start-up import, relative to
+/// the app-data directory, and the variable that named one. New pages
+/// program, Slice 2b (D3): the import is retired, and a file left at either
+/// is only named in the log (`warn_about_a_left_over_db_json`); nothing reads
+/// it. The process working directory was never a source (2026-09 production
+/// readiness, Slice 1 — finding F23).
 const LEGACY_IMPORT_DIR_NAME: &str = "import";
 const LEGACY_IMPORT_FILE_NAME: &str = "db.json";
+const LEGACY_DB_PATH_ENV: &str = "SSE_LEGACY_DB_PATH";
 
 #[derive(Debug)]
 pub struct RuntimePaths {
@@ -380,9 +382,12 @@ pub(crate) fn bootstrap_runtime_from_paths(
         )?,
     }
 
-    auto_import_legacy_db(&runtime_paths, || {
-        resolve_legacy_import_source(&runtime_paths.app_data_dir)
-    })?;
+    // New pages program, Slice 2b (D3): no db.json is imported any more; one
+    // left where the retired start-up import looked is named, not read.
+    warn_about_a_left_over_db_json(
+        &runtime_paths,
+        &left_over_db_json_from(&runtime_paths.app_data_dir, |name| env::var_os(name)),
+    )?;
 
     let control_surface_token =
         load_or_create_bridge_token(&runtime_paths.app_data_dir).map_err(std::io::Error::other)?;
@@ -745,95 +750,77 @@ fn storage_startup_failure(
     Box::new(failure)
 }
 
-/// The one-way db.json import at a start. It runs only into saved data it
-/// would not replace — no completed setup and no earlier import (new pages
-/// program, Slice 2: the gate was an empty Planning projects table, which
-/// schema 8 drops) — and only when there is a source. Slice 2b retires it.
-fn auto_import_legacy_db(
-    runtime_paths: &RuntimePaths,
-    resolve_source: impl FnOnce() -> Option<PathBuf>,
-) -> EngineResult<()> {
-    if legacy_import_finds_saved_data(&runtime_paths.db_path)? {
-        return Ok(());
-    }
-    let Some(source_path) = resolve_source() else {
-        append_log(
-            &runtime_paths.log_file_path,
-            "INFO",
-            "No legacy db.json source discovered for auto-import.",
-        )?;
-        return Ok(());
-    };
-    match import_legacy_db(
-        &runtime_paths.db_path,
-        &LegacyImportRequest {
-            source_path: source_path.clone(),
-            force: false,
-        },
-    ) {
-        Ok(summary) => append_log(
-            &runtime_paths.log_file_path,
-            "INFO",
-            &format!(
-                "Auto-imported legacy db from {}: {} settings (the setup flag and the page to open)",
-                summary.source_path, summary.updated_settings
-            ),
-        )?,
-        Err(error) => append_log(
-            &runtime_paths.log_file_path,
-            "WARN",
-            &format!(
-                "Legacy auto-import skipped or failed for {}: {}",
-                source_path.display(),
-                error
-            ),
-        )?,
-    }
-    Ok(())
-}
-
-fn resolve_legacy_import_source(app_data_dir: &Path) -> Option<PathBuf> {
-    resolve_legacy_import_source_from(app_data_dir, |name| env::var_os(name))
-}
-
-/// Source priority for the one-way legacy import: `SSE_LEGACY_DB_PATH`, then
-/// `<app-data>/import/db.json`. Nothing else — in particular not a `db.json`
-/// under the working directory the engine happened to be started from.
-fn resolve_legacy_import_source_from<F>(app_data_dir: &Path, mut get_env: F) -> Option<PathBuf>
+/// The db.json files left where the retired start-up import looked for one
+/// (new pages program, Slice 2b — D3): the file `SSE_LEGACY_DB_PATH` names,
+/// then `<app-data>/import/db.json` — the import's own order — each only
+/// when a file is there, and one file once. `SSE_DISABLE_AUTO_IMPORT`, which
+/// turned the import off, means nothing any more and is not read.
+///
+/// 2026-09-25: both places are looked at, and a place counts only when a
+/// file is there. Until then a set variable was named whether or not
+/// anything was at its path, and the staged file went unmentioned while it
+/// was set — the import's order, though nothing is read any more.
+fn left_over_db_json_from<F>(app_data_dir: &Path, mut get_env: F) -> Vec<PathBuf>
 where
     F: FnMut(&str) -> Option<OsString>,
 {
-    if env_string("SSE_DISABLE_AUTO_IMPORT", &mut get_env)
-        .is_some_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE"))
-    {
-        return None;
-    }
-
-    if let Some(explicit_path) = env_string("SSE_LEGACY_DB_PATH", &mut get_env) {
-        return Some(PathBuf::from(explicit_path));
-    }
-
-    let staged_path = app_data_dir
+    let named = env_string(LEGACY_DB_PATH_ENV, &mut get_env).map(PathBuf::from);
+    let staged = app_data_dir
         .join(LEGACY_IMPORT_DIR_NAME)
         .join(LEGACY_IMPORT_FILE_NAME);
-    if staged_path.is_file() {
-        return Some(staged_path);
+    let mut left_over: Vec<PathBuf> = Vec::new();
+    for path in named.into_iter().chain([staged]) {
+        let same_file = |other: &PathBuf| {
+            *other == path
+                || matches!(
+                    (fs::canonicalize(other), fs::canonicalize(&path)),
+                    (Ok(left), Ok(right)) if left == right
+                )
+        };
+        if path.is_file() && !left_over.iter().any(same_file) {
+            left_over.push(path);
+        }
     }
+    left_over
+}
 
-    None
+/// The one line a start writes about the left-over db.json files, naming
+/// each: "A db.json at <a> was left alone: …", or "A db.json at <a> and at
+/// <b> was left alone: …" when both places hold one. No file is read, moved
+/// or imported, and the start goes on; the operator's data holds what it
+/// held.
+fn warn_about_a_left_over_db_json(
+    runtime_paths: &RuntimePaths,
+    left_over: &[PathBuf],
+) -> EngineResult<()> {
+    let Some((first, others)) = left_over.split_first() else {
+        return Ok(());
+    };
+    let places = others
+        .iter()
+        .fold(first.display().to_string(), |places, path| {
+            format!("{places} and at {}", path.display())
+        });
+    append_log(
+        &runtime_paths.log_file_path,
+        "WARN",
+        &format!(
+            "A db.json at {places} was left alone: Studio Control no longer imports db.json files."
+        ),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        acquire_instance_lock, apply_pending_restore, auto_import_legacy_db,
-        bootstrap_runtime_from_paths, current_runtime_platform, default_app_data_dir_for_platform,
-        resolve_legacy_import_source_from, resolve_runtime_paths_from, safe_start_requested,
-        startup_failure_code, storage_startup_failure, validate_protocol_version, RuntimePaths,
-        RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME,
-        STARTUP_CODE_BOOTSTRAP_FAILED, STARTUP_CODE_ENGINE_ALREADY_RUNNING,
-        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
-        SUPPORTED_PROTOCOL_VERSION,
+        acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
+        current_runtime_platform, default_app_data_dir_for_platform, left_over_db_json_from,
+        resolve_runtime_paths_from, safe_start_requested, startup_failure_code,
+        storage_startup_failure, validate_protocol_version, warn_about_a_left_over_db_json,
+        RuntimePaths, RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME,
+        INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
+        STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
+        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
@@ -1037,140 +1024,115 @@ mod tests {
         );
     }
 
-    // 2026-09 production readiness, Slice 1 (finding F23): the auto-import
-    // source is the explicit env path or the staged file under app-data —
-    // the process working directory is not consulted. The process-level
-    // proof (a `data/db.json` under the engine's working directory stays
-    // unimported) is `auto_import_ignores_cwd` in tests/end_to_end.rs,
-    // because the working directory is process-wide and cannot be varied
-    // inside a unit test.
+    // New pages program, Slice 2b (D3): the start-up db.json import is
+    // retired. A db.json left where it looked — `SSE_LEGACY_DB_PATH`'s file,
+    // then the staged `<app-data>/import/db.json` — is named in one warning
+    // line and never read: the saved data keeps its setup and its page, and
+    // the file stays as it was. `SSE_DISABLE_AUTO_IMPORT` no longer hides it.
+    // A `data/db.json` beside the app-data (the old repo-local convention)
+    // was never a source (F23). Until the slice, new saved data took the
+    // staged file's setup flag and page at the start. 2026-09-25: a place
+    // counts only when a file is there, and one line names both when both
+    // hold one; until then a set variable was named with nothing at its path,
+    // and it hid the staged file.
     #[test]
-    fn legacy_import_source_prefers_the_explicit_path() {
-        let app_data = TestDir::new("legacy-explicit");
-        let staged = app_data.path().join("import");
-        fs::create_dir_all(&staged).expect("import dir");
-        fs::write(staged.join("db.json"), "{}").expect("staged file");
+    fn a_left_over_db_json_is_named_once_and_never_read() {
+        let test_dir = TestDir::new("left-over-db-json");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
+        let settings_before = list_settings_by_prefix(&paths.db_path, "").expect("settings");
 
-        let source = resolve_legacy_import_source_from(
-            app_data.path(),
-            env_fixture(&[("SSE_LEGACY_DB_PATH", "/tmp/explicit/db.json")]),
-        );
-
-        assert_eq!(source, Some(PathBuf::from("/tmp/explicit/db.json")));
-    }
-
-    #[test]
-    fn legacy_import_source_reads_only_the_staged_app_data_file() {
-        let app_data = TestDir::new("legacy-staged");
-        // A `data/db.json` next to the app-data dir (the old repo-local
-        // convention) is not a source.
-        let decoy = app_data.path().join("data");
+        let decoy = test_dir.path().join("data");
         fs::create_dir_all(&decoy).expect("decoy dir");
         fs::write(decoy.join("db.json"), "{}").expect("decoy file");
-
-        assert_eq!(
-            resolve_legacy_import_source_from(app_data.path(), env_fixture(&[])),
-            None,
-            "without a staged import file there is no auto-import source"
+        let missing = test_dir.path().join("deleted").join("db.json");
+        let missing_env = [(
+            "SSE_LEGACY_DB_PATH",
+            missing.to_str().expect("a UTF-8 path"),
+        )];
+        assert!(
+            left_over_db_json_from(test_dir.path(), env_fixture(&[])).is_empty(),
+            "nothing is left over without the variable or a staged file"
+        );
+        assert!(
+            left_over_db_json_from(test_dir.path(), env_fixture(&missing_env)).is_empty(),
+            "a variable naming no file names nothing"
         );
 
-        let staged = app_data.path().join("import");
-        fs::create_dir_all(&staged).expect("import dir");
-        fs::write(staged.join("db.json"), "{}").expect("staged file");
-
-        assert_eq!(
-            resolve_legacy_import_source_from(app_data.path(), env_fixture(&[])),
-            Some(staged.join("db.json"))
-        );
-    }
-
-    // New pages program, Slice 2 (interim until Slice 2b): the start-up
-    // import writes the setup flag and the page, so it runs only into saved
-    // data it would not replace. New saved data takes it once; a later start
-    // with the same source leaves what the operator did since; a set-up desk
-    // never takes it. Before the slice the gate was an empty Planning projects
-    // table, so a set-up desk without Planning rows was imported over.
-    #[test]
-    fn the_start_up_import_never_replaces_saved_data() {
-        let staged = |test_dir: &TestDir, has_completed_setup: bool| {
-            let source = test_dir.path().join("import").join("db.json");
-            fs::create_dir_all(source.parent().expect("a parent")).expect("import dir");
-            fs::write(
-                &source,
-                format!(
-                    r#"{{"projects":[{{"id":"proj-1","title":"Old"}}],"settings":{{"dashboardView":"lighting","hasCompletedSetup":{has_completed_setup}}}}}"#
-                ),
-            )
-            .expect("the staged db.json should be written");
-            source
-        };
-        let page_and_setup = |paths: &RuntimePaths| {
-            let settings = list_settings_by_prefix(&paths.db_path, "").expect("settings");
-            (
-                settings.get("shell.workspace").cloned(),
-                settings.get("app.commissioning.completed").cloned(),
-            )
-        };
-
-        // New saved data: imported once.
-        let fresh = TestDir::new("auto-import-fresh");
-        let paths = runtime_paths_for(&fresh);
-        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
-        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
-        let source = staged(&fresh, true);
-        auto_import_legacy_db(&paths, || Some(source.clone())).expect("the import runs");
-        assert_eq!(
-            page_and_setup(&paths),
-            (Some(String::from("lighting")), Some(String::from("true")))
-        );
-        // The operator moves on; the next start with the same source (now
-        // saying the setup is not done) changes nothing.
-        set_settings_owned(
-            &paths.db_path,
-            &[(String::from("shell.workspace"), String::from("audio"))],
+        let staged = test_dir.path().join("import").join("db.json");
+        fs::create_dir_all(staged.parent().expect("a parent")).expect("import dir");
+        fs::write(
+            &staged,
+            r#"{"schemaVersion":8,"projects":[],"settings":{"dashboardView":"lighting","hasCompletedSetup":true}}"#,
         )
-        .expect("the page should write");
-        let source = staged(&fresh, false);
-        auto_import_legacy_db(&paths, || Some(source.clone())).expect("the start goes on");
+        .expect("the staged db.json should be written");
+        let staged_bytes = fs::read(&staged).expect("the staged db.json reads");
+        let named = test_dir.path().join("elsewhere-db.json");
+        fs::write(&named, "{}").expect("the named db.json should be written");
+        let named_env = [("SSE_LEGACY_DB_PATH", named.to_str().expect("a UTF-8 path"))];
         assert_eq!(
-            page_and_setup(&paths),
-            (Some(String::from("audio")), Some(String::from("true")))
+            left_over_db_json_from(
+                test_dir.path(),
+                env_fixture(&[("SSE_DISABLE_AUTO_IMPORT", "1")]),
+            ),
+            vec![staged.clone()]
+        );
+        assert_eq!(
+            left_over_db_json_from(test_dir.path(), env_fixture(&missing_env)),
+            vec![staged.clone()],
+            "a variable naming no file does not hide the staged one"
+        );
+        assert_eq!(
+            left_over_db_json_from(test_dir.path(), env_fixture(&named_env)),
+            vec![named.clone(), staged.clone()],
+            "both files, the variable's first"
+        );
+        assert_eq!(
+            left_over_db_json_from(
+                test_dir.path(),
+                env_fixture(&[("SSE_LEGACY_DB_PATH", staged.to_str().expect("a UTF-8 path"))]),
+            ),
+            vec![staged.clone()],
+            "the staged file named by the variable is one file"
         );
 
-        // A set-up desk that never imported: the source is not even looked for.
-        let desk = TestDir::new("auto-import-desk");
-        let paths = runtime_paths_for(&desk);
-        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
-        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
-        set_settings_owned(
-            &paths.db_path,
-            &[
-                (
-                    String::from("app.commissioning.completed"),
-                    String::from("true"),
-                ),
-                (
-                    String::from("app.commissioning.stage"),
-                    String::from("ready"),
-                ),
-                (String::from("shell.workspace"), String::from("audio")),
-            ],
-        )
-        .expect("the desk should be set up");
-        let source = staged(&desk, false);
-        let mut looked = false;
-        auto_import_legacy_db(&paths, || {
-            looked = true;
-            Some(source.clone())
-        })
-        .expect("the start goes on");
-        assert!(!looked, "a set-up desk does not look for a source");
+        // Two starts: one with the staged file alone, one with both.
+        for env in [&missing_env, &named_env] {
+            warn_about_a_left_over_db_json(
+                &paths,
+                &left_over_db_json_from(test_dir.path(), env_fixture(env)),
+            )
+            .expect("the start goes on");
+        }
+        warn_about_a_left_over_db_json(&paths, &[]).expect("nothing to say");
+
+        let log = fs::read_to_string(&paths.log_file_path).expect("the engine log");
+        let lines = log
+            .lines()
+            .filter(|line| line.contains("db.json"))
+            .collect::<Vec<_>>();
+        assert_eq!(lines.len(), 2, "one line a start: {log}");
+        for (line, places) in lines.iter().zip([
+            staged.display().to_string(),
+            format!("{} and at {}", named.display(), staged.display()),
+        ]) {
+            assert!(line.contains(" WARN "), "{line}");
+            assert!(
+                line.ends_with(&format!(
+                    "A db.json at {places} was left alone: Studio Control no longer imports db.json files."
+                )),
+                "{line}"
+            );
+        }
+        assert!(!log.contains(&missing.display().to_string()), "{log}");
         assert_eq!(
-            page_and_setup(&paths),
-            (Some(String::from("audio")), Some(String::from("true")))
+            list_settings_by_prefix(&paths.db_path, "").expect("settings"),
+            settings_before,
+            "nothing was imported"
         );
-        let log = fs::read_to_string(&paths.log_file_path).unwrap_or_default();
-        assert!(!log.contains("Auto-imported"), "{log}");
+        assert_eq!(fs::read(&staged).expect("the staged db.json"), staged_bytes);
+        assert_eq!(fs::read(&named).expect("the named db.json"), b"{}");
     }
 
     fn runtime_paths_for(test_dir: &TestDir) -> RuntimePaths {
@@ -1586,25 +1548,6 @@ mod tests {
         assert!(
             log.contains("WARN") && log.contains("refused and removed"),
             "{log}"
-        );
-    }
-
-    #[test]
-    fn legacy_import_source_is_disabled_by_env() {
-        let app_data = TestDir::new("legacy-disabled");
-        let staged = app_data.path().join("import");
-        fs::create_dir_all(&staged).expect("import dir");
-        fs::write(staged.join("db.json"), "{}").expect("staged file");
-
-        assert_eq!(
-            resolve_legacy_import_source_from(
-                app_data.path(),
-                env_fixture(&[
-                    ("SSE_DISABLE_AUTO_IMPORT", "1"),
-                    ("SSE_LEGACY_DB_PATH", "/tmp/explicit/db.json"),
-                ]),
-            ),
-            None
         );
     }
 

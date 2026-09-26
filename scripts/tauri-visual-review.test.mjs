@@ -9,8 +9,9 @@ import { fileURLToPath } from "node:url";
 // tauri-visual-review.mjs is intentionally thin: it shells out to `npm run
 // build --workspace frontend/app` and `npm run playwright:test --workspace
 // frontend/app -- visual-review.spec.ts`, then writes a small summary JSON
-// stub. The top-level body runs at import time, the only non-side-effect
-// function is `resolveGitSha`, and it exports nothing — so the full flow
+// stub. Its work runs in `main()` only when it is the main module (since
+// 2026-09-25, new pages Slice 2b: importing a script does nothing), the only
+// non-side-effect function is `resolveGitSha`, and it exports nothing — so the full flow
 // would require Playwright + npm + a built Storybook to verify end-to-end
 // (which the `frontend:playwright:test` lane already does).
 //

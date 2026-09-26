@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -127,72 +136,102 @@ function renderPackageXml({ version, releaseDate }) {
 `;
 }
 
-const target = parseTarget(readFlag("--target"));
-const prepareOnly = hasFlag("--prepare-only");
-const allowStaged = hasFlag("--allow-staged");
+function main() {
+  const target = parseTarget(readFlag("--target"));
+  const prepareOnly = hasFlag("--prepare-only");
+  const allowStaged = hasFlag("--allow-staged");
 
-if (prepareOnly && !allowStaged) {
-  // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
-  // produces a staged build root without a built update repository; that's
-  // only ever useful in the staged-verification lane and must be opted into.
-  throw new Error(
-    "native-update-repo.mjs --prepare-only produces a staged (incomplete) update repository payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full repository (requires QtIFW repogen)."
+  if (prepareOnly && !allowStaged) {
+    // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
+    // produces a staged build root without a built update repository; that's
+    // only ever useful in the staged-verification lane and must be opted into.
+    throw new Error(
+      "native-update-repo.mjs --prepare-only produces a staged (incomplete) update repository payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full repository (requires QtIFW repogen)."
+    );
+  }
+
+  const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
+  const releaseDate = new Date().toISOString().slice(0, 10);
+  const { packagedPath, repositoryPath, archivePath } = resolvePackagedPayload(target);
+
+  ensurePackagedPayload(target, packagedPath);
+
+  const updateRoot = path.join(rootDir, "release", "native-updates", target);
+  const buildRoot = path.join(updateRoot, "ifw");
+  const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
+  const metaDir = path.join(packageRoot, "meta");
+  const dataDir = path.join(packageRoot, "data");
+
+  rmSync(buildRoot, { force: true, recursive: true });
+  mkdirSync(metaDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+
+  writeFileSync(
+    path.join(metaDir, "package.xml"),
+    renderPackageXml({ version: packageJson.version, releaseDate }),
+    "utf8"
   );
+  copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
+
+  const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
+  cpSync(packagedPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
+
+  console.log(`Prepared native update repository staging for ${target}: ${buildRoot}`);
+  console.log(`Staged payload: ${stagedPayloadPath}`);
+
+  if (prepareOnly) {
+    console.log("Skipping repogen build because --prepare-only was requested.");
+    process.exit(0);
+  }
+
+  const repoGen = resolveQtIfwTools({ rootDir }).repoGen;
+  if (!repoGen) {
+    throw new Error(
+      "Qt Installer Framework repogen was not found. Set SSE_QT_IFW_REPOGEN, put repogen on PATH, or install QtIFW into .tools/qt-ifw."
+    );
+  }
+
+  console.log(`Using QtIFW repogen via ${repoGen.source}: ${repoGen.value}`);
+  rmSync(repositoryPath, { force: true, recursive: true });
+  mkdirSync(path.dirname(repositoryPath), { recursive: true });
+  rmSync(archivePath, { force: true, recursive: true });
+
+  run(repoGen.value, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
+
+  if (target === "macos") {
+    archiveMacPath(repositoryPath, archivePath);
+  } else {
+    archiveWindowsPath(repositoryPath, archivePath);
+  }
+
+  console.log(`Built native update repository: ${repositoryPath}`);
+  console.log(`Archived native update repository: ${archivePath}`);
 }
 
-const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
-const releaseDate = new Date().toISOString().slice(0, 10);
-const { packagedPath, repositoryPath, archivePath } = resolvePackagedPayload(target);
-
-ensurePackagedPayload(target, packagedPath);
-
-const updateRoot = path.join(rootDir, "release", "native-updates", target);
-const buildRoot = path.join(updateRoot, "ifw");
-const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
-const metaDir = path.join(packageRoot, "meta");
-const dataDir = path.join(packageRoot, "data");
-
-rmSync(buildRoot, { force: true, recursive: true });
-mkdirSync(metaDir, { recursive: true });
-mkdirSync(dataDir, { recursive: true });
-
-writeFileSync(
-  path.join(metaDir, "package.xml"),
-  renderPackageXml({ version: packageJson.version, releaseDate }),
-  "utf8"
-);
-copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
-
-const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
-cpSync(packagedPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
-
-console.log(`Prepared native update repository staging for ${target}: ${buildRoot}`);
-console.log(`Staged payload: ${stagedPayloadPath}`);
-
-if (prepareOnly) {
-  console.log("Skipping repogen build because --prepare-only was requested.");
-  process.exit(0);
+// Runs only as `node scripts/native-update-repo.mjs …`: an import does nothing
+// (2026-09-25; it removes and rewrites folders under release/ and may start
+// native-package.mjs). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
 }
 
-const repoGen = resolveQtIfwTools({ rootDir }).repoGen;
-if (!repoGen) {
-  throw new Error(
-    "Qt Installer Framework repogen was not found. Set SSE_QT_IFW_REPOGEN, put repogen on PATH, or install QtIFW into .tools/qt-ifw."
-  );
+if (isMainModule()) {
+  main();
 }
-
-console.log(`Using QtIFW repogen via ${repoGen.source}: ${repoGen.value}`);
-rmSync(repositoryPath, { force: true, recursive: true });
-mkdirSync(path.dirname(repositoryPath), { recursive: true });
-rmSync(archivePath, { force: true, recursive: true });
-
-run(repoGen.value, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
-
-if (target === "macos") {
-  archiveMacPath(repositoryPath, archivePath);
-} else {
-  archiveWindowsPath(repositoryPath, archivePath);
-}
-
-console.log(`Built native update repository: ${repositoryPath}`);
-console.log(`Archived native update repository: ${archivePath}`);

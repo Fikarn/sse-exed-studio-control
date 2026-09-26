@@ -24,7 +24,7 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 
 ### Rust engine
 
-- owns persisted state, schema migrations, and legacy import
+- owns persisted state, schema migrations, and backups
 - owns commissioning, dashboard, support, lighting, audio, and control-surface contracts
 - owns device-facing safety rules, diagnostics, and recovery behavior
 - exposes snapshots and commands over the native protocol in `native/protocol/v1.md`
@@ -35,11 +35,11 @@ Everything assumes a single trusted machine with no cloud dependency. Supported 
 - audio adapters stay behind engine-owned sync, recall, and safety contracts
 - control-surface exports and bridge behavior stay engine-owned
 
-## Legacy Import
+## Legacy Import (retired)
 
-The Electron/Next.js runtime was removed in `v2.1.0`. A one-way import path in `native/rust-engine/src/legacy_import.rs` remains so that operators migrating from a pre-`v2.0.0` installation can bring their old `db.json` forward on first native launch. The legacy runtime itself is no longer in the repository.
+The Electron/Next.js runtime was removed in `v2.1.0`. A one-way import path (`native/rust-engine/src/legacy_import.rs`) stayed so that operators migrating from a pre-`v2.0.0` installation could bring their old `db.json` forward on first native launch; since the new pages program's Slice 2 it carried only whether setup was complete and the page to open.
 
-Since the new pages program's Slice 2 the import carries only what is not Planning — whether setup is complete and the page to open — and ignores the rest of a `db.json`. It is interim: Slice 2b retires it (`storage.importLegacyDb`, the start-up auto-import and `SSE_LEGACY_DB_PATH`) once the lanes that seed a test engine through it are seeded through the app's own requests.
+Slice 2b of that program (2026-09-25) retired it: `storage.importLegacyDb`, the start-up auto-import, `SSE_LEGACY_DB_PATH` and `SSE_DISABLE_AUTO_IMPORT` are gone, and no pre-`v2.0.0` code is left in the repository. A `db.json` offered to Verify or Restore is refused by name before anything is written, and a start that finds a left-over one (`SSE_LEGACY_DB_PATH`, or `<app-data>/import/db.json`) names it in one warning line of the log and reads nothing (`native/protocol/v1.md`, "A left-over `db.json`"). The lanes and the development parity fixtures seed their saved data through the app's own requests or write it directly.
 
 ## Studio Module Pattern
 

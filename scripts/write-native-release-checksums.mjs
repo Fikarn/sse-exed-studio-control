@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -111,24 +111,54 @@ function sha256File(targetPath) {
   });
 }
 
-const target = parseTarget(readFlag("--target"));
-const mode = parseMode(readFlag("--mode") ?? "full");
-const outputPath = checksumOutputPath(target);
-const entries = checksumEntriesFor(target, mode);
+async function main() {
+  const target = parseTarget(readFlag("--target"));
+  const mode = parseMode(readFlag("--mode") ?? "full");
+  const outputPath = checksumOutputPath(target);
+  const entries = checksumEntriesFor(target, mode);
 
-for (const entry of entries) {
-  assert(existsSync(entry.path), `${entry.label} not found at ${entry.path}.`);
+  for (const entry of entries) {
+    assert(existsSync(entry.path), `${entry.label} not found at ${entry.path}.`);
+  }
+
+  mkdirSync(path.dirname(outputPath), { recursive: true });
+
+  const lines = [];
+  for (const entry of entries) {
+    const digest = await sha256File(entry.path);
+    lines.push(`${digest}  ${path.basename(entry.path)}`);
+  }
+
+  await import("node:fs/promises").then(({ writeFile }) => writeFile(outputPath, `${lines.join("\n")}\n`, "utf8"));
+
+  console.log(`Wrote native ${target} ${mode} checksum manifest: ${outputPath}`);
+  console.log(`Checksummed ${entries.length} artifact(s) for ${releaseIdentity.displayName}.`);
 }
 
-mkdirSync(path.dirname(outputPath), { recursive: true });
-
-const lines = [];
-for (const entry of entries) {
-  const digest = await sha256File(entry.path);
-  lines.push(`${digest}  ${path.basename(entry.path)}`);
+// Runs only as `node scripts/write-native-release-checksums.mjs …`: an import
+// does nothing (2026-09-26; the run writes the checksum manifest under
+// release/checksums). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
 }
 
-await import("node:fs/promises").then(({ writeFile }) => writeFile(outputPath, `${lines.join("\n")}\n`, "utf8"));
-
-console.log(`Wrote native ${target} ${mode} checksum manifest: ${outputPath}`);
-console.log(`Checksummed ${entries.length} artifact(s) for ${releaseIdentity.displayName}.`);
+if (isMainModule()) {
+  await main();
+}

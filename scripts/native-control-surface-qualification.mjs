@@ -1,22 +1,26 @@
-import { connect, createServer } from "node:net";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DECK_PAGE_LABELS, IMPORTED_WORKSPACE } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import {
+  DECK_PAGE_LABELS,
+  SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
+} from "./native-parity-acceptance.mjs";
+import { assert, EngineHarness, hardenedLaneEnv, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const controlSurfaceHost = "127.0.0.1";
 // New pages program, Slice 2 (D5): the deck lost its PROJECTS and TASKS pages,
 // their route (`POST /api/deck/action`) and the deck mode with Planning. The
 // checks that went through them now go through the LIGHTS page and its route;
 // each changed step says so in summary.json.
 const DECK_ROUTES_CHANGED =
-  "New pages program, Slice 2: the deck key followed into the hardware link's own snapshot is the LIGHTS page's next-light key (lighting.snapshot) and the imported page is read back through the deck; until then it was the PROJECTS page's filter key (planning.snapshot) and the deck mode.";
+  "New pages program, Slices 2 and 2b: the deck key followed into the hardware link's own snapshot is the LIGHTS page's next-light key (lighting.snapshot) and the page saved through settings.update is read back through the deck; until Slice 2b that page came from a db.json fixture through the import, and until Slice 2 the key was the PROJECTS page's filter key (planning.snapshot) and the deck mode.";
 const REFUSALS_CHANGED =
   "New pages program, Slice 2: the refused requests go to the LIGHTS route (/api/deck/light-action) and the deck's last event and selected light prove nothing got through; until then they went to the PROJECTS and TASKS pages' route and the project count proved it.";
 const PROFILE_CHANGED =
@@ -76,32 +80,6 @@ function resolvePackagedRuntime(target) {
       "studio-control-engine.exe"
     ),
   };
-}
-
-async function reserveLocalPort() {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, controlSurfaceHost, () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close(() => {
-          reject(new Error("Failed to resolve a dedicated control-surface qualification port."));
-        });
-        return;
-      }
-
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(address.port);
-      });
-    });
-  });
 }
 
 async function fetchJson(url, options = {}) {
@@ -294,8 +272,6 @@ async function main() {
     );
   }
 
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const packaged = resolvePackagedRuntime(target);
   assert(
     existsSync(packaged.enginePath),
@@ -317,7 +293,6 @@ async function main() {
   const summary = {
     target,
     label: packaged.label,
-    fixturePath,
     qualificationRoot,
     enginePath: packaged.enginePath,
     appDataDir: runtime.appDataDir,
@@ -331,14 +306,17 @@ async function main() {
   let failure = null;
 
   try {
-    const reservedPort = await reserveLocalPort();
+    // The lanes' hardening (native-runtime-harness.mjs) names the bridge's
+    // own port, which this lane then expects every answer to come from.
+    const laneEnv = await hardenedLaneEnv();
+    const reservedPort = Number(laneEnv.SSE_CONTROL_SURFACE_PORT);
     const expectedBaseUrl = `http://${controlSurfaceHost}:${reservedPort}`;
     summary.requestedPort = reservedPort;
     summary.expectedBaseUrl = expectedBaseUrl;
 
     console.log(`Packaged control-surface bridge qualification root: ${qualificationRoot}`);
     console.log(
-      "Step 1: start the packaged engine with imported workstation data on a dedicated localhost bridge port."
+      "Step 1: start the packaged engine on fresh saved data on a dedicated localhost bridge port and save the page it opens on."
     );
 
     harness = new EngineHarness({
@@ -346,17 +324,17 @@ async function main() {
       appDataDir: runtime.appDataDir,
       logsDir: runtime.logsDir,
       engineExecutable: packaged.enginePath,
-      env: {
-        SSE_LEGACY_DB_PATH: fixturePath,
-        SSE_CONTROL_SURFACE_PORT: String(reservedPort),
-      },
+      env: laneEnv,
     });
 
     await harness.start();
+    await seedSavedWorkspace(harness, "bridge-qualification", `Packaged native ${packaged.label} engine`);
     summary.steps.push({
       name: "packaged-engine-start",
       status: "passed",
-      message: "Packaged engine started with imported workstation data.",
+      message:
+        "Packaged engine started on fresh saved data with the light outputs held and the simulated console, and saved Lighting as the page it opens on.",
+      scopeChanged: SAVED_DATA_MARKER_CHANGED,
     });
 
     const bridgeTokenPath = path.join(runtime.appDataDir, bridgeTokenFileName);
@@ -429,22 +407,22 @@ async function main() {
     const lcdAudioBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
     const lcdWorkspace = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=workspace`);
 
-    // The page the imported db.json opens on reaches the deck: the context and
-    // the `workspace` LCD, which the profile's page-follow triggers read.
+    // The page saved in step 1 reaches the deck: the context and the
+    // `workspace` LCD, which the profile's page-follow triggers read.
     assert(
-      contextBefore.workspace === IMPORTED_WORKSPACE &&
+      contextBefore.workspace === SEEDED_WORKSPACE &&
         typeof contextBefore.audio?.bank === "string" &&
         Array.isArray(contextBefore.audio?.strips) &&
         contextBefore.audio.strips.length === 4,
-      `Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the imported page '${IMPORTED_WORKSPACE}' (got '${contextBefore.workspace}') or the audio deck block.`
+      `Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the saved page '${SEEDED_WORKSPACE}' (got '${contextBefore.workspace}') or the audio deck block.`
     );
     assert(
       typeof lcdAudioBefore === "string" && lcdAudioBefore.length > 0,
       "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio_strip_1 did not return audio strip text."
     );
     assert(
-      lcdWorkspace === IMPORTED_WORKSPACE,
-      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the imported page '${IMPORTED_WORKSPACE}'.`
+      lcdWorkspace === SEEDED_WORKSPACE,
+      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the saved page '${SEEDED_WORKSPACE}'.`
     );
 
     // New saved data holds no lights, so the lane adds two through the app's
@@ -573,7 +551,7 @@ async function main() {
       name: "bridge-http-routes",
       status: "passed",
       message:
-        "Packaged bridge accepted live HTTP requests, showed the imported page to the deck, and round-tripped lighting and audio actions.",
+        "Packaged bridge accepted live HTTP requests, showed the saved page to the deck, and round-tripped lighting and audio actions.",
       scopeChanged: DECK_ROUTES_CHANGED,
     });
 
@@ -821,10 +799,10 @@ async function main() {
         ),
       `Packaged control-surface bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of lighting to page 1 and audio to page 2 on custom:lcd_workspace.`
     );
-    const importedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
+    const savedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
     assert(
-      importedFollow && profile.pages?.[String(importedFollow.page)]?.name === "LIGHTS",
-      `Packaged control-surface bridge qualification failed: the imported page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
+      savedFollow && profile.pages?.[String(savedFollow.page)]?.name === "LIGHTS",
+      `Packaged control-surface bridge qualification failed: the saved page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
     );
 
     const lcdKeys = new Set();
@@ -921,7 +899,33 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+// Runs only as `node scripts/native-control-surface-qualification.mjs …`: an
+// import does nothing (2026-09-26; the run starts the packaged engine from
+// release/native and its bridge). The two paths are compared as real paths —
+// through a directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

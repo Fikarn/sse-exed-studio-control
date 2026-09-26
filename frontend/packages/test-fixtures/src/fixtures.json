@@ -79,7 +79,7 @@
       "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
       "backupCount": 0,
       "latestBackupPath": null,
-      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
       "backups": [],
       "summary": "No backup exported yet.",
       "recentBackups": [],
@@ -166,7 +166,7 @@
       "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
       "backupCount": 1,
       "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
-      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
       "backups": [
         {
           "name": "native-backup-2026-04-22T07-12-00.000Z.json",
@@ -347,7 +347,7 @@
       "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
       "backupCount": 1,
       "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
-      "restoreSummary": "Restore from a native support archive or a legacy db.json export.",
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
       "backups": [
         {
           "name": "native-backup-2026-04-22T07-12-00.000Z.json",

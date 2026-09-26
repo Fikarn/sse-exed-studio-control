@@ -1,5 +1,14 @@
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, statSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -266,26 +275,57 @@ function verifyUpdateStaging(target, mode) {
   }
 }
 
-const target = parseTarget(readFlag("--target"));
-const mode = parseMode(readFlag("--mode") ?? "staged");
-const packagedPath = packagedPayloadPath(target);
-const manifestPath = path.join(rootDir, "release", "tauri-candidate", target, "candidate-manifest.json");
+async function main() {
+  const target = parseTarget(readFlag("--target"));
+  const mode = parseMode(readFlag("--mode") ?? "staged");
+  const packagedPath = packagedPayloadPath(target);
+  const manifestPath = path.join(rootDir, "release", "tauri-candidate", target, "candidate-manifest.json");
 
-verifyCandidatePayload(target, packagedPath, "Packaged");
-assertNonEmptyFile(manifestPath, `Tauri candidate manifest (${target})`);
-verifyInstallerStaging(target, mode);
-verifyUpdateStaging(target, mode);
-await verifyPayloadParity(
-  packagedPath,
-  installerPayloadPath(target),
-  `Packaged Tauri candidate (${target})`,
-  `Installer staged Tauri candidate (${target})`
-);
-await verifyPayloadParity(
-  packagedPath,
-  updatePayloadPath(target),
-  `Packaged Tauri candidate (${target})`,
-  `Update staged Tauri candidate (${target})`
-);
+  verifyCandidatePayload(target, packagedPath, "Packaged");
+  assertNonEmptyFile(manifestPath, `Tauri candidate manifest (${target})`);
+  verifyInstallerStaging(target, mode);
+  verifyUpdateStaging(target, mode);
+  await verifyPayloadParity(
+    packagedPath,
+    installerPayloadPath(target),
+    `Packaged Tauri candidate (${target})`,
+    `Installer staged Tauri candidate (${target})`
+  );
+  await verifyPayloadParity(
+    packagedPath,
+    updatePayloadPath(target),
+    `Packaged Tauri candidate (${target})`,
+    `Update staged Tauri candidate (${target})`
+  );
 
-console.log(`Verified Tauri candidate artifacts for ${target} (${mode}).`);
+  console.log(`Verified Tauri candidate artifacts for ${target} (${mode}).`);
+}
+
+// Runs only as `node scripts/legacy/verify-tauri-candidate-artifacts.mjs …`: an
+// import does nothing (2026-09-26; the run reads and hashes the candidate
+// artifacts under release/ and fails the process when one is missing). The two
+// paths are compared as real paths — through a directory junction or a short
+// 8.3 name, `process.argv[1]` and `import.meta.url` spell the same file
+// differently, and a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
+}

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import dgram from "node:dgram";
 import { tmpdir } from "node:os";
@@ -7,13 +7,15 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
 import { createQualificationEvidence } from "./tauri-qualification-evidence.mjs";
 import { shellStillRunning } from "./tauri-shell-running.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
-const evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
+// The lane's evidence folder; main() makes it, so an import makes nothing.
+let evidence = null;
 
 function needsCommandShell(command) {
   return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
@@ -135,19 +137,25 @@ function readJson(pathname) {
   }
 }
 
-function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
-  const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
-    cwd: rootDir,
-    detached: process.platform !== "win32",
-    env: {
-      ...process.env,
+// Every shell gets the lanes' hardening (native-runtime-harness.mjs, new pages
+// program, Slice 2b): a bridge port of its own, the light outputs held and the
+// simulated console.
+async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
+  const env = laneProcessEnv(
+    await hardenedLaneEnv(),
+    {
       SSE_APP_DATA_DIR: appDataDir,
-      SSE_DISABLE_AUTO_IMPORT: "1",
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
       SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
     },
+    { label: "The workspace qualification's shell" }
+  );
+  const child = spawn(npmCommand, ["run", "tauri:dev", "--workspace", "frontend/app"], {
+    cwd: rootDir,
+    detached: process.platform !== "win32",
+    env,
     shell: needsCommandShell(npmCommand),
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -174,11 +182,13 @@ const DEFAULT_WAIT_TIMEOUT_MS = Number(process.env.SSE_TAURI_QUALIFICATION_TIMEO
 // Mirror of `SSE_NATIVE_ACCEPTANCE_SKIP_AUDIO_SYNC` (added in plan PR 2 for
 // the native:acceptance lane): when set, the workspace qualification skips
 // the audio-mutation block + the post-restart audio-state assertions because
-// `audioSnapshot?.verified` only flips true after real RME TotalMix OSC
-// packets arrive on the receive port, and stock GitHub runners have no
+// `audioSnapshot?.verified` only flipped true after real RME TotalMix OSC
+// packets arrived on the receive port, and stock GitHub runners have no
 // TotalMix. The lighting round-trips still execute. The CI
-// qualification job sets this; local laptop runs without the env var
-// continue to require live TotalMix exactly as before.
+// qualification job sets this. Since Slice 2b of the new pages program the
+// lane's shells run the simulated console, whose probe passes on any host, so
+// a run without the variable exercises the block against the simulation —
+// never against a real TotalMix.
 const SKIP_AUDIO_PROBE = process.env.SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE === "1";
 
 // New pages program, Slice 1: Planning has left the screen, and with it this
@@ -308,7 +318,7 @@ async function launchRestartReadySession(runtime) {
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     const session = createSessionFiles("sse-tauri-workspace-session-");
-    const child = launchTauriShell({
+    const child = await launchTauriShell({
       appDataDir: runtime.appDataDir,
       commandPath: session.commandPath,
       logsDir: runtime.logsDir,
@@ -360,7 +370,7 @@ async function runWorkspaceQualification() {
 
   console.log("Tauri workspace qualification: step 1/2 live migrated workspace flows.");
 
-  const firstRun = launchTauriShell({
+  const firstRun = await launchTauriShell({
     appDataDir: runtime.appDataDir,
     commandPath: firstSession.commandPath,
     logsDir: runtime.logsDir,
@@ -377,10 +387,11 @@ async function runWorkspaceQualification() {
     });
     assertWorkspaceReady(initialStatus, "setup");
 
-    // All three probes run, so a workstation with live TotalMix publishes
-    // through the real gate. The engine refuses `stage: ready` while any probe
-    // is not `passed` (2026-09 audit Slice 8), so the explicit override is sent
-    // only when a probe cannot pass on this host: no TotalMix
+    // All three probes run, so a host where they pass publishes through the
+    // real gate (the audio probe against the simulated console since Slice 2b
+    // of the new pages program). The engine refuses `stage: ready` while any
+    // probe is not `passed` (2026-09 audit Slice 8), so the explicit override is
+    // sent only when a probe is not counted on: the audio block skipped
     // (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80 not bindable
     // for the lighting probe server (2026-09 production readiness, Slice 1).
     await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
@@ -645,13 +656,45 @@ async function runWorkspaceQualification() {
   }
 }
 
-try {
-  await runWorkspaceQualification();
-  console.log(`Tauri workspace qualification evidence: ${evidence.write("passed")}`);
-  console.log("Tauri workspace qualification passed.");
-} catch (error) {
-  evidence.write("failed", {
-    error: error instanceof Error ? error.message : String(error),
-  });
-  throw error;
+async function main() {
+  evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
+  try {
+    await runWorkspaceQualification();
+    console.log(`Tauri workspace qualification evidence: ${evidence.write("passed")}`);
+    console.log("Tauri workspace qualification passed.");
+  } catch (error) {
+    evidence.write("failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+// Runs only as `node scripts/tauri-workspace-qualification.mjs`: an import does
+// nothing (2026-09-26; the run makes an evidence folder and starts the dev
+// server, engines and shells on scratch app data). The two paths are compared
+// as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }

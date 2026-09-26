@@ -29,6 +29,17 @@ const exportedArchivePaths = new WeakMap<MutableFixtureState, Set<string>>();
 const ARCHIVE_FORMAT_VERSION = 5;
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
+// New pages program, Slice 2b (D3, 2026-09-25): the db.json import is retired. An export
+// from the old Studio Control in the backups folder is refused at Verify (ok: false) and at
+// Restore, before anything is written, a rollback archive included, in the hardware link's
+// own words (it answers INVALID_PARAMS; the window is handed the sentence either way). The
+// hardware link reads what is inside the file; the double has only the name to go by.
+function oldStudioControlExportRefusal(path: string) {
+  const fileName = path.split(/[\\/]/).pop() ?? path;
+  if (!fileName.endsWith("db.json")) return null;
+  return `${fileName} is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead.`;
+}
+
 /** Setup / Support's requests: shell settings, commissioning, backups, the Stream Deck profile export. */
 export function handleFixtureSetupRequest(
   context: FixtureRequestContext,
@@ -235,6 +246,10 @@ export function handleFixtureSetupRequest(
       const path = asString(params.path);
       const match = findFixtureBackup(state, path);
       const kind = path.endsWith(".sqlite3") ? "database" : "archive";
+      const oldExport = oldStudioControlExportRefusal(path);
+      if (oldExport) {
+        return { detail: oldExport, kind, ok: false, path };
+      }
       if (kind === "database") {
         return {
           detail: "Database backup, schema 6, integrity ok: 40 settings.",
@@ -244,7 +259,7 @@ export function handleFixtureSetupRequest(
           schemaVersion: 6,
         };
       }
-      const exportedAt = new Date(asNumber(match?.modifiedAt, Date.now())).toISOString();
+      const exportedAt = new Date(asNumber(match.modifiedAt, Date.now())).toISOString();
       const formatVersion = exportedArchivePaths.get(state)?.has(path)
         ? ARCHIVE_FORMAT_VERSION
         : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
@@ -259,7 +274,10 @@ export function handleFixtureSetupRequest(
     case "support.backup.restore": {
       const path = asString(params.path);
       findFixtureBackup(state, path);
-      const legacyImport = path.endsWith("db.json");
+      const oldExport = oldStudioControlExportRefusal(path);
+      if (oldExport) {
+        throw new Error(oldExport);
+      }
       // A database backup is staged and applied at the next start; the
       // store restarts the link on `requiresRestart` (Slice 7 — F20).
       const databaseRestore = path.endsWith(".sqlite3");
@@ -284,13 +302,11 @@ export function handleFixtureSetupRequest(
         emit("app.changed", { reason: "backup-restored" });
       }
       // No Planning counts and no `detail` (the double's backups hold no Planning data).
-      // A legacy db.json restores only whether setup is complete and the page to open —
-      // the three setup keys and the page (interim until Slice 2b retires the import).
       return {
         requiresRestart: databaseRestore,
         rollbackBackupPath: buildFixtureBackupEntry(state).path,
-        settingsRestored: legacyImport ? 4 : 12,
-        sourceFormat: databaseRestore ? "database-backup" : legacyImport ? "legacy-db-json" : "native-support-backup",
+        settingsRestored: 12,
+        sourceFormat: databaseRestore ? "database-backup" : "native-support-backup",
         sourcePath: path,
       };
     }

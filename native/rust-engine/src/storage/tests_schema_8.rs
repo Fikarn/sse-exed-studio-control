@@ -1,13 +1,14 @@
 //! New pages program, Slice 2 (D2): schema 8 removes Planning's saved data —
-//! the 7 -> 8 step behind its pre-migration copy, the refusal of a newer
-//! database, and the interim db.json import's "existing data" gate. Beside
-//! `tests.rs` under the 2,000-line file-health guard.
+//! the 7 -> 8 step behind its pre-migration copy and the refusal of a newer
+//! database. Beside `tests.rs` under the 2,000-line file-health guard. (The
+//! interim db.json import's "existing data" gate was tested here until Slice
+//! 2b retired the import.)
 
 use super::tests::{all_settings, planning_objects, TestDir};
 use super::*;
+use crate::shell_settings::WORKSPACE_KEY;
 use crate::storage_backups::{newest_snapshot, snapshot_reason_of};
 use rusqlite::OpenFlags;
-use serde_json::json;
 use std::fs;
 
 /// Every schema object as (type, name, table, SQL with its whitespace
@@ -503,92 +504,5 @@ fn a_database_from_a_newer_build_is_refused_by_name() {
     assert!(
         newest_snapshot(&backups_dir).is_none(),
         "a refused database is not copied"
-    );
-}
-
-// The interim import's "existing data" (Slice 2, until Slice 2b retires the
-// import): a completed setup or an earlier import — what the setup flag and
-// the page it writes would replace. Before Slice 2 the gate was Planning rows,
-// so an import into a set-up desk without Planning rows went through.
-#[test]
-fn import_legacy_db_counts_a_completed_setup_or_an_earlier_import_as_saved_data() {
-    let test_dir = TestDir::new("storage-import-gate");
-    let source_path = test_dir.path().join("legacy-db.json");
-    fs::write(
-        &source_path,
-        serde_json::to_vec_pretty(&json!({
-            "settings": { "dashboardView": "lighting", "hasCompletedSetup": false }
-        }))
-        .expect("legacy payload should serialize"),
-    )
-    .expect("legacy db should be written");
-    let request = |force: bool| LegacyImportRequest {
-        source_path: source_path.clone(),
-        force,
-    };
-
-    // New saved data: nothing to replace; after the import, its own record is
-    // what the next one would replace.
-    let fresh_path = test_dir.path().join("fresh.sqlite3");
-    initialize_test_database(&fresh_path).expect("database should initialize");
-    assert!(!legacy_import_finds_saved_data(&fresh_path).expect("the gate should read"));
-    let summary = import_legacy_db(&fresh_path, &request(false)).expect("the import should run");
-    assert!(!summary.replaced_existing_data);
-    assert!(legacy_import_finds_saved_data(&fresh_path).expect("the gate should read"));
-
-    // A set-up desk that never imported anything.
-    let desk_path = test_dir.path().join("desk.sqlite3");
-    initialize_test_database(&desk_path).expect("database should initialize");
-    set_settings_owned(
-        &desk_path,
-        &[
-            (
-                String::from(COMMISSIONING_COMPLETED_KEY),
-                String::from("true"),
-            ),
-            (String::from(COMMISSIONING_STAGE_KEY), String::from("ready")),
-            (
-                String::from(COMMISSIONING_RUNNER_STAGE_KEY),
-                String::from("publish"),
-            ),
-            (String::from(WORKSPACE_KEY), String::from("audio")),
-        ],
-    )
-    .expect("the desk should be set up");
-    assert!(legacy_import_finds_saved_data(&desk_path).expect("the gate should read"));
-    let before = all_settings(&desk_path);
-    let error = import_legacy_db(&desk_path, &request(false))
-        .expect_err("a set-up desk is not replaced without force");
-    assert!(matches!(
-        error,
-        ImportLegacyError::ExistingDataRequiresForce
-    ));
-    assert_eq!(
-        all_settings(&desk_path),
-        before,
-        "a refused import writes nothing"
-    );
-    let words = error.to_string().to_lowercase();
-    for forbidden in [
-        "engine",
-        "backend",
-        "transport",
-        "ipc",
-        "snapshot",
-        "planning",
-    ] {
-        assert!(!words.contains(forbidden), "{words}");
-    }
-
-    let summary = import_legacy_db(&desk_path, &request(true)).expect("force replaces");
-    assert!(summary.replaced_existing_data);
-    let after = all_settings(&desk_path);
-    assert_eq!(
-        after.get(WORKSPACE_KEY).map(String::as_str),
-        Some("lighting")
-    );
-    assert_eq!(
-        after.get(COMMISSIONING_COMPLETED_KEY).map(String::as_str),
-        Some("false")
     );
 }

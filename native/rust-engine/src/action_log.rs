@@ -282,7 +282,6 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "dev.parityFixture.load",
     "exports.companion.export",
     "settings.update",
-    "storage.importLegacyDb",
     "support.backup.export",
 ];
 

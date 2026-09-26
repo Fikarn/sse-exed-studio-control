@@ -1,5 +1,5 @@
 use super::*;
-use crate::app_state::APP_SETTINGS_PREFIX;
+use crate::app_state::{APP_SETTINGS_PREFIX, COMMISSIONING_RUNNER_STAGE_KEY};
 use crate::audio::{
     read_audio_snapshot, update_audio_channel, update_audio_mix_target, update_audio_settings,
     AudioChannelUpdateRequest, AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest,
@@ -73,7 +73,33 @@ impl Drop for TestDir {
     }
 }
 
-fn seed_legacy_payload(path: &Path) {
+/// The saved data most of these tests start from: setup complete and the
+/// Console the page to open. New pages program, Slice 2b: written directly;
+/// until then it came from `write_old_studio_control_export`'s file through
+/// the db.json import (`hasCompletedSetup: true`, `dashboardView: audio`),
+/// which wrote these four settings and nothing else of it.
+fn seed_completed_setup(db_path: &Path) {
+    set_settings_owned(
+        db_path,
+        &[
+            (
+                String::from(COMMISSIONING_COMPLETED_KEY),
+                String::from("true"),
+            ),
+            (
+                String::from(COMMISSIONING_RUNNER_STAGE_KEY),
+                String::from("publish"),
+            ),
+            (String::from(COMMISSIONING_STAGE_KEY), String::from("ready")),
+            (String::from(WORKSPACE_KEY), String::from("audio")),
+        ],
+    )
+    .expect("the completed setup should seed");
+}
+
+/// An export from the old Studio Control (a db.json): its schema number, a
+/// project, a task, an activity entry and its settings.
+fn write_old_studio_control_export(path: &Path) {
     fs::write(
         path,
         serde_json::to_vec_pretty(&json!({
@@ -131,25 +157,25 @@ fn seed_legacy_payload(path: &Path) {
                 "hasCompletedSetup": true
             }
         }))
-        .expect("legacy payload should serialize"),
+        .expect("the old export should serialize"),
     )
-    .expect("legacy payload should be written");
+    .expect("the old export should be written");
+}
+
+/// `text` as Windows Notepad's "Unicode" and a PowerShell 5 `>` save it:
+/// UTF-16 LE after the bytes FF FE, which are never UTF-8.
+fn utf16_with_bom(text: &str) -> Vec<u8> {
+    [0xFF, 0xFE]
+        .into_iter()
+        .chain(text.encode_utf16().flat_map(u16::to_le_bytes))
+        .collect()
 }
 
 #[test]
 fn export_support_backup_writes_archive_and_lists_it() {
     let test_dir = TestDir::new("export");
     let runtime = test_dir.runtime();
-    let legacy_path = test_dir.path().join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: legacy_path,
-            force: true,
-        },
-    )
-    .expect("legacy import should seed database");
+    seed_completed_setup(&runtime.db_path);
 
     let summary = export_support_backup(&runtime).expect("backup export should succeed");
     // New pages program, Slice 2: the reply no longer counts projects and
@@ -180,16 +206,7 @@ fn restore_support_backup_round_trips_native_archive() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("restore-native");
     let runtime = test_dir.runtime();
-    let legacy_path = test_dir.path().join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: legacy_path,
-            force: true,
-        },
-    )
-    .expect("legacy import should seed database");
+    seed_completed_setup(&runtime.db_path);
 
     let export = export_support_backup(&runtime).expect("backup export should succeed");
     set_settings_owned(
@@ -457,55 +474,207 @@ fn restore_support_backup_round_trips_native_archive() {
     assert!(!restored_main_mix.talkback);
 }
 
+/// Every file in the backups folder, by name.
+fn backup_file_names(runtime: &RuntimeContext) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(&runtime.backups_dir)
+        .expect("backups dir should list")
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+        .collect();
+    names.sort();
+    names
+}
+
+/// Every setting with its `updated_at`, to prove a refusal touched none.
+fn settings_rows(runtime: &RuntimeContext) -> Vec<(String, String, String)> {
+    let connection = open_connection(&runtime.db_path).expect("connection should open");
+    let mut statement = connection
+        .prepare("SELECT key, value, updated_at FROM app_settings ORDER BY key")
+        .expect("settings should prepare");
+    let rows = statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .expect("settings should query")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("settings should read");
+    rows
+}
+
+// New pages program, Slice 2b (D3): the db.json import is retired, and an
+// export from the old Studio Control in the backups folder is refused by
+// name — known by its name or by what it holds. Verify answers `ok: false`
+// with the sentence; a restore refuses it (INVALID_PARAMS) before anything is
+// written, the rollback archive included. Until the slice Verify said it
+// would restore whether setup is complete and the page, and a restore did
+// (`sourceFormat: legacy-db-json`, 4 settings) after writing a rollback
+// archive.
 #[test]
-fn restore_support_backup_accepts_legacy_json() {
-    let test_dir = TestDir::new("restore-legacy");
-    let runtime = test_dir.runtime();
-    // Slice 7 (F29): a restore source lives inside the backups folder.
-    let legacy_path = runtime.backups_dir.join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    let request = parse_support_restore_request(
-        &json!({ "path": legacy_path.display().to_string() }),
-        &runtime.backups_dir,
+fn an_old_studio_control_export_is_refused_by_name_and_writes_nothing() {
+    let test_dir = TestDir::new("old-export-refused");
+    let runtime = seeded_runtime(&test_dir);
+    // An import would change the page and the setup flag of the seeded data.
+    let reset = runtime.backups_dir.join("legacy-db.json");
+    fs::write(
+        &reset,
+        serde_json::to_vec_pretty(&json!({
+            "schemaVersion": 9,
+            "projects": [],
+            "settings": { "dashboardView": "lighting", "hasCompletedSetup": false }
+        }))
+        .expect("the old export should serialize"),
     )
-    .expect("a legacy export inside the backups folder is a valid source");
-    assert_eq!(request.kind, SupportBackupKind::Archive);
+    .expect("the old export should be written");
+    // The old app's own name, and its shape under another name.
+    let bare = runtime.backups_dir.join("db.json");
+    write_old_studio_control_export(&bare);
+    let renamed = runtime.backups_dir.join("studio-2025-backup.json");
+    write_old_studio_control_export(&renamed);
+    // A name alone is enough, whatever the file holds.
+    let named_only = runtime.backups_dir.join("stray-db.json");
+    fs::write(&named_only, b"{}").expect("the named file should be written");
+    let unreadable = runtime.backups_dir.join("broken-db.json");
+    fs::write(&unreadable, b"{ not json").expect("the broken file should be written");
+    // 2026-09-25: one re-saved as UTF-16 is not UTF-8, and its name is enough
+    // all the same. Until then Verify said it "could not be read" and a
+    // restore answered STORAGE_ERROR with the bare io text, the name unread.
+    let not_utf8 = runtime.backups_dir.join("x-db.json");
+    fs::write(
+        &not_utf8,
+        utf16_with_bom(r#"{"schemaVersion":9,"projects":[]}"#),
+    )
+    .expect("the UTF-16 file should be written");
 
-    let summary =
-        restore_support_backup(&runtime, &request).expect("legacy restore should succeed");
+    let files_before = backup_file_names(&runtime);
+    let rows_before = settings_rows(&runtime);
+    for (path, file_name) in [
+        (&reset, "legacy-db.json"),
+        (&bare, "db.json"),
+        (&renamed, "studio-2025-backup.json"),
+        (&named_only, "stray-db.json"),
+        (&unreadable, "broken-db.json"),
+        (&not_utf8, "x-db.json"),
+    ] {
+        let sentence = format!(
+            "{file_name} is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead."
+        );
+        let request = request_for(&runtime, path);
+        assert_eq!(request.kind, SupportBackupKind::Archive);
 
-    assert_eq!(summary.source_format, "legacy-db-json");
-    // New pages program, Slice 2 (interim until Slice 2b retires the
-    // db.json import): only whether setup is complete and the page to open
-    // are restored — the three setup keys and the page — and the file's
-    // project, task and activity entry are not, which the reply says. Until
-    // Slice 2 it restored 1 project, 1 task and 2 checklist items.
-    assert_eq!(summary.settings_restored, 4);
-    assert_eq!(summary.detail.as_deref(), Some(PLANNING_WAS_NOT_RESTORED));
-    assert!(
-        read_commissioning_snapshot(&runtime.db_path)
-            .expect("commissioning snapshot should load")
-            .has_completed_setup
+        let checked = verify_support_backup(&request);
+        assert!(!checked.ok, "{file_name}: {}", checked.detail);
+        assert_eq!(checked.kind, SupportBackupKind::Archive);
+        assert_eq!(checked.format_version, None, "{file_name}");
+        assert_eq!(checked.schema_version, None, "{file_name}");
+        assert_eq!(checked.detail, sentence);
+        assert_operator_words(&checked.detail);
+
+        match restore_support_backup(&runtime, &request) {
+            Err(SupportCommandError::InvalidParams(message)) => assert_eq!(message, sentence),
+            other => panic!("{file_name}: expected INVALID_PARAMS, got {other:?}"),
+        }
+    }
+    assert_eq!(
+        settings_rows(&runtime),
+        rows_before,
+        "no setting was written"
     );
-    assert!(list_settings_by_prefix(&runtime.db_path, "planning.")
-        .expect("settings should load")
-        .is_empty());
+    assert_eq!(
+        backup_file_names(&runtime),
+        files_before,
+        "no rollback archive or any other file was written"
+    );
+    assert!(rollback_archive_names(&runtime).is_empty());
+    assert_eq!(
+        fs::read(&reset).expect("the old export reads"),
+        serde_json::to_vec_pretty(&json!({
+            "schemaVersion": 9,
+            "projects": [],
+            "settings": { "dashboardView": "lighting", "hasCompletedSetup": false }
+        }))
+        .expect("the old export should serialize"),
+        "the file itself is left as it was"
+    );
+}
+
+// Slice 2b (D3): a restore applies nothing but a support archive. Any other
+// JSON in the backups folder is refused as not a backup archive, with the
+// sentence Verify gives, before anything is written. Until the slice it went
+// to the db.json import with `force`: a stray `{}` wrote setup not completed
+// and the Console, after a rollback archive.
+#[test]
+fn a_restore_of_json_that_is_not_a_backup_archive_changes_nothing() {
+    let test_dir = TestDir::new("not-an-archive");
+    let runtime = seeded_runtime(&test_dir);
+    set_settings_owned(
+        &runtime.db_path,
+        &[(String::from(WORKSPACE_KEY), String::from("lighting"))],
+    )
+    .expect("the page should write");
+    let mut strays = Vec::new();
+    for (name, contents) in [
+        ("stray.json", "{}"),
+        ("list.json", "[]"),
+        (
+            "settings-only.json",
+            r#"{"settings":{"dashboardView":"audio","hasCompletedSetup":false}}"#,
+        ),
+        (
+            "native-backup-without-type.json",
+            r#"{"formatVersion":5,"exportedAt":"2026-09-25T10:00:00.000Z"}"#,
+        ),
+    ] {
+        let path = runtime.backups_dir.join(name);
+        fs::write(&path, contents).expect("the stray file should be written");
+        strays.push(path);
+    }
+    // 2026-09-25: a file that is not UTF-8 is not a JSON backup, and is
+    // refused as one (INVALID_PARAMS); a restore answered STORAGE_ERROR until
+    // then, with the bare io text.
+    let not_utf8 = runtime.backups_dir.join("unicode.json");
+    fs::write(&not_utf8, utf16_with_bom("{}")).expect("the UTF-16 file should be written");
+
+    let files_before = backup_file_names(&runtime);
+    let rows_before = settings_rows(&runtime);
+    for path in &strays {
+        let sentence = format!("{} is not a Studio Control backup archive.", path.display());
+        let request = request_for(&runtime, path);
+        match restore_support_backup(&runtime, &request) {
+            Err(SupportCommandError::InvalidParams(message)) => assert_eq!(message, sentence),
+            other => panic!("{}: expected INVALID_PARAMS, got {other:?}", path.display()),
+        }
+        let checked = verify_support_backup(&request);
+        assert!(!checked.ok);
+        assert_eq!(checked.detail, sentence);
+    }
+    let request = request_for(&runtime, &not_utf8);
+    let refusal = match restore_support_backup(&runtime, &request) {
+        Err(SupportCommandError::InvalidParams(message)) => message,
+        other => panic!("unicode.json: expected INVALID_PARAMS, got {other:?}"),
+    };
+    let prefix = format!("{} is not a JSON backup: ", not_utf8.display());
+    assert!(
+        refusal.starts_with(&prefix) && refusal.contains("utf-8"),
+        "{refusal}"
+    );
+    let checked = verify_support_backup(&request);
+    assert!(!checked.ok);
+    assert_eq!(checked.detail, refusal);
+    assert_eq!(
+        settings_rows(&runtime),
+        rows_before,
+        "no setting was written"
+    );
+    assert_eq!(backup_file_names(&runtime), files_before);
+    assert!(rollback_archive_names(&runtime).is_empty());
+    let commissioning =
+        read_commissioning_snapshot(&runtime.db_path).expect("commissioning snapshot should load");
+    assert!(commissioning.has_completed_setup);
 }
 
 #[test]
 fn export_support_backup_records_storage_format_version() {
     let test_dir = TestDir::new("export-format-version");
     let runtime = test_dir.runtime();
-    let legacy_path = test_dir.path().join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: legacy_path,
-            force: true,
-        },
-    )
-    .expect("legacy import should seed database");
+    seed_completed_setup(&runtime.db_path);
 
     let export = export_support_backup(&runtime).expect("backup export should succeed");
     let archive_bytes = fs::read(&export.path).expect("archive should read back");
@@ -520,16 +689,7 @@ fn export_support_backup_records_storage_format_version() {
 fn restore_support_backup_accepts_format_v2_archive_without_storage_version() {
     let test_dir = TestDir::new("restore-format-v2");
     let runtime = test_dir.runtime();
-    let legacy_path = test_dir.path().join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: legacy_path,
-            force: true,
-        },
-    )
-    .expect("legacy import should seed database");
+    seed_completed_setup(&runtime.db_path);
 
     // Build a real archive then strip the v3-only field to forge a v2 shape.
     let mut archive_value =
@@ -560,16 +720,7 @@ fn restore_support_backup_accepts_format_v2_archive_without_storage_version() {
 
 fn seeded_runtime(test_dir: &TestDir) -> RuntimeContext {
     let runtime = test_dir.runtime();
-    let legacy_path = test_dir.path().join("legacy-db.json");
-    seed_legacy_payload(&legacy_path);
-    import_legacy_db(
-        &runtime.db_path,
-        &LegacyImportRequest {
-            source_path: legacy_path,
-            force: true,
-        },
-    )
-    .expect("legacy import should seed database");
+    seed_completed_setup(&runtime.db_path);
     runtime
 }
 
@@ -1619,7 +1770,8 @@ fn a_format_4_archive_restores_everything_but_its_planning_part() {
 // D3: Verify of an archive written before Planning left no longer counts
 // projects and tasks; it says the Planning part will not be restored when
 // the archive holds Planning data, and says nothing of it otherwise. A
-// legacy db.json (interim until Slice 2b) says what is still read from it.
+// legacy db.json is refused since Slice 2b retired the import (in Slice 2 it
+// said that whether setup is complete and the page would be restored).
 #[test]
 fn verify_says_a_format_4_archive_s_planning_part_is_skipped() {
     let test_dir = TestDir::new("format-4-verify");
@@ -1662,15 +1814,13 @@ fn verify_says_a_format_4_archive_s_planning_part_is_skipped() {
     );
 
     let legacy = runtime.backups_dir.join("legacy-db.json");
-    seed_legacy_payload(&legacy);
+    write_old_studio_control_export(&legacy);
     let checked = verify_support_backup(&request_for(&runtime, &legacy));
-    assert!(checked.ok, "{}", checked.detail);
-    assert_eq!(checked.schema_version, Some(9));
+    assert!(!checked.ok, "{}", checked.detail);
+    assert_eq!(checked.schema_version, None);
     assert_eq!(
         checked.detail,
-        format!(
-            "Legacy db.json export (schema 9); only whether setup is complete and the page to open are restored from it. {PLANNING_WILL_NOT_BE_RESTORED}"
-        )
+        "legacy-db.json is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead."
     );
     assert_operator_words(&checked.detail);
 }

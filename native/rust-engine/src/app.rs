@@ -27,7 +27,6 @@ use crate::commissioning::{
 };
 use crate::diagnostics::{append_log, configured_log_level, request_log_line};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
-use crate::legacy_import::{parse_import_request, ImportLegacyError};
 use crate::lighting::{
     apply_lighting_palette_with_preview, bump_lighting_render_generation,
     clear_lighting_identify_bursts, create_lighting_fixture, create_lighting_group,
@@ -67,7 +66,7 @@ use crate::protocol::{
     EVENT_LIGHTING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
-use crate::storage::{import_legacy_db, list_settings_by_prefix, set_settings, EngineResult};
+use crate::storage::{list_settings_by_prefix, set_settings, EngineResult};
 use crate::support::{
     export_support_backup, parse_support_restore_request, read_support_snapshot,
     restore_support_backup, verify_support_backup, SupportCommandError,
@@ -577,9 +576,11 @@ impl EngineApp {
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
-            // error enums (storage.importLegacyDb), chained snapshot reads
+            // error enums (support.backup.*), chained snapshot reads
             // (commissioning.update, settings.update), or unique reply
-            // shapes (exports.companion.export).
+            // shapes (exports.companion.export). storage.importLegacyDb left
+            // with the db.json import (new pages program, Slice 2b) and
+            // answers UNKNOWN_METHOD below.
             // -------------------------------------------------------------
             "support.backup.export" => match export_support_backup(&self.runtime) {
                 Ok(result) => Self::reply_with_support_change(
@@ -711,44 +712,6 @@ impl EngineApp {
                     Self::reply(invalid_params(request.id, message))
                 }
             },
-            "storage.importLegacyDb" => match parse_import_request(&request.params) {
-                Ok(import_request) => {
-                    match import_legacy_db(&self.runtime.db_path, &import_request) {
-                        Ok(summary) => {
-                            let _ = append_log(
-                                &self.runtime.log_file_path,
-                                "INFO",
-                                &format!(
-                                    "Imported legacy db from {}: {} settings (the setup flag and the page to open)",
-                                    summary.source_path, summary.updated_settings
-                                ),
-                            );
-                            Self::reply(ok_response(
-                                request.id,
-                                serde_json::to_value(summary).unwrap_or_else(|_| json!({})),
-                            ))
-                        }
-                        Err(error) => {
-                            let code = match error {
-                                ImportLegacyError::ExistingDataRequiresForce => {
-                                    "IMPORT_REQUIRES_FORCE"
-                                }
-                                ImportLegacyError::SourceNotFound(_) => "IMPORT_SOURCE_NOT_FOUND",
-                                ImportLegacyError::SourceReadFailed(_)
-                                | ImportLegacyError::SourceParseFailed(_) => "IMPORT_FAILED",
-                                ImportLegacyError::Storage(_) => "STORAGE_ERROR",
-                            };
-                            let _ = append_log(
-                                &self.runtime.log_file_path,
-                                "WARN",
-                                &format!("Legacy import failed: {}", error),
-                            );
-                            Self::reply(error_response(request.id, code, error.to_string()))
-                        }
-                    }
-                }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
             _ => Self::reply(error_response(
                 request.id,
                 "UNKNOWN_METHOD",
@@ -851,8 +814,8 @@ impl EngineApp {
     // the uniform shapes (read-no-params, mutate with a single event) so the
     // match body collapses to one-liners. Custom arms with non-uniform error enums
     // or chained read-snapshot calls (`commissioning.update`, `settings.update`,
-    // `support.backup.*`, `exports.companion.export`, `storage.importLegacyDb`)
-    // stay as hand-written branches.
+    // `support.backup.*`, `exports.companion.export`) stay as hand-written
+    // branches.
     // -----------------------------------------------------------------------
 
     fn dispatch_read<T, F>(&self, request_id: serde_json::Value, read: F) -> EngineReply

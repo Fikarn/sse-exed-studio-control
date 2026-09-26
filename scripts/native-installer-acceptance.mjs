@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   writeFileSync,
@@ -17,10 +18,18 @@ import {
   assertContinuitySentinel,
   assertSavedWorkspace,
   createContinuitySentinel,
-  IMPORTED_WORKSPACE,
+  publishWithOverride,
   SAVED_DATA_MARKER_CHANGED,
+  SEEDED_WORKSPACE,
+  seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import {
+  assert,
+  EngineHarness,
+  hardenedLaneEnv,
+  laneProcessEnv,
+  resolvePathFromRoot,
+} from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 import {
   nativeReleaseRequiresOperatorUiReady,
@@ -30,7 +39,6 @@ import {
 } from "./native-release-runtime.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const fixturePath = path.join(rootDir, "native", "rust-engine", "fixtures", "commissioning-sample-db.json");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 // New pages program, Slice 2: the sentinel is a lighting group; until then it
@@ -315,11 +323,12 @@ function resolveMaintenanceToolPath(target, installRoot) {
   throw new Error(`Maintenance tool not found under ${installRoot}.`);
 }
 
-function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
+async function runCliStep(command, args, acceptanceRoot, stepName) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const stdoutPath = path.join(stepRoot, "stdout.log");
   const stderrPath = path.join(stepRoot, "stderr.log");
   const homeDir = path.join(acceptanceRoot, "home");
+  const env = await installerRunEnv(acceptanceRoot, stepName);
 
   rmSync(stepRoot, { force: true, recursive: true });
   mkdirSync(stepRoot, { recursive: true });
@@ -328,12 +337,7 @@ function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   const result = spawnSync(command, args, {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      HOME: homeDir,
-      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
-      ...env,
-    },
+    env,
   });
 
   writeFileSync(stdoutPath, result.stdout ?? "", "utf8");
@@ -362,7 +366,7 @@ function runCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   };
 }
 
-function safeRunCliStep(command, args, acceptanceRoot, stepName, env = {}) {
+async function safeRunCliStep(command, args, acceptanceRoot, stepName) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const stdoutPath = path.join(stepRoot, "stdout.log");
   const stderrPath = path.join(stepRoot, "stderr.log");
@@ -374,15 +378,11 @@ function safeRunCliStep(command, args, acceptanceRoot, stepName, env = {}) {
 
   let result;
   try {
+    const env = await installerRunEnv(acceptanceRoot, stepName);
     result = spawnSync(command, args, {
       cwd: rootDir,
       encoding: "utf8",
-      env: {
-        ...process.env,
-        HOME: homeDir,
-        XDG_CACHE_HOME: path.join(homeDir, ".cache"),
-        ...env,
-      },
+      env,
     });
   } catch (error) {
     return {
@@ -418,6 +418,32 @@ function safeRunCliStep(command, args, acceptanceRoot, stepName, env = {}) {
   };
 }
 
+/**
+ * The environment of every QtIFW run: the install, the reinstall and each
+ * maintenance-tool step. QtIFW runs the installed app's first-launch check
+ * (`native/installer-templates/tauri-installscript.qs`) as soon as the files
+ * are in place, with the installer's own environment; the lane gave that no
+ * app data of its own, so on Windows the check opened the real one
+ * (%APPDATA%, which the lane's HOME does not move). It gets a scratch folder
+ * and the lanes' hardening (new pages program, Slice 2b). Since 2026-09-25
+ * runCliStep and safeRunCliStep build it themselves, so no step can leave it
+ * out, and laneProcessEnv refuses it without a scratch app-data folder.
+ */
+async function installerRunEnv(acceptanceRoot, stepName) {
+  const homeDir = path.join(acceptanceRoot, "home");
+  const firstLaunchRoot = path.join(acceptanceRoot, "installer-first-launch");
+  return laneProcessEnv(
+    await hardenedLaneEnv(),
+    {
+      HOME: homeDir,
+      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
+      SSE_APP_DATA_DIR: path.join(firstLaunchRoot, "app-data"),
+      SSE_LOG_DIR: path.join(firstLaunchRoot, "logs"),
+    },
+    { label: `Installer acceptance step '${stepName}' (QtIFW runs the installed app's first-launch check)` }
+  );
+}
+
 function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expectedTarget, env = {}) {
   const stepRoot = path.join(acceptanceRoot, stepName);
   const smokeStatusPath = path.join(stepRoot, "smoke-status.json");
@@ -430,14 +456,18 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
   const result = spawnSync(installed.shellPath, installed.commandArgs(smokeStatusPath), {
     cwd: rootDir,
     encoding: "utf8",
-    env: {
-      ...process.env,
-      HOME: homeDir,
-      XDG_CACHE_HOME: path.join(homeDir, ".cache"),
-      ...env,
-      SSE_APP_DATA_DIR: runtime.appDataDir,
-      SSE_LOG_DIR: runtime.logsDir,
-    },
+    env: laneProcessEnv(
+      {
+        HOME: homeDir,
+        XDG_CACHE_HOME: path.join(homeDir, ".cache"),
+        ...env,
+      },
+      {
+        SSE_APP_DATA_DIR: runtime.appDataDir,
+        SSE_LOG_DIR: runtime.logsDir,
+      },
+      { label: `Installed ${installed.label} acceptance step '${stepName}'` }
+    ),
   });
 
   writeFileSync(path.join(stepRoot, "stdout.log"), result.stdout ?? "", "utf8");
@@ -610,7 +640,7 @@ function deleteUninstallKeysUnderInstallRoot(installRoot) {
   });
 }
 
-function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, stepName }) {
+async function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, stepName }) {
   const summary = {
     installRoot,
     purge: { attempted: false, ok: false, toolPath: null, error: null },
@@ -646,7 +676,7 @@ function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, stepNa
   if (toolPath) {
     summary.purge.toolPath = toolPath;
     summary.purge.attempted = true;
-    const purgeResult = safeRunCliStep(
+    const purgeResult = await safeRunCliStep(
       toolPath,
       ["--verbose", "--default-answer", "--confirm-command", "purge"],
       acceptanceRoot,
@@ -711,8 +741,6 @@ async function main() {
     throw new Error(`native-installer-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 
-  assert(existsSync(fixturePath), `Fixture missing: ${fixturePath}`);
-
   const installerExecutable = resolveInstallerExecutable(target, runtimeKind);
   const repositoryPath = resolveRepositoryPath(target, runtimeKind);
 
@@ -732,7 +760,7 @@ async function main() {
     console.log(
       `Installer acceptance pre-purge: detected stale install at ${stalePrePurgeRoot}; purging maintenance-tool registry before recreating acceptance root.`
     );
-    const prePurge = teardownAcceptanceInstall({
+    const prePurge = await teardownAcceptanceInstall({
       target,
       installRoot: stalePrePurgeRoot,
       acceptanceRoot,
@@ -764,7 +792,7 @@ async function main() {
     console.log(SAVED_DATA_MARKER_CHANGED);
     console.log("Step 1: install the actual offline installer into a clean target root.");
 
-    runCliStep(
+    await runCliStep(
       installerExecutable,
       ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
       acceptanceRoot,
@@ -779,20 +807,23 @@ async function main() {
     assert(existsSync(installed.enginePath), `Installed engine missing at ${installed.enginePath}.`);
 
     console.log(
-      "Step 2: import workstation data (its setup flag and page) through the installed shell and persist a continuity sentinel (a lighting group)."
+      "Step 2: start the installed shell on fresh saved data, save the page it opens on, publish the setup and persist a continuity sentinel (a lighting group)."
     );
-    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-import", "commissioning", {
-      SSE_LEGACY_DB_PATH: fixturePath,
-    });
+    runInstalledSmoke(
+      installed,
+      acceptanceRoot,
+      runtime,
+      "installed-first-launch",
+      "commissioning",
+      await hardenedLaneEnv()
+    );
 
     const firstRun = new EngineHarness({
       rootDir,
       appDataDir: runtime.appDataDir,
       logsDir: runtime.logsDir,
       engineExecutable: installed.enginePath,
-      env: {
-        SSE_DISABLE_AUTO_IMPORT: "1",
-      },
+      env: await hardenedLaneEnv(),
     });
 
     try {
@@ -803,24 +834,15 @@ async function main() {
 
       assert(
         initialAppSnapshot.startup?.targetSurface === "commissioning",
-        `Expected installer acceptance import to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
+        `Expected installer acceptance's fresh saved data to start in commissioning, got '${initialAppSnapshot.startup?.targetSurface}'.`
       );
-      // The import is seen by the page it wrote: new saved data opens on the
-      // Console, the fixture on Lighting.
-      assertSavedWorkspace(
-        initialAppSnapshot,
-        IMPORTED_WORKSPACE,
-        `Installed ${installed.label} engine`,
-        "after the import"
-      );
+      // The page is seeded through the app's own request: new saved data
+      // opens on the Console, and Lighting is saved instead.
+      await seedSavedWorkspace(firstRun, "installer-installed", `Installed ${installed.label} engine`);
 
-      const commissioningUpdate = await firstRun.request("installer-commissioning-ready", "commissioning.update", {
-        stage: "ready",
-      });
-      assert(
-        commissioningUpdate.startup?.targetSurface === "dashboard",
-        `Expected installer acceptance to unlock dashboard, got '${commissioningUpdate.startup?.targetSurface}'.`
-      );
+      // No hardware on this host: the explicit probe override (2026-09 audit
+      // Slice 8), without which a fresh hardware link refuses the publish.
+      await publishWithOverride(firstRun, "installer-installed", `Installed ${installed.label} engine`);
 
       sentinel = await createContinuitySentinel(
         firstRun,
@@ -845,7 +867,7 @@ async function main() {
     const maintenanceToolPath = resolveMaintenanceToolPath(target, installRoot);
     const repositoryUri = pathToFileURL(repositoryPath).href;
 
-    const installedPackages = runCliStep(
+    const installedPackages = await runCliStep(
       maintenanceToolPath,
       ["--verbose", "list"],
       acceptanceRoot,
@@ -856,7 +878,7 @@ async function main() {
       `Expected maintenance tool list output to include ${releaseIdentity.packageId}.`
     );
 
-    const repositorySearch = runCliStep(
+    const repositorySearch = await runCliStep(
       maintenanceToolPath,
       ["--verbose", "--set-temp-repository", repositoryUri, "--type", "package", "search", releaseIdentity.packageId],
       acceptanceRoot,
@@ -868,7 +890,7 @@ async function main() {
     );
 
     console.log("Step 4: purge the installed program directory through the maintenance tool and reinstall it.");
-    runCliStep(
+    await runCliStep(
       maintenanceToolPath,
       ["--verbose", "--default-answer", "--confirm-command", "purge"],
       acceptanceRoot,
@@ -881,7 +903,7 @@ async function main() {
     );
     cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot);
 
-    runCliStep(
+    await runCliStep(
       installerExecutable,
       ["--verbose", "--root", installRoot, "--accept-licenses", "--default-answer", "--confirm-command", "install"],
       acceptanceRoot,
@@ -896,18 +918,14 @@ async function main() {
     assert(existsSync(installed.enginePath), `Reinstalled engine missing at ${installed.enginePath}.`);
 
     console.log("Step 5: relaunch the reinstalled application and verify operator state survived the reinstall.");
-    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", {
-      SSE_DISABLE_AUTO_IMPORT: "1",
-    });
+    runInstalledSmoke(installed, acceptanceRoot, runtime, "installed-relaunch", "dashboard", await hardenedLaneEnv());
 
     const secondRun = new EngineHarness({
       rootDir,
       appDataDir: runtime.appDataDir,
       logsDir: runtime.logsDir,
       engineExecutable: installed.enginePath,
-      env: {
-        SSE_DISABLE_AUTO_IMPORT: "1",
-      },
+      env: await hardenedLaneEnv(),
     });
 
     try {
@@ -926,7 +944,7 @@ async function main() {
       );
       assertSavedWorkspace(
         reinstalledAppSnapshot,
-        IMPORTED_WORKSPACE,
+        SEEDED_WORKSPACE,
         `Reinstalled ${installed.label} engine`,
         "after the reinstall"
       );
@@ -955,7 +973,7 @@ async function main() {
   } catch (error) {
     mainError = error;
   } finally {
-    teardown = teardownAcceptanceInstall({
+    teardown = await teardownAcceptanceInstall({
       target,
       installRoot,
       acceptanceRoot,
@@ -999,7 +1017,32 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+// Runs only as `node scripts/native-installer-acceptance.mjs …`: an import
+// does nothing (2026-09-25). The two paths are compared as real paths —
+// through a directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}

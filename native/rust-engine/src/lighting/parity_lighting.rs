@@ -1,6 +1,12 @@
+//! The lighting part of the development parity fixtures: the settings the
+//! `lighting-populated` fixture writes, from its bundled payload
+//! (`fixtures/parity-lighting-populated.json`). New pages program, Slice 2b:
+//! renamed from `legacy_import.rs` when the db.json import was retired. The
+//! payload keeps the old db.json's names for its parts but holds nothing
+//! else, and every part refuses a field it does not read.
+
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::path::Path;
 
 use crate::commissioning::{LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY};
 use crate::lighting_backend::{read_default_lighting_inventory, LightingBackendConfig};
@@ -11,19 +17,21 @@ use super::types::*;
 use super::*;
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingFixturePayloadWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightingPayloadWire {
     #[serde(default)]
-    lights: Vec<LegacyLightingFixtureWire>,
+    lights: Vec<ParityLightWire>,
     #[serde(default, rename = "lightGroups")]
-    light_groups: Vec<LegacyLightingGroupWire>,
+    light_groups: Vec<ParityLightGroupWire>,
     #[serde(default, rename = "lightScenes")]
-    light_scenes: Vec<LegacyLightingSceneWire>,
+    light_scenes: Vec<ParityLightSceneWire>,
     #[serde(default, rename = "lightingSettings")]
-    lighting_settings: LegacyLightingSettingsWire,
+    lighting_settings: ParityLightingSettingsWire,
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingFixtureWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightWire {
     #[serde(default)]
     id: String,
     #[serde(default)]
@@ -43,7 +51,7 @@ struct LegacyLightingFixtureWire {
     #[serde(default, rename = "groupId")]
     group_id: Option<String>,
     #[serde(default)]
-    effect: Option<LegacyLightingEffectWire>,
+    effect: Option<ParityLightEffectWire>,
     #[serde(default, rename = "spatialX")]
     spatial_x: Option<f64>,
     #[serde(default, rename = "spatialY")]
@@ -53,7 +61,8 @@ struct LegacyLightingFixtureWire {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingGroupWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightGroupWire {
     #[serde(default)]
     id: String,
     #[serde(default)]
@@ -63,7 +72,8 @@ struct LegacyLightingGroupWire {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingSceneWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightSceneWire {
     #[serde(default)]
     id: String,
     #[serde(default)]
@@ -71,11 +81,12 @@ struct LegacyLightingSceneWire {
     #[serde(default)]
     order: i64,
     #[serde(default, rename = "lightStates")]
-    light_states: Vec<LegacyLightingSceneFixtureStateWire>,
+    light_states: Vec<ParitySceneLightStateWire>,
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingSceneFixtureStateWire {
+#[serde(deny_unknown_fields)]
+struct ParitySceneLightStateWire {
     #[serde(default, rename = "lightId")]
     light_id: String,
     #[serde(default)]
@@ -87,7 +98,8 @@ struct LegacyLightingSceneFixtureStateWire {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingEffectWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightEffectWire {
     #[serde(default, rename = "type")]
     effect_type: String,
     #[serde(default)]
@@ -95,7 +107,8 @@ struct LegacyLightingEffectWire {
 }
 
 #[derive(Debug, Deserialize, Default)]
-struct LegacyLightingSettingsWire {
+#[serde(deny_unknown_fields)]
+struct ParityLightingSettingsWire {
     #[serde(default, rename = "apolloBridgeIp")]
     apollo_bridge_ip: String,
     #[serde(default, rename = "dmxUniverse")]
@@ -109,16 +122,40 @@ struct LegacyLightingSettingsWire {
     #[serde(default, rename = "grandMaster")]
     grand_master: i64,
     #[serde(default, rename = "cameraMarker")]
-    camera_marker: Option<LightingSpatialMarker>,
+    camera_marker: Option<ParitySpatialMarkerWire>,
     #[serde(default, rename = "subjectMarker")]
-    subject_marker: Option<LightingSpatialMarker>,
+    subject_marker: Option<ParitySpatialMarkerWire>,
 }
 
-pub fn import_legacy_lighting_fixture(
-    db_path: &Path,
+/// The camera or subject marker. Its own wire struct, so that it refuses a
+/// field it does not read like every other part of the payload: the shared
+/// `LightingSpatialMarker` ignores one, and it stays so, because it also
+/// reads the markers in the saved settings.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ParitySpatialMarkerWire {
+    x: f64,
+    y: f64,
+    rotation: f64,
+}
+
+impl From<ParitySpatialMarkerWire> for LightingSpatialMarker {
+    fn from(marker: ParitySpatialMarkerWire) -> Self {
+        Self {
+            x: marker.x,
+            y: marker.y,
+            rotation: marker.rotation,
+        }
+    }
+}
+
+/// The lighting settings a parity fixture's payload stands for. Slice 2b:
+/// they are returned, not written, so the fixture load writes them in the
+/// same transaction as its setup flag, its page and its other settings.
+pub fn parity_lighting_settings(
     payload_json: &str,
-) -> Result<(), LightingCommandError> {
-    let wire = serde_json::from_str::<LegacyLightingFixturePayloadWire>(payload_json)
+) -> Result<Vec<(String, String)>, LightingCommandError> {
+    let wire = serde_json::from_str::<ParityLightingPayloadWire>(payload_json)
         .map_err(|error| LightingCommandError::Storage(error.to_string()))?;
     let config = LightingBackendConfig {
         enabled: !wire.lighting_settings.apollo_bridge_ip.trim().is_empty(),
@@ -330,11 +367,21 @@ pub fn import_legacy_lighting_fixture(
         ),
         (
             String::from(LIGHTING_CAMERA_MARKER_KEY),
-            serialize_optional_marker(wire.lighting_settings.camera_marker.as_ref())?,
+            serialize_optional_marker(
+                wire.lighting_settings
+                    .camera_marker
+                    .map(LightingSpatialMarker::from)
+                    .as_ref(),
+            )?,
         ),
         (
             String::from(LIGHTING_SUBJECT_MARKER_KEY),
-            serialize_optional_marker(wire.lighting_settings.subject_marker.as_ref())?,
+            serialize_optional_marker(
+                wire.lighting_settings
+                    .subject_marker
+                    .map(LightingSpatialMarker::from)
+                    .as_ref(),
+            )?,
         ),
         (
             String::from(LIGHTING_LAST_ACTION_STATUS_KEY),
@@ -347,5 +394,58 @@ pub fn import_legacy_lighting_fixture(
         ),
     ]);
 
-    persist_lighting_state(db_path, &updates)
+    Ok(updates)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        parity_lighting_settings, LIGHTING_CAMERA_MARKER_KEY, LIGHTING_SUBJECT_MARKER_KEY,
+    };
+
+    // New pages program, Slice 2b: the bundled payload holds only what the
+    // fixture load reads. A field no part of it reads — the old db.json's
+    // `schemaVersion` and `settings`, a light's colour, a scene's creation
+    // time, a marker's height or label — is refused instead of being carried
+    // along unread. A marker that holds only what is read is written as it
+    // was.
+    #[test]
+    fn a_field_the_payload_reader_does_not_read_is_refused() {
+        assert!(parity_lighting_settings(r#"{ "lights": [{ "id": "light-1" }] }"#).is_ok());
+        let updates = parity_lighting_settings(
+            r#"{ "lightingSettings": { "cameraMarker": { "x": 0.5, "y": 0.84, "rotation": 0 }, "subjectMarker": { "x": 0.5, "y": 0.46, "rotation": 180 } } }"#,
+        )
+        .expect("a payload with both markers loads");
+        let written = |key: &str| {
+            updates
+                .iter()
+                .find(|(name, _)| name == key)
+                .and_then(|(_, value)| serde_json::from_str::<serde_json::Value>(value).ok())
+        };
+        assert_eq!(
+            written(LIGHTING_CAMERA_MARKER_KEY),
+            Some(serde_json::json!({ "x": 0.5, "y": 0.84, "rotation": 0.0 }))
+        );
+        assert_eq!(
+            written(LIGHTING_SUBJECT_MARKER_KEY),
+            Some(serde_json::json!({ "x": 0.5, "y": 0.46, "rotation": 180.0 }))
+        );
+        for payload in [
+            r#"{ "schemaVersion": 1 }"#,
+            r#"{ "settings": { "hasCompletedSetup": true } }"#,
+            r#"{ "lights": [{ "id": "light-1", "red": 0 }] }"#,
+            r#"{ "lightGroups": [{ "id": "group-key", "colorIndex": 1 }] }"#,
+            r#"{ "lightScenes": [{ "id": "scene-1", "createdAt": "2026-04-18T08:00:00.000Z" }] }"#,
+            r#"{ "lightScenes": [{ "id": "scene-1", "lightStates": [{ "lightId": "light-1", "gmTint": 0 }] }] }"#,
+            r#"{ "lights": [{ "id": "light-1", "effect": { "type": "pulse", "depth": 3 } }] }"#,
+            r#"{ "lightingSettings": { "dmxEnabled": false, "sacnPriority": 100 } }"#,
+            r#"{ "lightingSettings": { "cameraMarker": { "x": 0.5, "y": 0.84, "rotation": 0, "z": 1 } } }"#,
+            r#"{ "lightingSettings": { "subjectMarker": { "x": 0.5, "y": 0.46, "rotation": 180, "label": "Host" } } }"#,
+        ] {
+            assert!(
+                parity_lighting_settings(payload).is_err(),
+                "{payload} should be refused"
+            );
+        }
+    }
 }

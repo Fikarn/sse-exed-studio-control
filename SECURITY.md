@@ -18,7 +18,6 @@ This application is designed for **local-only use** on a single trusted studio w
 - Denial of service affecting the DMX/lighting or audio control paths
 - Unsafe behavior in the local control-surface bridge that binds `127.0.0.1`
 - Supply-chain or release-signing issues affecting the native installer, update repository, or packaged Tauri/Rust binaries
-- Unsafe handling of the one-way legacy `db.json` importer during first-launch migration
 
 ## What protects the workstation
 

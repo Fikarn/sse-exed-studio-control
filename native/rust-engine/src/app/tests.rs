@@ -174,6 +174,89 @@ fn planning_requests_are_unknown_methods() {
     }
 }
 
+// New pages program, Slice 2b (D3): the db.json import left the hardware
+// link. `storage.importLegacyDb` is an unknown method like any other and
+// reads nothing, and a db.json in the backups folder is refused by a restore
+// with INVALID_PARAMS, naming the file, before anything changes. Until the
+// slice the request wrote the file's setup flag and page, and so did the
+// restore.
+#[test]
+fn the_db_json_import_is_gone_from_the_requests() {
+    let test_dir = TestDir::new("db-json-gone");
+    let app = app_for(&test_dir);
+    let backups_dir = test_dir.path().join("backups");
+    fs::create_dir_all(&backups_dir).expect("the backups folder should be created");
+    let db_json = backups_dir.join("db.json");
+    fs::write(
+        &db_json,
+        r#"{"schemaVersion":8,"projects":[],"settings":{"dashboardView":"lighting","hasCompletedSetup":true}}"#,
+    )
+    .expect("the db.json should be written");
+    let settings_before =
+        crate::storage::list_settings_by_prefix(&app.runtime.db_path, "").expect("settings");
+    let code = |reply: &super::EngineReply| {
+        reply
+            .response
+            .error
+            .as_ref()
+            .and_then(|error| error.get("code"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    };
+
+    for params in [
+        json!({ "path": db_json.display().to_string() }),
+        json!({ "path": db_json.display().to_string(), "force": true }),
+    ] {
+        let reply = app.handle_request(RequestEnvelope {
+            kind: String::from("request"),
+            id: json!("import-1"),
+            method: String::from("storage.importLegacyDb"),
+            params,
+        });
+        assert!(!reply.response.ok);
+        assert_eq!(code(&reply).as_deref(), Some("UNKNOWN_METHOD"));
+        assert!(reply.events.is_empty());
+    }
+
+    let reply = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("restore-1"),
+        method: String::from("support.backup.restore"),
+        params: json!({ "path": db_json.display().to_string() }),
+    });
+    assert!(!reply.response.ok);
+    assert_eq!(code(&reply).as_deref(), Some("INVALID_PARAMS"));
+    assert_eq!(
+        reply
+            .response
+            .error
+            .as_ref()
+            .and_then(|error| error.get("message"))
+            .and_then(Value::as_str),
+        Some(
+            "db.json is an export from the old Studio Control (db.json); this version no longer restores those. Restore a backup archive or a database backup instead."
+        )
+    );
+    assert!(reply.events.is_empty(), "a refused restore raises nothing");
+
+    assert_eq!(
+        crate::storage::list_settings_by_prefix(&app.runtime.db_path, "").expect("settings"),
+        settings_before
+    );
+    let mut backups = fs::read_dir(&backups_dir)
+        .expect("the backups folder lists")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    backups.sort();
+    assert_eq!(
+        backups,
+        vec![String::from("db.json")],
+        "no rollback archive"
+    );
+}
+
 // Finding F27: at the default level a request leaves no line in the log
 // — neither the old per-request INFO line nor the DEBUG one.
 #[test]

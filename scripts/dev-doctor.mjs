@@ -1,13 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { formatQtIfwToolSummary, qtifwInstructions, resolveQtIfwTools } from "./qt-ifw-tools.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = new Set(process.argv.slice(2));
-const releaseMode = args.has("--release");
 
 const results = [];
 
@@ -157,7 +155,7 @@ function checkTauriScaffold() {
   pass("Tauri scaffold", "Required Tauri shell files are present.");
 }
 
-function checkQtIfw() {
+function checkQtIfw(releaseMode) {
   const tools = resolveQtIfwTools({ rootDir });
 
   if (tools.complete) {
@@ -173,7 +171,7 @@ function checkQtIfw() {
   }
 }
 
-function checkGitCleanliness() {
+function checkGitCleanliness(releaseMode) {
   const result = run("git", ["status", "--short"]);
   if (result.exitCode !== 0) {
     fail("Git status", result.stderr || "Unable to read git status.");
@@ -214,14 +212,47 @@ function printResults() {
   }
 }
 
-console.log(releaseMode ? "Running release readiness doctor..." : "Running developer readiness doctor...");
-checkNode();
-checkCommand("npm", commandName("npm"), ["--version"]);
-checkCommand("cargo", "cargo", ["--version"]);
-checkCommand("rustc", "rustc", ["--version"]);
-checkPackageInstall();
-checkReleaseRuntime();
-checkTauriScaffold();
-checkQtIfw();
-checkGitCleanliness();
-printResults();
+function main() {
+  const args = new Set(process.argv.slice(2));
+  const releaseMode = args.has("--release");
+
+  console.log(releaseMode ? "Running release readiness doctor..." : "Running developer readiness doctor...");
+  checkNode();
+  checkCommand("npm", commandName("npm"), ["--version"]);
+  checkCommand("cargo", "cargo", ["--version"]);
+  checkCommand("rustc", "rustc", ["--version"]);
+  checkPackageInstall();
+  checkReleaseRuntime();
+  checkTauriScaffold();
+  checkQtIfw(releaseMode);
+  checkGitCleanliness(releaseMode);
+  printResults();
+}
+
+// Runs only as `node scripts/dev-doctor.mjs …`: an import does nothing
+// (2026-09-26; the run starts node, npm, cargo, rustc and git to read their
+// state and sets the process's exit code). The two paths are compared as real
+// paths — through a directory junction or a short 8.3 name, `process.argv[1]`
+// and `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main();
+}
