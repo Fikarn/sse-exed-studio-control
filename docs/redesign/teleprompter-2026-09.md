@@ -1,6 +1,6 @@
 # The Teleprompter: what it does (2026-09-26)
 
-Status: the designer's proposal for D20 (open), written in C0 on branch `new-pages/c0-boards` for the operator to review with the Teleprompter boards in `docs/redesign/assets/concepts/` (D19). This text says what the operator can do and see; the boards show where it sits. Where the two differ, the review settles it. No source, token or test was edited. Once approved, this is the scope of Part C's Teleprompter slice (D21 proposes that slice first).
+Status: approved by the operator on 2026-09-26 (the ledger's D20), with board 1, "Live mirror" (`docs/redesign/assets/concepts/A-teleprompter-1.html`, D19), and the answers in §14. Written in C0 on branch `new-pages/c0-boards` as the designer's proposal. This text says what the operator can do and see; the board shows where it sits, and where the two differ the board wins: the editor opens in the bay (Edit script, with a quarter-size copy of the glass), the time left sits over the copy, the scripts list is in the plate, and the text size keys are in the look. It is the scope of Part C's Teleprompter slices, Slices 4–7 (the Teleprompter first, D21).
 
 Sources: the ledger `docs/plans/new-pages-2026-09.md`: D4 (the tab order), D9 (the page), D11 (what is armed), D12 (what must never happen), D14 (the PROMPTER deck page), D15 rule 4 (only the live app draws on the Prompter XL), C0's Prompter XL finding, and Appendix B items 13–17 (the walk). The system: `system-a-2026-09.md` (the cluster rule, the arm, the state vocabulary, the copy rules). The operator's interview of 2026-09-24: the operator at the PC runs the main camera's prompter; Studio Control draws the script; Word and text import were assumed but not confirmed.
 
@@ -287,15 +287,17 @@ One risk to walk on purpose, under item 16: a full-screen scroll changes every f
 
 ## 14. Open questions for the operator
 
-1. Where do the scripts come from today: Word, Google Docs, or the home-built program? Does that program hold scripts worth bringing over, and in what format?
-2. How far from the glass is the presenter? That distance sets the standard size: 88 px is comfortable to about 2 m, and 3 m needs about 132 px for the same comfort.
-3. Should speed be in words a minute (proposed) or on a plain 1–10 scale?
-4. Should `BACK` go to the start of the paragraph (proposed) or back a fixed few lines?
-5. Should a jump keep the text scrolling (proposed), or always pause it?
-6. White or yellow text? Should text already read be dimmed (proposed: on)?
-7. The PROMPTER page has spare keys. Should they be `◂ CUE` and `CUE ▸`? And is a `PLAY` key needed on the CAMERAS page, for a take run from the Cameras tab?
-8. Is a Blank key wanted (one press hides the text for a moment and keeps the place), or is Clear enough?
-9. Is the Prompter XL always plugged in? If it is put away between shows, a red `NOT CONNECTED` stays in the header all day, and amber would fit better.
-10. Does Elgato Camera Hub run on this PC (it installs the DisplayLink driver)? If so, its own prompter feature must stay off, or two programs will draw on one screen.
-11. When Studio Control is closed, the Prompter XL shows the Windows desktop. Should that screen get a black desktop background?
-12. Is a "fit to time" key wanted, which sets the speed so the script ends in a given time (say 3:00)?
+Answered by the operator on 2026-09-26; where the question carried a recommendation, the operator took it.
+
+1. Where do the scripts come from today: Word, Google Docs, or the home-built program? Does that program hold scripts worth bringing over, and in what format? **Answer:** Word documents and text pasted from e-mail or the web. Nothing comes over from the home-built program; `.docx`, `.txt` and paste stay as §3.1 has them.
+2. How far from the glass is the presenter? That distance sets the standard size: 88 px is comfortable to about 2 m, and 3 m needs about 132 px for the same comfort. **Answer:** about 2 m, so the standard size stays 88 px.
+3. Should speed be in words a minute (proposed) or on a plain 1–10 scale? **Answer:** words a minute.
+4. Should `BACK` go to the start of the paragraph (proposed) or back a fixed few lines? **Answer:** the start of the paragraph.
+5. Should a jump keep the text scrolling (proposed), or always pause it? **Answer:** a jump keeps the scroll as it was; only `TOP` pauses.
+6. White or yellow text? Should text already read be dimmed (proposed: on)? **Answer:** white by default (yellow stays in the look), and text already read is dimmed.
+7. The PROMPTER page has spare keys. Should they be `◂ CUE` and `CUE ▸`? And is a `PLAY` key needed on the CAMERAS page, for a take run from the Cameras tab? **Answer:** `◂ CUE` and `CUE ▸` on the PROMPTER page; no `PLAY` on the CAMERAS page.
+8. Is a Blank key wanted (one press hides the text for a moment and keeps the place), or is Clear enough? **Answer:** no: Clear (press twice) keeps the script and its place, and Put on the prompter brings it back.
+9. Is the Prompter XL always plugged in? If it is put away between shows, a red `NOT CONNECTED` stays in the header all day, and amber would fit better. **Answer:** always plugged in, so `NOT CONNECTED` stays red.
+10. Does Elgato Camera Hub run on this PC (it installs the DisplayLink driver)? If so, its own prompter feature must stay off, or two programs will draw on one screen. **Answer:** a walk check (Appendix B item 13): if Camera Hub is installed, its own prompter feature is off.
+11. When Studio Control is closed, the Prompter XL shows the Windows desktop. Should that screen get a black desktop background? **Answer:** yes, a black background, set by hand in Windows (Studio Control never changes Windows' settings); a walk check (Appendix B item 13).
+12. Is a "fit to time" key wanted, which sets the speed so the script ends in a given time (say 3:00)? **Answer:** not now.

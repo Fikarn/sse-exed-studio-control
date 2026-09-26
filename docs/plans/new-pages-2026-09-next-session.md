@@ -1,21 +1,17 @@
 # New pages program — the next session
 
-Written 2026-09-26, after Slice SW landed, for a session away from the studio workstation (a cloud session). The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the execution record. This page says where to start, what a session off the workstation cannot do, and the program's standing rules that were only in the operator's session prompts.
+Written 2026-09-26, after Slice SW landed, for a session away from the studio workstation (a cloud session); brought up to date the same day, after C0's answers. The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the execution record. This page says where to start, what a session off the workstation cannot do, and the program's standing rules that were only in the operator's session prompts.
 
 ## Start here
 
 1. `git log --oneline -5` (`main` at `f28909e` or later).
-2. Read `AGENTS.md`, then the ledger's `Status:` and `Tracking:` paragraphs, the Decisions table (D1–D22), `Hardware safety`, and Part C's C0 section. The landed slices' sections are records — skip them unless a question points there.
+2. Read `AGENTS.md`, then the ledger's `Status:` and `Tracking:` paragraphs, the Decisions table (D1–D22), `Hardware safety`, and Part C: its common rules and the first slice that is not `verified`. The landed slices' sections are records — skip them unless a question points there.
 
 ## Where things stand
 
 - **Landed on `main`:** S1 (#211), S2 (#213), SF (#214), S2b (#215), S3 (#216), SW (#221, `f28909e`). Each slice's record is in the ledger; each merge's commits are kept under a tag `archive/new-pages-<slice>-2026-09`.
-- **Next: C0 — design, no code.** It waits on the operator's answers, each asked with a recommendation:
-  - **D19**, the two pages' design: one board per page from `docs/redesign/assets/concepts/A-cameras-{1,2,3}.html` and `A-teleprompter-{1,2,3}.html`. Recommended: Cameras board 2, "Hero and two"; Teleprompter board 1, "Live mirror". The index and the ten decisions the boards raise are in [`docs/redesign/new-pages-boards-2026-09.md`](../redesign/new-pages-boards-2026-09.md).
-  - **D20**, the prompter's functionality: the proposal in [`docs/redesign/teleprompter-2026-09.md`](../redesign/teleprompter-2026-09.md), its open questions in §14.
-  - **D18**, how Studio Control talks to the cameras: the ledger's D18 row and C0 section.
-  - **D21**, Part C's slice order. Recommended: the Teleprompter first.
-  - Then C0's last step: Part C's slices written into the ledger in place of the provisional list, with Status lines, for the operator to approve.
+- **C0's answers are in** (2026-09-26, in a cloud session): D18–D21 and the ten decisions the boards raised, the operator taking every recommendation — Cameras from board 2, "Hero and two", Teleprompter from board 1, "Live mirror", the Teleprompter first — and D12 amended for the page's own copy of the glass. C0's last step is done: Part C's slices, Slices 4–13, are in the ledger in place of the provisional list, approved by the operator the same day.
+- **Next: Slice 4**, the Teleprompter's scripts and the prompter in the hardware link, once C0's record has merged. Slices 4 and 8 change only the hardware link and the contract and can be done off the workstation. Slices 5, 6, 7, 9, 10 and 13 add or move boards (7 and 13 through Setup's deck steps, which draw every page the deck has), and Slices 5, 10, 11 and 12 bring Windows-only code (the screens' names, NDI, Windows' Bluetooth pairing, the LUMIX SDK) that CI's Linux runners never compile: those are finished on the workstation. Slice 12 also waits on D18's two checks, which are the operator's.
 - **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each), and a low Dependabot alert (#7) on `main`.
 - **On the workstation:** the live app stays `main`'s build of `98bbb06` (schema 7) until the program's close-out; the Appendix B walk happens there, on the program's last build.
 
