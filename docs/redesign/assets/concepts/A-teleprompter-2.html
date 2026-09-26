@@ -1,0 +1,3041 @@
+<!doctype html>
+<html
+  lang="en"
+  data-theme="studio"
+  data-states="paused,playing,at-end,not-updated,outro-selected,replace-armed,not-connected,not-showing,duplicated,low-resolution,ready,no-scripts,many-cues,deck-away"
+>
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Teleprompter · Concept A, board 2 — Editor first · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         TELEPROMPTER in Concept A's language, board 2 — "EDITOR FIRST" (revised
+         after its critique, 2026-09-26).
+         Built for preparing and adjusting scripts between takes; the running
+         controls never move and sit in the cluster.
+         Cluster (424 px, left), in the system's order: the state display (the
+         Prompter XL's state, the sentence, the way out, the armed row); the
+         take-time keys — time left (the one 44 px number), PLAY (lit green while
+         scrolling), BACK · TOP, speed in words a minute, the jumps and Go to
+         paragraph, the text size — each block the same height in every state,
+         so no key moves; one line saying where the Stream Deck is (D14); the
+         list "On the glass today" (the last three Put on / Replace / Update /
+         Clear presses); and the one standing action, Clear the prompter · press
+         twice, at the bottom.
+         Bay: split. Left (896 px), the script editor on a black well: paragraph
+         numbers in a gutter, cues drawn as they look on the glass, each
+         paragraph's length at this speed in a rail, the reading line and edits
+         the prompter has not had yet marked in the gutter and on a scroll map
+         (each mark its own form: cue ticks left, edit bars right, the reading
+         line across with its arrow); under it the words and length, and the
+         Replace key when another script is selected. Right (776 px), a smaller
+         live copy of the Prompter XL's screen (the glass's own layout scaled to
+         40 %, unmirrored), the whole-script bar and the cue keys in three
+         columns (room for the doc's 24).
+         Plate (416 px, right): the scripts (sorted by name, ON PROMPTER marked),
+         Open file… · Paste as a new script · New script, Removed, the selected
+         script's earlier versions, the look, Remove.
+         Functionality: docs/redesign/teleprompter-2026-09.md (D20). D4 tabs, no
+         key hints anywhere, no key bound.
+         The live copy is drawn on a canvas, as a picture: the glass's own pixels
+         at 40 %, so the presenter's 88 px type is not page type and no text box
+         of it reaches past the frame. Today's census and contrast probe measure
+         the board without any picture exemption. (Proposed for D19/D20, not made
+         here: system §10 and the probe exempt a [data-picture] subtree, for the
+         built page, whose live copy may be drawn another way.)
+         One key per action: a state's way out lives only in the state display
+         (Put on the prompter, Update the prompter, Try again); the editor's foot
+         carries only the Replace key, which is no state's way out.
+         States (?state=) — all seven words of the doc's state set are drawn:
+           paused          ON SCREEN · 02 Interview intro on the glass, paused at ¶ 9 (default)
+           playing         ON SCREEN · scrolling; PLAY lit green; the header latch; the
+                           editor follows the reading line until it is touched
+           at-end          ON SCREEN · "At the end."; PLAY out and locked; 0:00 left; END
+                           at the reading line
+           not-updated     NOT UPDATED · edits the prompter has not had; Update · press twice
+                           (a replace of the text on the glass — for the operator, D11)
+           outro-selected  05 Outro selected; the Replace key at rest
+           replace-armed   05 Outro selected; Replace · ARMED · press again · 3.9 s
+           not-connected   NOT CONNECTED · unplugged; PLAY locked; the copy HELD, dimmed
+           not-showing     NOT SHOWING · no window on the Prompter XL; Try again; HELD
+           duplicated      DUPLICATED · Windows mirrors a screen onto it; HELD
+           low-resolution  LOW RESOLUTION · 1280×720; the copy at the glass's own layout
+           ready           READY · the prompter is blank; a script selected; run keys locked
+           no-scripts      READY · no scripts yet; the editor shows the three ways in and
+                           the import rules (its sentence is a proposed second READY
+                           sentence; the doc has one)
+           many-cues       ON SCREEN · 04 Case walkthrough, 24 cues on lines of their own:
+                           the cue keys at the doc's limit, all on the page
+           deck-away       ON SCREEN; the Stream Deck moved to CAMERAS by its page key
+         Declined from the critique: the plate head naming the selected script
+         (the editor's head in the bay already names it with its numbers; the
+         plate here is the library — recorded as a proposal); editing the system
+         doc, the probe and teleprompter-2026-09.md §7 / §10 (outside this file:
+         noted for the doc owner).
+         ?theme=studio|graphite|bone · ?switcher=0 hides the mock's state switcher
+         (it sits outside #board, is not part of the page, and hides itself
+         under automation, so no census or capture sees it).
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* ---- material ---- */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint {
+        color: var(--amber-ink);
+      }
+      .key.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.live .hint {
+        color: var(--green-ink);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.primary .hint {
+        color: var(--primary-ink);
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .key.locked {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        cursor: not-allowed;
+      }
+      /* the design system's arm: an amber keyline on a black well, the word, the countdown */
+      .key.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+        position: relative;
+        overflow: hidden;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .key.armed .tag {
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .key.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .well .lamp {
+        background: rgba(255, 255, 255, 0.24);
+      }
+      .lamp.ok,
+      .well .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber,
+      .well .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red,
+      .well .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .tri {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        flex: none;
+      }
+      .tri.l {
+        border-right: 7px solid currentColor;
+      }
+      .tri.r {
+        border-left: 7px solid currentColor;
+      }
+
+      /* ---- shell ---- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      .lampchip.green,
+      .lampchip.green b {
+        color: var(--green-text);
+      }
+      .lampchip.green {
+        border-color: var(--green-text);
+      }
+      .lampchip[hidden] {
+        display: none;
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body ---- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        flex: none;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .armed-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 6px;
+        border: 1px solid var(--amber-text);
+        border-radius: var(--r8);
+        padding: 6px 10px;
+      }
+      .armed-row .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .armed-row .t {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--well-text);
+      }
+      .armed-row .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .armed-row .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      .armed-row .bar i {
+        display: block;
+        height: 100%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .label {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .level {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .hero {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .tl-sub {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 8px;
+        text-align: right;
+      }
+      .key.play {
+        flex-direction: column;
+        gap: 10px;
+        min-height: 112px;
+        flex: none;
+      }
+      .key.play .cap,
+      .key.big .cap {
+        font-size: 20px;
+      }
+      .row2 {
+        display: flex;
+        gap: 12px;
+      }
+      .key.big {
+        flex: 1;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 72px;
+      }
+      .stepper {
+        display: grid;
+        grid-template-columns: 56px 1fr 56px;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .stepper.s4 {
+        grid-template-columns: 56px 1fr 56px 104px;
+      }
+      .stepper .key {
+        min-height: 52px;
+        padding: 0;
+        font: 600 20px/1 var(--mono);
+      }
+      .stepper .key.word {
+        font: 600 14px/1 var(--ui);
+      }
+      .stepper .read {
+        border-radius: var(--r8);
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 8px;
+        padding-top: 15px;
+      }
+      .stepper .read b {
+        font: 600 20px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .stepper .read span {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .sub-hint {
+        font: 500 12px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 6px;
+      }
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .jgrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .jgrid .key {
+        min-height: 48px;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 0 14px;
+      }
+      .jgrid .key.fwd {
+        justify-content: flex-end;
+      }
+      .goto {
+        display: grid;
+        grid-template-columns: 1fr 124px 72px;
+        gap: 8px;
+        align-items: center;
+      }
+      .goto .l {
+        font: 500 14px/1.2 var(--ui);
+      }
+      .goto .field {
+        height: 48px;
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+      }
+      .goto .field b {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .goto .field span {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .goto .key {
+        min-height: 48px;
+      }
+      /* where the Stream Deck is (D14): a lamp word and one line, the same height in every state */
+      .deckline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: none;
+      }
+      .deckline .dl1 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .deckline .dl1 b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .deckline .dl1 .pg {
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--text);
+      }
+      .deckline.amber .dl1,
+      .deckline.amber .dl1 b,
+      .deckline.amber .dl1 .pg {
+        color: var(--amber-text);
+      }
+      .deckline .dl2 {
+        font: 500 12px/1.3 var(--ui);
+        color: var(--text-2);
+        padding-left: 16px;
+        white-space: nowrap;
+      }
+      /* On the glass today: the last three Put on / Replace / Update / Clear presses (a list) */
+      .recent .rec {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr);
+        align-items: baseline;
+        column-gap: 10px;
+        padding-top: 7px;
+        border-top: 1px solid var(--line);
+        font: 500 13px/1.35 var(--ui);
+      }
+      .recent .rec + .rec {
+        margin-top: 7px;
+      }
+      .recent .rec .tm {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .recent .foot {
+        font: 500 12px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 8px;
+      }
+      .recent .none {
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+        flex: none;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        white-space: nowrap;
+      }
+
+      /* ---- locks: a locked key is a dashed outline at 55 %, its reason in reach ---- */
+      .lock-run [data-run],
+      .lock-play [data-play] {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        color: var(--text);
+      }
+      .lock-run [data-run] .hint,
+      .lock-play [data-play] .hint {
+        color: var(--text-2);
+      }
+      /* readouts are displays: they stay at full ink when their keys lock, and show — with no value */
+
+      /* ---- bay: the editor beside the live copy ---- */
+      .bay {
+        padding: 16px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 776px;
+        gap: 16px;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        min-width: 0;
+      }
+      .col-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 32px;
+      }
+      .col-head .t {
+        font: 600 16px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .col-head .d {
+        font: 400 13px/1.2 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .col-head .right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+      .lampword {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .lampword.green {
+        color: var(--green-text);
+      }
+      .lampword.amber {
+        color: var(--amber-text);
+      }
+      .lampword.red {
+        color: var(--red-text);
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .toolbar .sep {
+        width: 1px;
+        height: 24px;
+        background: var(--line-2);
+        margin: 0 4px;
+      }
+      .toolbar .right {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+
+      .editor {
+        flex: 1;
+        min-height: 0;
+        border-radius: var(--r12);
+        position: relative;
+        overflow: hidden;
+        padding: 14px 32px 14px 0;
+      }
+      .para {
+        display: grid;
+        grid-template-columns: 64px minmax(0, 1fr) 128px;
+        column-gap: 18px;
+        padding: 10px 0;
+        position: relative;
+      }
+      .para::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 12px;
+        bottom: 12px;
+        width: 3px;
+        border-radius: var(--pill);
+        background: transparent;
+      }
+      .para .num {
+        font: 500 13px/30px var(--mono);
+        color: var(--well-text-2);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        height: 30px;
+      }
+      .para .num .tri {
+        display: none;
+      }
+      .para .txt {
+        font: 400 20px/1.5 var(--ui);
+        color: var(--well-text);
+      }
+      .para .txt b {
+        font-weight: 600;
+      }
+      .para .txt u {
+        text-underline-offset: 4px;
+      }
+      .para .cue {
+        font: italic 500 16px/1 var(--ui);
+        color: var(--blue-text);
+      }
+      .para .cue.own {
+        display: block;
+        line-height: 1.6;
+        margin-bottom: 2px;
+      }
+      .para .rail {
+        font: 500 13px/1.45 var(--mono);
+        color: var(--well-text-2);
+        text-align: right;
+        padding-top: 5px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .para .rail small {
+        font: 500 12px/1.3 var(--ui);
+      }
+      .para .rail .hl {
+        color: var(--well-text);
+      }
+      .para .rail .am {
+        color: var(--amber-text);
+      }
+      .para.reading::before {
+        background: var(--well-text);
+      }
+      .para.reading .num {
+        color: var(--well-text);
+      }
+      .para.reading .num .tri {
+        display: inline-block;
+      }
+      .playing .para.reading::before {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .playing .para.reading .num,
+      .playing .para.reading .rail .hl {
+        color: var(--green-text);
+      }
+      .para.edited::before {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      /* END as the glass draws it (the cue colour), then the operator's numbers in the rail's ink */
+      .para.end .txt {
+        font: 500 13px/1.6 var(--ui);
+        color: var(--well-text-2);
+      }
+      .para.end .txt .endw {
+        font: italic 500 16px/1.6 var(--ui);
+        color: var(--blue-text);
+        margin-right: 10px;
+      }
+      .caret {
+        display: inline-block;
+        width: 2px;
+        height: 24px;
+        background: var(--well-text);
+        vertical-align: -5px;
+        margin-left: 1px;
+      }
+      /* the scroll map: each mark has its own form, as on the script bar — the view is the thumb in
+         the track; cues are short neutral ticks on the left; edits the prompter has not had are amber
+         bars on the right, as long as the paragraph; the reading line runs across with the gutter's
+         arrow beside it */
+      .smap {
+        position: absolute;
+        right: 8px;
+        top: 16px;
+        bottom: 16px;
+        width: 16px;
+      }
+      .smap::before {
+        content: "";
+        position: absolute;
+        left: 6px;
+        width: 4px;
+        top: 0;
+        bottom: 0;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .smap .thumb {
+        position: absolute;
+        left: 6px;
+        width: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.3);
+      }
+      .smap .tk {
+        position: absolute;
+        display: block;
+      }
+      .smap .tk.cue {
+        left: 0;
+        width: 5px;
+        height: 2px;
+        margin-top: -1px;
+        background: var(--well-text-2);
+      }
+      .smap .tk.ed {
+        left: 11px;
+        width: 5px;
+        min-height: 6px;
+        border-radius: var(--pill);
+        background: var(--amber-text);
+      }
+      .smap .tk.rd {
+        left: 0;
+        width: 16px;
+        height: 2px;
+        margin-top: -1px;
+        background: var(--well-text);
+        color: var(--well-text);
+      }
+      .smap .tk.rd .tri {
+        position: absolute;
+        left: -10px;
+        top: -4px;
+        border-top-width: 5px;
+        border-bottom-width: 5px;
+      }
+      .playing .smap .tk.rd {
+        background: var(--green-text);
+        color: var(--green-text);
+      }
+      .ed-foot {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-height: 60px;
+        flex: none;
+      }
+      .ed-foot .stats {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        flex: none;
+      }
+      .ed-foot .stats b {
+        font: 600 14px/1 var(--mono);
+        color: var(--text);
+      }
+      .ed-foot .go {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .ed-foot .note {
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+        text-align: right;
+        max-width: 320px;
+      }
+      .ed-foot .note.wide {
+        max-width: 660px;
+      }
+      .ed-foot .key {
+        min-height: 48px;
+        padding: 0 18px;
+        white-space: nowrap;
+        flex: none;
+      }
+      .ed-foot .key.armed {
+        min-height: 56px;
+        padding: 10px 18px 12px;
+      }
+      .ed-foot .key.armed .what {
+        font: 600 14px/1 var(--ui);
+      }
+
+      /* ---- the first-run screen (no scripts yet) ---- */
+      .screen {
+        flex: 1;
+        border-radius: var(--r12);
+        padding: 40px 44px;
+        display: none;
+        flex-direction: column;
+        gap: 28px;
+        color: var(--well-text);
+      }
+      .empty .screen {
+        display: flex;
+      }
+      .empty .editor,
+      .empty .toolbar,
+      .empty .ed-foot {
+        display: none;
+      }
+      .screen .eyebrow {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .screen h1 {
+        font: 600 24px/1.2 var(--ui);
+        margin-top: 10px;
+      }
+      .screen .lead {
+        font: 500 14px/1.5 var(--ui);
+        color: var(--well-text-2);
+        max-width: 720px;
+        margin-top: 8px;
+      }
+      .screen .ways {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+      .screen .ways .key {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-height: 72px;
+        padding: 0 18px;
+      }
+      .screen .cols {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 28px;
+      }
+      .screen .cols .h {
+        font: 600 14px/1.2 var(--ui);
+        margin-bottom: 12px;
+      }
+      .screen .cols .r {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font: 500 14px/1.4 var(--ui);
+        color: var(--well-text);
+        padding: 5px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .screen .cols .r .lamp {
+        transform: translateY(-1px);
+      }
+      .screen .cols .r em {
+        font-style: normal;
+      }
+      .screen .cols .r span {
+        color: var(--well-text-2);
+      }
+      .screen .example {
+        border-top: 1px solid rgba(255, 255, 255, 0.12);
+        padding-top: 18px;
+        font: 500 14px/1.5 var(--ui);
+        color: var(--well-text-2);
+      }
+      .screen .example b {
+        font-weight: 500;
+        color: var(--well-text);
+      }
+
+      /* ---- the live copy of the Prompter XL's screen: a picture of the glass, drawn on a canvas ---- */
+      .livecopy {
+        position: relative;
+        width: 776px;
+        height: 437px;
+        border-radius: var(--r8);
+        overflow: hidden;
+        flex: none;
+      }
+      .livecopy canvas {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 776px;
+        height: 437px;
+        display: block;
+      }
+      /* held: the Prompter XL cannot show it, so the copy is dimmed to the read-text level and a red
+         keyline inside the frame encloses the word, so it cannot pass for a picture on a screen */
+      .held {
+        position: absolute;
+        inset: 10px;
+        border: 2px solid var(--red-text);
+        border-radius: var(--r4);
+        display: none;
+      }
+      .is-held .held {
+        display: block;
+      }
+      .held span {
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        padding: 7px 10px;
+        border-radius: var(--r4);
+        background: var(--well);
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--red-text);
+      }
+      .live-note {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+        min-height: 18px;
+      }
+      .live-note.red {
+        color: var(--red-text);
+      }
+      .bar-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 4px;
+      }
+      .bar-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .bar-head .d {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .bar-head .d b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .sbar {
+        position: relative;
+        height: 48px;
+        border-radius: var(--r8);
+        overflow: hidden;
+        cursor: pointer;
+        flex: none;
+      }
+      .sbar .sg {
+        position: absolute;
+        top: 14px;
+        bottom: 10px;
+        border-radius: var(--r4);
+        background: rgba(255, 255, 255, 0.36);
+      }
+      .sbar .sg.read {
+        background: rgba(255, 255, 255, 0.18);
+      }
+      .sbar .ct {
+        position: absolute;
+        top: 4px;
+        width: 3px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--well-text-2);
+      }
+      .sbar .edm {
+        position: absolute;
+        bottom: 4px;
+        height: 3px;
+        border-radius: var(--pill);
+        background: var(--amber-text);
+      }
+      .sbar .pl {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--well-text);
+        box-shadow: 0 0 6px var(--bloom-white);
+      }
+      .playing .sbar .pl {
+        background: var(--green-text);
+        box-shadow: 0 0 6px var(--bloom-green);
+      }
+      .snums {
+        position: relative;
+        height: 14px;
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        margin-top: -4px;
+      }
+      .snums span {
+        position: absolute;
+        top: 0;
+        width: 22px;
+        text-align: center;
+        transform: translateX(-50%);
+      }
+      .snums span.cur {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .cues {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .key.cuek {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+        min-height: 56px;
+        padding: 0 14px;
+      }
+      .key.cuek .n {
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .key.cuek .n em {
+        font-style: normal;
+        color: var(--text);
+      }
+      .key.cuek .nm {
+        font: 600 14px/1.2 var(--ui);
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .key.cuek .br {
+        color: var(--text-2);
+      }
+      .blank .onair,
+      .blank-note {
+        display: none;
+      }
+      .blank .blank-note {
+        display: flex;
+      }
+      .blank-note {
+        min-height: 48px;
+        border-radius: var(--r8);
+        border: 1px dashed var(--line-2);
+        align-items: center;
+        padding: 0 16px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+
+      /* ---- plate: the scripts, the selected one's versions, the look ---- */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 36px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .slist {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .key.srow {
+        display: grid;
+        grid-template-columns: 14px minmax(0, 1fr) auto;
+        align-items: center;
+        align-content: center;
+        column-gap: 10px;
+        min-height: 50px;
+        padding: 0 12px;
+        text-align: left;
+      }
+      .srow .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .srow .meta {
+        grid-column: 2;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+        white-space: nowrap;
+      }
+      .srow .tag {
+        grid-row: 1 / span 2;
+        grid-column: 3;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+        text-align: right;
+      }
+      .srow .tag.plain {
+        color: var(--text);
+      }
+      .srow .tag i {
+        display: block;
+        font-style: normal;
+        margin-top: 5px;
+      }
+      .srow .tag i.am {
+        color: var(--amber-text);
+      }
+      .srow .tag i.gr {
+        color: var(--green-text);
+      }
+      .srow .tag i.rd {
+        color: var(--red-text);
+      }
+      .srow .tag i.nt {
+        color: var(--text-2);
+      }
+      .srow .lamp {
+        grid-row: 1 / span 2;
+      }
+      .key.srow.sel {
+        border: 2px solid var(--accent);
+      }
+      .srow-empty {
+        min-height: 50px;
+        border-radius: var(--r8);
+        border: 1px dashed var(--line-2);
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .removed {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        padding: 0 2px 0 4px;
+      }
+      .removed b {
+        color: var(--text);
+        font: 600 14px/1 var(--mono);
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .ver {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 12px;
+        padding-top: 8px;
+        border-top: 1px solid var(--line);
+      }
+      .ver .w {
+        font: 500 14px/1.2 var(--ui);
+      }
+      .ver .m {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .ver .cur {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        padding-right: 4px;
+      }
+      .look {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .lk {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 12px;
+        min-height: 36px;
+      }
+      .lk .l {
+        font: 500 14px/1.2 var(--ui);
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .lk .l small {
+        font: 400 12px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .mstep {
+        display: grid;
+        grid-template-columns: 32px 78px 32px;
+        gap: 4px;
+        align-items: center;
+      }
+      .mstep .key {
+        min-height: 32px;
+        padding: 0;
+        font: 600 16px/1 var(--mono);
+      }
+      .mstep .val {
+        height: 32px;
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 600 14px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .seg {
+        display: flex;
+        gap: 4px;
+        padding: 3px;
+        border-radius: var(--r8);
+      }
+      .seg .key {
+        min-height: 30px;
+        padding: 0 10px;
+        border-radius: var(--r4);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 13px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .danger {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .danger .why {
+        font: 500 12px/1.3 var(--ui);
+        color: var(--text-2);
+      }
+
+      /* ---- footer: telemetry only, no hints ---- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .item b.red {
+        color: var(--red-text);
+      }
+      .footer .item b.amber {
+        color: var(--amber-text);
+      }
+
+      /* ---- the mock's own state switcher: outside #board, not part of the page ---- */
+      .mock {
+        position: fixed;
+        right: 10px;
+        bottom: 6px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 6px;
+        border-radius: var(--r8);
+        background: rgba(18, 18, 22, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        font: 500 12px/1 var(--mono);
+        color: #e8e8ec;
+      }
+      .mock .l {
+        color: #b0b0b8;
+        margin: 0 4px 0 8px;
+      }
+      .mock select {
+        height: 28px;
+        padding: 0 6px;
+        border-radius: var(--r4);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: #202026;
+        font: 500 12px/1 var(--mono);
+        color: #e8e8ec;
+      }
+      .mock button {
+        min-height: 28px;
+        padding: 0 8px;
+        border-radius: var(--r4);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        font: 500 12px/1 var(--mono);
+        color: #e8e8ec;
+      }
+      .mock button.on {
+        background: #f0b35b;
+        border-color: #f0b35b;
+        color: #1a1000;
+      }
+      .mock[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-teleprompter-2">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>Setup / Support</button>
+          <button class="tab" data-key>Lighting</button>
+          <button class="tab" data-key>Audio</button>
+          <button class="tab" data-key>Cameras</button>
+          <button class="tab on" data-key aria-current="page">Teleprompter</button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Cameras</b> ok</button>
+          <button class="lampchip" id="hdrPrompter" data-key>
+            <i class="lamp ok"></i><b>Prompter</b> <span>ok</span>
+          </button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip green" id="hdrPlaying" data-key hidden aria-label="Prompter playing, opens this page">
+            <i class="lamp ok"></i><b>Prompter playing</b> · 3:12 left
+          </button>
+          <div class="clock" id="clock">14:29</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <!-- ================= cluster: the state, the take-time keys, the list, the standing action ================= -->
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">ON SCREEN</div>
+            </div>
+            <div class="state-sub" id="stateSub"></div>
+            <div class="state-meta" id="stateMeta"></div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <div>
+            <div class="level">
+              <div class="label">Time left · at this speed</div>
+              <div class="hero" id="tlHero">3:12</div>
+            </div>
+            <div class="tl-sub" id="tlSub">of 6:40 · ¶ 9 of 18 · 52 %</div>
+          </div>
+
+          <button class="key play" id="playKey" data-key data-take data-play aria-label="Play or pause the scroll">
+            <span class="cap">Play</span><span class="hint" id="playHint">paused at ¶ 9 · press to scroll</span>
+          </button>
+
+          <div class="row2">
+            <button class="key big" data-key data-take data-run aria-label="Back to the start of the paragraph">
+              <span class="cap">Back</span><span class="hint" id="backHint">start of ¶ 9</span>
+            </button>
+            <button class="key big" data-key data-take data-run aria-label="Top: pause and go to the first line">
+              <span class="cap">Top</span><span class="hint" id="topHint">pauses · first line</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="label">Speed</div>
+            <div class="stepper">
+              <button class="key" data-key data-take data-run aria-label="Slower by 5 words a minute">−</button>
+              <div class="read well"><b id="spd">140</b><span id="spdUnit">words/min · this script's own</span></div>
+              <button class="key" data-key data-take data-run aria-label="Faster by 5 words a minute">+</button>
+            </div>
+            <div class="sub-hint" id="spdHint">5 words/min a press · never starts the scroll</div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Jumps <span id="jumpSub">keep the scroll as it is</span></div>
+            </div>
+            <div class="jgrid">
+              <button class="key" data-key data-take data-run><i class="tri l"></i>Paragraph</button>
+              <button class="key fwd" data-key data-take data-run>Paragraph<i class="tri r"></i></button>
+              <button class="key" data-key data-take data-run><i class="tri l"></i>Cue</button>
+              <button class="key fwd" data-key data-take data-run>Cue<i class="tri r"></i></button>
+              <button class="key" data-key data-take data-run><i class="tri l"></i>Line</button>
+              <button class="key fwd" data-key data-take data-run>Line<i class="tri r"></i></button>
+            </div>
+            <div class="goto">
+              <span class="l">Go to paragraph</span>
+              <div class="field well" role="textbox" aria-label="Paragraph number">
+                <b id="gotoN">9</b><span id="gotoOf">of 18</span>
+              </div>
+              <button class="key" data-key data-take data-run>Go</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="label">Text size on the glass</div>
+            <div class="stepper s4">
+              <button class="key" data-key data-take data-run aria-label="Smaller by 4 px">−</button>
+              <div class="read well"><b>88 px</b><span>standard</span></div>
+              <button class="key" data-key data-take data-run aria-label="Larger by 4 px">+</button>
+              <button class="key word" data-key data-take data-run>Standard</button>
+            </div>
+            <div class="sub-hint" id="sizeHint">4 px a press · Standard goes back to 88 px</div>
+          </div>
+
+          <div class="deckline" id="deckLine" aria-label="Where the Stream Deck is">
+            <div class="dl1"><i class="lamp ok" id="deckLamp"></i><span id="deckT1"></span></div>
+            <div class="dl2" id="deckT2"></div>
+          </div>
+
+          <div class="sec recent">
+            <div class="sec-head">
+              <div class="title">On the glass today <span id="recentSub"></span></div>
+            </div>
+            <div id="recent"></div>
+          </div>
+
+          <div class="actions">
+            <button class="key" id="clearKey" data-key data-run aria-label="Clear the prompter, press twice">
+              Clear the prompter · press twice
+            </button>
+          </div>
+        </aside>
+
+        <!-- ================= bay: the editor beside the live copy ================= -->
+        <main class="bay" data-region="script">
+          <section class="col" data-region="editor">
+            <div class="col-head">
+              <span class="t" id="edTitle">02 Interview intro</span>
+              <span class="lampword green" id="edLamp"><i class="lamp ok"></i><span>On the prompter</span></span>
+              <span class="d" id="edSub"></span>
+              <span class="right"><span class="lampword muted" id="edSaved">Saved 14:02</span></span>
+            </div>
+            <div class="toolbar">
+              <button class="key sm" data-key>Bold</button>
+              <button class="key sm" data-key>Italic</button>
+              <button class="key sm" data-key>Underline</button>
+              <i class="sep"></i>
+              <button class="key sm" data-key>Add cue [ ]</button>
+              <i class="sep"></i>
+              <button class="key sm" data-key>Undo</button>
+              <button class="key sm" data-key>Redo</button>
+              <button class="key sm" data-key>Paste here</button>
+              <span class="right">
+                <span class="lampword green" id="follow"
+                  ><i class="lamp ok"></i><span>Following the reading line</span></span
+                >
+                <button class="key sm" id="showRL" data-key>Show the reading line</button>
+                <button class="key sm" data-key>Rename</button>
+              </span>
+            </div>
+            <div class="editor well" id="editor" role="textbox" aria-multiline="true" aria-label="Script editor"></div>
+            <div class="screen well" id="firstRun">
+              <div>
+                <div class="eyebrow">No scripts yet</div>
+                <h1>Bring in the first script</h1>
+                <div class="lead">
+                  From a Word document, a text file or the clipboard. Studio Control keeps its own copy, saved as you
+                  type; it never changes, locks or watches the file, and nothing is sent anywhere.
+                </div>
+              </div>
+              <div class="ways">
+                <button class="key primary" data-key>
+                  Open file…<span class="hint">Word .docx or plain text .txt</span>
+                </button>
+                <button class="key" data-key>
+                  Paste as a new script<span class="hint">what the Windows clipboard holds</span>
+                </button>
+                <button class="key" data-key>New script<span class="hint">an empty script to type into</span></button>
+              </div>
+              <div class="cols">
+                <div>
+                  <div class="h">Kept</div>
+                  <div class="r"><i class="lamp ok"></i>The text and its paragraphs</div>
+                  <div class="r"><i class="lamp ok"></i>Bold, italic and underline</div>
+                  <div class="r"><i class="lamp ok"></i>Word headings, as cues</div>
+                  <div class="r"><i class="lamp ok"></i>Text in square brackets, as cues</div>
+                  <div class="r">
+                    <i class="lamp ok"></i><em>Bullets and numbering <span>· as a dash or the number</span></em>
+                  </div>
+                </div>
+                <div>
+                  <div class="h">Left out, and counted</div>
+                  <div class="r"><i class="lamp"></i>Fonts, sizes, colours, highlighting</div>
+                  <div class="r"><i class="lamp"></i>Pictures and text boxes</div>
+                  <div class="r"><i class="lamp"></i>Headers, footers, footnotes, comments</div>
+                  <div class="r">
+                    <i class="lamp"></i><em>Tables <span>· row by row, a paragraph a cell</span></em>
+                  </div>
+                  <div class="r">
+                    <i class="lamp"></i><em>Tracked changes <span>· taken as accepted</span></em>
+                  </div>
+                </div>
+                <div>
+                  <div class="h">Refused, with the reason</div>
+                  <div class="r">
+                    <i class="lamp"></i><em>.doc <span>· save it as .docx in Word, then open that</span></em>
+                  </div>
+                  <div class="r">
+                    <i class="lamp"></i><em>PDF <span>· its lines are the page's, not the script's</span></em>
+                  </div>
+                  <div class="r">
+                    <i class="lamp"></i><em>RTF <span>· Word saves .docx or .txt</span></em>
+                  </div>
+                  <div class="r"><i class="lamp"></i>A password-protected document</div>
+                  <div class="r">
+                    <i class="lamp"></i><em>Over 30,000 words <span>· about 3½ hours</span></em>
+                  </div>
+                  <div class="r">
+                    <i class="lamp"></i><em>From the network <span>· download a Google Doc as .docx</span></em>
+                  </div>
+                </div>
+              </div>
+              <div class="example">
+                After an import the sentence counts what was left out:
+                <b
+                  >“Imported Interview intro.docx: 18 paragraphs, 933 words, 5 cues. Left out: 2 pictures, 1 comment.
+                  Tracked changes were taken as accepted.”</b
+                >
+              </div>
+            </div>
+            <div class="ed-foot">
+              <div class="stats" id="edStats"></div>
+              <div class="go" id="edGo"></div>
+            </div>
+          </section>
+
+          <section class="col" data-region="live">
+            <div class="col-head">
+              <span class="t">On the Prompter XL</span>
+              <span class="d" id="liveSub"></span>
+              <span class="right"
+                ><span class="lampword green" id="liveLamp"><i class="lamp ok"></i><span>connected</span></span></span
+              >
+            </div>
+            <!-- a picture of the glass: its own 1920×1080 layout, drawn on a canvas at 40 %, unmirrored -->
+            <div class="livecopy well" id="live" data-picture="prompter">
+              <canvas id="glass" role="img" aria-label="Live copy of the Prompter XL's screen"></canvas>
+              <div class="held" id="held"><span>HELD · NOT ON THE GLASS</span></div>
+            </div>
+            <div class="live-note" id="liveNote"></div>
+
+            <div class="onair">
+              <div class="bar-head">
+                <span class="t">Whole script · press a paragraph to go to its start</span>
+                <span class="d" id="barPlace"></span>
+              </div>
+            </div>
+            <div class="sbar well onair" id="sbar" data-take data-run role="slider" aria-label="Whole script"></div>
+            <div class="snums onair" id="snums"></div>
+            <div class="blank-note" id="barBlank">The script bar and the cue keys follow the script on the glass.</div>
+
+            <div class="sec onair">
+              <div class="sec-head">
+                <div class="title">Cues <span id="cueSub"></span></div>
+              </div>
+              <div class="cues" id="cues"></div>
+            </div>
+          </section>
+        </main>
+
+        <!-- ================= plate: the scripts, versions, the look ================= -->
+        <aside class="inspector plate" data-region="scripts">
+          <div class="insp-head">
+            <h2>Scripts</h2>
+            <div class="sub" id="libSub"></div>
+          </div>
+          <div class="insp-keys" id="inspKeys">
+            <button class="key" data-key>Open file…</button>
+            <button class="key" data-key>Paste as a new script</button>
+            <button class="key" data-key>New script</button>
+          </div>
+          <div class="slist" id="slist"></div>
+          <div class="removed" id="removed">
+            <span>Removed <b>2</b> · kept until deleted for good</span><button class="key sm" data-key>Show</button>
+          </div>
+
+          <div class="section" id="versions">
+            <div class="section-head"><span class="t">Earlier versions</span><span class="d" id="verSub"></span></div>
+            <div id="verRows"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">The look</span><span class="d">one for the prompter · applies at once</span>
+            </div>
+            <div class="look">
+              <div class="lk">
+                <span class="l">Standard size<small>capitals 11.5 mm · for about 2 m</small></span>
+                <div class="mstep">
+                  <button class="key" data-key aria-label="Standard size smaller">−</button
+                  ><span class="val well">88 px</span
+                  ><button class="key" data-key aria-label="Standard size larger">+</button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Line spacing</span>
+                <div class="mstep">
+                  <button class="key" data-key aria-label="Line spacing smaller">−</button
+                  ><span class="val well">1.4</span
+                  ><button class="key" data-key aria-label="Line spacing larger">+</button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Margins, each side<small>about 32 characters a line</small></span>
+                <div class="mstep">
+                  <button class="key" data-key aria-label="Margins smaller">−</button><span class="val well">12 %</span
+                  ><button class="key" data-key aria-label="Margins larger">+</button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Reading line<small>from the top</small></span>
+                <div class="mstep">
+                  <button class="key" data-key aria-label="Reading line higher">−</button
+                  ><span class="val well">35 %</span
+                  ><button class="key" data-key aria-label="Reading line lower">+</button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Text<small>always on black</small></span>
+                <div class="seg well">
+                  <button class="key on" data-key><span class="cap">White</span></button
+                  ><button class="key" data-key><span class="cap">Yellow</span></button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Dim the text already read</span>
+                <div class="seg well">
+                  <button class="key on" data-key><span class="cap">On</span></button
+                  ><button class="key" data-key><span class="cap">Off</span></button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">A line across the reading line</span>
+                <div class="seg well">
+                  <button class="key" data-key><span class="cap">On</span></button
+                  ><button class="key on" data-key><span class="cap">Off</span></button>
+                </div>
+              </div>
+              <div class="lk">
+                <span class="l">Paragraph numbers on the glass</span>
+                <div class="seg well">
+                  <button class="key" data-key><span class="cap">On</span></button
+                  ><button class="key on" data-key><span class="cap">Off</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="danger" id="danger">
+            <button class="key" id="removeKey" data-key>Remove 02 Interview intro</button>
+            <span class="why" id="removeWhy">On the prompter, so it cannot be removed: clear the prompter first.</span>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Prompter XL <b id="ftXL">1920×1080 · 60 Hz</b></span>
+        <span class="item">Script <b id="ftScript">02 Interview intro</b></span>
+        <span class="item">Place <b id="ftPlace">¶ 9 of 18 · 52 %</b></span>
+        <span class="item">Speed <b id="ftSpeed">140 words/min</b></span>
+        <span class="item">Left <b id="ftLeft">3:12</b></span>
+        <span class="item">Saved <b id="ftSaved">14:02</b></span>
+      </footer>
+    </div>
+
+    <div class="mock" id="mock" aria-label="Board states (the mock's own switcher)">
+      <label class="l" for="mockState">state</label>
+      <select id="mockState"></select>
+      <label class="l" for="mockTheme">theme</label>
+      <select id="mockTheme"></select>
+      <button id="mockOne" title="Show the board at 1:1">1:1</button>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const board = document.getElementById("board");
+      const $ = (id) => document.getElementById(id);
+      const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      // the length of so many words at a speed in words a minute
+      const len = (words, wpm) => clock(Math.round((words * 60) / wpm));
+
+      // ---- the scripts the prompter can show. Words per paragraph are the spoken words (cues are not read) ----
+      // 02 Interview intro: 18 paragraphs, 933 words. The place is word 44 of ¶ 9 = word 485 of 933 (52 %);
+      // at 140 words a minute the whole script is 6:40 and what is left is 3:12 (ends 14:32 from 14:29).
+      const INTRO = {
+        id: "intro",
+        name: "02 Interview intro",
+        file: "Interview intro.docx",
+        wpm: 140,
+        saved: "14:02",
+        counts: [44, 58, 61, 52, 63, 51, 62, 50, 61, 48, 44, 43, 51, 47, 55, 49, 52, 42],
+        place: { p: 9, w: 44 },
+        cues: [
+          { p: 1, t: "Welcome · CAM 1", own: true },
+          { p: 5, t: "Slide 2 · the three numbers", own: true },
+          { p: 9, t: "PAUSE", own: false, at: 29 },
+          { p: 12, t: "CAM 2 · guest walks in", own: true },
+          { p: 17, t: "Slide 6 · summary", own: true },
+        ],
+        glass: [8, 9, 10, 11],
+        paras: {
+          7: "When we planned this series, we asked every guest the same question before we started filming: what did you get wrong in the first ninety days? Most people hesitate. They talk about strategy, or timing, or the market. Our guest today answered in one word, and it was the word we least expected to hear from someone who has run three companies.",
+          8: "The word was <u>listening</u>. Not the polite kind, where you wait for your turn to speak, but the kind that changes what you do on Monday morning. She told us she spent her first month asking questions and her second month finding out which of the answers had been true.",
+          9: 'That second month is what this episode is about. How do you tell the difference between what people say in a meeting and what actually happens on the floor? <span class="cue">[PAUSE]</span> It sounds simple. It is <em>not</em>. It takes patience, a little courage, and a willingness to be told, politely or otherwise, that the plan on your desk was never going to work.',
+          10: "Our guest today has spent twenty years building companies in the Nordics, first in logistics and later in software. She has taken over teams that were growing too fast and teams that were quietly falling apart, and she says the first ninety days felt the same in both.",
+          11: "We filmed this conversation in the studio here at SSE, with no slides and no script for her, only the questions. What you will see is unedited, apart from one short break when the fire alarm in the next building decided to join us.",
+          12: "So let me hand over to the person you came to hear. Please welcome the chief executive of Nordlys Freight, Maria Ek. Maria, thank you for coming in, and thank you for saying yes before you knew what the first question would be.",
+          13: "Before we start, a word on how this works. Maria has not seen the questions. I have not seen her answers. If either of us goes off course, that is part of the point, and we have kept it in. The only rule we agreed on is that nobody says <b>synergy</b>.",
+          14: "So, Maria, the first question, and the one we ask everyone. You arrived at Nordlys Freight in the spring of a very difficult year. What did you believe on your first morning that you no longer believed ninety days later, and how exactly did you find out?",
+          15: "While Maria thinks about that, a note for those of you watching at home. Everything she mentions today, the books, the two reports and the short case we wrote about Nordlys, is on the programme page, and you find the link under this video. Take notes if you like, but you do not need to.",
+          16: "And a quick note for our own team in the studio: if the fire alarm goes off again, we keep rolling. We learned the hard way that the best answer of the afternoon tends to arrive at exactly the moment a bell starts ringing in the building next door.",
+          17: "So here is where we are before we begin. Three companies, two industries, one question about the first ninety days, and a guest who says the answer is <u>listening</u>. On the screen behind me are the three things we will come back to at the end, so keep an eye on them.",
+          18: "Maria, the floor is yours. Take your time, start wherever you like, and remember that nobody here has seen your answers, including me. Whenever you are ready, tell us about that very first morning and the one belief you walked in with.",
+        },
+      };
+      // the edit the prompter has not had (NOT UPDATED): ¶ 10 gains three words (933 → 936, 6:40 → 6:41);
+      // ¶ 14 has a word changed, out of the editor's view (the scroll map and the script bar show it)
+      const EDITED = [10, 14];
+      const P10_NEW =
+        'Our guest today has spent twenty-five years building companies across the Nordics and the Baltics<i class="caret"></i>, first in logistics and later in software. She has taken over teams that were growing too fast and teams that were quietly falling apart, and she says the first ninety days felt the same in both.';
+
+      // 04 Case walkthrough: 30 paragraphs, 1,307 words, 24 cues on lines of their own (the doc's limit
+      // for cue keys). The place is word 20 of ¶ 12 = word 510 (39 %); at 150 words a minute the whole
+      // script is 8:43 and what is left is 5:19.
+      const CASE = {
+        id: "case",
+        name: "04 Case walkthrough",
+        file: "Case walkthrough.docx",
+        wpm: 150,
+        saved: "14:11",
+        counts: [
+          36, 48, 41, 52, 44, 39, 47, 43, 50, 44, 46, 50, 40, 43, 42, 41, 49, 38, 45, 43, 47, 42, 44, 40, 46, 43, 45,
+          39, 41, 39,
+        ],
+        place: { p: 12, w: 20 },
+        cues: [
+          [1, "CAM 1 · wide"],
+          [2, "Slide 1 · the case"],
+          [3, "Slide 2 · Nordlys in 2019"],
+          [4, "Slide 3 · the routes"],
+          [6, "Slide 4 · the fleet"],
+          [7, "CAM 2 · close"],
+          [8, "Slide 5 · what broke"],
+          [9, "Slide 6 · the first call"],
+          [11, "Slide 7 · the data"],
+          [12, "Slide 8 · the cost curve"],
+          [13, "CAM 1 · wide"],
+          [14, "Slide 9 · three options"],
+          [15, "Slide 10 · option A"],
+          [16, "Slide 11 · option B"],
+          [17, "Slide 12 · option C"],
+          [19, "PAUSE · let it land"],
+          [20, "Slide 13 · the choice"],
+          [21, "Slide 14 · the pushback"],
+          [22, "CAM 2 · close"],
+          [24, "Slide 15 · a year later"],
+          [25, "Slide 16 · the numbers"],
+          [27, "Slide 17 · what she kept"],
+          [28, "Slide 18 · your turn"],
+          [30, "Slide 19 · questions"],
+        ].map(([p, t]) => ({ p, t, own: true })),
+        glass: [10, 11, 12, 13, 14],
+        paras: {
+          10: "By the autumn the company was losing money on four routes out of five. The trucks were full, the drivers were paid and the customers were mostly happy, which is exactly why nobody on the board believed the numbers when they first saw them.",
+          11: "The data had been there all along. Every delivery was scanned twice, once at the depot and once at the door, and nobody had ever put the two scans side by side. When the new finance lead did, the gaps between them told the whole story.",
+          12: "This is the curve she drew on a whiteboard that week. Each dot is a route. Across the bottom is how far it runs, and up the side is what it costs per parcel. Look at how the dots <em>lift off</em> to the right, long before a route gets long.",
+          13: "Now, the obvious reading of that curve is that the long routes are the problem. That was the board's first conclusion too, and it was wrong, which is why we are going to spend the next ten minutes on it.",
+          14: "There were three ways out, and each one had a champion in the room. We will take them one at a time, and I would like you to decide which one you would have backed before we tell you which one they chose.",
+          15: "Option A was to cut the long routes altogether. It was quick, it was easy to explain to the owners, and it would have made the curve look better within a quarter. It would also have lost them their <b>two largest customers</b>.",
+        },
+      };
+
+      // 05 Outro: 4 paragraphs, 110 words, 0:47 at 140 words a minute
+      const OUTRO = {
+        id: "outro",
+        name: "05 Outro",
+        file: "Outro.docx",
+        wpm: 140,
+        saved: "13:41",
+        counts: [29, 32, 30, 19],
+        place: { p: 1, w: 1 },
+        cues: [
+          { p: 1, t: "CAM 1 · wide", own: true },
+          { p: 4, t: "Slide 7 · credits", own: true },
+        ],
+        paras: {
+          1: "That is all we have time for today. Maria, thank you for your honesty, and for the fire alarm, which I think we will keep in the final cut.",
+          2: "If this conversation raised questions about your own first ninety days, the programme pages at SSE Executive Education have the reading list we mentioned and the dates of the next open programme.",
+          3: "Next time we meet a hospital director who changed the way her night shifts hand over to the day team, and it took her <em>four</em> attempts to get it right.",
+          4: "Until then, thank you for watching Leading Through Change. I'm Anna Lind, and I will see you next month.",
+        },
+      };
+      const BY_ID = { intro: INTRO, case: CASE, outro: OUTRO };
+      const total = (sc) => sc.counts.reduce((a, b) => a + b, 0);
+      const before = (sc, p) => sc.counts.slice(0, p - 1).reduce((a, b) => a + b, 0);
+      const placeWord = (sc) => before(sc, sc.place.p) + sc.place.w;
+      const ownCue = (sc, n) => sc.cues.find((c) => c.own && c.p === n);
+
+      // the library, sorted by name
+      const LIB = [
+        { id: "welcome", name: "01 Welcome", words: 262, wpm: 140 },
+        { id: "intro", name: "02 Interview intro", words: 933, wpm: 140 },
+        { id: "guest", name: "03 Guest questions", words: 595, wpm: 140 },
+        { id: "case", name: "04 Case walkthrough", words: 1307, wpm: 150 },
+        { id: "outro", name: "05 Outro", words: 110, wpm: 140 },
+        { id: "pickups", name: "12 Pick-ups", words: 119, wpm: 140 },
+      ];
+      // earlier versions: an import, and every time the text went onto the glass; the newest one that
+      // matches the script's text is marked current and has no Bring back
+      const VERSIONS = {
+        intro: (s) => ({
+          sub: "5 kept · up to 20",
+          rows: [
+            ["Put on the prompter", "today 14:05 · 933 words", !s.edited],
+            ["Imported Interview intro.docx", "today 13:40 · 918 words"],
+            ["Put on the prompter", "yesterday 16:12 · 902 words"],
+          ],
+          more: "2 more",
+        }),
+        outro: () => ({ sub: "1 kept · up to 20", rows: [["Imported Outro.docx", "today 13:41 · 110 words", true]] }),
+        case: () => ({
+          sub: "2 kept · up to 20",
+          rows: [
+            ["Put on the prompter", "today 14:12 · 1,307 words", true],
+            ["Imported Case walkthrough.docx", "today 13:44 · 1,296 words"],
+          ],
+        }),
+      };
+      // On the glass today: the last three glass changes, each a press on this page
+      const RECENT = {
+        intro: {
+          of: 5,
+          rows: [
+            ["14:05", "Put 02 Interview intro on the prompter"],
+            ["13:58", "Cleared the prompter"],
+            ["13:31", "Put 01 Welcome on the prompter"],
+          ],
+        },
+        blank: {
+          of: 6,
+          rows: [
+            ["14:26", "Cleared the prompter"],
+            ["14:05", "Put 02 Interview intro on the prompter"],
+            ["13:58", "Cleared the prompter"],
+          ],
+        },
+        case: {
+          of: 7,
+          rows: [
+            ["14:12", "Put 04 Case walkthrough on the prompter"],
+            ["14:10", "Cleared the prompter"],
+            ["14:05", "Put 02 Interview intro on the prompter"],
+          ],
+        },
+      };
+
+      // ---- states: what the prompter reports, with the doc's sentences ----
+      const ON_SUB = "The Prompter XL shows 02 Interview intro. Paused at paragraph 9 of 18.";
+      const ON_META = "Prompter XL · 1920×1080 · 60 Hz · 140 words a minute";
+      const KEPT = "Jumps, speed and size still work; the place is kept.";
+      const STATES = {
+        paused: {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: ON_SUB,
+          meta: ON_META,
+          hdr: ["ok", "ok"],
+          on: "intro",
+          sel: "intro",
+        },
+        playing: {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: "The Prompter XL shows 02 Interview intro. Playing at 140 words a minute.",
+          meta: "Ends 14:32 · paragraph 9 of 18 · 52 %",
+          hdr: ["ok", "ok"],
+          on: "intro",
+          sel: "intro",
+          playing: true,
+        },
+        "at-end": {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: "The Prompter XL shows 02 Interview intro. At the end.",
+          meta: "The scroll stopped at END at 14:32. BACK or TOP for another take.",
+          hdr: ["ok", "ok"],
+          on: "intro",
+          sel: "intro",
+          atEnd: true,
+          clock: "14:33",
+        },
+        "not-updated": {
+          tone: "attention",
+          word: "NOT UPDATED",
+          sub: "02 Interview intro was edited after it went on the prompter. The prompter still shows the earlier text.",
+          meta: "",
+          actions: [["Update the prompter · press twice", "primary"]],
+          hdr: ["amber", "not updated"],
+          on: "intro",
+          sel: "intro",
+          edited: true,
+          clock: "14:22",
+        },
+        "outro-selected": {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: ON_SUB,
+          meta: ON_META,
+          hdr: ["ok", "ok"],
+          on: "intro",
+          sel: "outro",
+        },
+        "replace-armed": {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: ON_SUB,
+          armed: {
+            text: "Replace 02 Interview intro with 05 Outro on the prompter · press again",
+            left: "3.9 s",
+            pct: 87,
+          },
+          hdr: ["ok", "ok"],
+          on: "intro",
+          sel: "outro",
+        },
+        "not-connected": {
+          tone: "error",
+          word: "NOT CONNECTED",
+          sub: "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen.",
+          meta: KEPT,
+          hdr: ["red", "not connected"],
+          on: "intro",
+          sel: "intro",
+          held: "nc",
+        },
+        "not-showing": {
+          tone: "error",
+          word: "NOT SHOWING",
+          sub: "Studio Control could not open its window on the Prompter XL.",
+          meta: "Windows could not place the window on that screen.",
+          actions: [["Try again", ""]],
+          hdr: ["red", "not showing"],
+          on: "intro",
+          sel: "intro",
+          held: "ns",
+        },
+        duplicated: {
+          tone: "error",
+          word: "DUPLICATED",
+          sub: "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.",
+          meta: KEPT,
+          hdr: ["red", "duplicated"],
+          on: "intro",
+          sel: "intro",
+          held: "dup",
+        },
+        "low-resolution": {
+          tone: "attention",
+          word: "LOW RESOLUTION",
+          sub: "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080 in Windows' display settings for the sharpest text.",
+          meta: "It shows 02 Interview intro, paused at paragraph 9 of 18.",
+          hdr: ["amber", "low resolution"],
+          on: "intro",
+          sel: "intro",
+          lowRes: true,
+        },
+        ready: {
+          tone: "ok",
+          word: "READY",
+          sub: "The Prompter XL is connected and blank. Choose a script and put it on the prompter.",
+          meta: "Selected: 02 Interview intro · 6:40",
+          actions: [["Put on the prompter", "primary"]],
+          hdr: ["ok", "blank"],
+          on: null,
+          sel: "intro",
+          blank: true,
+        },
+        "no-scripts": {
+          tone: "ok",
+          word: "READY",
+          sub: "The Prompter XL is connected and blank. There are no scripts yet: open a Word or text file, or paste one.",
+          meta: "",
+          hdr: ["ok", "blank"],
+          on: null,
+          sel: null,
+          blank: true,
+          empty: true,
+        },
+        "many-cues": {
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: "The Prompter XL shows 04 Case walkthrough. Paused at paragraph 12 of 30.",
+          meta: "Prompter XL · 1920×1080 · 60 Hz · 150 words a minute",
+          hdr: ["ok", "ok"],
+          on: "case",
+          sel: "case",
+        },
+      };
+      STATES["deck-away"] = { ...STATES.paused, deckAway: true };
+      const STATE_NAMES = Object.keys(STATES);
+      const HELD_TAG = { nc: "NOT CONNECTED", ns: "NOT SHOWING", dup: "DUPLICATED" };
+      const LOCKED_WHY = "locked until a script is on the prompter";
+
+      // ---- the editor: whole paragraphs only, the view ending on a paragraph boundary ----
+      function renderEditor(sc, s) {
+        const onP = s.on === sc.id;
+        const atEndView = onP && s.atEnd;
+        const nums =
+          sc.id === "outro"
+            ? [1, 2, 3, 4]
+            : sc.id === "case"
+              ? [10, 11, 12, 13, 14, 15]
+              : atEndView
+                ? [13, 14, 15, 16, 17, 18]
+                : [7, 8, 9, 10, 11, 12, 13];
+        const withEnd = sc.id === "outro" || atEndView;
+        let h = "";
+        for (const n of nums) {
+          const w = sc.counts[n - 1];
+          const edited = s.edited && sc.id === "intro" && EDITED.includes(n);
+          const words = edited && n === 10 ? 51 : w;
+          const html = edited && n === 10 ? P10_NEW : sc.paras[n];
+          const reading = onP && !s.atEnd && n === sc.place.p;
+          let rail = `<span>${len(words, sc.wpm)}</span><small>${words} words</small>`;
+          if (reading)
+            rail = `<span class="hl">reading line</span><small>word ${sc.place.w} of ${words} · ${len(words, sc.wpm)}</small>`;
+          if (edited) rail = `<span class="am">edited 14:21</span><small>not on the glass yet</small>`;
+          const cue = ownCue(sc, n);
+          h += `<div class="para${reading ? " reading" : ""}${edited ? " edited" : ""}" data-n="${n}">
+            <div class="num"><i class="tri r"></i>${n}</div>
+            <div class="txt">${cue ? `<span class="cue own">[${cue.t}]</span>` : ""}${html}</div>
+            <div class="rail">${rail}</div></div>`;
+        }
+        if (withEnd) {
+          const T = total(sc);
+          h += `<div class="para end${atEndView ? " reading" : ""}" data-n="end"><div class="num"><i class="tri r"></i></div><div class="txt"><span class="endw">END</span>${sc.counts.length} paragraphs · ${T.toLocaleString("en-US")} words · ${len(T, sc.wpm)} at ${sc.wpm} words/min</div><div class="rail">${atEndView ? '<span class="hl">reading line</span><small>at END</small>' : ""}</div></div>`;
+        }
+        const ed = $("editor");
+        ed.innerHTML = h;
+        // keep only whole paragraphs: drop from the end, or from the top when the view ends at END
+        const limit = ed.clientHeight - 14;
+        let paras = [...ed.querySelectorAll(".para")];
+        const over = () => paras[paras.length - 1].offsetTop + paras[paras.length - 1].offsetHeight > limit;
+        while (paras.length > 1 && over()) (withEnd ? paras.shift() : paras.pop()).remove();
+        paras = [...ed.querySelectorAll(".para[data-n]")].filter((p) => p.dataset.n !== "end");
+        const first = +paras[0].dataset.n,
+          last = +paras[paras.length - 1].dataset.n;
+        ed.insertAdjacentHTML(
+          "beforeend",
+          `<div class="smap" aria-hidden="true">${scrollMap(sc, s, first, last, withEnd)}</div>`
+        );
+      }
+
+      // the scroll map: the view (thumb), cues (left ticks), edits not on the glass (right bars), the reading line (across, with its arrow)
+      function scrollMap(sc, s, first, last, withEnd) {
+        const T = total(sc);
+        const pct = (w) => ((w / T) * 100).toFixed(2);
+        const top = before(sc, first),
+          bot = withEnd ? T : before(sc, last + 1);
+        let m = `<i class="thumb" style="top:${pct(top)}%;height:${pct(bot - top)}%"></i>`;
+        for (const c of sc.cues) m += `<i class="tk cue" style="top:${pct(before(sc, c.p) + (c.at || 0))}%"></i>`;
+        if (s.edited && sc.id === "intro")
+          for (const e of EDITED)
+            m += `<i class="tk ed" style="top:${pct(before(sc, e))}%;height:${pct(sc.counts[e - 1])}%"></i>`;
+        if (s.on === sc.id)
+          m += `<i class="tk rd" style="top:${s.atEnd ? 100 : pct(placeWord(sc))}%"><i class="tri r"></i></i>`;
+        return m;
+      }
+
+      // ---- the whole-script bar: a segment a paragraph, cue ticks at the top, the place across, edits at the bottom ----
+      function renderBar(sc, s) {
+        const W = $("sbar").clientWidth;
+        const T = total(sc);
+        const PW = s.atEnd ? T : placeWord(sc);
+        let h = "",
+          x = 0,
+          nums = "";
+        sc.counts.forEach((c, i) => {
+          const n = i + 1,
+            w = (c / T) * W;
+          const startWord = before(sc, n),
+            endWord = startWord + c;
+          if (endWord <= PW) h += `<i class="sg read" style="left:${x + 1}px;width:${w - 2}px"></i>`;
+          else if (startWord >= PW) h += `<i class="sg" style="left:${x + 1}px;width:${w - 2}px"></i>`;
+          else {
+            const r = ((PW - startWord) / c) * w;
+            h += `<i class="sg read" style="left:${x + 1}px;width:${r - 1}px"></i><i class="sg" style="left:${x + r}px;width:${w - r - 1}px"></i>`;
+          }
+          if (s.edited && sc.id === "intro" && EDITED.includes(n))
+            h += `<i class="edm" style="left:${x + 1}px;width:${w - 2}px"></i>`;
+          nums += `<span class="${!s.atEnd && n === sc.place.p ? "cur" : ""}" style="left:${x + w / 2 + 1}px">${n}</span>`;
+          x += w;
+        });
+        for (const c of sc.cues) h += `<i class="ct" style="left:${((before(sc, c.p) + (c.at || 0)) / T) * W}px"></i>`;
+        h += `<i class="pl" style="left:${Math.min(W - 2, (PW / T) * W)}px"></i>`;
+        $("sbar").innerHTML = h;
+        $("snums").innerHTML = nums;
+        $("barPlace").innerHTML = s.atEnd
+          ? "<b>END</b> · 100 %"
+          : `<b>¶ ${sc.place.p} of ${sc.counts.length}</b> · ${Math.round((PW / T) * 100)} %`;
+      }
+
+      // ---- the cue keys: every cue on a line of its own, in order, the first 24; the time to each at this speed ----
+      function renderCues(sc, s) {
+        const own = sc.cues.filter((c) => c.own);
+        const keys = own.slice(0, 24);
+        const PW = s.atEnd ? total(sc) : placeWord(sc);
+        const next = s.atEnd ? null : keys.find((c) => before(sc, c.p) > PW);
+        $("cues").innerHTML = keys
+          .map((c) => {
+            const w = before(sc, c.p) - PW;
+            const t = w <= 0 ? "read" : "in " + len(w, sc.wpm);
+            return `<button class="key cuek" data-key data-take data-run><span class="n">¶ ${c.p} · ${c === next ? "<em>next</em> · " : ""}${t}</span><span class="nm"><span class="br">[</span>${c.t}<span class="br">]</span></span></button>`;
+          })
+          .join("");
+        $("cueSub").textContent =
+          own.length >= 24
+            ? `${own.length} on a line of their own, a key each up to 24 · press to go there`
+            : `${own.length} on a line of their own · press to go there`;
+      }
+
+      // ---- the live copy: the glass's own layout, drawn as a picture ----
+      const GLASS_TEXT = "#ffffff",
+        GLASS_CUE = "#8fd0ff";
+      function tokens(html) {
+        // words with their emphasis; a cue in brackets is one token; punctuation after a tag sticks to its word
+        const t = document.createElement("template");
+        t.innerHTML = html;
+        const out = [];
+        let spaced = true; // did the text so far end in a space?
+        const walk = (node, st) => {
+          for (const n of node.childNodes) {
+            if (n.nodeType === 3) {
+              const text = n.textContent;
+              const parts = text.split(/\s+/).filter(Boolean);
+              parts.forEach((word, i) => {
+                const glue = i === 0 && out.length > 0 && !spaced && !/^\s/.test(text);
+                out.push({ t: word, glue, ...st });
+              });
+              if (text.length) spaced = /\s$/.test(text);
+            } else if (n.nodeType === 1) {
+              if (n.classList.contains("caret")) continue;
+              const s2 = { ...st };
+              if (n.tagName === "B") s2.b = true;
+              if (n.tagName === "EM" || n.tagName === "I") s2.i = true;
+              if (n.tagName === "U") s2.u = true;
+              if (n.classList.contains("cue")) s2.cue = true;
+              walk(n, s2);
+            }
+          }
+        };
+        walk(t.content, {});
+        return out;
+      }
+      function drawGlass(s) {
+        const cv = $("glass");
+        const dpr = window.devicePixelRatio || 1;
+        const CW = 776,
+          CH = 437;
+        if (cv.width !== Math.round(CW * dpr)) {
+          cv.width = Math.round(CW * dpr);
+          cv.height = Math.round(CH * dpr);
+        }
+        const ctx = cv.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, cv.width, cv.height);
+        if (s.blank) return; // nothing on the prompter: the glass is black
+        const sc = BY_ID[s.on];
+        const W = s.lowRes ? 1280 : 1920,
+          H = s.lowRes ? 720 : 1080;
+        const size = 88,
+          lh = size * 1.4,
+          cueSize = size * 0.7,
+          cueLh = cueSize * 1.4,
+          gap = lh / 2;
+        const x0 = W * 0.12,
+          colW = W * 0.76,
+          readY = H * 0.35;
+        const k = (CW * dpr) / W;
+        ctx.setTransform(k, 0, 0, k, 0, 0);
+        ctx.textBaseline = "middle";
+        const font = (t) =>
+          t.cue
+            ? `italic 500 ${cueSize}px Inter, system-ui, sans-serif`
+            : `${t.i ? "italic " : ""}${t.b ? 600 : 500} ${size}px Inter, system-ui, sans-serif`;
+        const dim = s.held ? 0.45 : 1; // held: the whole copy at the read-text level
+        // the reading arrow at the left edge
+        const arrow = () => {
+          ctx.globalAlpha = dim;
+          ctx.fillStyle = GLASS_TEXT;
+          const ah = (88 * H) / 1080,
+            aw = (72 * H) / 1080,
+            ax = (96 * W) / 1920;
+          ctx.beginPath();
+          ctx.moveTo(ax, readY - ah / 2);
+          ctx.lineTo(ax + aw, readY);
+          ctx.lineTo(ax, readY + ah / 2);
+          ctx.closePath();
+          ctx.fill();
+        };
+        if (s.atEnd) {
+          // END reached the reading line; the last line sits half a screen above it, off the top
+          ctx.globalAlpha = dim;
+          ctx.font = font({ cue: true });
+          ctx.fillStyle = GLASS_CUE;
+          ctx.fillText("END", x0, readY);
+          arrow();
+          return;
+        }
+        // lay the paragraphs out in the glass's pixels
+        const lines = [];
+        let y = 0,
+          placeLine = 0;
+        for (const n of sc.glass) {
+          const cue = ownCue(sc, n);
+          if (cue) {
+            lines.push({ y, h: cueLh, toks: [{ t: `[${cue.t}]`, cue: true, x: 0 }] });
+            y += cueLh;
+          }
+          let line = { y, h: lh, toks: [] },
+            x = 0,
+            wi = 0;
+          for (const t of tokens(sc.paras[n])) {
+            ctx.font = font(t);
+            const w = ctx.measureText(t.t).width;
+            ctx.font = font({});
+            const sp = t.glue ? 0 : ctx.measureText(" ").width;
+            if (x > 0 && x + sp + w > colW && !t.glue) {
+              lines.push(line);
+              y += lh;
+              line = { y, h: lh, toks: [] };
+              x = 0;
+            }
+            if (x > 0) x += sp;
+            t.x = x;
+            t.w = w;
+            line.toks.push(t);
+            x += w;
+            if (!t.cue && !t.glue) {
+              wi++;
+              if (n === sc.place.p && wi === sc.place.w) placeLine = lines.length;
+            }
+          }
+          lines.push(line);
+          y += lh + gap;
+        }
+        const off = readY - (lines[placeLine].y + lines[placeLine].h / 2);
+        lines.forEach((ln, i) => {
+          const cy = off + ln.y + ln.h / 2;
+          if (cy + ln.h / 2 < 0 || cy - ln.h / 2 > H) return;
+          ctx.globalAlpha = dim * (i < placeLine ? 0.45 : 1); // the text already read is dimmed
+          for (const t of ln.toks) {
+            ctx.font = font(t);
+            ctx.fillStyle = t.cue ? GLASS_CUE : GLASS_TEXT;
+            ctx.fillText(t.t, x0 + t.x, cy);
+            if (t.u) ctx.fillRect(x0 + t.x, cy + size * 0.42, t.w, 5);
+          }
+        });
+        arrow();
+      }
+
+      function renderRecent(s) {
+        const r = s.empty ? null : s.blank ? RECENT.blank : s.on === "case" ? RECENT.case : RECENT.intro;
+        $("recentSub").textContent = r ? `the last 3 of ${r.of}` : "";
+        $("recent").innerHTML = r
+          ? r.rows.map(([t, w]) => `<div class="rec"><span class="tm">${t}</span><span>${w}</span></div>`).join("") +
+            `<div class="foot">Each a press on this page · all in Recent actions</div>`
+          : `<div class="none">Nothing has been on the prompter today.</div>`;
+      }
+
+      function renderDeck(s) {
+        const page = (p) => `<b>Stream Deck</b> on <span class="pg">${p}</span>`;
+        let lamp = "ok",
+          cls = "",
+          t1 = `${page("PROMPTER")} · follows this page`,
+          t2 = "PLAY · BACK · TOP · dials for speed, position, size and paragraph";
+        if (s.deckAway) {
+          lamp = "amber";
+          cls = " amber";
+          t1 = `${page("CAMERAS")} · moved there by its page key`;
+          t2 = "Its dials drive the cameras; its page keys bring PROMPTER back";
+        } else if (s.blank) {
+          lamp = "";
+          t2 = "Every prompter key and dial is grey until a script is on";
+        } else if (s.held) {
+          lamp = "";
+          t2 = "PLAY and the speed dial's push are grey; the rest works";
+        }
+        $("deckLine").className = "deckline" + cls;
+        $("deckLamp").className = "lamp " + lamp;
+        $("deckT1").innerHTML = t1;
+        $("deckT2").textContent = t2;
+      }
+
+      function renderList(s) {
+        if (s.empty) {
+          $("slist").innerHTML =
+            `<div class="srow-empty">No scripts yet · the three ways in are in the editor's place</div>`;
+          $("libSub").textContent = "none yet · sorted by name, so 01, 02… sets the running order";
+          return;
+        }
+        $("libSub").textContent = "6 · sorted by name, so 01, 02… sets the running order";
+        $("slist").innerHTML = LIB.map((sc) => {
+          const on = sc.id === s.on;
+          const words = sc.id === "intro" && s.edited ? 936 : sc.words;
+          const sel = sc.id === s.sel;
+          let lamp = "",
+            tag = `<span class="tag"></span>`;
+          if (on) {
+            const second = s.held
+              ? `<i class="rd">${HELD_TAG[s.held]}</i>`
+              : s.edited
+                ? '<i class="am">NOT UPDATED</i>'
+                : s.playing
+                  ? '<i class="gr">PLAYING</i>'
+                  : s.atEnd
+                    ? '<i class="nt">AT THE END</i>'
+                    : "";
+            lamp = s.held ? "" : s.edited ? "amber" : "ok";
+            tag = `<span class="tag${s.held ? " plain" : ""}">ON PROMPTER${second}</span>`;
+          }
+          return `<button class="key srow${sel ? " sel" : ""}" data-key><i class="lamp ${lamp}"></i><span class="name">${sc.name}</span><span class="meta">${len(words, sc.wpm)} at ${sc.wpm} words/min · ${words.toLocaleString("en-US")} words</span>${tag}</button>`;
+        }).join("");
+      }
+
+      function renderVersions(s, sel) {
+        $("versions").style.display = s.empty ? "none" : "";
+        if (s.empty) return;
+        const v = VERSIONS[sel.id](s);
+        $("verSub").textContent = v.sub;
+        $("verRows").innerHTML =
+          v.rows
+            .map(
+              ([w, m, cur]) =>
+                `<div class="ver" style="margin-top:8px"><div><div class="w">${w}</div><div class="m">${m}</div></div>${cur ? '<span class="cur">current</span>' : '<button class="key sm" data-key>Bring back</button>'}</div>`
+            )
+            .join("") +
+          (v.more
+            ? `<div class="ver" style="margin-top:8px"><div class="m" style="margin:0">${v.more} · the oldest goes when a 21st is kept</div><button class="key sm" data-key>Show all</button></div>`
+            : "");
+      }
+
+      function lampword(el, tone, text) {
+        el.className = "lampword " + (tone === "ok" ? "green" : tone === "" ? "muted" : tone);
+        el.querySelector(".lamp").className = "lamp " + tone;
+        el.querySelector("span").textContent = text;
+      }
+
+      function applyState(name) {
+        if (!STATES[name]) name = "paused";
+        const s = STATES[name];
+        const sc = s.on ? BY_ID[s.on] : null; // the script on the prompter
+        const sel = s.sel ? BY_ID[s.sel] : null; // the script in the editor
+        const held = !!s.held;
+        board.dataset.state = name;
+        board.classList.toggle("blank", !!s.blank);
+        board.classList.toggle("empty", !!s.empty);
+        board.classList.toggle("playing", !!s.playing);
+        board.classList.toggle("is-held", held);
+        board.classList.toggle("lock-run", !!s.blank);
+        board.classList.toggle("lock-play", !!s.blank || held || !!s.atEnd);
+
+        // the state display: the word, the sentence, the way out, the armed row
+        $("state").className = "state well tone-" + s.tone;
+        $("stateLamp").className = "lamp " + (s.tone === "ok" ? "ok" : s.tone === "attention" ? "amber" : "red");
+        $("stateWord").textContent = s.word;
+        $("stateSub").textContent = s.sub;
+        $("stateMeta").innerHTML = s.armed
+          ? `<div class="armed-row"><span class="w">ARMED</span><span class="t">${s.armed.text}</span><span class="s">${s.armed.left}</span><span class="bar"><i style="width:${s.armed.pct}%"></i></span></div>`
+          : s.meta || "";
+        $("stateActions").innerHTML = (s.actions || [])
+          .map(([l, c]) => `<button class="key state-key ${c}" data-key>${l}</button>`)
+          .join("");
+
+        // the header: the Prompter lamp mirrors the worst state; the latch while it scrolls
+        const hdr = $("hdrPrompter");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + s.hdr[0];
+        hdr.querySelector("span").textContent = s.hdr[1];
+        $("hdrPlaying").hidden = !s.playing;
+        $("clock").textContent = s.clock || "14:29";
+
+        // the take-time keys: every block keeps its height in every state
+        const T = sc ? total(sc) : 0;
+        const PW = sc ? (s.atEnd ? T : placeWord(sc)) : 0;
+        const pct = sc ? Math.round((PW / T) * 100) : 0;
+        const n = sc ? sc.counts.length : 0;
+        const p = sc ? sc.place.p : 0;
+        const left = sc ? len(T - PW, sc.wpm) : "—";
+        $("tlHero").textContent = left;
+        $("tlSub").textContent = !sc
+          ? "the prompter is blank"
+          : s.atEnd
+            ? `of ${len(T, sc.wpm)} · at END · 100 %`
+            : s.playing
+              ? `of ${len(T, sc.wpm)} · ends 14:32 · ¶ ${p} of ${n} · ${pct} %`
+              : `of ${len(T, sc.wpm)} · ¶ ${p} of ${n} · ${pct} %`;
+        const play = $("playKey");
+        play.classList.toggle("live", !!s.playing);
+        $("playHint").textContent = s.blank
+          ? "locked · nothing on the prompter"
+          : s.held === "nc"
+            ? "locked · the Prompter XL is not connected"
+            : s.held === "ns"
+              ? "locked · nothing is drawn on the Prompter XL"
+              : s.held === "dup"
+                ? "locked · the Prompter XL copies another screen"
+                : s.atEnd
+                  ? "locked · at the end · BACK or TOP first"
+                  : s.playing
+                    ? `scrolling at ${sc.wpm} words/min · press to pause`
+                    : `paused at ¶ ${p} · press to scroll`;
+        if (s.blank || held || s.atEnd) play.setAttribute("aria-disabled", "true");
+        else play.removeAttribute("aria-disabled");
+        document.querySelectorAll("[data-run]").forEach((el) => {
+          if (s.blank) el.setAttribute("aria-disabled", "true");
+          else el.removeAttribute("aria-disabled");
+        });
+        $("backHint").textContent = s.blank ? "locked · nothing on" : `start of ¶ ${s.atEnd ? n : p}`;
+        $("topHint").textContent = s.blank ? "locked · nothing on" : "pauses · first line";
+        $("spd").textContent = sc ? sc.wpm : "—";
+        $("spdUnit").textContent = sc ? "words/min · this script's own" : "words/min";
+        $("spdHint").textContent = s.blank ? LOCKED_WHY : "5 words/min a press · never starts the scroll";
+        $("jumpSub").textContent = s.blank ? LOCKED_WHY : "keep the scroll as it is";
+        $("sizeHint").textContent = s.blank ? LOCKED_WHY : "4 px a press · Standard goes back to 88 px";
+        $("gotoN").textContent = sc ? (s.atEnd ? n : p) : "—";
+        $("gotoOf").textContent = sc ? `of ${n}` : "";
+        renderDeck(s);
+        renderRecent(s);
+        $("clearKey").textContent = s.blank ? "Clear the prompter · nothing on it" : "Clear the prompter · press twice";
+
+        // the editor
+        if (sel) {
+          const onP = sel.id === s.on;
+          $("edTitle").textContent = sel.name;
+          const lamp = $("edLamp");
+          lamp.style.display = "";
+          if (onP && held) lampword(lamp, "", "On the prompter · not on the glass");
+          else if (onP && s.edited) lampword(lamp, "amber", "On the prompter · not updated");
+          else if (onP && s.atEnd) lampword(lamp, "ok", "On the prompter · at the end");
+          else if (onP) lampword(lamp, "ok", "On the prompter");
+          else
+            lampword(
+              lamp,
+              "",
+              s.blank ? "Not on the prompter · it is blank" : `Not on the prompter · it shows ${sc.name}`
+            );
+          const words = sel.id === "intro" && s.edited ? 936 : total(sel);
+          $("edSub").textContent =
+            `from ${sel.file} · ${sel.counts.length} paragraphs · ${words.toLocaleString("en-US")} words · ${sel.cues.length} cues`;
+          $("edSaved").textContent = "Saved " + (sel.id === "intro" && s.edited ? "14:21" : sel.saved);
+          const following = onP && !!s.playing;
+          $("follow").style.display = following ? "" : "none";
+          $("showRL").style.display = onP && !following ? "" : "none";
+          renderEditor(sel, s);
+          $("edStats").innerHTML =
+            `<b>${words.toLocaleString("en-US")}</b> words · <b>${len(words, sel.wpm)}</b> at ${sel.wpm} words/min`;
+          let go = "";
+          if (s.armed)
+            go = `<span class="note">Comes on paused at the top. The prompter keeps 02 Interview intro until the second press.</span><button class="key armed" data-key><span class="what">Replace 02 Interview intro with 05 Outro</span><span class="tag">ARMED · press again · ${s.armed.left}</span><i class="count" style="width:${s.armed.pct}%"></i></button>`;
+          else if (!onP && sc)
+            go = `<span class="note">The prompter shows ${sc.name}. ${sel.name} comes on paused at the top.</span><button class="key primary" data-key>Replace on the prompter · press twice</button>`;
+          else if (s.edited)
+            go = `<span class="note wide">¶ 10 and ¶ 14 changed since 14:05, so the glass still shows the earlier text. Update the prompter replaces it on the glass and keeps the words at the reading line.</span>`;
+          else if (s.blank)
+            go = `<span class="note wide">The prompter is blank, so Put on the prompter is one press. It comes on paused at ¶ 9, where it was left.</span>`;
+          else if (held)
+            go = `<span class="note wide">The prompter holds this text and shows it again, at the same place, once it can draw on the Prompter XL.</span>`;
+          else
+            go = `<span class="lampword green"><i class="lamp ok"></i><span>The prompter shows this text</span></span>`;
+          $("edGo").innerHTML = go;
+        } else {
+          $("edTitle").textContent = "No script selected";
+          $("edLamp").style.display = "none";
+          $("edSub").textContent = "";
+          $("edSaved").textContent = "";
+          $("editor").innerHTML = "";
+          $("edStats").innerHTML = "";
+          $("edGo").innerHTML = "";
+        }
+
+        // the live copy and what follows the script on the prompter
+        $("liveSub").textContent = !sc
+          ? "the glass is black"
+          : held
+            ? `${sc.name} · held at the place, not on the glass`
+            : `${sc.name} · the glass's own layout at ${s.lowRes ? 61 : 40} %, unmirrored`;
+        const ll = $("liveLamp");
+        if (s.held === "nc") lampword(ll, "red", "not connected");
+        else if (s.held === "ns") lampword(ll, "red", "window not open");
+        else if (s.held === "dup") lampword(ll, "red", "duplicated");
+        else if (s.lowRes) lampword(ll, "amber", "connected · 1280×720");
+        else lampword(ll, "ok", "connected");
+        const note = $("liveNote");
+        note.className = "live-note" + (held ? " red" : "");
+        note.innerHTML = s.blank
+          ? "Nothing on the prompter. The glass stays black until a script is put on."
+          : s.held === "nc"
+            ? '<i class="lamp red"></i>Not connected, so the glass shows nothing. This held copy keeps the place for when it is back.'
+            : s.held === "ns"
+              ? '<i class="lamp red"></i>No window on the Prompter XL, so the glass shows nothing. This held copy keeps the place.'
+              : s.held === "dup"
+                ? '<i class="lamp red"></i>The script is not drawn on the Prompter XL. This held copy keeps the place.'
+                : "The wheel does nothing over this copy or the script bar, so a stray turn never moves the presenter's text.";
+        drawGlass(s);
+        if (sc) {
+          renderBar(sc, s);
+          renderCues(sc, s);
+        }
+
+        // the plate
+        $("inspKeys").style.display = s.empty ? "none" : "";
+        renderList(s);
+        $("removed").style.display = s.empty ? "none" : "";
+        renderVersions(s, sel);
+        $("danger").style.display = s.empty ? "none" : "";
+        if (sel) {
+          const rk = $("removeKey");
+          const onPrompter = sel.id === s.on;
+          rk.textContent = `Remove ${sel.name}`;
+          rk.classList.toggle("locked", onPrompter);
+          if (onPrompter) rk.setAttribute("aria-disabled", "true");
+          else rk.removeAttribute("aria-disabled");
+          $("removeWhy").textContent = onPrompter
+            ? "On the prompter, so it cannot be removed: clear the prompter first."
+            : "Moves it to Removed; Restore brings it back.";
+        }
+
+        // the footer: telemetry only
+        const xl = $("ftXL");
+        xl.textContent =
+          s.held === "nc"
+            ? "not connected"
+            : s.held === "dup"
+              ? "a copy of another screen"
+              : s.lowRes
+                ? "1280×720 · 60 Hz"
+                : "1920×1080 · 60 Hz";
+        xl.className = s.held === "nc" || s.held === "dup" ? "red" : s.lowRes ? "amber" : "";
+        $("ftScript").textContent = sc ? sc.name : "—";
+        $("ftPlace").textContent = !sc ? "—" : s.atEnd ? "END · 100 %" : `¶ ${p} of ${n} · ${pct} %`;
+        $("ftSpeed").textContent = sc ? `${sc.wpm} words/min` : "—";
+        $("ftLeft").textContent = left;
+        $("ftSaved").textContent = !sel ? "—" : sel.id === "intro" && s.edited ? "14:21" : sel.saved;
+
+        renderMock(name);
+      }
+
+      // ---- harness: theme and state from the URL; the switcher; fit to the window ----
+      let theme = params.get("theme") || "studio";
+      let current = params.get("state") || "paused";
+      let one = false;
+      function setUrl() {
+        const q = new URLSearchParams(location.search);
+        q.set("state", current);
+        q.set("theme", theme);
+        try {
+          history.replaceState(null, "", "?" + q.toString());
+        } catch (e) {
+          /* a file URL may refuse; the board still switches */
+        }
+      }
+      $("mockState").innerHTML = STATE_NAMES.map((n) => `<option value="${n}">${n}</option>`).join("");
+      $("mockTheme").innerHTML = ["studio", "graphite", "bone"]
+        .map((t) => `<option value="${t}">${t}</option>`)
+        .join("");
+      function renderMock(name) {
+        $("mockState").value = name;
+        $("mockTheme").value = theme;
+        $("mockOne").className = one ? "on" : "";
+      }
+      $("mockState").addEventListener("change", (e) => {
+        current = e.target.value;
+        setUrl();
+        applyState(current);
+      });
+      $("mockTheme").addEventListener("change", (e) => {
+        theme = e.target.value;
+        document.documentElement.dataset.theme = theme;
+        setUrl();
+        renderMock(current);
+      });
+      $("mockOne").addEventListener("click", () => {
+        one = !one;
+        fit();
+        renderMock(current);
+      });
+      if (navigator.webdriver || params.get("switcher") === "0") $("mock").hidden = true;
+      document.documentElement.dataset.theme = theme;
+      function fit() {
+        const k = Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        board.style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+      fit();
+      applyState(current);
+      // the type decides the line breaks on the glass and which paragraphs fit the editor: draw again once it is in
+      if (document.fonts && document.fonts.ready)
+        Promise.all([
+          document.fonts.load("500 88px Inter"),
+          document.fonts.load("600 88px Inter"),
+          document.fonts.ready,
+        ])
+          .catch(() => {})
+          .then(() => applyState(current));
+    </script>
+  </body>
+</html>

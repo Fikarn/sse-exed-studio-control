@@ -376,7 +376,7 @@ Validation: as S1 (every board moves), plus the new source-scan guard. If the in
 
 ### C0 — Design (no code)
 
-Status: in progress (next: D18's two open questions, then the boards). The research ran on 2026-09-24; D17 was decided the same day.
+Status: in progress (next: the operator's choice of one board per page (D19) and the review of the Teleprompter's functionality (D20), with the decisions the boards raise, in [`docs/redesign/new-pages-boards-2026-09.md`](../redesign/new-pages-boards-2026-09.md); D18's two open questions). The research ran on 2026-09-24; D17 was decided the same day. On 2026-09-26, while the operator was away, the boards were drawn (step 3): three Concept A boards per page at 2560×1440 in the three themes — `A-cameras-1.html` (three monitors), `-2` (hero and two), `-3` (camera console), `A-teleprompter-1.html` (live mirror), `-2` (editor first), `-3` (rundown) — and the functionality proposal, [`docs/redesign/teleprompter-2026-09.md`](../redesign/teleprompter-2026-09.md). Each board was drawn by a designer agent, critiqued against Concept A and the decisions by another, and revised; each fits 2560×1440 in all its states and themes (measured in the browser pane) with no console error. Nothing in the app changed.
 
 Findings (the deciding ones checked against their source on 2026-09-24):
 

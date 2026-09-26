@@ -1,0 +1,2833 @@
+<!doctype html>
+<html
+  lang="en"
+  data-theme="studio"
+  data-states="ready,choosing,armed,recording,stop-armed,rec-at-start,released,released-main,unreachable,unreachable-main,no-pictures,no-vmix,partial,stale"
+>
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Cameras · Concept A — Three monitors · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         CAMERAS in Concept A's language — board 1, "Three monitors", revision 2
+         (new pages program, C0; decisions D4, D10–D14, D17; D18 open, designed
+         for anyway). One family with A-lighting / A-cockpit / A-setup: header
+         (five tabs, D4, Cameras active, no key hints) · cluster 424 · bay ·
+         plate 416 · footer.
+         Cluster: the state display, then the take-time keys — REC for the main
+         camera only (D14; a fixed 144 px in every state, so nothing below it
+         moves) and the three camera keys (amber = the camera the plate and the
+         deck's dials drive) — then an echo of the deck's CAMERAS page (a display,
+         not keys), the pictures from vMix, Recent actions and the standing
+         actions. Release / Connect (D13) sit in the plate head of the selected
+         camera, away from the take-time keys.
+         Bay: the three pictures side by side and equal (NDI from vMix on this
+         PC, D17), each with the values its camera reports (D10); under them the
+         selected camera up close — a 1:1 loupe for focus and a waveform for
+         exposure, measured here from the picture, never a camera value, for the
+         selected camera only unless "All three" is pressed (the cost on the
+         vMix PC, Appendix B item 5).
+         Plate: the selected camera — one press for ISO, shutter, iris, ND, white
+         balance and tint, focus; press twice for resolution, frame rate,
+         dynamic range and display LUT (D11): one press opens the values the
+         camera offers, a pick arms it, a second press applies it.
+         Recording is the system's green "live" (§4: a running timer, a held
+         talkback; the deck's PLAY is lit green too): a lit green REC key, a
+         green lamp + word elsewhere. Red stays error and hazard. Whether the
+         studio wants the red tally convention instead is the operator's to rule
+         (system-a §4 and §7 would then need a tally role).
+         One word per condition, everywhere on the page:
+           CONNECTED (green) · RELEASED (blue) · UNREACHABLE (red, Lighting's
+           word) · NO PICTURES / NO PICTURE (amber; all, or one camera's) ·
+           STALE (amber; a picture that stopped changing, dimmed as the
+           Console dims stale meters). ND on a BGH1: "none in this camera".
+         Which word the state display shows when several hold:
+           UNREACHABLE > NO PICTURES > NO PICTURE > STALE > RELEASED > CONNECTED;
+           an armed change adds the armed row under any of them.
+         The elapsed recording time is counted here from the moment the camera
+         reported REC ("00:12:47 since 09:58:14"); it is shown only on the REC
+         key and in the header latch, from one value. A recording already
+         running when Studio Control opened has no count: "since before 10:06".
+         Pictures are CSS/SVG stand-ins: no external image; the only external
+         resource is the Google Fonts link the other boards use.
+         ?theme=studio|graphite|bone
+         ?state=
+           ready            all three connected, pictures from vMix, CAM 1 selected
+           choosing         CAM 1's frame rate: the values the camera offers are open
+           armed            CAM 1's frame rate 25 → 50 fps armed in the plate
+           recording        CAM 1 records while CAM 2 is selected; an ISO change sent
+                            to CAM 2 waits for its report; zebras on
+           stop-armed       REC pressed while recording: STOP? · press again · 2.1 s
+           rec-at-start     Studio Control opened while CAM 1 was already recording
+           released         CAM 2 handed to LUMIX Tether; values hidden; Connect
+           released-main    CAM 1 handed to the iPad; REC locked with the reason
+           unreachable      CAM 3 does not answer on the network; its picture still arrives
+           unreachable-main CAM 1 does not answer over Bluetooth; REC locked
+           no-pictures      vMix runs but sends no camera pictures; the controls still work
+           no-vmix          vMix is not running on this PC
+           partial          2 of 3: no picture for CAM 3 (selected: its close-up is empty)
+           stale            CAM 2's picture stopped changing at 10:04:12 (selected)
+         ?sel=1|2|3 overrides the selected camera · ?all=1 shows all three up close ·
+         ?switcher=0 hides the mock bar (it sits outside #board, starts folded and
+         hides itself under automation)
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* ---- material ---- */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      /* armed: arm-then-apply (D11) — a well with an amber keyline, the word, the time left, a countdown bar */
+      .key.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+        position: relative;
+        overflow: hidden;
+      }
+      .key.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .lamp.blue {
+        background: var(--blue-text);
+        box-shadow: 0 0 10px var(--bloom-blue);
+      }
+      /* a lamp with its word: colour never stands alone */
+      .lw {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+      }
+      .lw.ok {
+        color: var(--green-text);
+      }
+      .lw.amber {
+        color: var(--amber-text);
+      }
+      .lw.red {
+        color: var(--red-text);
+      }
+      .lw.blue {
+        color: var(--blue-text);
+      }
+
+      /* ---- shell ---- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      .lampchip.blue,
+      .lampchip.blue b {
+        color: var(--blue-text);
+      }
+      .lampchip.blue {
+        border-color: var(--blue-text);
+      }
+      .lampchip[hidden] {
+        display: none;
+      }
+      .lampchip .mono {
+        font-family: var(--mono);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body ---- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        flex: none;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-info {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state.tone-info .state-word {
+        color: var(--blue-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .state-actions .key.primary {
+        color: var(--primary-ink);
+      }
+      .armed-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 6px;
+        border: 1px solid var(--amber-text);
+        border-radius: var(--r8);
+        padding: 6px 10px;
+      }
+      .armed-row .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .armed-row .t {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text);
+      }
+      .armed-row .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .armed-row .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      .armed-row .bar i {
+        display: block;
+        height: 100%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+
+      /* REC: the main camera only (D14). One fixed height in every state, three fixed rows, one line each, so
+         the camera keys below it never move: ready · live (the system's green live fill: a running timer, like a
+         held talkback and the deck's PLAY) · armed (STOP?: the arm recipe, keeping the green lamp and the REC
+         word) · locked (dashed, 55 %, the reason at full ink) */
+      .key.rec {
+        flex: none;
+        height: 144px;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 10px;
+        padding: 0 16px;
+        position: relative;
+        overflow: hidden;
+      }
+      .rec-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 20px;
+      }
+      .rec-top .lamp {
+        width: 12px;
+        height: 12px;
+      }
+      .rec-top .cap,
+      .rec-top .stop {
+        font: 600 20px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .rec-top .stop {
+        color: var(--amber-text);
+      }
+      .rec-top .who {
+        margin-left: auto;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .rec-mid {
+        height: 44px;
+        display: flex;
+        align-items: center;
+        font: 500 20px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .rec-mid.hero {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .rec-bot {
+        height: 16px;
+        font: 500 13px/16px var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .key.rec.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.rec.live .who,
+      .key.rec.live .rec-bot {
+        color: var(--green-ink);
+      }
+      .key.rec.live .lamp {
+        background: var(--green-ink);
+        box-shadow: none;
+      }
+      .key.rec.armed {
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+      }
+      .key.rec.armed .rec-top .cap {
+        color: var(--green-text);
+      }
+      .key.rec.armed .who {
+        color: var(--amber-text);
+        font: 600 13px/1 var(--mono);
+      }
+      .key.rec.armed .rec-bot {
+        color: var(--well-text-2);
+      }
+      .key.rec.locked {
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        cursor: not-allowed;
+      }
+      .key.rec.locked .rec-top,
+      .key.rec.locked .rec-mid {
+        opacity: 0.55;
+      }
+      .key.rec.locked .rec-bot {
+        color: var(--text);
+      }
+      /* the REC latch in the header: live, so the lamp and word are green */
+      .lampchip.green,
+      .lampchip.green b {
+        color: var(--green-text);
+      }
+      .lampchip.green {
+        border-color: var(--green-text);
+      }
+
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: none;
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 16px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+
+      /* the three cameras: select (amber = the camera the plate and the deck's dials drive) · its link in the page's
+         words (CONNECTED · RELEASED · UNREACHABLE). Release and Connect sit in the plate head, not beside these keys. */
+      .cams {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .cam {
+        display: grid;
+        grid-template-columns: 108px 1fr;
+        gap: 8px;
+        height: 72px;
+      }
+      .cam .sel {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 8px;
+        padding: 0 14px;
+      }
+      .cam .sel .cap {
+        font-size: 20px;
+      }
+      .cam .sel .nm {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .cam .sel.on .nm {
+        color: var(--amber-ink);
+      }
+      .cam .st {
+        border-radius: var(--r8);
+        padding: 0 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .cam .st .lw {
+        font-size: 14px;
+      }
+      .cam .st .l {
+        font: 500 13px/16px var(--ui);
+        height: 16px;
+        color: var(--well-text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .cam .st .l .mono {
+        font-family: var(--mono);
+      }
+      /* the deck's CAMERAS page, echoed (D14): a display, not keys */
+      .deck {
+        border-radius: var(--r8);
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .dkeys {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .dk {
+        height: 48px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: var(--r4);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--well-text-2);
+      }
+      .dk small {
+        font: 500 12px/1 var(--ui);
+        letter-spacing: 0;
+      }
+      .dk.on {
+        color: var(--amber-text);
+        border-color: var(--amber-text);
+      }
+      /* REC on the deck: lit green while CAM 1 records (the deck's PLAY is lit green too); dashed while REC is locked */
+      .dk.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: transparent;
+        color: var(--green-ink);
+      }
+      .dk.lock {
+        border-style: dashed;
+        opacity: 0.55;
+      }
+      .dstrip {
+        font: 500 13px/1 var(--mono);
+        color: var(--well-text);
+        padding: 9px 10px;
+        border-radius: var(--r4);
+        background: rgba(255, 255, 255, 0.07);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pics {
+        border-radius: var(--r8);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .pics .lw {
+        font-size: 14px;
+      }
+      .pics .l {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--well-text-2);
+      }
+      .note {
+        font: 500 12px/1.3 var(--ui);
+        color: var(--text-2);
+      }
+      .log {
+        display: flex;
+        flex-direction: column;
+      }
+      .log .row {
+        display: grid;
+        grid-template-columns: 48px 1fr auto;
+        column-gap: 10px;
+        align-items: center;
+        min-height: 34px;
+        border-top: 1px solid var(--line);
+      }
+      .log .row:last-child {
+        border-bottom: 1px solid var(--line);
+      }
+      .log .t {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .log .x {
+        font: 500 14px/1.2 var(--ui);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .log .src {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* ---- bay: three monitors, then the selected camera up close ---- */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        min-width: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .bay-head,
+      .sect-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+        flex: none;
+        min-width: 0;
+      }
+      .bay-head .t,
+      .sect-head .t {
+        font: 600 14px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .bay-head .d,
+      .sect-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+      .bay-head .right,
+      .sect-head .right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: none;
+      }
+      .trio {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+        flex: none;
+      }
+      .mon {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-radius: var(--r12);
+        min-width: 0;
+      }
+      .mon.sel {
+        outline: 2px solid var(--accent);
+        outline-offset: 6px;
+      }
+      .mon-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 36px;
+        padding: 0 4px;
+        border-radius: var(--r8);
+      }
+      .mon-head .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .mon-head .nm {
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .mon-head .lw {
+        margin-left: auto;
+      }
+      .pic {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        border-radius: var(--r8);
+        overflow: hidden;
+        cursor: crosshair;
+      }
+      .pic svg,
+      .loupe svg,
+      .wave svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      /* stale: the last frame, dimmed — the Console's treatment for stale meters */
+      .pic.stale svg,
+      .loupe.stale svg,
+      .wave.stale svg {
+        opacity: 0.4;
+      }
+      .pline {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        padding: 0 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pline.blue {
+        color: var(--blue-text);
+      }
+      .pline.red {
+        color: var(--red-text);
+      }
+      .pline.amber {
+        color: var(--amber-text);
+      }
+      .vals {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .fv {
+        height: 52px;
+        border-radius: var(--r8);
+        padding: 0 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .fv .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        white-space: nowrap;
+      }
+      .fv .v {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      .fv .v.na {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .fv .v.ip {
+        font-size: 14px;
+      }
+      .fv .v.live {
+        color: var(--green-text);
+      }
+      .fv.doubt {
+        border: 1px dashed var(--amber-text);
+      }
+      .fv.doubt .v {
+        color: var(--amber-text);
+      }
+      .sect {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+      }
+      .sect.grow {
+        flex: 1;
+        min-height: 0;
+      }
+      /* up close: the selected camera's 1:1 loupe beside its waveform; "All three" puts three of each in columns */
+      .close {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 592px;
+        grid-template-rows: minmax(0, 1fr);
+        gap: 16px;
+      }
+      .close.all {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-rows: 330px minmax(0, 1fr);
+        gap: 8px 16px;
+      }
+      .loupe,
+      .wave {
+        position: relative;
+        border-radius: var(--r8);
+        overflow: hidden;
+        min-height: 0;
+      }
+      .wave .wcap {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        top: 12px;
+        font: 500 12px/1.35 var(--ui);
+        color: var(--well-text-2);
+      }
+      .wave text {
+        font: 500 12px var(--mono);
+        fill: var(--well-text-2);
+      }
+      .wave .grat {
+        stroke: rgba(255, 255, 255, 0.12);
+        stroke-width: 1;
+      }
+      .wave .z95 {
+        stroke: rgba(255, 255, 255, 0.45);
+        stroke-width: 1;
+        stroke-dasharray: 6 6;
+      }
+      .wave .z95.on {
+        stroke: var(--amber-text);
+      }
+      .wave .trace {
+        stroke: rgba(214, 232, 255, 0.5);
+        stroke-width: 1.6;
+        fill: none;
+      }
+      .chip {
+        position: absolute;
+        font: 600 12px/1 var(--mono);
+        color: var(--well-text);
+        background: rgba(0, 0, 0, 0.74);
+        border-radius: var(--r4);
+        padding: 5px 7px;
+      }
+      .chip.tally,
+      .chip.stale {
+        top: 12px;
+        left: 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .chip.tally {
+        color: var(--green-text);
+        border: 1px solid var(--green-text);
+      }
+      .chip.stale {
+        color: var(--amber-text);
+        border: 1px solid var(--amber-text);
+      }
+      .chip.lchip {
+        left: 10px;
+        bottom: 10px;
+        color: var(--well-text-2);
+      }
+      .nopic {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+        padding: 0 48px;
+      }
+      .nopic .lw {
+        font-size: 14px;
+      }
+      .nopic .s {
+        font: 500 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+      }
+
+      /* ---- plate: the selected camera ---- */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 4px;
+      }
+      .insp-head .ttl {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        min-width: 0;
+      }
+      .insp-head .ttl .sub {
+        margin-top: 0;
+      }
+      /* the plate head's one key: Release (D13), or Connect for a released camera */
+      .insp-head .rel {
+        flex: none;
+        width: 132px;
+        min-height: 52px;
+        flex-direction: column;
+        gap: 6px;
+        padding: 0 10px;
+      }
+      .insp-head .rel .h {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .pnote {
+        border: 1px solid var(--blue-text);
+        border-radius: var(--r8);
+        padding: 10px 12px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+        font: 500 13px/1.35 var(--ui);
+      }
+      .pnote.red {
+        border-color: var(--red-text);
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        text-align: right;
+      }
+      .step {
+        display: grid;
+        grid-template-columns: 1fr 40px 108px 40px;
+        gap: 8px;
+        align-items: center;
+        min-height: 44px;
+      }
+      .step.na-row {
+        grid-template-columns: 1fr 232px;
+      }
+      .step .nm {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .step .nm b {
+        font: 600 14px/1 var(--ui);
+      }
+      .step .nm span {
+        font: 500 12px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .step .nm span.pend {
+        color: var(--amber-text);
+        font-weight: 600;
+      }
+      .key.pm {
+        min-height: 40px;
+        padding: 0;
+        font: 500 20px/1 var(--mono);
+      }
+      .rd {
+        height: 40px;
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 600 20px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .rd.doubt {
+        border: 1px dashed var(--amber-text);
+        color: var(--amber-text);
+      }
+      .nabox {
+        min-height: 40px;
+        border-radius: var(--r8);
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        font: 500 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+      }
+      .seg {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
+        padding: 3px;
+        border-radius: var(--r8);
+      }
+      .seg .key {
+        min-height: 32px;
+        padding: 0 4px;
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+        font: 600 14px/1 var(--mono);
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .ctl {
+        display: grid;
+        grid-template-columns: 1fr 96px;
+        align-items: center;
+        gap: 12px;
+      }
+      .ctl .v {
+        font: 600 20px/1 var(--mono);
+        text-align: right;
+      }
+      .ctl-label {
+        display: flex;
+        justify-content: space-between;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .ctl-label b {
+        color: var(--text);
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .hslider {
+        position: relative;
+        height: 34px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 3px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .hslider.cct .track {
+        height: 8px;
+        margin-top: -4px;
+        background: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+      }
+      .row3 {
+        display: grid;
+        grid-template-columns: 1fr 1.25fr 1fr;
+        gap: 8px;
+      }
+      .row3 .key {
+        min-height: 44px;
+      }
+      .fpos {
+        border-radius: var(--r8);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .fpos .ft {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text);
+      }
+      .fpos .ft b {
+        font: 600 13px/1 var(--mono);
+      }
+      .ftrack {
+        position: relative;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .ftrack i {
+        position: absolute;
+        top: -6px;
+        width: 2px;
+        height: 16px;
+        margin-left: -1px;
+        background: var(--well-text);
+      }
+      /* press twice (D11): one fixed 56 px key in every state, so arming moves nothing in the plate.
+         rest: name · "press to choose" · the reported value; open: the values the camera offers float below
+         (the drawer level, over the sections under it, never pushing them); armed: ARMED · press again · 3.9 s,
+         the reported value → the pick in amber, the countdown bar; the value stays the reported one until the
+         camera answers */
+      .key.choice {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        align-content: center;
+        column-gap: 12px;
+        row-gap: 6px;
+        height: 56px;
+        padding: 0 14px;
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+      }
+      .key.choice .cl {
+        grid-column: 1;
+        grid-row: 1;
+        font: 600 14px/1 var(--ui);
+      }
+      .key.choice .cs {
+        grid-column: 1;
+        grid-row: 2;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .key.choice .cv {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-self: center;
+        font: 600 16px/1 var(--mono);
+        white-space: nowrap;
+      }
+      .key.choice .cv .to {
+        color: var(--amber-text);
+      }
+      .key.choice.armed .cs {
+        font: 600 12px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .key.choice.open {
+        border: 2px solid var(--accent);
+      }
+      .key.choice.open .cs {
+        color: var(--text);
+      }
+      .anchor {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+      }
+      .chooser {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: calc(100% + 8px);
+        min-height: 280px;
+        z-index: 5;
+        border-radius: var(--r12);
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        border: 1px solid var(--line-2);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 12px 32px rgba(0, 0, 0, 0.6);
+      }
+      .chooser .ch-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .chooser .ch-head b {
+        font: 600 14px/1 var(--ui);
+      }
+      .chooser .ch-head span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .chooser .opts {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .chooser .opts .key {
+        min-height: 44px;
+        flex-direction: column;
+        gap: 5px;
+        padding: 0 4px;
+        font: 600 16px/1 var(--mono);
+      }
+      .chooser .opts .key small {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .chooser .opts .key.now {
+        border: 2px solid var(--accent);
+      }
+      .chooser .ch-note {
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .chooser .ch-foot {
+        margin-top: auto;
+        display: flex;
+        justify-content: flex-end;
+      }
+      /* the section the deck's dials drive (BANK): a neutral tag, like a selection */
+      .dials {
+        flex: none;
+        font: 500 12px/1 var(--ui);
+        color: var(--text);
+        border: 1px solid var(--line-2);
+        border-radius: var(--pill);
+        padding: 4px 8px;
+      }
+      .section-head .r {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 16px/1 var(--mono);
+        text-align: right;
+      }
+      .readouts .v.na {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .readouts .v.live {
+        color: var(--green-text);
+      }
+      .fine {
+        margin-top: auto;
+        font: 500 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      /* a camera Studio Control does not hold or cannot reach: its controls lock, the reason sits in the plate */
+      .inspector.locked .key[data-take],
+      .inspector.locked .hslider[data-take] {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .inspector.locked .key[data-take] {
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+      }
+      .inspector.locked .hslider .cap {
+        display: none;
+      }
+
+      /* ---- footer ---- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .right {
+        margin-left: auto;
+      }
+
+      /* ---- mock bar: outside #board, not part of the page; starts folded in the footer's empty stretch ---- */
+      #mockbar {
+        position: fixed;
+        left: 62%;
+        bottom: 6px;
+        z-index: 10;
+        font: 500 11px/1 var(--ui);
+        color: #f4f4f5;
+        background: #1b1c21;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      }
+      #mockbar[hidden] {
+        display: none;
+      }
+      #mockbar .mbrow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        max-width: 560px;
+      }
+      #mockbar .mbrow > span {
+        width: 38px;
+        color: #a6a6ad;
+      }
+      #mockbar button {
+        height: 20px;
+        padding: 0 6px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #f4f4f5;
+        font: 500 11px/1 var(--ui);
+      }
+      #mockbar button.on {
+        background: #f0b35b;
+        color: #1a1000;
+        border-color: transparent;
+      }
+      #mockbar.min .mbrow + .mbrow {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-cameras-1">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>Setup / Support</button>
+          <button class="tab" data-key>Lighting</button>
+          <button class="tab" data-key>Audio</button>
+          <button class="tab on" data-key aria-current="page">Cameras</button>
+          <button class="tab" data-key>Teleprompter</button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip" id="hdrCams" data-key><i class="lamp ok"></i><b>Cameras</b> <span>ok</span></button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Prompter</b> ok</button>
+          <button class="lampchip amber" data-key><i class="lamp amber"></i><b>Solo</b> 1</button>
+          <button class="lampchip green" id="hdrRec" data-key hidden>
+            <i class="lamp ok"></i><b>REC</b> <span class="mono" id="hdrRecT">CAM 1 · 00:12:47 since 09:58:14</span>
+          </button>
+          <div class="clock">10:11</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <!-- ================= cluster ================= -->
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">CONNECTED</div>
+            </div>
+            <div class="state-sub" id="stateSub"></div>
+            <div class="state-meta" id="stateMeta"></div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <button class="key rec" id="rec" data-key data-take aria-label="Record on CAM 1, the main camera">
+            <span class="rec-top"
+              ><i class="lamp" id="recLamp"></i><span class="cap" id="recCap">REC</span
+              ><span class="stop" id="recStop" hidden>STOP?</span
+              ><span class="who" id="recWho">CAM 1 · main camera</span></span
+            >
+            <span class="rec-mid" id="recMid">Not recording</span>
+            <span class="rec-bot" id="recBot">One press starts · stopping asks twice</span>
+          </button>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Cameras <span>press to select · the plate and the deck follow</span></div>
+            </div>
+            <div class="cams" id="cams"></div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Stream Deck <span>the CAMERAS page as the deck shows it</span></div>
+            </div>
+            <div class="deck well" id="deck" aria-label="What the Stream Deck's CAMERAS page shows"></div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">From vMix <span>the pictures, NDI on this PC</span></div>
+              <button class="key sm" data-key>Check again</button>
+            </div>
+            <div class="pics well" id="pics"></div>
+            <div class="note">
+              Studio Control only receives what vMix sends; it never takes a camera input from vMix.
+            </div>
+          </div>
+
+          <div class="sec">
+            <div class="sec-head">
+              <div class="title">Recent actions <span>starts, stops, armed changes</span></div>
+            </div>
+            <div class="log" id="log"></div>
+          </div>
+
+          <div class="actions">
+            <button class="key primary" data-key>Check cameras</button>
+            <button class="key" data-key>Open camera setup</button>
+          </div>
+        </aside>
+
+        <!-- ================= bay: three monitors, then the selected camera up close ================= -->
+        <main class="bay" data-region="monitors">
+          <div class="bay-head">
+            <span class="t">Pictures</span
+            ><span class="d"
+              >the three cameras side by side, as vMix sends them · guides and aids are drawn here only, never on the
+              camera or in vMix</span
+            >
+            <span class="right"
+              ><button class="key sm on" id="kGuides" data-key aria-pressed="true">Guides</button
+              ><button class="key sm" id="kZebra" data-key aria-pressed="false">Zebras 95 %</button
+              ><button class="key sm" id="kPeak" data-key aria-pressed="false">Focus peaking</button></span
+            >
+          </div>
+          <div class="trio" id="mons"></div>
+          <div class="sect grow">
+            <div class="sect-head">
+              <span class="t" id="closeT">CAM 1 · Main, up close</span><span class="d" id="closeD"></span>
+              <span class="right"
+                ><button class="key sm on" id="kOne" data-key aria-pressed="true">Selected camera</button
+                ><button class="key sm" id="kAll" data-key aria-pressed="false">All three</button></span
+              >
+            </div>
+            <div class="close" id="close"></div>
+          </div>
+        </main>
+
+        <!-- ================= plate: the selected camera ================= -->
+        <aside class="inspector plate" data-region="inspector" id="plate"></aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Selected <b id="ftSel">CAM 1 · Main</b></span>
+        <span class="item">Recording <b id="ftRec">CAM 1 · not recording</b></span>
+        <span class="item">Pictures <b id="ftPic">vMix · 3 of 3 · 25 fps</b></span>
+        <span class="item">Cameras <b id="ftLinks">3 of 3 connected</b></span>
+        <span class="item">Deck <b id="ftDeck">CAMERAS · CAM 1 · Exposure</b></span>
+        <span class="right">Camera values shown are the ones the cameras report</span>
+      </footer>
+    </div>
+
+    <div id="mockbar" class="min" aria-label="Mock controls, not part of the page">
+      <div class="mbrow"><span>Mock</span><button id="mbMin">show</button></div>
+      <div class="mbrow" id="mbStates"><span>State</span></div>
+      <div class="mbrow" id="mbThemes"><span>Theme</span></div>
+      <div class="mbrow" id="mbScale"><span>Scale</span></div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+
+      // ---- the three cameras (the operator's interview; addresses, names and vMix inputs as set in Setup) ----
+      const CAMS = {
+        1: {
+          cap: "CAM 1",
+          name: "Main",
+          model: "Pocket 6K Pro",
+          full: "Blackmagic Pocket Cinema Camera 6K Pro",
+          bm: true,
+          link: "Bluetooth",
+          app: "the iPad",
+          relTo: "to the iPad",
+          center: [960, 470],
+        },
+        2: {
+          cap: "CAM 2",
+          name: "Second",
+          model: "BGH1",
+          full: "Panasonic LUMIX BGH1",
+          bm: false,
+          link: "172.16.16.85",
+          app: "LUMIX Tether",
+          relTo: "to LUMIX Tether",
+          center: [1180, 520],
+        },
+        3: {
+          cap: "CAM 3",
+          name: "Operator",
+          model: "BGH1",
+          full: "Panasonic LUMIX BGH1",
+          bm: false,
+          link: "172.16.16.30",
+          app: "LUMIX Tether",
+          relTo: "to LUMIX Tether",
+          center: [900, 500],
+          soft: true,
+        },
+      };
+      // What each camera reports back (C0). The Pocket over Bluetooth: ISO, shutter, iris, ND, white balance and tint,
+      // focus (the lens position is an open assumption), video mode, dynamic range, display LUT, codec, record — no
+      // battery or card time (timecode and media are not in C0's list, so they are not drawn). The BGH1 over the
+      // network: no tint, focus position, picture profile or LUT; it has no ND filter; it does not record here.
+      const VALS = {
+        1: {
+          iso: "400",
+          shutter: "180°",
+          iris: "f/2.8",
+          nd: "2 stops",
+          ndKey: "2",
+          wb: "3200 K",
+          wbK: 3200,
+          tint: "0",
+          focus: "62 %",
+          focusPct: 62,
+          format: "4K DCI · 25",
+          res: "4K DCI · 4096 × 2160",
+          fps: "25 fps",
+          fpsNow: "25",
+          look: "Film + LUT",
+          dr: "Film",
+          lut: "Film to Extended Video",
+          codec: "Blackmagic RAW Q5",
+        },
+        2: {
+          iso: "800",
+          shutter: "1/50",
+          iris: "f/4.0",
+          wb: "3200 K",
+          wbK: 3200,
+          format: "FHD · 25p",
+          res: "FHD · 1920 × 1080",
+          fps: "25p",
+        },
+        3: {
+          iso: "800",
+          shutter: "1/50",
+          iris: "f/2.8",
+          wb: "4300 K",
+          wbK: 4300,
+          format: "FHD · 25p",
+          res: "FHD · 1920 × 1080",
+          fps: "25p",
+        },
+      };
+      // the frame rates the Pocket 6K Pro offers at 4K DCI (the model's table, not a camera report)
+      const FPS_4K = ["23.98", "24", "25", "29.97", "30", "50", "59.94", "60"];
+      const REC_FROM = "09:58:14"; // when CAM 1 reported REC; the elapsed time is counted here from it
+
+      // ---- the page's states ----
+      const LOG = [
+        ["09:41", "CAM 1 recording stopped", "Stream Deck"],
+        ["09:12", "CAM 1 recording started", "Stream Deck"],
+        ["09:05", "CAM 1 frame rate 50 → 25 fps", "Screen"],
+        ["08:58", "CAM 3 connected", "Screen"],
+        ["08:52", "CAM 3 released to LUMIX Tether", "Screen"],
+        ["08:40", "CAM 1 LUT set to Extended Video", "Screen"],
+      ];
+      const HELD_SUB = "All three cameras answer and are connected. Their pictures arrive from vMix.";
+      const STATES = {
+        ready: {
+          sel: 1,
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          meta: "Values as the cameras report them · last report 10:11:01",
+          hdr: ["ok", "ok"],
+        },
+        choosing: {
+          sel: 1,
+          choosing: true,
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          meta: "Choosing CAM 1's frame rate · nothing is sent until the second press",
+          hdr: ["ok", "ok"],
+        },
+        armed: {
+          sel: 1,
+          armedFps: { to: "50", left: "3.9 s", pct: 87 },
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          armed: { text: "CAM 1 to 50 fps · press again", left: "3.9 s", pct: 87 },
+          hdr: ["ok", "ok"],
+        },
+        recording: {
+          sel: 2,
+          rec: "live",
+          recT: "00:12:47",
+          zebras: true,
+          pending: { cam: 2, field: "iso", sent: "1000" },
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          meta: "CAM 1 recording since " + REC_FROM + " · the deck's dials are on CAM 2",
+          hdr: ["ok", "ok"],
+          log: [["09:58", "CAM 1 recording started", "Stream Deck"]],
+        },
+        "stop-armed": {
+          sel: 1,
+          rec: "armed",
+          recT: "00:12:49",
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          armed: { text: "Stop CAM 1 · press REC again", left: "2.1 s", pct: 70 },
+          hdr: ["ok", "ok"],
+          log: [["09:58", "CAM 1 recording started", "Stream Deck"]],
+        },
+        "rec-at-start": {
+          sel: 1,
+          rec: "found",
+          opened: "10:06",
+          tone: "ok",
+          word: "CONNECTED",
+          sub: HELD_SUB,
+          meta: "CAM 1 was already recording when Studio Control opened at 10:06 · nothing was sent to it",
+          hdr: ["ok", "ok"],
+          log: [["10:06", "CAM 1 found recording at start", "Camera"]],
+        },
+        released: {
+          sel: 2,
+          released: 2,
+          tone: "info",
+          word: "RELEASED",
+          sub: "CAM 2 is with LUMIX Tether. Studio Control reads and sends it nothing until Connect.",
+          meta: "Connect reads its settings; nothing is sent",
+          actions: [["Connect CAM 2", "primary"]],
+          hdr: ["blue", "1 released"],
+          log: [["10:02", "CAM 2 released to LUMIX Tether", "Screen"]],
+        },
+        "released-main": {
+          sel: 1,
+          released: 1,
+          recLock: { mid: "With the iPad", bot: "Start and stop recording on the iPad or the camera" },
+          tone: "info",
+          word: "RELEASED",
+          sub: "CAM 1 is with the iPad. Studio Control reads and sends it nothing, REC included, until Connect.",
+          meta: "Connect reads its settings; nothing is sent",
+          actions: [["Connect CAM 1", "primary"]],
+          hdr: ["blue", "1 released"],
+          log: [["10:02", "CAM 1 released to the iPad", "Screen"]],
+        },
+        unreachable: {
+          sel: 3,
+          unreach: 3,
+          tone: "error",
+          word: "UNREACHABLE",
+          sub: "CAM 3 does not answer at 172.16.16.30. Check its network cable and PoE power.",
+          meta: "Its picture still arrives from vMix",
+          actions: [
+            ["Try CAM 3 again", "primary"],
+            ["Open camera setup", ""],
+          ],
+          hdr: ["red", "1 unreachable"],
+          log: [["10:04", "CAM 3 unreachable", "Camera"]],
+        },
+        "unreachable-main": {
+          sel: 1,
+          unreach: 1,
+          recLock: { mid: "Not answering", bot: "Use the camera's own REC · its state is unknown here" },
+          tone: "error",
+          word: "UNREACHABLE",
+          sub: "CAM 1 does not answer over Bluetooth. Check it is on and within range of this PC.",
+          meta: "Nothing changes on it: a recording carries on",
+          actions: [
+            ["Try CAM 1 again", "primary"],
+            ["Open camera setup", ""],
+          ],
+          hdr: ["red", "1 unreachable"],
+          log: [["10:04", "CAM 1 unreachable", "Camera"]],
+        },
+        "no-pictures": {
+          sel: 1,
+          nopic: "sending",
+          tone: "attention",
+          word: "NO PICTURES",
+          sub: "vMix is running but sends no camera pictures: is its NDI for Cameras / Calls / Audio Inputs on?",
+          meta: "vMix: Settings › Outputs · camera controls still work",
+          actions: [["Check again", ""]],
+          hdr: ["amber", "no pictures"],
+        },
+        "no-vmix": {
+          sel: 1,
+          nopic: "novmix",
+          tone: "attention",
+          word: "NO PICTURES",
+          sub: "vMix is not running on this PC, so no camera pictures arrive. The camera controls still work.",
+          meta: "They appear once vMix runs with its NDI output on",
+          actions: [["Check again", ""]],
+          hdr: ["amber", "no pictures"],
+        },
+        partial: {
+          sel: 3,
+          missing: 3,
+          tone: "attention",
+          word: "NO PICTURE",
+          sub: "No picture for CAM 3 arrives from vMix. CAM 1 and CAM 2 do; every control still works.",
+          meta: "Is CAM 3 still input 3 in this vMix session?",
+          actions: [["Check again", ""]],
+          hdr: ["amber", "1 no picture"],
+        },
+        stale: {
+          sel: 2,
+          stale: { cam: 2, since: "10:04:12" },
+          tone: "attention",
+          word: "STALE",
+          sub: "CAM 2's picture stopped changing at 10:04:12: vMix sends no new frames for it.",
+          meta: "Look at CAM 2's input in vMix",
+          actions: [["Check again", ""]],
+          hdr: ["amber", "1 stale"],
+        },
+      };
+
+      // ---- picture stand-ins: SVG scenes in the 1920 × 1080 space of the NDI picture ----
+      function scene1(p) {
+        let books = "";
+        const cols = [
+          "#5b4b3c",
+          "#34455a",
+          "#6a5a44",
+          "#2f3a2f",
+          "#7a6a52",
+          "#3e4a5e",
+          "#584636",
+          "#4a3f52",
+          "#6b5b3f",
+          "#2e3d4f",
+        ];
+        for (const y0 of [520, 760]) {
+          let x = 108,
+            i = y0 === 520 ? 0 : 3;
+          while (x < 500) {
+            const w = 22 + ((i * 37) % 20),
+              h = 110 + ((i * 53) % 50);
+            books += `<rect x="${x}" y="${y0 - h}" width="${w}" height="${h}" fill="${cols[i % cols.length]}"/>`;
+            x += w + 3;
+            i++;
+          }
+        }
+        const eye = (cx) =>
+          `<ellipse cx="${cx}" cy="460" rx="21" ry="10.5" fill="#efe5dc"/><circle cx="${cx}" cy="460" r="9" fill="#5a3f2b"/><circle cx="${cx}" cy="460" r="4.5" fill="#0d0a08"/><circle cx="${cx + 4}" cy="456" r="2.6" fill="#ffffff"/><path d="M${cx - 23} 456 Q ${cx} 443 ${cx + 23} 456" stroke="#5c3a28" stroke-width="3" fill="none"/><path d="M${cx - 18} 469 Q ${cx} 475 ${cx + 18} 469" stroke="#a87458" stroke-width="1.5" fill="none"/>`;
+        const defs = `<linearGradient id="${p}wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3442"/><stop offset="1" stop-color="#131820"/></linearGradient>
+          <radialGradient id="${p}pool" cx="0.27" cy="0.32" r="0.55"><stop offset="0" stop-color="#ffc48c" stop-opacity="0.32"/><stop offset="1" stop-color="#ffc48c" stop-opacity="0"/></radialGradient>
+          <radialGradient id="${p}skin" cx="0.34" cy="0.36" r="0.8"><stop offset="0" stop-color="#f2c6a2"/><stop offset="0.55" stop-color="#cf9571"/><stop offset="1" stop-color="#86533a"/></radialGradient>
+          <linearGradient id="${p}jk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3b4659"/><stop offset="1" stop-color="#161b25"/></linearGradient>
+          <linearGradient id="${p}desk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4633"/><stop offset="1" stop-color="#241a12"/></linearGradient>`;
+        const body = `<rect width="1920" height="1080" fill="url(#${p}wall)"/><rect width="1920" height="1080" fill="url(#${p}pool)"/>
+          <rect x="90" y="520" width="430" height="10" fill="#3b3128"/><rect x="90" y="760" width="430" height="10" fill="#3b3128"/>${books}
+          <rect x="1360" y="170" width="440" height="270" rx="8" fill="#1c2431" stroke="#2c3748" stroke-width="3"/>
+          <rect x="1392" y="206" width="220" height="22" rx="4" fill="#4c6384"/><rect x="1392" y="252" width="360" height="12" rx="4" fill="#33445c"/><rect x="1392" y="280" width="320" height="12" rx="4" fill="#33445c"/><rect x="1392" y="308" width="340" height="12" rx="4" fill="#33445c"/>
+          <ellipse cx="1660" cy="700" rx="95" ry="150" fill="#1f3326"/><ellipse cx="1606" cy="640" rx="50" ry="90" fill="#274232"/><rect x="1615" y="820" width="90" height="118" rx="6" fill="#2b2622"/>
+          <path d="M560 1080 C 585 840, 760 745, 960 740 C 1160 745, 1335 840, 1360 1080 Z" fill="url(#${p}jk)"/>
+          <rect x="912" y="590" width="96" height="175" rx="34" fill="#c08563"/>
+          <path d="M904 752 L 960 905 L 1016 752 Z" fill="#e4e8ec"/>
+          <path d="M872 748 L 960 935 L 905 758 Z" fill="#232a36"/><path d="M1048 748 L 960 935 L 1015 758 Z" fill="#1c222d"/>
+          <ellipse cx="842" cy="480" rx="17" ry="32" fill="#cf9571"/><ellipse cx="1078" cy="480" rx="17" ry="32" fill="#a86f4f"/>
+          <ellipse cx="960" cy="470" rx="120" ry="152" fill="url(#${p}skin)"/>
+          <path d="M842 480 C 824 330, 896 294, 960 294 C 1030 294, 1100 330, 1080 470 C 1066 390, 1026 350, 960 350 C 896 350, 858 396, 842 480 Z" fill="#2a1c14"/>
+          <g stroke="#4d3526" stroke-width="2" fill="none"><path d="M868 392 C 890 336, 940 316, 1000 322"/><path d="M880 372 C 910 330, 960 318, 1030 336"/><path d="M900 350 C 930 320, 990 312, 1050 350"/><path d="M856 430 C 858 380, 880 350, 920 334"/><path d="M1070 440 C 1068 390, 1050 356, 1010 336"/></g>
+          <path d="M898 432 Q 924 418 950 428" stroke="#3a2519" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M972 428 Q 998 418 1024 432" stroke="#3a2519" stroke-width="8" stroke-linecap="round" fill="none"/>
+          ${eye(925)}${eye(997)}
+          <path d="M963 470 Q 956 516 946 528 Q 962 540 980 528" stroke="#9a6446" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <path d="M926 580 Q 962 596 998 580" stroke="#7d4032" stroke-width="7" stroke-linecap="round" fill="none"/>
+          <g fill="#8a5238" fill-opacity="0.35"><circle cx="905" cy="505" r="1.6"/><circle cx="915" cy="512" r="1.3"/><circle cx="1012" cy="508" r="1.5"/><circle cx="1020" cy="500" r="1.2"/><circle cx="990" cy="515" r="1.3"/></g>
+          <rect x="0" y="935" width="1920" height="145" fill="url(#${p}desk)"/>
+          <rect x="600" y="958" width="260" height="60" fill="#d9d4ca" transform="rotate(-4 730 988)"/>
+          <rect x="1400" y="858" width="64" height="82" rx="10" fill="#e3ddd3"/><path d="M1464 878 C 1494 878, 1494 918, 1464 918" stroke="#e3ddd3" stroke-width="9" fill="none"/>`;
+        return { defs, body };
+      }
+      function scene2(p, zebras) {
+        const eye = (cx) =>
+          `<ellipse cx="${cx}" cy="518" rx="8" ry="4" fill="#efe5dc"/><circle cx="${cx}" cy="518" r="3.4" fill="#3c2a1d"/><circle cx="${cx}" cy="518" r="1.6" fill="#0d0a08"/><circle cx="${cx + 1.5}" cy="516.5" r="1.1" fill="#ffffff"/>`;
+        const defs = `<linearGradient id="${p}wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#262d38"/><stop offset="1" stop-color="#10141a"/></linearGradient>
+          <linearGradient id="${p}floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c231c"/><stop offset="1" stop-color="#141009"/></linearGradient>
+          <radialGradient id="${p}skin" cx="0.34" cy="0.36" r="0.8"><stop offset="0" stop-color="#eac09c"/><stop offset="0.6" stop-color="#c48a66"/><stop offset="1" stop-color="#7e4f37"/></radialGradient>
+          <linearGradient id="${p}jk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#394356"/><stop offset="1" stop-color="#1a1f29"/></linearGradient>
+          <pattern id="${p}zeb" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="14" height="28" fill="#000000" fill-opacity="0.6"/></pattern>`;
+        const body = `<rect width="1920" height="1080" fill="url(#${p}wall)"/>
+          <rect x="0" y="790" width="1920" height="290" fill="url(#${p}floor)"/>
+          <ellipse cx="1300" cy="935" rx="560" ry="80" fill="#34291f"/>
+          <rect x="200" y="150" width="660" height="390" rx="10" fill="#0e1117"/><rect x="210" y="160" width="640" height="370" fill="#f2f6fa"/><rect x="210" y="160" width="640" height="70" fill="#1d3b5e"/>
+          ${zebras ? `<rect x="210" y="230" width="640" height="300" fill="url(#${p}zeb)"/>` : ""}
+          <rect x="250" y="268" width="420" height="20" rx="3" fill="#8ea3ba"/><rect x="250" y="310" width="520" height="14" rx="3" fill="#a9b9ca"/><rect x="250" y="340" width="470" height="14" rx="3" fill="#a9b9ca"/>
+          <rect x="560" y="400" width="40" height="100" fill="#4a7bb0"/><rect x="620" y="370" width="40" height="130" fill="#4a7bb0"/><rect x="680" y="420" width="40" height="80" fill="#4a7bb0"/><rect x="740" y="390" width="40" height="110" fill="#e0a040"/>
+          <rect x="520" y="540" width="20" height="260" fill="#0e1117"/><rect x="440" y="790" width="180" height="14" rx="6" fill="#0e1117"/>
+          <rect x="1716" y="120" width="164" height="220" rx="8" fill="#d9dde2" fill-opacity="0.72"/><rect x="1794" y="340" width="8" height="460" fill="#16181c"/>
+          <rect x="1370" y="700" width="70" height="100" rx="6" fill="#2b241f"/><ellipse cx="1405" cy="660" rx="40" ry="60" fill="#22382a"/>
+          <rect x="1060" y="640" width="250" height="160" rx="24" fill="#3a2f28"/><rect x="1075" y="800" width="14" height="80" fill="#1a1512"/><rect x="1282" y="800" width="14" height="80" fill="#1a1512"/>
+          <path d="M1110 760 L 1290 770 L 1330 900 L 1276 908 L 1246 820 L 1130 820 Z" fill="#23272f"/><ellipse cx="1302" cy="912" rx="34" ry="12" fill="#111111"/>
+          <path d="M1090 790 C 1096 640, 1132 594, 1180 590 C 1228 594, 1264 640, 1270 790 Z" fill="url(#${p}jk)"/>
+          <rect x="1164" y="552" width="32" height="50" rx="12" fill="#b88262"/>
+          <path d="M1160 598 L 1180 660 L 1200 598 Z" fill="#dfe4ea"/>
+          <ellipse cx="1180" cy="520" rx="46" ry="60" fill="url(#${p}skin)"/>
+          <path d="M1134 522 C 1128 462, 1156 450, 1180 450 C 1208 450, 1236 462, 1228 518 C 1222 488, 1204 474, 1180 474 C 1158 474, 1140 488, 1134 522 Z" fill="#3b2a1e"/>
+          <path d="M1154 506 Q 1164 501 1174 505" stroke="#3a2519" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M1186 505 Q 1196 501 1206 506" stroke="#3a2519" stroke-width="3" stroke-linecap="round" fill="none"/>
+          ${eye(1164)}${eye(1196)}
+          <path d="M1182 522 Q 1179 538 1175 542 Q 1181 546 1188 542" stroke="#9a6446" stroke-width="2" fill="none"/>
+          <path d="M1168 554 Q 1180 560 1192 554" stroke="#7d4032" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <rect x="1480" y="650" width="230" height="150" rx="24" fill="#352b24"/><rect x="1494" y="800" width="14" height="80" fill="#1a1512"/><rect x="1682" y="800" width="14" height="80" fill="#1a1512"/>`;
+        return { defs, body };
+      }
+      function scene3(p) {
+        let rack = "";
+        for (let i = 0; i < 10; i++) {
+          rack += `<rect x="96" y="${190 + i * 56}" width="248" height="40" rx="3" fill="#141922"/><circle cx="120" cy="${210 + i * 56}" r="4" fill="${i % 3 ? "#52e08a" : "#ffb347"}" fill-opacity="0.8"/><circle cx="138" cy="${210 + i * 56}" r="4" fill="#52e08a" fill-opacity="${i % 2 ? 0.8 : 0.25}"/>`;
+        }
+        let slats = "";
+        for (let x = 1516; x < 1800; x += 24)
+          slats += `<rect x="${x}" y="176" width="12" height="388" fill="#1c2230"/>`;
+        let deck = "";
+        const fills = ["#2a2f3a", "#f0b35b", "#2a2f3a", "#3ddc7a", "#4a6fa5"];
+        for (let j = 0; j < 3; j++)
+          for (let i = 0; i < 5; i++)
+            deck += `<rect x="${1272 + i * 34}" y="${986 + j * 22}" width="26" height="16" rx="3" fill="${fills[(i + j * 2) % 5]}" fill-opacity="0.85"/>`;
+        const eye = (cx) =>
+          `<ellipse cx="${cx}" cy="497" rx="15" ry="7.5" fill="#dfe6f0"/><circle cx="${cx}" cy="497" r="6" fill="#3b4656"/><circle cx="${cx}" cy="497" r="3" fill="#07090c"/><circle cx="${cx + 2.5}" cy="494.5" r="1.8" fill="#ffffff"/>`;
+        const defs = `<linearGradient id="${p}bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121821"/><stop offset="1" stop-color="#07090c"/></linearGradient>
+          <radialGradient id="${p}glow" cx="0.5" cy="1.05" r="0.75"><stop offset="0" stop-color="#7fb0ff" stop-opacity="0.28"/><stop offset="1" stop-color="#7fb0ff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="${p}skin" cx="0.5" cy="0.62" r="0.8"><stop offset="0" stop-color="#ddd1d0"/><stop offset="0.6" stop-color="#a0949e"/><stop offset="1" stop-color="#58536a"/></radialGradient>
+          <linearGradient id="${p}hood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b3039"/><stop offset="1" stop-color="#12151a"/></linearGradient>
+          <filter id="${p}soft" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="2.4"/></filter>`;
+        const body = `<g filter="url(#${p}soft)"><rect width="1920" height="1080" fill="url(#${p}bg)"/>
+          <rect x="80" y="170" width="280" height="600" rx="6" fill="#0d1016" stroke="#1a2029" stroke-width="3"/>${rack}
+          <rect x="1500" y="160" width="300" height="420" rx="6" fill="#161b24"/>${slats}
+          <rect width="1920" height="1080" fill="url(#${p}glow)"/>
+          <path d="M520 1080 C 545 860, 710 780, 900 776 C 1090 780, 1255 860, 1280 1080 Z" fill="url(#${p}hood)"/>
+          <path d="M860 800 L 850 930 M940 800 L 950 930" stroke="#8a93a3" stroke-width="5" fill="none"/>
+          <rect x="858" y="610" width="84" height="170" rx="30" fill="#877d8a"/>
+          <ellipse cx="900" cy="505" rx="110" ry="140" fill="url(#${p}skin)"/>
+          <path d="M792 470 C 786 360, 850 340, 900 340 C 960 340, 1016 364, 1008 470 C 996 410, 956 386, 900 386 C 846 386, 804 412, 792 470 Z" fill="#1c1814"/>
+          <path d="M772 500 C 760 300, 1040 300, 1028 500" stroke="#15171b" stroke-width="24" fill="none"/>
+          <ellipse cx="786" cy="522" rx="30" ry="54" fill="#1c1f25"/><ellipse cx="1014" cy="522" rx="30" ry="54" fill="#1c1f25"/>
+          <path d="M840 462 Q 862 452 884 460" stroke="#23262c" stroke-width="6" stroke-linecap="round" fill="none"/><path d="M916 460 Q 938 452 960 462" stroke="#23262c" stroke-width="6" stroke-linecap="round" fill="none"/>
+          ${eye(863)}${eye(937)}
+          <rect x="834" y="476" width="58" height="42" rx="12" fill="none" stroke="#1d1f24" stroke-width="5"/><rect x="908" y="476" width="58" height="42" rx="12" fill="none" stroke="#1d1f24" stroke-width="5"/><path d="M892 490 Q 900 484 908 490" stroke="#1d1f24" stroke-width="4" fill="none"/>
+          <rect x="840" y="482" width="46" height="9" rx="4" fill="#bcd4ff" fill-opacity="0.3"/><rect x="914" y="482" width="46" height="9" rx="4" fill="#bcd4ff" fill-opacity="0.3"/>
+          <path d="M902 508 Q 898 540 890 552 Q 902 560 914 552" stroke="#5d6a80" stroke-width="3" fill="none"/>
+          <path d="M872 590 Q 900 602 928 590" stroke="#5a4150" stroke-width="5" stroke-linecap="round" fill="none"/>
+          <rect x="0" y="960" width="1920" height="120" fill="#171a20"/><rect x="690" y="985" width="520" height="30" rx="6" fill="#262c38"/>
+          <rect x="1260" y="975" width="190" height="84" rx="10" fill="#0c0d10"/>${deck}
+          <rect x="-20" y="780" width="420" height="320" rx="10" fill="#0a0c10"/><rect x="1560" y="800" width="400" height="300" rx="10" fill="#0a0c10"/></g>`;
+        return { defs, body };
+      }
+      const SCENES = { 1: scene1, 2: scene2, 3: scene3 };
+      // framing guides (thirds, the 90 % safe area, the centre) and the loupe's frame: drawn by Studio Control on its own copy
+      function overlays(id, guides, lp) {
+        const n = 'vector-effect="non-scaling-stroke"';
+        let s = "";
+        if (guides) {
+          s += `<g fill="none" stroke="rgba(255,255,255,0.38)" stroke-width="1">`;
+          for (const x of [640, 1280]) s += `<line x1="${x}" y1="0" x2="${x}" y2="1080" ${n}/>`;
+          for (const y of [360, 720]) s += `<line x1="0" y1="${y}" x2="1920" y2="${y}" ${n}/>`;
+          s += `<rect x="96" y="54" width="1728" height="972" stroke-dasharray="6 6" ${n}/>`;
+          s += `<path d="M936 540 H984 M960 516 V564" ${n}/></g>`;
+        }
+        if (lp)
+          s += `<rect x="${lp.x}" y="${lp.y}" width="${lp.w}" height="${lp.h}" fill="none" stroke="#ffffff" stroke-width="1.5" ${n}/>`;
+        return s;
+      }
+
+      // ---- waveforms: brightness bands across each picture, drawn from the scene (measured, never reported) ----
+      const WAVE = {
+        1: [
+          [0, 1, 0.13, 0.22, 5],
+          [0.05, 0.27, 0.22, 0.42, 3],
+          [0, 1, 0.16, 0.26, 2],
+          [0.29, 0.71, 0.05, 0.12, 4],
+          [0.44, 0.56, 0.52, 0.66, 6, -0.14],
+          [0.47, 0.53, 0.82, 0.88, 3],
+          [0.71, 0.94, 0.12, 0.2, 2],
+          [0.73, 0.76, 0.74, 0.8, 3],
+        ],
+        2: [
+          [0, 1, 0.11, 0.18, 4],
+          [0, 1, 0.07, 0.12, 2],
+          [0.11, 0.44, 0.955, 0.985, 6],
+          [0.13, 0.4, 0.55, 0.7, 2],
+          [0.11, 0.44, 0.18, 0.24, 1],
+          [0.56, 0.67, 0.08, 0.2, 4],
+          [0.59, 0.64, 0.48, 0.62, 4, -0.08],
+          [0.55, 0.9, 0.18, 0.3, 2],
+          [0.89, 0.98, 0.62, 0.7, 2],
+        ],
+        3: [
+          [0, 1, 0.03, 0.08, 5],
+          [0.04, 0.18, 0.1, 0.16, 2],
+          [0.05, 0.08, 0.55, 0.85, 0.6],
+          [0.28, 0.66, 0.06, 0.14, 4],
+          [0.41, 0.53, 0.34, 0.5, 5, 0.04],
+          [0.36, 0.64, 0.18, 0.3, 2],
+          [0.66, 0.76, 0.3, 0.66, 1.5],
+        ],
+      };
+      function rng(a) {
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function waveSVG(id, W, H, zebras, top) {
+        const L = 40,
+          R = 12,
+          T = top,
+          B = 12,
+          pw = W - L - R,
+          ph = H - T - B;
+        const y = (l) => (T + (1 - l) * ph).toFixed(1);
+        let s = "";
+        for (const g of [0, 0.25, 0.5, 0.75, 1])
+          s += `<line class="grat" x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}"/><text x="${L - 10}" y="${+y(g) + 4}" text-anchor="end">${g * 100}</text>`;
+        s += `<line class="z95 ${zebras ? "on" : ""}" x1="${L}" x2="${W - R}" y1="${y(0.95)}" y2="${y(0.95)}"/>`;
+        const r = rng(id * 7919);
+        let d = "";
+        for (let x = 0; x <= pw; x += 2) {
+          const t = x / pw;
+          for (const [x0, x1, lo, hi, dens, slope = 0] of WAVE[id]) {
+            if (t < x0 || t > x1) continue;
+            const u = (t - x0) / (x1 - x0);
+            const n = Math.floor(dens) + (r() < dens % 1 ? 1 : 0);
+            for (let i = 0; i < n; i++) {
+              const l = Math.max(0, Math.min(1.01, lo + (hi - lo) * r() + slope * (u - 0.5)));
+              d += `M${(L + x).toFixed(1)} ${y(l)}h1.6`;
+            }
+          }
+        }
+        s += `<path class="trace" d="${d}"/>`;
+        return `<svg viewBox="0 0 ${W} ${H}" aria-label="Waveform of ${CAMS[id].cap}">${s}</svg>`;
+      }
+
+      // ---- one word per condition (see the head comment for the precedence) ----
+      const LW = {
+        ok: `<span class="lw ok"><i class="lamp ok"></i>CONNECTED</span>`,
+        rel: `<span class="lw blue"><i class="lamp blue"></i>RELEASED</span>`,
+        un: `<span class="lw red"><i class="lamp red"></i>UNREACHABLE</span>`,
+      };
+      const linkWord = (id, s) => (s.released === id ? LW.rel : s.unreach === id ? LW.un : LW.ok);
+      const noPicOf = (id, s) => !!s.nopic || s.missing === id;
+      const staleOf = (id, s) => !!(s.stale && s.stale.cam === id);
+      const recOnOf = (s) => s.rec === "live" || s.rec === "armed" || s.rec === "found";
+
+      // ---- the values under a picture: only what the camera reports; a value it cannot report says so ----
+      function fields(id, s) {
+        const c = CAMS[id],
+          v = VALS[id],
+          bm = c.bm;
+        const hidden = s.released === id || s.unreach === id;
+        const recOn = bm && recOnOf(s);
+        const F = [
+          ["ISO", v.iso, "", "iso"],
+          ["Shutter", v.shutter],
+          ["Iris", v.iris],
+          ["ND", bm ? v.nd : "none in this camera", bm ? "" : "fact"],
+          ["White balance", v.wb],
+          ["Tint", bm ? v.tint : "not reported", bm ? "" : "na"],
+          ["Focus", bm ? v.focus : "not reported", bm ? "" : "na"],
+          ["Format", v.format],
+          ["Profile / LUT", bm ? v.look : "not reported", bm ? "" : "na"],
+          ["Recording", bm ? (recOn ? "recording" : "stopped") : "CAM 1 only", bm ? (recOn ? "live" : "") : "fact"],
+          ["Card time", bm ? "not reported" : "CAM 1 only", bm ? "na" : "fact"],
+          ["Link", c.link, bm ? "fact-v" : "ip"],
+        ];
+        return F.map(([l, val, kind = "", key]) => {
+          const doubt = s.pending && s.pending.cam === id && key === s.pending.field && !hidden;
+          let cls = "v",
+            out = val;
+          if (kind === "na" || kind === "fact") cls += " na";
+          if (kind === "ip") cls += " ip";
+          if (kind === "live") {
+            cls += " live";
+            out = `<i class="lamp ok"></i>${val}`;
+          }
+          if (hidden && !["na", "fact", "fact-v", "ip"].includes(kind)) {
+            cls = "v";
+            out = "—";
+          }
+          return `<div class="fv well ${doubt ? "doubt" : ""}"><span class="l">${l}</span><span class="${cls}">${out}</span></div>`;
+        }).join("");
+      }
+
+      // ---- plate helpers ----
+      const section = (t, d, inner, tag) =>
+        `<div class="section"><div class="section-head"><span class="t">${t}</span><span class="r"><span class="d">${d}</span>${tag ? `<span class="dials">on the deck's dials</span>` : ""}</span></div>${inner}</div>`;
+      const pm = (lbl, up) =>
+        `<button class="key pm" data-key data-take aria-label="${up ? "Raise" : "Lower"} ${lbl}">${up ? "+" : "−"}</button>`;
+      const step = (lbl, sub, val, pend) =>
+        `<div class="step"><span class="nm"><b>${lbl}</b>${pend ? `<span class="pend">sent ${pend.sent} · waiting</span>` : `<span>${sub}</span>`}</span>${pm(lbl, false)}<span class="rd well ${pend ? "doubt" : ""}">${val}</span>${pm(lbl, true)}</div>`;
+      const naRow = (lbl, sub, text) =>
+        `<div class="step na-row"><span class="nm"><b>${lbl}</b><span>${sub}</span></span><span class="nabox well">${text}</span></div>`;
+      // press twice: rest · open (the chooser floats below) · armed
+      const choice = (lbl, val, locked) =>
+        `<button class="key choice" data-key data-take aria-label="${lbl}: ${val}${locked ? "" : ", press to choose"}"><span class="cl">${lbl}</span>${locked ? "" : `<span class="cs">press to choose</span>`}<span class="cv">${val}</span></button>`;
+      const openChoice = (lbl, val) =>
+        `<button class="key choice open" data-key data-take aria-expanded="true" aria-label="${lbl}: ${val}, choosing"><span class="cl">${lbl}</span><span class="cs">choose below · nothing is sent yet</span><span class="cv">${val}</span></button>`;
+      const armedChoice = (lbl, from, a) =>
+        `<button class="key choice armed" data-key data-take aria-label="${lbl} ${from} to ${a.to} armed, press again to apply"><span class="cl">${lbl}</span><span class="cs">ARMED · press again · ${a.left}</span><span class="cv">${from} → <span class="to">${a.to} fps</span></span><i class="count" style="width: ${a.pct}%"></i></button>`;
+      const chooser = (c, now) =>
+        `<div class="chooser" role="dialog" aria-label="Choose ${c.cap}'s frame rate"><div class="ch-head"><b>Frame rate</b><span>what ${c.cap} offers at 4K DCI</span></div><div class="opts">${FPS_4K.map((f) => `<button class="key ${f === now ? "now" : ""}" data-key data-take aria-label="${f} fps${f === now ? ", the camera's value now" : ""}">${f}${f === now ? "<small>now</small>" : ""}</button>`).join("")}</div><div class="ch-note">A pick arms it: Frame rate then reads ARMED, and a second press on it applies. The picture to vMix drops briefly.</div><div class="ch-foot"><button class="key sm" data-key>Cancel</button></div></div>`;
+
+      function plateHTML(id, s) {
+        const c = CAMS[id],
+          v = VALS[id],
+          bm = c.bm;
+        const released = s.released === id,
+          unreach = s.unreach === id,
+          locked = released || unreach;
+        const R = (x) => (locked ? "—" : x);
+        const pend = s.pending && s.pending.cam === id ? s.pending : null;
+        // the plate head: title, sub, the link word, and its one key — Release, or Connect for a released camera (D13)
+        const key = released
+          ? `<button class="key rel" data-key aria-label="Connect ${c.cap}: take it back and read its settings; nothing is sent"><span>Connect</span><span class="h">take it back</span></button>`
+          : `<button class="key rel" data-key aria-label="Release ${c.cap} ${c.relTo}"><span>Release</span><span class="h">${c.relTo}</span></button>`;
+        let h = `<div class="insp-head"><div class="ttl"><h2>${c.cap} · ${c.name}</h2><div class="sub">${c.full} · ${bm ? "over Bluetooth" : "on the network at " + c.link}</div>${linkWord(id, s)}</div>${key}</div>`;
+        if (released)
+          h += `<div class="pnote"><span>Released to ${c.app} at 10:02. Studio Control reads and sends it nothing${bm ? ", REC included," : ""} until Connect, which takes it back and reads its settings; nothing is sent.</span></div>`;
+        if (unreach)
+          h += `<div class="pnote red"><span>Not answering since 10:04. Its values stay hidden until it answers; nothing is sent to it.</span></div>`;
+        // one press (D11)
+        const nd = bm
+          ? `<div class="step na-row"><span class="nm"><b>ND</b><span>built-in filter · stops</span></span><div class="seg well">${["Clear", "2", "4", "6"].map((k) => `<button class="key ${!locked && k === v.ndKey ? "on" : ""}" data-key data-take aria-label="ND ${k}">${k}</button>`).join("")}</div></div>`
+          : naRow("ND", "built-in filter", "none in this camera");
+        h += section(
+          "Exposure",
+          "one press",
+          step(
+            "ISO",
+            bm ? "native 400 and 3200" : "one-third steps",
+            R(v.iso),
+            pend && pend.field === "iso" ? pend : null
+          ) +
+            step("Shutter", bm ? "angle · 1/50 at 25 fps" : "speed", R(v.shutter)) +
+            step("Iris", "as the lens reports it", R(v.iris)) +
+            nd,
+          !locked
+        );
+        const wbPct = (((v.wbK - 2500) / 7500) * 100).toFixed(1);
+        h += section(
+          "Colour",
+          "one press",
+          `<div class="ctl-label"><b>White balance</b><span>2500 – 10 000 K</span></div><div class="ctl"><div class="hslider well cct" data-key data-take role="slider" aria-label="White balance"><div class="track"></div><div class="cap" style="left: calc(17px + ${wbPct}% - ${wbPct / 100} * 34px)"></div></div><div class="v">${R(v.wb)}</div></div>` +
+            (bm
+              ? step("Tint", "magenta − · green +", R(v.tint))
+              : naRow("Tint", "magenta − · green +", "not reported by this camera"))
+        );
+        h += section(
+          "Focus",
+          bm ? "one press · Focus once needs an autofocus lens" : "one press",
+          `<div class="row3"><button class="key" data-key data-take>Nearer</button><button class="key" data-key data-take>Focus once</button><button class="key" data-key data-take>Farther</button></div>` +
+            (bm
+              ? `<div class="fpos well"><span class="ft">${locked ? "—" : `<b>${v.focusPct} %</b> toward far · as the lens reports it`}</span><div class="ftrack">${locked ? "" : `<i style="left: ${v.focusPct}%"></i>`}</div></div>`
+              : `<div class="nabox well">The camera does not report where it is focused. Judge focus in its 1:1 loupe.</div>`)
+        );
+        // press twice (D11): one press opens the values the camera offers, a pick arms, a second press applies
+        let fps = choice("Frame rate", R(v.fps), locked);
+        if (id === 1 && s.armedFps) fps = armedChoice("Frame rate", v.fpsNow, s.armedFps);
+        if (id === 1 && s.choosing) fps = openChoice("Frame rate", v.fps) + chooser(c, v.fpsNow);
+        h += section(
+          "Format",
+          "press twice · the picture drops briefly",
+          choice("Resolution", R(v.res), locked) + `<div class="anchor">${fps}</div>`
+        );
+        h += section(
+          "Picture profile and LUT",
+          "press twice",
+          bm
+            ? choice("Dynamic range", R(v.dr), locked) + choice("Display LUT", R(v.lut), locked)
+            : `<div class="nabox well">This camera does not report its picture profile or LUT. Set them in LUMIX Tether after Release.</div>`
+        );
+        const recState = locked
+          ? "—"
+          : s.rec === "found"
+            ? `<span class="v live">recording · began before ${s.opened}</span>`
+            : recOnOf(s)
+              ? `<span class="v live">recording since ${REC_FROM}</span>`
+              : `<span class="v">not recording</span>`;
+        h += section(
+          "Recording",
+          bm ? "main camera only · REC is in the cluster" : "",
+          bm
+            ? `<div class="readouts"><span>State</span>${locked ? `<span class="v">—</span>` : recState}<span>Codec</span><span class="v">${R(v.codec)}</span><span>Card time left</span><span class="v na">not reported by the camera</span></div>`
+            : `<div class="nabox well">Not recorded in this studio — REC acts on CAM 1, the main camera.</div>`
+        );
+        h += `<div class="fine">Not offered here: formatting a card, firmware, factory reset.</div>`;
+        return { html: h, locked };
+      }
+
+      // ---- render ----
+      let cur = { name: "ready", sel: null, guides: true, zeb: null, all: params.get("all") === "1" };
+      function render() {
+        const s = STATES[cur.name] || STATES.ready;
+        const sel = cur.sel || +params.get("sel") || s.sel;
+        const board = document.getElementById("board");
+        board.dataset.state = cur.name;
+        const recOn = recOnOf(s);
+        const lock = s.recLock;
+
+        // header: the Cameras lamp mirrors the page's state word; REC is a latch visible from every page
+        const hdr = document.getElementById("hdrCams");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + s.hdr[0];
+        hdr.querySelector("span").textContent = s.hdr[1];
+        document.getElementById("hdrRec").hidden = !recOn;
+        document.getElementById("hdrRecT").textContent =
+          s.rec === "found" ? `CAM 1 · since before ${s.opened}` : `CAM 1 · ${s.recT} since ${REC_FROM}`;
+
+        // state display
+        document.getElementById("state").className = "state well tone-" + s.tone;
+        document.getElementById("stateLamp").className =
+          "lamp " + { ok: "ok", attention: "amber", error: "red", info: "blue" }[s.tone];
+        document.getElementById("stateWord").textContent = s.word;
+        document.getElementById("stateSub").textContent = s.sub;
+        const meta = document.getElementById("stateMeta");
+        if (s.armed)
+          meta.innerHTML = `<div class="armed-row"><span class="w">ARMED</span><span class="t">${s.armed.text}</span><span class="s">${s.armed.left}</span><span class="bar"><i style="width: ${s.armed.pct}%"></i></span></div>`;
+        else meta.textContent = s.meta;
+        document.getElementById("stateActions").innerHTML = (s.actions || [])
+          .map(([l, c]) => `<button class="key state-key ${c}" data-key>${l}</button>`)
+          .join("");
+
+        // REC (the main camera, whichever camera is selected): one height, three rows, in every state
+        const rec = document.getElementById("rec");
+        rec.className = "key rec" + (lock ? " locked" : s.rec === "armed" ? " armed" : recOn ? " live" : "");
+        document.getElementById("recLamp").className = "lamp" + (!lock && recOn ? " ok" : "");
+        document.getElementById("recStop").hidden = s.rec !== "armed" || !!lock;
+        document.getElementById("recWho").textContent =
+          s.rec === "armed" ? "press again · 2.1 s" : "CAM 1 · main camera";
+        const mid = document.getElementById("recMid");
+        const timed = !lock && (s.rec === "live" || s.rec === "armed");
+        mid.className = "rec-mid" + (timed ? " hero" : "");
+        mid.textContent = lock
+          ? lock.mid
+          : timed
+            ? s.recT
+            : s.rec === "found"
+              ? `Recording · began before ${s.opened}`
+              : "Not recording";
+        document.getElementById("recBot").textContent = lock
+          ? lock.bot
+          : s.rec === "armed"
+            ? "A second press stops CAM 1's recording"
+            : s.rec === "live"
+              ? `Counted since ${REC_FROM} · press twice to stop`
+              : s.rec === "found"
+                ? "Found recording at start · press twice to stop"
+                : "One press starts · stopping asks twice";
+        rec.querySelector(".count")?.remove();
+        if (s.rec === "armed" && !lock) rec.insertAdjacentHTML("beforeend", `<i class="count" style="width: 70%"></i>`);
+        if (lock) rec.setAttribute("aria-disabled", "true");
+        else rec.removeAttribute("aria-disabled");
+        rec.setAttribute(
+          "aria-label",
+          lock
+            ? `REC unavailable: ${lock.bot}`
+            : s.rec === "armed"
+              ? "Stop armed, press again to stop CAM 1"
+              : recOn
+                ? "CAM 1 recording, press twice to stop"
+                : "Record on CAM 1, the main camera"
+        );
+
+        // camera keys: select, and the link in the page's words
+        document.getElementById("cams").innerHTML = [1, 2, 3]
+          .map((id) => {
+            const c = CAMS[id];
+            const where = c.bm ? "Bluetooth" : `<span class="mono">${c.link}</span>`;
+            const line =
+              s.released === id
+                ? `with ${c.app} since 10:02`
+                : s.unreach === id
+                  ? `since 10:04 · ${where}`
+                  : `${where} · ${c.model}`;
+            return `<div class="cam"><button class="key sel ${id === sel ? "on" : ""}" data-key data-take data-sel="${id}" aria-pressed="${id === sel}" aria-label="Select ${c.cap}, ${c.name}"><span class="cap">${c.cap}</span><span class="nm">${c.name}</span></button><div class="st well">${linkWord(id, s)}<span class="l">${line}</span></div></div>`;
+          })
+          .join("");
+
+        // the deck's CAMERAS page: CAM 1–3 (amber = the camera the dials drive), BANK, REC (always CAM 1, lit green
+        // while it records); the touch strip shows the selected camera's reported values for the bank
+        const sv = VALS[sel],
+          sc = CAMS[sel];
+        const strip =
+          s.released === sel
+            ? `${sc.cap} · released · no values`
+            : s.unreach === sel
+              ? `${sc.cap} · unreachable · no values`
+              : `${sc.cap} · ISO ${sv.iso} · ${sv.shutter} · ${sv.iris} · ${sc.bm ? "ND " + sv.nd : "ND none"}`;
+        const recCell = lock
+          ? `<span class="dk lock">REC<small>${s.released === 1 ? "iPad" : "no link"}</small></span>`
+          : s.rec === "armed"
+            ? `<span class="dk on">STOP?<small>2.1 s</small></span>`
+            : recOn
+              ? `<span class="dk live">REC<small>CAM 1</small></span>`
+              : `<span class="dk">REC<small>CAM 1</small></span>`;
+        document.getElementById("deck").innerHTML =
+          `<div class="dkeys">${[1, 2, 3].map((id) => `<span class="dk ${id === sel ? "on" : ""}">${CAMS[id].cap}<small>${id === sel ? "dials" : CAMS[id].name}</small></span>`).join("")}<span class="dk">BANK<small>Exposure</small></span>${recCell}</div><div class="dstrip">${strip}</div>`;
+
+        // the pictures from vMix
+        const lwA = (w) => `<span class="lw amber"><i class="lamp amber"></i>${w}</span>`;
+        document.getElementById("pics").innerHTML =
+          s.nopic === "novmix"
+            ? `${lwA("NO PICTURES")}<span class="l">0 of 3 · vMix is not running on this PC</span>`
+            : s.nopic
+              ? `${lwA("NO PICTURES")}<span class="l">0 of 3 · vMix runs on this PC but sends no camera pictures</span>`
+              : s.missing
+                ? `${lwA("NO PICTURE")}<span class="l">CAM ${s.missing} · 2 of 3 pictures arrive · 1920 × 1080 · 25 fps</span>`
+                : s.stale
+                  ? `${lwA("STALE")}<span class="l">CAM ${s.stale.cam}: no new frame since ${s.stale.since} · 3 of 3 streams open</span>`
+                  : `<span class="lw ok"><i class="lamp ok"></i>RECEIVING</span><span class="l">3 of 3 pictures · 1920 × 1080 · 25 fps each · vMix running on this PC</span>`;
+
+        // recent actions
+        const log = [...(s.log || []), ...LOG].slice(0, 6);
+        document.getElementById("log").innerHTML = log
+          .map(
+            ([t, x, src]) =>
+              `<div class="row"><span class="t">${t}</span><span class="x">${x}</span><span class="src">${src}</span></div>`
+          )
+          .join("");
+
+        // bay: aids
+        const zeb = cur.zeb === null ? !!s.zebras : cur.zeb;
+        const tog = (idn, on) => {
+          const k = document.getElementById(idn);
+          k.className = "key sm" + (on ? " on" : "");
+          k.setAttribute("aria-pressed", String(on));
+        };
+        tog("kZebra", zeb);
+        tog("kGuides", cur.guides);
+        tog("kOne", !cur.all);
+        tog("kAll", cur.all);
+
+        // monitors: the three pictures, equal
+        const mons = document.getElementById("mons");
+        mons.innerHTML = [1, 2, 3]
+          .map((id) => {
+            const c = CAMS[id];
+            const pline = s.nopic
+              ? `<div class="pline amber">No picture: ${s.nopic === "novmix" ? "vMix is not running" : "vMix sends none"} · the camera's values below still update</div>`
+              : s.missing === id
+                ? `<div class="pline amber">No picture: vMix sends nothing for input ${id} · the camera's values below still update</div>`
+                : staleOf(id, s)
+                  ? `<div class="pline amber">Stale: no new frame since ${s.stale.since} · the camera's values below still update</div>`
+                  : s.released === id
+                    ? `<div class="pline blue">Released to ${c.app} at 10:02 · values hidden until Connect</div>`
+                    : s.unreach === id
+                      ? `<div class="pline red">Unreachable since 10:04 · values hidden until it answers</div>`
+                      : `<div class="pline">vMix input ${id} · 1920 × 1080 · 25 fps · values as the camera reports them</div>`;
+            return `<div class="mon ${id === sel ? "sel" : ""}" data-cam="${id}"><button class="mon-head" data-key data-sel="${id}" aria-label="Select ${c.cap}"><span class="cap">${c.cap}</span><span class="nm">${c.name} · ${c.model}</span>${linkWord(id, s)}</button><div class="pic well ${staleOf(id, s) ? "stale" : ""}" id="pic${id}" data-pic="${id}" role="button" data-key aria-label="Select ${c.cap} and move its loupe to where you click"></div>${pline}<div class="vals">${fields(id, s)}</div></div>`;
+          })
+          .join("");
+
+        // up close: the selected camera's 1:1 loupe and waveform, or all three on request
+        const ids = cur.all ? [1, 2, 3] : [sel];
+        const close = document.getElementById("close");
+        close.className = "close" + (cur.all ? " all" : "");
+        close.innerHTML =
+          ids
+            .map(
+              (id) =>
+                `<div class="loupe well ${staleOf(id, s) ? "stale" : ""}" id="lp${id}" aria-label="${CAMS[id].cap} at 1:1"></div>`
+            )
+            .join("") +
+          ids.map((id) => `<div class="wave well ${staleOf(id, s) ? "stale" : ""}" id="wv${id}"></div>`).join("");
+        document.getElementById("closeT").textContent = cur.all
+          ? "All three, up close"
+          : `${CAMS[sel].cap} · ${CAMS[sel].name}, up close`;
+        document.getElementById("closeD").textContent = cur.all
+          ? "1:1 loupes and waveforms for all three · three times the work on this PC, which also runs vMix"
+          : "1:1 loupe for focus · waveform for exposure · measured on this PC from the picture vMix sends, not reported by the camera · the other two on request";
+
+        const boxes = {};
+        for (const id of ids) {
+          const lp = document.getElementById("lp" + id);
+          const w = lp.clientWidth,
+            h = lp.clientHeight,
+            [cx, cy] = CAMS[id].center;
+          boxes[id] = {
+            x: Math.round(Math.max(0, Math.min(1920 - w, cx - w / 2))),
+            y: Math.round(Math.max(0, Math.min(1080 - h, cy - h / 2))),
+            w,
+            h,
+          };
+        }
+        for (const id of [1, 2, 3]) {
+          const pic = document.getElementById("pic" + id);
+          if (noPicOf(id, s)) {
+            const why =
+              s.nopic === "novmix"
+                ? "vMix is not running on this PC. The picture appears once vMix runs with NDI for Cameras / Calls / Audio Inputs on."
+                : s.nopic
+                  ? "vMix is running but sends no camera pictures. Is NDI for Cameras / Calls / Audio Inputs on (Settings › Outputs), with the cameras as inputs?"
+                  : `vMix sends nothing for input ${id}. Is ${CAMS[id].cap} still an input in this vMix session?`;
+            pic.innerHTML = `<div class="nopic"><span class="lw amber"><i class="lamp amber"></i>NO PICTURE</span><span class="s">${why}</span></div>`;
+          } else {
+            const a = SCENES[id]("p" + id + "_", zeb && id === 2);
+            pic.innerHTML = `<svg viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs>${a.defs}</defs>${a.body}${overlays(id, cur.guides, boxes[id])}</svg>`;
+            if (staleOf(id, s))
+              pic.insertAdjacentHTML(
+                "beforeend",
+                `<span class="chip stale"><i class="lamp amber"></i>STALE · ${s.stale.since}</span>`
+              );
+            else if (recOn && id === 1)
+              pic.insertAdjacentHTML("beforeend", `<span class="chip tally"><i class="lamp ok"></i>REC</span>`);
+          }
+        }
+        for (const id of ids) {
+          const lp = document.getElementById("lp" + id),
+            wv = document.getElementById("wv" + id),
+            box = boxes[id];
+          if (noPicOf(id, s)) {
+            lp.innerHTML = `<div class="nopic"><span class="s">No picture from vMix to show at 1:1</span></div>`;
+            wv.innerHTML = `<div class="nopic"><span class="s">No picture from vMix to measure</span></div>`;
+            continue;
+          }
+          const b = SCENES[id]("l" + id + "_", zeb && id === 2);
+          lp.innerHTML = `<svg viewBox="${box.x} ${box.y} ${box.w} ${box.h}" aria-hidden="true"><defs>${b.defs}</defs>${b.body}</svg>${staleOf(id, s) ? `<span class="chip stale"><i class="lamp amber"></i>STALE · the frame from ${s.stale.since}</span>` : ""}<span class="chip lchip">${CAMS[id].cap} · 1:1</span>`;
+          // what the waveform measures: the camera's HDMI picture as vMix sends it (never the recording)
+          const unread = s.released === id || s.unreach === id;
+          const cap = staleOf(id, s)
+            ? `Measured on the frame from ${s.stale.since}; no new frames since.`
+            : unread
+              ? `Measures ${CAMS[id].cap}'s HDMI picture. Its LUT and picture profile are not read while it is ${s.released === id ? "released" : "unreachable"}.`
+              : CAMS[id].bm
+                ? `Measures CAM 1's HDMI picture with the display LUT on (${VALS[1].lut}, as the camera reports). The recording is Film, flatter than this.`
+                : `Measures ${CAMS[id].cap}'s HDMI picture. Its picture profile is not reported, so the page cannot say which curve this is.`;
+          wv.innerHTML = `<span class="wcap">${cap}</span>` + waveSVG(id, wv.clientWidth, wv.clientHeight, zeb, 56);
+        }
+
+        // plate
+        const p = plateHTML(sel, s);
+        const plate = document.getElementById("plate");
+        plate.innerHTML = p.html;
+        plate.classList.toggle("locked", p.locked);
+        plate.querySelectorAll("[data-take]").forEach((el) => {
+          if (p.locked) el.setAttribute("aria-disabled", "true");
+          else el.removeAttribute("aria-disabled");
+        });
+
+        // footer
+        document.getElementById("ftSel").textContent = `${CAMS[sel].cap} · ${CAMS[sel].name}`;
+        document.getElementById("ftRec").textContent = lock
+          ? s.released === 1
+            ? "CAM 1 · with the iPad"
+            : "CAM 1 · unreachable"
+          : s.rec === "found"
+            ? `CAM 1 · since before ${s.opened}`
+            : recOn
+              ? `CAM 1 · since ${REC_FROM}`
+              : "CAM 1 · not recording";
+        document.getElementById("ftPic").textContent =
+          s.nopic === "novmix"
+            ? "vMix not running · no pictures"
+            : s.nopic
+              ? "vMix · no pictures"
+              : s.missing
+                ? "vMix · 2 of 3 · 1 no picture"
+                : s.stale
+                  ? "vMix · 3 of 3 · 1 stale"
+                  : "vMix · 3 of 3 · 25 fps";
+        document.getElementById("ftLinks").textContent = s.released
+          ? "2 connected · 1 released"
+          : s.unreach
+            ? "2 connected · 1 unreachable"
+            : "3 of 3 connected";
+        document.getElementById("ftDeck").textContent = `CAMERAS · ${CAMS[sel].cap} · Exposure`;
+
+        // mock interaction: selecting a camera re-renders; a click on a picture selects it and moves its loupe there
+        document.querySelectorAll("[data-sel]").forEach((el) =>
+          el.addEventListener("click", () => {
+            cur.sel = +el.dataset.sel;
+            render();
+          })
+        );
+        document.querySelectorAll("[data-pic]").forEach((el) =>
+          el.addEventListener("click", (e) => {
+            const id = +el.dataset.pic,
+              r = el.getBoundingClientRect();
+            CAMS[id].center = [((e.clientX - r.left) / r.width) * 1920, ((e.clientY - r.top) / r.height) * 1080];
+            cur.sel = id;
+            render();
+          })
+        );
+        markBar();
+      }
+
+      // bay toggles (mock): guides, zebras, the close-up for the selected camera or all three
+      document.getElementById("kGuides").addEventListener("click", () => {
+        cur.guides = !cur.guides;
+        render();
+      });
+      document.getElementById("kZebra").addEventListener("click", () => {
+        const s = STATES[cur.name] || STATES.ready;
+        cur.zeb = !(cur.zeb === null ? !!s.zebras : cur.zeb);
+        render();
+      });
+      document.getElementById("kOne").addEventListener("click", () => {
+        cur.all = false;
+        render();
+      });
+      document.getElementById("kAll").addEventListener("click", () => {
+        cur.all = true;
+        render();
+      });
+
+      // ---- mock bar (outside #board; starts folded; hidden under automation or with ?switcher=0) ----
+      const bar = document.getElementById("mockbar");
+      if (params.get("switcher") === "0" || (navigator.webdriver && params.get("switcher") !== "1")) bar.hidden = true;
+      const setParam = (k, v) => {
+        params.set(k, v);
+        try {
+          history.replaceState(null, "", "?" + params.toString());
+        } catch (e) {
+          /* file:// may refuse; the board still switches */
+        }
+      };
+      for (const name of Object.keys(STATES)) {
+        const b = document.createElement("button");
+        b.textContent = name.replace(/-/g, " ");
+        b.dataset.state = name;
+        b.addEventListener("click", () => {
+          cur.name = name;
+          cur.sel = null;
+          cur.zeb = null;
+          params.delete("sel");
+          setParam("state", name);
+          render();
+        });
+        document.getElementById("mbStates").appendChild(b);
+      }
+      for (const t of ["studio", "graphite", "bone"]) {
+        const b = document.createElement("button");
+        b.textContent = t;
+        b.dataset.theme = t;
+        b.addEventListener("click", () => {
+          document.documentElement.dataset.theme = t;
+          setParam("theme", t);
+          markBar();
+        });
+        document.getElementById("mbThemes").appendChild(b);
+      }
+      let one = false;
+      for (const [label, val] of [
+        ["fit", false],
+        ["1:1", true],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = label;
+        b.dataset.one = String(val);
+        b.addEventListener("click", () => {
+          one = val;
+          fit();
+          markBar();
+        });
+        document.getElementById("mbScale").appendChild(b);
+      }
+      document.getElementById("mbMin").addEventListener("click", (e) => {
+        bar.classList.toggle("min");
+        e.target.textContent = bar.classList.contains("min") ? "show" : "hide";
+      });
+      function markBar() {
+        bar.querySelectorAll("[data-state]").forEach((b) => b.classList.toggle("on", b.dataset.state === cur.name));
+        bar
+          .querySelectorAll("[data-theme]")
+          .forEach((b) => b.classList.toggle("on", b.dataset.theme === document.documentElement.dataset.theme));
+        bar.querySelectorAll("[data-one]").forEach((b) => b.classList.toggle("on", b.dataset.one === String(one)));
+      }
+      function fit() {
+        const k = Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        document.getElementById("board").style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      addEventListener("resize", fit);
+
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+      cur.name = STATES[params.get("state")] ? params.get("state") : "ready";
+      render();
+      fit();
+    </script>
+  </body>
+</html>
