@@ -27,26 +27,21 @@ const engine = { component: "studio-control-engine", version: "2.2.1", mustList:
 
 test("a target names its triple and three SBOMs, one per thing inside the bundle", () => {
   assert.equal(TARGETS.windows.triple, "x86_64-pc-windows-msvc");
-  assert.equal(TARGETS.macos.triple, "aarch64-apple-darwin");
 
-  const plan = sbomPlan("/repo", "macos", "2.2.1");
+  const plan = sbomPlan("/repo", "windows", "2.2.1");
   assert.deepEqual(
     plan.map((item) => [item.part, path.basename(item.path), item.component, item.mustList]),
     [
-      ["frontend", "SSE-ExEd-Studio-Control-Native-macOS-frontend.cdx.json", "sse-exed-studio-control", "react"],
-      ["engine", "SSE-ExEd-Studio-Control-Native-macOS-engine.cdx.json", "studio-control-engine", "rusqlite"],
-      ["shell", "SSE-ExEd-Studio-Control-Native-macOS-shell.cdx.json", "sse-exed-tauri-shell", "tauri"],
+      ["frontend", "SSE-ExEd-Studio-Control-Native-windows-frontend.cdx.json", "sse-exed-studio-control", "react"],
+      ["engine", "SSE-ExEd-Studio-Control-Native-windows-engine.cdx.json", "studio-control-engine", "rusqlite"],
+      ["shell", "SSE-ExEd-Studio-Control-Native-windows-shell.cdx.json", "sse-exed-tauri-shell", "tauri"],
     ]
   );
   // Beside the checksum manifests, never inside the packaged bundle's folder.
   for (const item of plan) {
-    assert.equal(path.dirname(item.path), path.join("/repo", "release", "sbom", "macos"));
+    assert.equal(path.dirname(item.path), path.join("/repo", "release", "sbom", "windows"));
     assert.equal(item.version, "2.2.1");
   }
-  assert.equal(
-    path.basename(sbomPlan("/repo", "windows", "2.2.1")[0].path),
-    "SSE-ExEd-Studio-Control-Native-windows-frontend.cdx.json"
-  );
 });
 
 test("an SBOM is accepted only for the right component, version and contents", () => {
@@ -74,7 +69,7 @@ test("an SBOM is accepted only for the right component, version and contents", (
 
 test("an unknown target is refused before anything is written", () => {
   assert.equal(parseTarget("windows"), "windows");
-  for (const bad of ["linux", "", undefined, "constructor", "__proto__"]) {
+  for (const bad of ["macos", "linux", "", undefined, "constructor", "__proto__"]) {
     assert.throws(() => parseTarget(bad), /Unsupported target/, String(bad));
   }
   const result = spawnSync(process.execPath, [scriptPath, "--target=linux"], { encoding: "utf8" });

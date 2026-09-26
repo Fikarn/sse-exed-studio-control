@@ -43,32 +43,14 @@ function readFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(
-    `Unsupported control-surface qualification target '${value}'. Use --target=macos or --target=windows.`
-  );
+  throw new Error(`Unsupported control-surface qualification target '${value}'. Use --target=windows.`);
 }
 
-function resolvePackagedRuntime(target) {
-  if (target === "macos") {
-    return {
-      label: "macOS",
-      enginePath: path.join(
-        rootDir,
-        "release",
-        "native",
-        "macos",
-        "SSE ExEd Studio Control Native.app",
-        "Contents",
-        "MacOS",
-        "studio-control-engine"
-      ),
-    };
-  }
-
+function resolvePackagedRuntime() {
   return {
     label: "Windows",
     enginePath: path.join(
@@ -265,14 +247,13 @@ function writeSummary(qualificationRoot, summary) {
 
 async function main() {
   const target = parseTarget(readFlag("--target"));
-  const expectedPlatform = target === "macos" ? "darwin" : "win32";
-  if (process.platform !== expectedPlatform) {
+  if (process.platform !== "win32") {
     throw new Error(
       `native-control-surface-qualification.mjs target '${target}' must run on a matching host platform.`
     );
   }
 
-  const packaged = resolvePackagedRuntime(target);
+  const packaged = resolvePackagedRuntime();
   assert(
     existsSync(packaged.enginePath),
     `Packaged native ${packaged.label} engine not found at ${packaged.enginePath}. Run the matching package smoke command first.`

@@ -27,7 +27,6 @@ import { TARGETS, clean, findPackagedExecutables, isInside, listProcessPaths, pl
 
 const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "clean.mjs");
 const WINDOWS_APP = "release/native/windows/SSE ExEd Studio Control Native";
-const MAC_APP = "release/native/macos/SSE ExEd Studio Control Native.app/Contents/MacOS";
 
 function write(root, relativePath, contents = "x") {
   const full = path.join(root, relativePath);
@@ -47,10 +46,9 @@ function makeRoot({ app = null } = {}) {
   write(root, "release/checksums/windows/SHA256.txt");
   write(root, "release/sbom/windows/engine.cdx.json");
   write(root, "artifacts/evidence.json");
-  write(root, "docs/.DS_Store");
   if (app) {
-    write(root, `${app}/sse-exed-tauri-shell${app.includes("windows") ? ".exe" : ""}`, "SHELL-BYTES");
-    write(root, `${app}/studio-control-engine${app.includes("windows") ? ".exe" : ""}`, "ENGINE-BYTES");
+    write(root, `${app}/sse-exed-tauri-shell.exe`, "SHELL-BYTES");
+    write(root, `${app}/studio-control-engine.exe`, "ENGINE-BYTES");
   }
   return root;
 }
@@ -67,7 +65,6 @@ test("without a packaged app everything goes, release included, as it always did
   }
   // --local's extras were not asked for.
   assert.equal(existsSync(path.join(root, "artifacts/evidence.json")), true);
-  assert.equal(existsSync(path.join(root, "docs/.DS_Store")), true);
   assert.equal(existsSync(path.join(root, "scripts/keep-me.mjs")), true);
 });
 
@@ -79,14 +76,7 @@ test("a packaged app under release/native is kept, byte for byte, and the rest s
 
   assert.equal(readFileSync(path.join(root, WINDOWS_APP, "sse-exed-tauri-shell.exe"), "utf8"), "SHELL-BYTES");
   assert.equal(readFileSync(path.join(root, WINDOWS_APP, "studio-control-engine.exe"), "utf8"), "ENGINE-BYTES");
-  for (const gone of [
-    "native/target",
-    "frontend/app/dist",
-    "release/checksums",
-    "release/sbom",
-    "artifacts",
-    "docs/.DS_Store",
-  ]) {
+  for (const gone of ["native/target", "frontend/app/dist", "release/checksums", "release/sbom", "artifacts"]) {
     assert.equal(existsSync(path.join(root, gone)), false, gone);
   }
 
@@ -99,14 +89,7 @@ test("a packaged app under release/native is kept, byte for byte, and the rest s
   assert.match(said, /npm run clean:local -- --include-release/);
 });
 
-test("the macOS bundle and a lane's windows.production-keep folder are packaged apps too", () => {
-  const mac = makeRoot({ app: MAC_APP });
-  assert.deepEqual(
-    findPackagedExecutables(mac).map((found) => found.relativePath),
-    [`${MAC_APP}/sse-exed-tauri-shell`, `${MAC_APP}/studio-control-engine`]
-  );
-  assert.deepEqual(planClean({ rootDir: mac }).keep, ["release/native"]);
-
+test("a lane's windows.production-keep folder, and a copy kept deeper, are packaged apps too", () => {
   // A packaging lane that died half-way leaves production under this name.
   const stranded = makeRoot({ app: "release/native/windows.production-keep/SSE ExEd Studio Control Native" });
   const plan = planClean({ rootDir: stranded });
@@ -115,6 +98,17 @@ test("the macOS bundle and a lane's windows.production-keep folder are packaged 
     "release/checksums",
     "release/sbom",
   ]);
+
+  // As deep as the search reaches (where the macOS bundle kept its
+  // executables until the new pages program's Slice SW, D22): a copy moved
+  // two folders further down is found and kept too.
+  const deep = "release/native/rollback/2026-09-23/windows/SSE ExEd Studio Control Native";
+  const deeper = makeRoot({ app: deep });
+  assert.deepEqual(
+    findPackagedExecutables(deeper).map((found) => found.relativePath),
+    [`${deep}/sse-exed-tauri-shell.exe`, `${deep}/studio-control-engine.exe`]
+  );
+  assert.deepEqual(planClean({ rootDir: deeper }).keep, ["release/native"]);
 
   // An executable of another name, or a packaged name outside release/native, is nobody's installed app.
   const other = makeRoot();
@@ -162,7 +156,6 @@ test("--include-release refuses while a process runs from the folder, and remove
     "native/target/debug/big.bin",
     "release/checksums/windows/SHA256.txt",
     "artifacts/evidence.json",
-    "docs/.DS_Store",
   ]) {
     assert.equal(existsSync(path.join(root, kept)), true, kept);
   }
@@ -212,7 +205,6 @@ test("--dry-run says what it would do and removes nothing", async () => {
     `${WINDOWS_APP}/studio-control-engine.exe`,
     "native/target/debug/big.bin",
     "artifacts/evidence.json",
-    "docs/.DS_Store",
   ]) {
     assert.equal(existsSync(path.join(root, kept)), true, kept);
   }

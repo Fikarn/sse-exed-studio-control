@@ -19,11 +19,11 @@ function assert(condition, message) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported target '${value}'. Use --target=windows.`);
 }
 
 function parseMode(value) {
@@ -35,11 +35,7 @@ function parseMode(value) {
 }
 
 function checksumOutputPath(target) {
-  const fileName =
-    target === "macos"
-      ? "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"
-      : "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt";
-  return path.join(rootDir, "release", "checksums", target, fileName);
+  return path.join(rootDir, "release", "checksums", target, "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt");
 }
 
 function checksumEntriesFor(target, mode) {
@@ -47,10 +43,7 @@ function checksumEntriesFor(target, mode) {
   const entries = [
     {
       label: "packaged native bundle archive",
-      path:
-        target === "macos"
-          ? path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-macOS.zip")
-          : path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-windows.zip"),
+      path: path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-windows.zip"),
     },
   ];
 
@@ -58,41 +51,23 @@ function checksumEntriesFor(target, mode) {
     entries.push(
       {
         label: "native installer artifact",
-        path:
-          target === "macos"
-            ? path.join(
-                rootDir,
-                "release",
-                "native-installer",
-                target,
-                "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"
-              )
-            : path.join(
-                rootDir,
-                "release",
-                "native-installer",
-                target,
-                "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"
-              ),
+        path: path.join(
+          rootDir,
+          "release",
+          "native-installer",
+          target,
+          "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"
+        ),
       },
       {
         label: "native update repository archive",
-        path:
-          target === "macos"
-            ? path.join(
-                rootDir,
-                "release",
-                "native-updates",
-                target,
-                "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
-              )
-            : path.join(
-                rootDir,
-                "release",
-                "native-updates",
-                target,
-                "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
-              ),
+        path: path.join(
+          rootDir,
+          "release",
+          "native-updates",
+          target,
+          "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
+        ),
       }
     );
   }

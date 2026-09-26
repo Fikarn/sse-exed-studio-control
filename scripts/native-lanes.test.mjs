@@ -94,7 +94,6 @@ const DESTRUCTIVE_SCRIPTS = [
   "scripts/native-update-repo.mjs",
   "scripts/native-installer-acceptance.mjs",
   "scripts/native-sign-windows.mjs",
-  "scripts/native-sign-macos.mjs",
   "scripts/write-native-release-checksums.mjs",
   "scripts/native-windows-release-evidence.mjs",
   "scripts/native-release-build.mjs",
@@ -930,9 +929,6 @@ test("a lane's app gets an absolute scratch app-data and log folder of its own, 
   assert.deepEqual(defaultAppDataDirs({ APPDATA: "", LOCALAPPDATA: "C:\\L" }, "win32"), [
     `C:\\L\\${DEFAULT_APP_DATA_DIR_NAME}`,
   ]);
-  assert.deepEqual(defaultAppDataDirs({ HOME: "/Users/op" }, "darwin"), [
-    `/Users/op/Library/Application Support/${DEFAULT_APP_DATA_DIR_NAME}`,
-  ]);
   assert.deepEqual(defaultAppDataDirs({ XDG_DATA_HOME: "/x/data", HOME: "/home/op" }, "linux"), [
     `/x/data/${DEFAULT_APP_DATA_DIR_NAME}`,
     `/home/op/.local/share/${DEFAULT_APP_DATA_DIR_NAME}`,
@@ -944,11 +940,7 @@ test("a lane's app gets an absolute scratch app-data and log folder of its own, 
     // the platform reads; the real one is only ever compared with.
     const platformBase = path.join(root, "platform-app-data");
     const platformVariables =
-      process.platform === "win32"
-        ? { APPDATA: platformBase }
-        : process.platform === "darwin"
-          ? { HOME: platformBase }
-          : { XDG_DATA_HOME: platformBase };
+      process.platform === "win32" ? { APPDATA: platformBase } : { XDG_DATA_HOME: platformBase };
     const [standInDefault] = defaultAppDataDirs(platformVariables);
     mkdirSync(standInDefault, { recursive: true });
     const junction = path.join(root, "junction");

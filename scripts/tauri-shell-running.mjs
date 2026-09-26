@@ -1,5 +1,5 @@
 // Whether a qualification lane's `tauri dev` shell is still running (new pages
-// program, faster checks, 2026-09-25). On Linux and macOS the lanes start it
+// program, faster checks, 2026-09-25). On Linux (CI) the lanes start it
 // detached, so it leads its own process group — npm, the Tauri CLI, vite,
 // cargo and the shell — and close it by signalling that group. Its leader's
 // `exitCode` is no answer: a process that died from a signal keeps

@@ -12,11 +12,12 @@ import { isValidReleaseTag, readPackageJson, resolveReleaseTag } from "./helpers
 //
 // Writes `release/manifests/<tag>.json` — a single chain-of-custody file
 // covering everything a future auditor would need to reproduce or contest
-// a release: per-artifact SHA-256s, code-signing identity, notarization
-// ticket (when available), QtIFW versions, build host fingerprint (no
-// user/hostname), git SHA, build timestamps, and a pointer to the visual
-// review evidence. Defensive — anything not present on this host is
-// recorded as `null` rather than aborting the script.
+// a release: per-artifact SHA-256s, code-signing identity, QtIFW versions,
+// build host fingerprint (no user/hostname), git SHA, build timestamps, and
+// a pointer to the visual review evidence. Defensive — anything not present
+// on this host is recorded as `null` rather than aborting the script. The
+// macOS signing identity and notarization ticket left the manifest with
+// macOS in the new pages program's Slice SW (D22).
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -29,11 +30,10 @@ function parseChecksumLine(line) {
   return { sha256: match[1].toLowerCase(), name: match[2].trim() };
 }
 
-/** All artifact rows from `release/checksums/{macos,windows}/*.txt`. */
+/** All artifact rows from `release/checksums/windows/*.txt`. */
 export function readChecksumEntries({ rootDir: rootDirOverride = rootDir } = {}) {
-  const targets = ["macos", "windows"];
+  const targets = ["windows"];
   const fileNames = {
-    macos: "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt",
     windows: "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt",
   };
   const entries = [];
@@ -96,17 +96,6 @@ export function readQtIfwVersions({ rootDir: rootDirOverride = rootDir, run = sp
   };
 }
 
-/** macOS Developer ID identity, or null on other platforms / when missing. */
-export function readMacosSigningIdentity({ platform = process.platform, run = spawnSync } = {}) {
-  if (platform !== "darwin") return null;
-  const result = run("security", ["find-identity", "-v", "-p", "codesigning"], { encoding: "utf8" });
-  if (result.error || (result.status ?? 1) !== 0) return null;
-  const stdout = String(result.stdout ?? "");
-  const match = stdout.match(/^\s+\d+\)\s+([A-F0-9]{40})\s+"(.+)"\s*$/m);
-  if (!match) return null;
-  return { sha1: match[1], commonName: match[2] };
-}
-
 /** Build-host fingerprint. No username/hostname — only kernel/runtime versions. */
 export function readHostFingerprint({ run = spawnSync } = {}) {
   return {
@@ -136,10 +125,8 @@ function gitSha({ rootDir: rootDirOverride = rootDir, run = spawnSync } = {}) {
 export function buildManifest({
   tag,
   rootDir: rootDirOverride = rootDir,
-  platform = process.platform,
   buildStartedAt = new Date().toISOString(),
   buildFinishedAt = new Date().toISOString(),
-  notarizationTicketUuid = null,
   run = spawnSync,
 } = {}) {
   if (!tag || !isValidReleaseTag(tag)) {
@@ -163,11 +150,7 @@ export function buildManifest({
     artifacts,
     qtIfw: readQtIfwVersions({ rootDir: rootDirOverride, run }),
     signing: {
-      macos: readMacosSigningIdentity({ platform, run }),
       windows: null,
-    },
-    notarization: {
-      macos: { ticketUuid: notarizationTicketUuid },
     },
     visualReview: {
       summaryPath: findVisualReviewSummary({ rootDir: rootDirOverride }),
@@ -197,17 +180,15 @@ if (isMain()) {
     console.error(`Invalid release tag '${tag}'. Expected vX.Y.Z or vX.Y.Z-prerelease.`);
     process.exit(1);
   }
-  // Optional explicit timestamps + ticket UUID for callers that already
-  // know them (publish-release.mjs passes them through).
+  // Optional explicit timestamps for callers that already know them
+  // (publish-release.mjs passes them through).
   const startedAt = args.find((value) => value.startsWith("--started-at="))?.slice("--started-at=".length);
   const finishedAt = args.find((value) => value.startsWith("--finished-at="))?.slice("--finished-at=".length);
-  const ticketUuid = args.find((value) => value.startsWith("--notary-ticket="))?.slice("--notary-ticket=".length);
 
   const manifest = buildManifest({
     tag,
     buildStartedAt: startedAt ?? new Date().toISOString(),
     buildFinishedAt: finishedAt ?? new Date().toISOString(),
-    notarizationTicketUuid: ticketUuid ?? null,
   });
   const written = writeManifest({ tag, manifest });
   console.log(`Wrote release manifest: ${written}`);

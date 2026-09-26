@@ -121,7 +121,7 @@ export function formatArtifactHashTable(entries) {
     grouped.set(entry.target, list);
   }
   const sections = [];
-  for (const target of ["macos", "windows"]) {
+  for (const target of ["windows"]) {
     const list = grouped.get(target);
     if (!list || list.length === 0) continue;
     sections.push(`### ${target}`);
@@ -142,17 +142,14 @@ export function formatReleaseNotes({ body, repoUrl, artifactHashes = null }) {
     "## Install / Update",
     "",
     "- Windows 11 `x64`: download `SSE-ExEd-Studio-Control-Native-windows-Installer.exe` and run the offline installer.",
-    "- macOS Apple Silicon: download `SSE-ExEd-Studio-Control-Native-macOS-Installer.zip`, open it, and launch `SSE-ExEd-Studio-Control-Native-macOS-Installer.app`.",
     "- Existing workstations: prefer the maintenance-tool update repository or a newer offline installer during a safe update window.",
     "- Support-only packaged bundle zips are published for smoke and debugging; first-time installs should use the installer artifacts instead.",
-    "- Verify downloaded artifacts against the published per-platform `SHA256` manifest before operator rollout.",
+    "- Verify downloaded artifacts against the published `SHA256` manifest before operator rollout.",
     "- User data should survive install, update, reinstall, and rollback unless the workstation app-data directory is deleted on purpose.",
     "",
     "## Update Artifacts",
     "",
-    "- `SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip`",
     "- `SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip`",
-    "- `SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt`",
     "- `SSE-ExEd-Studio-Control-Native-windows-SHA256.txt`",
     "",
   ];

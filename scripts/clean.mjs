@@ -18,7 +18,7 @@
 // - `--dry-run` prints what would happen and removes nothing.
 import { spawnSync } from "node:child_process";
 import { readdirSync, readlinkSync, realpathSync, statSync } from "node:fs";
-import { readdir, rm } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -33,15 +33,16 @@ export const TARGETS = [
   "release",
 ];
 
-export const LOCAL_TARGETS = [".swift-module-cache", "artifacts", "test-results", "aqtinstall.log"];
+export const LOCAL_TARGETS = ["artifacts", "test-results", "aqtinstall.log"];
 
 const RELEASE_DIR = "release";
 const PACKAGED_APP_DIR = "release/native";
 const PACKAGED_EXECUTABLE = /^(sse-exed-tauri-shell|studio-control-engine)(\.exe)?$/;
-// release/native/<platform>/<payload>.app/Contents/MacOS/<executable> is the deepest layout.
+// release/native/<platform>/<payload>/<executable> is the packaged layout. The
+// search reaches two levels deeper, as it did for the macOS bundle until the
+// new pages program's Slice SW (D22): a copy of the app kept one or two
+// folders further down is found and kept too.
 const PACKAGED_APP_SEARCH_DEPTH = 5;
-
-const dsStoreSkipDirs = new Set([".git", ".tools", "node_modules", "release", "artifacts", "target"]);
 
 function toPosix(relativePath) {
   return relativePath.split(path.sep).join("/");
@@ -109,19 +110,16 @@ export function listProcessPaths() {
     }
   }
 
-  const result =
-    process.platform === "win32"
-      ? spawnSync(
-          "powershell",
-          [
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "Get-CimInstance Win32_Process | ForEach-Object { $_.ExecutablePath }",
-          ],
-          { encoding: "utf8" }
-        )
-      : spawnSync("ps", ["-axo", "comm="], { encoding: "utf8" });
+  const result = spawnSync(
+    "powershell",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Get-CimInstance Win32_Process | ForEach-Object { $_.ExecutablePath }",
+    ],
+    { encoding: "utf8" }
+  );
   if (result.error || result.status !== 0) {
     return null;
   }
@@ -190,32 +188,6 @@ export function planClean({ rootDir, local = false, includeRelease = false, proc
   return { remove, keep: [PACKAGED_APP_DIR], packaged, refusal: null };
 }
 
-async function removeDsStoreFiles(rootDir, directory, { dryRun, log }) {
-  let entries;
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  await Promise.all(
-    entries.map(async (entry) => {
-      const entryPath = path.join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (!dsStoreSkipDirs.has(entry.name)) {
-          await removeDsStoreFiles(rootDir, entryPath, { dryRun, log });
-        }
-        return;
-      }
-
-      if (entry.isFile() && entry.name === ".DS_Store") {
-        if (!dryRun) await rm(entryPath, { force: true });
-        log(`${dryRun ? "would remove" : "removed"} ${path.relative(rootDir, entryPath)}`);
-      }
-    })
-  );
-}
-
 /** Run the clean. Returns the process exit code. */
 export async function clean({
   rootDir,
@@ -238,9 +210,6 @@ export async function clean({
       log(`${dryRun ? "would remove" : "removed"} ${relativePath}`);
     })
   );
-  if (local) {
-    await removeDsStoreFiles(rootDir, rootDir, { dryRun, log });
-  }
 
   if (plan.keep.length > 0) {
     warn(
