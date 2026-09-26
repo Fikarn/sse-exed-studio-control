@@ -175,8 +175,8 @@ Retina MacBook panels can have enough physical pixels for the target operator su
 
 Use **Scaled Studio Preview** for normal built-in-display human review. Since the new pages program's Slice 3 (2026-09) it opens only from the page's address, `?operatorReview=studio` (the command palette that also opened it is gone, and the app no longer remembers the choice), so it is a browser review:
 
-1. Build the front end (`npm run build --workspace frontend/app`) and serve it with `npm run preview --workspace frontend/app -- --host 127.0.0.1 --port 4173`.
-2. Open `http://127.0.0.1:4173/?fixture=audio-populated&transport=fixture&operatorReview=studio` (any fixture id from `frontend/packages/test-fixtures/src/fixtures.json`).
+1. Build the front end (`npm run build --workspace frontend/app`) and serve it with `npm run preview --workspace frontend/app -- --host 127.0.0.1 --port 4180 --strictPort` (not `4173`, which Playwright binds; §2c, Fixtures).
+2. Open `http://127.0.0.1:4180/?fixture=audio-populated&transport=fixture&operatorReview=studio` (any fixture id from `frontend/packages/test-fixtures/src/fixtures.json`).
 3. Review the proportional `2560x1440` studio canvas scaled into the current window.
 4. Drop `operatorReview=studio` from the address before judging native compact/windowed behavior.
 

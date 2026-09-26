@@ -41,10 +41,10 @@ Studio Control binds no key of its own (2026-09 new pages, Slice 3): every actio
 
 - Tab moves between controls; Enter or Space presses the control that has focus.
 - Typing fills a field; Enter in a field confirms it, and Esc in a rename field puts the old name back.
-- On a slider, fader or knob that has focus, the arrow keys move it one step, Home and End to its ends, and Page Up and Page Down a larger step where it has one; Enter opens its typed entry. A talent mark that has focus moves 0.1 m with the arrow keys.
+- On a slider, fader or knob that has focus, the arrow keys move it one step, Home and End to its ends, and Page Up and Page Down a larger step where it has one (the Console's knobs and plate sliders and Lighting's sliders do; the strip faders and the Main level do not); Enter opens its typed entry where it has one (the strip faders, the knobs, the Grand master, a fixture's sliders), and typed entry offers "Reset to <default>". A talent mark that has focus moves 0.1 m with the arrow keys.
 - Esc closes a dialog, a right-click menu, the colour picker and the search field's Recent list, and cancels an armed key.
 
-The web view's own keys are switched off, so F5, Ctrl+R and Ctrl+Shift+R never reload the screen during a show, and the find, print, zoom and back keys do nothing; copy, paste and select-all still work in fields. Alt+F4 still asks "Close Studio Control?". The window commands are keys in Setup / Support › Workstation (**Studio fullscreen**, **Windowed**, **Reset the window layout**); **Reset the window layout** is on the recovery screens too.
+The web view's own keys are switched off, so F5, Ctrl+R and Ctrl+Shift+R never reload the screen during a show, and the find, print, zoom and back keys do nothing; copy, paste and select-all still work in fields. Alt+F4 still asks "Close Studio Control?". The window commands are keys in Setup / Support › Workstation (**Studio fullscreen**, **Windowed**, **Reset the window layout**). When Studio Control is in a window, or on a screen narrower than the studio monitor (display 2 at 125 %), the Workstation plate is not on screen: press **Support** on the Setup / Support cluster, and the same three keys are under the Support screen, in Workstation. **Reset the window layout** is on the recovery screens too. Below that width the plate's other keys (the theme, the UI scale, Restart the hardware link…, the light outputs' Armed and Held) are not on screen: press **Studio fullscreen** first.
 
 ## Lighting Output
 
@@ -281,7 +281,7 @@ A band at the foot of the screen — "Studio Control hit a problem in the backgr
 
 ## Recommended Checks Before A Live Session
 
-1. Launch the packaged native app and confirm it reaches the expected target surface, fullscreen on the studio monitor (display 3, 2560×1440 at 100 % scaling — the only size the app is built for). If it opens on the other screen or in a window, press **Reset the window layout** in Setup / Support › Workstation (or on the recovery screen, if Studio Control stopped there).
+1. Launch the packaged native app and confirm it reaches the expected target surface, fullscreen on the studio monitor (display 3, 2560×1440 at 100 % scaling — the only size the app is built for). If it opens on the other screen or in a window, open Setup / Support, press **Support** on the cluster and press **Reset the window layout** under Workstation (on the studio monitor it is in Workstation on the right; on the recovery screen, if Studio Control stopped there).
 2. Confirm lighting, audio, and support summaries show the expected ready state; the header's Lighting lamp reads `held` if the light outputs are held.
 3. Trigger a test light scene recall if lighting is in scope.
 4. Confirm the Console's state display reads `VERIFIED` and its footer `Metering TotalMix · live` — not simulated, stale, or offline. If it reads `NOT VERIFIED` or `OFFLINE`, run the audio probe; if the meters stay still, press **Sync from TotalMix** ("When the Console's meters stay still" above).
