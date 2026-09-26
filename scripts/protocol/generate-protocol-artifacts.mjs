@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { format } from "prettier";
@@ -147,20 +147,22 @@ export interface EventEnvelope<TEvent extends string = EventName> {
 }
 `;
 
-writeGenerated(schemaPath, await format(stableJson(schema), { ...prettierOptions, parser: "json" }));
-writeGenerated(tsOutputPath, await format(generatedTs, { ...prettierOptions, parser: "typescript" }));
+async function main() {
+  writeGenerated(schemaPath, await format(stableJson(schema), { ...prettierOptions, parser: "json" }));
+  writeGenerated(tsOutputPath, await format(generatedTs, { ...prettierOptions, parser: "typescript" }));
 
-// Snapshot bindings come from ts-rs running under the `ts-rs` cargo feature.
-// We invoke `cargo test --features ts-rs ... -- export_bindings` with
-// TS_RS_EXPORT_DIR pointing at the canonical snapshots/ output dir, then
-// post-process every generated file:
-//   - rewrite bigint -> number, because the wire format is JSON numbers
-//     (i64/u64/usize fields in Rust are emitted by serde as JSON numbers
-//     and parse on the TS side as `number`, never `bigint`)
-//   - re-sort fields lexicographically so the file order is deterministic
-//     across machines that don't share rustc/serde version specifics
-//   - reformat through prettier so our format:check stays green
-await regenerateSnapshotBindings();
+  // Snapshot bindings come from ts-rs running under the `ts-rs` cargo feature.
+  // We invoke `cargo test --features ts-rs ... -- export_bindings` with
+  // TS_RS_EXPORT_DIR pointing at the canonical snapshots/ output dir, then
+  // post-process every generated file:
+  //   - rewrite bigint -> number, because the wire format is JSON numbers
+  //     (i64/u64/usize fields in Rust are emitted by serde as JSON numbers
+  //     and parse on the TS side as `number`, never `bigint`)
+  //   - re-sort fields lexicographically so the file order is deterministic
+  //     across machines that don't share rustc/serde version specifics
+  //   - reformat through prettier so our format:check stays green
+  await regenerateSnapshotBindings();
+}
 
 function listGeneratedFilesRecursive(dir) {
   const entries = [];
@@ -284,4 +286,34 @@ async function regenerateSnapshotBindings() {
       `Snapshot binding count drift: ts-rs produced ${stagedFiles.length} files but ${finalCount} are present after sync.`
     );
   }
+}
+
+// Runs only as `node scripts/protocol/generate-protocol-artifacts.mjs
+// [--check]`: an import does nothing (2026-09-26; the run rewrites the
+// generated protocol files, runs cargo test for the snapshot bindings and
+// deletes the bindings the engine no longer produces). The two paths are
+// compared as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }

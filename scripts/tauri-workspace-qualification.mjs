@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import dgram from "node:dgram";
 import { tmpdir } from "node:os";
@@ -14,7 +14,8 @@ import { shellStillRunning } from "./tauri-shell-running.mjs";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
-const evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
+// The lane's evidence folder; main() makes it, so an import makes nothing.
+let evidence = null;
 
 function needsCommandShell(command) {
   return process.platform === "win32" && /\.(bat|cmd)$/i.test(command);
@@ -655,13 +656,45 @@ async function runWorkspaceQualification() {
   }
 }
 
-try {
-  await runWorkspaceQualification();
-  console.log(`Tauri workspace qualification evidence: ${evidence.write("passed")}`);
-  console.log("Tauri workspace qualification passed.");
-} catch (error) {
-  evidence.write("failed", {
-    error: error instanceof Error ? error.message : String(error),
-  });
-  throw error;
+async function main() {
+  evidence = createQualificationEvidence({ lane: "workspaces", rootDir });
+  try {
+    await runWorkspaceQualification();
+    console.log(`Tauri workspace qualification evidence: ${evidence.write("passed")}`);
+    console.log("Tauri workspace qualification passed.");
+  } catch (error) {
+    evidence.write("failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+// Runs only as `node scripts/tauri-workspace-qualification.mjs`: an import does
+// nothing (2026-09-26; the run makes an evidence folder and starts the dev
+// server, engines and shells on scratch app data). The two paths are compared
+// as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }

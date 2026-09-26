@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -198,34 +198,67 @@ function verifyUpdateContinuity(target, packageJson, identity) {
   expectIncludes(packageXml, `<Version>${packageJson.version}</Version>`, packageXmlPath);
 }
 
-const target = parseTarget(readFlag("--target"));
-const packageJson = loadJson(path.join(rootDir, "package.json"));
-const identity = loadJson(path.join(rootDir, "scripts", "native-release-identity.json"));
-const previousRef = readFlag("--previous-ref") ?? findPreviousReleaseRef(packageJson.version);
+function main() {
+  const target = parseTarget(readFlag("--target"));
+  const packageJson = loadJson(path.join(rootDir, "package.json"));
+  const identity = loadJson(path.join(rootDir, "scripts", "native-release-identity.json"));
+  const previousRef = readFlag("--previous-ref") ?? findPreviousReleaseRef(packageJson.version);
 
-if (!previousRef) {
-  console.log(
-    `No previous tagged release lower than ${packageJson.version} was found. Skipping continuity verification.`
+  if (!previousRef) {
+    console.log(
+      `No previous tagged release lower than ${packageJson.version} was found. Skipping continuity verification.`
+    );
+    process.exit(0);
+  }
+
+  const previousPackageJson = readJsonAtRef(previousRef, "package.json");
+  assert(
+    previousPackageJson?.version,
+    `Previous release ref '${previousRef}' is missing package.json version metadata.`
   );
-  process.exit(0);
+  assert(
+    compareVersions(previousPackageJson.version, packageJson.version) < 0,
+    `Previous release version ${previousPackageJson.version} must be lower than current version ${packageJson.version}.`
+  );
+
+  const previousIdentity = readJsonAtRef(previousRef, "scripts/native-release-identity.json") ?? legacyIdentity;
+  assert(
+    JSON.stringify(lockedIdentityFields(previousIdentity)) === JSON.stringify(lockedIdentityFields(identity)),
+    `Native release identity changed between ${previousRef} and ${packageJson.version}. Installer/update locked identity fields must remain stable for continuity.`
+  );
+
+  verifyInstallerContinuity(target, packageJson, identity);
+  verifyUpdateContinuity(target, packageJson, identity);
+
+  console.log(
+    `Verified native release continuity for ${target} from ${previousRef} (${previousPackageJson.version}) to ${packageJson.version}.`
+  );
 }
 
-const previousPackageJson = readJsonAtRef(previousRef, "package.json");
-assert(previousPackageJson?.version, `Previous release ref '${previousRef}' is missing package.json version metadata.`);
-assert(
-  compareVersions(previousPackageJson.version, packageJson.version) < 0,
-  `Previous release version ${previousPackageJson.version} must be lower than current version ${packageJson.version}.`
-);
+// Runs only as `node scripts/verify-native-release-continuity.mjs …`: an import
+// does nothing (2026-09-26; the run reads git tags and release/ and may end the
+// process). The two paths are compared as real paths — through a directory
+// junction or a short 8.3 name, `process.argv[1]` and `import.meta.url` spell
+// the same file differently, and a plain comparison would skip the run without
+// a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
 
-const previousIdentity = readJsonAtRef(previousRef, "scripts/native-release-identity.json") ?? legacyIdentity;
-assert(
-  JSON.stringify(lockedIdentityFields(previousIdentity)) === JSON.stringify(lockedIdentityFields(identity)),
-  `Native release identity changed between ${previousRef} and ${packageJson.version}. Installer/update locked identity fields must remain stable for continuity.`
-);
-
-verifyInstallerContinuity(target, packageJson, identity);
-verifyUpdateContinuity(target, packageJson, identity);
-
-console.log(
-  `Verified native release continuity for ${target} from ${previousRef} (${previousPackageJson.version}) to ${packageJson.version}.`
-);
+if (isMainModule()) {
+  main();
+}

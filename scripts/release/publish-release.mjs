@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +16,6 @@ import {
 import { buildManifest, manifestPathFor, readChecksumEntries, writeManifest } from "./write-release-manifest.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-process.chdir(rootDir);
 
 const REQUIRED_ASSETS = [
   path.join("release", "native-installer", "macos", "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"),
@@ -108,81 +107,114 @@ function resolveAssets() {
   return [...required, ...optional];
 }
 
-const args = process.argv.slice(2);
-const tag = resolveReleaseTag(args);
-const dryRun = hasFlag("--dry-run");
-const clobber = hasFlag("--clobber");
-const draft = hasFlag("--draft");
-const packageJson = readPackageJson();
+function main() {
+  process.chdir(rootDir);
 
-assert(isValidReleaseTag(tag), `Invalid release tag '${tag}'. Expected vX.Y.Z or vX.Y.Z-prerelease.`);
+  const args = process.argv.slice(2);
+  const tag = resolveReleaseTag(args);
+  const dryRun = hasFlag("--dry-run");
+  const clobber = hasFlag("--clobber");
+  const draft = hasFlag("--draft");
+  const packageJson = readPackageJson();
 
-const repoSlug = resolveRepoSlug(packageJson);
-const notes = resolveReleaseNotes(tag, packageJson);
-const assets = resolveAssets();
+  assert(isValidReleaseTag(tag), `Invalid release tag '${tag}'. Expected vX.Y.Z or vX.Y.Z-prerelease.`);
 
-// plan PR 3 / workstream C3 — write the chain-of-custody manifest before
-// the gh release upload so it ships as a release asset alongside the
-// installers + checksums.
-const manifestPath = manifestPathFor(tag, { rootDir });
-const manifest = buildManifest({
-  tag,
-  rootDir,
-  buildStartedAt: process.env.SSE_RELEASE_BUILD_STARTED_AT ?? new Date().toISOString(),
-  buildFinishedAt: new Date().toISOString(),
-  notarizationTicketUuid: process.env.SSE_MACOS_NOTARY_TICKET_UUID ?? null,
-});
-writeManifest({ tag, manifest, rootDir });
-console.log(`Wrote release manifest: ${manifestPath}`);
-assets.push(manifestPath);
+  const repoSlug = resolveRepoSlug(packageJson);
+  const notes = resolveReleaseNotes(tag, packageJson);
+  const assets = resolveAssets();
 
-const notesDir = mkdtempSync(path.join(os.tmpdir(), "sse-release-notes-"));
-const notesPath = path.join(notesDir, `${tag}.md`);
-const prerelease = tag.includes("-");
-
-writeFileSync(notesPath, notes, "utf8");
-
-console.log(`Release tag: ${tag}`);
-console.log(`Repository: ${repoSlug}`);
-console.log(`Release notes: ${notesPath}`);
-console.log("Assets:");
-for (const asset of assets) {
-  console.log(`- ${asset}`);
-}
-
-if (dryRun) {
-  console.log("Dry run complete. No GitHub release was created or modified.");
-  process.exit(0);
-}
-
-run("gh", ["--version"], { capture: true });
-
-const releaseView = run("gh", ["release", "view", tag, "--repo", repoSlug], {
-  allowFailure: true,
-  capture: true,
-});
-
-if (releaseView.exitCode === 0) {
-  console.log(`Updating existing GitHub release ${tag}.`);
-  run("gh", ["release", "edit", tag, "--repo", repoSlug, "--title", tag, "--notes-file", notesPath]);
-  run("gh", ["release", "upload", tag, "--repo", repoSlug, ...(clobber ? ["--clobber"] : []), ...assets]);
-} else {
-  console.log(`Creating GitHub release ${tag}.`);
-  run("gh", [
-    "release",
-    "create",
+  // plan PR 3 / workstream C3 — write the chain-of-custody manifest before
+  // the gh release upload so it ships as a release asset alongside the
+  // installers + checksums.
+  const manifestPath = manifestPathFor(tag, { rootDir });
+  const manifest = buildManifest({
     tag,
-    "--repo",
-    repoSlug,
-    "--verify-tag",
-    "--title",
-    tag,
-    "--notes-file",
-    notesPath,
-    ...(draft ? ["--draft"] : []),
-    ...(prerelease ? ["--prerelease"] : []),
-    ...assets,
-  ]);
+    rootDir,
+    buildStartedAt: process.env.SSE_RELEASE_BUILD_STARTED_AT ?? new Date().toISOString(),
+    buildFinishedAt: new Date().toISOString(),
+    notarizationTicketUuid: process.env.SSE_MACOS_NOTARY_TICKET_UUID ?? null,
+  });
+  writeManifest({ tag, manifest, rootDir });
+  console.log(`Wrote release manifest: ${manifestPath}`);
+  assets.push(manifestPath);
+
+  const notesDir = mkdtempSync(path.join(os.tmpdir(), "sse-release-notes-"));
+  const notesPath = path.join(notesDir, `${tag}.md`);
+  const prerelease = tag.includes("-");
+
+  writeFileSync(notesPath, notes, "utf8");
+
+  console.log(`Release tag: ${tag}`);
+  console.log(`Repository: ${repoSlug}`);
+  console.log(`Release notes: ${notesPath}`);
+  console.log("Assets:");
+  for (const asset of assets) {
+    console.log(`- ${asset}`);
+  }
+
+  if (dryRun) {
+    console.log("Dry run complete. No GitHub release was created or modified.");
+    process.exit(0);
+  }
+
+  run("gh", ["--version"], { capture: true });
+
+  const releaseView = run("gh", ["release", "view", tag, "--repo", repoSlug], {
+    allowFailure: true,
+    capture: true,
+  });
+
+  if (releaseView.exitCode === 0) {
+    console.log(`Updating existing GitHub release ${tag}.`);
+    run("gh", ["release", "edit", tag, "--repo", repoSlug, "--title", tag, "--notes-file", notesPath]);
+    run("gh", ["release", "upload", tag, "--repo", repoSlug, ...(clobber ? ["--clobber"] : []), ...assets]);
+  } else {
+    console.log(`Creating GitHub release ${tag}.`);
+    run("gh", [
+      "release",
+      "create",
+      tag,
+      "--repo",
+      repoSlug,
+      "--verify-tag",
+      "--title",
+      tag,
+      "--notes-file",
+      notesPath,
+      ...(draft ? ["--draft"] : []),
+      ...(prerelease ? ["--prerelease"] : []),
+      ...assets,
+    ]);
+  }
+
+  console.log(`Published ${tag} to GitHub Releases.`);
 }
 
-console.log(`Published ${tag} to GitHub Releases.`);
+// Runs only as `node scripts/release/publish-release.mjs …`: an import does
+// nothing (2026-09-26; the run changes the working directory, writes the
+// release manifest under release/ and creates or edits the GitHub release with
+// gh). The two paths are compared as real paths — through a directory junction
+// or a short 8.3 name, `process.argv[1]` and `import.meta.url` spell the same
+// file differently, and a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main();
+}

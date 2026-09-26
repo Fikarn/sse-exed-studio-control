@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -126,38 +126,69 @@ function readReportTimestamp(playwrightReportDir) {
   }
 }
 
-run(npmCommand, ["run", "build", "--workspace", "frontend/app"]);
-run(npmCommand, ["run", "playwright:test", "--workspace", "frontend/app", "--", "visual-review.spec.ts"]);
+function main() {
+  run(npmCommand, ["run", "build", "--workspace", "frontend/app"]);
+  run(npmCommand, ["run", "playwright:test", "--workspace", "frontend/app", "--", "visual-review.spec.ts"]);
 
-mkdirSync(summaryDir, { recursive: true });
+  mkdirSync(summaryDir, { recursive: true });
 
-const { baselines, coverage } = readBaselineCoverage();
-const playwrightReport = "frontend/app/playwright-report/index.html";
+  const { baselines, coverage } = readBaselineCoverage();
+  const playwrightReport = "frontend/app/playwright-report/index.html";
 
-const summary = {
-  capturedAt: new Date().toISOString(),
-  githubSha: resolveGitSha(),
-  platform: process.platform,
-  playwrightReport,
-  playwrightReportGeneratedAt: readReportTimestamp(path.join(rootDir, "frontend/app/playwright-report")),
-  baselinesDir: baselinesRelative,
-  coverage,
-  baselines,
-  note: "Playwright `toHaveScreenshot` owns per-fixture diffs. `coverage` + `baselines` reflect what is committed at this commit; per-PR diff status lives in the Playwright HTML report uploaded by the frontend-e2e CI job.",
-};
+  const summary = {
+    capturedAt: new Date().toISOString(),
+    githubSha: resolveGitSha(),
+    platform: process.platform,
+    playwrightReport,
+    playwrightReportGeneratedAt: readReportTimestamp(path.join(rootDir, "frontend/app/playwright-report")),
+    baselinesDir: baselinesRelative,
+    coverage,
+    baselines,
+    note: "Playwright `toHaveScreenshot` owns per-fixture diffs. `coverage` + `baselines` reflect what is committed at this commit; per-PR diff status lives in the Playwright HTML report uploaded by the frontend-e2e CI job.",
+  };
 
-const summaryPath = path.join(summaryDir, "fixture-viewport-summary.json");
-writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+  const summaryPath = path.join(summaryDir, "fixture-viewport-summary.json");
+  writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
 
-console.log(
-  JSON.stringify(
-    {
-      baselineSnapshotCount: baselines.length,
-      baselinesDir: baselinesRelative,
-      playwrightReport,
-      summary: summaryPath,
-    },
-    null,
-    2
-  )
-);
+  console.log(
+    JSON.stringify(
+      {
+        baselineSnapshotCount: baselines.length,
+        baselinesDir: baselinesRelative,
+        playwrightReport,
+        summary: summaryPath,
+      },
+      null,
+      2
+    )
+  );
+}
+
+// Runs only as `node scripts/tauri-visual-review.mjs`: an import does nothing
+// (2026-09-26; the run builds the front end, starts the Playwright visual
+// review and writes its summary under artifacts/). The two paths are compared
+// as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main();
+}

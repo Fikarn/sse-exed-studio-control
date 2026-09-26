@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 
 // plan PR 10 / workstream G2 — Tier 1 coverage for scripts/release/publish-release.mjs.
 //
-// The script's top-level body runs at import time, calls `gh` when not in
+// The script's work runs in `main()` when it is the main module (importing it
+// does nothing since 2026-09-25, new pages Slice 2b), calls `gh` when not in
 // --dry-run mode, and resolves paths relative to its own rootDir (../..
 // from scripts/release/). Tests drive it as a subprocess against a temp-root
 // fixture and cover:

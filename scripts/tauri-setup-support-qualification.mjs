@@ -7,6 +7,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -24,7 +25,8 @@ import { shellStillRunning } from "./tauri-shell-running.mjs";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const devServerPort = 4173;
-const evidence = createQualificationEvidence({ lane: "setup-support", rootDir });
+// The lane's evidence folder; main() makes it, so an import makes nothing.
+let evidence = null;
 
 function assert(condition, message) {
   if (!condition) {
@@ -1416,13 +1418,45 @@ async function runSetupSupportQualification() {
   }
 }
 
-try {
-  await runSetupSupportQualification();
-  console.log(`Tauri Setup/Support qualification evidence: ${evidence.write("passed")}`);
-  console.log("Tauri Setup/Support qualification passed.");
-} catch (error) {
-  evidence.write("failed", {
-    error: error instanceof Error ? error.message : String(error),
-  });
-  throw error;
+async function main() {
+  evidence = createQualificationEvidence({ lane: "setup-support", rootDir });
+  try {
+    await runSetupSupportQualification();
+    console.log(`Tauri Setup/Support qualification evidence: ${evidence.write("passed")}`);
+    console.log("Tauri Setup/Support qualification passed.");
+  } catch (error) {
+    evidence.write("failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
+
+// Runs only as `node scripts/tauri-setup-support-qualification.mjs`: an import
+// does nothing (2026-09-26; the run makes an evidence folder and starts the dev
+// server, engines and shells on scratch app data). The two paths are compared
+// as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }
