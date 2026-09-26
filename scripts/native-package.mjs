@@ -1,8 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { isInside, listProcessPaths } from "./clean.mjs";
 import { publishWithOverride } from "./native-parity-acceptance.mjs";
 import {
   nativeReleaseAppIdentifier,
@@ -11,11 +23,21 @@ import {
   nativeReleaseSmokeArgs,
   resolveNativeReleaseRuntime,
 } from "./native-release-runtime.mjs";
-import { EngineHarness, hardenedLaneEnv, laneProcessEnv } from "./native-runtime-harness.mjs";
+import {
+  EngineHarness,
+  hardenedLaneEnv,
+  LIVE_APP_CONTROL_SURFACE_PORT,
+  laneProcessEnv,
+} from "./native-runtime-harness.mjs";
 
+// On the studio workstation `release/native/windows` is not build output: it
+// is the installed app the studio runs, and this script deletes and rebuilds
+// it. Since 2026-09-25 (the review of new pages Slice 2b, during which an
+// import of this script began deleting it — only the running shell's file
+// lock stopped it) the work runs only when the script is started, never when
+// it is imported, and a Windows run refuses to remove that folder while
+// Studio Control runs from it or answers on the live app's bridge port.
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = new Set(process.argv.slice(2));
-const smokeTest = args.has("--smoke-test");
 const releaseRuntime = resolveNativeReleaseRuntime(rootDir);
 
 function readFlag(name) {
@@ -37,12 +59,6 @@ function normalizeTargetPlatform(value) {
   }
 
   return value;
-}
-
-const targetPlatform = normalizeTargetPlatform(readFlag("--target"));
-
-if (targetPlatform !== process.platform) {
-  throw new Error(`native-package.mjs target '${targetPlatform}' must run on a matching host platform.`);
 }
 
 function run(command, commandArgs, options = {}) {
@@ -270,7 +286,62 @@ function packageMacLocal() {
   };
 }
 
-function packageWindowsLocal() {
+/**
+ * Whether something accepts connections on 127.0.0.1:`port`: true, false, or
+ * null when that could not be told.
+ */
+function acceptsLocalConnections(port) {
+  return new Promise((resolve) => {
+    const socket = connect({ host: "127.0.0.1", port });
+    const settle = (answer) => {
+      socket.destroy();
+      resolve(answer);
+    };
+    socket.setTimeout(2000, () => settle(null));
+    socket.once("connect", () => settle(true));
+    socket.once("error", (error) => settle(error.code === "ECONNREFUSED" ? false : null));
+  });
+}
+
+/**
+ * Refuses, before anything is removed, to replace an output folder that
+ * Studio Control may be running from: a process started from inside it, or
+ * anything answering on the live app's Stream Deck bridge port (38201), or
+ * either of those that cannot be checked. The keep-and-restore procedure
+ * moves the folder aside first; then there is nothing here to refuse.
+ */
+async function refuseToReplaceARunningApp(outputRoot) {
+  if (!existsSync(outputRoot)) {
+    return;
+  }
+  const folder = path.relative(rootDir, outputRoot);
+  const procedure = `Nothing was removed. On the studio workstation ${folder} is the installed app: close Studio Control, move ${folder} aside and keep it as the rollback (the keep-and-restore procedure, e.g. rename it to ${folder}.<commit>-<date>), then package again.`;
+  const running = listProcessPaths();
+  if (running === null) {
+    throw new Error(
+      `Packaging stopped: the running programs could not be listed, so it is not known whether Studio Control is running from ${folder}. ${procedure}`
+    );
+  }
+  const fromFolder = running.filter((processPath) => isInside(processPath, outputRoot));
+  if (fromFolder.length > 0) {
+    throw new Error(
+      `Packaging stopped: Studio Control is running from ${folder} (${fromFolder.join(", ")}), and packaging would delete it. ${procedure}`
+    );
+  }
+  const answering = await acceptsLocalConnections(LIVE_APP_CONTROL_SURFACE_PORT);
+  if (answering === true) {
+    throw new Error(
+      `Packaging stopped: something answers on 127.0.0.1:${LIVE_APP_CONTROL_SURFACE_PORT}, the live app's Stream Deck bridge port, so Studio Control is running and may be running from ${folder}. ${procedure}`
+    );
+  }
+  if (answering === null) {
+    throw new Error(
+      `Packaging stopped: it could not be checked whether anything answers on 127.0.0.1:${LIVE_APP_CONTROL_SURFACE_PORT}, the live app's Stream Deck bridge port. ${procedure}`
+    );
+  }
+}
+
+async function packageWindowsLocal() {
   if (process.platform !== "win32") {
     throw new Error("native-package.mjs Windows packaging can only run on Windows.");
   }
@@ -289,6 +360,7 @@ function packageWindowsLocal() {
     `Native engine executable not found at ${engineExecutablePath}. Run \`npm run native:engine:build\`.`
   );
 
+  await refuseToReplaceARunningApp(outputRoot);
   rmSync(outputRoot, { force: true, recursive: true });
   mkdirSync(packagedDirPath, { recursive: true });
 
@@ -343,18 +415,52 @@ async function smokePackagedBundle(packaged, scenarioName) {
   console.log(`Packaged native ${packaged.label} smoke passed for scenario '${scenarioName}'.`);
 }
 
-let packaged;
+async function main() {
+  const smokeTest = process.argv.slice(2).includes("--smoke-test");
+  const targetPlatform = normalizeTargetPlatform(readFlag("--target"));
+  if (targetPlatform !== process.platform) {
+    throw new Error(`native-package.mjs target '${targetPlatform}' must run on a matching host platform.`);
+  }
 
-if (targetPlatform === "darwin") {
-  packaged = packageMacLocal();
-} else if (targetPlatform === "win32") {
-  packaged = packageWindowsLocal();
-} else {
-  throw new Error("native-package.mjs currently supports macOS and Windows packaging only.");
+  let packaged;
+  if (targetPlatform === "darwin") {
+    packaged = packageMacLocal();
+  } else if (targetPlatform === "win32") {
+    packaged = await packageWindowsLocal();
+  } else {
+    throw new Error("native-package.mjs currently supports macOS and Windows packaging only.");
+  }
+
+  console.log(`Native release packaging runtime: ${nativeReleaseRuntimeLabel(releaseRuntime)}.`);
+
+  if (smokeTest) {
+    await smokePackagedBundle(packaged, readFlag("--scenario") ?? "dashboard");
+  }
 }
 
-console.log(`Native release packaging runtime: ${nativeReleaseRuntimeLabel(releaseRuntime)}.`);
+// Runs only as `node scripts/native-package.mjs …`: an import does nothing
+// (2026-09-25). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the packaging without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
 
-if (smokeTest) {
-  await smokePackagedBundle(packaged, readFlag("--scenario") ?? "dashboard");
+if (isMainModule()) {
+  await main();
 }

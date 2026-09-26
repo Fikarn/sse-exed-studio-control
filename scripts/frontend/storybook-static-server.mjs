@@ -1,7 +1,8 @@
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, realpathSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, normalize, resolve } from "node:path";
+import { basename, extname, join, normalize, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
@@ -68,41 +69,71 @@ async function getFilePath(root, requestPath) {
   return null;
 }
 
-const { port, root } = parseArgs(process.argv.slice(2));
+function main() {
+  const { port, root } = parseArgs(process.argv.slice(2));
 
-if (!existsSync(root)) {
-  console.error(`Static root does not exist: ${root}`);
-  process.exit(1);
-}
-
-const server = createServer(async (request, response) => {
-  const filePath = await getFilePath(root, request.url ?? "/");
-
-  if (!filePath) {
-    response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    response.end("Not found");
-    return;
+  if (!existsSync(root)) {
+    console.error(`Static root does not exist: ${root}`);
+    process.exit(1);
   }
 
-  const extension = extname(filePath);
-  const contentType = mimeTypes[extension] ?? "application/octet-stream";
+  const server = createServer(async (request, response) => {
+    const filePath = await getFilePath(root, request.url ?? "/");
 
-  response.writeHead(200, {
-    "Cache-Control": "no-store",
-    "Content-Type": contentType,
-  });
+    if (!filePath) {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+      return;
+    }
 
-  createReadStream(filePath).pipe(response);
-});
+    const extension = extname(filePath);
+    const contentType = mimeTypes[extension] ?? "application/octet-stream";
 
-server.listen(port, "127.0.0.1", () => {
-  console.log(`Serving Storybook static from ${root} on http://127.0.0.1:${port}`);
-});
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => {
-    server.close(() => {
-      process.exit(0);
+    response.writeHead(200, {
+      "Cache-Control": "no-store",
+      "Content-Type": contentType,
     });
+
+    createReadStream(filePath).pipe(response);
   });
+
+  server.listen(port, "127.0.0.1", () => {
+    console.log(`Serving Storybook static from ${root} on http://127.0.0.1:${port}`);
+  });
+
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.on(signal, () => {
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+  }
+}
+
+// Runs only as `node scripts/frontend/storybook-static-server.mjs …`: an import
+// does nothing (2026-09-26; the run opens a server on 127.0.0.1 and ends the
+// process on a signal). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && basename(started) === basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main();
 }

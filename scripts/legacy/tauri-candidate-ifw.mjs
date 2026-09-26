@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -150,126 +159,160 @@ function archiveWindowsPath(sourcePath, archivePath) {
   ]);
 }
 
-const target = parseTarget(readFlag("--target"));
-const kind = parseKind(readFlag("--kind"));
-const prepareOnly = hasFlag("--prepare-only");
-const allowStaged = hasFlag("--allow-staged");
+function main() {
+  const target = parseTarget(readFlag("--target"));
+  const kind = parseKind(readFlag("--kind"));
+  const prepareOnly = hasFlag("--prepare-only");
+  const allowStaged = hasFlag("--allow-staged");
 
-if (prepareOnly && !allowStaged) {
-  // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
-  // produces a staged build root without the QtIFW binarycreator / repogen
-  // output; that's only useful in the staged-verification lane and must be
-  // opted into.
-  throw new Error(
-    `legacy/tauri-candidate-ifw.mjs --prepare-only produces a staged (incomplete) ${kind} payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full ${kind} (requires QtIFW).`
-  );
-}
+  if (prepareOnly && !allowStaged) {
+    // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
+    // produces a staged build root without the QtIFW binarycreator / repogen
+    // output; that's only useful in the staged-verification lane and must be
+    // opted into.
+    throw new Error(
+      `legacy/tauri-candidate-ifw.mjs --prepare-only produces a staged (incomplete) ${kind} payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full ${kind} (requires QtIFW).`
+    );
+  }
 
-const releaseDate = new Date().toISOString().slice(0, 10);
-const payloadPath = ensurePackagedPayload(target);
-const rootName = kind === "installer" ? "tauri-candidate-installer" : "tauri-candidate-updates";
-const candidateRoot = path.join(rootDir, "release", rootName, target);
-const buildRoot = path.join(candidateRoot, "ifw");
-const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
-const metaDir = path.join(packageRoot, "meta");
-const dataDir = path.join(packageRoot, "data");
-const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
+  const releaseDate = new Date().toISOString().slice(0, 10);
+  const payloadPath = ensurePackagedPayload(target);
+  const rootName = kind === "installer" ? "tauri-candidate-installer" : "tauri-candidate-updates";
+  const candidateRoot = path.join(rootDir, "release", rootName, target);
+  const buildRoot = path.join(candidateRoot, "ifw");
+  const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
+  const metaDir = path.join(packageRoot, "meta");
+  const dataDir = path.join(packageRoot, "data");
+  const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
 
-rmSync(buildRoot, { force: true, recursive: true });
-mkdirSync(metaDir, { recursive: true });
-mkdirSync(dataDir, { recursive: true });
+  rmSync(buildRoot, { force: true, recursive: true });
+  mkdirSync(metaDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
 
-if (kind === "installer") {
-  const configDir = path.join(buildRoot, "config");
-  mkdirSync(configDir, { recursive: true });
+  if (kind === "installer") {
+    const configDir = path.join(buildRoot, "config");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      path.join(configDir, "config.xml"),
+      renderConfigXml({ targetDir: releaseIdentity.targetDir, version: packageJson.version }),
+      "utf8"
+    );
+  }
+
   writeFileSync(
-    path.join(configDir, "config.xml"),
-    renderConfigXml({ targetDir: releaseIdentity.targetDir, version: packageJson.version }),
+    path.join(metaDir, "package.xml"),
+    renderPackageXml({
+      description:
+        kind === "installer"
+          ? "Offline native installer staging for the Tauri candidate shell and bundled Rust engine."
+          : "Tauri candidate runtime distributed through the Qt Installer Framework maintenance-tool repository.",
+      includeScript: kind === "installer",
+      releaseDate,
+      version: packageJson.version,
+    }),
     "utf8"
   );
-}
-
-writeFileSync(
-  path.join(metaDir, "package.xml"),
-  renderPackageXml({
-    description:
-      kind === "installer"
-        ? "Offline native installer staging for the Tauri candidate shell and bundled Rust engine."
-        : "Tauri candidate runtime distributed through the Qt Installer Framework maintenance-tool repository.",
-    includeScript: kind === "installer",
-    releaseDate,
-    version: packageJson.version,
-  }),
-  "utf8"
-);
-copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
-if (kind === "installer") {
-  copyFileSync(
-    path.join(rootDir, "native", "installer-templates", "tauri-installscript.qs"),
-    path.join(metaDir, "installscript.qs")
-  );
-}
-cpSync(payloadPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
-
-console.log(`Prepared Tauri candidate ${kind} staging for ${target}: ${buildRoot}`);
-console.log(`Staged Tauri candidate payload: ${stagedPayloadPath}`);
-
-if (prepareOnly) {
-  console.log(`Skipping QtIFW ${kind} build because --prepare-only was requested.`);
-  process.exit(0);
-}
-
-const ifwTool = resolveIfwTool(kind);
-if (!ifwTool) {
-  const toolName = kind === "installer" ? "binarycreator" : "repogen";
-  throw new Error(
-    `Qt Installer Framework ${toolName} was not found. Set the matching SSE_QT_IFW_* path or install QtIFW.`
-  );
-}
-
-if (kind === "installer") {
-  const installerPath =
-    target === "macos"
-      ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app")
-      : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
-  const archivePath =
-    target === "macos" ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.zip") : null;
-
-  rmSync(installerPath, { force: true, recursive: true });
-  if (archivePath) {
-    rmSync(archivePath, { force: true, recursive: true });
+  copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
+  if (kind === "installer") {
+    copyFileSync(
+      path.join(rootDir, "native", "installer-templates", "tauri-installscript.qs"),
+      path.join(metaDir, "installscript.qs")
+    );
   }
-  run(ifwTool, [
-    "--offline-only",
-    "-c",
-    path.join(buildRoot, "config", "config.xml"),
-    "-p",
-    path.join(buildRoot, "packages"),
-    installerPath,
-  ]);
-  if (archivePath) {
-    archiveMacPath(installerPath, archivePath);
-  }
-  console.log(`Built Tauri candidate installer artifact: ${installerPath}`);
-  if (archivePath) {
-    console.log(`Archived Tauri candidate installer artifact: ${archivePath}`);
-  }
-} else {
-  const repositoryPath = path.join(candidateRoot, "repository");
-  const archivePath =
-    target === "macos"
-      ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-UpdateRepository.zip")
-      : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip");
+  cpSync(payloadPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
 
-  rmSync(repositoryPath, { force: true, recursive: true });
-  rmSync(archivePath, { force: true, recursive: true });
-  mkdirSync(path.dirname(repositoryPath), { recursive: true });
-  run(ifwTool, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
-  if (target === "macos") {
-    archiveMacPath(repositoryPath, archivePath);
+  console.log(`Prepared Tauri candidate ${kind} staging for ${target}: ${buildRoot}`);
+  console.log(`Staged Tauri candidate payload: ${stagedPayloadPath}`);
+
+  if (prepareOnly) {
+    console.log(`Skipping QtIFW ${kind} build because --prepare-only was requested.`);
+    process.exit(0);
+  }
+
+  const ifwTool = resolveIfwTool(kind);
+  if (!ifwTool) {
+    const toolName = kind === "installer" ? "binarycreator" : "repogen";
+    throw new Error(
+      `Qt Installer Framework ${toolName} was not found. Set the matching SSE_QT_IFW_* path or install QtIFW.`
+    );
+  }
+
+  if (kind === "installer") {
+    const installerPath =
+      target === "macos"
+        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app")
+        : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
+    const archivePath =
+      target === "macos"
+        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.zip")
+        : null;
+
+    rmSync(installerPath, { force: true, recursive: true });
+    if (archivePath) {
+      rmSync(archivePath, { force: true, recursive: true });
+    }
+    run(ifwTool, [
+      "--offline-only",
+      "-c",
+      path.join(buildRoot, "config", "config.xml"),
+      "-p",
+      path.join(buildRoot, "packages"),
+      installerPath,
+    ]);
+    if (archivePath) {
+      archiveMacPath(installerPath, archivePath);
+    }
+    console.log(`Built Tauri candidate installer artifact: ${installerPath}`);
+    if (archivePath) {
+      console.log(`Archived Tauri candidate installer artifact: ${archivePath}`);
+    }
   } else {
-    archiveWindowsPath(repositoryPath, archivePath);
+    const repositoryPath = path.join(candidateRoot, "repository");
+    const archivePath =
+      target === "macos"
+        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-UpdateRepository.zip")
+        : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip");
+
+    rmSync(repositoryPath, { force: true, recursive: true });
+    rmSync(archivePath, { force: true, recursive: true });
+    mkdirSync(path.dirname(repositoryPath), { recursive: true });
+    run(ifwTool, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
+    if (target === "macos") {
+      archiveMacPath(repositoryPath, archivePath);
+    } else {
+      archiveWindowsPath(repositoryPath, archivePath);
+    }
+    console.log(`Built Tauri candidate update repository: ${repositoryPath}`);
+    console.log(`Archived Tauri candidate update repository: ${archivePath}`);
   }
-  console.log(`Built Tauri candidate update repository: ${repositoryPath}`);
-  console.log(`Archived Tauri candidate update repository: ${archivePath}`);
+}
+
+// Runs only as `node scripts/legacy/tauri-candidate-ifw.mjs …`: an import does
+// nothing (2026-09-26; the run deletes and rewrites folders under
+// release/tauri-candidate-installer or release/tauri-candidate-updates, may
+// start tauri-package-candidate.mjs and may end the process). The two paths are
+// compared as real paths — through a directory junction or a short 8.3 name,
+// `process.argv[1]` and `import.meta.url` spell the same file differently, and
+// a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  main();
 }

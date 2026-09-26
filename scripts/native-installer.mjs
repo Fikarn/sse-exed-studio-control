@@ -1,5 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -137,90 +146,120 @@ function renderPackageXml({ version, releaseDate }) {
 `;
 }
 
-const target = parseTarget(readFlag("--target"));
-const prepareOnly = hasFlag("--prepare-only");
-const allowStaged = hasFlag("--allow-staged");
+function main() {
+  const target = parseTarget(readFlag("--target"));
+  const prepareOnly = hasFlag("--prepare-only");
+  const allowStaged = hasFlag("--allow-staged");
 
-if (prepareOnly && !allowStaged) {
-  // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
-  // produces a staged build root without an installer binary; that's only
-  // ever useful in the staged-verification lane and must be opted into.
-  throw new Error(
-    "native-installer.mjs --prepare-only produces a staged (incomplete) installer payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full installer (requires QtIFW binarycreator)."
+  if (prepareOnly && !allowStaged) {
+    // plan PR 3 / workstream C2: stop silent staged fallbacks. `--prepare-only`
+    // produces a staged build root without an installer binary; that's only
+    // ever useful in the staged-verification lane and must be opted into.
+    throw new Error(
+      "native-installer.mjs --prepare-only produces a staged (incomplete) installer payload. Pass --allow-staged to confirm you want staged output, or drop --prepare-only to build the full installer (requires QtIFW binarycreator)."
+    );
+  }
+
+  const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
+  const releaseDate = new Date().toISOString().slice(0, 10);
+  const { packagedPath, installerPath, archivePath } = resolvePackagedPayload(target);
+
+  ensurePackagedPayload(target, packagedPath);
+
+  const installerRoot = path.join(rootDir, "release", "native-installer", target);
+  const buildRoot = path.join(installerRoot, "ifw");
+  const configDir = path.join(buildRoot, "config");
+  const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
+  const metaDir = path.join(packageRoot, "meta");
+  const dataDir = path.join(packageRoot, "data");
+
+  rmSync(buildRoot, { force: true, recursive: true });
+  mkdirSync(configDir, { recursive: true });
+  mkdirSync(metaDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+
+  writeFileSync(
+    path.join(configDir, "config.xml"),
+    renderConfigXml({ version: packageJson.version, targetDir: releaseIdentity.targetDir }),
+    "utf8"
   );
-}
-
-const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
-const releaseDate = new Date().toISOString().slice(0, 10);
-const { packagedPath, installerPath, archivePath } = resolvePackagedPayload(target);
-
-ensurePackagedPayload(target, packagedPath);
-
-const installerRoot = path.join(rootDir, "release", "native-installer", target);
-const buildRoot = path.join(installerRoot, "ifw");
-const configDir = path.join(buildRoot, "config");
-const packageRoot = path.join(buildRoot, "packages", releaseIdentity.packageId);
-const metaDir = path.join(packageRoot, "meta");
-const dataDir = path.join(packageRoot, "data");
-
-rmSync(buildRoot, { force: true, recursive: true });
-mkdirSync(configDir, { recursive: true });
-mkdirSync(metaDir, { recursive: true });
-mkdirSync(dataDir, { recursive: true });
-
-writeFileSync(
-  path.join(configDir, "config.xml"),
-  renderConfigXml({ version: packageJson.version, targetDir: releaseIdentity.targetDir }),
-  "utf8"
-);
-writeFileSync(
-  path.join(metaDir, "package.xml"),
-  renderPackageXml({ version: packageJson.version, releaseDate }),
-  "utf8"
-);
-copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
-copyFileSync(
-  path.join(rootDir, "native", "installer-templates", "tauri-installscript.qs"),
-  path.join(metaDir, "installscript.qs")
-);
-
-const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
-cpSync(packagedPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
-
-console.log(`Prepared native installer staging for ${target}: ${buildRoot}`);
-console.log(`Staged payload: ${stagedPayloadPath}`);
-
-if (prepareOnly) {
-  console.log("Skipping binarycreator build because --prepare-only was requested.");
-  process.exit(0);
-}
-
-const binaryCreator = resolveQtIfwTools({ rootDir }).binaryCreator;
-if (!binaryCreator) {
-  throw new Error(
-    "Qt Installer Framework binarycreator was not found. Set SSE_QT_IFW_BINARYCREATOR, put binarycreator on PATH, or install QtIFW into .tools/qt-ifw."
+  writeFileSync(
+    path.join(metaDir, "package.xml"),
+    renderPackageXml({ version: packageJson.version, releaseDate }),
+    "utf8"
   );
+  copyFileSync(path.join(rootDir, "LICENSE"), path.join(metaDir, "LICENSE.txt"));
+  copyFileSync(
+    path.join(rootDir, "native", "installer-templates", "tauri-installscript.qs"),
+    path.join(metaDir, "installscript.qs")
+  );
+
+  const stagedPayloadPath = path.join(dataDir, releaseIdentity.payloadNames[target]);
+  cpSync(packagedPath, stagedPayloadPath, { recursive: true, verbatimSymlinks: true });
+
+  console.log(`Prepared native installer staging for ${target}: ${buildRoot}`);
+  console.log(`Staged payload: ${stagedPayloadPath}`);
+
+  if (prepareOnly) {
+    console.log("Skipping binarycreator build because --prepare-only was requested.");
+    process.exit(0);
+  }
+
+  const binaryCreator = resolveQtIfwTools({ rootDir }).binaryCreator;
+  if (!binaryCreator) {
+    throw new Error(
+      "Qt Installer Framework binarycreator was not found. Set SSE_QT_IFW_BINARYCREATOR, put binarycreator on PATH, or install QtIFW into .tools/qt-ifw."
+    );
+  }
+
+  console.log(`Using QtIFW binarycreator via ${binaryCreator.source}: ${binaryCreator.value}`);
+  mkdirSync(path.dirname(installerPath), { recursive: true });
+  rmSync(installerPath, { force: true, recursive: true });
+  if (archivePath) {
+    rmSync(archivePath, { force: true, recursive: true });
+  }
+  run(binaryCreator.value, [
+    "--offline-only",
+    "-c",
+    path.join(configDir, "config.xml"),
+    "-p",
+    path.join(buildRoot, "packages"),
+    installerPath,
+  ]);
+
+  if (archivePath) {
+    archiveMacInstaller(installerPath, archivePath);
+    console.log(`Built native installer artifact: ${installerPath}`);
+    console.log(`Archived native installer artifact: ${archivePath}`);
+  } else {
+    console.log(`Built native installer artifact: ${installerPath}`);
+  }
 }
 
-console.log(`Using QtIFW binarycreator via ${binaryCreator.source}: ${binaryCreator.value}`);
-mkdirSync(path.dirname(installerPath), { recursive: true });
-rmSync(installerPath, { force: true, recursive: true });
-if (archivePath) {
-  rmSync(archivePath, { force: true, recursive: true });
+// Runs only as `node scripts/native-installer.mjs …`: an import does nothing
+// (2026-09-25; it removes and rewrites folders under release/ and may start
+// native-package.mjs). The two paths are compared as real paths — through a
+// directory junction or a short 8.3 name, `process.argv[1]` and
+// `import.meta.url` spell the same file differently, and a plain comparison
+// would skip the run without a word (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
+  }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
 }
-run(binaryCreator.value, [
-  "--offline-only",
-  "-c",
-  path.join(configDir, "config.xml"),
-  "-p",
-  path.join(buildRoot, "packages"),
-  installerPath,
-]);
 
-if (archivePath) {
-  archiveMacInstaller(installerPath, archivePath);
-  console.log(`Built native installer artifact: ${installerPath}`);
-  console.log(`Archived native installer artifact: ${archivePath}`);
-} else {
-  console.log(`Built native installer artifact: ${installerPath}`);
+if (isMainModule()) {
+  main();
 }

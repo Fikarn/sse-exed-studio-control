@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -21,7 +22,6 @@ import { EngineHarness, hardenedLaneEnv, laneProcessEnv } from "../native-runtim
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const releaseIdentity = JSON.parse(readFileSync(path.join(rootDir, "scripts", "native-release-identity.json"), "utf8"));
 const args = process.argv.slice(2);
-const smokeTest = args.includes("--smoke-test");
 const keepSmokeRuntime = process.env.SSE_TAURI_KEEP_SMOKE_RUNTIME === "1";
 
 function readFlag(name) {
@@ -390,21 +390,53 @@ async function smokePackagedCandidate(packaged, scenarioName) {
   }
 }
 
-const target = parseTarget(readFlag("--target"));
+async function main() {
+  const smokeTest = args.includes("--smoke-test");
+  const target = parseTarget(readFlag("--target"));
 
-if (process.platform !== expectedPlatform(target)) {
-  throw new Error(`Tauri candidate target '${target}' must run on a matching host platform.`);
+  if (process.platform !== expectedPlatform(target)) {
+    throw new Error(`Tauri candidate target '${target}' must run on a matching host platform.`);
+  }
+
+  const packaged = target === "macos" ? packageMacCandidate() : packageWindowsCandidate();
+  const manifestPath = writeCandidateManifest(packaged);
+
+  console.log(`Packaged Tauri ${packaged.label} candidate payload: ${packaged.packagedPayloadPath}`);
+  console.log(`Packaged Tauri ${packaged.label} candidate archive: ${packaged.archivePath}`);
+  console.log(`Tauri candidate manifest: ${manifestPath}`);
+
+  if (smokeTest) {
+    for (const scenarioName of readSmokeScenarios()) {
+      await smokePackagedCandidate(packaged, scenarioName);
+    }
+  }
 }
 
-const packaged = target === "macos" ? packageMacCandidate() : packageWindowsCandidate();
-const manifestPath = writeCandidateManifest(packaged);
-
-console.log(`Packaged Tauri ${packaged.label} candidate payload: ${packaged.packagedPayloadPath}`);
-console.log(`Packaged Tauri ${packaged.label} candidate archive: ${packaged.archivePath}`);
-console.log(`Tauri candidate manifest: ${manifestPath}`);
-
-if (smokeTest) {
-  for (const scenarioName of readSmokeScenarios()) {
-    await smokePackagedCandidate(packaged, scenarioName);
+// Runs only as `node scripts/legacy/tauri-package-candidate.mjs …`: an import
+// does nothing (2026-09-26; the run deletes and rebuilds
+// release/tauri-candidate/<target> and may start the packaged app). The two
+// paths are compared as real paths — through a directory junction or a short
+// 8.3 name, `process.argv[1]` and `import.meta.url` spell the same file
+// differently, and a plain comparison would skip the run without a word
+// (scripts/dev-check-cli.mjs).
+function isMainModule() {
+  const started = process.argv[1];
+  if (!started) {
+    return false;
   }
+  const self = fileURLToPath(import.meta.url);
+  let same = false;
+  try {
+    same = realpathSync.native(started) === realpathSync.native(self);
+  } catch {
+    // Not a file the file system resolves: not this one.
+  }
+  if (!same && path.basename(started) === path.basename(self)) {
+    throw new Error(`${started} was started, but it could not be matched to ${self}; nothing was done.`);
+  }
+  return same;
+}
+
+if (isMainModule()) {
+  await main();
 }
