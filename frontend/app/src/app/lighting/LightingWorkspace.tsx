@@ -13,7 +13,7 @@ import { useLightingEditor } from "./useLightingEditor";
 export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
   const editor = useLightingEditor(props);
   const { lightingSnapshot, lightingDmxMonitorSnapshot } = props;
-  const { operatorLayout, dmxStripOn, setDmxStripOn } = editor.session;
+  const { dmxStripOn, setDmxStripOn } = editor.session;
   const { bridgeReachable, bridgeUniverse, fixturesPatched, liveFixtureEntries, previewMode } = editor.rig;
   const { effectiveSceneModified, lastSavedLabel } = editor.sceneEditor;
   if (!lightingSnapshot) {
@@ -30,7 +30,7 @@ export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
   }
 
   return (
-    <div className={styles.shell} data-testid="lighting-workspace" data-layout-mode={operatorLayout.layoutMode}>
+    <div className={styles.shell} data-testid="lighting-workspace">
       {/* Visual overhaul A, Slice 5: the toolbar, the bridge banner and the
           preview banner are gone. What they carried is the cluster's — the
           rig's state and its way out at the top, the keys and the rig's

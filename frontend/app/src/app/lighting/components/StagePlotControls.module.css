@@ -209,21 +209,3 @@
   background: var(--color-brand-green-glow);
   color: var(--color-brand-text-primary);
 }
-
-@media (max-width: 1440px) {
-  .controls {
-    right: var(--operator-stage-control-inset, 10px);
-    bottom: var(--operator-stage-control-inset, 10px);
-  }
-
-  .modeButton {
-    min-width: var(--operator-stage-control-mode-width, 44px);
-    padding: 0 calc(6px * var(--operator-ui-scale-factor, 1));
-  }
-
-  .renderModeGroup :global(button) {
-    min-width: var(--operator-stage-control-render-mode-width, 56px);
-    padding: 0 calc(5px * var(--operator-ui-scale-factor, 1));
-    font-size: var(--operator-font-size-xxs, var(--font-size-tick));
-  }
-}
