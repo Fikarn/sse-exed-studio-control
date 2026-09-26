@@ -29,15 +29,10 @@ Rule: if a change would move product state, persistence, or device policy into R
 
 ## Hardware target (binding)
 
-- Primary operator surface: fullscreen `2560×1440` on a fixed second monitor. **Operator ruling 2026-09-07 (visual overhaul A, plan D4): `2560×1440` is the only resolution that matters.** Chrome budget: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
-- `1920×1080` and `1280×800` remain as fallback layouts, not deliverables: their guards stay (`audio-legibility`, `viewport-contract`, the six-size scroll check) but no design gate runs below `2560×1440`.
-- **Operator ruling 2026-09-18: only the Windows build and only `2560×1440` matter.** Do no work for Linux, macOS or any other resolution (no linux or darwin captures, no fallback-viewport fixes). Leave their guards as they are; if one turns red for a reason that is not also a Windows `2560×1440` reason, say so, record it and move on — and ask before deleting such a guard. One exception (operator decision, 2026-09-23): `frontend-e2e` is a required check, so a change that moves a board refreshes its `linux` capture too, from the branch push run's `playwright-test-results` artifact, before it merges (the production readiness ledger, Baseline refresh procedure); `darwin` and the win32 captures at other sizes stay as they are.
+- **Operator ruling, absolute since 2026-09-26: Studio Control always runs at `2560×1440`, fullscreen on an external display, on a Windows machine.** Any other resolution and any other operating system is not to be considered — "unnecessary and a waste of time". Do not design, fix, test, verify or document anything for another size (1920×1080, 1280×800, a windowed size, a laptop panel) or another system (Linux, macOS). What still exists only for them — captures, tests, guards, fallback layouts, Studio Preview, the windowed layout, CI steps, macOS paths, docs — is being removed (the new pages program, D22 and Slice SW); until it is gone, do not maintain it: a failure that is only another size's or system's is recorded and left. CI may run on Linux runners as infrastructure, but nothing may depend on Linux rendering. (This makes the rulings of 2026-09-07, visual overhaul A's D4, and 2026-09-18 absolute; the 2026-09-18 "leave the guards and ask before deleting one" and the 2026-09-23 linux-capture duty end with Slice SW.)
+- Chrome budget at `2560×1440`: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
 - **No scroll during normal operation.** Dense fixed-height layouts.
 - Devices currently in play: RME Fireface UFX III (audio), Litepanels Apollo Bridge / Astra Bi-Color / Aputure Infinimat / Infinibar PB12 (lighting), Stream Deck+ + Bitfocus Companion local (control).
-
-When developing on a Retina MacBook, enforce the built-in-display review workflow from `docs/DEVELOPMENT.md`: use the app-owned Scaled Studio Preview for proportional `2560×1440` studio review, and do not judge studio-full fit/layout from the default Retina logical desktop.
-
-Scaled Studio Preview is a scaled `2560×1440` studio canvas, not a compact host viewport. Operator-density rules must key off the logical operator surface so the preview matches native `2560×1440` after scaling.
 
 Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
