@@ -3,9 +3,10 @@ name: release-evidence
 # Production readiness 2026-09, Slice 12 (findings F17 and F03, decision D2).
 #
 # A `v*` tag — or a manual run — builds the packaged bundle on a clean Windows
-# and a clean macOS runner and keeps, as workflow artifacts: the bundle archive,
-# its SHA256 manifest, and CycloneDX SBOMs of what the bundle carries (the npm
-# packages in the web assets, the crates in the engine, the crates in the shell).
+# runner and keeps, as workflow artifacts: the bundle archive, its SHA256
+# manifest, and CycloneDX SBOMs of what the bundle carries (the npm packages in
+# the web assets, the crates in the engine, the crates in the shell). The macOS
+# runner went with macOS in the new pages program's Slice SW (D22).
 #
 # What this workflow does NOT do, on purpose:
 # - it publishes nothing. No GitHub Release is created or edited and nothing is
@@ -57,11 +58,6 @@ jobs:
             lane: win
             archive: SSE-ExEd-Studio-Control-Native-windows.zip
             manifest: SSE-ExEd-Studio-Control-Native-windows-SHA256.txt
-          - target: macos
-            os: macos-14
-            lane: mac
-            archive: SSE-ExEd-Studio-Control-Native-macOS.zip
-            manifest: SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     defaults:
@@ -102,13 +98,8 @@ jobs:
         id: signing
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.SSE_WINDOWS_SIGN_CERT_BASE64 }}
-          MACOS_IDENTITY: ${{ secrets.SSE_MACOS_CODESIGN_IDENTITY }}
         run: |
-          if [ "${{ matrix.target }}" = "windows" ]; then
-            secret="SSE_WINDOWS_SIGN_CERT_BASE64"; value="$WINDOWS_CERTIFICATE"
-          else
-            secret="SSE_MACOS_CODESIGN_IDENTITY"; value="$MACOS_IDENTITY"
-          fi
+          secret="SSE_WINDOWS_SIGN_CERT_BASE64"; value="$WINDOWS_CERTIFICATE"
           if [ -n "$value" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
             line="Signing: enabled — the secret $secret is set."
@@ -118,27 +109,6 @@ jobs:
           fi
           echo "$line"
           echo "$line" >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Import the macOS signing certificate into a throwaway keychain
-        if: matrix.target == 'macos' && steps.signing.outputs.enabled == 'true'
-        env:
-          CERTIFICATE_BASE64: ${{ secrets.SSE_MACOS_SIGN_CERT_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.SSE_MACOS_SIGN_CERT_PASSWORD }}
-        run: |
-          if [ -z "$CERTIFICATE_BASE64" ] || [ -z "$CERTIFICATE_PASSWORD" ]; then
-            echo "SSE_MACOS_CODESIGN_IDENTITY is set but SSE_MACOS_SIGN_CERT_BASE64 / SSE_MACOS_SIGN_CERT_PASSWORD are not: a runner has no keychain to find the identity in." >&2
-            exit 1
-          fi
-          keychain="$RUNNER_TEMP/sse-signing.keychain-db"
-          keychain_password="$(openssl rand -hex 24)"
-          echo "$CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/sse-signing.p12"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          security import "$RUNNER_TEMP/sse-signing.p12" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
-          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain"
-          security list-keychain -d user -s "$keychain"
-          rm -f "$RUNNER_TEMP/sse-signing.p12"
 
       - name: Locate signtool
         if: matrix.target == 'windows' && steps.signing.outputs.enabled == 'true'
@@ -157,10 +127,6 @@ jobs:
           SSE_WINDOWS_SIGN_CERT_BASE64: ${{ secrets.SSE_WINDOWS_SIGN_CERT_BASE64 }}
           SSE_WINDOWS_SIGN_CERT_PASSWORD: ${{ secrets.SSE_WINDOWS_SIGN_CERT_PASSWORD }}
           SSE_WINDOWS_SIGN_TIMESTAMP_URL: ${{ secrets.SSE_WINDOWS_SIGN_TIMESTAMP_URL }}
-          SSE_MACOS_CODESIGN_IDENTITY: ${{ secrets.SSE_MACOS_CODESIGN_IDENTITY }}
-          SSE_MACOS_NOTARY_APPLE_ID: ${{ secrets.SSE_MACOS_NOTARY_APPLE_ID }}
-          SSE_MACOS_NOTARY_PASSWORD: ${{ secrets.SSE_MACOS_NOTARY_PASSWORD }}
-          SSE_MACOS_NOTARY_TEAM_ID: ${{ secrets.SSE_MACOS_NOTARY_TEAM_ID }}
         run: npm run native:sign:${{ matrix.lane }}:bundle
 
       # --- checksums (after signing: signing rebuilds the archive) ------------
@@ -171,7 +137,7 @@ jobs:
         run: |
           manifest="../../checksums/${{ matrix.target }}/${{ matrix.manifest }}"
           cat "$manifest"
-          if command -v sha256sum > /dev/null; then sha256sum -c "$manifest"; else shasum -a 256 -c "$manifest"; fi
+          sha256sum -c "$manifest"
 
       # --- SBOMs ----------------------------------------------------------------
       - name: Install the SBOM generators

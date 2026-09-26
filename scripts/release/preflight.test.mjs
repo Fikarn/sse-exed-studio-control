@@ -1,25 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import {
-  checkDiskSpace,
-  checkGithubReleasesApi,
-  checkMacosCodeSigning,
-  checkMacosNotarization,
-  checkQtIfwTools,
-  checkWindowsSignTool,
-} from "./preflight.mjs";
-
-function fakeSpawn(scenarios) {
-  return (command, args = []) => {
-    const key = [command, ...args].join(" ");
-    const scenario = scenarios[key] ?? scenarios.default;
-    if (!scenario) {
-      throw new Error(`fakeSpawn: no scenario for '${key}'`);
-    }
-    return { status: 0, stdout: "", stderr: "", ...scenario };
-  };
-}
+import { checkDiskSpace, checkGithubReleasesApi, checkQtIfwTools, checkWindowsSignTool } from "./preflight.mjs";
 
 test("checkDiskSpace passes when available space exceeds the requirement", () => {
   const result = checkDiskSpace({
@@ -62,43 +44,8 @@ test("checkQtIfwTools downgrades to SKIP when --allow-staged is set", (t) => {
   assert.match(result.message, /Staged-verify lane only/);
 });
 
-test("checkMacosCodeSigning skips on non-darwin hosts", () => {
-  const result = checkMacosCodeSigning({ platform: "linux", run: () => ({ status: 0, stdout: "" }) });
-  assert.equal(result.ok, true);
-  assert.equal(result.skipped, true);
-});
-
-test("checkMacosCodeSigning SKIPs when security returns no identities (unsigned-deployment posture)", () => {
-  const result = checkMacosCodeSigning({
-    platform: "darwin",
-    run: fakeSpawn({
-      default: { status: 0, stdout: "     0 valid identities found\n" },
-    }),
-  });
-  assert.equal(result.ok, true);
-  assert.equal(result.skipped, true);
-  assert.match(result.message, /unsigned controlled deployment/);
-});
-
-test("checkMacosCodeSigning parses the first valid identity", () => {
-  const result = checkMacosCodeSigning({
-    platform: "darwin",
-    run: fakeSpawn({
-      default: {
-        status: 0,
-        stdout:
-          "  1) 0123456789ABCDEF0123456789ABCDEF01234567 \"Developer ID Application: SSE ExEd (TEAMID01)\"\n" +
-          "     1 valid identities found\n",
-      },
-    }),
-  });
-  assert.equal(result.ok, true);
-  assert.equal(result.details.sha1, "0123456789ABCDEF0123456789ABCDEF01234567");
-  assert.equal(result.details.commonName, "Developer ID Application: SSE ExEd (TEAMID01)");
-});
-
 test("checkWindowsSignTool skips on non-win32 hosts", () => {
-  const result = checkWindowsSignTool({ platform: "darwin", run: () => ({ status: 0, stdout: "" }) });
+  const result = checkWindowsSignTool({ platform: "linux", run: () => ({ status: 0, stdout: "" }) });
   assert.equal(result.ok, true);
   assert.equal(result.skipped, true);
 });
@@ -110,34 +57,6 @@ test("checkWindowsSignTool fails when signtool is missing", () => {
   });
   assert.equal(result.ok, false);
   assert.match(result.message, /signtool\.exe/);
-});
-
-test("checkMacosNotarization SKIPs when env vars are missing (unsigned-deployment posture)", () => {
-  const result = checkMacosNotarization({
-    platform: "darwin",
-    env: {},
-    run: () => ({ status: 0, stdout: "" }),
-  });
-  assert.equal(result.ok, true);
-  assert.equal(result.skipped, true);
-  assert.match(result.message, /SSE_MACOS_NOTARY_APPLE_ID/);
-  assert.match(result.message, /SSE_MACOS_NOTARY_KEYCHAIN_PROFILE/);
-});
-
-test("checkMacosNotarization passes when xcrun returns 0", () => {
-  const result = checkMacosNotarization({
-    platform: "darwin",
-    env: {
-      SSE_MACOS_NOTARY_APPLE_ID: "ops@sse.example",
-      SSE_MACOS_NOTARY_TEAM_ID: "TEAMID01",
-      SSE_MACOS_NOTARY_KEYCHAIN_PROFILE: "sse-notary",
-    },
-    run: fakeSpawn({
-      default: { status: 0, stdout: "" },
-    }),
-  });
-  assert.equal(result.ok, true);
-  assert.match(result.message, /TEAMID01/);
 });
 
 test("checkGithubReleasesApi treats 200/401 as reachable", async () => {

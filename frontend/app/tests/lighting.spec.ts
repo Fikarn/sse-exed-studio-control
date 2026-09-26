@@ -6,13 +6,14 @@ import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: lighting workspace specs split out of
 // operator-shell.spec.ts. Covers the snapshot loading posture, fixture
-// snapshot rendering, layout responsiveness across viewport sizes,
-// scaled-studio-preview entry, preview mode, palette pools, patch mode,
-// view bookmarks, drag-lasso multi-select, fixture drag/rotate, typed entry,
-// DMX monitor expand, and DMX-unreachable + blackout posture. New pages
-// program, Slice 3 (D6): Lighting binds no key of its own, so every case
+// snapshot rendering, the layout at 2560×1440, preview mode, palette pools,
+// patch mode, view bookmarks, drag-lasso multi-select, fixture drag/rotate,
+// typed entry, DMX monitor expand, and DMX-unreachable + blackout posture. New
+// pages program, Slice 3 (D6): Lighting binds no key of its own, so every case
 // here reaches its control on screen; the keys it used to press are pressed
-// in `no-shortcuts.spec.ts`, where nothing may answer them.
+// in `no-shortcuts.spec.ts`, where nothing may answer them. Slice SW (D22): the
+// cases for other sizes and for Studio Preview went; the layout's checks are
+// the 2560 case's.
 
 test("renders the lighting snapshot loading posture", async ({ page }) => {
   await openFixture(page, "lighting-loading");
@@ -122,7 +123,6 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
 });
 
 test("renders lighting fixture symbol families and stage plot render modes", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
   await openFixture(page, "lighting-symbol-families");
 
   const plot = page.getByRole("application", { name: "Lighting stage plot" });
@@ -155,77 +155,40 @@ test("renders lighting fixture symbol families and stage plot render modes", asy
   await expect(fresnel).toHaveAttribute("aria-pressed", "true");
 });
 
-test("keeps the full lighting workspace visible at the 1920x1080 fallback size", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
+// New pages program, Slice SW (D22). Old: "keeps the full lighting workspace
+// visible at the 1920x1080 fallback size" and "adapts lighting layout modes
+// across supported logical viewport sizes", six sizes from 1280 × 800 up, the
+// narrow drawer among them. New: that loop's 2560 row, with the fallback case's
+// look at what the cluster carries. Reason: one screen, one layout.
+test("the lighting layout at 2560x1440: the cluster, the stage and every primary control fit", async ({ page }) => {
+  await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "lighting-populated");
 
   const workspace = page.getByRole("main").first();
-  // Visual overhaul A, Slice 5. Old: the Lighting workspace toolbar. New: the
-  // shell's cluster, which carries what the toolbar carried and the rig's state
-  // above it. Reason: Lighting follows the cluster rule — the state first and
-  // fixed, then the keys, in the same place as every other workspace.
-  await expect(page.getByTestId("lighting-cluster")).toBeVisible();
-  // The scenes and the groups are the cluster's sections now, so they are read
-  // off the cluster rather than the workspace's own main element.
+  // Visual overhaul A, Slice 5: the shell's cluster carries what the toolbar
+  // carried and the rig's state above it; the scenes and the groups are its
+  // sections, so they are read off the cluster rather than the workspace's own
+  // main element.
   const cluster = page.getByTestId("lighting-cluster");
+  await expect(cluster).toBeVisible();
   await expect(cluster.getByText("Scenes", { exact: true })).toBeVisible();
   await expect(cluster.getByText("Groups", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("lighting-stage")).toBeVisible();
   await expect(page.getByRole("application", { name: "Lighting stage plot" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Patch/ })).toBeVisible();
   await expect(workspace.getByText("1 fixture selected")).toBeVisible();
+  await expectToolbarPrimaryControlsFit(page);
+  await expectNoDocumentScroll(page);
 
-  const layoutMetrics = await page.evaluate(() => ({
-    scrollHeight: document.documentElement.scrollHeight,
-    scrollWidth: document.documentElement.scrollWidth,
-    viewportHeight: window.innerHeight,
-    viewportWidth: window.innerWidth,
-  }));
+  const stageBounds = await page.getByTestId("lighting-stage").boundingBox();
+  expect(stageBounds?.width ?? 0).toBeGreaterThanOrEqual(560);
+  expect(stageBounds?.height ?? 0).toBeGreaterThanOrEqual(440);
 
-  expect(layoutMetrics.scrollHeight).toBeLessThanOrEqual(layoutMetrics.viewportHeight + 1);
-  expect(layoutMetrics.scrollWidth).toBeLessThanOrEqual(layoutMetrics.viewportWidth + 1);
-});
-
-test("adapts lighting layout modes across supported logical viewport sizes", async ({ page }) => {
-  const cases = [
-    { width: 1280, height: 800, mode: "narrowUtility" },
-    { width: 1440, height: 900, mode: "desktopCompact" },
-    { width: 1600, height: 960, mode: "desktopCompact" },
-    { width: 1728, height: 1117, mode: "desktopCompact" },
-    { width: 1920, height: 1080, mode: "studioFull" },
-    { width: 2560, height: 1440, mode: "studioFull" },
-  ] as const;
-
-  for (const entry of cases) {
-    await page.setViewportSize({ width: entry.width, height: entry.height });
-    await openFixture(page, "lighting-populated");
-
-    await expect(page.locator("[data-operator-layout-root]")).toHaveAttribute("data-layout-mode", entry.mode);
-    await expect(page.getByTestId("lighting-cluster")).toBeVisible();
-    await expect(page.getByTestId("lighting-stage")).toBeVisible();
-    await expectToolbarPrimaryControlsFit(page);
-    await expectNoDocumentScroll(page);
-
-    const stageBounds = await page.getByTestId("lighting-stage").boundingBox();
-    expect(stageBounds?.width ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 520 : 560);
-    expect(stageBounds?.height ?? 0).toBeGreaterThanOrEqual(entry.mode === "narrowUtility" ? 400 : 440);
-
-    // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
-    // tools folded into a toolbar overflow menu. New: Highlight, Solo and Find
-    // are keys on the cluster at every size. Reason: the cluster carries the
-    // rig's standing actions, and it is the same cluster at every size.
-    await expect(page.getByTestId("lighting-highlight-toggle")).toBeVisible();
-    await expect(page.getByTestId("lighting-solo-toggle")).toBeVisible();
-    await expect(page.getByTestId("lighting-identify-find")).toBeVisible();
-
-    if (entry.mode === "narrowUtility") {
-      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
-      await page.getByTestId("lighting-open-inspector").click();
-      await expect(page.getByTestId("lighting-inspector-drawer")).toBeVisible();
-      await expect(page.getByTestId("lighting-inspector-drawer").getByLabel("Fixture intensity")).toBeVisible();
-      await page.getByTestId("lighting-inspector-drawer").getByRole("button", { name: "Close" }).click();
-      await expect(page.getByTestId("lighting-inspector-drawer")).toHaveCount(0);
-    }
-  }
+  // Visual overhaul A, Slice 5: Highlight, Solo and Find are keys on the
+  // cluster, which carries the rig's standing actions.
+  await expect(page.getByTestId("lighting-highlight-toggle")).toBeVisible();
+  await expect(page.getByTestId("lighting-solo-toggle")).toBeVisible();
+  await expect(page.getByTestId("lighting-identify-find")).toBeVisible();
 });
 
 // Visual overhaul A, Slice 5 (plan Slice 5, findings M3 and C3): when the
@@ -323,34 +286,6 @@ test("the plate shows the selected fixture's sections at once, with no tab row",
   await expect(page.getByTestId("lighting-plate-palettes")).toBeAttached();
   await expect(plate.getByRole("button", { name: "Delete fixture" })).toBeVisible();
 });
-
-test("renders scaled studio preview inside the current MacBook-sized viewport", async ({ page }) => {
-  await page.setViewportSize({ width: 1512, height: 982 });
-  const response = await page.goto("/?fixture=lighting-populated&transport=fixture&operatorReview=studio");
-  expect(response, "studio preview fixture should return a document response").not.toBeNull();
-  expect(response!.status(), "studio preview fixture should not fail to load").toBeLessThan(400);
-
-  const root = page.locator("[data-operator-layout-root]");
-  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
-  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
-  await expect(root).toHaveAttribute("data-layout-width", "2560");
-  await expect(root).toHaveAttribute("data-layout-height", "1440");
-  await expect(page.getByText(/Studio Preview/)).toBeVisible();
-  // S14: the helper reads the primary controls once; the workspace is a chunk
-  // of its own now, so wait until it is the thing on screen.
-  await expectWorkspaceMounted(page, "lighting");
-  await expectToolbarPrimaryControlsFit(page);
-  await expectNoDocumentScroll(page);
-
-  const visualBounds = await root.boundingBox();
-  expect(visualBounds?.width ?? 0).toBeLessThanOrEqual(1512 + 1);
-  expect(visualBounds?.height ?? 0).toBeLessThanOrEqual(982 + 1);
-  expect((visualBounds?.width ?? 0) / (visualBounds?.height ?? 1)).toBeCloseTo(16 / 9, 2);
-});
-
-// New pages program, Slice 3 (decision 1): the case that entered and left
-// Studio Preview from the command palette went with the palette. Studio Preview
-// opens only from its address, which the case above covers.
 
 test("supports lighting preview mode without driving live scene state", async ({ page }) => {
   await openFixture(page, "lighting-populated");

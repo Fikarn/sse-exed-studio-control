@@ -1,15 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  chmodSync,
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { connect } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import { isInside, listProcessPaths } from "./clean.mjs";
 import { publishWithOverride } from "./native-parity-acceptance.mjs";
 import {
-  nativeReleaseAppIdentifier,
   nativeReleaseRuntimeLabel,
   nativeReleaseShellExecutableName,
   nativeReleaseSmokeArgs,
@@ -51,9 +40,6 @@ function normalizeTargetPlatform(value) {
     return process.platform;
   }
 
-  if (value === "macos") {
-    return "darwin";
-  }
   if (value === "windows") {
     return "win32";
   }
@@ -111,9 +97,7 @@ function normalizeForOutputComparison(value) {
 }
 
 function resolveEngineExecutablePath() {
-  return process.platform === "win32"
-    ? path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe")
-    : path.join(rootDir, "native", "target", "debug", "studio-control-engine");
+  return path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe");
 }
 
 function resolveTauriShellPath(target) {
@@ -130,39 +114,6 @@ function archiveWindowsDirectory(sourceDir, archivePath) {
       "''"
     )}' -Force`,
   ]);
-}
-
-function writeTauriMacInfoPlist(appPath) {
-  const contentsPath = path.join(appPath, "Contents");
-  const version = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version;
-  const plist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleDevelopmentRegion</key>
-  <string>en</string>
-  <key>CFBundleDisplayName</key>
-  <string>SSE ExEd Studio Control</string>
-  <key>CFBundleExecutable</key>
-  <string>sse-exed-tauri-shell</string>
-  <key>CFBundleIdentifier</key>
-  <string>${nativeReleaseAppIdentifier()}</string>
-  <key>CFBundleName</key>
-  <string>SSE ExEd Studio Control</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>${version}</string>
-  <key>CFBundleVersion</key>
-  <string>${version}</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>12.0</string>
-  <key>NSHighResolutionCapable</key>
-  <true/>
-</dict>
-</plist>
-`;
-  writeFileSync(path.join(contentsPath, "Info.plist"), plist, "utf8");
 }
 
 function verifyBundledEngineStart(smokeStatus, expectedEnginePath, statusPath) {
@@ -237,53 +188,6 @@ function smokeScenarioConfig(name) {
     default:
       throw new Error(`Unsupported packaged smoke scenario: ${name}`);
   }
-}
-
-function packageMacLocal() {
-  if (process.platform !== "darwin") {
-    throw new Error("native-package.mjs macOS packaging can only run on macOS.");
-  }
-
-  const sourceShellPath = resolveTauriShellPath("macos");
-  const engineExecutablePath = resolveEngineExecutablePath();
-  const outputRoot = path.join(rootDir, "release", "native", "macos");
-  const packagedAppPath = path.join(outputRoot, "SSE ExEd Studio Control Native.app");
-  const packagedMacOsDir = path.join(packagedAppPath, "Contents", "MacOS");
-  const packagedResourcesDir = path.join(packagedAppPath, "Contents", "Resources");
-  const packagedShellPath = path.join(packagedMacOsDir, "sse-exed-tauri-shell");
-  const packagedEnginePath = path.join(packagedMacOsDir, "studio-control-engine");
-  const packagedArchivePath = path.join(outputRoot, "SSE-ExEd-Studio-Control-Native-macOS.zip");
-
-  assertExists(sourceShellPath, `Tauri shell executable not found at ${sourceShellPath}. Run \`npm run tauri:build\`.`);
-  assertExists(
-    engineExecutablePath,
-    `Native engine executable not found at ${engineExecutablePath}. Run \`npm run native:engine:build\`.`
-  );
-
-  rmSync(outputRoot, { force: true, recursive: true });
-  mkdirSync(packagedMacOsDir, { recursive: true });
-  mkdirSync(packagedResourcesDir, { recursive: true });
-
-  copyFileSync(sourceShellPath, packagedShellPath);
-  copyFileSync(engineExecutablePath, packagedEnginePath);
-  chmodSync(packagedShellPath, statSync(sourceShellPath).mode);
-  chmodSync(packagedEnginePath, statSync(engineExecutablePath).mode);
-  writeTauriMacInfoPlist(packagedAppPath);
-
-  run("codesign", ["--force", "--deep", "--sign", "-", packagedAppPath]);
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", packagedAppPath, packagedArchivePath]);
-
-  console.log(`Packaged native macOS Tauri bundle: ${packagedAppPath}`);
-  console.log(`Packaged native macOS archive: ${packagedArchivePath}`);
-
-  return {
-    label: "macOS",
-    packagedShellPath,
-    packagedEnginePath,
-    runtime: releaseRuntime,
-    smokeRuntimeDir: path.join(outputRoot, "smoke-runtime"),
-    target: "macos",
-  };
 }
 
 /**
@@ -423,12 +327,10 @@ async function main() {
   }
 
   let packaged;
-  if (targetPlatform === "darwin") {
-    packaged = packageMacLocal();
-  } else if (targetPlatform === "win32") {
+  if (targetPlatform === "win32") {
     packaged = await packageWindowsLocal();
   } else {
-    throw new Error("native-package.mjs currently supports macOS and Windows packaging only.");
+    throw new Error("native-package.mjs supports Windows packaging only.");
   }
 
   console.log(`Native release packaging runtime: ${nativeReleaseRuntimeLabel(releaseRuntime)}.`);

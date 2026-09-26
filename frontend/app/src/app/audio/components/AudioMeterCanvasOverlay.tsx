@@ -617,7 +617,7 @@ export function AudioMeterCanvasOverlay({
 
     const mutationObserver = new MutationObserver(requestMeasure);
     mutationObserver.observe(paintRoot, {
-      attributeFilter: ["data-density", "data-view-mode", "data-selected"],
+      attributeFilter: ["data-view-mode", "data-selected"],
       attributes: true,
       childList: true,
       subtree: true,

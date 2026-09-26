@@ -28,11 +28,11 @@ function hasFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported Tauri candidate IFW target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported Tauri candidate IFW target '${value}'. Use --target=windows.`);
 }
 
 function parseKind(value) {
@@ -101,7 +101,7 @@ function ensurePackagedPayload(target) {
     return payloadPath;
   }
 
-  if ((target === "macos" && process.platform === "darwin") || (target === "windows" && process.platform === "win32")) {
+  if (target === "windows" && process.platform === "win32") {
     run(process.execPath, [
       path.join(rootDir, "scripts", "legacy", "tauri-package-candidate.mjs"),
       `--target=${target}`,
@@ -142,10 +142,6 @@ ${includeScript ? "  <Script>installscript.qs</Script>\n" : ""}  <Licenses>
   </Licenses>
 </Package>
 `;
-}
-
-function archiveMacPath(sourcePath, archivePath) {
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", sourcePath, archivePath]);
 }
 
 function archiveWindowsPath(sourcePath, archivePath) {
@@ -238,19 +234,9 @@ function main() {
   }
 
   if (kind === "installer") {
-    const installerPath =
-      target === "macos"
-        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app")
-        : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
-    const archivePath =
-      target === "macos"
-        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.zip")
-        : null;
+    const installerPath = path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
 
     rmSync(installerPath, { force: true, recursive: true });
-    if (archivePath) {
-      rmSync(archivePath, { force: true, recursive: true });
-    }
     run(ifwTool, [
       "--offline-only",
       "-c",
@@ -259,29 +245,19 @@ function main() {
       path.join(buildRoot, "packages"),
       installerPath,
     ]);
-    if (archivePath) {
-      archiveMacPath(installerPath, archivePath);
-    }
     console.log(`Built Tauri candidate installer artifact: ${installerPath}`);
-    if (archivePath) {
-      console.log(`Archived Tauri candidate installer artifact: ${archivePath}`);
-    }
   } else {
     const repositoryPath = path.join(candidateRoot, "repository");
-    const archivePath =
-      target === "macos"
-        ? path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-UpdateRepository.zip")
-        : path.join(candidateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip");
+    const archivePath = path.join(
+      candidateRoot,
+      "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip"
+    );
 
     rmSync(repositoryPath, { force: true, recursive: true });
     rmSync(archivePath, { force: true, recursive: true });
     mkdirSync(path.dirname(repositoryPath), { recursive: true });
     run(ifwTool, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
-    if (target === "macos") {
-      archiveMacPath(repositoryPath, archivePath);
-    } else {
-      archiveWindowsPath(repositoryPath, archivePath);
-    }
+    archiveWindowsPath(repositoryPath, archivePath);
     console.log(`Built Tauri candidate update repository: ${repositoryPath}`);
     console.log(`Archived Tauri candidate update repository: ${archivePath}`);
   }

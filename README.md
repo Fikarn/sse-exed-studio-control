@@ -13,15 +13,14 @@ This repository is intentionally optimized for a specific deployment profile rat
 
 - selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
 - separate `Rust` engine (persistence, safety, device logic)
-- offline Qt Installer Framework packages on Windows 11 `x64` and macOS Apple Silicon
+- an offline Qt Installer Framework package on Windows 11 `x64`, the only system it runs on
 - no legacy code: the one-way importer for the pre-`v2.0.0` `db.json` was retired in the new pages program's Slice 2b (2026-09), so a `db.json` is neither imported nor restored
 
 The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipping runtime passed macOS and Windows target-host evidence. QtIFW remains the installer and update-repository wrapper.
 
 ## Distribution Targets
 
-- Windows 11 `x64` packaged as a Qt Installer Framework offline installer
-- macOS Apple Silicon packaged as a Qt Installer Framework offline installer
+- Windows 11 `x64` packaged as a Qt Installer Framework offline installer (the only target since 2026-09-26: there is no macOS or Linux package)
 - GitHub Releases as the installer and update-repository artifact backend
 - One fixed studio workstation as the primary production target
 
@@ -30,10 +29,9 @@ The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipp
 Release artifacts are published through [GitHub Releases](https://github.com/Fikarn/sse-exed-studio-control/releases/latest).
 
 - Windows: install the generated native `.exe` offline installer
-- macOS: install from the generated native offline installer archive
 - Updates: use the published native maintenance-tool update repository artifacts for controlled workstation updates
-- Integrity: verify downloads against the published per-platform `SHA256` manifest before operator rollout
-- Trust: expect unsigned-installer warnings on macOS and Windows and handle them as a deliberate operator-managed install, not a public self-serve consumer install
+- Integrity: verify downloads against the published `SHA256` manifest before operator rollout
+- Trust: expect unsigned-installer warnings on Windows and handle them as a deliberate operator-managed install, not a public self-serve consumer install
 
 Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md) and [docs/RELEASE.md](docs/RELEASE.md).
 
@@ -100,7 +98,7 @@ The Planning workspace was removed in 2026-09 at the operator's request (the new
 
 This project is deliberately tuned to the current studio installation.
 
-- Display: dedicated second monitor at `2560x1440` — the only size that matters (operator ruling 2026-09-18: Windows only, `2560x1440` only; the smaller fallback layouts keep their guards but are not worked on)
+- Display: dedicated second monitor at `2560x1440`, the program fullscreen on it, on Windows — the only size and the only system (operator ruling 2026-09-26; the new pages program's Slice SW removed the smaller layouts and everything else that existed for another size or system)
 - Audio interface: RME Fireface UFX III
 - Lighting bridge: Litepanels Apollo Bridge
 - Control surface: Stream Deck+
@@ -158,21 +156,13 @@ npm run frontend:foundation
 npm run tauri:foundation
 npm run tauri:setup-support:qualify
 npm run tauri:workspaces:qualify
-npm run native:package:mac:local
-npm run native:package:mac:smoke
-npm run native:package:mac:clean-smoke
 npm run native:package:win:local
 npm run native:package:win:smoke
 npm run native:package:win:clean-smoke
-npm run native:installer:mac:prepare
-npm run native:installer:mac:local
 npm run native:installer:win:prepare
 npm run native:installer:win:local
-npm run native:update-repo:mac:prepare
-npm run native:update-repo:mac:local
 npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
-npm run native:release:mac:local
 npm run native:release:win:local
 npm run native:acceptance
 ```
@@ -204,7 +194,7 @@ Beyond `dev:check`, which also enforces the Vitest coverage floors, three gates 
 
 The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
 
-`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`. Both keep `release/native` when a packaged app is in it (on a workstation that runs the app from the repository, that folder is the installed app) and say so; `-- --include-release` removes it as well and refuses while the app is running, and `-- --dry-run` removes nothing.
+`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`. Both keep `release/native` when a packaged app is in it (on a workstation that runs the app from the repository, that folder is the installed app) and say so; `-- --include-release` removes it as well and refuses while the app is running, and `-- --dry-run` removes nothing.
 
 ## Release Model
 
@@ -219,7 +209,7 @@ Releases are changelog-driven and tag-driven:
 7. Create and push a `vX.Y.Z` tag
 8. Publish the locally built target-host artifacts with `npm run release:publish -- --tag vX.Y.Z`
 
-Release builds are local/target-host gates, not GitHub Actions gates. The macOS Apple Silicon and Windows 11 `x64` release hosts build and verify their own installers, update-repository archives, and SHA256 manifests; `release:publish` uploads the checked artifacts to GitHub Releases using release notes generated from `CHANGELOG.md`.
+Release builds are local/target-host gates, not GitHub Actions gates. The Windows 11 `x64` release host builds and verifies the installer, the update-repository archive and the SHA256 manifest; `release:publish` uploads the checked artifacts to GitHub Releases using release notes generated from `CHANGELOG.md`.
 
 ## Engineering Standards
 

@@ -12,30 +12,6 @@
   transition: opacity var(--motion-duration-exit) ease;
 }
 
-:global([data-layout-mode="desktopCompact"]) .rail {
-  gap: 10px;
-}
-
-:global([data-layout-mode="desktopCompact"]) .sceneGrid {
-  gap: 7px;
-}
-
-:global([data-layout-mode="narrowUtility"]) .rail,
-:global([data-layout-mode="constrained"]) .rail {
-  gap: 9px;
-}
-
-:global([data-layout-mode="narrowUtility"]) .master,
-:global([data-layout-mode="constrained"]) .master {
-  gap: 10px;
-  padding: 12px;
-}
-
-:global([data-layout-mode="narrowUtility"]) .sceneGrid,
-:global([data-layout-mode="constrained"]) .sceneGrid {
-  grid-template-columns: 1fr;
-}
-
 .railPaused {
   opacity: 0.42;
 }
@@ -371,9 +347,9 @@
 
 /* Virtualized variant — react-window's Grid needs a fixed-size container.
    Activated only when filtered scenes exceed the virtualization threshold
-   (see SceneRail.tsx). The 60vh ceiling matches typical 1080p / 1440p
-   workspace heights so the rail stays usable inside its outer scroll
-   without nested fighting. */
+   (see SceneRail.tsx). The 60vh ceiling matches the 1440 px workspace
+   height so the rail stays usable inside its outer scroll without nested
+   fighting. */
 .sceneGridVirtualized {
   height: 60vh;
   max-height: 60vh;

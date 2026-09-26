@@ -2,12 +2,14 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { liveAudioMasks } from "./helpers/liveAudioMasks";
 
-// Visual review baselines for the operator shell across the hardware-profile
-// fallback ladder plus the Scaled Studio Preview surface. Replaces the
-// screenshot-only loop that used to live in `scripts/tauri-visual-review.mjs`:
-// the captures are now `toHaveScreenshot` baselines committed under
-// `tests/__visual__/visual-review.spec.ts-snapshots/`, and PR diffs upload via
-// the GitHub Actions `playwright-report` / `test-results` artifacts.
+// Visual review baselines for the operator shell at 2560×1440, the one screen
+// Studio Control runs on. Replaces the screenshot-only loop that used to live
+// in `scripts/tauri-visual-review.mjs`: the captures are `toHaveScreenshot`
+// baselines committed under `tests/__visual__/visual-review.spec.ts-snapshots/`.
+// New pages program, Slice SW (D22): the other sizes of the ladder and Scaled
+// Studio Preview went, and the captures are compared on the Windows workstation
+// only (`ignoreSnapshots` in playwright.config.ts) — on CI's Linux runner these
+// cases make their other checks and compare no screenshot.
 
 const FIXTURES = ["setup-ready", "protocol-mismatch", "lighting-populated", "audio-populated"] as const;
 
@@ -17,22 +19,8 @@ interface Viewport {
   readonly label: string;
 }
 
-const SIZES: readonly Viewport[] = [
-  { width: 1280, height: 800, label: "1280x800" },
-  { width: 1440, height: 900, label: "1440x900" },
-  { width: 1600, height: 960, label: "1600x960" },
-  { width: 1728, height: 1117, label: "1728x1117" },
-  { width: 1920, height: 1080, label: "1920x1080" },
-  { width: 2560, height: 1440, label: "2560x1440" },
-];
-
-// plan PR 11 / workstream A2: extend Scaled Studio Preview baselines beyond
-// Audio so every operator surface in `OperatorLayoutProvider.tsx` is
-// regression-tested on the proportional `2560x1440` review canvas, not just
-// the Audio fixture. The host viewport mirrors the built-in 14-inch M5
-// MacBook (the documented review surface in `docs/DEVELOPMENT.md §2b`).
-const STUDIO_PREVIEW_FIXTURES = ["setup-ready", "lighting-populated", "audio-populated"] as const;
-const STUDIO_PREVIEW_HOST: Viewport = { width: 1512, height: 982, label: "1512x982" };
+// The capture names keep their `-2560x1440` suffix.
+const STUDIO: Viewport = { width: 2560, height: 1440, label: "2560x1440" };
 
 // Lighting fixtures render relative time labels ("last 19h ago" on scene
 // cards), and every shell prints the header clock. Freezing the clock for every
@@ -60,23 +48,9 @@ function masksFor(page: Page, fixture: string): Locator[] {
   return fixture.startsWith("audio-") ? liveAudioMasks(page) : [];
 }
 
-function expectedLayoutMode(width: number, height: number): string {
-  if (width >= 1920 && height >= 1080) return "studioFull";
-  if (width >= 1440 && height >= 900) return "desktopCompact";
-  if (width >= 1280 && height >= 800) return "narrowUtility";
-  return "constrained";
-}
-
-async function gotoFixture(
-  page: Page,
-  fixture: string,
-  options: { operatorReview?: "studio"; theme?: "graphite" | "bone" } = {}
-) {
+async function gotoFixture(page: Page, fixture: string, options: { theme?: "graphite" | "bone" } = {}) {
   await page.clock.setFixedTime(FIXTURE_NOW);
   const params = new URLSearchParams({ fixture, transport: "fixture" });
-  if (options.operatorReview) {
-    params.set("operatorReview", options.operatorReview);
-  }
   if (options.theme) {
     params.set("theme", options.theme);
   }
@@ -118,16 +92,13 @@ async function assertViewportFit(page: Page, size: Viewport, fixture: string) {
   );
 }
 
-async function assertLightingResponsive(page: Page, size: Viewport) {
-  const expectedMode = expectedLayoutMode(size.width, size.height);
+async function assertLightingLayout(page: Page, size: Viewport) {
   const details = await page.evaluate(() => {
-    const root = document.querySelector("[data-operator-layout-root]");
     const stage = document.querySelector('[data-testid="lighting-stage"]');
     const primaryControls = Array.from(document.querySelectorAll("[data-toolbar-primary]"));
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     return {
-      layoutMode: root?.getAttribute("data-layout-mode") ?? null,
       primaryControls: primaryControls.map((control) => {
         const rect = (control as HTMLElement).getBoundingClientRect();
         return {
@@ -150,8 +121,6 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
     };
   });
 
-  expect(details.layoutMode, `lighting layout mode @ ${size.label}`).toBe(expectedMode);
-
   // Visual overhaul A, Slice 5. Old: seven toolbar primaries, "overflow" among
   // them, each measured where it stood. New: the same ids on their new homes in
   // the cluster, minus "overflow" — nothing folds into an overflow menu now.
@@ -169,11 +138,9 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
   ]);
   await expectToolbarPrimaryControlsFit(page);
 
-  const stageMinWidth = expectedMode === "narrowUtility" ? 520 : 560;
-  const stageMinHeight = expectedMode === "narrowUtility" ? 400 : 440;
   expect(details.stage, `lighting stage missing @ ${size.label}`).not.toBeNull();
-  expect(details.stage!.width, `lighting stage width @ ${size.label}`).toBeGreaterThanOrEqual(stageMinWidth);
-  expect(details.stage!.height, `lighting stage height @ ${size.label}`).toBeGreaterThanOrEqual(stageMinHeight);
+  expect(details.stage!.width, `lighting stage width @ ${size.label}`).toBeGreaterThanOrEqual(560);
+  expect(details.stage!.height, `lighting stage height @ ${size.label}`).toBeGreaterThanOrEqual(440);
 
   // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
   // tools folded into a toolbar overflow menu, and this checked the menu held
@@ -185,122 +152,24 @@ async function assertLightingResponsive(page: Page, size: Viewport) {
       `lighting cluster missing '${testId}' @ ${size.label}`
     ).toBe(1);
   }
-
-  if (expectedMode === "narrowUtility") {
-    const drawer = page.locator('[data-testid="lighting-inspector-drawer"]');
-    expect(await drawer.count(), `lighting inspector drawer should start closed @ ${size.label}`).toBe(0);
-    await page.locator('[data-testid="lighting-open-inspector"]').click();
-    await drawer.waitFor({ state: "visible" });
-    await expect(
-      drawer.getByLabel("Fixture intensity"),
-      `lighting inspector drawer should expose selected fixture controls @ ${size.label}`
-    ).toBeVisible();
-    await drawer.getByRole("button", { name: "Close" }).click();
-    await drawer.waitFor({ state: "detached" });
-  }
 }
 
-function assertRatioClose(actual: number, expected: number, label: string, tolerance = 0.06) {
-  expect(Number.isFinite(actual), `${label} ratio must be finite`).toBe(true);
-  expect(Math.abs(actual - expected), label).toBeLessThanOrEqual(tolerance);
-}
+test.describe(`viewport ${STUDIO.label}`, () => {
+  test.use({ viewport: { width: STUDIO.width, height: STUDIO.height } });
 
-async function assertStudioPreviewFidelity(page: Page, fixture: string, size: Viewport) {
-  const details = await page.evaluate(() => {
-    const root = document.querySelector("[data-operator-layout-root]");
-    const ratioFor = (node: Element | null) => {
-      if (!node) return null;
-      const rect = (node as HTMLElement).getBoundingClientRect();
-      return rect.height > 0 ? rect.width / rect.height : null;
-    };
-    // 2026-05-27 redesign: the compact preamp is now an SVG AudioStripPreamp
-    // knob (role=slider, square ~1:1) rather than a "preamp-panel-compact"
-    // bitmap. The fidelity check is that the scaled studio preview preserves
-    // the knob's square aspect ratio.
-    // Visual overhaul A, Slice 4b: the strips carry a gain key instead of a
-    // knob, so the fidelity check measures the strip's fader groove — the tall
-    // control the scale must not distort — and the plate's knob keeps the
-    // square check where it still stands.
-    const preampKnobRatios = Array.from(
-      document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="preamp gain"]')
-    ).map((node) => ratioFor(node));
-    const grooveRatios = Array.from(
-      document.querySelectorAll('[data-testid="audio-workspace"] [role="slider"][aria-label*="send level"]')
-    ).map((node) => ratioFor(node));
+  for (const fixture of FIXTURES) {
+    test(`${fixture}`, async ({ page }) => {
+      await gotoFixture(page, fixture);
 
-    return {
-      grooveRatios,
-      preampKnobRatios,
-      root: root
-        ? {
-            layoutHeight: root.getAttribute("data-layout-height"),
-            layoutMode: root.getAttribute("data-layout-mode"),
-            layoutWidth: root.getAttribute("data-layout-width"),
-            reviewSurface: root.getAttribute("data-review-surface"),
-          }
-        : null,
-    };
-  });
-
-  expect(details.root?.reviewSurface, `Studio Preview review surface @ ${size.label}`).toBe("studioPreview");
-  expect(details.root?.layoutMode, `Studio Preview layout mode @ ${size.label}`).toBe("studioFull");
-  expect(details.root?.layoutWidth, `Studio Preview simulated width @ ${size.label}`).toBe("2560");
-  expect(details.root?.layoutHeight, `Studio Preview simulated height @ ${size.label}`).toBe("1440");
-
-  if (fixture.startsWith("audio-")) {
-    // 2026-05-27 redesign: the canvas bar label ("Editing …") and selected-meta
-    // ("routed to main out") were removed from the slimmed context bar, so the
-    // audio fidelity check now verifies the SVG preamp knobs render square in
-    // the scaled studio preview (the scale must preserve their aspect ratio).
-    expect(
-      details.grooveRatios.length,
-      `Audio Studio Preview must render strip faders @ ${size.label}`
-    ).toBeGreaterThan(0);
-    // A 44 px column that is far taller than it is wide: the scale must keep
-    // it that way rather than squashing it.
-    details.grooveRatios.forEach((ratio, index) => {
-      expect(ratio ?? Number.NaN, `Audio Studio Preview strip fader ${index + 1} @ ${size.label}`).toBeLessThan(0.5);
-    });
-    details.preampKnobRatios.forEach((ratio, index) => {
-      assertRatioClose(ratio ?? Number.NaN, 1, `Audio Studio Preview preamp knob ${index + 1} @ ${size.label}`, 0.1);
-    });
-  }
-}
-
-for (const size of SIZES) {
-  test.describe(`viewport ${size.label}`, () => {
-    test.use({ viewport: { width: size.width, height: size.height } });
-
-    for (const fixture of FIXTURES) {
-      test(`${fixture}`, async ({ page }) => {
+      if (fixture === "lighting-populated") {
+        await assertLightingLayout(page, STUDIO);
+        // The harness scrolls each primary control into view; re-navigate so
+        // the baseline screenshot captures the rest state.
         await gotoFixture(page, fixture);
+      }
 
-        if (fixture === "lighting-populated") {
-          await assertLightingResponsive(page, size);
-          // The lighting responsive harness opens overlays for non-studioFull
-          // modes; re-navigate so the baseline screenshot captures the rest
-          // state instead of any tail end of those interactions.
-          await gotoFixture(page, fixture);
-        }
-
-        await assertViewportFit(page, size, fixture);
-        await expect(page).toHaveScreenshot(`${fixture}-${size.label}.png`, {
-          mask: masksFor(page, fixture),
-          maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
-        });
-      });
-    }
-  });
-}
-
-test.describe("studio preview", () => {
-  test.use({ viewport: { width: STUDIO_PREVIEW_HOST.width, height: STUDIO_PREVIEW_HOST.height } });
-
-  for (const fixture of STUDIO_PREVIEW_FIXTURES) {
-    test(`${fixture} @ ${STUDIO_PREVIEW_HOST.label}`, async ({ page }) => {
-      await gotoFixture(page, fixture, { operatorReview: "studio" });
-      await assertStudioPreviewFidelity(page, fixture, STUDIO_PREVIEW_HOST);
-      await expect(page).toHaveScreenshot(`${fixture}-studio-preview-${STUDIO_PREVIEW_HOST.label}.png`, {
+      await assertViewportFit(page, STUDIO, fixture);
+      await expect(page).toHaveScreenshot(`${fixture}-${STUDIO.label}.png`, {
         mask: masksFor(page, fixture),
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
       });
@@ -350,8 +219,7 @@ test.describe("per-theme foundation", () => {
 // functionally tested but never visually locked — the lighting "No fixtures
 // on the rig yet" canvas state, the setup degraded banner posture and the
 // audio assumed-state warning band could all silently regress. One
-// state-locking capture each at the primary resolution (these states carry no
-// layout-ladder risk — the populated fixtures own the 6-viewport ladder).
+// state-locking capture each at 2560×1440.
 // Close-out extension: the remaining degraded postures from the round-2
 // audit's R2-FIX-01 matrix (audio not-verified / offline / action-failed
 // warning bands + the lighting DMX-unreachable posture) join the loop —
@@ -377,30 +245,6 @@ test.describe("state coverage", () => {
         mask: masksFor(page, fixture),
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
       });
-    });
-  }
-});
-
-test.describe("dpr-independent lighting layout", () => {
-  for (const deviceScaleFactor of [1, 2] as const) {
-    test(`devicePixelRatio ${deviceScaleFactor}`, async ({ browser }) => {
-      const context = await browser.newContext({
-        deviceScaleFactor,
-        timezoneId: "Europe/Stockholm",
-        viewport: { width: 1440, height: 900 },
-      });
-      try {
-        const page = await context.newPage();
-        await page.goto("/?fixture=lighting-populated&transport=fixture", {
-          waitUntil: "networkidle",
-        });
-        const mode = await page.locator("[data-operator-layout-root]").getAttribute("data-layout-mode");
-        expect(mode, `lighting layout mode must follow CSS viewport size (DPR=${deviceScaleFactor})`).toBe(
-          "desktopCompact"
-        );
-      } finally {
-        await context.close();
-      }
     });
   }
 });

@@ -128,7 +128,8 @@ pub fn startup_failure_code(error: &(dyn Error + Send + Sync + 'static)) -> &'st
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum RuntimePlatform {
-    Macos,
+    /// The Linux CI runners, which build and test the engine (new pages
+    /// program, Slice SW, D22: Studio Control itself runs on Windows only).
     Unix,
     Windows,
 }
@@ -136,8 +137,6 @@ enum RuntimePlatform {
 fn current_runtime_platform() -> RuntimePlatform {
     if cfg!(target_os = "windows") {
         RuntimePlatform::Windows
-    } else if cfg!(target_os = "macos") {
-        RuntimePlatform::Macos
     } else {
         RuntimePlatform::Unix
     }
@@ -176,9 +175,6 @@ where
     let base = match platform {
         RuntimePlatform::Windows => {
             env_path("APPDATA", get_env).or_else(|| env_path("LOCALAPPDATA", get_env))
-        }
-        RuntimePlatform::Macos => {
-            env_path("HOME", get_env).map(|home| home.join("Library").join("Application Support"))
         }
         RuntimePlatform::Unix => env_path("XDG_DATA_HOME", get_env)
             .or_else(|| env_path("HOME", get_env).map(|home| home.join(".local").join("share"))),
@@ -883,7 +879,7 @@ mod tests {
     fn host_platform_base() -> (&'static str, &'static str) {
         match current_runtime_platform() {
             RuntimePlatform::Windows => ("APPDATA", "C:\\Users\\operator\\AppData\\Roaming"),
-            RuntimePlatform::Macos | RuntimePlatform::Unix => ("HOME", "/home/operator"),
+            RuntimePlatform::Unix => ("HOME", "/home/operator"),
         }
     }
 
@@ -957,16 +953,6 @@ mod tests {
             default_app_data_dir_for_platform(RuntimePlatform::Windows, &mut windows_local)
                 .expect("windows local base"),
             PathBuf::from("C:/Users/operator/AppData/Local").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-
-        let mut macos = env_fixture(&[("HOME", "/Users/operator")]);
-        assert_eq!(
-            default_app_data_dir_for_platform(RuntimePlatform::Macos, &mut macos)
-                .expect("macos base"),
-            PathBuf::from("/Users/operator")
-                .join("Library")
-                .join("Application Support")
-                .join(DEFAULT_APP_DATA_DIR_NAME)
         );
 
         let mut unix = env_fixture(&[("XDG_DATA_HOME", "/home/operator/.local/data")]);

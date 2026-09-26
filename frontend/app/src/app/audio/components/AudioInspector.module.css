@@ -27,12 +27,6 @@
   min-width: 0;
 }
 
-/* Below the studio surface the plate spends less air; every section stays. */
-:global([data-operator-layout-root][data-chrome="compact"]) .inspector {
-  gap: 12px;
-  padding: 14px 12px;
-}
-
 /* ── Tab strip ────────────────────────────────────────────────────────────── */
 
 .inspectorTabs {
@@ -591,24 +585,6 @@
 .inspectorActionButton:disabled {
   opacity: var(--control-disabled-opacity);
   cursor: not-allowed;
-}
-
-/* C01 fit: the send-fader card sits above the meter card in the Preamp/Channel
-   panel, and at the dense operator heights (e.g. the 1920x1080 fallback) the
-   audit's padding:14/gap:8 chrome overflowed the panel by ~29px — its "footprint
-   <= default buttons" assumption was wrong, because the unstyled fallback had no
-   card chrome at all. 2560 keeps the roomy base; compact the card only at
-   <=1120px logical height, mirroring the EQ/Dyn/Sends tabs' own operator-root
-   blocks (keyed on the logical operator surface so the scaled studio preview
-   still matches native 2560x1440). */
-@container operator-root (max-height: 1120px) {
-  .inspectorFaderCard {
-    gap: 3px;
-    padding: 4px 10px;
-  }
-  .inspectorActionButton {
-    height: 24px;
-  }
 }
 
 /* Preamp tab body hint: tells the operator the preamp lives in the sticky

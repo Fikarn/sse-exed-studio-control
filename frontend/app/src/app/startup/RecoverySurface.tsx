@@ -92,15 +92,15 @@ export function RecoverySurface({
       testId="recovery-surface"
     >
       {/* The shell's sentence says what did not happen, once; the band adds
-          only the way on. With Setup / Support in Support mode the window keys
-          are on screen at any window size, under Workstation: on the plate at
-          the studio surface, under the Support screen in a window (review
-          findings 22, 23). */}
+          only the way on: the window keys are under Workstation on Setup /
+          Support's plate, whichever mode the bay is in (review findings 22,
+          23). New pages program, Slice SW (D22): "and press Support" went with
+          the keys' copy under the Support screen, drawn only below 2200 px. */}
       {windowRefusal ? (
         <Section title="Window" testId="recovery-window-refusal">
           <p className={recoveryStyles.nextStep} role="status">
-            {windowRefusal} Next: retry startup, then open Setup / Support and press Support: Reset the window layout is
-            under Workstation.
+            {windowRefusal} Next: retry startup, then open Setup / Support: Reset the window layout is under
+            Workstation.
           </p>
         </Section>
       ) : null}

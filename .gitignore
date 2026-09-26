@@ -1,8 +1,6 @@
 node_modules/
 .env
 .env.local
-.DS_Store
-**/.DS_Store
 release/
 !scripts/release/
 !scripts/release/**
@@ -11,7 +9,6 @@ release/
 npm-debug.log*
 .cache/
 .tools/
-.swift-module-cache/
 .idea/
 .vscode/
 tmp/

@@ -127,7 +127,7 @@ export function useAudioInspectorEqState({
   ) => {
     if (!selectedChannel || !viewModel.capabilities.canEditProcessing) return;
     // Why: re-read the EQ graph rect every pointer event so resize mid-drag
-    // (scaled-preview toggle, virtual-keyboard reflow) does not lag the
+    // (a UI-scale change, virtual-keyboard reflow) does not lag the
     // drag sideways. `eqDragRef` still anchors band+pointer identity.
     const graph = event.currentTarget.closest("[data-eq-graph]");
     if (!(graph instanceof HTMLElement)) return;

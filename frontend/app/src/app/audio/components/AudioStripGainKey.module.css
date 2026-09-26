@@ -7,16 +7,3 @@
   min-height: 30px;
   padding: 0 6px;
 }
-
-/* New pages program, Slice 3: below the studio surface a strip is 96 px and
-   its gain key 86 px, while "GAIN" and "36 dB" need about 85 px of content
-   beside 12 px of padding and an 8 px gap, so the value ran 6 px past the key
-   and past its strip. The Inputs column used to be wider than its strips (its
-   heading was), which hid that; since the heading's bank keys and readout it
-   is exactly as wide as the strips, and the spill made the tier scroll at the
-   1920 fallback (audio.spec.ts, "keeps the full audio workspace visible").
-   Tighter padding and gap fit it; the studio surface is unchanged. */
-[data-density="compact"] .gainKey {
-  gap: 4px;
-  padding: 0 4px;
-}

@@ -45,11 +45,11 @@ function readFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported delivery acceptance target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported delivery acceptance target '${value}'. Use --target=windows.`);
 }
 
 function countSuppressedLines(text, patterns, writer) {
@@ -118,17 +118,6 @@ function resolveStagedPayloadPath(target, channel) {
 
 function resolveInstalledRuntime(target, installedPayloadPath) {
   const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  if (target === "macos") {
-    return {
-      label: "macOS",
-      payloadPath: installedPayloadPath,
-      shellPath: path.join(installedPayloadPath, "Contents", "MacOS", shellName),
-      enginePath: path.join(installedPayloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
-      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
-    };
-  }
-
   return {
     label: "Windows",
     payloadPath: installedPayloadPath,
@@ -212,8 +201,7 @@ function runInstalledSmoke(installed, acceptanceRoot, runtime, stepName, expecte
 
 async function main() {
   const target = parseTarget(readFlag("--target"));
-  const expectedPlatform = target === "macos" ? "darwin" : "win32";
-  if (process.platform !== expectedPlatform) {
+  if (process.platform !== "win32") {
     throw new Error(`native-delivery-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 

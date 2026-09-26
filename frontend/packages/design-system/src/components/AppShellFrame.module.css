@@ -7,10 +7,13 @@
 .shell {
   display: grid;
   grid-template-rows: var(--operator-shell-height, var(--chrome-studio-header)) minmax(0, 1fr) auto;
-  height: var(--operator-app-height, 100vh);
-  height: var(--operator-app-height-dynamic, 100dvh);
-  min-height: var(--operator-app-min-height, 100vh);
-  min-height: var(--operator-app-min-height-dynamic, 100dvh);
+  /* New pages program, Slice SW (D22): the window, which is the whole
+     2560 × 1440 screen. The --operator-app-* hooks that let Studio Preview
+     size the shell to its scaled frame went with it. */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100vh;
+  min-height: 100dvh;
   min-width: 0;
   overflow: hidden;
   background: var(--material-bg);
@@ -127,42 +130,4 @@
   padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
   background: var(--material-bay);
   box-shadow: var(--elevation-bay);
-}
-
-/* Fallback layouts below the studio surface (not a deliverable, plan D4): the
-   plates narrow so the bay still fits. Keyed off the operator surface's own
-   density line (the 2200 px the Console banks its strips at), never the host
-   window, so Scaled Studio Preview keeps the studio geometry (AGENTS.md
-   §Hardware target). */
-/* The mock's fallback gutter (12 px at 1920, 16 at the studio surface). */
-:global([data-operator-layout-root][data-chrome="compact"]) .bay {
-  padding: calc(12px * var(--operator-ui-scale-factor, 1));
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-cluster] .body {
-  grid-template-columns: 232px minmax(0, 1fr);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-plate] .body {
-  grid-template-columns: minmax(0, 1fr) 360px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .shell[data-cluster][data-plate] .body {
-  grid-template-columns: 232px minmax(0, 1fr) 360px;
-}
-
-@media (max-width: 1919px) {
-  .header {
-    gap: 16px;
-  }
-
-  .eyebrow {
-    display: none;
-  }
-}
-
-@media (max-width: 1439px) {
-  .wordmark {
-    display: none;
-  }
 }

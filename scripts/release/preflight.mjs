@@ -12,8 +12,8 @@ import { readPackageJson, resolveRepositoryHttpUrl } from "./helpers.mjs";
 // Read-only preflight that runs in <30 s and reports the state of every
 // dependency the 12-stage release chain assumes before it commits to the
 // long-running build. Anything that would otherwise fail an hour into the
-// chain (missing QtIFW, expired notarization keychain profile, no disk,
-// GitHub Releases API unreachable) fails here instead.
+// chain (missing QtIFW, no disk, GitHub Releases API unreachable) fails here
+// instead.
 //
 // Wired into `release:verify` so the preflight runs before
 // `verify-native-release.mjs`. Local maintainers can also run
@@ -24,55 +24,6 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../.
 /** Wraps each preflight check so the report is uniform. */
 function checkResult(id, label, ok, message, { skipped = false, details = null } = {}) {
   return { id, label, ok, message, skipped, details };
-}
-
-/**
- * macOS code-signing identity probe. Looks for at least one identity with
- * `security find-identity -v -p codesigning`. Skipped on non-darwin hosts.
- */
-export function checkMacosCodeSigning({ platform = process.platform, run = spawnSync } = {}) {
-  if (platform !== "darwin") {
-    return checkResult(
-      "macos-code-signing",
-      "macOS code-signing identity",
-      true,
-      "Skipped on non-macOS host.",
-      { skipped: true }
-    );
-  }
-
-  const result = run("security", ["find-identity", "-v", "-p", "codesigning"], { encoding: "utf8" });
-  if (result.error) {
-    return checkResult(
-      "macos-code-signing",
-      "macOS code-signing identity",
-      false,
-      `Failed to spawn 'security find-identity': ${result.error.message}`
-    );
-  }
-  const stdout = String(result.stdout ?? "");
-  const identityMatch = stdout.match(/^\s+\d+\)\s+([A-F0-9]{40})\s+"(.+)"\s*$/m);
-  if (!identityMatch) {
-    // AGENTS.md: "Deployment profile: one fixed studio workstation, unsigned
-    // controlled deployment. Public signing is deferred." Treat the
-    // missing-identity case as SKIPPED with a clear advisory so the
-    // preflight stays usable on hosts that intentionally don't have a cert.
-    return checkResult(
-      "macos-code-signing",
-      "macOS code-signing identity",
-      true,
-      "No Developer ID Application identity in the login keychain. SKIPPED (unsigned controlled deployment is the current posture; install/unlock a cert to enable this check).",
-      { skipped: true }
-    );
-  }
-
-  return checkResult(
-    "macos-code-signing",
-    "macOS code-signing identity",
-    true,
-    `Found identity: ${identityMatch[2]} (sha1 ${identityMatch[1]}).`,
-    { details: { sha1: identityMatch[1], commonName: identityMatch[2] } }
-  );
 }
 
 /**
@@ -105,79 +56,6 @@ export function checkWindowsSignTool({ platform = process.platform, run = spawnS
     );
   }
   return checkResult("windows-signtool", "Windows signtool", true, "signtool resolves and responds to `sign /?`.");
-}
-
-/**
- * macOS notarization keychain-profile probe. Calls `xcrun notarytool history`
- * as a read-only credential test. Requires `SSE_MACOS_NOTARY_APPLE_ID`,
- * `SSE_MACOS_NOTARY_TEAM_ID`, and `SSE_MACOS_NOTARY_KEYCHAIN_PROFILE`.
- */
-export function checkMacosNotarization({ platform = process.platform, env = process.env, run = spawnSync } = {}) {
-  if (platform !== "darwin") {
-    return checkResult(
-      "macos-notarization",
-      "macOS notarization keychain profile",
-      true,
-      "Skipped on non-macOS host.",
-      { skipped: true }
-    );
-  }
-
-  const appleId = env.SSE_MACOS_NOTARY_APPLE_ID;
-  const teamId = env.SSE_MACOS_NOTARY_TEAM_ID;
-  const keychainProfile = env.SSE_MACOS_NOTARY_KEYCHAIN_PROFILE;
-
-  if (!appleId || !teamId || !keychainProfile) {
-    // Same unsigned-controlled-deployment posture as the code-signing
-    // check — SKIP rather than FAIL when env vars are absent so the
-    // preflight stays usable on the maintainer's laptop.
-    return checkResult(
-      "macos-notarization",
-      "macOS notarization keychain profile",
-      true,
-      "Notarization not configured. SKIPPED. Set SSE_MACOS_NOTARY_APPLE_ID, SSE_MACOS_NOTARY_TEAM_ID, and SSE_MACOS_NOTARY_KEYCHAIN_PROFILE to enable this check.",
-      { skipped: true }
-    );
-  }
-
-  const result = run(
-    "xcrun",
-    [
-      "notarytool",
-      "history",
-      "--apple-id",
-      appleId,
-      "--team-id",
-      teamId,
-      "--keychain-profile",
-      keychainProfile,
-    ],
-    { encoding: "utf8" }
-  );
-
-  if (result.error) {
-    return checkResult(
-      "macos-notarization",
-      "macOS notarization keychain profile",
-      false,
-      `Failed to spawn 'xcrun notarytool history': ${result.error.message}`
-    );
-  }
-  if ((result.status ?? 1) !== 0) {
-    const stderr = String(result.stderr ?? "").trim();
-    return checkResult(
-      "macos-notarization",
-      "macOS notarization keychain profile",
-      false,
-      `'xcrun notarytool history' exited ${result.status}. Output: ${stderr || "(empty)"}. Verify keychain profile + Apple ID credentials.`
-    );
-  }
-  return checkResult(
-    "macos-notarization",
-    "macOS notarization keychain profile",
-    true,
-    `Notarization credentials valid for team ${teamId}.`
-  );
 }
 
 /**
@@ -298,7 +176,6 @@ export async function checkGithubReleasesApi({
 
 export async function runPreflight({
   platform = process.platform,
-  env = process.env,
   rootDir: rootDirOverride = rootDir,
   fetchFn,
   run = spawnSync,
@@ -307,9 +184,7 @@ export async function runPreflight({
   const results = [];
   results.push(checkDiskSpace({ targetPath: rootDirOverride }));
   results.push(checkQtIfwTools({ rootDir: rootDirOverride, allowStaged }));
-  results.push(checkMacosCodeSigning({ platform, run }));
   results.push(checkWindowsSignTool({ platform, run }));
-  results.push(checkMacosNotarization({ platform, env, run }));
   results.push(
     await checkGithubReleasesApi({
       repoUrl: resolveRepositoryHttpUrl(readPackageJson()),

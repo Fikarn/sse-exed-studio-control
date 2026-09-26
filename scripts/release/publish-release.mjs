@@ -18,16 +18,12 @@ import { buildManifest, manifestPathFor, readChecksumEntries, writeManifest } fr
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const REQUIRED_ASSETS = [
-  path.join("release", "native-installer", "macos", "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"),
   path.join("release", "native-installer", "windows", "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"),
-  path.join("release", "native-updates", "macos", "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"),
   path.join("release", "native-updates", "windows", "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"),
-  path.join("release", "checksums", "macos", "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"),
   path.join("release", "checksums", "windows", "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt"),
 ];
 
 const OPTIONAL_ASSETS = [
-  path.join("release", "native", "macos", "SSE-ExEd-Studio-Control-Native-macOS.zip"),
   path.join("release", "native", "windows", "SSE-ExEd-Studio-Control-Native-windows.zip"),
   // plan PR 11 / workstream A3: ship the visual-review coverage summary
   // alongside the manifest when the operator has run `tauri:visual:review`
@@ -132,7 +128,6 @@ function main() {
     rootDir,
     buildStartedAt: process.env.SSE_RELEASE_BUILD_STARTED_AT ?? new Date().toISOString(),
     buildFinishedAt: new Date().toISOString(),
-    notarizationTicketUuid: process.env.SSE_MACOS_NOTARY_TICKET_UUID ?? null,
   });
   writeManifest({ tag, manifest, rootDir });
   console.log(`Wrote release manifest: ${manifestPath}`);

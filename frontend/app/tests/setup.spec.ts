@@ -181,42 +181,21 @@ test("setup-degraded fixture surfaces the recovery + support entry points", asyn
   await expect(page.getByTestId("support-plate")).toBeVisible();
 });
 
-test("the step screen needs no scroll at 1280x800 (SET-11)", async ({ page }) => {
-  // Slice 11 / SET-11 locked that runner content below the fold could still be
-  // reached by a real wheel scroll, because the global overflow:hidden chain
-  // used to clip it. Visual overhaul A, Slice 7 (system §2) changes the
-  // contract it is guarding: a commissioning step is a screen at the height the
-  // step needs, so the step itself is on screen without scrolling at all — and
-  // the lists that have no bound (the archives) are the only things that
-  // scroll. This asserts the stronger property.
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await openFixture(page, "setup-ready");
-  await expect(page.getByText("Commissioning runner")).toBeVisible();
-
-  const screen = page.getByTestId("setup-screen-publish");
-  const box = await screen.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.y).toBeGreaterThanOrEqual(0);
-  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
-
-  // Every key the step offers is reachable without a gesture.
-  for (const testId of ["setup-step-primary", "setup-mode-support", "setup-run-all-probes"]) {
-    const control = page.getByTestId(testId);
-    const controlBox = await control.boundingBox();
-    expect(controlBox, testId).not.toBeNull();
-    expect(controlBox!.y + controlBox!.height, testId).toBeLessThanOrEqual(800);
-  }
-});
-
 // ---------------------------------------------------------------------------
 // Visual overhaul A, Slice 7 (plan Slice 7): the cluster rule on Setup.
 // ---------------------------------------------------------------------------
 
+// New pages program, Slice SW (D22): "the step screen needs no scroll at
+// 1280x800 (SET-11)" went with the size. Slice 7 had made its contract this
+// case's stronger one — a commissioning step is a screen at the height the step
+// needs, on screen without scrolling — and its one key this case did not name,
+// Support's, joins the list here.
 test("the Publish keys and every probe result are fully visible without scrolling (C4)", async ({ page }) => {
   await openFixture(page, "setup-ready");
 
+  // The studio screen (playwright.config.ts's viewport).
   const viewport = page.viewportSize();
-  expect(viewport).not.toBeNull();
+  expect(viewport).toEqual({ width: 2560, height: 1440 });
   const bottom = viewport!.height;
 
   // The publish step, the probes it gates on and the keys that do it all sit on
@@ -224,6 +203,7 @@ test("the Publish keys and every probe result are fully visible without scrollin
   for (const testId of [
     "setup-screen-publish",
     "setup-step-primary",
+    "setup-mode-support",
     "setup-probe-lighting",
     "setup-probe-audio",
     "setup-probe-control-surface",
@@ -557,7 +537,9 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
   await expectWorkspaceMounted(page, "setup");
   const plate = page.getByTestId("support-plate");
   const windowKeys = plate.getByRole("group", { name: "Window" });
-  await expect(windowKeys.getByRole("button")).toHaveText(["Studio fullscreen", "Windowed", "Reset the window layout"]);
+  // New pages program, Slice SW (D22, SW-3): the Windowed key went with the
+  // shell's windowed layout; the screen is always shown fullscreen.
+  await expect(windowKeys.getByRole("button")).toHaveText(["Studio fullscreen", "Reset the window layout"]);
   await expect(plate.getByTestId("support-workstation")).toContainText("kept for the next launch");
 
   const scaleBox = await plate.getByTestId("support-scale-switch").boundingBox();
@@ -568,7 +550,7 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
 
   // Outside the installed app the native shell is not there: a press moves
   // nothing and says nothing — no message, no error.
-  for (const testId of ["support-window-studio-fullscreen", "support-window-windowed", "support-window-reset"]) {
+  for (const testId of ["support-window-studio-fullscreen", "support-window-reset"]) {
     const key = plate.getByTestId(testId);
     await key.click();
     await expect(key).toBeEnabled();
@@ -584,68 +566,13 @@ test("Workstation's window keys sit after UI scale, and in the browser they do n
   expect(dangerBox).not.toBeNull();
   expect(dangerBox!.y + dangerBox!.height).toBeLessThanOrEqual(1440);
   expect(windowBox!.y + windowBox!.height).toBeLessThan(dangerBox!.y);
-
-  // Review finding 22: the Support screen has a copy of the row for a window
-  // too narrow for the plate (the next cases). At the studio surface it is
-  // not drawn: Support shows one Window row, the plate's.
-  await page.getByTestId("setup-mode-support").click();
-  await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
-  await expect(page.getByRole("group", { name: "Window" })).toHaveCount(1);
-  await expect(windowKeys).toBeVisible();
-  await expect(page.getByTestId("support-bay-workstation")).toBeHidden();
 });
 
-// Review finding 22. Below the studio surface (a layout under 2200 px) the
-// Support plate is not drawn. That is the window the Windowed key itself makes
-// (1600 × 960, centred; also Reset with no studio monitor and the launch
-// fallback) and display 2 (2560 × 1440 at 125 %: 2048 × 1152). The keys that
-// bring the studio surface back went with the plate, so the Support screen
-// draws Workstation's window row under it: one press of Support on the
-// cluster, nothing to scroll.
-for (const size of [
-  { width: 1600, height: 960, label: "the windowed layout" },
-  { width: 2048, height: 1152, label: "display 2 at 125 %" },
-]) {
-  test(`in ${size.label} (${size.width}x${size.height}) the window keys are on the Support screen (S3, decision 2)`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await openFixture(page, "setup-ready");
-    await expectWorkspaceMounted(page, "setup");
-    await expect(page.getByTestId("support-plate")).toBeHidden();
-
-    await page.getByTestId("setup-mode-support").click();
-    await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
-    const windowKeys = page.getByRole("group", { name: "Window" });
-    await expect(windowKeys).toHaveCount(1);
-    await expect(windowKeys.getByRole("button")).toHaveText([
-      "Studio fullscreen",
-      "Windowed",
-      "Reset the window layout",
-    ]);
-    await expect(page.getByTestId("support-bay-workstation")).toContainText("kept for the next launch");
-
-    // On screen as Support opens, each a full-size key. Outside the installed
-    // app the native shell is not there: a press moves nothing and says
-    // nothing.
-    for (const testId of [
-      "support-bay-window-studio-fullscreen",
-      "support-bay-window-windowed",
-      "support-bay-window-reset",
-    ]) {
-      const key = page.getByTestId(testId);
-      await expect(key).toBeVisible();
-      await expect(key).toBeEnabled();
-      await expect(key).toBeInViewport({ ratio: 1 });
-      const box = await key.boundingBox();
-      expect(box, testId).not.toBeNull();
-      expect(Math.min(box!.width, box!.height), testId).toBeGreaterThanOrEqual(24);
-      await key.click();
-      await expect(key).toBeEnabled();
-      await expect(page.getByTestId("setup-feedback")).toHaveCount(0);
-    }
-  });
-}
+// New pages program, Slice SW (D22, SW-3): the two cases "in the windowed
+// layout (1600x960)" and "in display 2 at 125 % (2048x1152) the window keys are
+// on the Support screen" went, with the Support screen's copy of the window
+// keys for a layout under 2200 px (review finding 22). The plate's keys are the
+// case above's.
 
 test("Setup prints no key hints: the footer, the Console key, the bay head (S3)", async ({ page }) => {
   await openFixture(page, "setup-ready");

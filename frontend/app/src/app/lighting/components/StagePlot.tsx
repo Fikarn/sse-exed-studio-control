@@ -423,8 +423,7 @@ export function StagePlot({
         className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
         viewBox={`0 -${PLOT_TOP_GUTTER_CM} ${widthCm} ${depthCm + PLOT_TOP_GUTTER_CM}`}
         // Fill Desk preserves the current operator-familiar stretched plot.
-        // Fit Room / 100% use SVG meet scaling so spatial proportions remain
-        // accurate in compact utility windows.
+        // Fit Room / 100% use SVG meet scaling so spatial proportions remain accurate.
         preserveAspectRatio={viewport.zoomMode === "fillDesk" ? "none" : "xMidYMid meet"}
         xmlns="http://www.w3.org/2000/svg"
         onPointerDown={(event) => {

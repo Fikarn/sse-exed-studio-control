@@ -14,8 +14,14 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // per story.
 //
 // Baselines live next to the per-surface specs under
-// `tests/__visual__/storybook.spec.ts-snapshots/`, platform-suffixed so
-// macOS dev and Linux CI each own their copy.
+// `tests/__visual__/storybook.spec.ts-snapshots/`: the win32 captures at
+// 2560×1440, the only ones there are.
+//
+// New pages program, Slice SW (D22): Studio Control runs on Windows at
+// 2560×1440. Off Windows Playwright skips the comparison (`ignoreSnapshots`),
+// so CI's Linux runner still checks that every story loads and paints, and the
+// captures are compared on the workstation before each push
+// (`frontend/app/tests/__visual__/README.md`).
 
 const STORYBOOK_BASE = "http://127.0.0.1:6007";
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");

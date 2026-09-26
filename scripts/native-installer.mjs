@@ -28,15 +28,11 @@ function hasFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos") {
-    return "macos";
-  }
-
   if (value === "windows") {
     return "windows";
   }
 
-  throw new Error(`Unsupported installer target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported installer target '${value}'. Use --target=windows.`);
 }
 
 function run(command, args, options = {}) {
@@ -55,31 +51,7 @@ function run(command, args, options = {}) {
   }
 }
 
-function archiveMacInstaller(sourceAppPath, archivePath) {
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", sourceAppPath, archivePath]);
-}
-
-function resolvePackagedPayload(target) {
-  if (target === "macos") {
-    return {
-      packagedPath: path.join(rootDir, "release", "native", "macos", "SSE ExEd Studio Control Native.app"),
-      installerPath: path.join(
-        rootDir,
-        "release",
-        "native-installer",
-        "macos",
-        "SSE-ExEd-Studio-Control-Native-macOS-Installer.app"
-      ),
-      archivePath: path.join(
-        rootDir,
-        "release",
-        "native-installer",
-        "macos",
-        "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"
-      ),
-    };
-  }
-
+function resolvePackagedPayload() {
   return {
     packagedPath: path.join(rootDir, "release", "native", "windows", "SSE ExEd Studio Control Native"),
     installerPath: path.join(
@@ -89,17 +61,11 @@ function resolvePackagedPayload(target) {
       "windows",
       "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"
     ),
-    archivePath: null,
   };
 }
 
 function ensurePackagedPayload(target, packagedPath) {
   if (existsSync(packagedPath)) {
-    return;
-  }
-
-  if (target === "macos" && process.platform === "darwin") {
-    run(process.execPath, [path.join(rootDir, "scripts", "native-package.mjs"), "--target=macos"]);
     return;
   }
 
@@ -162,7 +128,7 @@ function main() {
 
   const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
   const releaseDate = new Date().toISOString().slice(0, 10);
-  const { packagedPath, installerPath, archivePath } = resolvePackagedPayload(target);
+  const { packagedPath, installerPath } = resolvePackagedPayload();
 
   ensurePackagedPayload(target, packagedPath);
 
@@ -215,9 +181,6 @@ function main() {
   console.log(`Using QtIFW binarycreator via ${binaryCreator.source}: ${binaryCreator.value}`);
   mkdirSync(path.dirname(installerPath), { recursive: true });
   rmSync(installerPath, { force: true, recursive: true });
-  if (archivePath) {
-    rmSync(archivePath, { force: true, recursive: true });
-  }
   run(binaryCreator.value, [
     "--offline-only",
     "-c",
@@ -227,13 +190,7 @@ function main() {
     installerPath,
   ]);
 
-  if (archivePath) {
-    archiveMacInstaller(installerPath, archivePath);
-    console.log(`Built native installer artifact: ${installerPath}`);
-    console.log(`Archived native installer artifact: ${archivePath}`);
-  } else {
-    console.log(`Built native installer artifact: ${installerPath}`);
-  }
+  console.log(`Built native installer artifact: ${installerPath}`);
 }
 
 // Runs only as `node scripts/native-installer.mjs …`: an import does nothing

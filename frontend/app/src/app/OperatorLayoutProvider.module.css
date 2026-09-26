@@ -1,26 +1,3 @@
-.viewport {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--color-bg-deep);
-}
-
-.nativeViewport {
-  display: block;
-}
-
-.reviewViewport {
-  /* S14 (THEME-05): the desk-behind-the-shell gradient was raw dark literals
-     that froze on theme switch; the backdrop tokens carry the exact Studio
-     values and re-theme (bone = light desk, graphite = cool-dark). */
-  background:
-    radial-gradient(circle at top left, var(--color-shell-backdrop-glow), transparent 36%),
-    linear-gradient(180deg, var(--color-shell-backdrop-top) 0%, var(--color-shell-backdrop-bottom) 100%);
-}
-
 /* Scale tokens are defined for the shell root AND for document.body when the
    provider stamps `data-operator-scale-host` on it. Overlays portal to body
    (dialogs, drawers, context menu, color picker, toasts), so without the body
@@ -93,36 +70,22 @@
   --operator-toolbar-gap: 14px;
   --operator-toolbar-padding-x: 22px;
   --operator-toolbar-control-height: 28px;
-  --operator-toolbar-button-label-display: inline;
   --operator-pane-padding: 14px;
-  --operator-stage-min-width: 640px;
   --operator-stage-min-height: 480px;
   --size-toolbar-height: 44px;
 }
 
+/* New pages program, Slice SW (D22): the root is the whole 2560 × 1440 window.
+   It took over the positioning and the deep background of the viewport wrapper
+   that framed Studio Preview. */
 .root {
+  position: relative;
   height: 100%;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  background: var(--color-bg-deep);
   container: operator-root / size;
-}
-
-.reviewViewport .root {
-  --operator-app-height: 100%;
-  --operator-app-height-dynamic: 100%;
-  --operator-app-min-height: 0;
-  --operator-app-min-height-dynamic: 0;
-
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  /* Slice 9 (system §5): the preview frame floats — the drawer's recipe. */
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-primary-500) 28%, transparent),
-    var(--elevation-float);
-  transform: translate(-50%, -50%) scale(var(--operator-review-scale, 1));
-  transform-origin: center center;
 }
 
 .root[data-ui-scale="90"],
@@ -153,77 +116,4 @@
   --operator-toolbar-control-height: 34px;
   --operator-pane-padding: 18px;
   --size-toolbar-height: 54px;
-}
-
-.root[data-layout-mode="desktopCompact"] {
-  --operator-shell-header-gap: calc(12px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-x: calc(24px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-left: calc(24px * var(--operator-ui-scale-factor));
-  --operator-shell-brand-gap: calc(18px * var(--operator-ui-scale-factor));
-  --operator-shell-main-padding: calc(12px * var(--operator-ui-scale-factor));
-  --operator-shell-main-header-height: clamp(56px, calc(64px * var(--operator-ui-scale-factor)), 82px);
-  --operator-toolbar-gap: 8px;
-  --operator-toolbar-padding-x: 16px;
-  --operator-pane-padding: 12px;
-  --operator-stage-min-width: 560px;
-  --operator-stage-min-height: 440px;
-  --operator-stage-control-inset: calc(10px * var(--operator-ui-scale-factor));
-  --operator-stage-control-mode-width: calc(44px * var(--operator-ui-scale-factor));
-}
-
-.root[data-layout-mode="narrowUtility"],
-.root[data-layout-mode="constrained"] {
-  --operator-shell-header-gap: calc(10px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-x: calc(18px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-left: calc(18px * var(--operator-ui-scale-factor));
-  --operator-shell-brand-gap: calc(14px * var(--operator-ui-scale-factor));
-  --operator-shell-main-padding: calc(10px * var(--operator-ui-scale-factor));
-  --operator-shell-main-header-height: clamp(52px, calc(60px * var(--operator-ui-scale-factor)), 76px);
-  --operator-stage-control-inset: calc(10px * var(--operator-ui-scale-factor));
-  --operator-stage-control-mode-width: calc(44px * var(--operator-ui-scale-factor));
-  --operator-toolbar-gap: 7px;
-  --operator-toolbar-padding-x: 12px;
-  --operator-toolbar-button-label-display: none;
-  --operator-pane-padding: 10px;
-  --operator-stage-min-width: 520px;
-  --operator-stage-min-height: 400px;
-  --size-toolbar-height: 42px;
-}
-
-.constrainedWarning {
-  position: fixed;
-  right: 12px;
-  bottom: 12px;
-  z-index: var(--z-overlay);
-  max-width: min(360px, calc(100vw - 24px));
-  padding: 10px 12px;
-  border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-key);
-  background: color-mix(in srgb, var(--color-danger-soft) 78%, var(--color-bg-canvas));
-  color: var(--color-danger-500);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  line-height: 1.4;
-  box-shadow: var(--shadow-lg);
-}
-
-.reviewBadge {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-overlay);
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--color-brand-green) 72%, var(--color-bg-border));
-  border-radius: var(--radius-ctl);
-  background: color-mix(in srgb, var(--color-bg-raised) 96%, var(--color-brand-green-soft));
-  /* Slice 9 (system §5): a badge is not a lamp, so it does not bloom. */
-  box-shadow: var(--elevation-float);
-  color: var(--color-brand-text-primary);
-  font-family: var(--font-family-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  pointer-events: none;
 }

@@ -334,12 +334,6 @@
   opacity: var(--control-disabled-opacity);
 }
 
-@container operator-root (max-height: 1120px) {
-  .eqGraphFull {
-    min-height: 132px;
-  }
-}
-
 /* ── All-bands knob grid (2026-05-27 Console redesign) ──────────────────── */
 
 .eqBandGrid {

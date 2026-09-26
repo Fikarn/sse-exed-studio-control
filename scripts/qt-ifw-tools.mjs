@@ -104,17 +104,9 @@ export function formatQtIfwToolSummary(tools) {
   return `binarycreator via ${tools.binaryCreator.source}: ${tools.binaryCreator.value}; repogen via ${tools.repoGen.source}: ${tools.repoGen.value}`;
 }
 
-export function qtifwInstructions(platform = process.platform) {
-  if (platform === "win32") {
-    return [
-      'Set $env:SSE_QT_IFW_BINARYCREATOR = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\binarycreator.exe"',
-      'Set $env:SSE_QT_IFW_REPOGEN = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\repogen.exe"',
-    ].join("\n");
-  }
-
+export function qtifwInstructions() {
   return [
-    "Install QtIFW into .tools/qt-ifw or another local path, then export:",
-    'export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"',
-    'export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"',
+    'Set $env:SSE_QT_IFW_BINARYCREATOR = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\binarycreator.exe"',
+    'Set $env:SSE_QT_IFW_REPOGEN = "C:\\Qt\\Tools\\QtInstallerFramework\\4.11\\bin\\repogen.exe"',
   ].join("\n");
 }

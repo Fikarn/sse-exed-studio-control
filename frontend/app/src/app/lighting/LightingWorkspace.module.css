@@ -83,18 +83,6 @@
   overflow: hidden;
 }
 
-.body[data-layout-mode="desktopCompact"] {
-  grid-template-columns:
-    minmax(var(--operator-stage-min-width, 560px), 1fr)
-    6px
-    minmax(280px, var(--lighting-inspector-width, 360px));
-}
-
-.body[data-layout-mode="narrowUtility"],
-.body[data-layout-mode="constrained"] {
-  grid-template-columns: minmax(var(--operator-stage-min-width, 520px), 1fr);
-}
-
 .bodyResizing {
   cursor: col-resize;
   user-select: none;

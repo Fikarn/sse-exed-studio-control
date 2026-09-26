@@ -59,8 +59,6 @@ export interface LightingClusterProps {
   onToggleHighlight: () => void;
   onToggleSolo: () => void;
   onOpenDmxMonitor: () => void;
-  /** Narrow surfaces open the plate as a drawer; wider ones show it beside the plot. */
-  onOpenInspector?: () => void;
   onRecallFadeMsChange: (value: number) => void;
   onResaveScene: () => void;
   onRevertScene?: () => void;
@@ -125,7 +123,6 @@ export function LightingCluster(props: LightingClusterProps) {
     onToggleHighlight,
     onToggleSolo,
     onOpenDmxMonitor,
-    onOpenInspector,
     onRecallFadeMsChange,
     onResaveScene,
     onRevertScene,
@@ -353,11 +350,6 @@ export function LightingCluster(props: LightingClusterProps) {
           <Key size="small" testId="lighting-open-dmx-monitor" onClick={onOpenDmxMonitor}>
             DMX monitor
           </Key>
-          {onOpenInspector ? (
-            <Key size="small" testId="lighting-open-inspector" aria-label="Inspector" onClick={onOpenInspector}>
-              Inspector
-            </Key>
-          ) : null}
         </div>
         {/* What the selection can be asked to do: hold it lit, dim everything
             else, or pulse it so the operator can find it in the room. A lit

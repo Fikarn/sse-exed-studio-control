@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -10,7 +9,6 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -55,11 +53,11 @@ function readFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported installer acceptance target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported installer acceptance target '${value}'. Use --target=windows.`);
 }
 
 function parseRuntime(value) {
@@ -126,40 +124,14 @@ function normalizeForOutputComparison(value) {
   return value.replaceAll("\\", "/");
 }
 
-function resolveInstallerExecutable(target, runtimeKind) {
+function resolveInstallerExecutable(runtimeKind) {
   if (runtimeKind === "tauri") {
-    if (target === "macos") {
-      return path.join(
-        rootDir,
-        "release",
-        "tauri-candidate-installer",
-        "macos",
-        "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app",
-        "Contents",
-        "MacOS",
-        "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer"
-      );
-    }
-
     return path.join(
       rootDir,
       "release",
       "tauri-candidate-installer",
       "windows",
       "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe"
-    );
-  }
-
-  if (target === "macos") {
-    return path.join(
-      rootDir,
-      "release",
-      "native-installer",
-      "macos",
-      "SSE-ExEd-Studio-Control-Native-macOS-Installer.app",
-      "Contents",
-      "MacOS",
-      "SSE-ExEd-Studio-Control-Native-macOS-Installer"
     );
   }
 
@@ -180,18 +152,6 @@ function resolveRepositoryPath(target, runtimeKind) {
 function resolveInstalledRuntime(target, installRoot, runtimeKind) {
   const installedRuntime = effectiveInstalledRuntime(runtimeKind);
   const shellName = nativeReleaseShellExecutableName(target, installedRuntime);
-  if (target === "macos") {
-    const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
-    return {
-      label: "macOS",
-      payloadPath,
-      shellPath: path.join(payloadPath, "Contents", "MacOS", shellName),
-      enginePath: path.join(payloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, installedRuntime, statusPath),
-      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(installedRuntime),
-    };
-  }
-
   const payloadPath = path.join(installRoot, releaseIdentity.payloadNames[target]);
   return {
     label: "Windows",
@@ -204,7 +164,7 @@ function resolveInstalledRuntime(target, installRoot, runtimeKind) {
 }
 
 function probeInstallRootAfterInstall(installRoot, phase) {
-  if (process.platform !== "win32" || !existsSync(installRoot)) {
+  if (!existsSync(installRoot)) {
     return;
   }
   const entries = readdirSync(installRoot, { withFileTypes: true })
@@ -228,7 +188,7 @@ function probeInstallRootAfterInstall(installRoot, phase) {
 }
 
 function promoteWindowsMaintenanceToolNew(installRoot) {
-  if (process.platform !== "win32" || !existsSync(installRoot)) {
+  if (!existsSync(installRoot)) {
     return null;
   }
 
@@ -263,16 +223,8 @@ function promoteWindowsMaintenanceToolNew(installRoot) {
   return null;
 }
 
-function resolveMaintenanceToolPath(target, installRoot) {
-  const candidates =
-    target === "macos"
-      ? [
-          path.join(installRoot, "maintenancetool.app", "Contents", "MacOS", "maintenancetool"),
-          path.join(installRoot, "maintenancetool.app", "Contents", "MacOS", "MaintenanceTool"),
-          path.join(installRoot, "MaintenanceTool.app", "Contents", "MacOS", "maintenancetool"),
-          path.join(installRoot, "MaintenanceTool.app", "Contents", "MacOS", "MaintenanceTool"),
-        ]
-      : [path.join(installRoot, "maintenancetool.exe"), path.join(installRoot, "MaintenanceTool.exe")];
+function resolveMaintenanceToolPath(installRoot) {
+  const candidates = [path.join(installRoot, "maintenancetool.exe"), path.join(installRoot, "MaintenanceTool.exe")];
 
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
@@ -292,31 +244,14 @@ function resolveMaintenanceToolPath(target, installRoot) {
 
   if (existsSync(installRoot)) {
     const entries = readdirSync(installRoot, { withFileTypes: true });
-
-    if (target === "windows") {
-      const matchingExe = entries.find(
-        (entry) =>
-          entry.isFile() &&
-          entry.name.toLowerCase().includes("maintenancetool") &&
-          entry.name.toLowerCase().endsWith(".exe")
-      );
-      if (matchingExe) {
-        return path.join(installRoot, matchingExe.name);
-      }
-    } else {
-      const matchingEntry = entries.find((entry) => entry.name.toLowerCase().includes("maintenancetool"));
-      if (matchingEntry && target === "macos" && matchingEntry.isDirectory()) {
-        const dynamicCandidate = path.join(
-          installRoot,
-          matchingEntry.name,
-          "Contents",
-          "MacOS",
-          path.parse(matchingEntry.name).name
-        );
-        if (existsSync(dynamicCandidate)) {
-          return dynamicCandidate;
-        }
-      }
+    const matchingExe = entries.find(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.toLowerCase().includes("maintenancetool") &&
+        entry.name.toLowerCase().endsWith(".exe")
+    );
+    if (matchingExe) {
+      return path.join(installRoot, matchingExe.name);
     }
   }
 
@@ -563,10 +498,6 @@ function cleanupInstallRootAfterPurge(target, installRoot, acceptanceRoot) {
 }
 
 function findUninstallKeysUnderInstallRoot(installRoot) {
-  if (process.platform !== "win32") {
-    return [];
-  }
-
   const installRootNormalized = path
     .resolve(installRoot)
     .replace(/[\\/]+$/, "")
@@ -622,10 +553,6 @@ function findUninstallKeysUnderInstallRoot(installRoot) {
 }
 
 function deleteUninstallKeysUnderInstallRoot(installRoot) {
-  if (process.platform !== "win32") {
-    return [];
-  }
-
   const matches = findUninstallKeysUnderInstallRoot(installRoot);
   return matches.map(({ subkey, installLocation }) => {
     const result = spawnSync("reg.exe", ["delete", subkey, "/f"], { encoding: "utf8" });
@@ -659,7 +586,7 @@ async function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, 
 
   let toolPath = null;
   try {
-    toolPath = resolveMaintenanceToolPath(target, installRoot);
+    toolPath = resolveMaintenanceToolPath(installRoot);
   } catch (error) {
     summary.purge.error = error instanceof Error ? error.message : String(error);
     summary.purge.installRootContents = readdirSync(installRoot, { withFileTypes: true }).map((entry) => ({
@@ -691,9 +618,9 @@ async function teardownAcceptanceInstall({ target, installRoot, acceptanceRoot, 
     }
   }
 
-  const purgeLeftOrphans = process.platform === "win32" && findUninstallKeysUnderInstallRoot(installRoot).length > 0;
+  const purgeLeftOrphans = findUninstallKeysUnderInstallRoot(installRoot).length > 0;
 
-  if (process.platform === "win32" && (!summary.purge.ok || purgeLeftOrphans)) {
+  if (!summary.purge.ok || purgeLeftOrphans) {
     summary.fallback.attempted = true;
     summary.fallback.removed = deleteUninstallKeysUnderInstallRoot(installRoot);
     if (summary.fallback.removed.length > 0) {
@@ -725,23 +652,18 @@ function resolveAcceptanceRoot(explicitRoot, target) {
     return explicitRoot;
   }
 
-  if (process.platform === "win32") {
-    // QtIFW rejects install roots that contain '~', which can appear in Windows temp paths.
-    return path.join(rootDir, "release", "native-installer-acceptance", target);
-  }
-
-  return mkdtempSync(path.join(os.tmpdir(), "sse-native-installer-acceptance-"));
+  // QtIFW rejects install roots that contain '~', which can appear in Windows temp paths.
+  return path.join(rootDir, "release", "native-installer-acceptance", target);
 }
 
 async function main() {
   const target = parseTarget(readFlag("--target"));
   const runtimeKind = parseRuntime(readFlag("--runtime"));
-  const expectedPlatform = target === "macos" ? "darwin" : "win32";
-  if (process.platform !== expectedPlatform) {
+  if (process.platform !== "win32") {
     throw new Error(`native-installer-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 
-  const installerExecutable = resolveInstallerExecutable(target, runtimeKind);
+  const installerExecutable = resolveInstallerExecutable(runtimeKind);
   const repositoryPath = resolveRepositoryPath(target, runtimeKind);
 
   assert(
@@ -864,7 +786,7 @@ async function main() {
     }
 
     console.log("Step 3: verify the installed maintenance tool can see the installed package and staged repository.");
-    const maintenanceToolPath = resolveMaintenanceToolPath(target, installRoot);
+    const maintenanceToolPath = resolveMaintenanceToolPath(installRoot);
     const repositoryUri = pathToFileURL(repositoryPath).href;
 
     const installedPackages = await runCliStep(
@@ -992,29 +914,17 @@ async function main() {
     throw new Error(teardown.error);
   }
 
-  if (process.platform === "win32") {
-    console.log(
-      `Installer acceptance final teardown: maintenance-tool purge ${
-        teardown.purge.attempted
-          ? teardown.purge.ok
-            ? "succeeded"
-            : `failed (${teardown.purge.error})`
-          : "skipped (tool unavailable)"
-      }; ${teardown.orphansBefore.length} Uninstall registry entr${
-        teardown.orphansBefore.length === 1 ? "y" : "ies"
-      } cleaned, ${teardown.fallback.attempted ? `${teardown.fallback.removed.length} via reg-delete fallback, ` : ""}0 orphans remain.`
-    );
-  } else {
-    console.log(
-      `Installer acceptance final teardown: maintenance-tool purge ${
-        teardown.purge.attempted
-          ? teardown.purge.ok
-            ? "succeeded"
-            : `failed (${teardown.purge.error})`
-          : "skipped (tool unavailable)"
-      }; registry assertions skipped on non-Windows host.`
-    );
-  }
+  console.log(
+    `Installer acceptance final teardown: maintenance-tool purge ${
+      teardown.purge.attempted
+        ? teardown.purge.ok
+          ? "succeeded"
+          : `failed (${teardown.purge.error})`
+        : "skipped (tool unavailable)"
+    }; ${teardown.orphansBefore.length} Uninstall registry entr${
+      teardown.orphansBefore.length === 1 ? "y" : "ies"
+    } cleaned, ${teardown.fallback.attempted ? `${teardown.fallback.removed.length} via reg-delete fallback, ` : ""}0 orphans remain.`
+  );
 }
 
 // Runs only as `node scripts/native-installer-acceptance.mjs …`: an import

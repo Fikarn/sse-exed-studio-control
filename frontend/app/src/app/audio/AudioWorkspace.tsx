@@ -5,16 +5,11 @@ import { ConfirmDialog, ContextMenu, ShellRegion, type ContextMenuItem } from "@
 import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
-import {
-  AUDIO_COMPACT_DENSITY_MAX_WIDTH,
-  AUDIO_ARM_TIMEOUT_MS,
-  AUDIO_DRAFT_CLEAR_MS,
-  AUDIO_RECALL_PULSE_MS,
-} from "./audioConstants";
+import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
-import { AUDIO_FADER_UNITY, type AudioDensityMode, type AudioFeedbackTone } from "./audioFormatting";
+import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
 import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
 import {
   audioChannelSupportsPhase,
@@ -120,13 +115,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   // Slice 3c — follow the global theme rather than an audio-local state, so the
   // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
   // AudioTopBar drives the same global setter.
-  const { bodyWidth, theme: audioTheme } = useOperatorLayout();
-  // 2026-09 audit Slice 9 (operator decision 6): below 2200 px of operator
-  // root the Console runs at compact density — 4 inputs, 4 playback pairs, 3
-  // outputs per bank, 380 px inspector — so the 1920×1080 studio monitor never
-  // scrolls a tier sideways. The Scaled Studio Preview measures its 2560
-  // logical root and stays desktop; the layout mode (studioFull) is untouched.
-  const density: AudioDensityMode = bodyWidth < AUDIO_COMPACT_DENSITY_MAX_WIDTH ? "compact" : "desktop";
+  const { theme: audioTheme } = useOperatorLayout();
   const recallPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -145,9 +134,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       appSnapshot,
       audioSnapshot: audioSnapshotForView,
       bankIndex,
-      density,
     });
-  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex, density]);
+  }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
 
   // The arm hook also owns the Esc that cancels an arm (new pages program,
   // Slice 3); the Console binds no other key.
@@ -578,7 +566,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     <div
       className={styles.audioShell}
       data-audio-theme={audioTheme}
-      data-density={density}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}

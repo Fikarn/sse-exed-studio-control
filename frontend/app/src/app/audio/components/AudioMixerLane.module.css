@@ -121,9 +121,31 @@
   min-width: 0;
 }
 
-.stripKeys > * > * {
+.stripKeys > * > :first-child {
   display: block;
   width: 100%;
+}
+
+/* New pages program, Slice SW: a key's tooltip opens inwards across the row —
+   Mute's from its left edge, Solo's from its right — as wide as its words, up
+   to the row. The rule above used to catch it too and make it as narrow as its
+   key, so its words spilled out of it: at a lane's last strip, past the lane,
+   which then had 4 px to scroll — a scrollbar under Playback at 2560 × 1440.
+   `translate` undoes the design system's centring shift; its fade and lift
+   stay. */
+.stripKeys > * > [role="tooltip"] {
+  width: max-content;
+  max-width: calc(200% + 6px);
+  translate: 50%;
+}
+
+.stripKeys > :first-child > [role="tooltip"] {
+  left: 0;
+}
+
+.stripKeys > :last-child > [role="tooltip"] {
+  left: auto;
+  right: 0;
 }
 
 .stripKey {
@@ -135,32 +157,4 @@
 .stripClip {
   flex: none;
   min-height: 24px;
-}
-
-/* Below the studio surface the strip narrows and spends less air; nothing is
-   dropped — the fader block simply keeps less height. */
-:global([data-operator-layout-root][data-chrome="compact"]) .strip {
-  width: 96px;
-  gap: 8px;
-  padding: 8px 4px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .stripName {
-  font-size: var(--font-size-name);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .stripHead {
-  height: 44px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .stripReadout {
-  height: 34px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .stripPre {
-  height: 60px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .stripKey {
-  min-height: 30px;
 }

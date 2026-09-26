@@ -29,6 +29,8 @@ import { fileURLToPath } from "node:url";
 //   4. The wrapper preserves the documented "baselinesDir" /
 //      "playwrightReport" keys it logs to stdout — release-acceptance
 //      readers (and HANDOFF.md) consume those.
+//   5. The coverage it records is the win32 captures' alone, with no Studio
+//      Preview (new pages program, Slice SW, D22).
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const scriptPath = path.join(repoRoot, "scripts", "tauri-visual-review.mjs");
@@ -98,4 +100,15 @@ test("the wrapper points at the published baseline dir under frontend/app/tests/
   // means the wrapper would log a path no other tooling reads.
   const source = readScript();
   assert.match(source, /frontend\/app\/tests\/__visual__\/visual-review\.spec\.ts-snapshots/);
+});
+
+test("the wrapper counts the win32 captures alone, and no Studio Preview", () => {
+  // New pages program, Slice SW (D22): Studio Control runs on Windows at
+  // 2560x1440, the committed captures are the win32 ones and Studio Preview
+  // went, so the parser takes a `-win32.png` name and knows no other platform
+  // and no preview surface.
+  const source = readScript();
+  assert.match(source, /-win32\\\.png\$/);
+  assert.doesNotMatch(source, /darwin|linux/);
+  assert.doesNotMatch(source, /studio[- ]?preview/i);
 });

@@ -314,7 +314,12 @@
   grid-row: 3;
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 440px;
+  /* Visual overhaul A, Slice 4b: the studio surface's plate is 416 px (D4's
+     `424px 1fr 416px`), which is what the bay needs to hold thirteen 120 px
+     strips in three tiers without scrolling. Slice 4c builds the plate itself
+     at this width. New pages program, Slice SW (D22): the studio surface is the
+     only one, so this is the rule itself rather than a container query. */
+  grid-template-columns: minmax(0, 1fr) 416px;
   gap: 0;
   min-height: 0;
   min-width: 0;
@@ -347,41 +352,4 @@
   .masterHalo {
     transition: none !important;
   }
-}
-
-/* Visual overhaul A, Slice 4b: the studio surface's plate is 416 px (D4's
-   `424px 1fr 416px`), which is what the bay needs to hold thirteen 120 px
-   strips in three tiers without scrolling. Slice 4c builds the plate itself at
-   this width. */
-@container operator-root (min-width: 2200px) and (min-height: 1250px) {
-  .audioBody {
-    grid-template-columns: minmax(0, 1fr) 416px;
-  }
-}
-
-@container operator-root (max-width: 2100px) {
-  .audioBody {
-    grid-template-columns: minmax(0, 1fr) 380px;
-  }
-}
-
-@container operator-root (max-width: 1600px) {
-  .audioBody {
-    grid-template-columns: minmax(0, 1fr) 320px;
-  }
-}
-
-/* 2026-09 audit Slice 9: the former `[data-layout-mode="studioFull"] .audioShell
-   .audioBody { 504px }` override is gone. It out-specified the ≤ 2100 px
-   container rule above, so the 1920×1080 studio monitor (studioFull from
-   1920 up) got a 504 px inspector and its tiers scrolled sideways. The 504 px
-   inspector now lives only under the ≥ 2200 px container query. */
-
-/* Visual overhaul A, Slice 4a: below the studio surface the Console's cluster
-   takes 232 px off the left of the shell, so the transitional inspector gives
-   the same back. 2560×1440 (D4) is untouched — this only keeps the 1920×1080
-   fallback free of sideways scroll until Slice 4c retires the inspector into
-   the plate. */
-:global([data-operator-layout-root][data-chrome="compact"]) .audioBody {
-  grid-template-columns: minmax(0, 1fr) 360px;
 }

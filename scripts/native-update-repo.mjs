@@ -28,15 +28,11 @@ function hasFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos") {
-    return "macos";
-  }
-
   if (value === "windows") {
     return "windows";
   }
 
-  throw new Error(`Unsupported update repository target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported update repository target '${value}'. Use --target=windows.`);
 }
 
 function run(command, args, options = {}) {
@@ -55,10 +51,6 @@ function run(command, args, options = {}) {
   }
 }
 
-function archiveMacPath(sourcePath, archivePath) {
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", sourcePath, archivePath]);
-}
-
 function archiveWindowsPath(sourcePath, archivePath) {
   run("powershell", [
     "-NoProfile",
@@ -70,21 +62,7 @@ function archiveWindowsPath(sourcePath, archivePath) {
   ]);
 }
 
-function resolvePackagedPayload(target) {
-  if (target === "macos") {
-    return {
-      packagedPath: path.join(rootDir, "release", "native", "macos", "SSE ExEd Studio Control Native.app"),
-      repositoryPath: path.join(rootDir, "release", "native-updates", "macos", "repository"),
-      archivePath: path.join(
-        rootDir,
-        "release",
-        "native-updates",
-        "macos",
-        "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
-      ),
-    };
-  }
-
+function resolvePackagedPayload() {
   return {
     packagedPath: path.join(rootDir, "release", "native", "windows", "SSE ExEd Studio Control Native"),
     repositoryPath: path.join(rootDir, "release", "native-updates", "windows", "repository"),
@@ -100,11 +78,6 @@ function resolvePackagedPayload(target) {
 
 function ensurePackagedPayload(target, packagedPath) {
   if (existsSync(packagedPath)) {
-    return;
-  }
-
-  if (target === "macos" && process.platform === "darwin") {
-    run(process.execPath, [path.join(rootDir, "scripts", "native-package.mjs"), "--target=macos"]);
     return;
   }
 
@@ -152,7 +125,7 @@ function main() {
 
   const packageJson = JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8"));
   const releaseDate = new Date().toISOString().slice(0, 10);
-  const { packagedPath, repositoryPath, archivePath } = resolvePackagedPayload(target);
+  const { packagedPath, repositoryPath, archivePath } = resolvePackagedPayload();
 
   ensurePackagedPayload(target, packagedPath);
 
@@ -197,12 +170,7 @@ function main() {
   rmSync(archivePath, { force: true, recursive: true });
 
   run(repoGen.value, ["-p", path.join(buildRoot, "packages"), repositoryPath]);
-
-  if (target === "macos") {
-    archiveMacPath(repositoryPath, archivePath);
-  } else {
-    archiveWindowsPath(repositoryPath, archivePath);
-  }
+  archiveWindowsPath(repositoryPath, archivePath);
 
   console.log(`Built native update repository: ${repositoryPath}`);
   console.log(`Archived native update repository: ${archivePath}`);

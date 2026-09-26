@@ -31,11 +31,11 @@ GitHub Actions are merge hygiene, not release acceptance evidence. Record local 
 
 ## Visual review
 
-> The `frontend-e2e` CI job runs the `visual-review.spec.ts` baselines + uploads the Playwright report and snapshot diffs as the `playwright-report` and `playwright-test-results` Actions artifacts. Click the run's Summary tab → Artifacts panel to download them.
+> CI compares no screenshots: the captures are the win32 ones at `2560x1440`, and `npm run frontend:playwright:test` compares them, with the UI contract, on the studio workstation before each push. A change that moves a board refreshes its captures there and every changed PNG is inspected before `git add` (`docs/DEVELOPMENT.md §2b`).
 
-- [ ] Visual review artifact reviewed in the latest CI run (operator-visible surface changed → diff reviewed; otherwise → tick "no operator-visible surface changed")
+- [ ] `npm run frontend:playwright:test` passed on the studio workstation before the push (operator-visible surface changed → changed captures refreshed and inspected; otherwise → tick "no operator-visible surface changed")
 - [ ] No operator-visible surface changed
-- [ ] Studio-monitor manual inspection completed on the fixed `2560x1440` second monitor (or Scaled Studio Preview when only proportional review is required) — required for operator-visible changes per `AGENTS.md §Visual Review Discipline`
+- [ ] Studio-monitor manual inspection completed on the fixed `2560x1440` second monitor — required for operator-visible changes per `AGENTS.md §Visual Review Discipline`
 - [ ] Hardware code paths touched? If yes, link the workstation pass record for `npm run native:test:hardware` here:
 
 ## Product Areas

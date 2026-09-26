@@ -126,16 +126,8 @@ export function AudioTieredMixer({
                   : "No sources in this bank"}
               </span>
               <span className={styles.tierDetail} data-testid={`audio-tier-mix-for-${tier.id}`}>
-                <span data-mix-for-name="full">
-                  sends into{" "}
-                  {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
-                </span>
-                <span data-mix-for-name="short">
-                  →{" "}
-                  {viewModel.selectedMixTarget?.shortName ??
-                    viewModel.hardwareOutputs.mixTargets[0]?.shortName ??
-                    "Main"}
-                </span>
+                sends into{" "}
+                {viewModel.selectedMixTarget?.name ?? viewModel.hardwareOutputs.mixTargets[0]?.name ?? "Main Out"}
               </span>
               {/* The console is locked: the reason stands on the tier the hand
                   is reaching for, not only in the state display. */}

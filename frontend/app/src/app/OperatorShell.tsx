@@ -186,11 +186,8 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   // the palette and guide keys, the restart key) are gone; every one of them
   // had an on-screen twin at 2560 — the header tabs, the theme, the UI scale
   // and "Restart the hardware link…" on Setup / Support's plate, "Retry
-  // startup" — and the window commands are keys in Workstation, under the
-  // Support screen below 2200 px (where the Workstation plate is hidden) and on
-  // the recovery screens. Below 2200 px the plate's other keys are not on
-  // screen; Studio fullscreen brings them back. Escape still closes the
-  // shell's dialogs (ShellDialog).
+  // startup" — and the window commands are keys in Workstation and on the
+  // recovery screens. Escape still closes the shell's dialogs (ShellDialog).
 
   const shellExperience = deriveShellExperience(shellState);
 

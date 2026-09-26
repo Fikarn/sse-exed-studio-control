@@ -20,7 +20,6 @@ const legacyIdentity = {
   updateDescription:
     "Native workstation runtime distributed through the Qt Installer Framework maintenance-tool repository.",
   payloadNames: {
-    macos: "SSE ExEd Studio Control Native.app",
     windows: "SSE ExEd Studio Control Native",
   },
 };
@@ -38,11 +37,11 @@ function assert(condition, message) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported target '${value}'. Use --target=windows.`);
 }
 
 function fileText(targetPath) {
@@ -132,7 +131,9 @@ function lockedIdentityFields(identity) {
     displayName: normalized.displayName,
     installerTitle: normalized.installerTitle,
     packageId: normalized.packageId,
-    payloadNames: normalized.payloadNames,
+    // New pages program, Slice SW (D22): Windows is the only payload. Releases
+    // up to v2.2.1 also name a macOS one, which is not compared.
+    payloadNames: { windows: normalized.payloadNames?.windows },
     productUrl: normalized.productUrl,
     publisher: normalized.publisher,
     startMenuDir: normalized.startMenuDir,

@@ -22,14 +22,9 @@ import { useLightingEditor, type LightingEditor } from "./useLightingEditor";
 // and a cct clamped to 2000–10000 (`normalize_lighting_editor_state`).
 
 const toast = vi.hoisted(() => ({ push: vi.fn(), dismiss: vi.fn(), clear: vi.fn() }));
-const layout = vi.hoisted(() => ({ isNarrow: false, layoutMode: "studioFull" }));
 vi.mock("../shared/toastContext", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../shared/toastContext")>()),
   useToast: () => toast,
-}));
-vi.mock("../OperatorLayoutProvider", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../OperatorLayoutProvider")>()),
-  useOperatorLayout: () => layout,
 }));
 
 type SceneCreate = Parameters<ShellStore["createLightingScene"]>[0];

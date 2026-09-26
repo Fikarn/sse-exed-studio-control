@@ -27,17 +27,16 @@ risk profile changes.
 These run during the 12-stage release chain. A silent regression
 here ships broken artifacts or breaks rollback.
 
-| Script                                 | Test                                                                                                                                                                                       |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)                                                                                                                                                        |
-| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)                                                                                                                                                      |
-| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10)                                                                                                                                          |
-| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
-| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)                                                                                                                                               |
-| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)                                                                                                                                                 |
-| `native-sign-macos.mjs`                | `native-sign.test.mjs` pins the dormant path (skip, exit 0, the variable named) and that half a configuration fails; signing itself stays an _accepted gap_ (requires keychain identities) |
-| `native-sign-windows.mjs`              | `native-sign.test.mjs`, the same; signing itself stays an _accepted gap_ (requires signtool + cert)                                                                                        |
-| `write-release-sboms.mjs`              | `write-release-sboms.test.mjs` — the plan and the refusal rule; the two generators run in `release-evidence.yml`                                                                           |
+| Script                                 | Test                                                                                                                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `native-installer.mjs`                 | `native-installer.test.mjs` (PR 10)                                                                                                                                                     |
+| `native-update-repo.mjs`               | `native-update-repo.test.mjs` (PR 10)                                                                                                                                                   |
+| `write-native-release-checksums.mjs`   | `write-native-release-checksums.test.mjs` (PR 10)                                                                                                                                       |
+| `verify-native-release-artifacts.mjs`  | _accepted gap_ (release:verify exercises it)                                                                                                                                            |
+| `verify-native-release-continuity.mjs` | _accepted gap_ (release:verify exercises it)                                                                                                                                            |
+| `release/publish-release.mjs`          | `release/publish-release.test.mjs` (PR 10)                                                                                                                                              |
+| `native-sign-windows.mjs`              | `native-sign.test.mjs` pins the dormant path (skip, exit 0, the variables named) and that half a configuration fails; signing itself stays an _accepted gap_ (requires signtool + cert) |
+| `write-release-sboms.mjs`              | `write-release-sboms.test.mjs` — the plan and the refusal rule; the two generators run in `release-evidence.yml`                                                                        |
 
 ### Tier 2 — build / acceptance
 
@@ -104,7 +103,7 @@ The plan's "high-value paths" definition for Tier 1 + Tier 2 tests:
    a temp dir and asserts the produced files match the expected
    shape.
 4. **External-process boundary** — for scripts that call `signtool`,
-   `codesign`, `xcrun notarytool`, `binarycreator`, `repogen`, etc.,
+   `binarycreator`, `repogen`, etc.,
    mock the spawn call (via `node:child_process` injection or by
    `PATH`-prepending a fixture script) and assert the right args + the
    right exit-code handling.

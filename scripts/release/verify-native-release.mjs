@@ -39,29 +39,6 @@ function runReleaseRuntimeBuild() {
 }
 
 function main() {
-  if (process.platform === "darwin") {
-    assertAvailableDiskSpace({ label: "macOS release verification", targetPath: rootDir });
-    const qtIfwTools = resolveQtIfwTools({ rootDir });
-    if (qtIfwTools.complete) {
-      console.log(`Running full macOS native release verification with ${formatQtIfwToolSummary(qtIfwTools)}.`);
-      runNpmScript("native:release:mac:local");
-      runNpmScript("native:checksums:mac:write");
-    } else {
-      console.log("QtIFW tools not found. Running macOS native release staging verification.");
-      runReleaseRuntimeBuild();
-      runNpmScript("native:package:mac:smoke");
-      runNpmScript("native:package:mac:clean-smoke");
-      runNpmScript("native:package:mac:acceptance");
-      runNpmScript("native:installer:mac:prepare");
-      runNpmScript("native:update-repo:mac:prepare");
-      runNpmScript("native:checksums:mac:staged-write");
-      runNpmScript("native:artifacts:mac:staged-verify");
-      runNpmScript("native:continuity:mac:verify");
-      runNpmScript("native:delivery:mac:verify");
-    }
-    process.exit(0);
-  }
-
   if (process.platform === "win32") {
     assertAvailableDiskSpace({ label: "Windows release verification", targetPath: rootDir });
     const qtIfwTools = resolveQtIfwTools({ rootDir });
@@ -86,7 +63,7 @@ function main() {
   }
 
   console.log(
-    `Skipping platform-native packaging verification on ${process.platform}. Run release verification on macOS or Windows for installer and update-repository checks.`
+    `Skipping platform-native packaging verification on ${process.platform}. Run release verification on Windows for installer and update-repository checks.`
   );
 }
 

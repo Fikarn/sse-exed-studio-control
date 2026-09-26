@@ -4,23 +4,19 @@ This repository is built around a specific studio installation. The product and 
 
 ## Operator Environment
 
-**The operator's ruling, absolute since 2026-09-26: Studio Control always runs at `2560x1440`, fullscreen on an external display, on a Windows machine. No other resolution and no other operating system is considered.** The fallback sizes, the Studio Preview for laptop panels and the macOS notes below are what the new pages program's Slice SW removes (the ledger `docs/plans/new-pages-2026-09.md`, D22); until then they are not maintained.
+**The operator's ruling, absolute since 2026-09-26: Studio Control always runs at `2560x1440`, fullscreen on an external display, on a Windows machine. No other resolution and no other operating system is considered.** The new pages program's Slice SW removed what existed only for another size or system — the fallback layouts, the Studio Preview for laptop panels, the windowed layout and the macOS packaging (the ledger `docs/plans/new-pages-2026-09.md`, D22).
 
-- Dedicated second monitor
-- Primary target resolution: `2560x1440` logical pixels on the fixed studio monitor. Operator ruling 2026-09-07 (visual overhaul A, plan D4): this is the only resolution that matters; the chrome budget is header `56`, footer `40`, cluster `424`, plate `416`, gutters `16` (`chrome.studio.*` tokens), and every design gate runs at `2560x1440` only. The two smaller layouts below stay as fallbacks with their guards, not as deliverables.
-- Minimum supported live-use resolution: `1920x1080` logical pixels. Below `2200` px logical width the Audio Console runs at compact density — 4 input, 4 playback and 3 output strips visible (remaining playback strips banked), plate `360` px — so no tier ever scrolls sideways; at `2560x1440` it shows 4 / 6 / 3 with the `416` px plate (visual overhaul A, plan D4 — the numbers on line 8)
-- Utility/minimum mode: `1280x800` logical pixels for setup, inspection, and recovery workflows, not full simultaneous show control
+- Dedicated second monitor, Windows display scaling at 100 % (display 3 on the studio workstation). The window always opens fullscreen: on the display it was last on when that display is there, else on the `2560x1440` display, else on the display the window is on.
+- Resolution: `2560x1440` logical pixels on the fixed studio monitor, the only one. Operator ruling 2026-09-07 (visual overhaul A, plan D4), absolute since 2026-09-26: the chrome budget is header `56`, footer `40`, cluster `424`, plate `416`, gutters `16` (`chrome.studio.*` tokens), the Audio Console shows 4 input, 6 playback and 3 output strips beside the `416` px plate, and every design gate runs at `2560x1440` only.
+- One layout. The UI scale (90, 100, 110 or 125 % in Setup / Support › Workstation) is the operator's preference, not another layout.
 - No page scroll during normal operation
 - Dense, fixed-height operator surfaces preferred over document-style layouts
-- Layout decisions are based on logical viewport/CSS pixels. Physical monitor pixels and backing scale are diagnostics, not layout thresholds.
 
 ## Live Visual Verification
 
 When the user has the selected Tauri shell open for inspection, that exact running shell is the definitive visual verification surface for operator-visible feedback. In local development this is typically launched with `npm run tauri:dev`, process `sse-exed-tauri-shell`, window `SSE ExEd Studio Control`.
 
 If the user points out visual issues, interpret those comments against the live shell they are looking at unless they explicitly name a different artifact. Do not substitute redesign documents, browser-only views, historical screenshots, or retired shell paths as the source of truth. Automated screenshots and `npm run tauri:visual:review` remain required evidence, but live operator inspection refers to the open selected Tauri shell.
-
-On the built-in MacBook display, use the app-owned Scaled Studio Preview as the normal human review surface for the fixed studio monitor. The preview must emulate the `2560x1440` studio canvas exactly after scaling: layout mode, proportions, density decisions, canvas metadata, and control aspect ratios should match native `2560x1440` evidence. Do not let host-window compact media queries leak into Scaled Studio Preview; operator layout breakpoints should key off the logical operator surface, not the physical preview window.
 
 ## Audio
 
@@ -84,3 +80,4 @@ Out of scope unless explicitly re-scoped:
 - arbitrary audio interface support
 - arbitrary lighting-protocol abstraction beyond the current rig
 - mobile-first layouts
+- any screen size but `2560x1440` and any operating system but Windows (the operator's ruling of 2026-09-26)

@@ -61,16 +61,9 @@ function makeFakeRoot() {
   return root;
 }
 
-function seedPackagedPayload(root, target) {
-  // The script copies this into the IFW data dir. For macOS the path is an
-  // .app directory; for windows it's a directory. cpSync handles both.
-  if (target === "macos") {
-    const appPath = path.join(root, "release", "native", "macos", "SSE ExEd Studio Control Native.app");
-    mkdirSync(path.join(appPath, "Contents", "MacOS"), { recursive: true });
-    writeFileSync(path.join(appPath, "Contents", "Info.plist"), "<plist/>", "utf8");
-    writeFileSync(path.join(appPath, "Contents", "MacOS", "SSE ExEd Studio Control Native"), "binary bytes\n", "utf8");
-    return appPath;
-  }
+function seedPackagedPayload(root) {
+  // The script copies this directory into the IFW data dir. With it in place
+  // the script never starts native-package.mjs to build one.
   const winDir = path.join(root, "release", "native", "windows", "SSE ExEd Studio Control Native");
   mkdirSync(winDir, { recursive: true });
   writeFileSync(path.join(winDir, "SSE-ExEd-Studio-Control-Native.exe"), "binary bytes\n", "utf8");
@@ -108,83 +101,83 @@ test("rejects a missing --target with a non-zero exit", () => {
   assert.match(result.stderr, /Unsupported installer target/);
 });
 
-test("rejects --prepare-only without --allow-staged (plan PR 3 / C2)", () => {
+test("rejects --target=windows --prepare-only without --allow-staged (plan PR 3 / C2)", () => {
   const root = makeFakeRoot();
-  const result = runInstaller(root, "--target=macos", "--prepare-only");
+  const result = runInstaller(root, "--target=windows", "--prepare-only");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Pass --allow-staged to confirm/);
   assert.match(result.stderr, /staged \(incomplete\) installer payload/);
 });
 
-test("rejects --target=windows --prepare-only without --allow-staged with the same guard", () => {
-  const root = makeFakeRoot();
-  const result = runInstaller(root, "--target=windows", "--prepare-only");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Pass --allow-staged to confirm/);
-});
-
-test("fails fast when the packaged native payload is missing on a non-matching host", () => {
-  // No payload seeded; the host is darwin in CI/local tests. Skip if running
-  // on the same platform as the target — there the script would attempt to
-  // build the payload via native-package.mjs (out of scope for unit tests).
-  const otherTarget = process.platform === "darwin" ? "windows" : "macos";
-  const root = makeFakeRoot();
-  const result = runInstaller(root, `--target=${otherTarget}`, "--prepare-only", "--allow-staged");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Packaged native payload not found/);
-});
-
+// On Windows the script builds a missing payload through native-package.mjs
+// (out of scope for unit tests); CI's Linux runners reach the refusal.
 test(
-  "happy path with --target=macos --prepare-only --allow-staged produces the staged IFW tree",
-  { skip: process.platform !== "darwin" },
+  "fails fast when the packaged native payload is missing on a host that cannot build it",
+  { skip: process.platform === "win32" && "on Windows the script builds a missing payload itself" },
   () => {
     const root = makeFakeRoot();
-    seedPackagedPayload(root, "macos");
-    const result = runInstaller(root, "--target=macos", "--prepare-only", "--allow-staged");
-    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
-
-    const buildRoot = path.join(root, "release", "native-installer", "macos", "ifw");
-    assert.equal(existsSync(buildRoot), true, "build root should exist");
-
-    // config.xml should be rendered with the package.json version.
-    const configXml = readFileSync(path.join(buildRoot, "config", "config.xml"), "utf8");
-    assert.match(configXml, /<Version>9\.9\.9<\/Version>/);
-    assert.match(configXml, /<Name>SSE ExEd Studio Control Native<\/Name>/);
-
-    // package.xml should also embed the version.
-    const releaseIdentity = JSON.parse(
-      readFileSync(path.join(repoRoot, "scripts", "native-release-identity.json"), "utf8")
-    );
-    const packageXml = readFileSync(
-      path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "package.xml"),
-      "utf8"
-    );
-    assert.match(packageXml, /<Version>9\.9\.9<\/Version>/);
-
-    // LICENSE.txt + installscript.qs should have been copied through.
-    assert.equal(existsSync(path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "LICENSE.txt")), true);
-    assert.equal(
-      existsSync(path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "installscript.qs")),
-      true
-    );
-
-    // The packaged .app should be staged into data/.
-    assert.equal(
-      existsSync(
-        path.join(buildRoot, "packages", releaseIdentity.packageId, "data", releaseIdentity.payloadNames.macos)
-      ),
-      true,
-      "staged payload .app should exist under data/"
-    );
+    const result = runInstaller(root, "--target=windows", "--prepare-only", "--allow-staged");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Packaged native payload not found/);
   }
 );
 
-test("happy path on darwin logs the staged payload path on stdout", { skip: process.platform !== "darwin" }, () => {
+// New pages program, Slice SW (D22): the happy paths ran only on macOS, with
+// the macOS target; they hold the Windows target now, on every host.
+test("happy path with --target=windows --prepare-only --allow-staged produces the staged IFW tree", () => {
   const root = makeFakeRoot();
-  seedPackagedPayload(root, "macos");
-  const result = runInstaller(root, "--target=macos", "--prepare-only", "--allow-staged");
+  seedPackagedPayload(root);
+  const result = runInstaller(root, "--target=windows", "--prepare-only", "--allow-staged");
   assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
-  assert.match(result.stdout, /Prepared native installer staging for macos/);
+
+  const buildRoot = path.join(root, "release", "native-installer", "windows", "ifw");
+  assert.equal(existsSync(buildRoot), true, "build root should exist");
+
+  // config.xml should be rendered with the package.json version.
+  const configXml = readFileSync(path.join(buildRoot, "config", "config.xml"), "utf8");
+  assert.match(configXml, /<Version>9\.9\.9<\/Version>/);
+  assert.match(configXml, /<Name>SSE ExEd Studio Control Native<\/Name>/);
+
+  // package.xml should also embed the version.
+  const releaseIdentity = JSON.parse(
+    readFileSync(path.join(repoRoot, "scripts", "native-release-identity.json"), "utf8")
+  );
+  const packageXml = readFileSync(
+    path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "package.xml"),
+    "utf8"
+  );
+  assert.match(packageXml, /<Version>9\.9\.9<\/Version>/);
+
+  // LICENSE.txt + installscript.qs should have been copied through.
+  assert.equal(existsSync(path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "LICENSE.txt")), true);
+  assert.equal(
+    existsSync(path.join(buildRoot, "packages", releaseIdentity.packageId, "meta", "installscript.qs")),
+    true
+  );
+
+  // The packaged directory should be staged into data/.
+  assert.equal(
+    existsSync(
+      path.join(
+        buildRoot,
+        "packages",
+        releaseIdentity.packageId,
+        "data",
+        releaseIdentity.payloadNames.windows,
+        "SSE-ExEd-Studio-Control-Native.exe"
+      )
+    ),
+    true,
+    "staged payload should exist under data/"
+  );
+});
+
+test("happy path logs the staged payload path on stdout", () => {
+  const root = makeFakeRoot();
+  seedPackagedPayload(root);
+  const result = runInstaller(root, "--target=windows", "--prepare-only", "--allow-staged");
+  assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  assert.match(result.stdout, /Prepared native installer staging for windows/);
   assert.match(result.stdout, /Staged payload:/);
   assert.match(result.stdout, /Skipping binarycreator build because --prepare-only was requested\./);
 });

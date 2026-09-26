@@ -4,7 +4,6 @@ import { asRecord } from "../../shellData";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { InspectorTab } from "../components/LightingInspectorTabs";
 import { useToast } from "../../shared/toastContext";
-import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { useResizableColumns } from "../useResizableColumns";
 import { useUndoStack } from "../useUndoStack";
 import { UndoTargets } from "../undoTargets";
@@ -29,8 +28,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   const [searchQuery, setSearchQuery] = useState("");
 
   const toast = useToast();
-  const operatorLayout = useOperatorLayout();
-  const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
   // while saving Scene A) don't stomp each other. Each handler scopes its
   // own key; the inspector reads via `busyActions.has(key)` /
@@ -77,7 +74,7 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setPendingInlineRename((prev) => ({ kind, id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
 
-  const columns = useResizableColumns(operatorLayout.layoutMode);
+  const columns = useResizableColumns();
   const undoStack = useUndoStack();
   // The scenes and fixtures the undo steps act on, followed through the ids an
   // undo gives them (Slice 3 review, finding 17). The steps read the rig at
@@ -101,12 +98,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   useEffect(() => {
     setActiveTabOverride(null);
   }, [uiMode, persistedSelectedFixtureId]);
-
-  useEffect(() => {
-    if (!operatorLayout.isNarrow) {
-      setInspectorDrawerOpen(false);
-    }
-  }, [operatorLayout.isNarrow]);
 
   // ---------------- handlers ----------------
 
@@ -173,14 +164,10 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setConfirmCutAllOpen(true);
   }, []);
 
-  const handleInspectGroup = useCallback(
-    (groupId: string) => {
-      setSelectedGroupId(groupId);
-      setActiveTabOverride("group");
-      if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
-    },
-    [operatorLayout.isNarrow]
-  );
+  const handleInspectGroup = useCallback((groupId: string) => {
+    setSelectedGroupId(groupId);
+    setActiveTabOverride("group");
+  }, []);
   return {
     uiMode,
     setUiMode,
@@ -192,9 +179,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     searchQuery,
     setSearchQuery,
     toast,
-    operatorLayout,
-    inspectorDrawerOpen,
-    setInspectorDrawerOpen,
     busyActions,
     startBusy,
     finishBusy,

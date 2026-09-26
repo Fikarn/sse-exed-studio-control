@@ -28,7 +28,7 @@ tauri-plugin-single-instance = "2.4.4"
 # New pages program, Slice 3 (decision 12): on Windows the shell switches
 # WebView2's own browser keys off (reload, find, print, zoom, back). Both crates
 # are already in the lock file through Tauri and wry, at these versions, so
-# nothing new is fetched; Linux and macOS builds do not see them.
+# nothing new is fetched; the Linux CI builds do not see them.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
 windows = "0.61"

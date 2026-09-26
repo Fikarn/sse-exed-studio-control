@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
-import type { OperatorLayoutMode } from "../operatorLayout";
-
 const LEGACY_STORAGE_KEY_RAIL = "lighting.layout.railWidth";
 const LEGACY_STORAGE_KEY_INSPECTOR = "lighting.layout.inspectorWidth";
 
@@ -17,50 +15,26 @@ interface ColumnSpec {
   inspectorMax: number;
 }
 
-const COLUMN_SPECS: Record<OperatorLayoutMode, ColumnSpec> = {
-  // Visual overhaul A, Slice 5: the plate is D4's 416 px at the studio surface
-  // and the mock's 360 px below it. The rail's numbers are kept for the stored
-  // widths, but the rail itself is the shell's cluster now.
-  studioFull: {
-    railDefault: 280,
-    railMin: 220,
-    railMax: 420,
-    inspectorDefault: 416,
-    inspectorMin: 280,
-    inspectorMax: 560,
-  },
-  desktopCompact: {
-    railDefault: 260,
-    railMin: 220,
-    railMax: 320,
-    inspectorDefault: 360,
-    inspectorMin: 280,
-    inspectorMax: 380,
-  },
-  narrowUtility: {
-    railDefault: 300,
-    railMin: 240,
-    railMax: 360,
-    inspectorDefault: 360,
-    inspectorMin: 320,
-    inspectorMax: 440,
-  },
-  constrained: {
-    railDefault: 260,
-    railMin: 220,
-    railMax: 300,
-    inspectorDefault: 320,
-    inspectorMin: 300,
-    inspectorMax: 380,
-  },
+// Visual overhaul A, Slice 5: the plate is D4's 416 px. The rail's numbers are
+// kept for the stored widths, but the rail itself is the shell's cluster now.
+const COLUMN_SPEC: ColumnSpec = {
+  railDefault: 280,
+  railMin: 220,
+  railMax: 420,
+  inspectorDefault: 416,
+  inspectorMin: 280,
+  inspectorMax: 560,
 };
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function storageKey(mode: OperatorLayoutMode, side: ResizeSide) {
-  return `lighting.layout.${mode}.${side}Width`;
+// New pages program, Slice SW (D22): one layout, so one pair of widths. Their
+// names keep the studio layout's "studioFull", so the widths the operator has
+// set survive.
+function storageKey(side: ResizeSide) {
+  return `lighting.layout.studioFull.${side}Width`;
 }
 
 function readStoredWidth(key: string, legacyKey: string, fallback: number, min: number, max: number) {
@@ -79,44 +53,38 @@ export interface ResizableColumns {
   isResizing: boolean;
 }
 
-function readWidths(mode: OperatorLayoutMode) {
-  const spec = COLUMN_SPECS[mode];
+function readWidths() {
   return {
     inspectorWidth: readStoredWidth(
-      storageKey(mode, "inspector"),
+      storageKey("inspector"),
       LEGACY_STORAGE_KEY_INSPECTOR,
-      spec.inspectorDefault,
-      spec.inspectorMin,
-      spec.inspectorMax
+      COLUMN_SPEC.inspectorDefault,
+      COLUMN_SPEC.inspectorMin,
+      COLUMN_SPEC.inspectorMax
     ),
     railWidth: readStoredWidth(
-      storageKey(mode, "rail"),
+      storageKey("rail"),
       LEGACY_STORAGE_KEY_RAIL,
-      spec.railDefault,
-      spec.railMin,
-      spec.railMax
+      COLUMN_SPEC.railDefault,
+      COLUMN_SPEC.railMin,
+      COLUMN_SPEC.railMax
     ),
   };
 }
 
-export function useResizableColumns(layoutMode: OperatorLayoutMode): ResizableColumns {
-  const [widths, setWidths] = useState(() => readWidths(layoutMode));
+export function useResizableColumns(): ResizableColumns {
+  const [widths, setWidths] = useState(readWidths);
   const [isResizing, setIsResizing] = useState(false);
-  const spec = COLUMN_SPECS[layoutMode];
-
-  useEffect(() => {
-    setWidths(readWidths(layoutMode));
-  }, [layoutMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKey(layoutMode, "rail"), String(widths.railWidth));
-  }, [layoutMode, widths.railWidth]);
+    window.localStorage.setItem(storageKey("rail"), String(widths.railWidth));
+  }, [widths.railWidth]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKey(layoutMode, "inspector"), String(widths.inspectorWidth));
-  }, [layoutMode, widths.inspectorWidth]);
+    window.localStorage.setItem(storageKey("inspector"), String(widths.inspectorWidth));
+  }, [widths.inspectorWidth]);
 
   const startResize = useCallback(
     (side: ResizeSide) => (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -135,12 +103,12 @@ export function useResizableColumns(layoutMode: OperatorLayoutMode): ResizableCo
         if (side === "rail") {
           setWidths((current) => ({
             ...current,
-            railWidth: clamp(startWidth + dx, spec.railMin, spec.railMax),
+            railWidth: clamp(startWidth + dx, COLUMN_SPEC.railMin, COLUMN_SPEC.railMax),
           }));
         } else {
           setWidths((current) => ({
             ...current,
-            inspectorWidth: clamp(startWidth - dx, spec.inspectorMin, spec.inspectorMax),
+            inspectorWidth: clamp(startWidth - dx, COLUMN_SPEC.inspectorMin, COLUMN_SPEC.inspectorMax),
           }));
         }
       };
@@ -157,7 +125,7 @@ export function useResizableColumns(layoutMode: OperatorLayoutMode): ResizableCo
       handle.addEventListener("pointerup", onUp);
       handle.addEventListener("pointercancel", onUp);
     },
-    [spec.inspectorMax, spec.inspectorMin, spec.railMax, spec.railMin, widths.inspectorWidth, widths.railWidth]
+    [widths.inspectorWidth, widths.railWidth]
   );
 
   return { railWidth: widths.railWidth, inspectorWidth: widths.inspectorWidth, startResize, isResizing };

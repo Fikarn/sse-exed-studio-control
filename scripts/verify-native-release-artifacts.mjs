@@ -49,57 +49,27 @@ function assertNonEmptyFile(targetPath, label) {
 
 function assertDirectoryHasEntries(targetPath, label) {
   assertExists(targetPath, label);
-  const entries = readdirSync(targetPath).filter((entry) => entry !== ".DS_Store");
+  const entries = readdirSync(targetPath);
   assert(entries.length > 0, `${label} is empty at ${targetPath}.`);
 }
 
 function checksumManifestPath(target) {
-  const fileName =
-    target === "macos"
-      ? "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"
-      : "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt";
-  return path.join(rootDir, "release", "checksums", target, fileName);
+  return path.join(rootDir, "release", "checksums", target, "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt");
 }
 
 function checksumArtifactPaths(target, mode) {
-  const artifacts = [
-    target === "macos"
-      ? path.join(rootDir, "release", "native", target, "SSE-ExEd-Studio-Control-Native-macOS.zip")
-      : path.join(rootDir, "release", "native", target, "SSE-ExEd-Studio-Control-Native-windows.zip"),
-  ];
+  const artifacts = [path.join(rootDir, "release", "native", target, "SSE-ExEd-Studio-Control-Native-windows.zip")];
 
   if (mode === "full") {
     artifacts.push(
-      target === "macos"
-        ? path.join(
-            rootDir,
-            "release",
-            "native-installer",
-            target,
-            "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"
-          )
-        : path.join(
-            rootDir,
-            "release",
-            "native-installer",
-            target,
-            "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"
-          ),
-      target === "macos"
-        ? path.join(
-            rootDir,
-            "release",
-            "native-updates",
-            target,
-            "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
-          )
-        : path.join(
-            rootDir,
-            "release",
-            "native-updates",
-            target,
-            "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
-          )
+      path.join(rootDir, "release", "native-installer", target, "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"),
+      path.join(
+        rootDir,
+        "release",
+        "native-updates",
+        target,
+        "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
+      )
     );
   }
 
@@ -142,9 +112,7 @@ async function collectPayloadEntries(rootPath) {
         });
       }
 
-      for (const entry of readdirSync(currentPath)
-        .filter((value) => value !== ".DS_Store")
-        .sort()) {
+      for (const entry of readdirSync(currentPath).sort()) {
         const childPath = path.join(currentPath, entry);
         const childRelativePath = relativePath
           ? normalizeRelativePath(path.join(relativePath, entry))
@@ -299,11 +267,11 @@ async function verifyPayloadParityForRelease(target) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported target '${value}'. Use --target=windows.`);
 }
 
 function parseMode(value) {
@@ -333,12 +301,8 @@ function verifyInstallerArtifacts(target, packageJson, mode) {
   const packageXmlPath = path.join(installerRoot, "ifw", "packages", releaseIdentity.packageId, "meta", "package.xml");
   const payloadDir = installerPayloadPath(target);
   const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  const shellPath =
-    target === "macos" ? path.join(payloadDir, "Contents", "MacOS", shellName) : path.join(payloadDir, shellName);
-  const enginePath =
-    target === "macos"
-      ? path.join(payloadDir, "Contents", "MacOS", "studio-control-engine")
-      : path.join(payloadDir, "studio-control-engine.exe");
+  const shellPath = path.join(payloadDir, shellName);
+  const enginePath = path.join(payloadDir, "studio-control-engine.exe");
 
   verifyCommonMetadata({
     packageJson,
@@ -353,17 +317,9 @@ function verifyInstallerArtifacts(target, packageJson, mode) {
   assertExists(enginePath, `Installer staged engine executable (${target})`);
 
   if (mode === "full") {
-    const finalArtifactPath =
-      target === "macos"
-        ? path.join(installerRoot, "SSE-ExEd-Studio-Control-Native-macOS-Installer.app")
-        : path.join(installerRoot, "SSE-ExEd-Studio-Control-Native-windows-Installer.exe");
-    const archivePath =
-      target === "macos" ? path.join(installerRoot, "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip") : null;
+    const finalArtifactPath = path.join(installerRoot, "SSE-ExEd-Studio-Control-Native-windows-Installer.exe");
 
     assertExists(finalArtifactPath, `Installer artifact (${target})`);
-    if (archivePath) {
-      assertNonEmptyFile(archivePath, `Installer archive (${target})`);
-    }
   }
 }
 
@@ -372,12 +328,8 @@ function verifyUpdateArtifacts(target, packageJson, mode) {
   const packageXmlPath = path.join(updateRoot, "ifw", "packages", releaseIdentity.packageId, "meta", "package.xml");
   const payloadDir = updatePayloadPath(target);
   const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  const shellPath =
-    target === "macos" ? path.join(payloadDir, "Contents", "MacOS", shellName) : path.join(payloadDir, shellName);
-  const enginePath =
-    target === "macos"
-      ? path.join(payloadDir, "Contents", "MacOS", "studio-control-engine")
-      : path.join(payloadDir, "studio-control-engine.exe");
+  const shellPath = path.join(payloadDir, shellName);
+  const enginePath = path.join(payloadDir, "studio-control-engine.exe");
 
   const packageXml = fileText(packageXmlPath);
   expectIncludes(packageXml, `<DisplayName>${releaseIdentity.displayName}</DisplayName>`, packageXmlPath);
@@ -391,10 +343,7 @@ function verifyUpdateArtifacts(target, packageJson, mode) {
 
   if (mode === "full") {
     const repositoryPath = path.join(updateRoot, "repository");
-    const archivePath =
-      target === "macos"
-        ? path.join(updateRoot, "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip")
-        : path.join(updateRoot, "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip");
+    const archivePath = path.join(updateRoot, "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip");
 
     assertDirectoryHasEntries(repositoryPath, `Update repository (${target})`);
     assertNonEmptyFile(archivePath, `Update repository archive (${target})`);
@@ -405,16 +354,9 @@ function verifyPackagedArtifacts(target, mode) {
   const packagedRoot = path.join(rootDir, "release", "native", target);
   const payloadPath = packagedPayloadPath(target);
   const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  const shellPath =
-    target === "macos" ? path.join(payloadPath, "Contents", "MacOS", shellName) : path.join(payloadPath, shellName);
-  const enginePath =
-    target === "macos"
-      ? path.join(payloadPath, "Contents", "MacOS", "studio-control-engine")
-      : path.join(payloadPath, "studio-control-engine.exe");
-  const archivePath =
-    target === "macos"
-      ? path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-macOS.zip")
-      : path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-windows.zip");
+  const shellPath = path.join(payloadPath, shellName);
+  const enginePath = path.join(payloadPath, "studio-control-engine.exe");
+  const archivePath = path.join(packagedRoot, "SSE-ExEd-Studio-Control-Native-windows.zip");
 
   assertExists(payloadPath, `Packaged payload (${target})`);
   assertExists(shellPath, `Packaged shell executable (${target})`);

@@ -87,11 +87,11 @@ describe("the recovery screen: Reset the window layout beside Retry startup", ()
     expect(within(band).getByRole("status").textContent).toContain(REFUSAL);
     // What did not happen is said once (review finding 23: the band's detail
     // said "the layout was not reset" above the same sentence), and the way on
-    // names where the key is in a window as well as at the studio surface
-    // (review finding 22).
+    // names where the key is (review finding 22). Slice SW (D22): no "press
+    // Support" — the key is on the plate, whichever mode the bay is in.
     expect(band.textContent?.match(/not reset/gi)).toHaveLength(1);
     expect(band.textContent).toContain(
-      "Next: retry startup, then open Setup / Support and press Support: Reset the window layout is under Workstation."
+      "Next: retry startup, then open Setup / Support: Reset the window layout is under Workstation."
     );
 
     // A reset that works clears the band.

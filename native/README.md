@@ -24,21 +24,13 @@ npm run frontend:foundation
 npm run tauri:foundation
 npm run tauri:setup-support:qualify
 npm run tauri:workspaces:qualify
-npm run native:package:mac:local
-npm run native:package:mac:smoke
-npm run native:package:mac:clean-smoke
 npm run native:package:win:local
 npm run native:package:win:smoke
 npm run native:package:win:clean-smoke
-npm run native:installer:mac:prepare
-npm run native:installer:mac:local
 npm run native:installer:win:prepare
 npm run native:installer:win:local
-npm run native:update-repo:mac:prepare
-npm run native:update-repo:mac:local
 npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
-npm run native:release:mac:local
 npm run native:release:win:local
 npm run native:acceptance
 npm run tauri:cutover:candidate
@@ -59,7 +51,7 @@ cargo check
 
 Notes:
 
-- `SSE_APP_DATA_DIR` and `SSE_LOG_DIR` are respected by the shell runtime, which makes sandboxed smoke tests and isolated local runs deterministic; an engine started with neither uses the platform app-data directory (`ExEd Studio Control Native` under `%APPDATA%`, `~/Library/Application Support` or `$XDG_DATA_HOME`), never a path relative to its working directory
+- `SSE_APP_DATA_DIR` and `SSE_LOG_DIR` are respected by the shell runtime, which makes sandboxed smoke tests and isolated local runs deterministic; an engine started with neither uses `%APPDATA%\ExEd Studio Control Native`, never a path relative to its working directory
 - shell settings now persist through the Rust engine, including workspace plus window size/maximized state
 - the engine imports no legacy `db.json` since the new pages program's Slice 2b retired the import (`storage.importLegacyDb` and the start-up auto-import): a start that finds a file at the path `SSE_LEGACY_DB_PATH` names, or at `<app-data>/import/db.json`, writes one `WARN` line naming it, or both ("A db.json at <path> was left alone: Studio Control no longer imports db.json files."), and reads nothing, and Verify and Restore refuse a `db.json` by name (unless it is a support archive), a file that is not UTF-8 included, before anything is written. `SSE_DISABLE_AUTO_IMPORT` is no longer read
 - the saved data is at schema 8 since the new pages program's Slice 2: the 7 → 8 step drops Planning's four tables and every `planning.*` setting and turns a saved Planning page into the Console, after the verified `pre-migration` copy every upgrade writes; older builds refuse schema 8

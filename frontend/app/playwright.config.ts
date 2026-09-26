@@ -78,9 +78,12 @@ export default defineConfig({
       threshold: 0.01,
     },
   },
-  // Chromium font + AA rendering differs between macOS (local dev) and Linux
-  // (CI), so each platform gets its own committed baseline file. See
-  // docs/plans/* "plan PR 1" + frontend/app/tests/__visual__/README.md.
+  // New pages program, Slice SW (D22): Studio Control runs on Windows at
+  // 2560×1440 and nowhere else, so the committed captures are the win32 ones
+  // (`{platform}` names them) and only Windows compares them. CI's Linux runner
+  // runs every case but skips every screenshot expectation.
+  // See frontend/app/tests/__visual__/README.md.
+  ignoreSnapshots: process.platform !== "win32",
   snapshotPathTemplate: "{testDir}/__visual__/{testFilePath}-snapshots/{arg}-{platform}{ext}",
   reporter: [["html", { outputFolder: "playwright-report" }]],
   projects: [
@@ -106,7 +109,9 @@ export default defineConfig({
       // plan PR 5 / workstream D5: Storybook static server for the
       // storybook.spec.ts visual lane. The `storybook-static/` build is
       // produced by `npm run frontend:storybook:build` (chained into
-      // `frontend:playwright:test`).
+      // `frontend:playwright:test`). Slice SW (D22): off Windows that lane is
+      // skipped, and the server is there for the UI contract's A-primitive
+      // pages, which are measured on every platform.
       command: "npm run storybook:serve-static",
       port: 6007,
       reuseExistingServer: !process.env.CI,

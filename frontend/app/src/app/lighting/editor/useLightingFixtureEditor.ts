@@ -43,18 +43,7 @@ export function useLightingFixtureEditor({
 }) {
   const { appSnapshot, lightingFixtureCatalogSnapshot, store } = props;
   const { fixtures, persistedSelectedFixtureId, previewMode, highlightActive, soloActive } = rig;
-  const {
-    setSelectedGroupId,
-    operatorLayout,
-    setInspectorDrawerOpen,
-    startBusy,
-    finishBusy,
-    undoStack,
-    undoTargets,
-    toast,
-    setUiMode,
-    reportError,
-  } = session;
+  const { setSelectedGroupId, startBusy, finishBusy, undoStack, undoTargets, toast, setUiMode, reportError } = session;
   const { sceneRenderPreview, activeScene } = sceneEditor;
   const [fixtureValuePreviews, setFixtureValuePreviews] = useState<ReadonlyMap<string, FixtureValuePreviewFields>>(
     () => new Map()
@@ -319,14 +308,12 @@ export function useLightingFixtureEditor({
 
       if (fixtureId === null) {
         setExtraSelectedFixtureIds(new Set());
-        if (operatorLayout.isNarrow) setInspectorDrawerOpen(false);
       } else if (additive) {
         // Add to selection (decision 10): a fixture already in the selection
         // comes out of it, the focused one included; any other joins it. The
         // focused fixture stays focused, so the engine is not asked to change
         // it — unless nothing is focused yet, when the fixture that joins
         // becomes the focused one and the plate shows the selection.
-        if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
         if (fixtureId === persistedSelectedFixtureId || extraSelectedFixtureIds.has(fixtureId)) {
           await handleRemoveFromSelection(fixtureId);
           return;
@@ -337,7 +324,6 @@ export function useLightingFixtureEditor({
         }
       } else {
         setExtraSelectedFixtureIds(new Set());
-        if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
       }
 
       startBusy("fixture-select");
@@ -367,12 +353,13 @@ export function useLightingFixtureEditor({
   // on the plot toolbar reach the bookmark API through it). handleSelectFixture
   // is `useLiveCallback`-stable so closing over it is safe.
   const stagePlotViewport = useStagePlotViewport({
-    // DENSITY-04 — the full-bleed studioFull view now rests on the content frame
-    // (the populated rig fills the canvas instead of stretching the empty room);
-    // compact/utility panes keep the full-room fit for spatial proportion.
-    defaultZoomMode: operatorLayout.layoutMode === "studioFull" ? "fitContent" : "fitRoom",
+    // DENSITY-04 — the full-bleed studio view rests on the content frame (the
+    // populated rig fills the canvas instead of stretching the empty room).
+    defaultZoomMode: "fitContent",
     onBackgroundClick: () => void handleSelectFixture(null),
-    storageScope: operatorLayout.layoutMode,
+    // New pages program, Slice SW (D22): one layout. The zoom mode is still
+    // stored under the studio layout's name, so the operator's choice survives.
+    storageScope: "studioFull",
   });
 
   // Wave 31 — I9 chip-hover signal. SelectionChipStrip writes the hovered

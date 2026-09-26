@@ -31,11 +31,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 // plus the qt-ifw-tools.mjs that write-release-manifest.mjs imports.
 
 const REQUIRED_RELATIVE_ASSETS = [
-  ["release", "native-installer", "macos", "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"],
   ["release", "native-installer", "windows", "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"],
-  ["release", "native-updates", "macos", "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"],
   ["release", "native-updates", "windows", "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"],
-  ["release", "checksums", "macos", "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"],
   ["release", "checksums", "windows", "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt"],
 ];
 
@@ -82,9 +79,7 @@ function makeFakeRoot({ version = "9.9.9", omitAsset = null } = {}) {
   );
 
   // Seed every required asset (and matching checksum file lines).
-  const macInstaller = "fake macos installer bytes";
   const winInstaller = "fake windows installer bytes";
-  const macUpdate = "fake macos update repo";
   const winUpdate = "fake windows update repo";
 
   const written = [];
@@ -95,18 +90,10 @@ function makeFakeRoot({ version = "9.9.9", omitAsset = null } = {}) {
     mkdirSync(path.dirname(full), { recursive: true });
     const fileName = parts[parts.length - 1];
     let body = "fake artifact";
-    if (fileName.endsWith("Installer.zip")) body = macInstaller;
-    else if (fileName.endsWith("Installer.exe")) body = winInstaller;
-    else if (fileName.endsWith("macOS-UpdateRepository.zip")) body = macUpdate;
+    if (fileName.endsWith("Installer.exe")) body = winInstaller;
     else if (fileName.endsWith("windows-UpdateRepository.zip")) body = winUpdate;
-    else if (fileName.endsWith("macOS-SHA256.txt")) {
+    else if (fileName.endsWith("windows-SHA256.txt")) {
       // Two well-formed lines per real checksum format.
-      body = [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  SSE-ExEd-Studio-Control-Native-macOS-Installer.zip",
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip",
-        "",
-      ].join("\n");
-    } else if (fileName.endsWith("windows-SHA256.txt")) {
       body = [
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc  SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd  SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
@@ -145,20 +132,18 @@ test("--dry-run exits 0 and writes the chain-of-custody manifest", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.tag, "v9.9.9");
-  // The manifest's artifacts come from the seeded checksum files.
-  assert.equal(manifest.artifacts.length, 4);
+  // The manifest's artifacts come from the seeded checksum file.
+  assert.equal(manifest.artifacts.length, 2);
 });
 
 test("--dry-run lists all required assets on stdout", () => {
   const { root } = makeFakeRoot();
   const result = runPublishRelease(root, "--dry-run");
   assert.equal(result.status, 0, `stderr=${result.stderr}`);
-  assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-macOS-Installer\.zip/);
   assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-windows-Installer\.exe/);
-  assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository\.zip/);
   assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-windows-UpdateRepository\.zip/);
-  assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-macOS-SHA256\.txt/);
   assert.match(result.stdout, /SSE-ExEd-Studio-Control-Native-windows-SHA256\.txt/);
+  assert.doesNotMatch(result.stdout, /macOS/);
 });
 
 test("--dry-run prints the resolved repo slug derived from package.json", () => {
@@ -170,12 +155,12 @@ test("--dry-run prints the resolved repo slug derived from package.json", () => 
 
 test("fails when a required release asset is missing", () => {
   const { root } = makeFakeRoot({
-    omitAsset: path.join("release", "native-installer", "macos", "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip"),
+    omitAsset: path.join("release", "native-installer", "windows", "SSE-ExEd-Studio-Control-Native-windows-Installer.exe"),
   });
   const result = runPublishRelease(root, "--dry-run");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Required release asset is missing/);
-  assert.match(result.stderr, /SSE-ExEd-Studio-Control-Native-macOS-Installer\.zip/);
+  assert.match(result.stderr, /SSE-ExEd-Studio-Control-Native-windows-Installer\.exe/);
 });
 
 test("rejects an invalid --tag value", () => {
@@ -234,5 +219,5 @@ test("--dry-run embeds the artifact hash table in the printed notes path", () =>
   assert.ok(match, `expected a 'Release notes:' line; got: ${result.stdout}`);
   const notes = readFileSync(match[1].trim(), "utf8");
   assert.match(notes, /## Artifact verification/);
-  assert.match(notes, /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+  assert.match(notes, /cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc/);
 });

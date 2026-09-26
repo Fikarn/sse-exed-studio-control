@@ -180,11 +180,12 @@ async function readFg4(page: Page) {
   });
 }
 
+// New pages program, Slice SW (D22): 2560×1440 only; the 1920×1080 rows went.
+// These contrasts are computed from the DOM's colours, not sampled from pixels,
+// so they are checked on every platform.
 const SURFACES = [
   { width: 2560, height: 1440, theme: "studio" as const },
-  { width: 1920, height: 1080, theme: "studio" as const },
   { width: 2560, height: 1440, theme: "bone" as const },
-  { width: 1920, height: 1080, theme: "bone" as const },
 ];
 
 for (const { width, height, theme } of SURFACES) {

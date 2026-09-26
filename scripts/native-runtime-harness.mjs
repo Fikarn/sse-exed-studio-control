@@ -40,10 +40,10 @@ function envValue(env, name, platform) {
  * Every folder the hardware link or the shell could open as its app data when
  * `SSE_APP_DATA_DIR` is not set, read as bootstrap.rs
  * `default_app_data_dir_for_platform` reads it — `%APPDATA%`, else
- * `%LOCALAPPDATA%`, on Windows; `~/Library/Application Support` on macOS;
- * `$XDG_DATA_HOME`, else `~/.local/share`, elsewhere — each candidate, not only
- * the one that wins, joined with the app's folder name. On the studio
- * workstation the first is the operator's live data (2026-09-25).
+ * `%LOCALAPPDATA%`, on Windows; `$XDG_DATA_HOME`, else `~/.local/share`,
+ * elsewhere (CI's Linux runners) — each candidate, not only the one that wins,
+ * joined with the app's folder name. On the studio workstation the first is
+ * the operator's live data (2026-09-25).
  */
 export function defaultAppDataDirs(env, platform = process.platform) {
   const flavour = platform === "win32" ? path.win32 : path.posix;
@@ -54,8 +54,6 @@ export function defaultAppDataDirs(env, platform = process.platform) {
   let bases;
   if (platform === "win32") {
     bases = [...value("APPDATA"), ...value("LOCALAPPDATA")];
-  } else if (platform === "darwin") {
-    bases = value("HOME").map((home) => flavour.join(home, "Library", "Application Support"));
   } else {
     bases = [...value("XDG_DATA_HOME"), ...value("HOME").map((home) => flavour.join(home, ".local", "share"))];
   }

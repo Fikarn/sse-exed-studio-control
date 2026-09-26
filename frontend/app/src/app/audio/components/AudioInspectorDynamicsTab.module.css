@@ -219,25 +219,3 @@
   letter-spacing: 0;
   white-space: nowrap;
 }
-
-@container operator-root (max-height: 1120px) {
-  .dynamicsGraphFull {
-    min-height: 132px;
-  }
-
-  .processingControlGrid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 5px;
-  }
-
-  .processingControl {
-    grid-template-columns: 30px minmax(0, 1fr) 54px;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .processingControl strong {
-    justify-self: end;
-    font-size: var(--font-size-tick);
-  }
-}

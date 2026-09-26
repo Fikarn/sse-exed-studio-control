@@ -5,12 +5,13 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 // Thin wrapper that invokes the `visual-review.spec.ts` Playwright spec so
-// `npm run tauri:visual:review` keeps working. The actual capture matrix
-// (5 fixtures × 6 viewports + Scaled Studio Preview across the operator
-// surfaces) plus responsive assertions live in
-// `frontend/app/tests/visual-review.spec.ts`; baselines land under
-// `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/`, and the
-// PR diff gate runs in CI via `.github/workflows/dev-checks.yml`.
+// `npm run tauri:visual:review` keeps working. The captures (the operator
+// surfaces at 2560×1440, in the three themes, and the designed states) and
+// their layout checks live in `frontend/app/tests/visual-review.spec.ts`;
+// baselines land under
+// `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/`. New pages
+// program, Slice SW (D22): they are the win32 captures at 2560×1440 and are
+// compared on the Windows workstation only; CI compares none.
 //
 // plan PR 11 / workstream A3: this wrapper also emits the richer summary
 // shape that the release manifest's `visualReview.summaryPath` (see
@@ -47,34 +48,15 @@ function resolveGitSha() {
 }
 
 // Parse a committed baseline filename into structured coverage info. The arg
-// template inside the spec is either `<fixture>-<WxH>` for the main grid or
-// `<fixture>-studio-preview-<WxH>` for Scaled Studio Preview, and the
-// `playwright.config.ts` snapshotPathTemplate appends `-<platform>.png`.
+// template inside the spec is `<fixture>-<WxH>` (a themed capture's fixture
+// carries its theme: `<fixture>-<theme>`), and the `playwright.config.ts`
+// snapshotPathTemplate appends `-<platform>.png`. Since Slice SW (D22) the
+// platform is win32 and nothing else; any other name is not a baseline.
 function parseBaselineFilename(filename) {
-  const match = filename.match(/^(.+?)-(darwin|linux|win32)\.png$/);
+  const match = filename.match(/^((.+)-(\d+x\d+))-win32\.png$/);
   if (!match) return null;
-  const [, arg, platform] = match;
-  const studioPreview = arg.match(/^(.+)-studio-preview-(\d+x\d+)$/);
-  if (studioPreview) {
-    return {
-      arg,
-      fixture: studioPreview[1],
-      filename,
-      platform,
-      surface: "studioPreview",
-      viewport: studioPreview[2],
-    };
-  }
-  const main = arg.match(/^(.+)-(\d+x\d+)$/);
-  if (!main) return null;
-  return {
-    arg,
-    fixture: main[1],
-    filename,
-    platform,
-    surface: "operator",
-    viewport: main[2],
-  };
+  const [, arg, fixture, viewport] = match;
+  return { arg, fixture, filename, platform: "win32", viewport };
 }
 
 function readBaselineCoverage() {
@@ -95,14 +77,10 @@ function readBaselineCoverage() {
 
   const fixtures = new Set();
   const viewports = new Set();
-  const studioPreviewFixtures = new Set();
   const totalBaselineSnapshots = {};
   for (const baseline of baselines) {
     fixtures.add(baseline.fixture);
     viewports.add(baseline.viewport);
-    if (baseline.surface === "studioPreview") {
-      studioPreviewFixtures.add(baseline.fixture);
-    }
     totalBaselineSnapshots[baseline.platform] = (totalBaselineSnapshots[baseline.platform] ?? 0) + 1;
   }
 
@@ -110,7 +88,6 @@ function readBaselineCoverage() {
     baselines,
     coverage: {
       fixtures: [...fixtures].sort(),
-      studioPreviewFixtures: [...studioPreviewFixtures].sort(),
       totalBaselineSnapshots,
       viewports: [...viewports].sort(),
     },
@@ -144,7 +121,7 @@ function main() {
     baselinesDir: baselinesRelative,
     coverage,
     baselines,
-    note: "Playwright `toHaveScreenshot` owns per-fixture diffs. `coverage` + `baselines` reflect what is committed at this commit; per-PR diff status lives in the Playwright HTML report uploaded by the frontend-e2e CI job.",
+    note: "Playwright `toHaveScreenshot` owns per-fixture diffs. `coverage` + `baselines` reflect what is committed at this commit: the win32 captures at 2560x1440, compared on the Windows workstation only (CI compares none since Slice SW, D22); this run's diff status is in the Playwright HTML report it wrote.",
   };
 
   const summaryPath = path.join(summaryDir, "fixture-viewport-summary.json");

@@ -40,7 +40,7 @@ export function nativeReleaseRuntimeLabel(runtime) {
 
 export function nativeReleaseShellExecutableName(target, runtime) {
   normalizeRuntime(runtime, "native release runtime");
-  return target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
+  return "sse-exed-tauri-shell.exe";
 }
 
 export function nativeReleaseSmokeArgs(target, runtime, statusPath) {
@@ -51,8 +51,4 @@ export function nativeReleaseSmokeArgs(target, runtime, statusPath) {
 export function nativeReleaseRequiresOperatorUiReady(runtime) {
   normalizeRuntime(runtime, "native release runtime");
   return false;
-}
-
-export function nativeReleaseAppIdentifier() {
-  return "com.sse.exedstudiocontrol";
 }

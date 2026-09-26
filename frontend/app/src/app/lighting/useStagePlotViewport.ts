@@ -133,6 +133,9 @@ export interface UseStagePlotViewportOptions {
    *  Plain left-click clearing is owned by the marquee hook; middle-click
    *  rarely fires this path but is preserved for completeness. */
   onBackgroundClick?: () => void;
+  /** The zoom mode's default and the name it is stored under, read when the
+   *  hook mounts (new pages program, Slice SW: one layout, so they no longer
+   *  change while the plot is up). */
   defaultZoomMode?: StagePlotZoomMode;
   storageScope?: string;
 }
@@ -228,17 +231,6 @@ export function useStagePlotViewport(options: UseStagePlotViewportOptions = {}):
       return resolved;
     });
   }, []);
-
-  useEffect(() => {
-    const next = readStoredZoomMode(storageScope, defaultZoomMode);
-    // Non-fitContent modes rest at IDENTITY. When a layout/scope change lands on one
-    // (e.g. a studioFull→compact resize while the rig is framed), reset the transform
-    // so a leftover fitContent frame doesn't persist under a "Fit Room" pane. fitContent
-    // itself re-frames via StagePlot's zoomMode effect, so leave its transform alone.
-    setViewportState((current) =>
-      next === "fitContent" ? { ...current, zoomMode: next } : { ...IDENTITY, zoomMode: next }
-    );
-  }, [defaultZoomMode, setViewportState, storageScope]);
 
   const scheduleViewportState = useCallback((next: ViewportState) => {
     stateRef.current = next;

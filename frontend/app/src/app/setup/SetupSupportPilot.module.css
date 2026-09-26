@@ -81,38 +81,6 @@
     gap: 6px;
   }
 
-  /* Below the studio surface the Support plate gives the bay its width back;
-     Support is one press away on the cluster, and the bay's Support screen
-     has the backups and Workstation's window keys (A-setup.html's 1280 board
-     hides the inspector for the same reason). */
-  :global([data-operator-layout-root][data-chrome="compact"]) .body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  :global([data-operator-layout-root][data-chrome="compact"]) .plateColumn {
-    display: none;
-  }
-
-  /* New pages program, Slice 3 (review finding 22): the mirror of the rule
-     above. The bay's copy of Workstation's window keys is drawn only while the
-     plate is not, so exactly one Window row is ever on screen: the plate's at
-     the studio surface (no studio board moves), the bay's below it, where
-     "Windowed" puts the window. It keeps the plate's width. */
-  .compactWorkstation {
-    display: none;
-  }
-
-  :global([data-operator-layout-root][data-chrome="compact"]) .compactWorkstation {
-    display: block;
-    flex: none;
-    max-width: var(--chrome-studio-plate);
-  }
-
-  :global([data-operator-layout-root][data-chrome="compact"]) .bay {
-    gap: 8px;
-    padding: 10px;
-  }
-
   .degradedBanner,
   .feedbackBanner,
   .utilityRow {
@@ -270,22 +238,6 @@
 
   .runnerSide {
     align-content: start;
-  }
-
-  /* SET-11: scroll-within safety net. The global overflow:hidden chain
-     (html/body/#root → PreReadyFrame .main) clips any runner/support content
-     that exceeds the viewport — at 1280×800/1440×900/1600×960 the panels
-     visibly crush/overlap today. Each panel scrolls inside its grid track;
-     the negative-margin/padding bleed keeps Surface shadows and focus rings
-     painting inside the scrollport without moving content at rest.
-     (.supportGrid gets the same treatment deliberately — the support deck is
-     unbaselined but clips the same way.) */
-  .runnerMain,
-  .runnerSide,
-  .supportGrid {
-    overflow-y: auto;
-    margin: calc(-1 * var(--space-4));
-    padding: var(--space-4);
   }
 
   .heroSurface,
@@ -581,55 +533,5 @@
     border: 1px dashed var(--color-border-default);
     border-radius: var(--radius-screen);
     text-align: center;
-  }
-
-  @media (max-width: 1680px) {
-    .runnerBody,
-    .supportGrid {
-      grid-template-columns: 1fr;
-    }
-
-    .supportHero {
-      grid-row: auto;
-    }
-
-    .metricRow,
-    .checkGrid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (max-width: 1240px) {
-    .stepRail,
-    .fieldGrid,
-    .buttonMatrix,
-    .dialRow,
-    .restoreSummary {
-      grid-template-columns: 1fr;
-    }
-
-    .degradedBanner,
-    .utilityRow,
-    .cardHeader,
-    .checkHeader,
-    .backupRow,
-    .sideRow,
-    .verifyLead {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-
-    .bannerActions,
-    .utilityActions,
-    .inlineActions,
-    .supportRailButtons {
-      width: 100%;
-    }
-
-    .bannerActions > *,
-    .utilityActions > *,
-    .inlineActions > * {
-      flex: 1 1 180px;
-    }
   }
 }

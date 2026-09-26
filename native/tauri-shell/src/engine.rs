@@ -576,7 +576,8 @@ fn env_path(name: &str) -> Option<PathBuf> {
 
 #[derive(Clone, Copy)]
 enum RuntimePlatform {
-    Macos,
+    /// The Linux CI runners, which build and test the shell (new pages
+    /// program, Slice SW, D22: Studio Control itself runs on Windows only).
     Unix,
     Windows,
 }
@@ -584,8 +585,6 @@ enum RuntimePlatform {
 fn current_runtime_platform() -> RuntimePlatform {
     if cfg!(target_os = "windows") {
         RuntimePlatform::Windows
-    } else if cfg!(target_os = "macos") {
-        RuntimePlatform::Macos
     } else {
         RuntimePlatform::Unix
     }
@@ -612,8 +611,6 @@ where
         RuntimePlatform::Windows => {
             env_path("APPDATA", &mut get_env).or_else(|| env_path("LOCALAPPDATA", &mut get_env))
         }
-        RuntimePlatform::Macos => env_path("HOME", &mut get_env)
-            .map(|home| home.join("Library").join("Application Support")),
         RuntimePlatform::Unix => env_path("XDG_DATA_HOME", &mut get_env).or_else(|| {
             env_path("HOME", &mut get_env).map(|home| home.join(".local").join("share"))
         }),
@@ -630,6 +627,7 @@ pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
     let binary_name = if cfg!(target_os = "windows") {
         "studio-control-engine.exe"
     } else {
+        // The Linux CI runners' build.
         "studio-control-engine"
     };
 
@@ -994,23 +992,6 @@ mod tests {
         assert_eq!(
             resolved,
             PathBuf::from("C:/Users/operator/AppData/Roaming").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-    }
-
-    #[test]
-    fn macos_default_app_data_matches_application_support_location() {
-        let resolved = default_app_data_dir_for_platform(
-            RuntimePlatform::Macos,
-            env_fixture(&[("HOME", "/Users/operator")]),
-        )
-        .expect("macos app data should resolve");
-
-        assert_eq!(
-            resolved,
-            PathBuf::from("/Users/operator")
-                .join("Library")
-                .join("Application Support")
-                .join(DEFAULT_APP_DATA_DIR_NAME)
         );
     }
 

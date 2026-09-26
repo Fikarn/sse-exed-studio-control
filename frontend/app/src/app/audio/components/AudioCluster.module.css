@@ -118,20 +118,3 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-
-/* Visual overhaul A, Slice 4a: the 1920×1080 fallback is 360 px shorter than
-   the studio surface, so the cluster spends less air between its blocks and
-   the eight snapshot keys still land inside it. 2560×1440 (D4) keeps the
-   mock's 16 px rhythm untouched. */
-:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
-  gap: 12px;
-  padding: 12px 12px 12px;
-  /* Below the studio surface the cluster carries the same blocks in 360 px less
-     height. It spends less air, drops the caption the segmented keys already
-     say, and scrolls rather than clipping when a state sentence runs long. */
-  overflow-y: auto;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .mixTargetCaption {
-  display: none;
-}

@@ -4,10 +4,11 @@ This directory contains the selected native shell for the current shipping runti
 
 Current posture:
 
-- single-window Tauri 2 shell
+- single-window Tauri 2 shell, Windows only; the Linux CI runners build and test it
+- the window is always fullscreen (new pages program, Slice SW, D22): at launch on the display it was last on when that display is there (`%APPDATA%\com.sse.exedstudiocontrol\shell-window-layout.json`; a file from an older build still loads, a windowed one included), else on the 2560×1440 display, else on the display it is on. **Studio fullscreen** (`shell_enter_studio_fullscreen`) goes to the 2560×1440 display, else stays on the current one; **Reset the window layout** (`shell_reset_window_layout`) forgets the saved display first. There is no windowed layout
 - React frontend served from `frontend/app` in development and bundled for production builds
 - Rust engine remains a separate process and is launched through bridge commands
-- packaged shipping builds expect `studio-control-engine` / `studio-control-engine.exe` beside the Tauri shell executable, with `SSE_ENGINE_BIN` still available as an explicit override
+- packaged shipping builds expect `studio-control-engine.exe` beside the Tauri shell executable (the Linux CI builds look for `studio-control-engine`), with `SSE_ENGINE_BIN` still available as an explicit override
 - Qt/QML fallback retirement is complete; do not add a fallback shell path without a new architecture decision and release plan
 
 Key files:
@@ -29,7 +30,7 @@ Engine supervision and single instance (2026-09 production readiness, Slice 5 �
 
 - an exit watcher polls the engine process every 250 ms (the process mutex is held only for the poll); when the process is gone, every request still waiting is answered `ENGINE_EXITED`, `engine://event` carries `engine.exited { status, graceful, generation, pid }`, and the bridge is empty for the next `engine_start`. `stop()` marks the exit expected before it closes stdin, so a restart or the close reports `graceful: true`; whichever of the watcher and `stop()` takes the process reports it, exactly once
 - `engine_start` and `engine_summary` answer `pid` and `generation` (the launch number within this shell); the front-end keeps the generation to tell a stale `engine.exited` from a current one, and the test bridge's status carries `enginePid` / `engineGeneration` for the qualification lane
-- `tauri-plugin-single-instance` is the first plugin registered: a second launch hands its arguments to the running shell, which unminimises, shows and focuses its window, and exits. On Linux the plugin needs a D-Bus session bus; without one it stays silent and the engine's exclusive lock on `<app-data>/engine.lock` (`ENGINE_ALREADY_RUNNING` for the second engine) is the guard
+- `tauri-plugin-single-instance` is the first plugin registered: a second launch hands its arguments to the running shell, which unminimises, shows and focuses its window, and exits. On the Linux CI runners the plugin needs a D-Bus session bus; without one it stays silent and the engine's exclusive lock on `<app-data>/engine.lock` (`ENGINE_ALREADY_RUNNING` for the second engine) is the guard
 
 Repo-root commands:
 
