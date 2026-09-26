@@ -10,7 +10,7 @@
    inspector speaks one card vocabulary instead of the legacy accent-tinted
    gradient. Shared by both Sends AND Dynamics cards. Resting padding/gap are
    unchanged (8px radius vs the old 7px is height-neutral) so the no-scroll
-   budget and the @container compaction block below both still hold. */
+   budget still holds. */
 .sendCardFull {
   display: grid;
   gap: 8px;
@@ -141,19 +141,4 @@
   border-color: var(--accent-glow);
   background: var(--accent-soft);
   color: var(--accent);
-}
-
-@container operator-root (max-height: 1120px) {
-  .sendStack {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    margin-top: 6px;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .sendCardFull {
-    gap: 6px;
-    padding: 7px;
-  }
 }

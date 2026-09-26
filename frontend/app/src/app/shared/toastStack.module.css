@@ -26,11 +26,3 @@
   z-index: var(--z-toast);
   pointer-events: none;
 }
-
-@media (max-width: 720px) {
-  .stack {
-    right: 12px;
-    bottom: calc(12px + var(--toast-safe-bottom, var(--size-health-bar-height)) + 10px);
-    max-width: calc(100vw - 24px);
-  }
-}

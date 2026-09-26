@@ -3,31 +3,17 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type Dispatch,
-  type CSSProperties,
   type ReactNode,
   type SetStateAction,
 } from "react";
 
-import {
-  deriveOperatorLayoutMode,
-  isOperatorReviewSurface,
-  isOperatorUiScale,
-  OPERATOR_COMPACT_CHROME_MAX_WIDTH,
-  OPERATOR_STUDIO_PREVIEW_SIZE,
-  type OperatorLayoutMode,
-  type OperatorReviewSurface,
-  type OperatorUiScale,
-} from "./operatorLayout";
+import { isOperatorUiScale, type OperatorUiScale } from "./operatorLayout";
 
 import styles from "./OperatorLayoutProvider.module.css";
 
 const UI_SCALE_STORAGE_KEY = "app.operator.uiScale";
-/** Where builds before new pages Slice 3 remembered Studio Preview. Nothing
- *  reads it now; the provider removes it once on start. */
-const RETIRED_REVIEW_SURFACE_STORAGE_KEY = "app.operator.reviewSurface";
 const THEME_STORAGE_KEY = "app.operator.theme";
 
 export type OperatorTheme = "studio" | "graphite" | "bone";
@@ -36,23 +22,13 @@ function isOperatorTheme(value: unknown): value is OperatorTheme {
   return value === "studio" || value === "graphite" || value === "bone";
 }
 
+// New pages program, Slice SW (D22): one layout, the studio one at 2560 × 1440,
+// so the provider measures nothing. It carries the operator's two preferences.
 interface OperatorLayoutContextValue {
-  layoutMode: OperatorLayoutMode;
   uiScale: OperatorUiScale;
   setUiScale: Dispatch<SetStateAction<OperatorUiScale>>;
   theme: OperatorTheme;
   setTheme: Dispatch<SetStateAction<OperatorTheme>>;
-  /** Fixed for the session by the address (`?operatorReview=studio`). */
-  reviewSurface: OperatorReviewSurface;
-  reviewScale: number;
-  reviewTargetWidth: number | null;
-  reviewTargetHeight: number | null;
-  isStudioSurface: boolean;
-  isCompact: boolean;
-  isNarrow: boolean;
-  bodyWidth: number;
-  bodyHeight: number;
-  devicePixelRatio: number;
 }
 
 const OperatorLayoutContext = createContext<OperatorLayoutContextValue | null>(null);
@@ -63,20 +39,6 @@ function readStoredUiScale(): OperatorUiScale {
   return isOperatorUiScale(parsed) ? parsed : 100;
 }
 
-// New pages program, Slice 3 (D6, decision 1): Studio Preview draws the
-// 2560 × 1440 screen scaled into a smaller window, for design review on a
-// laptop. It leaves the operator's screens: only the address opens it
-// (`?operatorReview=studio`, as the tests and reviews do), nothing on screen
-// enters or leaves it, and the choice is no longer remembered — a remembered
-// preview with no way out would stick.
-function readRequestedReviewSurface(): OperatorReviewSurface {
-  if (typeof window === "undefined") return "native";
-  const params = new URL(window.location.href).searchParams;
-  const requested = params.get("operatorReview") ?? params.get("reviewSurface");
-  if (requested === "studio") return "studioPreview";
-  return isOperatorReviewSurface(requested) ? requested : "native";
-}
-
 function readStoredTheme(): OperatorTheme {
   if (typeof window === "undefined") return "studio";
   const requested = new URL(window.location.href).searchParams.get("theme");
@@ -85,88 +47,9 @@ function readStoredTheme(): OperatorTheme {
   return isOperatorTheme(stored) ? stored : "studio";
 }
 
-function shouldShowConstrainedWarning() {
-  if (typeof window === "undefined") return false;
-  const params = new URL(window.location.href).searchParams;
-  return import.meta.env.DEV || params.get("transport") === "fixture";
-}
-
 export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [size, setSize] = useState(() => ({
-    height: typeof window === "undefined" ? 1080 : window.innerHeight,
-    width: typeof window === "undefined" ? 1920 : window.innerWidth,
-  }));
-  const [viewportSize, setViewportSize] = useState(() => ({
-    height: typeof window === "undefined" ? 1080 : window.innerHeight,
-    width: typeof window === "undefined" ? 1920 : window.innerWidth,
-  }));
-  const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
-    typeof window === "undefined" ? 1 : window.devicePixelRatio
-  );
   const [uiScale, setUiScale] = useState<OperatorUiScale>(readStoredUiScale);
-  const [reviewSurface] = useState<OperatorReviewSurface>(readRequestedReviewSurface);
   const [theme, setTheme] = useState<OperatorTheme>(readStoredTheme);
-
-  const reviewEnabled = reviewSurface === "studioPreview";
-  const reviewTarget = reviewEnabled ? OPERATOR_STUDIO_PREVIEW_SIZE : null;
-
-  useEffect(() => {
-    const node = rootRef.current;
-    if (!node) return;
-
-    const update = (width: number, height: number) => {
-      setSize({
-        height: Math.round(height),
-        width: Math.round(width),
-      });
-    };
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) update(entry.contentRect.width, entry.contentRect.height);
-    });
-    observer.observe(node);
-    update(node.clientWidth, node.clientHeight);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const node = viewportRef.current;
-    if (!node) return;
-
-    const update = (rect: DOMRectReadOnly) => {
-      setViewportSize({
-        height: Math.round(rect.height),
-        width: Math.round(rect.width),
-      });
-    };
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) update(entry.contentRect);
-    });
-    observer.observe(node);
-    update(node.getBoundingClientRect());
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const updateDpr = () => setDevicePixelRatio(window.devicePixelRatio);
-    window.addEventListener("resize", updateDpr);
-    const media = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-    media.addEventListener("change", updateDpr);
-
-    return () => {
-      window.removeEventListener("resize", updateDpr);
-      media.removeEventListener("change", updateDpr);
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -188,12 +71,6 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     };
   }, [uiScale]);
 
-  // A preview remembered by an older build is forgotten once, on start.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.removeItem(RETIRED_REVIEW_SURFACE_STORAGE_KEY);
-  }, []);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
@@ -206,87 +83,12 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
-  const layoutMode = deriveOperatorLayoutMode(size);
-  const reviewScale =
-    reviewTarget === null
-      ? 1
-      : Math.min(1, viewportSize.width / reviewTarget.width, viewportSize.height / reviewTarget.height);
-  const boundedReviewScale = Number.isFinite(reviewScale) && reviewScale > 0 ? reviewScale : 1;
-  const value = useMemo<OperatorLayoutContextValue>(
-    () => ({
-      bodyHeight: size.height,
-      bodyWidth: size.width,
-      devicePixelRatio,
-      isCompact: layoutMode !== "studioFull",
-      isNarrow: layoutMode === "narrowUtility" || layoutMode === "constrained",
-      isStudioSurface: layoutMode === "studioFull",
-      layoutMode,
-      reviewScale: boundedReviewScale,
-      reviewSurface,
-      reviewTargetHeight: reviewTarget?.height ?? null,
-      reviewTargetWidth: reviewTarget?.width ?? null,
-      setTheme,
-      setUiScale,
-      theme,
-      uiScale,
-    }),
-    [
-      boundedReviewScale,
-      devicePixelRatio,
-      layoutMode,
-      reviewSurface,
-      reviewTarget?.height,
-      reviewTarget?.width,
-      size.height,
-      size.width,
-      theme,
-      uiScale,
-    ]
-  );
-  const rootStyle = reviewEnabled
-    ? ({
-        "--operator-review-scale": String(boundedReviewScale),
-        height: `${OPERATOR_STUDIO_PREVIEW_SIZE.height}px`,
-        width: `${OPERATOR_STUDIO_PREVIEW_SIZE.width}px`,
-      } as CSSProperties)
-    : undefined;
+  const value = useMemo<OperatorLayoutContextValue>(() => ({ setTheme, setUiScale, theme, uiScale }), [theme, uiScale]);
 
   return (
     <OperatorLayoutContext.Provider value={value}>
-      <div
-        ref={viewportRef}
-        className={`${styles.viewport} ${reviewEnabled ? styles.reviewViewport : styles.nativeViewport}`}
-        data-operator-review-viewport
-        data-review-surface={reviewSurface}
-      >
-        <div
-          ref={rootRef}
-          className={styles.root}
-          style={rootStyle}
-          data-operator-layout-root
-          data-chrome={size.width < OPERATOR_COMPACT_CHROME_MAX_WIDTH ? "compact" : "studio"}
-          data-layout-mode={layoutMode}
-          data-ui-scale={uiScale}
-          data-review-surface={reviewSurface}
-          data-review-scale={Math.round(boundedReviewScale * 1000) / 1000}
-          data-layout-width={size.width}
-          data-layout-height={size.height}
-          data-device-pixel-ratio={Math.round(devicePixelRatio * 100) / 100}
-        >
-          {children}
-          {layoutMode === "constrained" && shouldShowConstrainedWarning() ? (
-            <div className={styles.constrainedWarning} role="status">
-              Constrained operator viewport: {size.width}x{size.height}. Minimum utility mode is 1280x800 logical CSS
-              pixels.
-            </div>
-          ) : null}
-        </div>
-        {reviewEnabled ? (
-          <div className={styles.reviewBadge} role="status">
-            Studio Preview — {OPERATOR_STUDIO_PREVIEW_SIZE.width} × {OPERATOR_STUDIO_PREVIEW_SIZE.height} at{" "}
-            {Math.round(boundedReviewScale * 100)}%
-          </div>
-        ) : null}
+      <div className={styles.root} data-operator-layout-root data-ui-scale={uiScale}>
+        {children}
       </div>
     </OperatorLayoutContext.Provider>
   );

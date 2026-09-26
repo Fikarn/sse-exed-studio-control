@@ -9,7 +9,7 @@ import {
   type AudioSnapshotEntry,
   type SnapshotRecord,
 } from "../shellData";
-import { describeAudioStatus, formatMeterDb, type AudioDensityMode } from "./audioFormatting";
+import { describeAudioStatus, formatMeterDb } from "./audioFormatting";
 
 export type AudioTierId = "hardware-inputs" | "software-playback" | "hardware-outputs";
 export type AudioGroupTierId = Extract<AudioTierId, "hardware-inputs" | "software-playback">;
@@ -61,7 +61,6 @@ export interface AudioWorkspaceViewModel {
   channels: AudioChannelEntry[];
   clampedBankIndex: number;
   clippedChannels: AudioChannelEntry[];
-  density: AudioDensityMode;
   fadersPerBank: number;
   feedingChannelIds: string[];
   footerTelemetry: {
@@ -291,22 +290,17 @@ export function isChannelFeedingMixTarget(channel: AudioChannelEntry, mixTargetI
 }
 
 /**
- * Strips per bank for each density (2026-09 audit Slice 9, operator decision 6).
- * desktop (operator root ≥ 2200 px): 4 inputs, 6 playback pairs, 12 strips;
- * compact (< 2200 px — the 1920×1080 fallback): 4 / 4 / 8, so the three tiers
- * fit their columns without a horizontal scroll; touch (legacy toolbar mode):
- * 8 / 4 / 8. `fadersPerBank` (engine setting) caps the input and strip counts.
+ * Strips per bank (2026-09 audit Slice 9, operator decision 6): 4 inputs, 6
+ * playback pairs, 12 strips. `fadersPerBank` (engine setting) caps the input
+ * and strip counts. New pages program, Slice SW (D22): these are the studio
+ * surface's counts and the only ones; the compact and touch tables went with
+ * the other screen sizes.
  */
-export function audioBankSizes(density: AudioDensityMode, fadersPerBank: number) {
-  const table = {
-    compact: { inputs: 4, playback: 4, strips: 8 },
-    desktop: { inputs: 4, playback: 6, strips: 12 },
-    touch: { inputs: 8, playback: 4, strips: 8 },
-  }[density];
+export function audioBankSizes(fadersPerBank: number) {
   return {
-    hardwareInputBankSize: Math.min(table.inputs, fadersPerBank),
-    softwarePlaybackBankSize: table.playback,
-    visibleStripCount: Math.min(table.strips, fadersPerBank),
+    hardwareInputBankSize: Math.min(4, fadersPerBank),
+    softwarePlaybackBankSize: 6,
+    visibleStripCount: Math.min(12, fadersPerBank),
   };
 }
 
@@ -369,13 +363,11 @@ export function buildAudioViewModel({
   appSnapshot,
   audioSnapshot,
   bankIndex,
-  density,
   activeChannelGroups,
 }: {
   appSnapshot: SnapshotRecord | null;
   audioSnapshot: AudioSnapshot;
   bankIndex: number;
-  density: AudioDensityMode;
   activeChannelGroups: AudioChannelGroupSelections;
 }): AudioWorkspaceViewModel {
   const channels = getAudioChannels(audioSnapshot);
@@ -397,7 +389,7 @@ export function buildAudioViewModel({
     1,
     Math.min(24, typeof audioSnapshot.fadersPerBank === "number" ? audioSnapshot.fadersPerBank : 12)
   );
-  const { hardwareInputBankSize, softwarePlaybackBankSize, visibleStripCount } = audioBankSizes(density, fadersPerBank);
+  const { hardwareInputBankSize, softwarePlaybackBankSize, visibleStripCount } = audioBankSizes(fadersPerBank);
   const hardwareSourceChannels = channels.filter((entry) => entry.role !== "playback-pair");
   const softwarePlaybackSourceChannels = channels.filter((entry) => entry.role === "playback-pair");
   const hardwareInputGroups = orderedGroupsForChannels(hardwareSourceChannels);
@@ -520,7 +512,6 @@ export function buildAudioViewModel({
     channels,
     clampedBankIndex,
     clippedChannels,
-    density,
     fadersPerBank,
     feedingChannelIds,
     footerTelemetry: {

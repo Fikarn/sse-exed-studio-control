@@ -467,9 +467,8 @@ export function getAudioSnapshots(snapshot: AudioSnapshot | null): AudioSnapshot
 }
 
 // Map the long engine summary to a short status word for the shell header
-// monitor control (e.g. "ready", "pending", "passed"). The 92 px header is tight at
-// 1280 px Tauri default — the per-item summary belongs in the workspace's
-// own health bar, not the global header.
+// monitor control (e.g. "ready", "pending", "passed"). The per-item summary
+// belongs in the workspace's own health bar, not the global header.
 function statusLabelFor(check: { status?: string } | undefined, fallback: string): string {
   switch (check?.status) {
     case "passed":
