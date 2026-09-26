@@ -28,8 +28,8 @@ On the Windows workstation, by the local Playwright lane, before every push:
 `npm run frontend:playwright:test` (it builds the app and Storybook first).
 
 CI compares none of them. Its `frontend-e2e` job runs on a Linux runner, where
-`ignoreSnapshots` is on (`playwright.config.ts`), `storybook.spec.ts` is
-skipped, and the UI contract takes no screenshot and samples no contrast
+`ignoreSnapshots` is on (`playwright.config.ts`), so `storybook.spec.ts` only
+checks that each story loads and paints, and the UI contract takes no screenshot and samples no contrast
 (`helpers/ui-contract/measure.mjs`). Every other check in those specs runs
 there as everywhere.
 

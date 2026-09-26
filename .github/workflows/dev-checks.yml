@@ -29,8 +29,8 @@ concurrency:
   cancel-in-progress: true
 
 # Required merge hygiene on protected branches. Never a release gate.
-# Target-host release evidence on macOS Apple Silicon and Windows 11 x64
-# remains the release acceptance mechanism for this repo (see AGENTS.md).
+# Target-host release evidence on Windows 11 x64 remains the release
+# acceptance mechanism for this repo (see AGENTS.md).
 jobs:
   format-protocol:
     runs-on: ubuntu-latest
@@ -126,9 +126,9 @@ jobs:
   # Playwright suite, sharing the Vite preview server boot cost as B2 suggests.
   # New pages program, Slice SW (D22): Studio Control runs on Windows at
   # 2560x1440, so on this Linux runner the suite compares no screenshot
-  # (`ignoreSnapshots` off Windows, frontend/app/playwright.config.ts), skips
-  # the capture-only `storybook.spec.ts` and samples no contrast in the UI
-  # contract; every behaviour case runs. The win32 captures and the contrast are
+  # (`ignoreSnapshots` off Windows, frontend/app/playwright.config.ts) and
+  # samples no contrast in the UI contract; every behaviour case runs, the
+  # Storybook stories' load-and-paint checks included. The win32 captures and the contrast are
   # checked on the workstation before each push. Storybook is still built: the
   # UI contract measures the A-primitive stories here too.
   frontend-e2e:

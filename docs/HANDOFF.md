@@ -264,7 +264,7 @@ Validation recorded for this pass:
 
 ### Responsive operator layout, Lighting-first pass
 
-Status: complete and merged through [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71). Superseded by the new pages program's Slice SW (2026-09-26, D22): the layout modes below `studioFull`, the narrow drawer, Scaled Studio Preview, the windowed layout and the six-size capture ladder are gone; the facts below are the record of this pass (the UI scale, the stage zoom and the shell-owned window preferences stay).
+Status: complete and merged through [PR #71](https://github.com/Fikarn/sse-exed-studio-control/pull/71). Superseded by the new pages program's Slice SW (2026-09-26, D22): the layout modes below `studioFull`, the narrow drawer, Scaled Studio Preview, the windowed layout and the six-size capture ladder are gone; the facts below are the record of this pass, not current practice (the UI scale, the stage zoom and the shell-owned window preferences stay).
 
 Important facts for future sessions:
 

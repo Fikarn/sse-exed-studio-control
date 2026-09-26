@@ -221,7 +221,9 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
   test.use({ viewport: { width: SURFACE.width, height: SURFACE.height } });
 
   for (const story of A_STORIES) {
-    test(`${story.name} passes the light, target, radius, type and contrast checks`, async ({ page }) => {
+    test(`${story.name} passes the light, target, radius and type checks, and contrast on Windows`, async ({
+      page,
+    }) => {
       await page.goto(`http://127.0.0.1:6007/iframe.html?id=${encodeURIComponent(story.id)}&viewMode=story`, {
         waitUntil: "networkidle",
       });

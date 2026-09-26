@@ -18,10 +18,10 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // 2560×1440, the only ones there are.
 //
 // New pages program, Slice SW (D22): Studio Control runs on Windows at
-// 2560×1440, and this spec does nothing but capture, so it runs on Windows
-// only. It is skipped, not quarantined: the gate is checked on the workstation
-// before each push (`frontend/app/tests/__visual__/README.md`).
-test.skip(process.platform !== "win32", "the Storybook captures are the Windows workstation's (D22)");
+// 2560×1440. Off Windows Playwright skips the comparison (`ignoreSnapshots`),
+// so CI's Linux runner still checks that every story loads and paints, and the
+// captures are compared on the workstation before each push
+// (`frontend/app/tests/__visual__/README.md`).
 
 const STORYBOOK_BASE = "http://127.0.0.1:6007";
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
