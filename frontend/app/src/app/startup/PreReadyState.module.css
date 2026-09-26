@@ -33,7 +33,3 @@
   gap: 12px;
   min-width: 0;
 }
-
-:global([data-operator-layout-root][data-chrome="compact"]) .shell {
-  padding: 10px;
-}

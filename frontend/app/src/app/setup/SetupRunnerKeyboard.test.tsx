@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useSyncExternalStore } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShellFrame } from "@sse/design-system";
 import { createFixtureTransport, createShellStore, type ShellStore } from "@sse/engine-client";
@@ -60,31 +60,6 @@ function blurAll() {
   (document.activeElement as HTMLElement | null)?.blur();
   expect(document.activeElement).toBe(document.body);
 }
-
-beforeAll(() => {
-  // jsdom has neither ResizeObserver nor matchMedia; the layout provider
-  // only needs ones that never fire.
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-  );
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    addEventListener() {},
-    addListener() {},
-    dispatchEvent() {
-      return false;
-    },
-    matches: false,
-    media: query,
-    onchange: null,
-    removeEventListener() {},
-    removeListener() {},
-  }));
-});
 
 afterEach(() => {
   cleanup();

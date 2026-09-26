@@ -39,8 +39,8 @@ function main() {
   }
 
   // plan PR 3 / workstream C4: embed authoritative artifact hashes in the
-  // release notes body when the per-platform SHA-256 manifests exist on
-  // disk. Empty array → table is omitted gracefully.
+  // release notes body when the Windows SHA-256 manifest exists on disk.
+  // Empty array → table is omitted gracefully.
   const artifactHashes = readChecksumEntries();
 
   const output = formatReleaseNotes({

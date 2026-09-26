@@ -4,8 +4,9 @@
 
 Ship `SSE ExEd Studio Control` as a production-grade native desktop product for:
 
-- Windows 11 `x64`
-- macOS Apple Silicon
+- Windows 11 `x64`, fullscreen at `2560x1440` on the studio's external monitor
+
+macOS Apple Silicon left the plan on 2026-09-26: Studio Control runs only on Windows, at `2560x1440` (the operator's ruling; the new pages program's Slice SW removed the macOS packaging, signing and release assets). The items below that name macOS were done for it before then.
 
 The full journey should feel production-ready for a controlled workstation deployment from the GitHub repo page through install, first launch, setup, normal use, update, and rollback.
 
@@ -16,7 +17,7 @@ Native parity was signed off and the legacy runtime was retired in `v2.1.0`. The
 - Product name: `SSE ExEd Studio Control`
 - Distribution: direct download from GitHub Releases
 - Windows packaging: Qt Installer Framework offline installer
-- macOS packaging: Qt Installer Framework offline installer
+- Platform: Windows only, at `2560x1440` (the operator's ruling of 2026-09-26)
 - Update channel: Qt Installer Framework maintenance-tool update repository
 - Primary deployment profile: one fixed studio workstation
 
@@ -25,7 +26,7 @@ Native parity was signed off and the legacy runtime was retired in `v2.1.0`. The
 These still need deliberate rollout ownership:
 
 1. Public-distribution trust, only if the deployment model changes
-   If the project later needs frictionless public self-serve installs, decide who owns the Windows signing certificate and the Apple Developer account or team.
+   If the project later needs frictionless public self-serve installs, decide who owns the Windows signing certificate.
 
 ## Workstreams
 
@@ -55,7 +56,7 @@ Exit criteria:
 
 ### 3. Release Pipeline And Trust
 
-- [x] Keep cross-platform tagged-release validation in place
+- [x] Keep tagged-release validation in place
 - [x] Build native Windows and macOS installers on target release hosts
 - [x] Build native maintenance-tool update-repository archives on target release hosts
 - [x] Publish SHA256 manifests for native release artifacts
@@ -65,13 +66,12 @@ Exit criteria:
 - [x] Add optional Windows signing hooks to local release validation
 - [x] Document the unsigned controlled-deployment posture for Windows and macOS installs
 - [ ] Configure Windows signing secrets and validate a signed installer build if public self-serve distribution becomes necessary
-- [ ] Configure Apple signing and notarization secrets and validate a trusted macOS installer build if public self-serve distribution becomes necessary
 - [x] Add an explicit release acceptance checklist for installer and update verification
 
 Exit criteria:
 
 - tagged releases have locally published native installers and update-repository archives
-- operators have documented manual trust steps for unsigned Windows and macOS installs
+- operators have documented manual trust steps for unsigned Windows installs
 - integrity and rollback checks are available before operator rollout
 
 ### 4. Installed-App Experience
@@ -105,7 +105,7 @@ Exit criteria:
 Before calling the productization pass complete, confirm:
 
 1. The repo page, README, and latest release page all refer to `SSE ExEd Studio Control`.
-2. Windows and macOS native installers are downloadable from GitHub Releases.
+2. The Windows native installer is downloadable from GitHub Releases.
 3. Native update-repository archives are published with each tagged release.
 4. First launch reaches commissioning or dashboard reliably on a clean machine.
 5. Setup is understandable and recoverable if deferred.
@@ -126,4 +126,3 @@ Use [docs/HANDOFF.md](./HANDOFF.md) for current engineering truth. The historica
 The remaining productization work is:
 
 - configure Windows signing secrets if public self-serve distribution becomes necessary
-- configure Apple signing/notarization secrets if public self-serve distribution becomes necessary

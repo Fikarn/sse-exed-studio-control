@@ -9,7 +9,6 @@
   "installerDescription": "Offline native installer for the shipping desktop shell and bundled Rust engine.",
   "updateDescription": "Shipping workstation runtime distributed through the Qt Installer Framework maintenance-tool repository.",
   "payloadNames": {
-    "macos": "SSE ExEd Studio Control Native.app",
     "windows": "SSE ExEd Studio Control Native"
   }
 }

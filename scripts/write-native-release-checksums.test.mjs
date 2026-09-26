@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 // The script is pure file-I/O (no spawn), so we drive it as a subprocess
 // against a temp-root fixture and assert:
 //
-//   1. Arg parsing — --target=macos/windows, --mode=staged/full; bad
-//      values rejected.
+//   1. Arg parsing — --target=windows, --mode=staged/full; bad values
+//      rejected.
 //   2. Exit codes — 0 on success, non-zero when a required artifact is
 //      missing or the target/mode is bad.
 //   3. File I/O contract — the produced SHA256.txt is a single space-
@@ -65,8 +65,8 @@ test("rejects an unsupported --mode value with a non-zero exit", () => {
   const root = makeFakeRoot();
   // The packaged-zip needs to exist before we hit the mode parser (mode is
   // parsed first in the script though — verify either ordering works).
-  writeArtifact(root, "release/native/macos/SSE-ExEd-Studio-Control-Native-macOS.zip", "bytes\n");
-  const result = runChecksums(root, "--target=macos", "--mode=quick");
+  writeArtifact(root, "release/native/windows/SSE-ExEd-Studio-Control-Native-windows.zip", "bytes\n");
+  const result = runChecksums(root, "--target=windows", "--mode=quick");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Unsupported mode/);
 });
@@ -78,66 +78,66 @@ test("rejects a missing --target with a non-zero exit", () => {
   assert.match(result.stderr, /Unsupported target/);
 });
 
-test("fails when the packaged-zip is missing (--mode=staged, --target=macos)", () => {
+test("fails when the packaged-zip is missing (--mode=staged, --target=windows)", () => {
   const root = makeFakeRoot();
-  const result = runChecksums(root, "--target=macos", "--mode=staged");
+  const result = runChecksums(root, "--target=windows", "--mode=staged");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /packaged native bundle archive not found/);
 });
 
-test("--mode=staged --target=macos writes a one-line SHA256 manifest", () => {
+test("--mode=staged --target=windows writes a one-line SHA256 manifest", () => {
   const root = makeFakeRoot();
-  const zipBody = "fake macOS zip bytes";
-  writeArtifact(root, "release/native/macos/SSE-ExEd-Studio-Control-Native-macOS.zip", zipBody);
+  const zipBody = "fake Windows zip bytes";
+  writeArtifact(root, "release/native/windows/SSE-ExEd-Studio-Control-Native-windows.zip", zipBody);
 
-  const result = runChecksums(root, "--target=macos", "--mode=staged");
+  const result = runChecksums(root, "--target=windows", "--mode=staged");
   assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
 
   const manifestPath = path.join(
     root,
     "release",
     "checksums",
-    "macos",
-    "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"
+    "windows",
+    "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt"
   );
   assert.equal(existsSync(manifestPath), true);
 
   const manifest = readFileSync(manifestPath, "utf8");
-  const expected = `${sha256Hex(zipBody)}  SSE-ExEd-Studio-Control-Native-macOS.zip\n`;
+  const expected = `${sha256Hex(zipBody)}  SSE-ExEd-Studio-Control-Native-windows.zip\n`;
   assert.equal(manifest, expected);
   assert.match(result.stdout, /Checksummed 1 artifact\(s\)/);
 });
 
-test("--mode=full --target=macos writes a three-line SHA256 manifest covering installer + update repo", () => {
+test("--mode=full --target=windows writes a three-line SHA256 manifest covering installer + update repo", () => {
   const root = makeFakeRoot();
-  const zipBody = "fake macOS zip bytes";
-  const installerBody = "fake macOS installer bytes";
-  const updateRepoBody = "fake macOS update repo bytes";
+  const zipBody = "fake Windows zip bytes";
+  const installerBody = "fake Windows installer bytes";
+  const updateRepoBody = "fake Windows update repo bytes";
 
-  writeArtifact(root, "release/native/macos/SSE-ExEd-Studio-Control-Native-macOS.zip", zipBody);
+  writeArtifact(root, "release/native/windows/SSE-ExEd-Studio-Control-Native-windows.zip", zipBody);
   writeArtifact(
     root,
-    "release/native-installer/macos/SSE-ExEd-Studio-Control-Native-macOS-Installer.zip",
+    "release/native-installer/windows/SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
     installerBody
   );
   writeArtifact(
     root,
-    "release/native-updates/macos/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip",
+    "release/native-updates/windows/SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
     updateRepoBody
   );
 
-  const result = runChecksums(root, "--target=macos", "--mode=full");
+  const result = runChecksums(root, "--target=windows", "--mode=full");
   assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
 
   const manifest = readFileSync(
-    path.join(root, "release", "checksums", "macos", "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt"),
+    path.join(root, "release", "checksums", "windows", "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt"),
     "utf8"
   );
   const lines = manifest.trimEnd().split("\n");
   assert.equal(lines.length, 3, `expected 3 lines, got ${lines.length}: ${manifest}`);
-  assert.equal(lines[0], `${sha256Hex(zipBody)}  SSE-ExEd-Studio-Control-Native-macOS.zip`);
-  assert.equal(lines[1], `${sha256Hex(installerBody)}  SSE-ExEd-Studio-Control-Native-macOS-Installer.zip`);
-  assert.equal(lines[2], `${sha256Hex(updateRepoBody)}  SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip`);
+  assert.equal(lines[0], `${sha256Hex(zipBody)}  SSE-ExEd-Studio-Control-Native-windows.zip`);
+  assert.equal(lines[1], `${sha256Hex(installerBody)}  SSE-ExEd-Studio-Control-Native-windows-Installer.exe`);
+  assert.equal(lines[2], `${sha256Hex(updateRepoBody)}  SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip`);
   assert.match(result.stdout, /Checksummed 3 artifact\(s\)/);
 });
 
@@ -145,8 +145,8 @@ test("--mode default is 'full' when --mode is omitted", () => {
   const root = makeFakeRoot();
   // Only seed the staged zip; with default mode=full the script must demand
   // the installer + update repo too.
-  writeArtifact(root, "release/native/macos/SSE-ExEd-Studio-Control-Native-macOS.zip", "x");
-  const result = runChecksums(root, "--target=macos");
+  writeArtifact(root, "release/native/windows/SSE-ExEd-Studio-Control-Native-windows.zip", "x");
+  const result = runChecksums(root, "--target=windows");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /native installer artifact not found/);
 });

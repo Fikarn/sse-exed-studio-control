@@ -15,18 +15,6 @@ import {
 // meter-canvas.ts; this module is the workspace + snapshot deck +
 // inspector overview piece.
 
-// 2026-05-27 Console redesign: both preamp controls are now square SVG rotary
-// dials — AudioStripPreamp (32×32) in the channel strip and AudioKnob (132×132)
-// in the inspector hero. The role="slider" element measures ~1:1 in every
-// surface, so the old 640×213 / 426×640 preamp-bitmap aspect ratios no longer
-// apply. Kept as two named constants so the per-surface assertions still read
-// as "strip preamp" vs "inspector preamp" intent.
-// Visual overhaul A, Slice 4b: the strip's preamp is a gain key now, so only
-// the inspector's knob is measured by aspect. COMPACT_PREAMP_ASPECT_RATIO is
-// retired with the strip knob; its callers compare the two surfaces' gain keys
-// to each other instead.
-export const NARROW_PREAMP_ASPECT_RATIO = 1;
-
 async function readRequiredBoxBySelector(page: Page, selector: string, label: string) {
   const box = await page.locator(selector).first().boundingBox();
   expect(box, `${label} should have a box`).not.toBeNull();
@@ -108,8 +96,8 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
       stateWidth: rect(state),
     };
   });
-  // A share, not a pixel count: the Scaled Studio Preview renders the 2560
-  // canvas at ~59 %, so the cluster measures ~250 px there and ~424 px native.
+  // A share of the shell, not a pixel count (the cluster is 424 px of 2560,
+  // plan D4).
   expect(metrics.clusterWidth / metrics.shellWidth, "cluster fills its column").toBeGreaterThan(0.12);
   expect(metrics.stateWidth / metrics.clusterWidth, "state display fills the cluster").toBeGreaterThan(0.8);
   expect(metrics.monitorMeter / metrics.clusterWidth, "monitor master meter is filled").toBeGreaterThan(0.8);
@@ -147,17 +135,18 @@ export async function expectSnapshotActionsDoNotOverlapContent(page: Page, snaps
   const actionBox = await readRequiredLocatorBox(actions, `${snapshotId} action strip`);
   expectInsideBox(actionBox, floatBox, `${snapshotId} action strip inside the slot float`);
 
+  // New pages program, Slice SW (D22): the mix-shape thumbnail is always drawn
+  // now (only the fallback size dropped it), so it is measured like the rest.
+  // Each box is read with its edges: `boxesIntersect` compares left / right /
+  // top / bottom, and the raw `boundingBox()` (x, y, width, height) it was given
+  // until this slice made every overlap test false.
   for (const [locator, label] of [
     [tile.getByTestId(`audio-snapshot-name-${snapshotId}`), "name"],
-    // The mix-shape thumbnail is the one part the slot drops below the studio
-    // surface, so it is measured only where it is drawn.
     [tile.getByTestId(`audio-snapshot-thumb-${snapshotId}`), "thumbnail"],
     [tile.getByTestId(`audio-snapshot-meta-${snapshotId}`), "status"],
   ] as const) {
-    const contentBox = await locator.boundingBox();
-    if (label === "thumbnail" && contentBox === null) continue;
-    expect(contentBox, `${snapshotId} ${label} should render a measurable box`).not.toBeNull();
-    expect(boxesIntersect(actionBox, contentBox!), `${snapshotId} action strip overlaps ${label}`).toBe(false);
+    const contentBox = await readRequiredLocatorBox(locator, `${snapshotId} ${label}`);
+    expect(boxesIntersect(actionBox, contentBox), `${snapshotId} action strip overlaps ${label}`).toBe(false);
   }
 }
 

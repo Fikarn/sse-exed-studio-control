@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { expectNoDocumentScroll } from "./helpers/geometry";
 import { openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: startup + recovery surface specs split out
@@ -99,35 +100,26 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
 });
 
-test("recovery shell scrolls within the frame at 1920x1080 (SET-11)", async ({ page }) => {
+test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page }) => {
   // Slice 11 / SET-11: the recovery shell carried a 100vh/100dvh min-height
   // inside PreReadyFrame's overflow:hidden main, so the bottom card was
-  // amputated at 1920x1080 with no way to scroll to it. The shell now
-  // scrolls within the frame; this locks that the last reference block can
-  // be brought fully into view.
-  await page.setViewportSize({ width: 1920, height: 1080 });
+  // amputated at 1920x1080 with no way to scroll to it; the shell now scrolls
+  // within the frame. New pages program, Slice SW (D22). Old: at 1920 × 1080
+  // the last reference block started below the fold and a real wheel scroll had
+  // to bring it into view. New: at 2560 × 1440 it is on screen as the screen
+  // opens, with nothing scrolled. Reason: the studio screen is the only one,
+  // and there the stronger property holds.
+  await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "protocol-mismatch");
   await expect(page.getByTestId("setup-recovery-surface-state-display")).toContainText("PROTOCOL MISMATCH", {
     timeout: 10000,
   });
 
-  // Precondition: the last reference block starts below the fold. The
-  // gesture must be a REAL wheel scroll: overflow:hidden ancestors still
-  // honor programmatic scrolling (scrollIntoViewIfNeeded passes either
-  // way), but swallow user input — the operator-visible defect.
-  const updatePosture = page.getByText("Update posture");
-  const before = await updatePosture.boundingBox();
-  expect(before).not.toBeNull();
-  expect(before!.y + before!.height).toBeGreaterThan(1080);
-
-  await page.getByText("What went wrong?").hover();
-  await page.mouse.wheel(0, 2400);
-  await expect
-    .poll(async () => {
-      const box = await updatePosture.boundingBox();
-      return box !== null && box.y >= 0 && box.y + box.height <= 1080;
-    })
-    .toBe(true);
+  const box = await page.getByText("Update posture").boundingBox();
+  expect(box, "the last reference block should have a box").not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(1440);
+  await expectNoDocumentScroll(page);
 });
 
 // Visual overhaul A, Slice 7 (plan Slice 7): a recovery surface is not a dead

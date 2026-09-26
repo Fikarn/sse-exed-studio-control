@@ -36,22 +36,3 @@
   color: var(--text-text2);
   white-space: nowrap;
 }
-
-/* Below the studio surface the block keeps all three columns — the scale, the
-   groove and the meter — in a 96 px strip: the mock's 1920 geometry. The groove
-   stays a 40 px target, well above the take-time floor. */
-:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock {
-  gap: 4px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .scale {
-  width: 20px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock [role="slider"] {
-  width: 40px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .faderBlock [data-meter] {
-  width: 20px;
-}

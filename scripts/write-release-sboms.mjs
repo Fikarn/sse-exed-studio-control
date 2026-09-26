@@ -1,7 +1,7 @@
 // write-release-sboms.mjs — CycloneDX SBOMs for what a packaged bundle carries
 // (production readiness 2026-09, Slice 12 — finding F17, decision D2).
 //
-//   node scripts/write-release-sboms.mjs --target=windows|macos
+//   node scripts/write-release-sboms.mjs --target=windows
 //
 // Three files under `release/sbom/<target>/`, one per thing inside the bundle:
 //
@@ -28,14 +28,13 @@ const SPEC_VERSION = "1.5";
 
 export const TARGETS = {
   windows: { triple: "x86_64-pc-windows-msvc", fileLabel: "windows" },
-  macos: { triple: "aarch64-apple-darwin", fileLabel: "macOS" },
 };
 
 export function parseTarget(value) {
   if (Object.hasOwn(TARGETS, value ?? "")) {
     return value;
   }
-  throw new Error(`Unsupported target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported target '${value}'. Use --target=windows.`);
 }
 
 /** The three SBOMs of a target: where each lands and what it must describe. */

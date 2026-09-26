@@ -67,8 +67,6 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     requestAddFixture,
     requestEmergencyCut,
     setDmxMonitorOpen,
-    operatorLayout,
-    setInspectorDrawerOpen,
     setSearchQuery,
     handleTogglePatch,
     setConfirmDeleteScene,
@@ -117,7 +115,6 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
         onStopFind={() => void handleStopFind()}
         onUndo={() => void handleUndo()}
         onOpenDmxMonitor={() => setDmxMonitorOpen(true)}
-        onOpenInspector={operatorLayout.isNarrow ? () => setInspectorDrawerOpen(true) : undefined}
         onOpenSetup={() => void store.setWorkspace("setup")}
         onRecallFadeMsChange={setRecallFadeMs}
         onResaveScene={() => void handleResaveScene()}

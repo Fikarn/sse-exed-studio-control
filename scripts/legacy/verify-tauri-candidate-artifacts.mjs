@@ -30,11 +30,11 @@ function assert(condition, message) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported Tauri candidate artifact target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported Tauri candidate artifact target '${value}'. Use --target=windows.`);
 }
 
 function parseMode(value) {
@@ -97,9 +97,7 @@ async function collectPayloadEntries(rootPath) {
         });
       }
 
-      for (const entry of readdirSync(currentPath)
-        .filter((value) => value !== ".DS_Store")
-        .sort()) {
+      for (const entry of readdirSync(currentPath).sort()) {
         await visit(
           path.join(currentPath, entry),
           relativePath ? normalizeRelativePath(path.join(relativePath, entry)) : normalizeRelativePath(entry)
@@ -190,22 +188,18 @@ function updatePayloadPath(target) {
   );
 }
 
-function shellExecutablePath(target, payloadPath) {
-  return target === "macos"
-    ? path.join(payloadPath, "Contents", "MacOS", "sse-exed-tauri-shell")
-    : path.join(payloadPath, "sse-exed-tauri-shell.exe");
+function shellExecutablePath(payloadPath) {
+  return path.join(payloadPath, "sse-exed-tauri-shell.exe");
 }
 
-function engineExecutablePath(target, payloadPath) {
-  return target === "macos"
-    ? path.join(payloadPath, "Contents", "MacOS", "studio-control-engine")
-    : path.join(payloadPath, "studio-control-engine.exe");
+function engineExecutablePath(payloadPath) {
+  return path.join(payloadPath, "studio-control-engine.exe");
 }
 
 function verifyCandidatePayload(target, payloadPath, label) {
   assertExists(payloadPath, `${label} payload (${target})`);
-  assertExists(shellExecutablePath(target, payloadPath), `${label} Tauri shell executable (${target})`);
-  assertExists(engineExecutablePath(target, payloadPath), `${label} engine executable (${target})`);
+  assertExists(shellExecutablePath(payloadPath), `${label} Tauri shell executable (${target})`);
+  assertExists(engineExecutablePath(payloadPath), `${label} engine executable (${target})`);
 }
 
 function verifyPackageXml(packageXmlPath, expectedDescription) {
@@ -241,17 +235,8 @@ function verifyInstallerStaging(target, mode) {
   verifyCandidatePayload(target, installerPayloadPath(target), "Installer staged");
 
   if (mode === "full") {
-    const installerPath =
-      target === "macos"
-        ? path.join(installerRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.app")
-        : path.join(installerRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
+    const installerPath = path.join(installerRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-Installer.exe");
     assertExists(installerPath, `Tauri candidate installer artifact (${target})`);
-    if (target === "macos") {
-      assertNonEmptyFile(
-        path.join(installerRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-Installer.zip"),
-        `Tauri candidate installer archive (${target})`
-      );
-    }
   }
 }
 
@@ -267,9 +252,7 @@ function verifyUpdateStaging(target, mode) {
   if (mode === "full") {
     assertExists(path.join(updateRoot, "repository"), `Tauri candidate update repository (${target})`);
     assertNonEmptyFile(
-      target === "macos"
-        ? path.join(updateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS-UpdateRepository.zip")
-        : path.join(updateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip"),
+      path.join(updateRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-windows-UpdateRepository.zip"),
       `Tauri candidate update repository archive (${target})`
     );
   }

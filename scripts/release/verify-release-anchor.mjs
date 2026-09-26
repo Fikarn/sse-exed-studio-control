@@ -6,11 +6,8 @@ import { fileURLToPath } from "node:url";
 import { readPackageJson, resolveReleaseTag, resolveRepositoryHttpUrl } from "./helpers.mjs";
 
 const REQUIRED_ASSETS = [
-  "SSE-ExEd-Studio-Control-Native-macOS-Installer.zip",
   "SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
-  "SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip",
   "SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
-  "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt",
   "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt",
 ];
 

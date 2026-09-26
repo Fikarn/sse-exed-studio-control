@@ -1,61 +1,84 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { OperatorLayoutProvider } from "./OperatorLayoutProvider";
+import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
 
-// New pages program, Slice 3 (D6, decision 1): Studio Preview leaves the
-// operator's screens. Only the address opens it; a choice an older build
-// remembered no longer does, because nothing on screen could leave it.
+// New pages program, Slice SW (D22): Studio Control runs at 2560 × 1440 only,
+// so the provider measures nothing (jsdom has no ResizeObserver or matchMedia,
+// and none is stubbed here). What it keeps is the operator's UI scale and
+// theme: remembered across starts, and stamped where the tokens read them —
+// the root, body (for overlays that portal there) and <html>.
 
-const RETIRED_KEY = "app.operator.reviewSurface";
-
-class NoResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+function Preferences() {
+  const { setTheme, setUiScale, theme, uiScale } = useOperatorLayout();
+  return (
+    <>
+      <p>{`${uiScale} ${theme}`}</p>
+      <button type="button" onClick={() => setUiScale(90)}>
+        90 %
+      </button>
+      <button type="button" onClick={() => setTheme("graphite")}>
+        Graphite
+      </button>
+    </>
+  );
 }
 
-function reviewSurface() {
-  return document.querySelector("[data-operator-review-viewport]")?.getAttribute("data-review-surface");
+function renderProvider() {
+  return render(
+    <OperatorLayoutProvider>
+      <Preferences />
+    </OperatorLayoutProvider>
+  );
 }
 
 beforeEach(() => {
-  // jsdom has neither; the provider measures with both.
-  vi.stubGlobal("ResizeObserver", NoResizeObserver);
-  vi.stubGlobal("matchMedia", () => ({ addEventListener() {}, removeEventListener() {} }));
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
 });
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
+  document.documentElement.removeAttribute("data-theme");
 });
 
-describe("Studio Preview", () => {
-  it("does not open from a remembered choice, and forgets it", () => {
-    window.localStorage.setItem(RETIRED_KEY, "studioPreview");
-    render(
-      <OperatorLayoutProvider>
-        <p>shell</p>
-      </OperatorLayoutProvider>
-    );
-    expect(reviewSurface()).toBe("native");
-    expect(screen.queryByText(/Studio Preview/)).toBeNull();
-    expect(window.localStorage.getItem(RETIRED_KEY)).toBeNull();
+describe("OperatorLayoutProvider", () => {
+  it("starts from the remembered UI scale and theme and stamps them on the root, body and <html>", () => {
+    window.localStorage.setItem("app.operator.uiScale", "125");
+    window.localStorage.setItem("app.operator.theme", "bone");
+    renderProvider();
+
+    expect(screen.getByText("125 bone")).toBeTruthy();
+    expect(document.querySelector("[data-operator-layout-root]")?.getAttribute("data-ui-scale")).toBe("125");
+    expect(document.body.hasAttribute("data-operator-scale-host")).toBe(true);
+    expect(document.body.getAttribute("data-ui-scale")).toBe("125");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("bone");
   });
 
-  it("opens from the address, and is not remembered", () => {
-    window.history.replaceState(null, "", "/?operatorReview=studio");
-    render(
-      <OperatorLayoutProvider>
-        <p>shell</p>
-      </OperatorLayoutProvider>
-    );
-    expect(reviewSurface()).toBe("studioPreview");
-    expect(screen.getByText(/Studio Preview — 2560 × 1440 at/)).toBeTruthy();
-    expect(window.localStorage.getItem(RETIRED_KEY)).toBeNull();
+  it("reads an unknown UI scale as 100 %, and the address's theme before the remembered one", () => {
+    window.localStorage.setItem("app.operator.uiScale", "150");
+    window.localStorage.setItem("app.operator.theme", "bone");
+    window.history.replaceState(null, "", "/?theme=graphite");
+    renderProvider();
+
+    expect(screen.getByText("100 graphite")).toBeTruthy();
+  });
+
+  it("remembers a new choice, stamps it, and takes the body stamp away when it unmounts", () => {
+    const { unmount } = renderProvider();
+    fireEvent.click(screen.getByRole("button", { name: "90 %" }));
+    fireEvent.click(screen.getByRole("button", { name: "Graphite" }));
+
+    expect(screen.getByText("90 graphite")).toBeTruthy();
+    expect(window.localStorage.getItem("app.operator.uiScale")).toBe("90");
+    expect(window.localStorage.getItem("app.operator.theme")).toBe("graphite");
+    expect(document.body.getAttribute("data-ui-scale")).toBe("90");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("graphite");
+
+    unmount();
+    expect(document.body.hasAttribute("data-operator-scale-host")).toBe(false);
+    expect(document.body.hasAttribute("data-ui-scale")).toBe(false);
   });
 });

@@ -24,22 +24,19 @@ function makeArtifact(rootDir, relativePath, contents = "x") {
   writeFileSync(full, contents, "utf8");
 }
 
-test("readChecksumEntries parses both macOS and Windows checksum manifests", () => {
+test("readChecksumEntries parses the Windows checksum manifest", () => {
   const rootDir = mkdtempSync(path.join(tmpdir(), "sse-manifest-"));
-  makeChecksum(rootDir, "macos", "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt", [
-    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  SSE-ExEd-Studio-Control-Native-macOS-Installer.zip",
-    "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210  SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip",
-  ]);
   makeChecksum(rootDir, "windows", "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt", [
-    "1111111111111111111111111111111111111111111111111111111111111111  SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef  SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
+    "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210  SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
   ]);
 
   const entries = readChecksumEntries({ rootDir });
-  assert.equal(entries.length, 3);
+  assert.equal(entries.length, 2);
   assert.ok(entries.every((entry) => /^[0-9a-f]{64}$/.test(entry.sha256)));
   assert.deepEqual(
-    entries.map((entry) => entry.target).sort(),
-    ["macos", "macos", "windows"]
+    entries.map((entry) => entry.target),
+    ["windows", "windows"]
   );
 });
 
@@ -62,10 +59,10 @@ test("findVisualReviewSummary returns null when no summary exists", () => {
 
 test("buildManifest assembles every documented field defensively", () => {
   const rootDir = mkdtempSync(path.join(tmpdir(), "sse-manifest-build-"));
-  makeChecksum(rootDir, "macos", "SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt", [
-    "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111  SSE-ExEd-Studio-Control-Native-macOS-Installer.zip",
+  makeChecksum(rootDir, "windows", "SSE-ExEd-Studio-Control-Native-windows-SHA256.txt", [
+    "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111  SSE-ExEd-Studio-Control-Native-windows-Installer.exe",
   ]);
-  makeArtifact(rootDir, "release/native-installer/macos/SSE-ExEd-Studio-Control-Native-macOS-Installer.zip", "x".repeat(123));
+  makeArtifact(rootDir, "release/native-installer/windows/SSE-ExEd-Studio-Control-Native-windows-Installer.exe", "x".repeat(123));
 
   const fakeRun = (command) => {
     if (command === "git") return { status: 0, stdout: "deadbeef\n" };
@@ -78,10 +75,8 @@ test("buildManifest assembles every documented field defensively", () => {
   const manifest = buildManifest({
     tag: "v9.9.9",
     rootDir,
-    platform: "darwin",
     buildStartedAt: "2026-05-25T10:00:00Z",
     buildFinishedAt: "2026-05-25T10:15:00Z",
-    notarizationTicketUuid: "00000000-1111-2222-3333-444444444444",
     run: fakeRun,
   });
 
@@ -95,15 +90,16 @@ test("buildManifest assembles every documented field defensively", () => {
 
   assert.equal(manifest.artifacts.length, 1);
   assert.equal(manifest.artifacts[0].sizeBytes, 123);
-  assert.equal(manifest.artifacts[0].target, "macos");
+  assert.equal(manifest.artifacts[0].target, "windows");
 
   // QtIFW absent on this temp host — both null, no exception thrown.
   assert.equal(manifest.qtIfw.binaryCreator, null);
   assert.equal(manifest.qtIfw.repoGen, null);
 
-  assert.equal(manifest.notarization.macos.ticketUuid, "00000000-1111-2222-3333-444444444444");
-  // No `security` binary stubbed for this fakeRun path; signing should be null.
-  assert.equal(manifest.signing.windows, null);
+  // Windows signing is dormant (no certificate yet); the macOS signing
+  // identity and notarization ticket went with macOS (Slice SW, D22).
+  assert.deepEqual(manifest.signing, { windows: null });
+  assert.equal(Object.hasOwn(manifest, "notarization"), false);
 });
 
 test("buildManifest rejects an invalid tag", () => {

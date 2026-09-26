@@ -40,11 +40,11 @@ function readFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported packaged acceptance target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported packaged acceptance target '${value}'. Use --target=windows.`);
 }
 
 function countSuppressedLines(text, patterns, writer) {
@@ -98,17 +98,6 @@ function normalizeForOutputComparison(value) {
 
 function resolvePackagedRuntime(target) {
   const shellName = nativeReleaseShellExecutableName(target, releaseRuntime);
-  if (target === "macos") {
-    const payloadPath = path.join(rootDir, "release", "native", "macos", "SSE ExEd Studio Control Native.app");
-    return {
-      label: "macOS",
-      shellPath: path.join(payloadPath, "Contents", "MacOS", shellName),
-      enginePath: path.join(payloadPath, "Contents", "MacOS", "studio-control-engine"),
-      commandArgs: (statusPath) => nativeReleaseSmokeArgs(target, releaseRuntime, statusPath),
-      requiresOperatorUiReady: nativeReleaseRequiresOperatorUiReady(releaseRuntime),
-    };
-  }
-
   const payloadPath = path.join(rootDir, "release", "native", "windows", "SSE ExEd Studio Control Native");
   return {
     label: "Windows",
@@ -188,8 +177,7 @@ function runPackagedSmoke(packaged, acceptanceRoot, runtime, stepName, expectedT
 
 async function main() {
   const target = parseTarget(readFlag("--target"));
-  const expectedPlatform = target === "macos" ? "darwin" : "win32";
-  if (process.platform !== expectedPlatform) {
+  if (process.platform !== "win32") {
     throw new Error(`native-packaged-acceptance.mjs target '${target}' must run on a matching host platform.`);
   }
 

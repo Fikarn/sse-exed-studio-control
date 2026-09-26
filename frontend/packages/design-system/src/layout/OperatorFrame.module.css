@@ -34,10 +34,4 @@
   .contextRail {
     grid-area: context;
   }
-
-  @media (max-width: 2100px) {
-    .frame {
-      grid-template-columns: 96px minmax(0, 1fr) minmax(280px, 320px);
-    }
-  }
 }

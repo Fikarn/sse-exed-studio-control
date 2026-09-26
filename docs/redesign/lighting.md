@@ -15,7 +15,7 @@ audit_refs:
 
 # Lighting — Direction D delta spec
 
-> Direction **D — Scene desk** supersedes the locked **Cr — Spatial desk** direction. The visual proposal is the v6 prototype at [Lighting-D-Scene-Desk.html](./assets/lighting/Lighting-D-Scene-Desk.html); render at 2560×1440 on the BetterDisplay review surface for operator-size review. The base 4-PR implementation sequence lives in [lighting-direction-d-implementation-plan.md](./lighting-direction-d-implementation-plan.md), and the completed premium pass lives in [lighting-d-premium-plan.md](./lighting-d-premium-plan.md). This file is the design-spec record — what the workspace _is_ for two operator personas, not how to build it.
+> Direction **D — Scene desk** supersedes the locked **Cr — Spatial desk** direction. The visual proposal is the v6 prototype at [Lighting-D-Scene-Desk.html](./assets/lighting/Lighting-D-Scene-Desk.html); render at 2560×1440, full screen on the studio monitor, for operator-size review. The base 4-PR implementation sequence lives in [lighting-direction-d-implementation-plan.md](./lighting-direction-d-implementation-plan.md), and the completed premium pass lives in [lighting-d-premium-plan.md](./lighting-d-premium-plan.md). This file is the design-spec record — what the workspace _is_ for two operator personas, not how to build it.
 
 ## Why D supersedes Cr
 
@@ -35,7 +35,6 @@ Direction D **preserves** these Cr commitments unchanged:
 - **Stage plot anchor.** The 2-D top-down spatial canvas remains the workspace's centerpiece. Fixtures render at `spatialX / spatialY`; beam cones use `beamAngleDegrees` and CCT-tinted gradients.
 - **Patch fields.** `dmxStartAddress`, `rigZ`, `beamAngleDegrees`, `Identify` burst — same engine fields, same operator surface, no fixture pan/tilt.
 - **12 m × 8 m room.** Studio dimensions are constants; multi-universe DMX, 3-D plot, and per-fixture Z-position editing remain out of scope.
-- **1920×1080 fallback.** The collapsed budget for laptop displays still respects the no-scroll rule.
 - **Persistence path.** Lighting state lives on `appSnapshot.lighting` (engine-driven) and `appSnapshot.shell.lighting` (frontend UI state). No schema bump.
 
 ## What D supersedes
@@ -71,17 +70,7 @@ Vertical sum: 92 + 44 + 1240 + 64 = 1440 ✓.
 
 Horizontal split inside the body: 380 + 1740 + 440 = 2560 ✓. No `ScrollView` wrapper anywhere — the no-scroll rule from the audit (§C7) carries forward.
 
-### Region grid — 1920×1080 fallback
-
-Proportional collapse of the body's three columns:
-
-| Body column | 2560 width | 1920 width |
-| ----------- | ---------- | ---------- |
-| Rail        | 380        | 320        |
-| Plot        | 1740       | 1240       |
-| Inspector   | 440        | 360        |
-
-Health bar height drops to 56 px; toolbar stays 44 px; shell header stays 92 px. Vertical: 92 + 44 + 868 + 56 = 1060 (with the title bar accounted for elsewhere).
+`2560×1440` is the only size (the operator's ruling of 2026-09-26). The `1920×1080` fallback grid this section used to give was dropped when the new pages program's Slice SW removed the app's other layouts.
 
 ## 2. States
 

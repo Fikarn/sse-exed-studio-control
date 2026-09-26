@@ -139,10 +139,6 @@
   right: 0;
 }
 
-:global([data-operator-layout-root][data-chrome="compact"]) .slotPreview {
-  max-width: 200px;
-}
-
 /* Save, rename and delete are deliberate, so they live in the slot's float
    with the preview — the resting tile stays the mock's name and last recall. */
 .slotActions {
@@ -160,13 +156,6 @@
   flex: 1;
   min-height: 28px;
   padding: 0 6px;
-}
-
-/* At the fallback size the slot keeps the two facts the operator acts on — the
-   name and when it was last recalled. The mix-shape thumbnail is the first
-   thing to go. */
-:global([data-operator-layout-root][data-chrome="compact"]) .slotThumb {
-  display: none;
 }
 
 .empty {

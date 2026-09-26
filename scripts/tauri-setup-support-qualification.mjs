@@ -377,8 +377,8 @@ async function runStalledRequestCheck(session, child, bridgeIp) {
 // copy of the shell (`second-instance`, finding F19) must be refused within
 // five.
 const ENGINE_CRASH_DETECT_MS = 2_000;
-// On Windows and macOS the single-instance plugin refuses the second copy
-// before its window exists — within 5 s (113 ms on the workstation). On
+// On Windows the single-instance plugin refuses the second copy before its
+// window exists — within 5 s (113 ms on the workstation). On
 // Linux the second copy first goes through GTK's start-up, which under xvfb
 // waits about 30 s on the AT-SPI bus lookup before any Tauri plugin runs
 // (the first CI run of Slice 5 saw the refusal land after ~30 s), so its
@@ -1139,12 +1139,12 @@ async function runSetupSupportQualification() {
 
     // Scenario `second-instance` (Slice 5 — F19): a second copy of the shell
     // launched while the first is up never gets a working engine. On Windows
-    // and macOS the shell's single-instance plugin hands the launch to the
-    // running shell and exits; on a Linux session without a D-Bus session
+    // the shell's single-instance plugin hands the launch to the running
+    // shell and exits; on a Linux session without a D-Bus session
     // bus the plugin cannot see the first shell, and the engine's lock on
     // `<app-data>/engine.lock` refuses the second engine instead, so the
     // second shell stops at ENGINE_ALREADY_RUNNING. Both are recorded; only
-    // the plugin's refusal is accepted on Windows and macOS.
+    // the plugin's refusal is accepted on Windows.
     console.log("Tauri Setup/Support qualification: step 6/8 a second copy of the shell is refused.");
     const secondSession = createSessionFiles("sse-tauri-second-instance-");
     const secondRun = await launchSecondShellInstance({

@@ -16,7 +16,6 @@ export async function openFixture(
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
     crash?: "setup" | "lighting" | "audio";
-    operatorReview?: "studio";
     theme?: "graphite" | "bone";
   }
 ) {
@@ -26,9 +25,6 @@ export async function openFixture(
   });
   if (options?.theme) {
     params.set("theme", options.theme);
-  }
-  if (options?.operatorReview) {
-    params.set("operatorReview", options.operatorReview);
   }
   if (options?.crash) {
     params.set("crash", options.crash);

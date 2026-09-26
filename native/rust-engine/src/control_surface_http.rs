@@ -55,11 +55,11 @@ const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The bearer token the bridge demands on every request (finding F01):
 /// `<app-data>/control-surface.token`, 64 hex characters from OS randomness,
-/// created on the first launch of an install and reused afterwards (owner
-/// read/write only where the platform has file modes). The exported Stream
-/// Deck profile embeds it, which is why a profile exported before this landed
-/// stops working and must be exported and imported again. Lanes override it
-/// with `SSE_CONTROL_SURFACE_TOKEN`, which then leaves the file alone.
+/// created on the first launch of an install and reused afterwards. The
+/// exported Stream Deck profile embeds it, which is why a profile exported
+/// before this landed stops working and must be exported and imported again.
+/// Lanes override it with `SSE_CONTROL_SURFACE_TOKEN`, which then leaves the
+/// file alone.
 pub fn load_or_create_bridge_token(app_data_dir: &Path) -> Result<String, String> {
     load_or_create_bridge_token_from(app_data_dir, |name| std::env::var_os(name))
 }
@@ -120,20 +120,10 @@ fn generate_bridge_token() -> Result<String, String> {
 fn write_bridge_token_file(path: &Path, token: &str) -> std::io::Result<()> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
     let mut file = options.open(path)?;
     file.write_all(token.as_bytes())?;
     file.write_all(b"\n")?;
     file.flush()?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600))?;
-    }
     Ok(())
 }
 
@@ -1249,17 +1239,6 @@ mod tests {
         let other = load_or_create_bridge_token_from(other_install.path(), |_| None)
             .expect("another install gets its own token");
         assert_ne!(other, first);
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mode = fs::metadata(&token_path)
-                .expect("metadata")
-                .permissions()
-                .mode()
-                & 0o777;
-            assert_eq!(mode, 0o600);
-        }
     }
 
     #[test]

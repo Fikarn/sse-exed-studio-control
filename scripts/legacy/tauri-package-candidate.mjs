@@ -31,11 +31,11 @@ function readFlag(name) {
 }
 
 function parseTarget(value) {
-  if (value === "macos" || value === "windows") {
+  if (value === "windows") {
     return value;
   }
 
-  throw new Error(`Unsupported Tauri candidate target '${value}'. Use --target=macos or --target=windows.`);
+  throw new Error(`Unsupported Tauri candidate target '${value}'. Use --target=windows.`);
 }
 
 function readSmokeScenarios() {
@@ -53,10 +53,6 @@ function readSmokeScenarios() {
   }
 
   return ["clean-start"];
-}
-
-function expectedPlatform(target) {
-  return target === "macos" ? "darwin" : "win32";
 }
 
 function assertExists(targetPath, message) {
@@ -89,51 +85,18 @@ function resolveGitSha() {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-function resolveTauriShellPath(target) {
-  const executableName = target === "windows" ? "sse-exed-tauri-shell.exe" : "sse-exed-tauri-shell";
-  return path.join(rootDir, "native", "target", "release", executableName);
+function resolveTauriShellPath() {
+  return path.join(rootDir, "native", "target", "release", "sse-exed-tauri-shell.exe");
 }
 
-function resolveEnginePath(target) {
-  const executableName = target === "windows" ? "studio-control-engine.exe" : "studio-control-engine";
+function resolveEnginePath() {
+  const executableName = "studio-control-engine.exe";
   const candidates = [
     path.join(rootDir, "native", "target", "debug", executableName),
     path.join(rootDir, "native", "target", "release", executableName),
   ];
 
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
-}
-
-function writeMacInfoPlist(appPath) {
-  const contentsPath = path.join(appPath, "Contents");
-  const plist = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleDevelopmentRegion</key>
-  <string>en</string>
-  <key>CFBundleDisplayName</key>
-  <string>SSE ExEd Studio Control</string>
-  <key>CFBundleExecutable</key>
-  <string>sse-exed-tauri-shell</string>
-  <key>CFBundleIdentifier</key>
-  <string>com.sse.exedstudiocontrol.replatform</string>
-  <key>CFBundleName</key>
-  <string>SSE ExEd Studio Control</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>${JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version}</string>
-  <key>CFBundleVersion</key>
-  <string>${JSON.parse(readFileSync(path.join(rootDir, "package.json"), "utf8")).version}</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>12.0</string>
-  <key>NSHighResolutionCapable</key>
-  <true/>
-</dict>
-</plist>
-`;
-  writeFileSync(path.join(contentsPath, "Info.plist"), plist, "utf8");
 }
 
 function archiveWindowsDirectory(sourceDir, archivePath) {
@@ -147,58 +110,13 @@ function archiveWindowsDirectory(sourceDir, archivePath) {
   ]);
 }
 
-function packageMacCandidate() {
-  if (process.platform !== "darwin") {
-    throw new Error("Tauri macOS candidate packaging must run on macOS.");
-  }
-
-  const sourceShellPath = resolveTauriShellPath("macos");
-  const sourceEnginePath = resolveEnginePath("macos");
-  const outputRoot = path.join(rootDir, "release", "tauri-candidate", "macos");
-  const packagedAppPath = path.join(outputRoot, releaseIdentity.payloadNames.macos);
-  const packagedMacOsDir = path.join(packagedAppPath, "Contents", "MacOS");
-  const packagedResourcesDir = path.join(packagedAppPath, "Contents", "Resources");
-  const packagedShellPath = path.join(packagedMacOsDir, "sse-exed-tauri-shell");
-  const packagedEnginePath = path.join(packagedMacOsDir, "studio-control-engine");
-  const archivePath = path.join(outputRoot, "SSE-ExEd-Studio-Control-Tauri-Candidate-macOS.zip");
-
-  assertExists(sourceShellPath, `Tauri shell executable not found at ${sourceShellPath}. Run \`npm run tauri:build\`.`);
-  assertExists(
-    sourceEnginePath,
-    `Rust engine executable not found at ${sourceEnginePath}. Run \`npm run native:engine:build\`.`
-  );
-
-  rmSync(outputRoot, { force: true, recursive: true });
-  mkdirSync(packagedMacOsDir, { recursive: true });
-  mkdirSync(packagedResourcesDir, { recursive: true });
-
-  copyFileSync(sourceShellPath, packagedShellPath);
-  copyFileSync(sourceEnginePath, packagedEnginePath);
-  chmodSync(packagedShellPath, statSync(sourceShellPath).mode);
-  chmodSync(packagedEnginePath, statSync(sourceEnginePath).mode);
-  writeMacInfoPlist(packagedAppPath);
-
-  run("codesign", ["--force", "--deep", "--sign", "-", packagedAppPath]);
-  run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", packagedAppPath, archivePath]);
-
-  return {
-    archivePath,
-    label: "macOS",
-    outputRoot,
-    packagedEnginePath,
-    packagedPayloadPath: packagedAppPath,
-    packagedShellPath,
-    target: "macos",
-  };
-}
-
 function packageWindowsCandidate() {
   if (process.platform !== "win32") {
     throw new Error("Tauri Windows candidate packaging must run on Windows.");
   }
 
-  const sourceShellPath = resolveTauriShellPath("windows");
-  const sourceEnginePath = resolveEnginePath("windows");
+  const sourceShellPath = resolveTauriShellPath();
+  const sourceEnginePath = resolveEnginePath();
   const outputRoot = path.join(rootDir, "release", "tauri-candidate", "windows");
   const packagedDirPath = path.join(outputRoot, releaseIdentity.payloadNames.windows);
   const packagedShellPath = path.join(packagedDirPath, "sse-exed-tauri-shell.exe");
@@ -394,11 +312,11 @@ async function main() {
   const smokeTest = args.includes("--smoke-test");
   const target = parseTarget(readFlag("--target"));
 
-  if (process.platform !== expectedPlatform(target)) {
+  if (process.platform !== "win32") {
     throw new Error(`Tauri candidate target '${target}' must run on a matching host platform.`);
   }
 
-  const packaged = target === "macos" ? packageMacCandidate() : packageWindowsCandidate();
+  const packaged = packageWindowsCandidate();
   const manifestPath = writeCandidateManifest(packaged);
 
   console.log(`Packaged Tauri ${packaged.label} candidate payload: ${packaged.packagedPayloadPath}`);

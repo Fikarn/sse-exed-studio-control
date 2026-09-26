@@ -85,11 +85,7 @@
      rgba(8,10,8,.78) composites over the #07090b graphite floor to #080a09 —
      ≤2/255 per channel from a pure-cool equivalent; chip text 17.61:1, border
      1.17:1 (= Studio). The cream grid reads 3.31/1.91/1.23 vs the cool floor
-     (Studio: 3.32/1.91/1.23); minigraph worst CCT bar 8.38:1 (Studio 8.37).
-     Only the shell backdrop re-hues to the cool family. */
-  --color-shell-backdrop-glow: rgba(111, 214, 206, 0.1);
-  --color-shell-backdrop-top: #040608;
-  --color-shell-backdrop-bottom: #070a0d;
+     (Studio: 3.32/1.91/1.23); minigraph worst CCT bar 8.38:1 (Studio 8.37). */
   /* 2026-09 audit Slice 10: the shell header gradient's bottom stop was a
      Studio-only literal in AppShellFrame.module.css; it now themes with the
      cool-dark floor (bg-deep #07090b → #050708). */
@@ -184,10 +180,6 @@
      at .85 gives worst-bar 5.07:1 and an 8.69:1 chip edge vs the thumb. */
   --color-scene-minigraph-bg: rgba(26, 24, 20, 0.85);
 
-  /* S14 — shell/review backdrop: light desk gradient from the bone bg family. */
-  --color-shell-backdrop-glow: rgba(54, 96, 58, 0.1);
-  --color-shell-backdrop-top: #f2eee5;
-  --color-shell-backdrop-bottom: #ded9cc;
   /* 2026-09 audit Slice 10: the shell header used to end in the Studio literal
      #060706 on every theme, which painted a near-black band with dark nav
      labels on the light Bone chrome. The header now ends one step below the

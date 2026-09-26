@@ -11,7 +11,7 @@ import {
   boardName,
   isLoading,
 } from "./helpers/ui-contract/boards.mjs";
-import { checkRatchet, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
+import { SAMPLES_CONTRAST, checkRatchet, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
 import { TARGETS } from "./helpers/ui-contract/boards.mjs";
 
 // Visual overhaul A, Slice 0 — the UI contract lanes (system §10 as tests).
@@ -31,11 +31,33 @@ import { TARGETS } from "./helpers/ui-contract/boards.mjs";
 // a count may only fall, a floor may only rise, and a board that scrolls today
 // may not start scrolling. Re-seed only at a slice close, after inspecting the
 // diff — the diff is the "numbers that moved" report.
+//
+// New pages program, Slice SW (D22): the contrast is sampled on Windows only
+// (`SAMPLES_CONTRAST` in measure.mjs). On CI's Linux runner every other measure
+// is checked and the contrast is not.
 
 const RATCHETS = JSON.parse(readFileSync(new URL("./ui-contract.ratchets.json", import.meta.url), "utf8")) as Record<
   string,
   Record<string, number | boolean | null>
 >;
+
+interface ContrastFail {
+  ratio: number;
+  size: number;
+  text: string;
+  el: string;
+  color: string;
+  bg: string;
+}
+
+/** The worst sampled contrast for a failure report, or why there is none. */
+function worstContrast(contrast: { fails: ContrastFail[] } | null, count: number, separator: string) {
+  if (contrast === null) return "not sampled off Windows";
+  return contrast.fails
+    .slice(0, count)
+    .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
+    .join(separator);
+}
 
 test.describe("UI contract", () => {
   test.use({ viewport: { width: SURFACE.width, height: SURFACE.height } });
@@ -54,10 +76,7 @@ test.describe("UI contract", () => {
         const { measures, contrast } = await measureBoard(page);
         const problems = checkRatchet(measures, ratchet!);
         const detail = problems.length
-          ? `\n${JSON.stringify(measures, null, 1)}\nworst contrast: ${contrast.fails
-              .slice(0, 8)
-              .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
-              .join("\n")}`
+          ? `\n${JSON.stringify(measures, null, 1)}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
           : "";
         expect(problems, `${name} moved the wrong way:${detail}`).toEqual([]);
       });
@@ -171,10 +190,7 @@ test.describe("UI contract", () => {
       const offPolicy: string[] = census.light.gradientsOffEls;
       const problems = checkRatchet(measures, ratchet!);
       const detail = problems.length
-        ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${contrast.fails
-            .slice(0, 8)
-            .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
-            .join("\n")}`
+        ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
         : "";
       expect(problems, `setup-ready @ ${theme}, held, moved the wrong way:${detail}`).toEqual([]);
     });
@@ -223,14 +239,9 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
       if (measures.shadowNegative > 0) problems.push(`${measures.shadowNegative} shadows with a negative offset`);
       if (measures.blurOver8Unlit > 0) problems.push(`${measures.blurOver8Unlit} blurs over 8 px on unlit elements`);
       if (measures.gradientsOff > 0) problems.push(`${measures.gradientsOff} gradients off policy`);
-      if (measures.contrastFails > 0)
-        problems.push(
-          `${measures.contrastFails} contrast failures: ` +
-            contrast.fails
-              .slice(0, 6)
-              .map((f) => `${f.ratio}:1 ${f.size}px "${f.text}" ${f.el} ${f.color} on ${f.bg}`)
-              .join(" · ")
-        );
+      // Slice SW (D22): the contrast is judged where it is sampled, on Windows.
+      if (SAMPLES_CONTRAST && measures.contrastFails !== 0)
+        problems.push(`${measures.contrastFails} contrast failures: ${worstContrast(contrast, 6, " · ")}`);
       expect(problems, `${story.name}: ${JSON.stringify(measures)}`).toEqual([]);
     });
   }

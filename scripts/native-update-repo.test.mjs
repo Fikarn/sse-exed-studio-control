@@ -33,14 +33,9 @@ function makeFakeRoot() {
   return root;
 }
 
-function seedPackagedPayload(root, target) {
-  if (target === "macos") {
-    const appPath = path.join(root, "release", "native", "macos", "SSE ExEd Studio Control Native.app");
-    mkdirSync(path.join(appPath, "Contents", "MacOS"), { recursive: true });
-    writeFileSync(path.join(appPath, "Contents", "Info.plist"), "<plist/>", "utf8");
-    writeFileSync(path.join(appPath, "Contents", "MacOS", "SSE ExEd Studio Control Native"), "binary bytes\n", "utf8");
-    return appPath;
-  }
+function seedPackagedPayload(root) {
+  // With the payload in place the script never starts native-package.mjs to
+  // build one.
   const winDir = path.join(root, "release", "native", "windows", "SSE ExEd Studio Control Native");
   mkdirSync(winDir, { recursive: true });
   writeFileSync(path.join(winDir, "SSE-ExEd-Studio-Control-Native.exe"), "binary bytes\n", "utf8");
@@ -75,39 +70,39 @@ test("rejects a missing --target with a non-zero exit", () => {
   assert.match(result.stderr, /Unsupported update repository target/);
 });
 
-test("rejects --prepare-only without --allow-staged (plan PR 3 / C2)", () => {
+test("rejects --target=windows --prepare-only without --allow-staged (plan PR 3 / C2)", () => {
   const root = makeFakeRoot();
-  const result = runUpdateRepo(root, "--target=macos", "--prepare-only");
+  const result = runUpdateRepo(root, "--target=windows", "--prepare-only");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Pass --allow-staged to confirm/);
   assert.match(result.stderr, /staged \(incomplete\) update repository payload/);
 });
 
-test("rejects --target=windows --prepare-only without --allow-staged", () => {
-  const root = makeFakeRoot();
-  const result = runUpdateRepo(root, "--target=windows", "--prepare-only");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Pass --allow-staged to confirm/);
-});
+// On Windows the script builds a missing payload through native-package.mjs
+// (out of scope for unit tests); CI's Linux runners reach the refusal.
+test(
+  "fails fast when the packaged native payload is missing on a host that cannot build it",
+  { skip: process.platform === "win32" && "on Windows the script builds a missing payload itself" },
+  () => {
+    const root = makeFakeRoot();
+    const result = runUpdateRepo(root, "--target=windows", "--prepare-only", "--allow-staged");
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Packaged native payload not found/);
+  }
+);
 
-test("fails fast when the packaged native payload is missing on a non-matching host", () => {
-  const otherTarget = process.platform === "darwin" ? "windows" : "macos";
+// New pages program, Slice SW (D22): the happy paths ran only on macOS, with
+// the macOS target; they hold the Windows target now, on every host.
+test("happy path produces the staged update-repo tree", () => {
   const root = makeFakeRoot();
-  const result = runUpdateRepo(root, `--target=${otherTarget}`, "--prepare-only", "--allow-staged");
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Packaged native payload not found/);
-});
-
-test("happy path on darwin produces the staged update-repo tree", { skip: process.platform !== "darwin" }, () => {
-  const root = makeFakeRoot();
-  seedPackagedPayload(root, "macos");
-  const result = runUpdateRepo(root, "--target=macos", "--prepare-only", "--allow-staged");
+  seedPackagedPayload(root);
+  const result = runUpdateRepo(root, "--target=windows", "--prepare-only", "--allow-staged");
   assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
 
   const releaseIdentity = JSON.parse(
     readFileSync(path.join(repoRoot, "scripts", "native-release-identity.json"), "utf8")
   );
-  const buildRoot = path.join(root, "release", "native-updates", "macos", "ifw");
+  const buildRoot = path.join(root, "release", "native-updates", "windows", "ifw");
 
   // package.xml + LICENSE.txt must be rendered under meta/.
   const packageXml = readFileSync(
@@ -122,24 +117,29 @@ test("happy path on darwin produces the staged update-repo tree", { skip: proces
   // here. repogen reads from packages/ directly.
   assert.equal(existsSync(path.join(buildRoot, "config")), false, "update-repo build should not write a config/ dir");
 
-  // Staged payload .app should be copied into data/.
+  // The packaged directory should be copied into data/.
   assert.equal(
-    existsSync(path.join(buildRoot, "packages", releaseIdentity.packageId, "data", releaseIdentity.payloadNames.macos)),
+    existsSync(
+      path.join(
+        buildRoot,
+        "packages",
+        releaseIdentity.packageId,
+        "data",
+        releaseIdentity.payloadNames.windows,
+        "SSE-ExEd-Studio-Control-Native.exe"
+      )
+    ),
     true,
-    "staged payload .app should exist under data/"
+    "staged payload should exist under data/"
   );
 });
 
-test(
-  "happy path on darwin logs the staged payload path and skip-repogen line",
-  { skip: process.platform !== "darwin" },
-  () => {
-    const root = makeFakeRoot();
-    seedPackagedPayload(root, "macos");
-    const result = runUpdateRepo(root, "--target=macos", "--prepare-only", "--allow-staged");
-    assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
-    assert.match(result.stdout, /Prepared native update repository staging for macos/);
-    assert.match(result.stdout, /Staged payload:/);
-    assert.match(result.stdout, /Skipping repogen build because --prepare-only was requested\./);
-  }
-);
+test("happy path logs the staged payload path and skip-repogen line", () => {
+  const root = makeFakeRoot();
+  seedPackagedPayload(root);
+  const result = runUpdateRepo(root, "--target=windows", "--prepare-only", "--allow-staged");
+  assert.equal(result.status, 0, `expected exit 0; stderr=${result.stderr}`);
+  assert.match(result.stdout, /Prepared native update repository staging for windows/);
+  assert.match(result.stdout, /Staged payload:/);
+  assert.match(result.stdout, /Skipping repogen build because --prepare-only was requested\./);
+});

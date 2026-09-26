@@ -40,7 +40,7 @@ Corner toggle sits top-right, below the Back-to-Console row. States: `[● Runne
 | Step body (centered) | remaining | Centered column, max-width **1400 px** at `2560×1440` (intentional letterbox). Content varies per step — see **Steps** below.                                           |
 | Footer action bar    | 72 px     | Sticky bottom; left = `BACK` (ghost), right = primary action for the current step (`CONTINUE`, `PROBE`, `RESUME`, `PUBLISH ⏎`). Keyboard `⏎` binds to the right action. |
 
-The intentional 1400 px centering is deliberate per §Setup density: the runner is a focused task, not a live-operation surface, and a wide column breaks the visual hierarchy of the step cards. At `1920×1080` fallback the column scales to `min(width - 64px, 1400)` which resolves to 1856 px — no letterbox at fallback resolution.
+The intentional 1400 px centering is deliberate per §Setup density: the runner is a focused task, not a live-operation surface, and a wide column breaks the visual hierarchy of the step cards.
 
 ### Steps — 1 through 5
 

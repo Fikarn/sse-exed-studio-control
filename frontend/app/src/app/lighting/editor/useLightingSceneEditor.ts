@@ -41,18 +41,7 @@ export function useLightingSceneEditor({
     liveFixtures,
     bridgeReachable,
   } = rig;
-  const {
-    startBusy,
-    toast,
-    finishBusy,
-    uiMode,
-    undoStack,
-    undoTargets,
-    operatorLayout,
-    setInspectorDrawerOpen,
-    busyActions,
-    reportError,
-  } = session;
+  const { startBusy, toast, finishBusy, uiMode, undoStack, undoTargets, busyActions, reportError } = session;
   const [sceneRenderPreviewId, setSceneRenderPreviewId] = useState<string | null>(null);
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
@@ -604,7 +593,6 @@ export function useLightingSceneEditor({
     // sees what the scene contains. The recall IPC drives the actual rig.
     setSceneRenderPreviewId(sceneId);
     setInspectorSelectedSceneId(sceneId);
-    if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
     if (!bridgeReachable && !previewMode) {
       // Skip the IPC entirely when the bridge is unreachable — the engine
       // would just reject it. Surface a single non-error toast so the

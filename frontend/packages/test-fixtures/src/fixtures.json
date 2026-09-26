@@ -76,7 +76,7 @@
       ]
     },
     "supportSnapshot": {
-      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
       "backupCount": 0,
       "latestBackupPath": null,
       "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
@@ -163,14 +163,14 @@
       ]
     },
     "supportSnapshot": {
-      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
       "backupCount": 1,
-      "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+      "latestBackupPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
       "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
       "backups": [
         {
           "name": "native-backup-2026-04-22T07-12-00.000Z.json",
-          "path": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
           "sizeBytes": 4096,
           "modifiedAt": 1776841920000
         }
@@ -344,14 +344,14 @@
       ]
     },
     "supportSnapshot": {
-      "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
       "backupCount": 1,
-      "latestBackupPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+      "latestBackupPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
       "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
       "backups": [
         {
           "name": "native-backup-2026-04-22T07-12-00.000Z.json",
-          "path": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups/native-backup-2026-04-22T07-12-00.000Z.json",
+          "path": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups\\native-backup-2026-04-22T07-12-00.000Z.json",
           "sizeBytes": 4096,
           "modifiedAt": 1776841920000
         }
@@ -406,12 +406,12 @@
       "requestedProtocol": "1",
       "supportedProtocol": "2",
       "paths": {
-        "appDataDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control",
-        "logsDir": "/Users/operator/Library/Logs/SSE ExEd Studio Control",
-        "logFilePath": "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
-        "dbPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
-        "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
-        "updateRepositoryPath": "/Users/operator/Downloads/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
+        "appDataDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native",
+        "logsDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs",
+        "logFilePath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs\\studio-control.log",
+        "dbPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\studio-control.sqlite3",
+        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
+        "updateRepositoryPath": "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
       }
     }
   },
@@ -430,12 +430,12 @@
       "code": "BOOTSTRAP_FAILED",
       "message": "Database integrity check failed during startup.",
       "paths": {
-        "appDataDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control",
-        "logsDir": "/Users/operator/Library/Logs/SSE ExEd Studio Control",
-        "logFilePath": "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
-        "dbPath": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
-        "backupDir": "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
-        "updateRepositoryPath": "/Users/operator/Downloads/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip"
+        "appDataDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native",
+        "logsDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs",
+        "logFilePath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs\\studio-control.log",
+        "dbPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\studio-control.sqlite3",
+        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
+        "updateRepositoryPath": "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
       }
     }
   },
@@ -1469,44 +1469,6 @@
       ]
     },
     "audioSnapshot": null
-  },
-  "audio-1920-fallback": {
-    "appSnapshot": {
-      "shell": {
-        "workspace": "audio"
-      },
-      "summary": "Audio workspace active."
-    },
-    "commissioningSnapshot": {
-      "hasCompletedSetup": true,
-      "stage": "ready",
-      "runnerStage": "publish",
-      "checks": [
-        {
-          "id": "control-surface",
-          "label": "Control Surface Probe",
-          "status": "passed",
-          "message": "Control surface bridge verified."
-        },
-        {
-          "id": "lighting",
-          "label": "Lighting Bridge Probe",
-          "status": "passed",
-          "message": "Lighting bridge verified."
-        },
-        {
-          "id": "audio",
-          "label": "Audio OSC Probe",
-          "status": "passed",
-          "message": "OSC connection synchronized."
-        }
-      ]
-    },
-    "audioSnapshot": {
-      "consoleStateConfidence": "aligned",
-      "lastActionMessage": "Sync succeeded",
-      "lastActionStatus": "succeeded"
-    }
   },
   "lighting-populated-noselect": {
     "appSnapshot": {

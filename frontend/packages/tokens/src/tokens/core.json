@@ -225,15 +225,6 @@
       "$value": "{color.primary.400}"
     },
     "shell": {
-      "backdropGlow": {
-        "$value": "rgba(153, 186, 146, 0.1)"
-      },
-      "backdropTop": {
-        "$value": "#050705"
-      },
-      "backdropBottom": {
-        "$value": "#070a08"
-      },
       "headerBottom": {
         "$value": "#060706"
       },
@@ -891,7 +882,7 @@
     }
   },
   "chrome": {
-    "$description": "Visual overhaul A, plan D4: the chrome budget of the one surface, 2560x1440. The 1920 and 1280 fallbacks live in the mocks and are not a deliverable.",
+    "$description": "Visual overhaul A, plan D4: the chrome budget of the one surface, 2560x1440.",
     "studio": {
       "header": {
         "$value": "56px"

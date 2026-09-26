@@ -28,7 +28,7 @@ What you expected to happen.
 
 **Platform**
 
-- OS: [macOS / Windows]
+- Windows version: [e.g., Windows 11 Pro 24H2]
 - App version: [e.g., 2.2.1]
 
 **Hardware context**

@@ -4,8 +4,7 @@
 
 Production packaging now targets:
 
-- Windows 11 `x64` via a Qt Installer Framework offline installer
-- macOS Apple Silicon via a Qt Installer Framework offline installer
+- Windows 11 `x64` via a Qt Installer Framework offline installer — the only target: Studio Control runs only on Windows (the operator's ruling of 2026-09-26; the new pages program's Slice SW removed the macOS packaging, signing and release assets)
 - GitHub Releases as the distribution surface for installers, packaged bundle zips, and native update-repository archives
 
 The visible product name remains `SSE ExEd Studio Control`.
@@ -14,7 +13,7 @@ The visible product name remains `SSE ExEd Studio Control`.
 
 The native runtime is the only release path:
 
-- Native macOS and Windows target-host release lanes build packaged bundles, smoke-test them, build offline installers, and generate maintenance-tool update-repository archives.
+- The native Windows target-host release lane builds the packaged bundle, smoke-tests it, builds the offline installer, and generates the maintenance-tool update-repository archive.
 - The legacy Electron runtime was retired in `v2.1.0`; no browser/Electron path remains in the repo.
 - Release readiness depends on packaging, smoke, acceptance, bridge-qualification, and install-time smoke-test gates — plus any open blockers tracked in [docs/HANDOFF.md](./HANDOFF.md).
 
@@ -22,9 +21,7 @@ The selected native release runtime is controlled by `scripts/native-release-run
 
 The historical replacement-shell candidate packaging path remains available for pre-switch evidence under separate roots:
 
-- `npm run tauri:package:mac:ifw-staged`
 - `npm run tauri:package:win:ifw-staged`
-- `npm run tauri:package:mac:ifw-local`
 - `npm run tauri:package:win:ifw-local`
 
 Those commands write to `release/tauri-candidate*` roots and do not publish the shipping path. The shipping release path is the `native:*` lane, which writes to `release/native*`, `release/native-installer*`, and `release/native-updates*` for the runtime selected by `scripts/native-release-runtime.json`.
@@ -33,69 +30,52 @@ Those commands write to `release/tauri-candidate*` roots and do not publish the 
 
 Each tagged release should publish:
 
-- `SSE-ExEd-Studio-Control-Native-macOS-Installer.zip`
 - `SSE-ExEd-Studio-Control-Native-windows-Installer.exe`
-- `SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip`
 - `SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip`
-- `SSE-ExEd-Studio-Control-Native-macOS-SHA256.txt`
 - `SSE-ExEd-Studio-Control-Native-windows-SHA256.txt`
 
-Release publication may also include packaged native bundle zips for support and smoke validation:
+Release publication may also include the packaged native bundle zip for support and smoke validation:
 
-- `SSE-ExEd-Studio-Control-Native-macOS.zip`
 - `SSE-ExEd-Studio-Control-Native-windows.zip`
+
+Releases up to `v2.2.1` also carried macOS assets; the release tooling now requires the Windows assets only.
 
 ## Installer And Update Strategy
 
 The approved native packaging posture is:
 
 - use Qt Installer Framework for installers
-- ship offline installers first on both platforms
+- ship the offline installer first
 - publish maintenance-tool update repositories alongside the installers
 - document the unsigned controlled-deployment posture before operator rollout
 - prefer conservative maintenance-tool updates over silent background update behavior
 
 Repo commands for the native release path:
 
-- `npm run native:installer:mac:prepare`
-- `npm run native:installer:mac:local`
 - `npm run native:installer:win:prepare`
 - `npm run native:installer:win:local`
-- `npm run native:update-repo:mac:prepare`
-- `npm run native:update-repo:mac:local`
 - `npm run native:update-repo:win:prepare`
 - `npm run native:update-repo:win:local`
-- `npm run native:checksums:mac:write`
-- `npm run native:checksums:mac:staged-write`
 - `npm run native:checksums:win:write`
 - `npm run native:checksums:win:staged-write`
-- `npm run native:package:mac:acceptance`
 - `npm run native:package:win:acceptance`
-- `npm run native:bridge:mac:verify`
 - `npm run native:bridge:win:verify`
-- `npm run native:artifacts:mac:verify`
 - `npm run native:artifacts:win:verify`
-- `npm run native:continuity:mac:verify`
 - `npm run native:continuity:win:verify`
-- `npm run native:delivery:mac:verify`
 - `npm run native:delivery:win:verify`
-- `npm run native:installer-acceptance:mac:verify`
 - `npm run native:installer-acceptance:win:verify`
-- `npm run native:sign:mac:release`
 - `npm run native:sign:win:release`
 
 The prepare commands stage QtIFW metadata and payload layout for the selected release runtime. The local commands run `binarycreator` or `repogen` when QtIFW is installed and the tools are available on `PATH` or via `SSE_QT_IFW_BINARYCREATOR` / `SSE_QT_IFW_REPOGEN`.
 The packaged acceptance commands verify that the packaged shell selected by `scripts/native-release-runtime.json` and the bundled engine start on fresh saved data, keep what they are given across a reopen against the same app-data directory, restore a support backup, and relaunch without losing operator state. Since the new pages program's Slice 2b the lane saves the page to open with `settings.update` and publishes with the probe override (the legacy `db.json` import is gone), and the backup is a format-5 archive with no Planning.
 The control-surface bridge qualification commands run the packaged engine on a dedicated localhost port, fail if the bundled bridge cannot bind, verify real HTTP behavior for `/api/deck/context`, `/api/deck/lcd`, `/api/deck/light-action`, and `/api/deck/audio-action` with the bridge token the engine wrote, prove the refusals (`401` / `403` / `400` / `413` / `408`) and the percent-decoded LCD key, and check that the exported Stream Deck profile carries the token on every request, holds the pages LIGHTS and AUDIO with a page-follow trigger for each, posts only to the lighting and audio routes, and reads only LCDs the bridge answers. (`/api/deck/action`, the PROJECTS and TASKS keys' route, left with Planning in Slice 2.)
-The checksum commands write per-platform SHA256 manifests for the native release artifacts. Full mode covers the packaged bundle, installer, and update-repository archive; staged mode covers the packaged bundle when QtIFW tools are not present locally.
+The checksum commands write the SHA256 manifest for the native release artifacts. Full mode covers the packaged bundle, installer, and update-repository archive; staged mode covers the packaged bundle when QtIFW tools are not present locally.
 The artifact verification commands assert the expected package identity, staged payload names, final installer/update archive outputs, checksum-manifest integrity, and payload consistency across the packaged bundle plus installer/update staging after those builds complete.
 The continuity verification commands compare the current native installer/update metadata against the previous lower `v*` tag and fail if the native package identity changes or the version does not advance.
 The staged delivery acceptance commands simulate an install from the staged offline-installer payload, apply the staged maintenance-tool payload over the same install location, then reinstall from the staged offline-installer payload again while preserving app data and verifying operator state survives each hop.
 The installer acceptance commands require the real QtIFW installer and update-repository artifacts; they install into a clean temp root, verify the installed maintenance tool can list the package and see the staged repository, purge the install root, then reinstall and confirm the operator state survives.
 The native acceptance, packaged acceptance, staged delivery acceptance, and installer acceptance lanes now fail if `health.snapshot` reports a bundled SQLite version older than `3.51.3` and outside the documented safe backports `3.50.7` / `3.44.6`.
 The packaged bridge qualification lane is the explicit bind/listen/HTTP release gate for the local control-surface bridge; it must run on a host that can bind `127.0.0.1` outside restrictive sandboxing.
-The macOS packaging path applies ad-hoc signing and now verifies bundle signature integrity before archiving; this validates bundle structure for controlled deployment but does not make the installer publicly trusted on operator machines.
-The macOS signing command re-signs the packaged app and installer bundle when `SSE_MACOS_CODESIGN_IDENTITY` is configured, then notarizes and staples them when either `SSE_MACOS_NOTARY_KEYCHAIN_PROFILE` or the Apple ID credential trio is configured.
 The Windows signing command signs the packaged shell, packaged engine, and final installer when a signing certificate and password are configured, then rebuilds the installer and update repository from the signed packaged payload.
 
 ## Standard Flow
@@ -134,13 +114,7 @@ git tag -a v2.0.0 -m "v2.0.0"
 git push origin v2.0.0
 ```
 
-7. Build and verify the platform artifacts on each target release host. The exact command may be `npm run release:verify`, or the explicit platform lane when collecting artifacts for publication:
-
-On macOS Apple Silicon:
-
-```bash
-npm run native:release:mac:local
-```
+7. Build and verify the artifacts on the Windows release host. The exact command may be `npm run release:verify`, or the explicit lane when collecting artifacts for publication:
 
 On Windows 11 `x64`:
 
@@ -177,7 +151,7 @@ What they enforce:
 
 ## Release Evidence (CI)
 
-Pushing a `v*` tag also starts [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml) (production readiness 2026-09, Slice 12). On a clean `windows-latest` and a clean `macos-14` runner it runs `npm ci`, `npm run native:engine:build`, `npm run tauri:build` and `npm run native:package:<win|mac>:local`, then writes the staged SHA256 manifest, checks the manifest against the archive, and writes three CycloneDX 1.5 SBOMs — the npm packages inside the web assets, the crates in the engine, the crates in the shell (`npm run native:sbom:<win|mac>:write`, which refuses an SBOM that is empty or describes the wrong component). Each runner uploads one artifact, `release-evidence-windows` / `release-evidence-macos`, kept for 30 days: the bundle archive, `release/checksums/<target>/` and `release/sbom/<target>/`. The run's summary page names the commit, the toolchain versions, the digest and whether the bundle was signed.
+Pushing a `v*` tag also starts [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml) (production readiness 2026-09, Slice 12). On a clean `windows-latest` runner it runs `npm ci`, `npm run native:engine:build`, `npm run tauri:build` and `npm run native:package:win:local`, then writes the staged SHA256 manifest, checks the manifest against the archive, and writes three CycloneDX 1.5 SBOMs — the npm packages inside the web assets, the crates in the engine, the crates in the shell (`npm run native:sbom:win:write`, which refuses an SBOM that is empty or describes the wrong component). The runner uploads one artifact, `release-evidence-windows`, kept for 30 days: the bundle archive, `release/checksums/windows/` and `release/sbom/windows/`. The run's summary page names the commit, the toolchain versions, the digest and whether the bundle was signed.
 
 What it is not:
 
@@ -208,23 +182,14 @@ The QtIFW product URL moved from the retired `Fikarn/project-management-dashboar
 
 The current supported rollout model is one controlled studio workstation, not public self-serve desktop distribution.
 
-- Windows: expect SmartScreen or equivalent unsigned-publisher warnings and treat the installer as a deliberate operator-managed install
-- macOS: expect Gatekeeper or notarization warnings and treat first launch as a deliberate operator-managed trust step
-- both platforms: verify the published `SHA256` manifest before install, keep a support backup before upgrades, and preserve the app-data directory during reinstall/update unless intentionally resetting the workstation
+- expect SmartScreen or equivalent unsigned-publisher warnings and treat the installer as a deliberate operator-managed install
+- verify the published `SHA256` manifest before install, keep a support backup before upgrades, and preserve the app-data directory during reinstall/update unless intentionally resetting the workstation
 
 ## Optional Signing
 
 The repo still includes optional signing hooks for future controlled-deployment hardening if public self-serve distribution ever becomes a goal.
 
-The local macOS release commands have optional signing hooks wired in. Configure these environment variables or secure local secret values to activate them:
-
-- `SSE_MACOS_CODESIGN_IDENTITY`
-- `SSE_MACOS_NOTARY_KEYCHAIN_PROFILE`
-- `SSE_MACOS_NOTARY_APPLE_ID`
-- `SSE_MACOS_NOTARY_PASSWORD`
-- `SSE_MACOS_NOTARY_TEAM_ID`
-
-The local Windows release commands also have optional signing hooks. Configure these environment variables or secure local secret values to activate them:
+The local Windows release commands have optional signing hooks. Configure these environment variables or secure local secret values to activate them:
 
 - `SSE_WINDOWS_SIGN_CERT_PATH`
 - `SSE_WINDOWS_SIGN_CERT_BASE64`
@@ -232,9 +197,8 @@ The local Windows release commands also have optional signing hooks. Configure t
 - `SSE_WINDOWS_SIGN_TIMESTAMP_URL`
 - `SSE_WINDOWS_SIGNTOOL_PATH`
 
-On the release-evidence runners the same hooks run as `npm run native:sign:win:bundle` / `native:sign:mac:bundle` (`--bundle-only`: the shell, the engine and the bundle archive — there is no installer there to rebuild or sign), fed from repository secrets of the same names: `SSE_WINDOWS_SIGN_CERT_BASE64`, `SSE_WINDOWS_SIGN_CERT_PASSWORD` and optionally `SSE_WINDOWS_SIGN_TIMESTAMP_URL`; `SSE_MACOS_CODESIGN_IDENTITY` together with `SSE_MACOS_SIGN_CERT_BASE64` and `SSE_MACOS_SIGN_CERT_PASSWORD` (the Developer ID certificate as a base64 `.p12`, imported into a throwaway keychain, because a runner has no keychain to find the identity in), and optionally the Apple ID notary trio. With no secret set the step prints why it skipped and the run stays green; with half a set it fails rather than skip. **The signing path has never run on a runner — no certificate exists yet.** The first evidence run after the secrets are added is its first test: expect to iterate on it, with a rehearsal tag, before relying on it for a release.
+On the release-evidence runner the same hooks run as `npm run native:sign:win:bundle` (`--bundle-only`: the shell, the engine and the bundle archive — there is no installer there to rebuild or sign), fed from repository secrets of the same names: `SSE_WINDOWS_SIGN_CERT_BASE64`, `SSE_WINDOWS_SIGN_CERT_PASSWORD` and optionally `SSE_WINDOWS_SIGN_TIMESTAMP_URL`. With no secret set the step prints why it skipped and the run stays green; with half a set it fails rather than skip. **The signing path has never run on a runner — no certificate exists yet.** The first evidence run after the secrets are added is its first test: expect to iterate on it, with a rehearsal tag, before relying on it for a release.
 
-Use the keychain-profile path when possible. The Apple ID credential trio is a fallback when the release host cannot rely on a preloaded keychain profile.
 Prefer a local certificate path on the Windows release host; `SSE_WINDOWS_SIGN_CERT_BASE64` remains available when the certificate must be materialized ephemerally.
 
 ## Preflight
@@ -260,23 +224,14 @@ For private or access-controlled repositories, provide a token that can read rel
 GITHUB_TOKEN=$(gh auth token) npm run release:anchor:verify -- --tag v2.0.0
 ```
 
-Platform-specific local verification:
-
-On macOS hosts:
-
-```bash
-npm run native:release:mac:local
-npm run native:bridge:mac:verify
-```
-
-On Windows hosts:
+Local verification on the Windows release host:
 
 ```bash
 npm run native:release:win:local
 npm run native:bridge:win:verify
 ```
 
-On non-target hosts, `npm run release:verify` skips the installer and update-repository build step and prints a reminder to validate on macOS or Windows.
+On any other host, `npm run release:verify` skips the installer and update-repository build step and prints a reminder to validate on Windows.
 
 ## Release Checklist
 
@@ -286,16 +241,16 @@ On non-target hosts, `npm run release:verify` skips the installer and update-rep
 4. Verify native startup routes correctly into commissioning or dashboard from the packaged build.
 5. Verify backup export and restore on a test database.
 6. Verify lighting/audio/control-surface recovery signals are visible from the native shell.
-7. Verify the packaged bridge qualification lane passes on a bind-capable macOS and Windows host so localhost bridge bind/listen/HTTP behavior is proven before release.
+7. Verify the packaged bridge qualification lane passes on the bind-capable Windows host so localhost bridge bind/listen/HTTP behavior is proven before release.
 8. Create and push a `v*` tag.
-9. Run the macOS and Windows target-host release lanes and collect the required artifacts on the publishing workstation.
+9. Run the Windows target-host release lane and collect the required artifacts on the publishing workstation.
 10. Run `npm run release:publish -- --tag vX.Y.Z`.
 11. Run `npm run release:anchor:verify -- --tag vX.Y.Z`.
-12. Verify the release includes both platform SHA256 manifests and that they match the uploaded artifacts you intend operators to use.
-13. Smoke-test the generated macOS and Windows installers from GitHub Releases, including the expected unsigned trust flow.
-14. Verify the release includes both platform update-repository archives.
+12. Verify the release includes the Windows SHA256 manifest and that it matches the uploaded artifacts you intend operators to use.
+13. Smoke-test the generated Windows installer from GitHub Releases, including the expected unsigned trust flow.
+14. Verify the release includes the Windows update-repository archive.
 15. Capture install and update notes for anything that would surprise the next operator or maintainer.
-16. For the production workstation rollout, follow [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md) and record the result on the linked rollout issue before closing any fallback window.
+16. For the production workstation rollout, follow [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md) (the `v2.2.1` runbook, kept as written: its Windows steps apply, its macOS rows no longer do) and record the result on the linked rollout issue before closing any fallback window.
 
 ## Final Mile
 
@@ -317,7 +272,7 @@ Test on a clean machine or VM when possible:
 6. Download the Companion profile and import it.
 7. Apply a newer tagged release through the maintenance-tool repository or a newer offline installer and verify user data is preserved.
 
-For the actual studio operator workstation, use [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md). That runbook is stricter than a generic clean-machine smoke test because it records the real display, audio, lighting, and Companion state used for rollout.
+For the actual studio operator workstation, use the Windows steps of [OPERATOR_WORKSTATION_ROLLOUT.md](./OPERATOR_WORKSTATION_ROLLOUT.md). That runbook is stricter than a generic clean-machine smoke test because it records the real display, audio, lighting, and Companion state used for rollout.
 
 ## Rollback
 
