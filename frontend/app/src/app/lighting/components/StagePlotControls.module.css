@@ -32,6 +32,16 @@
   border-right: 1px solid var(--color-bg-stroke);
 }
 
+/* New pages program, Slice 3 (decision 10): the Add to selection key, a mode
+   key of its own at the toolbar's head. */
+.selectionGroup {
+  display: inline-flex;
+  align-items: stretch;
+  padding-right: 2px;
+  margin-right: 2px;
+  border-right: 1px solid var(--color-bg-stroke);
+}
+
 .renderModeGroup :global([role="radiogroup"]) {
   min-height: var(--operator-stage-control-height, 26px);
   background: transparent;

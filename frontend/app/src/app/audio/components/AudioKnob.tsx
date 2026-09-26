@@ -9,9 +9,16 @@
  *
  * Contract mirrors AudioSliderControl so it slots into the existing
  * draft-store commit plumbing: `onPreview(value)` fires continuously during a
- * drag (→ setDraftValue), `onCommit(value)` fires on release / keyboard / reset
- * (→ engine commit + clearDraftValueLater). The knob keeps its own drag draft
- * internally and reverts to the `value` prop shortly after commit.
+ * drag (→ setDraftValue), `onCommit(value)` fires on release / keyboard /
+ * typed entry (→ engine commit + clearDraftValueLater). The knob keeps its own
+ * drag draft internally and reverts to the `value` prop shortly after commit.
+ *
+ * New pages program, Slice 3 (decisions 8–10): a focused knob takes the arrows
+ * (one step), Home / End (the ends) and Page Up / Page Down (five steps), and
+ * nothing with Shift, Ctrl or Alt; Enter or a double-click opens typed entry.
+ * The Shift five-step, the Shift fine drag, Backspace / Delete and
+ * Alt+double-click reset went: a knob with a `defaultValue` offers "Reset to
+ * <default>" in its typed entry instead.
  */
 import {
   useEffect,
@@ -33,7 +40,11 @@ export interface AudioKnobProps {
   ariaLabel: string;
   bipolar?: boolean;
   caption?: string;
+  /** The value typed entry's Reset key sets; no Reset key without one. */
   defaultValue?: number;
+  /** What the Reset key names after "Reset to"; defaults to the value and the
+      `numericSuffix` (`0 dB`). Given where the suffix would read oddly (`3:1`). */
+  defaultLabel?: string;
   disabled?: boolean;
   format?: (value: number) => string;
   max: number;
@@ -75,6 +86,7 @@ export function AudioKnob({
   ariaLabel,
   bipolar = false,
   caption,
+  defaultLabel,
   defaultValue,
   disabled = false,
   format,
@@ -162,13 +174,10 @@ export function AudioKnob({
     event.stopPropagation();
     event.currentTarget.focus();
     if (event.detail === 2) {
-      // C05: double-click opens typed entry (mirrors AudioFader / AudioStripPreamp);
-      // reset-to-default relocates to Alt+double-click (Backspace/Delete still reset).
-      if (event.altKey) {
-        if (defaultValue != null) previewAndCommit(clamp(defaultValue, min, max));
-      } else {
-        setNumberDialogOpen(true);
-      }
+      // C05: double-click opens typed entry (mirrors AudioFader). The reset
+      // to the default is the typed entry's Reset key (new pages program,
+      // Slice 3, decision 8), not a key held while double-clicking.
+      setNumberDialogOpen(true);
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -180,8 +189,7 @@ export function AudioKnob({
     if (!drag || drag.pointerId !== event.pointerId || disabled) return;
     event.preventDefault();
     event.stopPropagation();
-    const fine = event.shiftKey ? 0.25 : 1;
-    const delta = ((drag.startY - event.clientY) / AUDIO_KNOB_DRAG_TRAVEL_PX) * span * fine;
+    const delta = ((drag.startY - event.clientY) / AUDIO_KNOB_DRAG_TRAVEL_PX) * span;
     preview(clamp(drag.startValue + delta, min, max));
   };
 
@@ -208,27 +216,27 @@ export function AudioKnob({
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;
-    const multiplier = event.shiftKey ? 5 : 1;
     let next: number;
     switch (event.key) {
       case "ArrowUp":
       case "ArrowRight":
-        next = current + resolvedStep * multiplier;
+        next = current + resolvedStep;
         break;
       case "ArrowDown":
       case "ArrowLeft":
-        next = current - resolvedStep * multiplier;
+        next = current - resolvedStep;
+        break;
+      case "PageUp":
+        next = current + resolvedStep * 5;
+        break;
+      case "PageDown":
+        next = current - resolvedStep * 5;
         break;
       case "Home":
         next = min;
         break;
       case "End":
         next = max;
-        break;
-      case "Backspace":
-      case "Delete":
-        if (defaultValue == null) return;
-        next = defaultValue;
         break;
       case "Enter":
         // C05: Enter opens typed entry, mirroring the fader / strip-preamp siblings.
@@ -306,6 +314,8 @@ export function AudioKnob({
             setNumberDialogOpen(false);
             previewAndCommit(next);
           }}
+          resetLabel={defaultLabel}
+          resetValue={defaultValue == null ? undefined : clamp(defaultValue, min, max)}
           step={resolvedStep}
           suffix={numericSuffix}
           title={`Set ${ariaLabel}`}

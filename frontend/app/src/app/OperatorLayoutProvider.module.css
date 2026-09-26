@@ -23,8 +23,8 @@
 
 /* Scale tokens are defined for the shell root AND for document.body when the
    provider stamps `data-operator-scale-host` on it. Overlays portal to body
-   (dialogs, palette, context menu, color picker, shortcut guide, toasts), so
-   without the body copy they escape UI scale entirely — the S2/GLO-02 escape.
+   (dialogs, drawers, context menu, color picker, toasts), so without the body
+   copy they escape UI scale entirely — the S2/GLO-02 escape.
    Keeping ONE grouped rule (never a :root copy — that regressed setup/protocol
    surfaces in S2) means the factor math can't fork. Layout declarations stay
    in the .root-only rule below. */
@@ -94,7 +94,6 @@
   --operator-toolbar-padding-x: 22px;
   --operator-toolbar-control-height: 28px;
   --operator-toolbar-button-label-display: inline;
-  --operator-toolbar-kbd-display: inline;
   --operator-pane-padding: 14px;
   --operator-stage-min-width: 640px;
   --operator-stage-min-height: 480px;
@@ -185,7 +184,6 @@
   --operator-toolbar-gap: 7px;
   --operator-toolbar-padding-x: 12px;
   --operator-toolbar-button-label-display: none;
-  --operator-toolbar-kbd-display: none;
   --operator-pane-padding: 10px;
   --operator-stage-min-width: 520px;
   --operator-stage-min-height: 400px;

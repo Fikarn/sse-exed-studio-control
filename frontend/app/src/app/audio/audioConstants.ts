@@ -11,17 +11,20 @@
  * the engine source.
  */
 
-// Why: arm-then-apply safety window for 48V, snapshot recall, snapshot
-// overwrite, palette recall, and shortcut recall. After this window the armed
-// candidate clears and the operator must arm again.
+// Why: arm-then-apply safety window for 48V, snapshot recall and snapshot
+// overwrite. After this window the armed candidate clears and the operator
+// must arm again.
 // Source: previously inline at AudioWorkspace.tsx:103.
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
 // Why: arm-then-apply minimum dwell. A second activation of the same armed
-// key inside this window is ignored and the arm stays, so a double-click, a
-// bounced pointer or a held key's auto-repeat can never arm and apply a 48V
-// change, a snapshot recall or a snapshot overwrite in one motion. 350 ms is
-// past any double-click interval and well inside AUDIO_ARM_TIMEOUT_MS.
+// key inside this window is ignored and the arm stays, so a double-click or a
+// bounced pointer can never arm and apply a 48V change, a snapshot recall or a
+// snapshot overwrite in one motion. 350 ms is past any double-click interval
+// and well inside AUDIO_ARM_TIMEOUT_MS. The dwell does not stop a held key: its
+// auto-repeat goes on past it (Windows starts repeating after about 500 ms by
+// default), so `useAudioArming` cancels a held Enter's repeats while something
+// is armed (new pages program, Slice 3).
 // 2026-09 audit remediation, Slice 7.
 export const AUDIO_ARM_MIN_DWELL_MS = 350;
 
@@ -101,8 +104,9 @@ export const AUDIO_DRAFT_CLEAR_MS = 250;
 // Source: previously inline at AudioPreampControl.tsx:98,116,163,164.
 export const PREAMP_GAIN_MAX_DB = 75;
 
-// Why: default preamp gain in dB — the reset target for Backspace/Delete on the
-// preamp surfaces (inspector hero AudioKnob + channel-strip AudioStripPreamp).
+// Why: default preamp gain in dB — what typed entry's Reset key sets on the
+// preamp surfaces (the plate's AudioKnob and the strip's AudioStripGainKey;
+// new pages program, Slice 3, decision 8 — it used to be Backspace/Delete).
 // Consolidated so both surfaces reset to the same value (C13 preamp unification).
 // Source: previously inline at AudioInspectorChannelHardwareCard.tsx:32.
 export const PREAMP_GAIN_DEFAULT_DB = 24;

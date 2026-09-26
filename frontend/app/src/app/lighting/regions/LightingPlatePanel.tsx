@@ -97,7 +97,7 @@ export function LightingPlatePanel({ editor }: { editor: LightingEditor }) {
       onIdentifyBurst={handleIdentifyBurst}
       onPatchCommit={handlePatchCommit}
       onToggleGroupPower={handleToggleGroupPower}
-      onSelectFixture={(id, options) => void handleSelectFixture(id, options)}
+      onSelectFixture={(id) => void handleSelectFixture(id)}
       onSaveScene={handleSaveScene}
       onSaveSceneAs={() => setSaveSceneAsOpen(true)}
       onRecallScene={handleRecallScene}

@@ -5,8 +5,9 @@ import { openFixture } from "./helpers/openFixture";
 // 2026-09 audit remediation, Slice 6 (operator decision 4): talkback is a
 // hold, never a latch. Before this slice the button was a toggle and the only
 // coverage asserted that it existed with an aria-pressed attribute. These
-// cases drive the real button and key paths and count the engine requests
-// (`audio.talkback.hold`) the fixture transport receives.
+// cases drive the real button and count the engine requests
+// (`audio.talkback.hold`) the fixture transport receives. New pages program,
+// Slice 3 (D7): the page-wide T key went, and with it the case that held T.
 
 async function holdRequests(page: Page) {
   return page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.talkback.hold"] ?? 0);
@@ -23,7 +24,10 @@ test("holding the Talkback button engages, heartbeats while held, and releases o
   const button = page.getByTestId("audio-monitor-talkback");
   await expect(button).toBeEnabled();
   await expect(button).toHaveAttribute("aria-pressed", "false");
-  await expect(button).toContainText("Hold · T");
+  // New pages program, Slice 3 (D7). Old: the key read "Hold · T". New: "Hold".
+  // Reason: the T key went, and its hint with it.
+  await expect(button).toContainText("Hold");
+  await expect(button).not.toContainText("· T");
 
   const box = await button.boundingBox();
   expect(box).not.toBeNull();
@@ -61,55 +65,21 @@ test("a click never latches talkback", async ({ page }) => {
   expect(await holdRequests(page)).toBe(4);
 });
 
-test("holding T talks; releasing T, or the window losing focus, stops", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-  const button = page.getByTestId("audio-monitor-talkback");
-  // Production readiness S13. `audio-workspace` is also the test id of the
-  // "Loading the console…" surface, which has no Talkback key and nothing
-  // listening for T. When the click landed there the T that followed went to
-  // nobody, and a held key is not sent twice — six of the branch's first thirty
-  // CI runs (the trace of 35263526586: T went down 6 ms after the click, with
-  // the cluster still empty). Wait for the key the hold belongs to.
-  await expect(button).toBeEnabled();
-  await page.getByTestId("audio-workspace").click({ position: { x: 4, y: 4 } });
-
-  await page.keyboard.down("t");
-  await expect(button).toHaveAttribute("aria-pressed", "true");
-  await expect(button).toHaveAttribute("data-holding", "true");
-  expect(await holdRequests(page)).toBe(1);
-  await page.keyboard.up("t");
-  await expect(button).toHaveAttribute("aria-pressed", "false");
-  expect(await holdRequests(page)).toBe(2);
-
-  // Losing the window mid-hold releases; the late key-up sends nothing more.
-  await page.keyboard.down("t");
-  await expect(button).toHaveAttribute("aria-pressed", "true");
-  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-  await expect(button).toHaveAttribute("aria-pressed", "false");
-  expect(await holdRequests(page)).toBe(4);
-  await page.keyboard.up("t");
-  await page.waitForTimeout(200);
-  expect(await holdRequests(page)).toBe(4);
-
-  // Typing a t into a text field is text, not talkback.
-  await page.evaluate(() => {
-    const input = document.createElement("input");
-    input.id = "talkback-spec-input";
-    document.body.appendChild(input);
-    input.focus();
-  });
-  await page.keyboard.down("t");
-  await page.keyboard.up("t");
-  await expect(button).toHaveAttribute("aria-pressed", "false");
-  expect(await holdRequests(page)).toBe(4);
-});
+// New pages program, Slice 3 (D7): "holding T talks; releasing T, or the window
+// losing focus, stops" went with the T key.
 
 test("talkback cannot be held while audio is not verified", async ({ page }) => {
   await openFixture(page, "audio-not-verified");
   const button = page.getByTestId("audio-monitor-talkback");
   await expect(button).toBeDisabled();
-  await page.keyboard.down("t");
-  await page.keyboard.up("t");
+  // New pages program, Slice 3 (D7). Old: the case held T to try a hold. New:
+  // it presses and releases the dimmed key itself. Reason: the T key went; the
+  // key is what the operator would press.
+  const box = await button.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.up();
   await expect(button).toHaveAttribute("aria-pressed", "false");
   expect(await holdRequests(page)).toBe(0);
 });

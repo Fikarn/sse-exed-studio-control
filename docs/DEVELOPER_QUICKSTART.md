@@ -100,10 +100,9 @@ The production target is fullscreen `2560x1440` on a fixed second monitor. Retin
 
 For built-in-display development, use the scaled studio preview workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
 
-- run the app with `npm run tauri:dev`
-- open the command palette (`Ctrl+K`, `⌘K` on macOS) and run `Studio Preview: Enter 2560x1440 Review`
+- build and serve the front end, then open it with `?operatorReview=studio` in the address (the steps are in DEVELOPMENT.md; since the new pages program's Slice 3 the address is the only way in — the app has no command palette and does not remember the preview)
 - review the proportional `2560x1440` studio canvas scaled into the current window
-- exit scaled preview before judging native compact/windowed behavior
+- drop `operatorReview=studio` from the address before judging native compact/windowed behavior
 - keep `npm run tauri:visual:review` as the repeatable capture lane
 - do not accept `studioFull` composition decisions from the unscaled Retina logical desktop
 
@@ -246,7 +245,7 @@ For major upgrades:
 - `doctor` warns about Node: use `nvm use 24` for target-host alignment.
 - `doctor:release` fails on QtIFW: set `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 - Windows evidence says the worktree is dirty: remove generated evidence or rerun only after committing/stashing source changes.
-- The app looks compressed on a Retina MacBook: do not judge `studioFull` composition until `Studio Preview: Enter 2560x1440 Review` is active, or until you are on the fixed studio monitor.
+- The app looks compressed on a Retina MacBook: do not judge `studioFull` composition until the page is open with `?operatorReview=studio`, or until you are on the fixed studio monitor.
 
 ## Do Not Touch Without A Plan
 

@@ -238,11 +238,3 @@
   background: var(--accent-soft);
   color: var(--accent);
 }
-
-.canvasWarningBand kbd {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-tick);
-  letter-spacing: 0.04em;
-  color: var(--audio-caption-muted);
-  margin-left: 4px;
-}

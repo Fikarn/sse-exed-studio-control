@@ -58,8 +58,10 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
           facts={
             selectedPage ? (
               <div className={styles.deckPreview}>
+                {/* New pages program, Slice 3 (D6): a page is chosen by its
+                    tab; the tab no longer prints the number key that chose it. */}
                 <div className={styles.pageTabs}>
-                  {pages.map((page, index) => (
+                  {pages.map((page) => (
                     <button
                       key={page.id}
                       className={styles.pageTab}
@@ -71,7 +73,6 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
                       type="button"
                     >
                       {page.label}
-                      {activeStepId === "map" ? <small>{index + 1}</small> : null}
                     </button>
                   ))}
                 </div>

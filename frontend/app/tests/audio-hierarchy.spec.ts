@@ -55,8 +55,11 @@ test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", 
   // 2026-09 audit Slice 6: Talkback is a hold, not a toggle — the caption says
   // so, and a plain click never leaves it engaged (the hold specs in
   // audio-talkback.spec.ts drive the press / release paths).
+  // New pages program, Slice 3 (D7). Old: the caption read "Hold · T". New:
+  // "Hold". Reason: the T key went, and its hint with it.
   const talkback = page.getByTestId("audio-monitor-talkback");
-  await expect(talkback).toContainText("Hold · T");
+  await expect(talkback).toContainText("Hold");
+  await expect(talkback).not.toContainText("· T");
   await talkback.click();
   await expect(talkback).toHaveAttribute("aria-pressed", "false");
 });

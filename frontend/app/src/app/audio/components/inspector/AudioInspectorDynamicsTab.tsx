@@ -192,6 +192,7 @@ export function AudioInspectorDynamicsTab({
                 <AudioKnob
                   ariaLabel={`${selectedChannel.name} ${section} ratio`}
                   caption="Ratio"
+                  defaultLabel={section === "compressor" ? "3:1" : "2:1"}
                   defaultValue={section === "compressor" ? 3 : 2}
                   disabled={!viewModel.capabilities.canEditProcessing}
                   format={(value) => `${value.toFixed(1)}:1`}

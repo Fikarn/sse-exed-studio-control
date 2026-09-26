@@ -644,11 +644,3 @@ export function buildMonitorItems(
 
   return items;
 }
-
-export function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  return target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName);
-}

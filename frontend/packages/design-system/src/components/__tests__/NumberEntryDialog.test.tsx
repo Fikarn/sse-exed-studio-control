@@ -84,4 +84,153 @@ describe("NumberEntryDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  // New pages program, Slice 3 (decision 8): with the Backspace / Delete /
+  // Alt+double-click resets gone, the typed-entry dialog carries the way back
+  // to a control's default as a key of its own.
+  describe("the Reset key", () => {
+    it("shows only when the control has a default", () => {
+      render(
+        <NumberEntryDialog
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.queryByRole("button", { name: /^Reset to/ })).not.toBeInTheDocument();
+      expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Cancel", "Set value"]);
+    });
+
+    it("names the default with its unit and confirms exactly that value", () => {
+      const onConfirm = vi.fn();
+      const onCancel = vi.fn();
+      render(
+        <NumberEntryDialog
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          resetValue={0}
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      );
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      // It sits beside Cancel and Set value, in the dialog's own key row.
+      expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+        "Reset to 0 dB",
+        "Cancel",
+        "Set value",
+      ]);
+      // The typed draft does not matter: Reset confirms the default.
+      fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "37" } });
+      fireEvent.click(reset);
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+      expect(onConfirm).toHaveBeenCalledWith(0);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+
+    it("reads a percentage default and takes a label of its own", () => {
+      const { unmount } = render(
+        <NumberEntryDialog
+          title="Set Fixture intensity"
+          fieldLabel="Intensity"
+          initialValue={40}
+          min={0}
+          max={100}
+          suffix="%"
+          resetValue={100}
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.getByRole("button", { name: "Reset to 100 %" })).toBeInTheDocument();
+      unmount();
+
+      render(
+        <NumberEntryDialog
+          title="Set Host send"
+          fieldLabel="Send"
+          initialValue={-12}
+          min={-65}
+          max={6}
+          suffix="dB"
+          resetValue={0}
+          resetLabel="unity"
+          onConfirm={() => {}}
+          onCancel={() => {}}
+        />
+      );
+      expect(screen.getByRole("button", { name: "Reset to unity" })).toBeInTheDocument();
+    });
+
+    it("is disabled while a commit is in flight", () => {
+      const onConfirm = vi.fn();
+      render(
+        <NumberEntryDialog
+          busy
+          title="Set Host preamp gain"
+          fieldLabel="Gain"
+          initialValue={12}
+          min={0}
+          max={60}
+          suffix="dB"
+          resetValue={0}
+          onConfirm={onConfirm}
+          onCancel={() => {}}
+        />
+      );
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      expect(reset).toBeDisabled();
+      fireEvent.click(reset);
+      expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    // Slice 3 review (#9, #25): the Dialog used to move focus in again whenever
+    // its close handler changed. Every typed-entry caller passes an inline
+    // onCancel and the shell draws again at least every 15 s (its clock), so a
+    // Tab to "Reset to …" was undone before the Enter, and the Enter then set
+    // the typed value instead of the default.
+    it("keeps focus on the Reset key when the consumer draws again", () => {
+      // The control the typed entry opened from; focus goes back to it on close.
+      const knob = document.createElement("button");
+      knob.textContent = "Host preamp gain";
+      document.body.appendChild(knob);
+      knob.focus();
+
+      const props = {
+        title: "Set Host preamp gain",
+        fieldLabel: "Gain",
+        initialValue: 32,
+        min: 0,
+        max: 60,
+        suffix: "dB",
+        resetValue: 0,
+        onConfirm: () => {},
+      };
+      const firstCancel = vi.fn();
+      const { rerender } = render(<NumberEntryDialog {...props} onCancel={() => firstCancel()} />);
+      const reset = screen.getByRole("button", { name: "Reset to 0 dB" });
+      reset.focus();
+      expect(reset).toHaveFocus();
+
+      // The consumer draws again with a new inline onCancel: focus stays put.
+      const latestCancel = vi.fn();
+      rerender(<NumberEntryDialog {...props} onCancel={() => latestCancel()} />);
+      expect(reset).toHaveFocus();
+
+      // And Esc reaches the onCancel of the latest render, once.
+      fireEvent.keyDown(reset, { key: "Escape" });
+      expect(latestCancel).toHaveBeenCalledTimes(1);
+      expect(firstCancel).not.toHaveBeenCalled();
+      knob.remove();
+    });
+  });
 });

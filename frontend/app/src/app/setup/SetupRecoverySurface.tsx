@@ -14,7 +14,7 @@ import {
   type SnapshotRecord,
   withRestoreDetail,
 } from "../shellData";
-import { exportShellDiagnostics, openShellPath } from "../shellCommands";
+import { exportShellDiagnostics, openShellPath, resetWindowLayout } from "../shellCommands";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { PreReadyState } from "../startup/PreReadyState";
 import recoveryStyles from "../startup/RecoveryBands.module.css";
@@ -41,7 +41,6 @@ export function SetupRecoverySurface({
   healthSnapshot,
   liveTransportRequested,
   onRequestRestart,
-  onShowShortcuts,
   store,
   supportSnapshot,
 }: {
@@ -50,7 +49,6 @@ export function SetupRecoverySurface({
   healthSnapshot: SnapshotRecord | null;
   liveTransportRequested: boolean;
   onRequestRestart: () => void;
-  onShowShortcuts: () => void;
   store: ShellStore;
   supportSnapshot: SnapshotRecord | null;
 }) {
@@ -171,7 +169,10 @@ export function SetupRecoverySurface({
   return (
     // Visual overhaul A, Slice 7: the incident on the same skeleton as every
     // workspace — the word, the engine's sentence, its code in the display's
-    // own slot, and the ways out as keys on the display.
+    // own slot, and the ways out as keys on the display. New pages program,
+    // Slice 3 (decision 2): Reset the window layout sits beside Retry startup;
+    // it says nothing when the window moves, and a refusal lands in the
+    // message line below the display.
     <PreReadyState
       tone="error"
       word={getFailureTitle(failure).toUpperCase()}
@@ -185,19 +186,32 @@ export function SetupRecoverySurface({
           </Key>
           <Key
             size="small"
+            disabled={busyAction !== null}
+            testId="setup-recovery-window-reset"
+            onClick={() => void performAction("reset-window-layout", resetWindowLayout)}
+          >
+            Reset the window layout
+          </Key>
+          <Key
+            size="small"
             disabled={!canReturnToConsole}
             testId="setup-recovery-console"
             onClick={() => void store.setWorkspace("audio")}
           >
             Back to Console
           </Key>
-          <Key size="small" cap="Shortcuts" hint="?" testId="setup-recovery-shortcuts" onClick={onShowShortcuts} />
         </>
       }
       testId="setup-recovery-surface"
     >
       {feedback ? (
-        <div aria-live="polite" className={styles.setupFeedbackBanner} data-tone={feedback.tone} role="status">
+        <div
+          aria-live="polite"
+          className={styles.setupFeedbackBanner}
+          data-testid="setup-recovery-feedback"
+          data-tone={feedback.tone}
+          role="status"
+        >
           <StatusBadge
             label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
             tone={feedbackBadgeTone(feedback.tone)}

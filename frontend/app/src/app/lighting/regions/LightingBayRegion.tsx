@@ -1,8 +1,9 @@
+import { useCallback } from "react";
 import { LightingPlatePanel } from "./LightingPlatePanel";
 import styles from "../LightingWorkspace.module.css";
 import { StagePlot } from "../components/StagePlot";
 import { ColumnResizer } from "../components/ColumnResizer";
-import { Button } from "@sse/design-system";
+import { Drawer } from "@sse/design-system";
 import type { LightingEditor } from "../useLightingEditor";
 
 /** The bay: the plot, and the plate beside it (or in a drawer on a narrow layout). */
@@ -29,6 +30,8 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
     stagePlotActiveScene,
     stagePlotSceneModified,
     identifyingIds,
+    addToSelection,
+    setAddToSelection,
     handleSelectFixture,
     handleFixtureSpatialCommit,
     handleIdentifyBurst,
@@ -38,6 +41,9 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
     chipHoverFixtureId,
   } = editor.fixtureEditor;
   const { previewDirty } = editor.sceneEditor;
+  // The design system's drawer re-runs its focus handling whenever `onClose`
+  // changes, so it gets a stable one.
+  const closeInspectorDrawer = useCallback(() => setInspectorDrawerOpen(false), [setInspectorDrawerOpen]);
   const inspectorPanel = <LightingPlatePanel editor={editor} />;
   return (
     <>
@@ -83,6 +89,8 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
             searchQuery={searchQuery}
             identifyingFixtureIds={identifyingIds}
             highlightOverlayFixtureIds={overlayFixtureIds}
+            addToSelection={addToSelection}
+            onAddToSelectionChange={setAddToSelection}
             onSelectFixture={(id, options) => void handleSelectFixture(id, options ?? {})}
             onPositionCommit={
               previewMode
@@ -120,30 +128,19 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
         ) : null}
       </div>
 
-      {operatorLayout.isNarrow && inspectorDrawerOpen ? (
-        <div
-          className={styles.inspectorDrawerBackdrop}
-          role="presentation"
-          onMouseDown={() => setInspectorDrawerOpen(false)}
-          data-testid="lighting-inspector-drawer-backdrop"
+      {/* Below the studio surface the plate is a drawer. It is the design
+          system's, so Esc closes it (new pages program, Slice 3: the page-wide
+          Esc that used to close it by clearing the selection is gone). */}
+      {operatorLayout.isNarrow ? (
+        <Drawer
+          open={inspectorDrawerOpen}
+          title="Inspector"
+          onClose={closeInspectorDrawer}
+          width={420}
+          testId="lighting-inspector-drawer"
         >
-          <section
-            className={styles.inspectorDrawer}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Lighting inspector drawer"
-            onMouseDown={(event) => event.stopPropagation()}
-            data-testid="lighting-inspector-drawer"
-          >
-            <div className={styles.inspectorDrawerHeader}>
-              <span>Inspector</span>
-              <Button size="compact" variant="ghost" onClick={() => setInspectorDrawerOpen(false)}>
-                Close
-              </Button>
-            </div>
-            {inspectorPanel}
-          </section>
-        </div>
+          {inspectorPanel}
+        </Drawer>
       ) : null}
     </>
   );

@@ -1,5 +1,7 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
+import { IconButton } from "@sse/design-system";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import styles from "./AudioTieredMixer.module.css";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
@@ -39,7 +41,9 @@ export function AudioTieredMixer({
   draftStore,
   getDraftValue,
   onClearClip,
+  onNextBank,
   onOpenChannelMenu,
+  onPreviousBank,
   onSelectChannel,
   onSelectChannelGroup,
   onSelectOutputMixTarget,
@@ -56,7 +60,9 @@ export function AudioTieredMixer({
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onClearClip: (channelId: string) => void;
+  onNextBank: () => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
+  onPreviousBank: () => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectOutputMixTarget: (mixTargetId: string) => void;
@@ -66,25 +72,56 @@ export function AudioTieredMixer({
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   viewModel: AudioWorkspaceViewModel;
 }) {
+  // New pages program, Slice 3 (decision 3): the bank keys on the Inputs
+  // heading page both rows, as `[` and `]` did. They show whenever the rows
+  // have more than one bank — on bank 1 too — and are dimmed at the first and
+  // last bank. They sit between the row's name and its bank readout, so they
+  // never move when the readout's text changes from bank to bank. Paging is not a click on the heading: nothing
+  // inside the pair (a key, a dimmed key, the gap) lets the selected strip go.
+  const bankKeys =
+    viewModel.totalBanks > 1 ? (
+      <span className={styles.tierBankKeys} data-testid="audio-bank-keys" onClick={(event) => event.stopPropagation()}>
+        <IconButton
+          data-testid="audio-bank-previous"
+          disabled={viewModel.clampedBankIndex <= 0}
+          icon={ChevronLeft}
+          label="Previous bank"
+          onClick={onPreviousBank}
+          size="sm"
+        />
+        <IconButton
+          data-testid="audio-bank-next"
+          disabled={viewModel.clampedBankIndex >= viewModel.totalBanks - 1}
+          icon={ChevronRight}
+          label="Next bank"
+          onClick={onNextBank}
+          size="sm"
+        />
+      </span>
+    ) : null;
+
   return (
     <div className={styles.tieredMixer} data-testid="audio-tiered-mixer">
       {viewModel.sourceTiers.map((tier) => (
         <section className={styles.mixerTier} data-testid={tier.testId} data-tier={tier.id} key={tier.id}>
           <div
             className={styles.tierLabel}
+            data-bank-keys={tier.id === "hardware-inputs" && bankKeys ? "" : undefined}
             data-testid={`audio-tier-label-${tier.id}`}
             onClick={() => onSelectChannel(null)}
           >
             <div className={styles.tierHeaderLead}>
               <span className={styles.tierTitle}>{tier.label}</span>
+              {tier.id === "hardware-inputs" ? bankKeys : null}
+              {/* The heading that carries the bank keys prints the bank readout on
+                  every bank, bank 1 included, so the keys sit beside it (decision
+                  3) and the row's long description does not push "sends into
+                  Main Out" out of the heading; the other rows print their
+                  description until they are paged. */}
               <span className={styles.tierDetail} data-testid={`audio-tier-bank-pill-${tier.id}`}>
                 {tier.channels.length > 0
-                  ? viewModel.clampedBankIndex > 0
-                    ? `Bank ${viewModel.clampedBankIndex + 1} / ${viewModel.totalBanks} · ch ${
-                        viewModel.bankStart + 1
-                      }-${Math.min(viewModel.bankStart + viewModel.visibleStripCount, viewModel.channels.length)} of ${
-                        viewModel.channels.length
-                      }`
+                  ? viewModel.clampedBankIndex > 0 || (tier.id === "hardware-inputs" && bankKeys)
+                    ? tier.bankReadout
                     : tier.meta
                   : "No sources in this bank"}
               </span>
@@ -123,9 +160,10 @@ export function AudioTieredMixer({
                   key={chip.id}
                   onClick={(event) => {
                     event.stopPropagation();
+                    // A plain click switches the chip on or off; several can
+                    // be lit (new pages program, Slice 3, decision 10).
                     onSelectChannelGroup({
                       group: chip.id,
-                      mode: event.altKey ? "invert" : event.shiftKey ? "toggle" : "single",
                       tierId: tier.id as AudioChannelGroupSelectionRequest["tierId"],
                     });
                   }}

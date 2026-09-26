@@ -4,9 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // state one surface shares. The first press arms; a second press on the same
 // key at least `dwellMs` later applies; a press on any other key re-arms that
 // key instead; Escape or `timeoutMs` disarms. Only one key is armed at a time
-// and a held key never repeats into an apply. The numbers are the Console's
-// (350 ms dwell, 4.5 s window); the Console keeps its own `useAudioArming`
-// until Slice 4 moves it onto this hook.
+// and a held key never repeats into an apply: the dwell does not see to that
+// (Windows repeats a held key after about 500 ms, past the 350 ms dwell), the
+// window listener below does, by cancelling a held Enter's repeats while a key
+// is armed. The numbers are the Console's (350 ms dwell, 4.5 s window); the
+// Console keeps its own `useAudioArming` until Slice 4 moves it onto this
+// hook. New pages program, Slice 3 (D6): Esc is plain keyboard operation and
+// stays — the window listener below lives only while a key is armed — but
+// nothing on screen advertises it any more.
 
 export const ARM_DWELL_MS = 350;
 export const ARM_TIMEOUT_MS = 4500;
@@ -56,6 +61,14 @@ export function useArm({
       onDisarmRef.current?.(armed, "timeout");
     }, armed.timeoutMs);
     const onKeyDown = (event: KeyboardEvent) => {
+      // Enter held on the focused key repeats, and the browser presses the key
+      // again on every repeat. A cancelled keydown is not pressed, so a held
+      // Enter never confirms the arm; confirming takes a fresh press. Space
+      // presses a key once, when it is let go, so it has no repeats to stop.
+      if (event.key === "Enter" && event.repeat) {
+        event.preventDefault();
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault();
       setArmed(null);
@@ -72,8 +85,9 @@ export function useArm({
     (key: string, label: string, apply: () => void) => {
       const current = armedRef.current;
       if (current?.key === key) {
-        // Inside the dwell the repeat is a double-click, a bounced pointer or
-        // a held key: the arm stays and nothing is applied.
+        // Inside the dwell the second press is a double-click or a bounced
+        // pointer: the arm stays and nothing is applied. A held Enter's repeats
+        // do not reach here; the window listener above cancels them.
         if (now() - current.armedAt < dwellMs) return;
         setArmed(null);
         apply();

@@ -22,8 +22,6 @@ export interface RailItem {
   label: string;
   meta?: string;
   icon?: ReactNode;
-  /** Keyboard hint printed on the tab (aria-hidden), e.g. "Ctrl+2". */
-  hint?: string;
 }
 
 export interface MonitorItem {
@@ -109,7 +107,6 @@ export function AppShellFrame({
                 key={workspace.id}
                 id={workspace.id}
                 label={workspace.label}
-                hint={workspace.hint}
                 active={workspace.id === activeWorkspace}
                 disabled={tabsDisabled || disabledWorkspaces.includes(workspace.id)}
                 onClick={() => onWorkspaceChange?.(workspace.id)}

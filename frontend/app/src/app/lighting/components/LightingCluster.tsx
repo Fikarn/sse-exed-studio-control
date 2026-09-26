@@ -42,11 +42,20 @@ export interface LightingClusterProps {
   hasSelection: boolean;
   highlightActive: boolean;
   soloActive: boolean;
+  /** A Find is running: its key reads "Stop" and stops it (new pages program,
+   *  Slice 3, decision 6). */
+  findRunning?: boolean;
+  /** The step the Undo key will undo, or null when there is nothing to undo
+   *  (decision 5). */
+  undoLabel?: string | null;
+  undoBusy?: boolean;
   recentScenes: readonly LightingRecentScene[];
   searchQuery: string;
   onRecallRecentScene?: (sceneId: string) => void;
   onSearchChange: (value: string) => void;
   onIdentifyFind: () => void;
+  onStopFind?: () => void;
+  onUndo?: () => void;
   onToggleHighlight: () => void;
   onToggleSolo: () => void;
   onOpenDmxMonitor: () => void;
@@ -64,6 +73,15 @@ export interface LightingClusterProps {
 
 function fadeLabel(recallFadeMs: number) {
   return `${(recallFadeMs / 1000).toFixed(1)} s`;
+}
+
+// The Undo key's small print names the step it will undo; a long scene or
+// fixture name is cut so the key stays inside the cluster (its full name is
+// the key's accessible name and title).
+const UNDO_LABEL_MAX_CHARS = 40;
+
+function undoSmallPrint(label: string) {
+  return label.length > UNDO_LABEL_MAX_CHARS ? `${label.slice(0, UNDO_LABEL_MAX_CHARS - 1)}…` : label;
 }
 
 export function LightingCluster(props: LightingClusterProps) {
@@ -94,11 +112,16 @@ export function LightingCluster(props: LightingClusterProps) {
     hasSelection,
     highlightActive,
     soloActive,
+    findRunning = false,
+    undoLabel = null,
+    undoBusy = false,
     recentScenes,
     searchQuery,
     onRecallRecentScene,
     onSearchChange,
     onIdentifyFind,
+    onStopFind,
+    onUndo,
     onToggleHighlight,
     onToggleSolo,
     onOpenDmxMonitor,
@@ -135,7 +158,7 @@ export function LightingCluster(props: LightingClusterProps) {
   const lockedReason = state.locked
     ? state.sentence
     : patchMode
-      ? "Patch mode is on: the rig's levels are paused while you address fixtures. Press P to leave it."
+      ? "Patch mode is on: the rig's levels are paused while you address fixtures. Press Patch to leave it."
       : undefined;
 
   // The way out of the state the rig is in, as keys on the display itself.
@@ -337,14 +360,17 @@ export function LightingCluster(props: LightingClusterProps) {
           ) : null}
         </div>
         {/* What the selection can be asked to do: hold it lit, dim everything
-            else, or pulse it so the operator can find it in the room. */}
+            else, or pulse it so the operator can find it in the room. A lit
+            Highlight or Solo key switches it off, in Preview too: with the
+            page-wide Esc gone it is the only way to end it on the page (Slice 3
+            review, finding 16). Only switching one on waits for the live rig. */}
         <div className={styles.actionRow}>
           <Key
             size="small"
             mode="toggle"
             engaged={highlightActive}
             aria-pressed={highlightActive}
-            disabled={previewMode || (!hasSelection && !highlightActive)}
+            disabled={!highlightActive && (previewMode || !hasSelection)}
             title={
               hasSelection ? "Hold the selection at full white at neutral CCT" : "Select fixtures to enable Highlight"
             }
@@ -358,27 +384,54 @@ export function LightingCluster(props: LightingClusterProps) {
             mode="toggle"
             engaged={soloActive}
             aria-pressed={soloActive}
-            disabled={previewMode || (!hasSelection && !soloActive)}
+            disabled={!soloActive && (previewMode || !hasSelection)}
             title={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
             testId="lighting-solo-toggle"
             onClick={onToggleSolo}
           >
             Solo
           </Key>
+          {/* While a Find runs the key reads Stop, lit as a running timer is,
+              and pressing it stops the sequence, the flashes still waiting
+              included (new pages program, Slice 3, decision 6). */}
           <Key
             size="small"
-            disabled={previewMode || !hasSelection}
+            live={findRunning}
+            disabled={!findRunning && (previewMode || !hasSelection)}
             title={
-              hasSelection
-                ? "Pulse the selection in turn so you can locate each fixture"
-                : "Select fixtures to enable Find"
+              findRunning
+                ? "Stop the Find sequence, the flashes still waiting included"
+                : hasSelection
+                  ? "Pulse the selection in turn so you can locate each fixture"
+                  : "Select fixtures to enable Find"
             }
             testId="lighting-identify-find"
-            onClick={onIdentifyFind}
+            onClick={findRunning ? onStopFind : onIdentifyFind}
           >
-            Find
+            {findRunning ? "Stop" : "Find"}
           </Key>
         </div>
+        {/* The Undo key undoes the newest of the last 25 steps — Save scene,
+            Delete scene, Add fixture, Delete fixture — and its small print
+            names that step (decision 5). With nothing to undo it takes the
+            system's locked form, dimmed and dashed, with its reason. */}
+        {onUndo ? (
+          <div className={styles.actionRow}>
+            <Key
+              size="small"
+              hint={undoLabel ? undoSmallPrint(undoLabel) : "nothing to undo"}
+              locked={!undoLabel}
+              reason="Nothing to undo. Save scene, Delete scene, Add fixture and Delete fixture can be undone."
+              disabled={Boolean(undoLabel) && undoBusy}
+              title={undoLabel ? `Undo ${undoLabel}` : undefined}
+              aria-label={undoLabel ? `Undo ${undoLabel}` : undefined}
+              testId="lighting-undo"
+              onClick={onUndo}
+            >
+              Undo
+            </Key>
+          </div>
+        ) : null}
       </Section>
 
       {masterDialogOpen ? (

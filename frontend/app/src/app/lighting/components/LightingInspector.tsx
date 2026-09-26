@@ -65,7 +65,7 @@ export interface LightingInspectorProps {
   onIdentifyBurst: (fixtureId: string, fixtureName: string) => void;
   onPatchCommit: (fixtureId: string, nextStartAddress: number) => void;
   onToggleGroupPower: (groupId: string, on: boolean) => void;
-  onSelectFixture: (fixtureId: string, options?: { additive?: boolean }) => void;
+  onSelectFixture: (fixtureId: string) => void;
   onSaveScene?: () => void;
   onSaveSceneAs?: () => void;
   onRecallScene?: (sceneId: string) => void;

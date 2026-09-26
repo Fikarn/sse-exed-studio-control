@@ -19,7 +19,7 @@ export function useSetupPilotChrome({
   state: SetupPilotState;
   actions: SetupPilotActions;
 }) {
-  const { commissioningSnapshot, onShowShortcuts } = props;
+  const { commissioningSnapshot } = props;
   const {
     runnerSteps,
     probeHasError,
@@ -100,7 +100,6 @@ export function useSetupPilotChrome({
             }`
           : "what to do when something is wrong, and the archives to do it from"}
       </span>
-      <Key size="small" className={styles.bayShortcuts} cap="Shortcuts" hint="?" onClick={onShowShortcuts} />
     </>
   );
 

@@ -60,7 +60,7 @@ describe("StateDisplay", () => {
         word="VERIFIED"
         meta="42 values confirmed"
         armed={{
-          text: "Recall Interview block · press again to apply · Esc cancels",
+          text: "Recall Interview block · press again to apply",
           secondsLeft: 3.9,
           progress: 0.87,
         }}
@@ -169,6 +169,9 @@ describe("Key", () => {
 });
 
 describe("ArmKey", () => {
+  // New pages program, Slice 3 (D6). Old: the tag read `ARMED · press again ·
+  // Esc cancels · 3.9 s`. New: `ARMED · press again · 3.9 s`. Reason: Esc still
+  // cancels the arm (useArm), but its hint goes with every other key hint.
   it("renders the tag, the label and the countdown bar only while armed", () => {
     const { rerender } = render(
       <ArmKey armed={false} timeoutMs={4500} cap="3">
@@ -183,7 +186,8 @@ describe("ArmKey", () => {
       </ArmKey>
     );
     expect(screen.getByRole("button")).toHaveAttribute("data-armed", "true");
-    expect(screen.getByText("ARMED · press again · Esc cancels · 3.9 s")).toBeInTheDocument();
+    expect(screen.getByText("ARMED · press again · 3.9 s")).toBeInTheDocument();
+    expect(screen.getByRole("button")).not.toHaveTextContent(/Esc/);
     const bar = screen.getByTestId("audio-arm-countdown");
     expect(bar.getAttribute("style")).toContain("--arm-duration: 4500ms");
   });
@@ -234,6 +238,28 @@ describe("useArm", () => {
     });
     expect(result.current.armed).toBeNull();
     expect(onDisarm).toHaveBeenLastCalledWith(expect.objectContaining({ key: "k" }), "escape");
+  });
+
+  // Slice 3 review (#27): Enter held on the focused arm key repeats, and the
+  // browser presses the key again on every repeat, so the first repeat after the
+  // dwell (Windows repeats after about 500 ms) would confirm the arm. While a
+  // key is armed a repeated Enter is cancelled, which keeps the key from being
+  // pressed; a fresh Enter is left alone, so it can still confirm.
+  it("cancels a held Enter's repeats while a key is armed, and not a fresh Enter", () => {
+    const { result } = renderHook(() => useArm({ now: () => 0 }));
+    const armKey = document.createElement("button");
+    document.body.appendChild(armKey);
+    armKey.focus();
+    // fireEvent answers false when the keydown was cancelled.
+    const enter = (repeat: boolean) => fireEvent.keyDown(armKey, { key: "Enter", repeat });
+
+    expect(enter(true)).toBe(true);
+
+    act(() => result.current.armOrApply("recall:3", "Recall Interview block", () => {}));
+    expect(enter(true)).toBe(false);
+    expect(enter(false)).toBe(true);
+    expect(result.current.armed?.key).toBe("recall:3");
+    armKey.remove();
   });
 });
 
@@ -294,7 +320,11 @@ describe("Wells", () => {
 });
 
 describe("Slider and Groove", () => {
-  it("a slider is a slider with the value in per cent, arrows step it, Shift multiplies by five", () => {
+  // New pages program, Slice 3 (decision 9). Old: "…, Shift multiplies by five",
+  // Shift+ArrowDown → 0.45. New: a plain ArrowDown → 0.49, and Home joins End.
+  // Reason: a focused slider takes the arrows, Home and End and nothing with
+  // Shift, Ctrl or Alt; the modified arrow has a case of its own below.
+  it("a slider is a slider with the value in per cent; arrows step it, Home and End go to the ends", () => {
     const onChange = vi.fn();
     render(<Slider label="Main level" value={0.5} unity={0.8172} onChange={onChange} valueText="-6.0 dB" />);
     const slider = screen.getByRole("slider", { name: "Main level" });
@@ -302,10 +332,33 @@ describe("Slider and Groove", () => {
     expect(slider).toHaveAttribute("aria-valuetext", "-6.0 dB");
     fireEvent.keyDown(slider, { key: "ArrowRight" });
     expect(onChange).toHaveBeenLastCalledWith(0.51);
-    fireEvent.keyDown(slider, { key: "ArrowDown", shiftKey: true });
-    expect(onChange).toHaveBeenLastCalledWith(0.45);
+    fireEvent.keyDown(slider, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenLastCalledWith(0.49);
     fireEvent.keyDown(slider, { key: "End" });
     expect(onChange).toHaveBeenLastCalledWith(1);
+    fireEvent.keyDown(slider, { key: "Home" });
+    expect(onChange).toHaveBeenLastCalledWith(0);
+  });
+
+  // Decision 9: no Shift ×5 step. Shift+ArrowUp on a focused slider or fader
+  // moves exactly one plain step, and so do Ctrl and Alt.
+  it("a modified arrow on a focused slider or groove moves exactly one plain step", () => {
+    const onSlider = vi.fn();
+    const onGroove = vi.fn();
+    render(
+      <>
+        <Slider label="Main level" value={0.5} onChange={onSlider} />
+        <Groove label="Host fader" value={0.5} onChange={onGroove} />
+      </>
+    );
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Main level" }), { key: "ArrowUp", shiftKey: true });
+    expect(onSlider).toHaveBeenLastCalledWith(0.51);
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Host fader" }), { key: "ArrowUp", shiftKey: true });
+    expect(onGroove).toHaveBeenLastCalledWith(0.51);
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Host fader" }), { key: "ArrowDown", ctrlKey: true });
+    expect(onGroove).toHaveBeenLastCalledWith(0.49);
+    fireEvent.keyDown(screen.getByRole("slider", { name: "Host fader" }), { key: "ArrowDown", altKey: true });
+    expect(onGroove).toHaveBeenLastCalledWith(0.49);
   });
 
   it("a locked slider is aria-disabled and ignores keys; a doubted one is marked", () => {
@@ -353,13 +406,31 @@ describe("Slider and Groove", () => {
     expect(onRequestTypedEntry).toHaveBeenCalledTimes(2);
   });
 
-  it("puts a fader back on unity: Shift jumps to it, and a value beside it settles on it", () => {
+  // New pages program, Slice 3 (decision 10). Old: "Shift jumps to it" — a
+  // Shift + press set 0.8172 and committed it. New: Shift is not read, so the
+  // press lands where it points (0.5 here), and a press beside unity settles
+  // on it. Reason: a key held while pointing is a shortcut; the drag that
+  // settles on unity and right-click › "Reset to unity" stay.
+  it("puts a fader back on unity by hand: a press beside it settles on it, and Shift adds nothing", () => {
     const onChange = vi.fn();
     const onCommit = vi.fn();
-    render(<Groove label="Host fader" value={0.5} unity={0.8172} snapUnity onChange={onChange} onCommit={onCommit} />);
+    render(<Groove label="Host fader" value={0.3} unity={0.8172} snapUnity onChange={onChange} onCommit={onCommit} />);
     const groove = screen.getByRole("slider", { name: "Host fader" });
-    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, shiftKey: true }));
+    groove.setPointerCapture = () => {};
+    groove.releasePointerCapture = () => {};
+    // A 228 px column: 14 px insets and 200 px of travel, so y = 14 + (1 − value) × 200.
+    groove.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, left: 0, top: 0, right: 44, bottom: 228, width: 44, height: 228 }) as DOMRect;
+    // jsdom has no PointerEvent, so the press is the mouse event React listens for.
+    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 114, shiftKey: true }));
+    expect(onChange).toHaveBeenLastCalledWith(0.5);
+    expect(onCommit).not.toHaveBeenCalled();
+    fireEvent(groove, new MouseEvent("pointerup", { bubbles: true, button: 0, clientY: 114 }));
+    expect(onCommit).toHaveBeenLastCalledWith(0.5);
+    // 0.82 lands within the snap of 0.8172 and settles on unity exactly.
+    fireEvent(groove, new MouseEvent("pointerdown", { bubbles: true, button: 0, clientY: 50 }));
     expect(onChange).toHaveBeenLastCalledWith(0.8172);
+    fireEvent(groove, new MouseEvent("pointerup", { bubbles: true, button: 0, clientY: 50 }));
     expect(onCommit).toHaveBeenLastCalledWith(0.8172);
   });
 });

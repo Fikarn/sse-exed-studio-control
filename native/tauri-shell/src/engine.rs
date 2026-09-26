@@ -140,6 +140,33 @@ impl EngineBridge {
         )
     }
 
+    /// One line of the shell's own in `<logs>/shell.log`, the file the
+    /// engine's stderr goes to, through the same shared handle (new pages
+    /// program, Slice 3: the technical detail of a window command that did not
+    /// finish, whose screen sentence stays plain; a WebView2 setting the shell
+    /// could not apply). Best effort: when the logs folder cannot be resolved
+    /// or written, the line goes to stderr; debug builds echo it there as
+    /// well, like the engine's lines.
+    pub fn log_shell_line(&self, label: &str, message: &str) {
+        let written = resolve_runtime_directories()
+            .map(|(_, logs_dir)| self.log_shell_line_in(&logs_dir, label, message))
+            .unwrap_or(false);
+        if !written || cfg!(debug_assertions) {
+            eprintln!("{label} {message}");
+        }
+    }
+
+    /// `log_shell_line` for a known logs folder; true when the line was written.
+    fn log_shell_line_in(&self, logs_dir: &Path, label: &str, message: &str) -> bool {
+        self.shell_log_for(logs_dir)
+            .map(|log| {
+                log.lock()
+                    .map(|mut log| log.write_line(label, message).is_ok())
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)
+    }
+
     /// The shell log for `logs_dir`, opened once per shell.
     fn shell_log_for(&self, logs_dir: &Path) -> Result<SharedShellLog, String> {
         let mut slot = self
@@ -865,6 +892,35 @@ mod tests {
             "shell.log should carry the engine's stderr line, got: {content:?}"
         );
         assert!(content.starts_with('['), "{content:?}");
+    }
+
+    // New pages program, Slice 3: what the shell keeps off the screen — the
+    // detail of a window command that did not finish, a WebView2 setting it
+    // could not apply — is one line of its own in shell.log, beside the
+    // engine's, through the handle the engine's launches share.
+    #[test]
+    fn shell_lines_reach_shell_log_through_the_shared_handle() {
+        let bridge = EngineBridge::default();
+        let tree = TempTree::new("shell-line");
+        let logs_dir = tree.path("logs");
+
+        assert!(bridge.log_shell_line_in(
+            &logs_dir,
+            "SHELL",
+            "WebView2 browser keys stayed on: probe"
+        ));
+        assert!(bridge.log_shell_line_in(&logs_dir, "SHELL", "second line"));
+
+        let content =
+            fs::read_to_string(logs_dir.join(SHELL_LOG_FILE_NAME)).expect("shell.log is written");
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 2, "{content:?}");
+        assert!(lines[0].starts_with('['), "{content:?}");
+        assert!(
+            lines[0].ends_with("] SHELL WebView2 browser keys stayed on: probe"),
+            "{content:?}"
+        );
+        assert!(lines[1].ends_with("] SHELL second line"), "{content:?}");
     }
 
     // 2026-09 production readiness, Slice 5 (finding F09), replacing the

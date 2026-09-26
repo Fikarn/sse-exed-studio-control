@@ -19,7 +19,9 @@ export function AudioSignalCanvas({
   draftStore,
   getDraftValue,
   onClearClips,
+  onNextBank,
   onOpenChannelMenu,
+  onPreviousBank,
   recallReport,
   onDismissRecallReport,
   onArmPhantomFromRecall,
@@ -41,7 +43,9 @@ export function AudioSignalCanvas({
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onClearClips: (channelId?: string) => void;
+  onNextBank: () => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
+  onPreviousBank: () => void;
   recallReport: AudioRecallReport | null;
   onDismissRecallReport: () => void;
   onArmPhantomFromRecall: (channelId: string, channelName: string, phantom: boolean) => void;
@@ -121,7 +125,9 @@ export function AudioSignalCanvas({
         commitMixTargetContinuous={commitMixTargetContinuous}
         draftStore={draftStore}
         getDraftValue={getDraftValue}
+        onNextBank={onNextBank}
         onOpenChannelMenu={onOpenChannelMenu}
+        onPreviousBank={onPreviousBank}
         onClearClip={onClearClips}
         onSelectChannel={onSelectChannel}
         onSelectChannelGroup={onSelectChannelGroup}

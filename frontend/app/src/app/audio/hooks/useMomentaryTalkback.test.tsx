@@ -6,13 +6,8 @@ import { AUDIO_TALKBACK_HEARTBEAT_MS, useMomentaryTalkback } from "./useMomentar
 // 2026-09 audit remediation, Slice 6: talkback is a hold, never a latch. The
 // only talkback coverage before this was a Playwright assertion that the
 // button exists with an aria-pressed attribute.
-
-function keyEvent(type: "keydown" | "keyup", init: KeyboardEventInit & { target?: EventTarget } = {}) {
-  const { target, ...rest } = init;
-  const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, key: "t", ...rest });
-  (target ?? window).dispatchEvent(event);
-  return event;
-}
+// New pages program, Slice 3 (D7): the page-wide T hold key went, and with it
+// the case that held T; the disabled case no longer presses T.
 
 describe("useMomentaryTalkback", () => {
   beforeEach(() => {
@@ -55,46 +50,6 @@ describe("useMomentaryTalkback", () => {
     expect(hold).toHaveBeenCalledTimes(callsAfterRelease);
   });
 
-  it("holds while T is down and ignores repeat, modifiers and editable targets", () => {
-    const hold = vi.fn();
-    renderHook(() => useMomentaryTalkback({ enabled: true, hold }));
-
-    act(() => {
-      keyEvent("keydown", { key: "T", repeat: true });
-      keyEvent("keydown", { key: "t", ctrlKey: true });
-      keyEvent("keydown", { key: "t", shiftKey: true });
-    });
-    expect(hold).not.toHaveBeenCalled();
-
-    const input = document.createElement("input");
-    document.body.appendChild(input);
-    act(() => {
-      keyEvent("keydown", { key: "t", target: input });
-    });
-    expect(hold).not.toHaveBeenCalled();
-    input.remove();
-
-    let keydown!: KeyboardEvent;
-    act(() => {
-      keydown = keyEvent("keydown", { key: "t" });
-    });
-    expect(keydown.defaultPrevented).toBe(true);
-    expect(hold).toHaveBeenCalledTimes(1);
-    expect(hold).toHaveBeenLastCalledWith(true);
-
-    act(() => {
-      keyEvent("keyup", { key: "t" });
-    });
-    expect(hold).toHaveBeenCalledTimes(2);
-    expect(hold).toHaveBeenLastCalledWith(false);
-
-    // A stray key-up when nothing is held sends nothing.
-    act(() => {
-      keyEvent("keyup", { key: "t" });
-    });
-    expect(hold).toHaveBeenCalledTimes(2);
-  });
-
   it("releases on window blur, on a hidden document and on unmount", () => {
     const hold = vi.fn();
     const { result, unmount } = renderHook(() => useMomentaryTalkback({ enabled: true, hold }));
@@ -128,9 +83,6 @@ describe("useMomentaryTalkback", () => {
     });
 
     act(() => result.current.engage());
-    act(() => {
-      keyEvent("keydown", { key: "t" });
-    });
     expect(hold).not.toHaveBeenCalled();
 
     rerender({ enabled: true });

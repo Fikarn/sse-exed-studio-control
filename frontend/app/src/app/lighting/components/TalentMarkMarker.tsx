@@ -9,8 +9,10 @@ import type { StudioTalentMark } from "../studioLayout";
 
 const CLICK_PX_THRESHOLD = 4;
 const SNAP_METERS = 0.5;
+// New pages program, Slice 3 (decision 9): a focused talent mark takes the
+// arrow keys, 0.1 m a press — the only keyboard way to move one, since marks
+// have no position field. No key held with them changes the step.
 const KEY_NUDGE_METERS = 0.1;
-const KEY_NUDGE_FAST_METERS = 0.5;
 
 const TALENT_FILL = "var(--color-studio-talent-fill)";
 const TALENT_STROKE = "var(--color-studio-talent-ring)";
@@ -104,14 +106,16 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
     setGhost(null);
 
     if (cancelled || !wasDrag || !ghostNow || !onPositionCommit) return;
-    const xMeters = event.altKey ? ghostNow.x / 100 : snapMeters(ghostNow.x / 100);
-    const yMeters = event.altKey ? ghostNow.y / 100 : snapMeters(ghostNow.y / 100);
+    // Every drop snaps to the 0.5 m grid; the arrow keys move a focused mark
+    // in 0.1 m steps.
+    const xMeters = snapMeters(ghostNow.x / 100);
+    const yMeters = snapMeters(ghostNow.y / 100);
     onPositionCommit(mark.id, clamp(xMeters, 0, widthCm / 100), clamp(yMeters, 0, depthCm / 100));
   };
 
   const commitKeyboardMove = (event: ReactKeyboardEvent<SVGGElement>) => {
     if (!onPositionCommit) return;
-    const step = event.shiftKey ? KEY_NUDGE_FAST_METERS : KEY_NUDGE_METERS;
+    const step = KEY_NUDGE_METERS;
     let dx = 0;
     let dy = 0;
     if (event.key === "ArrowLeft") dx = -step;

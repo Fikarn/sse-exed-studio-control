@@ -126,7 +126,7 @@ function States() {
         word="VERIFIED"
         sentence="Console · TotalMix on the UFX III"
         armed={{
-          text: "Recall Interview block · press again to apply · Esc cancels",
+          text: "Recall Interview block · press again to apply",
           secondsLeft: 3.9,
           progress: 0.87,
         }}
@@ -294,10 +294,6 @@ function Sheet() {
           items={[
             { label: "Console", value: "confirmed · 42 values" },
             { label: "Metering", value: "RME · live" },
-          ]}
-          hints={[
-            { kbd: "Ctrl+K", label: "Palette" },
-            { kbd: "T", label: "hold to talk" },
           ]}
         />
       </div>

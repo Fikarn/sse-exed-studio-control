@@ -13,7 +13,7 @@ Entry point for Codex-assisted work in this repo. Keep it short. Follow the poin
 
 ## What this product is
 
-`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. Planning was removed in 2026-09 by the new pages program (`docs/plans/new-pages-2026-09.md`: from the screen in Slice 1, from the hardware link, the contract and the saved data in Slice 2), which then removes the keyboard shortcuts and adds Cameras and Teleprompter pages. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`, and its last piece, the one-way `db.json` import, in the new pages program's Slice 2b (a `db.json` is neither imported nor restored; no pre-v2.0.0 code is retained); there is no browser path.
+`SSE ExEd Studio Control` — a native desktop studio console for a single fixed operator workstation. DMX lighting, audio mixer (OSC/TotalMix), and Stream Deck+ commissioning. The new pages program (`docs/plans/new-pages-2026-09.md`, 2026-09) removed Planning (from the screen in Slice 1; from the hardware link, the contract and the saved data in Slice 2) and every keyboard shortcut (Slice 3: Studio Control binds no key of its own and shows no key hint), and then adds Cameras and Teleprompter pages. Bundle id `com.sse.exedstudiocontrol`. Current published operator-rollout version is `v2.2.1` (2026-04-24) — the legacy Electron/Next.js runtime was retired in `v2.1.0`, and its last piece, the one-way `db.json` import, in the new pages program's Slice 2b (a `db.json` is neither imported nor restored; no pre-v2.0.0 code is retained); there is no browser path.
 
 Checkpoint D is complete: the Qt/QML fallback shell, Qt-specific shell automation, and historical Qt parity assets are retired. Do not reintroduce a Qt shell path without a new architecture decision and replacement release plan.
 
@@ -29,15 +29,10 @@ Rule: if a change would move product state, persistence, or device policy into R
 
 ## Hardware target (binding)
 
-- Primary operator surface: fullscreen `2560×1440` on a fixed second monitor. **Operator ruling 2026-09-07 (visual overhaul A, plan D4): `2560×1440` is the only resolution that matters.** Chrome budget: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
-- `1920×1080` and `1280×800` remain as fallback layouts, not deliverables: their guards stay (`audio-legibility`, `viewport-contract`, the six-size scroll check) but no design gate runs below `2560×1440`.
-- **Operator ruling 2026-09-18: only the Windows build and only `2560×1440` matter.** Do no work for Linux, macOS or any other resolution (no linux or darwin captures, no fallback-viewport fixes). Leave their guards as they are; if one turns red for a reason that is not also a Windows `2560×1440` reason, say so, record it and move on — and ask before deleting such a guard. One exception (operator decision, 2026-09-23): `frontend-e2e` is a required check, so a change that moves a board refreshes its `linux` capture too, from the branch push run's `playwright-test-results` artifact, before it merges (the production readiness ledger, Baseline refresh procedure); `darwin` and the win32 captures at other sizes stay as they are.
+- **Operator ruling, absolute since 2026-09-26: Studio Control always runs at `2560×1440`, fullscreen on an external display, on a Windows machine.** Any other resolution and any other operating system is not to be considered — "unnecessary and a waste of time". Do not design, fix, test, verify or document anything for another size (1920×1080, 1280×800, a windowed size, a laptop panel) or another system (Linux, macOS). What still exists only for them — captures, tests, guards, fallback layouts, Studio Preview, the windowed layout, CI steps, macOS paths, docs — is being removed (the new pages program, D22 and Slice SW); until it is gone, do not maintain it: a failure that is only another size's or system's is recorded and left. CI may run on Linux runners as infrastructure, but nothing may depend on Linux rendering. (This makes the rulings of 2026-09-07, visual overhaul A's D4, and 2026-09-18 absolute; the 2026-09-18 "leave the guards and ask before deleting one" and the 2026-09-23 linux-capture duty end with Slice SW.)
+- Chrome budget at `2560×1440`: header 56, footer 40, cluster 424, plate 416, gutters 16; the Console shows 4 / 6 / 3 strips.
 - **No scroll during normal operation.** Dense fixed-height layouts.
 - Devices currently in play: RME Fireface UFX III (audio), Litepanels Apollo Bridge / Astra Bi-Color / Aputure Infinimat / Infinibar PB12 (lighting), Stream Deck+ + Bitfocus Companion local (control).
-
-When developing on a Retina MacBook, enforce the built-in-display review workflow from `docs/DEVELOPMENT.md`: use the app-owned Scaled Studio Preview for proportional `2560×1440` studio review, and do not judge studio-full fit/layout from the default Retina logical desktop.
-
-Scaled Studio Preview is a scaled `2560×1440` studio canvas, not a compact host viewport. Operator-density rules must key off the logical operator surface so the preview matches native `2560×1440` after scaling.
 
 Authoritative source: `docs/HARDWARE_PROFILE.md`.
 
@@ -149,6 +144,7 @@ When the selected Tauri shell is open for user inspection, that exact running sh
 - Frontend unit/component tests: `npm run frontend:test` (Vitest + `@testing-library/react`). Specs colocated as `*.test.ts` / `*.test.tsx` under each workspace.
 - Frontend Playwright + visual baselines: `npm run frontend:playwright:test`. `visual-review.spec.ts` commits `toHaveScreenshot` baselines under `frontend/app/tests/__visual__/visual-review.spec.ts-snapshots/` (per-platform `*-darwin.png` / `*-linux.png` / `*-win32.png` files; win32 is the studio workstation's local gate, linux is CI, darwin is refreshed on the macOS release host); the CI `frontend-e2e` job re-runs them and uploads diffs + the Playwright report as artifacts. `storybook.spec.ts` does the same for the Storybook static build. Both the behaviour specs and the visual lanes run against the built app (Playwright's `webServer` is `vite preview` over `frontend/app/dist`, reused when already running; the Storybook lane reads `storybook-static`), so after any frontend source edit run `npm run build --workspace frontend/app` (and `npm run frontend:storybook:build` for the Storybook lane) before `npx playwright test …`, or the specs exercise the previous build.
 - UI contract: `frontend/app/tests/ui-contract.spec.ts` measures 66 boards (22 fixtures × 3 themes at 2560×1440) plus the Storybook primitive pages against system §10, ratcheted per board in `frontend/app/tests/ui-contract.ratchets.json` — a measure may fall, never rise. Three sibling gates run outside it: `scripts/check-operator-copy.mjs`, the design system's `css-literals.test.ts` allowlist, and the tokens package's `themes.contrast.test.ts`. `docs/DEVELOPMENT.md §2c` has the commands, the re-seed flow and the traps.
+- Keys (the new pages program's Slice 3, D6): Studio Control binds no key of its own. `scripts/check-no-shortcuts.mjs`, run by `scripts:test` (so by `dev:check` and CI's `format-protocol`), fails on a key listener or key handler outside the places it lists with their reasons (dialogs, drawers, popups, the arm's Esc, focused sliders and lists), on any read of a modifier key but a dialog's Shift+Tab trap, on a `<kbd>`, `aria-keyshortcuts` or `accessKey`, and on a key hint in operator copy; `frontend/app/tests/no-shortcuts.spec.ts` presses every key the program used to bind and expects nothing on screen to move. A control needs a way to it on screen, never a key.
 - Smoke / acceptance / bridge-qualification lanes: see `docs/DEVELOPMENT.md §2b` and §4.
 - Each workspace is a chunk of its own: a spec whose first step after `openFixture` is a key or a one-shot DOM read calls `expectWorkspaceMounted(page, workspace)` first. A value that depends on the page's clock is pinned or driven with `page.clock`, never waited out with a fixed window; a Rust test that drives the shared console link waits on the link's state (`settle_console_link`), never on a sleep (`docs/DEVELOPMENT.md §2c` and "Engine changes").
 - `npm run file:health` fails any source file over 2,000 lines and has no allowlist for source files (production readiness S14): split before a file gets there.
@@ -213,15 +209,15 @@ When working through a sliced plan and a slice's premise turns out to be wrong o
 
 ## Where to look
 
-| For…                                    | Go to…                                                         |
-| --------------------------------------- | -------------------------------------------------------------- |
-| Runtime boundaries, shell/engine rules  | `docs/ARCHITECTURE.md`                                         |
-| Workstation dimensions, device list     | `docs/HARDWARE_PROFILE.md`                                     |
-| Operator task flows, keyboard shortcuts | `docs/OPERATIONS.md`                                           |
-| Cold-start developer onboarding         | `docs/DEVELOPER_QUICKSTART.md`                                 |
-| Daily build/test/package commands       | `docs/DEVELOPMENT.md`                                          |
-| Release steps, acceptance checklist     | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md`               |
-| Current engineering truth / open items  | `docs/HANDOFF.md`                                              |
-| The visual system and its gates         | `docs/redesign/system-a-2026-09.md`, `docs/DEVELOPMENT.md §2c` |
+| For…                                   | Go to…                                                         |
+| -------------------------------------- | -------------------------------------------------------------- |
+| Runtime boundaries, shell/engine rules | `docs/ARCHITECTURE.md`                                         |
+| Workstation dimensions, device list    | `docs/HARDWARE_PROFILE.md`                                     |
+| Operator task flows, the keys          | `docs/OPERATIONS.md`                                           |
+| Cold-start developer onboarding        | `docs/DEVELOPER_QUICKSTART.md`                                 |
+| Daily build/test/package commands      | `docs/DEVELOPMENT.md`                                          |
+| Release steps, acceptance checklist    | `docs/RELEASE.md`, `docs/PRODUCTIZATION_PLAN.md`               |
+| Current engineering truth / open items | `docs/HANDOFF.md`                                              |
+| The visual system and its gates        | `docs/redesign/system-a-2026-09.md`, `docs/DEVELOPMENT.md §2c` |
 
 If this file disagrees with any of the above, those docs win — this file is a pointer, not a spec.

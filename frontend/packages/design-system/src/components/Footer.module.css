@@ -39,32 +39,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .hints {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 18px;
-    flex: none;
-  }
-
-  .hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .hint kbd {
-    font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
-    color: var(--text-text2);
-    border: 1px solid var(--material-line2);
-    border-radius: var(--radius-ctl);
-    padding: 3px 5px;
-  }
-
+  /* The action key keeps the right edge. New pages program, Slice 3: the key
+     hints that pushed it there left (D6), so the key pushes itself. */
   .action {
     display: inline-flex;
     align-items: center;
-    margin-left: 12px;
+    margin-left: auto;
     flex: none;
   }
 }

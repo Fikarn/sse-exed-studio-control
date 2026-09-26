@@ -25,5 +25,23 @@ tauri = { version = "2.11.2", features = [] }
 # one and exits (2026-09 production readiness, Slice 5 - finding F19).
 tauri-plugin-single-instance = "2.4.4"
 
-[lints]
-workspace = true
+# New pages program, Slice 3 (decision 12): on Windows the shell switches
+# WebView2's own browser keys off (reload, find, print, zoom, back). Both crates
+# are already in the lock file through Tauri and wry, at these versions, so
+# nothing new is fetched; Linux and macOS builds do not see them.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38.2"
+windows = "0.61"
+
+# The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
+# difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
+# cannot be lifted even for one item. WebView2's settings are COM calls, which
+# are `unsafe` in the `windows` bindings, so `set_browser_accelerator_keys_off`
+# in main.rs (Windows only, called by `switch_off_browser_keys`, decision 12)
+# carries the one `#[allow(unsafe_code)]` in this crate; anything else that
+# uses `unsafe` still fails the build.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "warn"

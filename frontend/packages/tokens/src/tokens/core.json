@@ -698,7 +698,7 @@
     },
     "line2": {
       "$value": "rgba(255, 255, 255, 0.2)",
-      "$description": "stronger hairline, unlit lamp, kbd border"
+      "$description": "stronger hairline, unlit lamp"
     },
     "sheen": {
       "$value": "rgba(255, 255, 255, 0.08)",
@@ -1078,7 +1078,7 @@
       },
       "tick": {
         "$value": "{font.base.tick}",
-        "$description": "the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act"
+        "$description": "the floor: scale ticks, eyebrows, secondary meta - never read to act"
       },
       "label": {
         "$value": "{font.base.label}",
@@ -1211,7 +1211,7 @@
     },
     "ctl": {
       "$value": "4px",
-      "$description": "A: caps, fields, kbd, small lamps' boxes"
+      "$description": "A: caps, fields, small lamps' boxes"
     },
     "key": {
       "$value": "8px",

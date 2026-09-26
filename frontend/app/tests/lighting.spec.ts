@@ -1,16 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
-import { modifierShortcut } from "./helpers/modifier-shortcut";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: lighting workspace specs split out of
 // operator-shell.spec.ts. Covers the snapshot loading posture, fixture
 // snapshot rendering, layout responsiveness across viewport sizes,
 // scaled-studio-preview entry, preview mode, palette pools, patch mode,
-// view bookmarks, drag-lasso multi-select, fixture nudge/drag/rotate,
-// DMX monitor expand, and DMX-unreachable + blackout posture.
+// view bookmarks, drag-lasso multi-select, fixture drag/rotate, typed entry,
+// DMX monitor expand, and DMX-unreachable + blackout posture. New pages
+// program, Slice 3 (D6): Lighting binds no key of its own, so every case
+// here reaches its control on screen; the keys it used to press are pressed
+// in `no-shortcuts.spec.ts`, where nothing may answer them.
 
 test("renders the lighting snapshot loading posture", async ({ page }) => {
   await openFixture(page, "lighting-loading");
@@ -65,9 +67,18 @@ test("renders the lighting workspace from an engine-backed fixture snapshot", as
   // Visual overhaul A, Slice 5. Old: the health bar's "Saved" cell. New: the
   // shell footer's Scene item says "saved". Reason: the footer is the shell's.
   await expect(page.getByTestId("lighting-footer-telemetry")).toContainText("saved");
+  // New pages program, Slice 3 (D6): the footer's key hints ("Ctrl+K Command
+  // palette", "? Shortcuts", "Ctrl+Shift+M DMX monitor") are gone with their
+  // slot; the DMX strip key stays.
+  await expect(page.getByTestId("lighting-footer-shortcuts")).toHaveCount(0);
+  await expect(page.getByTestId("lighting-health-bar").locator("kbd")).toHaveCount(0);
+  await expect(page.getByTestId("lighting-dmx-strip-toggle")).toBeVisible();
   await expect(page.getByRole("img", { name: "Scene intensity shape for Warm wash" })).toBeVisible();
 
-  await page.keyboard.press("KeyS");
+  // New pages program, Slice 3 (D6). Old: the S key saved the rig as "Scene 3".
+  // New: the "New scene" tile on the scene rail does. Reason: the keyboard
+  // shortcuts are gone; the tile is S's twin (the inventory, section 3).
+  await page.getByRole("button", { name: "Save current state as a new scene" }).click();
   await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toBeVisible();
   await page.getByRole("button", { name: "Recall scene Interview" }).click();
   await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toHaveAttribute(
@@ -337,28 +348,9 @@ test("renders scaled studio preview inside the current MacBook-sized viewport", 
   expect((visualBounds?.width ?? 0) / (visualBounds?.height ?? 1)).toBeCloseTo(16 / 9, 2);
 });
 
-test("enters and exits scaled studio preview from the command palette", async ({ page }) => {
-  await page.setViewportSize({ width: 1512, height: 982 });
-  await openFixture(page, "lighting-populated");
-
-  await expectWorkspaceMounted(page, "lighting");
-  await page.keyboard.press("Meta+K");
-  await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" })).toBeVisible();
-  await page.getByRole("option", { name: "Enter Studio Preview at 2560 × 1440" }).click();
-
-  const root = page.locator("[data-operator-layout-root]");
-  await expect(root).toHaveAttribute("data-review-surface", "studioPreview");
-  await expect(root).toHaveAttribute("data-layout-mode", "studioFull");
-  await expect(page.getByText(/Studio Preview — 2560 × 1440 at/)).toBeVisible();
-
-  await page.keyboard.press("Meta+K");
-  await page.locator("input[placeholder*=command]").fill("studio preview");
-  await expect(page.getByRole("option", { name: "Exit Studio Preview" })).toBeVisible();
-  await page.getByRole("option", { name: "Exit Studio Preview" }).click();
-
-  await expect(root).toHaveAttribute("data-review-surface", "native");
-});
+// New pages program, Slice 3 (decision 1): the case that entered and left
+// Studio Preview from the command palette went with the palette. Studio Preview
+// opens only from its address, which the case above covers.
 
 test("supports lighting preview mode without driving live scene state", async ({ page }) => {
   await openFixture(page, "lighting-populated");
@@ -401,7 +393,7 @@ test("supports lighting preview mode without driving live scene state", async ({
   await expect(page.getByRole("button", { name: /^Fixture Key, 76 percent,/ })).toHaveAttribute("aria-pressed", "true");
 });
 
-test("supports lighting palette pools from the inspector and quick picker", async ({ page }) => {
+test("supports lighting palette pools from the inspector", async ({ page }) => {
   await openFixture(page, "lighting-palettes-selected");
 
   // Visual overhaul A, Slice 5b. Old: the Palettes tab was selected and the
@@ -418,13 +410,11 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent,/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText(/Lighting intensity palette 'Low' applied to 1 fixture/)).toBeVisible();
 
-  await page.keyboard.press(modifierShortcut("Shift+KeyP"));
-  const quickPicker = page.getByRole("dialog", { name: "Lighting palettes" });
-  await expect(quickPicker).toBeVisible();
-  await expect(quickPicker.getByLabel("Search palettes")).toBeFocused();
-  await expect(quickPicker.getByRole("button", { name: "Apply palette Low 10 %" }).first()).toBeVisible();
-  await quickPicker.getByLabel("Search palettes").fill("studio");
-  await quickPicker.getByRole("button", { name: "Apply palette Studio 4000 K" }).click();
+  // New pages program, Slice 3 (decision 7). Old: Ctrl+Shift+P opened the quick
+  // palette panel, which applied Studio 4000 K by search. New: the plate's own
+  // "Apply Studio". Reason: the panel went with its key; the plate's Palettes
+  // section applies the same palettes to the same selection.
+  await inspector.getByRole("button", { name: "Apply Studio" }).click();
   await expect(page.getByRole("button", { name: /^Fixture Key, 10 percent, 4000 kelvin/i })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -440,12 +430,6 @@ test("supports lighting palette pools from the inspector and quick picker", asyn
   const emptyInspector = page.getByLabel(/Lighting inspector.*Palettes/);
   await expect(emptyInspector.getByText("0 selected")).toBeVisible();
   await expect(emptyInspector.getByRole("button", { name: "Apply Low" })).toBeDisabled();
-  await page.keyboard.press(modifierShortcut("Shift+KeyP"));
-  await expect(page.getByText("Select fixtures to apply.")).toBeVisible();
-  await expect(
-    page.getByRole("dialog", { name: "Lighting palettes" }).getByRole("button", { name: "Apply palette Low 10 %" })
-  ).toBeDisabled();
-  await page.keyboard.press("Escape");
 
   await openFixture(page, "lighting-palettes-patch-disabled");
   const patchInspector = page.getByLabel(/Lighting inspector.*Palettes/);
@@ -465,7 +449,11 @@ test("supports lighting toolbar search, patch mode, and empty-state fixture crea
   await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
   await page.getByRole("button", { name: "Recall scene Warm wash" }).click();
   await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
-  await page.keyboard.press(modifierShortcut("KeyF"));
+  // New pages program, Slice 3 (D6). Old: Ctrl+F focused the search field. New:
+  // a click on it does. Reason: the keyboard shortcuts are gone; the field is
+  // its own way in. Its Recent list still opens on focus and takes the arrows
+  // and Enter (decision 11).
+  await page.getByLabel("Search fixtures, scenes and groups").click();
   await expect(page.getByLabel("Search fixtures, scenes and groups")).toBeFocused();
   const recentScenes = page.getByRole("listbox", { name: "Recent scenes" });
   await expect(recentScenes).toBeVisible();
@@ -480,7 +468,9 @@ test("supports lighting toolbar search, patch mode, and empty-state fixture crea
   await page.getByRole("button", { name: "Delete scene" }).click();
   await expect(page.getByText("Scene 'Interview' deleted.")).toBeVisible();
   await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Undo" }).click();
+  // New pages program, Slice 3: the message's Undo, matched exactly — the Rig
+  // section's Undo key ("Undo Delete scene Interview") now shares the word.
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toBeVisible();
 
   await page.getByLabel("Search fixtures, scenes and groups").fill("zzz");
@@ -539,32 +529,84 @@ test("surfaces patch collisions and auto-fixes them in lighting patch mode", asy
   await expect(workspace.getByText("Patch collision")).toHaveCount(0);
 });
 
+// The plot frames itself as Lighting opens, in a 200 ms animation that draws
+// over a zoom made while it runs. The view has settled once the zoom readout
+// holds still for longer than that.
+async function settledZoom(readout: Locator): Promise<string> {
+  // The readout always reads "N %", so the first read never matches this.
+  let last = "";
+  await expect
+    .poll(
+      async () => {
+        const now = await readout.innerText();
+        const held = now === last;
+        last = now;
+        return held;
+      },
+      { intervals: [300] }
+    )
+    .toBe(true);
+  return last;
+}
+
 test("persists lighting view bookmark slots through workspace changes", async ({ page }) => {
   await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  // Slice 3 review, finding 20. Old: after the click on the slot the case read
+  // its aria-pressed, which says only that the slot is filled — true before the
+  // click as after it — so a recall that moved nothing passed. New: the plot
+  // toolbar's zoom readout, saved with the view, moved away from it, and back
+  // after the recall.
+  const readout = page.getByRole("toolbar", { name: "Stage plot view" }).locator("[aria-live='polite']");
 
+  // New pages program, Slice 3 (D6). Old: Ctrl+Shift+1 saved view 1, with the
+  // message "Saved view 1. Shift+1 recalls it.", the header's Ctrl+3 / Ctrl+2
+  // went to the Console and back, and Shift+1 recalled the view. New: the view
+  // slot's right-click menu saves the view (the message went with the key), the
+  // header's tabs switch workspaces, and a click on the slot recalls it. Reason:
+  // the keyboard shortcuts are gone; these are their twins (the inventory,
+  // section 3). The zoom waits for the framing, so the saved view is not the
+  // framed one that opening Lighting shows anyway.
+  const framed = await settledZoom(readout);
   await page.getByRole("button", { name: "Zoom in" }).click();
-  await page.keyboard.press(modifierShortcut("Shift+Digit1"));
-  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
-  await expect(page.getByText("Saved view 1.")).toBeVisible();
+  await expect(readout).not.toHaveText(framed);
+  await page.getByRole("button", { name: /Empty slot 1/ }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Save current view to 1" }).click();
+  await expect(page.getByRole("button", { name: /Recall view 1/ })).toHaveAttribute("aria-pressed", "true");
+  const saved = await readout.innerText();
 
   // New pages program, Slice 1: Planning has left the screen, so the way out
-  // and back is the Console (Ctrl+3). Old: Ctrl+4 and the Planning workspace.
-  await page.keyboard.press(modifierShortcut("Digit3"));
+  // and back is the Console. Old: the Planning workspace.
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await nav.getByRole("button", { name: "Audio", exact: true }).click();
   await expectWorkspaceMounted(page, "audio");
-  await page.keyboard.press(modifierShortcut("Digit2"));
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
 
-  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
-  await page.keyboard.press("Shift+Digit1");
-  await expect(page.getByRole("button", { name: /Recall view 1/ })).toBeVisible();
+  // Lighting is drawn afresh and framed again. Move the view away from the
+  // saved one with a zoom key — a mode key would re-frame over the recall — and
+  // again if the click landed in the framing animation, which draws over it.
+  await expect(async () => {
+    await page.getByRole("button", { name: "Zoom out" }).click();
+    await expect(readout).not.toHaveText(saved, { timeout: 250 });
+  }).toPass();
+  await page.getByRole("button", { name: /Recall view 1/ }).click();
+  await expect(readout).toHaveText(saved);
 });
 
 test("supports lighting drag-lasso multi-select and group save", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 
+  // New pages program, Slice 3 (decision 10). Old: Shift+Enter on the focused
+  // marker added Fill to the selection. New: with the plot toolbar's Add to
+  // selection key lit, Enter on the focused marker (a plain press) adds it.
+  // Reason: a key held with a press is a shortcut, and it went; the toggle is
+  // its twin on screen.
+  const addToSelection = page.getByTestId("lighting-add-to-selection");
+  await addToSelection.click();
+  await expect(addToSelection).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: /^Fixture Fill,/ }).focus();
-  await page.keyboard.down("Shift");
   await page.keyboard.press("Enter");
-  await page.keyboard.up("Shift");
 
   await expect(page.getByLabel("Selected fixtures", { exact: true }).getByText("2 fixtures selected")).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear the selection" })).toBeVisible();
@@ -581,7 +623,12 @@ test("saves the current lighting selection as a scene from the inspector prompt"
   await openFixture(page, "lighting-populated");
 
   await expectWorkspaceMounted(page, "lighting");
-  await page.keyboard.press(modifierShortcut("Shift+KeyS"));
+  // New pages program, Slice 3 (D6). Old: Ctrl+Shift+S opened the name dialog.
+  // New: "Save as new" on the scene's plate, which the plate shows once no
+  // fixture is selected. Reason: the keyboard shortcuts are gone; the plate's
+  // key is the twin (the inventory, section 3).
+  await page.getByRole("button", { name: "Clear the selection" }).click();
+  await page.getByTestId("lighting-plate").getByRole("button", { name: "Save as new", exact: true }).click();
   const saveSceneDialog = page.getByRole("dialog", { name: "Save as new scene" });
   await expect(saveSceneDialog.getByLabel("Scene name")).toBeFocused();
   await saveSceneDialog.getByLabel("Scene name").fill("Interview reset");
@@ -590,14 +637,10 @@ test("saves the current lighting selection as a scene from the inspector prompt"
   await expect(page.getByRole("button", { name: /Recall scene Interview reset/i })).toBeVisible();
 });
 
-test("nudges the selected fixture horizontally from the keyboard", async ({ page }) => {
-  await openFixture(page, "lighting-populated");
-
-  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.24");
-  await page.keyboard.press("ArrowRight");
-
-  await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.35");
-});
+// New pages program, Slice 3 (decision 9): the case that moved the selected
+// fixture with the arrow keys wherever focus was went with the page-wide arrows.
+// The focused Stage X and Stage Y labels take the arrows (the case below), and
+// `no-shortcuts.spec.ts` presses the arrows with nothing focused.
 
 test("nudges a fixture Position field from the ScrubLabel slider keyboard", async ({ page }) => {
   await openFixture(page, "lighting-populated");
@@ -608,8 +651,8 @@ test("nudges a fixture Position field from the ScrubLabel slider keyboard", asyn
   await expect(stageX).toHaveAttribute("aria-valuenow", "0.24");
 
   await stageX.focus();
-  // The ScrubLabel handles the arrow (and preventDefaults it), so the global
-  // stage-plot nudge is suppressed and the value snaps onto the field's grid.
+  // The focused ScrubLabel takes the arrow (a focused slider's key, D6), and
+  // the value snaps onto the field's grid.
   await page.keyboard.press("ArrowRight");
   await expect(page.getByLabel("Stage X position in metres")).toHaveValue("0.3");
   await expect(stageX).toHaveAttribute("aria-valuenow", "0.3");
@@ -631,7 +674,9 @@ test("opens typed numeric entry on a lighting intensity slider via Enter and com
   const dialog = page.getByRole("dialog", { name: /Set Fixture intensity/i });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("spinbutton").fill("42");
-  await dialog.getByRole("button", { name: "Set" }).click();
+  // New pages program, Slice 3 (decision 8): the dialog has a "Reset to 100 %"
+  // key too, and "Set" alone would name it as well ("Reset" holds "set").
+  await dialog.getByRole("button", { name: "Set value", exact: true }).click();
 
   await expect(dialog).toBeHidden();
   await expect(intensity).toHaveAttribute("aria-valuenow", "42");
@@ -641,9 +686,43 @@ test("opens lighting intensity typed entry via a bare double-click", async ({ pa
   await openFixture(page, "lighting-populated");
 
   const intensity = page.getByRole("slider", { name: "Fixture intensity" });
-  // Bare double-click now opens typed entry (reset relocated to Alt+double-click).
+  // A plain double-click opens typed entry. New pages program, Slice 3
+  // (decision 8): the way back to the default is the dialog's Reset key (below);
+  // the Alt+double-click and Backspace / Delete resets are gone.
   await intensity.dblclick();
   await expect(page.getByRole("dialog", { name: /Set Fixture intensity/i })).toBeVisible();
+});
+
+// New pages program, Slice 3 (decision 8): Backspace or Delete on a focused
+// fixture slider, and Alt+double-click, reset it to its default. They went with
+// the keys held and the shortcuts; the typed entry offers "Reset to 100 %"
+// beside Cancel and Set value, and the colour temperature's goes to the middle
+// of the fixture's range.
+test("the typed entry's Reset key puts a fixture slider back to its default", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  const intensity = page.getByRole("slider", { name: "Fixture intensity" });
+  await expect(intensity).toHaveAttribute("aria-valuenow", "76");
+  await intensity.focus();
+  await page.keyboard.press("Enter");
+  const intensityDialog = page.getByRole("dialog", { name: /Set Fixture intensity/i });
+  await intensityDialog.getByRole("button", { name: "Reset to 100 %", exact: true }).click();
+  await expect(intensityDialog).toBeHidden();
+  await expect(intensity).toHaveAttribute("aria-valuenow", "100");
+  await expect(page.getByRole("button", { name: /^Fixture Key, 100 percent,/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+
+  // Key is an Astra Bi-Color, 3200 K to 5600 K: the middle is 4400 K.
+  const cct = page.getByRole("slider", { name: "Fixture CCT" });
+  await expect(cct).toHaveAttribute("aria-valuenow", "3200");
+  await cct.focus();
+  await page.keyboard.press("Enter");
+  const cctDialog = page.getByRole("dialog", { name: /Set Fixture CCT/i });
+  await cctDialog.getByRole("button", { name: "Reset to 4400 K", exact: true }).click();
+  await expect(cctDialog).toBeHidden();
+  await expect(cct).toHaveAttribute("aria-valuenow", "4400");
 });
 
 test("opens typed numeric entry on the lighting grand master and commits", async ({ page }) => {
@@ -788,16 +867,10 @@ test("rotates the selected fixture from the plot and inspector", async ({ page }
   );
 });
 
-test("toggles the expanded DMX monitor from the keyboard", async ({ page }) => {
-  await openFixture(page, "lighting-populated");
-
-  await expectWorkspaceMounted(page, "lighting");
-  await page.keyboard.press(modifierShortcut("Shift+KeyM"));
-  const dmxMonitorDialog = page.getByRole("dialog", { name: "DMX universe U1" });
-  await expect(dmxMonitorDialog).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(dmxMonitorDialog).toBeHidden();
-});
+// New pages program, Slice 3 (D6): the case that opened the full DMX monitor
+// with Ctrl+Shift+M went with the key. The cluster's "DMX monitor" key and the
+// strip's expand key open it (the case below, which also closes it with Esc —
+// Esc closes a dialog, D6).
 
 test("opens the compact DMX strip and expands it to the full monitor", async ({ page }) => {
   await openFixture(page, "lighting-populated");

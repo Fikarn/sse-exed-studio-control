@@ -1,4 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppShellFrame } from "../AppShellFrame";
@@ -9,7 +12,11 @@ import { Tab } from "../Tab";
 import { toneForSubsystem, worstTone } from "../statusTone";
 
 // Visual overhaul A, Slice 2: the shell primitives (Tab, Lamp, LampChip,
-// Footer), the tone map and the frame's regions.
+// Footer), the tone map and the frame's regions. New pages program, Slice 3
+// (D6): the tabs and the footer print no key hints.
+
+const cssOf = (name: string) =>
+  readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", name), "utf8");
 
 describe("statusTone", () => {
   it("ranks error over attention over info over ok over neutral", () => {
@@ -27,11 +34,15 @@ describe("statusTone", () => {
 });
 
 describe("Tab", () => {
-  it("keeps the workspace's name as its accessible name with the hint aria-hidden", () => {
-    render(<Tab id="lighting" label="Lighting" hint="Ctrl+2" />);
+  // Slice 3 (D6). Old: the tab took `hint="Ctrl+2"` and printed it in an
+  // aria-hidden <kbd>. New: the tab has no hint and prints only its name.
+  // Reason: Ctrl+1–3 are gone, and so is every hint that advertised them.
+  it("carries the workspace's name as its accessible name and prints no key hint", () => {
+    render(<Tab id="lighting" label="Lighting" />);
     const tab = screen.getByRole("button", { name: "Lighting" });
     expect(tab).toHaveAttribute("data-nav-id", "lighting");
-    expect(tab.querySelector("kbd")).toHaveAttribute("aria-hidden", "true");
+    expect(tab).toHaveTextContent(/^Lighting$/);
+    expect(tab.querySelector("kbd")).toBeNull();
   });
 
   it("marks the active tab as the current page and a machined key", () => {
@@ -85,11 +96,13 @@ describe("Lamp and LampChip", () => {
 });
 
 describe("Footer", () => {
-  it("declares the footer region with items, hints and the action slot", () => {
+  // Slice 3 (D6). Old: the footer took `hints` and printed two <kbd>s for
+  // "[ ] Bank". New: no hint slot, no <kbd>. Reason: the key hints went with
+  // the keys; the telemetry and the action key stay.
+  it("declares the footer region with items and the action slot, and no key hint", () => {
     render(
       <Footer
         items={[{ label: "Console", value: "confirmed · 42 values" }]}
-        hints={[{ kbd: ["[", "]"], label: "Bank" }]}
         action={<button type="button">Sync</button>}
         testId="shell-footer"
       />
@@ -98,8 +111,14 @@ describe("Footer", () => {
     expect(footer).toHaveAttribute("data-region", "footer");
     expect(footer).toHaveTextContent("Console");
     expect(footer).toHaveTextContent("confirmed · 42 values");
-    expect(footer.querySelectorAll("kbd")).toHaveLength(2);
+    expect(footer.querySelector("kbd")).toBeNull();
     expect(screen.getByRole("button", { name: "Sync" })).toBeInTheDocument();
+  });
+
+  // Inventory §7 note 9: the hints used to push the action key to the right
+  // edge; with them gone the action pushes itself there.
+  it("keeps the action key at the right edge", () => {
+    expect(cssOf("Footer.module.css")).toMatch(/\.action \{[^}]*margin-left: auto/);
   });
 
   // Visual overhaul A, Slice 4a: a workspace that swaps its health bar for this
@@ -114,9 +133,9 @@ describe("Footer", () => {
 
 describe("AppShellFrame", () => {
   const workspaces = [
-    { id: "setup", label: "Setup / Support", hint: "Ctrl+1" },
-    { id: "lighting", label: "Lighting", hint: "Ctrl+2" },
-    { id: "audio", label: "Audio", hint: "Ctrl+3" },
+    { id: "setup", label: "Setup / Support" },
+    { id: "lighting", label: "Lighting" },
+    { id: "audio", label: "Audio" },
   ];
   const monitorItems = [
     { id: "lighting", label: "Lighting", detail: "ok", status: "ok" as const },
@@ -156,7 +175,9 @@ describe("AppShellFrame", () => {
     );
     expect(screen.getByText("Studio Control")).toBeInTheDocument();
     expect(screen.getByText("SSE Executive Education")).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Workspace navigation" }).querySelectorAll("button")).toHaveLength(3);
+    const nav = screen.getByRole("navigation", { name: "Workspace navigation" });
+    expect(nav.querySelectorAll("button")).toHaveLength(3);
+    expect(nav.querySelector("kbd")).toBeNull();
     expect(screen.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("shell-lamp-audio")).toHaveAttribute("data-tone", "error");
     expect(screen.getByTestId("shell-lamp-latched-solo")).toHaveAttribute("data-latch");

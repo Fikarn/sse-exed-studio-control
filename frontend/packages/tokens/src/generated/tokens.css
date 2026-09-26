@@ -172,7 +172,7 @@
   --material-key-top: #26272e; /** key, top of its gradient */
   --material-well: #000000; /** display floor, a backlit well, the same in every theme */
   --material-line: rgba(255, 255, 255, 0.09); /** hairline */
-  --material-line2: rgba(255, 255, 255, 0.2); /** stronger hairline, unlit lamp, kbd border */
+  --material-line2: rgba(255, 255, 255, 0.2); /** stronger hairline, unlit lamp */
   --material-sheen: rgba(255, 255, 255, 0.08); /** the 1 px top highlight of a plate or key */
   --material-shade: rgba(0, 0, 0, 0.6); /** the shade under a key or a cap */
   --material-well-shade: rgba(0, 0, 0, 0.85); /** the inset shade at the top of a well */
@@ -302,7 +302,7 @@
   --space-9: 36px;
   --space-10: 40px;
   --radius-pill: 999px; /** A: chips, lamps, the grand master's cap */
-  --radius-ctl: 4px; /** A: caps, fields, kbd, small lamps' boxes */
+  --radius-ctl: 4px; /** A: caps, fields, small lamps' boxes */
   --radius-key: 8px; /** A: keys, wells, cards */
   --radius-screen: 12px; /** A: the state display, the bay screen, the plot, the drawer, plates and dialogs */
   --size-control-height: 36px;
@@ -379,7 +379,7 @@
   --audio-engaged-fill: var(--color-warning-500);
   --audio-engaged-dot: var(--color-warning-500);
   --font-family-sans: var(--font-family-ui);
-  --font-size-tick: var(--font-base-tick); /** the floor: scale ticks, eyebrows, secondary meta, kbd hints - never read to act */
+  --font-size-tick: var(--font-base-tick); /** the floor: scale ticks, eyebrows, secondary meta - never read to act */
   --font-size-label: var(--font-base-label); /** labels and rows read to act, hints */
   --font-size-body: var(--font-base-body); /** body, command keys, table rows, the engine's sentences */
   --font-size-name: var(--font-base-name); /** list names: snapshots, scenes, steps */

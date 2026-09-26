@@ -48,12 +48,15 @@ export interface FixtureMarkerProps {
    *  matching chip in the SelectionChipStrip, this fixture's marker
    *  gets a single-pulse ring so the chip ↔ marker pairing is clear. */
   chipHovered?: boolean;
-  onSelect: (id: string, options: { additive: boolean }) => void;
+  /** A click (or Enter / Space) on the marker. Whether that adds to the
+   *  selection is the plot's to say (its Add to selection key); no key held
+   *  while pointing changes it (new pages program, Slice 3, decision 10). */
+  onSelect: (id: string) => void;
   /**
    * Optional commit callback when the marker is dragged. xMeters / yMeters
-   * are already snapped to the 0.5 m grid unless Alt was held on pointerup.
-   * When omitted the marker is non-draggable; pointerdown still stops
-   * propagation so a click selects the fixture.
+   * are already snapped to the 0.5 m grid. When omitted the marker is
+   * non-draggable; pointerdown still stops propagation so a click selects
+   * the fixture.
    */
   onPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
   /** Optional commit callback when the selected marker's rotate handle is dragged. */
@@ -67,8 +70,8 @@ export interface FixtureMarkerProps {
   onRequestDelete?: (id: string, name: string) => void;
   /** Live drag callback for the parent's smart-guide layer. Fires on every
    *  pointermove past the click threshold with the in-flight (xMeters, yMeters)
-   *  in studio coordinates and whether Alt is held (free-positioning, snap off). */
-  onDragMove?: (id: string, xMeters: number, yMeters: number, altKey: boolean) => void;
+   *  in studio coordinates. */
+  onDragMove?: (id: string, xMeters: number, yMeters: number) => void;
   /** Fires when drag ends (commit or cancel) so the parent can hold the
    *  snapped drop position until the engine snapshot refresh catches up. */
   onDragEnd?: (id: string, committedPosition: { xMeters: number; yMeters: number } | null) => void;
@@ -238,7 +241,7 @@ export function FixtureMarker({
     []
   );
 
-  const updateDragFromPointer = (pointerId: number, clientX: number, clientY: number, altKey: boolean) => {
+  const updateDragFromPointer = (pointerId: number, clientX: number, clientY: number) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== pointerId || !draggable) return;
     const dx = clientX - drag.startClientX;
@@ -274,10 +277,10 @@ export function FixtureMarker({
     // F9 — surface live drag position to the parent so the smart-guide layer
     // can compute alignment lines vs. other fixtures. Pre-snap meters; the
     // commit handler still applies the 0.5 m snap on pointerup.
-    onDragMove?.(id, nextX / 100, nextY / 100, altKey);
+    onDragMove?.(id, nextX / 100, nextY / 100);
   };
 
-  const finishDragFromPointer = (pointerId: number, altKey: boolean, shiftKey: boolean, kind: "up" | "cancel") => {
+  const finishDragFromPointer = (pointerId: number, kind: "up" | "cancel") => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== pointerId) return;
     const target = markerRef.current;
@@ -294,13 +297,9 @@ export function FixtureMarker({
     let committedPosition: { xMeters: number; yMeters: number } | null = null;
 
     if (kind !== "cancel" && wasDrag && ghostNow && onPositionCommit) {
-      let xMeters = ghostNow.x / 100;
-      let yMeters = ghostNow.y / 100;
-      if (!altKey) {
-        xMeters = snapMeter(xMeters);
-        yMeters = snapMeter(yMeters);
-      }
-      committedPosition = { xMeters, yMeters };
+      // Every drop snaps to the 0.5 m grid; the Stage X and Stage Y fields on
+      // the plate place a fixture anywhere else.
+      committedPosition = { xMeters: snapMeter(ghostNow.x / 100), yMeters: snapMeter(ghostNow.y / 100) };
     }
 
     onDragEnd?.(id, committedPosition);
@@ -313,7 +312,7 @@ export function FixtureMarker({
     if (committedPosition && onPositionCommit) {
       onPositionCommit(id, committedPosition.xMeters, committedPosition.yMeters);
     } else {
-      onSelect(id, { additive: shiftKey });
+      onSelect(id);
     }
   };
 
@@ -322,13 +321,13 @@ export function FixtureMarker({
     if (!view) return;
     clearGlobalDragListeners();
     const handleMove = (event: PointerEvent) => {
-      updateDragFromPointer(event.pointerId, event.clientX, event.clientY, event.altKey);
+      updateDragFromPointer(event.pointerId, event.clientX, event.clientY);
     };
     const handleUp = (event: PointerEvent) => {
-      finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, "up");
+      finishDragFromPointer(event.pointerId, "up");
     };
     const handleCancel = (event: PointerEvent) => {
-      finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, "cancel");
+      finishDragFromPointer(event.pointerId, "cancel");
     };
     view.addEventListener("pointermove", handleMove);
     view.addEventListener("pointerup", handleUp);
@@ -442,11 +441,11 @@ export function FixtureMarker({
   };
 
   const handlePointerMove = (event: ReactPointerEvent<SVGGElement>) => {
-    updateDragFromPointer(event.pointerId, event.clientX, event.clientY, event.altKey);
+    updateDragFromPointer(event.pointerId, event.clientX, event.clientY);
   };
 
   const finishDrag = (event: ReactPointerEvent<SVGGElement>, kind: "up" | "cancel") => {
-    finishDragFromPointer(event.pointerId, event.altKey, event.shiftKey, kind);
+    finishDragFromPointer(event.pointerId, kind);
   };
 
   useEffect(() => {
@@ -486,10 +485,11 @@ export function FixtureMarker({
   const labelVisible =
     selected || pointerHovered || keyboardFocused || identifying || highlightOverlay || chipHovered || ghost !== null;
 
+  // Enter or Space presses the focused marker, as a click does (D6).
   const handleKeyDown = (event: ReactKeyboardEvent<SVGGElement>) => {
     if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
       event.preventDefault();
-      onSelect(id, { additive: event.shiftKey });
+      onSelect(id);
     }
   };
 

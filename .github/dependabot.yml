@@ -101,6 +101,16 @@ updates:
     rebase-strategy: disabled
     commit-message:
       prefix: "chore(native-deps)"
+    # New pages program, Slice 3: the shell's Windows-only COM code
+    # (`set_browser_accelerator_keys_off` in native/tauri-shell/src/main.rs)
+    # takes wry's `ICoreWebView2Controller` and returns `windows::core::Result`,
+    # so `windows` and `webview2-com` must stay at the versions Tauri and wry
+    # use. A bump of either alone would leave two versions in Cargo.lock and
+    # break the Windows build, which no CI job compiles; they move by hand,
+    # with a Tauri update. `scripts/check-no-shortcuts.test.mjs` holds the lock.
+    ignore:
+      - dependency-name: "windows"
+      - dependency-name: "webview2-com"
     groups:
       native-runtime:
         update-types:

@@ -61,7 +61,6 @@ function PilotOnStore({
         lightOutputsArmed={state.lightingSnapshot ? state.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={false}
         onRequestRestart={() => {}}
-        onShowShortcuts={() => {}}
         store={store}
         supportSnapshot={state.supportSnapshot}
       />
@@ -146,7 +145,6 @@ describe("the recovery screen reads the health checks in the hardware link's wor
           }}
           liveTransportRequested={false}
           onRequestRestart={() => {}}
-          onShowShortcuts={() => {}}
           store={store}
           supportSnapshot={null}
         />

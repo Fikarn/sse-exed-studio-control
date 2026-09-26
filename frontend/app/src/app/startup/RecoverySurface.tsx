@@ -1,6 +1,9 @@
+import { useState } from "react";
+
 import { Key, Section } from "@sse/design-system";
 import type { StartupFailure } from "@sse/engine-client";
 
+import { resetWindowLayout } from "../shellCommands";
 import { asRecord, type SnapshotRecord } from "../shellData";
 import { PreReadyState } from "./PreReadyState";
 import recoveryStyles from "./RecoveryBands.module.css";
@@ -9,7 +12,9 @@ import { formatFailureCode, formatFailureStage, formatPathLabel, getFailureTitle
 // Visual overhaul A, Slice 7: a failed start on the same skeleton. The word is
 // what failed, the sentence is the engine's own, the code stands in the
 // display's code slot, and Retry startup is the key on the display. Every band
-// below it names the next step the operator takes.
+// below it names the next step the operator takes. New pages program, Slice 3
+// (decision 2): Reset the window layout sits beside Retry startup, for a
+// window that came back on the wrong screen; a refusal is a band of its own.
 
 /**
  * The health snapshot's log excerpt as lines. The hardware link has always
@@ -27,13 +32,24 @@ export function RecoverySurface({
   failure,
   healthSnapshot,
   onRequestRestart,
-  onShowShortcuts,
 }: {
   failure: StartupFailure | null;
   healthSnapshot: SnapshotRecord | null;
   onRequestRestart: () => void;
-  onShowShortcuts: () => void;
 }) {
+  const [resettingWindow, setResettingWindow] = useState(false);
+  const [windowRefusal, setWindowRefusal] = useState<string | null>(null);
+  const resetWindow = async () => {
+    setResettingWindow(true);
+    setWindowRefusal(null);
+    try {
+      await resetWindowLayout();
+    } catch (error) {
+      setWindowRefusal(error instanceof Error ? error.message : "The window layout was not reset.");
+    } finally {
+      setResettingWindow(false);
+    }
+  };
   const healthPaths = asRecord(healthSnapshot?.paths);
   const paths = failure?.paths
     ? Object.entries(failure.paths)
@@ -63,11 +79,32 @@ export function RecoverySurface({
           <Key size="small" mode="primary" testId="recovery-retry" onClick={onRequestRestart}>
             Retry startup
           </Key>
-          <Key size="small" cap="Shortcuts" hint="?" testId="recovery-shortcuts" onClick={onShowShortcuts} />
+          <Key
+            size="small"
+            disabled={resettingWindow}
+            testId="recovery-window-reset"
+            onClick={() => void resetWindow()}
+          >
+            Reset the window layout
+          </Key>
         </>
       }
       testId="recovery-surface"
     >
+      {/* The shell's sentence says what did not happen, once; the band adds
+          only the way on. With Setup / Support in Support mode the window keys
+          are on screen at any window size, under Workstation: on the plate at
+          the studio surface, under the Support screen in a window (review
+          findings 22, 23). */}
+      {windowRefusal ? (
+        <Section title="Window" testId="recovery-window-refusal">
+          <p className={recoveryStyles.nextStep} role="status">
+            {windowRefusal} Next: retry startup, then open Setup / Support and press Support: Reset the window layout is
+            under Workstation.
+          </p>
+        </Section>
+      ) : null}
+
       {failure?.code === "PROTOCOL_MISMATCH" ? (
         <Section title="Protocol" detail="what Studio Control asked for and what answered" testId="recovery-protocol">
           <div className={recoveryStyles.rows}>

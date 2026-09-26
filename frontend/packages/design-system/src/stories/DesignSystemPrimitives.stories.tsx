@@ -310,7 +310,6 @@ export const DirectionDHealthBar: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),
@@ -330,7 +329,6 @@ export const DirectionDHealthBarDirty: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hints={[{ kbd: "?", label: "Shortcuts" }]}
       />
     </div>
   ),
@@ -460,10 +458,6 @@ export const DirectionDHealthBarActions: StoryObj<typeof meta> = {
           { label: "Session", value: "2h 47m" },
           { label: "App", value: "v2.2.2" },
         ]}
-        hints={[
-          { kbd: "⌘ K", label: "command palette" },
-          { kbd: "⌘ ⇧ M", label: "full DMX monitor" },
-        ]}
         actions={
           <Button size="compact" variant="ghost">
             DMX strip
@@ -502,9 +496,9 @@ export const AShellTabs: StoryObj<typeof meta> = {
   name: "A · Tab row",
   render: () => (
     <div style={{ display: "flex", gap: 4 }}>
-      <Tab id="setup" label="Setup / Support" hint="Ctrl+1" />
-      <Tab id="lighting" label="Lighting" hint="Ctrl+2" />
-      <Tab id="audio" label="Audio" hint="Ctrl+3" active />
+      <Tab id="setup" label="Setup / Support" />
+      <Tab id="lighting" label="Lighting" />
+      <Tab id="audio" label="Audio" active />
     </div>
   ),
 };
@@ -540,12 +534,11 @@ export const AShellFooter: StoryObj<typeof meta> = {
         { label: "Last sync", value: "18:24" },
         { label: "Bank", value: "all 13 strips" },
       ]}
-      hints={[
-        { kbd: "Ctrl+K", label: "Palette" },
-        { kbd: "?", label: "Shortcuts" },
-        { kbd: ["[", "]"], label: "Bank" },
-        { kbd: "T", label: "hold to talk" },
-      ]}
+      action={
+        <Button size="compact" variant="ghost">
+          DMX strip
+        </Button>
+      }
     />
   ),
 };

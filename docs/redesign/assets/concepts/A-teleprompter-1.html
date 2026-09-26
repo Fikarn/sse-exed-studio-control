@@ -1,0 +1,3014 @@
+<!doctype html>
+<html
+  lang="en"
+  data-theme="studio"
+  data-states="ready,playing,at-the-end,long-script,blank,not-updated,update-armed,armed,unplugged,duplicated,not-showing"
+>
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Teleprompter · Concept A — 1 Live mirror · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         TELEPROMPTER in Concept A's language — concept 1, "LIVE MIRROR".
+         Designed to docs/redesign/teleprompter-2026-09.md (D20, the proposal) and
+         the ledger's D4, D9, D11, D12, D14 (docs/plans/new-pages-2026-09.md).
+         Bay: a live copy of the Prompter XL's screen — its 1920×1080 layout drawn
+         unmirrored (the glass flips it) and scaled to 1,616 × 909 (84 %), so the
+         lines break where they break on the glass, the reading arrow sits 35 %
+         from the top and the text already read is dimmed. Nothing is drawn on the
+         copy that the presenter does not see: the operator's marks sit around it —
+         paragraph numbers and the reading-line mark in a 64 px gutter at its left,
+         the script, the place and the time left (the page's one 44 px number) above
+         it, the whole-script bar (one press target), the cue keys and Go to
+         paragraph under it. "Edit script" turns the bay into the editor of the
+         script selected in the plate, and keeps the glass in view as a quarter-size
+         copy; it can be opened in every state, a blank prompter included.
+         Cluster (424 px): the state display (the Prompter XL's state, the
+         sentence, the way out, the armed row), PLAY · BACK · TOP, the speed in
+         words a minute (− 5 / + 5, a 24 px readout), line · paragraph · cue steps,
+         the paragraph list (a window of 18 rows around the reading line — 4 read,
+         the one at the line, 13 ahead — with the rows above and below it counted
+         in its head; press one to go to its start), the standing actions.
+         Plate (416 px): the selected script and the key that puts it on the glass
+         (Put on · Replace · press twice · Update · press twice), the scripts sorted
+         by name, the look (size, spacing, margins, colour, reading line, dimming),
+         the Prompter XL as Windows reports it, and Studio Control's own windows.
+         States (?state=):
+           ready         ON SCREEN, paused at ¶ 8 — the default
+           playing       ON SCREEN, playing: PLAY lit green, the header latch
+           at-the-end    ON SCREEN, at the end: END at the reading line, PLAY out and
+                         locked with its reason; nothing loops (D12)
+           long-script   ON SCREEN, 03 Panel questions (36 paragraphs) at ¶ 21: the
+                         paragraph list's window and its counts
+           blank         READY: nothing on the prompter, every run key locked; the
+                         way out names the script it puts on
+           not-updated   NOT UPDATED: the script was edited; the bay shows the editor
+           update-armed  NOT UPDATED, Update pressed once: the key pressed (the way
+                         out) and the plate's key, one action, both armed
+           armed         Replace 02 Interview intro with 04 Outro · press again
+           unplugged     NOT CONNECTED: PLAY locked, the copy dimmed and marked
+                         "Not on the glass"; the prompter window is closed
+           duplicated    DUPLICATED: Windows mirrors another screen on the XL, so
+                         nothing is drawn there; PLAY locked
+           not-showing   NOT SHOWING: the prompter window could not open · Try again
+         ?view=live|edit overrides the bay's view (?state=blank&view=edit is the
+         editor with a blank prompter) · ?theme=studio|graphite|bone
+         The board switcher (bottom right) is mock chrome, not part of the design;
+         ?switcher=0 hides it. The bay's Live copy · Edit script switch also works in
+         the mock. No keyboard shortcut and no key hint anywhere (D6).
+         The live copy and its quarter-size twin are pictures (data-picture): their
+         type is the presenter's (88 px on the glass), not the page's, so the §10
+         type measures skip them, as they skip a camera picture.
+         NEEDS THE OPERATOR'S RULING (D12): the ledger's D12 says the script is never
+         shown "anywhere but the Prompter XL", and Appendix B items 13–14 check that
+         it "shows nowhere else". This page keeps its own copy of the script on
+         display 3 in every state, unplugged included (proposal §6.1). The board
+         dims that copy and marks it "Not on the glass" whenever the glass shows
+         nothing, but the concept stands only if the operator rules that the page's
+         copy is allowed and D12 and items 13–14 are amended to "no screen for the
+         presenter other than the Prompter XL". This board does not amend the ledger.
+         Differs from the proposal (teleprompter-2026-09.md), for review: the copy is
+         1,616 × 909, not 1,688 × 950, to make room for the gutter; the time left
+         sits over the copy, not in the cluster (the speed's readout is 24 px, not a
+         hero); the editor opens in the bay, not in the plate, and follows the
+         plate's selection; the scripts list lives in the plate, not the cluster
+         (proposal §2 Lists); a press-to-jump paragraph list is added to the
+         cluster; the text size keys live in the look (the deck's size dial is the
+         take-time one); a Prompter XL section is added to the plate; the operator's
+         cue marks use the --cue-text token (blue's value — a role system-a §4 does
+         not list yet; to be recorded there). No deck echo: the Stream Deck's page
+         is Setup's to show, since Studio Control knows only what it gives Companion.
+         The numbers (words, length, place, time left, the end) are computed from the
+         scripts below at their own words a minute, with 10 s for END's half screen
+         of run-out, so they agree everywhere: 02 Interview intro is 581 words, 4:19
+         long at 140, paused at ¶ 8 of 18 · 44 %, 2:30 left, ends 14:31 if played.
+         Checked in a browser at 2560×1440, all eleven states × both views × three
+         themes: no page scroll, 8 type sizes (12 · 13 · 14 · 15 · 16 · 20 · 24 · 44),
+         floor 12 px, nothing at weight 700, Inter + JetBrains Mono, exactly one 44 px
+         number, no target under 24 px and no take-time target under 28 px, radii
+         4 · 8 · 12 · pill, blur over 8 px only on lamps and lit keys, no outer shadow
+         with a negative offset, 0 running animations, no text clipped (the paragraph
+         list and the strip's script name end in an ellipsis by design), the state
+         display and the plate fit in every state, no kbd, no title tooltips.
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+        /* the glass: fixed, never themed — black gives off no light */
+        --glass-text: #ffffff;
+        --glass-cue: #8ec9ff;
+        --glass-arrow: rgba(255, 255, 255, 0.6);
+      }
+      /* --cue-text: the operator's cue colour, mirroring the glass's cue colour.
+         It takes blue's value in each theme; system-a §4 gives blue to information
+         only, so this role is proposed for the system (not yet recorded there). */
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --cue-text: #7cc4ff;
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --cue-text: #8ccaff;
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --cue-text: #0b62c2;
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button,
+      input {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* ---- material ---- */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        color: var(--well-text);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --cue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint {
+        color: var(--amber-ink);
+      }
+      .key.live {
+        background: linear-gradient(180deg, var(--green-top), var(--green));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--green-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 18px var(--bloom-green);
+      }
+      .key.live .hint {
+        color: var(--green-ink);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      .key.primary .hint {
+        color: var(--primary-ink);
+      }
+      .key.locked {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        color: var(--text);
+        cursor: not-allowed;
+      }
+      .key.locked .hint {
+        color: var(--text);
+      }
+      .key.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+        position: relative;
+        overflow: hidden;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .key.armed .tag {
+        font: 600 12px/1 var(--ui);
+        color: var(--amber-text);
+      }
+      .key.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .key.sm {
+        min-height: 32px;
+        font-size: 13px;
+        padding: 0 10px;
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .label {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .well .label {
+        color: var(--well-text-2);
+      }
+      .hero {
+        font: 600 44px/1 var(--mono);
+        letter-spacing: -0.02em;
+      }
+      .seg {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border-radius: var(--r12);
+      }
+      .seg .key {
+        flex: 1;
+        min-height: 40px;
+        border-radius: var(--r8);
+        background: transparent;
+        border-color: transparent;
+        box-shadow: none;
+        color: var(--well-text);
+      }
+      .seg .key .cap {
+        font-size: 14px;
+      }
+      .seg .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+
+      /* ---- shell ---- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      .lampchip.green,
+      .lampchip.green b {
+        color: var(--green-text);
+      }
+      .lampchip.green {
+        border-color: var(--green-text);
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body ---- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px minmax(0, 1fr) 416px;
+        min-height: 0;
+      }
+
+      /* ---- cluster ---- */
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        flex: none;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .armed-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 6px;
+        border: 1px solid var(--amber-text);
+        border-radius: var(--r8);
+        padding: 6px 10px;
+      }
+      .armed-row .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .armed-row .t {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--well-text);
+      }
+      .armed-row .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .armed-row .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      .armed-row .bar i {
+        display: block;
+        height: 100%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+
+      .runrow {
+        display: flex;
+        gap: 12px;
+        flex: none;
+      }
+      .key.play {
+        flex: 1;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 104px;
+        padding: 0 14px;
+        text-align: center;
+      }
+      .key.play .cap {
+        font-size: 20px;
+      }
+      .runcol {
+        width: 150px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .key.jump {
+        flex: 1;
+        flex-direction: column;
+        gap: 5px;
+        min-height: 48px;
+      }
+      .key.jump .hint {
+        font-size: 12px;
+      }
+      .speed {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+      }
+      .speed .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .speed .head .d {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .spd {
+        display: grid;
+        grid-template-columns: 80px 1fr 80px;
+        gap: 8px;
+        height: 56px;
+      }
+      .spd .key {
+        min-height: 56px;
+      }
+      .spd .key .cap {
+        font-size: 20px;
+      }
+      .spv {
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .spv .v {
+        font: 600 24px/1 var(--mono); /* the page's one 44 px number is time left, over the copy */
+        color: var(--well-text);
+      }
+      .spv .u {
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        flex: none;
+      }
+      .steps .key {
+        min-height: 36px;
+      }
+      .sec-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .sec-head .title span,
+      .sec-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .paras {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: 1;
+        min-height: 0;
+      }
+      .plist {
+        flex: 1;
+        min-height: 0;
+        border-radius: var(--r12);
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        overflow: hidden;
+      }
+      .prow {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        align-items: center;
+        column-gap: 8px;
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: var(--r8);
+        border: 1px solid transparent;
+        color: var(--well-text);
+        flex: none;
+      }
+      .prow .pn {
+        font: 500 13px/1 var(--mono);
+        color: var(--well-text-2);
+      }
+      .prow .pt {
+        font: 500 14px/1.2 var(--ui);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prow .pd {
+        font: 500 13px/1 var(--mono);
+        color: var(--well-text-2);
+      }
+      .prow .cw {
+        font: italic 500 13px/1 var(--ui);
+        color: var(--cue-text);
+      }
+      .prow.read .pt {
+        color: var(--well-text-2);
+      }
+      .prow.cur {
+        border: 2px solid var(--well-text);
+        background: rgba(255, 255, 255, 0.07);
+      }
+      .prow.cur .pn {
+        color: var(--well-text);
+      }
+      .plist .empty {
+        margin: auto;
+        max-width: 300px;
+        text-align: center;
+        font: 500 14px/1.4 var(--ui);
+        color: var(--well-text-2);
+      }
+      .locked-list .prow {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+      }
+      .arow {
+        display: flex;
+        gap: 8px;
+      }
+      .arow .key {
+        flex: 1 1 auto;
+        min-height: 40px;
+        padding: 0 8px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      /* ---- bay: the live mirror ---- */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .bay-head {
+        display: flex;
+        gap: 12px;
+        height: 64px;
+        flex: none;
+      }
+      .bay-head .seg {
+        width: 340px;
+      }
+      .bay-head .seg .key {
+        min-height: 54px;
+      }
+      .strip {
+        flex: 1;
+        border-radius: var(--r12);
+        display: flex;
+        align-items: center;
+        gap: 0;
+        padding: 0 20px;
+      }
+      .rd {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 0 24px;
+        border-left: 1px solid rgba(255, 255, 255, 0.12);
+        white-space: nowrap;
+      }
+      .rd:first-child {
+        padding-left: 0;
+        border-left: 0;
+      }
+      .rd .v16 {
+        font: 600 16px/1 var(--ui);
+        color: var(--well-text);
+      }
+      .rd .v20 {
+        font: 600 20px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .rd .v16.name {
+        display: inline-block;
+        max-width: 260px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.25;
+      }
+      .rd .s16 {
+        font: 500 16px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .rd .tagw {
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .rd .tagw.amber {
+        color: var(--amber-text);
+      }
+      .rd.right {
+        margin-left: auto;
+        flex: none;
+        align-items: center;
+        gap: 8px;
+        border-left: 0;
+        padding-right: 0;
+      }
+      .rd.right .lamp {
+        width: 10px;
+        height: 10px;
+      }
+      .rd.right.red .v16 {
+        color: var(--red-text);
+      }
+      .rd.right.green .v16 {
+        color: var(--green-text);
+      }
+
+      .liverow {
+        position: relative;
+        display: flex;
+        gap: 8px;
+        height: 909px;
+        flex: none;
+      }
+      .gutter {
+        width: 64px;
+        position: relative;
+        flex: none;
+      }
+      .gutter .gl {
+        position: absolute;
+        right: 16px; /* clear of the reading-line mark at the gutter's edge */
+        transform: translateY(-50%);
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .gutter .gl.cur {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .gutter .gl.cue,
+      .gutter .gl.end {
+        color: var(--cue-text);
+        font-family: var(--ui);
+        font-style: italic;
+      }
+      .gutter .gl.end {
+        font-style: normal;
+        font-family: var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .gutter .rmark {
+        position: absolute;
+        right: 0;
+        width: 0;
+        height: 0;
+        margin-top: -9px;
+        border-top: 9px solid transparent;
+        border-bottom: 9px solid transparent;
+        border-left: 12px solid var(--text);
+      }
+      .mirror {
+        width: 1616px;
+        height: 909px;
+        border-radius: var(--r8);
+        overflow: hidden;
+        position: relative;
+        background: #000;
+        outline: 1px solid var(--line-2);
+        flex: none;
+      }
+      /* nothing on the glass (not connected, duplicated, not showing): the page's
+         copy is dimmed and marked, so it cannot pass for a live prompter */
+      #board.offglass .mirror {
+        outline: 2px solid var(--red-text);
+        outline-offset: 2px;
+      }
+      #board.offglass .mirror .xl,
+      #board.offglass .thumb .xl {
+        opacity: 0.3;
+      }
+      .offnote {
+        position: absolute;
+        left: 880px; /* the copy's centre: the 64 px gutter, 8 px, then half of 1,616 */
+        bottom: 40px;
+        transform: translateX(-50%);
+        width: 720px;
+        border-radius: var(--r12);
+        border: 1px solid var(--red-text);
+        padding: 16px 20px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 12px;
+        row-gap: 8px;
+        align-items: center;
+      }
+      .offnote .lamp {
+        width: 10px;
+        height: 10px;
+      }
+      .offnote b {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--red-text);
+      }
+      .offnote p {
+        grid-column: 2;
+        font: 500 14px/1.4 var(--ui);
+        color: var(--well-text);
+      }
+      /* the Prompter XL's own 1920×1080 layout, scaled — the same lines, never a second layout */
+      .xl {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        background: #000;
+        overflow: hidden;
+        transform-origin: 0 0;
+      }
+      .mirror .xl {
+        transform: scale(0.8416667);
+      }
+      .thumb .xl {
+        transform: scale(0.25);
+      }
+      .xl .col {
+        position: absolute;
+        left: 230.4px; /* 12 % margins */
+        right: 230.4px;
+        top: 0;
+        font: 500 88px/1.4 var(--ui);
+        color: var(--glass-text);
+        font-feature-settings: normal;
+        hyphens: none;
+      }
+      .xl .col p {
+        margin: 0 0 61.6px; /* half a line between paragraphs */
+      }
+      .xl .col b {
+        font-weight: 600;
+      }
+      .xl .col u {
+        text-decoration-thickness: 5px;
+        text-underline-offset: 10px;
+      }
+      .xl .col .cue {
+        font: italic 500 61.6px/1.4 var(--ui); /* 70 % */
+        color: var(--glass-cue);
+        margin: 0 0 61.6px;
+      }
+      .xl .col .end {
+        font: 500 61.6px/1.4 var(--ui);
+        color: var(--glass-cue);
+        letter-spacing: 0.1em;
+        margin-top: 478.4px; /* half a screen below the last line */
+      }
+      .xl .dim {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 316.4px;
+        background: rgba(0, 0, 0, 0.55); /* white on black read at 45 % */
+      }
+      .xl .arrow {
+        position: absolute;
+        left: 120px;
+        top: 378px; /* the reading line, 35 % from the top */
+        width: 0;
+        height: 0;
+        margin-top: -30px;
+        border-top: 30px solid transparent;
+        border-bottom: 30px solid transparent;
+        border-left: 46px solid var(--glass-arrow);
+      }
+      .xl.blank .dim,
+      .xl.blank .arrow {
+        display: none;
+      }
+
+      .barblock {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+        padding-left: 72px;
+      }
+      .bar-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        height: 16px;
+      }
+      .bar-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      /* the whole-script bar is ONE press target (1,616 × 56): a press goes to the
+         start of the paragraph under the pointer. Segments, cue ticks and the place
+         marker are pictures inside it, so no paragraph is a target of its own and a
+         script of any length fits without a target shrinking. */
+      .sbar {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 56px;
+        border-radius: var(--r8);
+        padding: 0;
+      }
+      .sbar .art {
+        position: absolute;
+        inset: 0 3px 0 6px;
+      }
+      .sbar .sp {
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        border-radius: var(--r4);
+        background: rgba(255, 255, 255, 0.24);
+        overflow: hidden;
+      }
+      .sbar .sp .sn {
+        position: absolute;
+        left: 6px;
+        bottom: 6px;
+        font: 500 12px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .sbar .sp.read {
+        background: rgba(255, 255, 255, 0.09);
+      }
+      .sbar .sp.read .sn {
+        color: var(--well-text-2);
+      }
+      .sbar .sp.cur {
+        background: rgba(255, 255, 255, 0.24);
+        box-shadow: inset 0 0 0 2px var(--well-text);
+      }
+      .sbar .sp .part {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.55);
+      }
+      .sbar .cuetick {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        margin-left: -3px;
+        background: var(--cue-text);
+      }
+      .sbar .pmark {
+        position: absolute;
+        top: -4px;
+        bottom: -4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--well-text);
+      }
+      .sbar .pmark::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -6px;
+        border-left: 7px solid transparent;
+        border-right: 7px solid transparent;
+        border-top: 8px solid var(--well-text);
+      }
+      .cuerow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 40px;
+        flex: none;
+        padding-left: 72px;
+      }
+      .cuekeys {
+        display: flex;
+        gap: 8px;
+      }
+      .cuekeys .key {
+        min-height: 40px;
+        gap: 8px;
+      }
+      .cuekeys .key .n {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .cuekeys .key i {
+        font: italic 500 14px/1 var(--ui);
+        color: var(--cue-text);
+      }
+      .goto {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .goto .gl {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .gofield {
+        width: 88px;
+        height: 40px;
+        border-radius: var(--r8);
+        padding: 0 12px;
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+        cursor: text;
+      }
+      .gofield::placeholder {
+        color: var(--well-text-2);
+        opacity: 1;
+      }
+      .goto .key {
+        min-height: 40px;
+        min-width: 56px;
+      }
+      .nothing {
+        padding-left: 72px;
+        font: 500 16px/1 var(--ui);
+        color: var(--text-2);
+        height: 16px;
+        flex: none;
+      }
+      .foot-note {
+        padding-left: 72px;
+        font: 500 14px/1.4 var(--ui);
+        color: var(--text-2);
+        flex: none;
+      }
+
+      /* the editor view of the bay */
+      .editwrap {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 480px;
+        gap: 16px;
+      }
+      .editor {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+      }
+      .ed-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 40px;
+        flex: none;
+      }
+      .ed-bar .key {
+        min-height: 36px;
+        font-size: 13px;
+      }
+      .ed-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-right: 16px;
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .ed-name b {
+        font: 600 16px/1 var(--ui);
+        color: var(--text);
+      }
+      .ed-name .tagw {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .ed-name .tagw.amber {
+        color: var(--amber-text);
+      }
+      .ed-text {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        border-radius: var(--r12);
+        padding: 20px 28px 20px 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        cursor: text;
+      }
+      .ep {
+        display: grid;
+        grid-template-columns: 84px 1fr;
+        column-gap: 16px;
+      }
+      .ep .eg {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
+        padding-top: 5px;
+      }
+      .ep .en {
+        font: 500 13px/1 var(--mono);
+        color: var(--well-text-2);
+      }
+      .ep .em {
+        font: 600 12px/1 var(--ui);
+        color: var(--well-text);
+      }
+      .ep .et {
+        font: 400 20px/1.5 var(--ui);
+        color: var(--well-text);
+        padding-left: 14px;
+        border-left: 3px solid transparent;
+      }
+      .ep .et b {
+        font-weight: 600;
+      }
+      .ep .et.cuel {
+        font: italic 500 14px/1.5 var(--ui);
+        color: var(--cue-text);
+      }
+      .ep.cur .en {
+        color: var(--well-text);
+        font-weight: 600;
+      }
+      .ep.changed .et {
+        border-left-color: var(--amber-text);
+      }
+      .ep.changed .em {
+        color: var(--amber-text);
+      }
+      .caret {
+        display: inline-block;
+        width: 2px;
+        height: 24px;
+        margin: 0 1px -5px;
+        background: var(--well-text);
+      }
+      .ed-status {
+        display: flex;
+        gap: 24px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        height: 16px;
+        flex: none;
+      }
+      .ed-status b {
+        color: var(--text);
+        font: 600 13px/1 var(--mono);
+      }
+      .ed-status .r {
+        margin-left: auto;
+      }
+      .glassnow,
+      .gn-body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .gn-head {
+        display: flex;
+        align-items: center;
+        height: 40px;
+        justify-content: space-between;
+      }
+      .gn-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .thumb {
+        width: 480px;
+        height: 270px;
+        border-radius: var(--r8);
+        overflow: hidden;
+        position: relative;
+        background: #000;
+        outline: 1px solid var(--line-2);
+        flex: none;
+      }
+      .gn-read {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 16px;
+        row-gap: 10px;
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text-2);
+      }
+      .gn-read b {
+        font: 600 14px/1.3 var(--mono);
+        color: var(--text);
+        text-align: right;
+      }
+      .gn-read b.amber {
+        color: var(--amber-text);
+      }
+      .gn-note {
+        font: 400 13px/1.4 var(--ui);
+        color: var(--text-2);
+      }
+      .gn-empty {
+        font: 500 16px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .diff {
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .dp {
+        display: grid;
+        grid-template-columns: 48px 1fr;
+        column-gap: 12px;
+        row-gap: 6px;
+      }
+      .dp .dn {
+        grid-row: 1 / span 2;
+        font: 600 13px/1.4 var(--mono);
+        color: var(--amber-text);
+      }
+      .dp p {
+        font: 400 14px/1.4 var(--ui);
+      }
+      .dp .was {
+        color: var(--well-text-2);
+        text-decoration: line-through;
+      }
+      .dp .now {
+        color: var(--well-text);
+      }
+
+      /* the way-out key in the state display, armed (Update · press again) */
+      .state-actions .key.armed {
+        min-height: 48px;
+        padding: 0 12px 4px;
+        gap: 4px;
+        flex: 1;
+      }
+      .state-actions .key.armed .tag {
+        font-size: 12px;
+      }
+
+      /* ---- plate ---- */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--text-2);
+        margin-top: 6px;
+      }
+      .selstatus .onair {
+        border-radius: var(--r8);
+        min-height: 44px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font: 500 13px/1.3 var(--ui);
+        color: var(--well-text-2);
+      }
+      .selstatus .onair b {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+        white-space: nowrap;
+        flex: none;
+      }
+      .selstatus .key {
+        width: 100%;
+        min-height: 44px;
+        justify-content: flex-start;
+      }
+      .selstatus .key.armed {
+        min-height: 56px;
+        justify-content: center;
+        padding: 0 14px;
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1 1 auto;
+        min-height: 36px;
+        font-size: 13px;
+        padding: 0 8px;
+        white-space: nowrap;
+      }
+      .section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .section-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .section-head .t .d {
+        margin-left: 8px;
+      }
+      .section-head:has(.key) {
+        align-items: center;
+      }
+      .section-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .slist {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .key.srow {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        min-height: 38px;
+        padding: 3px 12px;
+        text-align: left;
+      }
+      .srow .name {
+        font: 600 15px/1.2 var(--ui);
+      }
+      .srow .meta {
+        grid-column: 1;
+        font: 500 12px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .srow .tag {
+        grid-row: 1 / span 2;
+        grid-column: 2;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .key.srow.sel {
+        border: 2px solid var(--accent);
+      }
+      .ctl-label {
+        display: flex;
+        justify-content: space-between;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .ctl-label b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .ctl {
+        display: grid;
+        grid-template-columns: 1fr 72px;
+        align-items: center;
+        gap: 12px;
+      }
+      .ctl .v {
+        font: 600 20px/1 var(--mono);
+        text-align: right;
+      }
+      .hslider {
+        position: relative;
+        height: 34px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .well.hslider .track {
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 3px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .sizerow {
+        display: grid;
+        grid-template-columns: 1fr 60px 60px auto;
+        gap: 8px;
+        height: 40px;
+      }
+      .sizev {
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+      }
+      .sizev .v {
+        font: 600 20px/1 var(--mono);
+        white-space: nowrap;
+      }
+      .sizev .s {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .sizerow .key {
+        min-height: 40px;
+        padding: 0 10px;
+      }
+      .sizerow .key .cap {
+        font-size: 16px;
+      }
+      .trow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 32px;
+        font: 500 14px/1.2 var(--ui);
+      }
+      .trow em {
+        font-style: normal;
+        font-size: 13px;
+        color: var(--text-2);
+        margin-left: 6px;
+      }
+      .trow .key.tog {
+        min-height: 32px;
+        width: 72px;
+        font-size: 13px;
+      }
+      .trow .seg {
+        padding: 3px;
+        gap: 4px;
+      }
+      .trow .seg .key {
+        min-height: 28px;
+        padding: 0 10px;
+      }
+      .trow .seg .key .cap {
+        font-size: 13px;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .field {
+        border-radius: var(--r8);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-height: 46px;
+      }
+      .field .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field .v {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .field .v.muted {
+        color: var(--well-text-2);
+        font: 500 13px/1.1 var(--ui);
+      }
+      .field .v.red {
+        color: var(--red-text);
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 14px/1 var(--ui);
+      }
+      .readouts .v {
+        font: 600 14px/1 var(--mono);
+      }
+      .readouts .v.muted {
+        font: 500 13px/1 var(--ui);
+      }
+
+      /* ---- footer ---- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+
+      /* ---- mock chrome, not the design: the board switcher ---- */
+      .harness {
+        position: fixed;
+        right: 12px;
+        bottom: 4px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border: 1px dashed var(--line-2);
+        border-radius: var(--r8);
+        background: var(--panel);
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .harness .hl {
+        padding: 0 6px;
+      }
+      .harness button {
+        min-height: 28px;
+        padding: 0 8px;
+        border-radius: var(--r4);
+        border: 1px solid transparent;
+        color: var(--text-2);
+        font: 500 12px/1 var(--ui);
+      }
+      .harness button[aria-pressed="true"] {
+        color: var(--text);
+        border-color: var(--line-2);
+      }
+      .harness .sep {
+        width: 1px;
+        height: 18px;
+        background: var(--line-2);
+        margin: 0 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="board" data-concept="A-teleprompter-1">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>Setup / Support</button>
+          <button class="tab" data-key>Lighting</button>
+          <button class="tab" data-key>Audio</button>
+          <button class="tab" data-key>Cameras</button>
+          <button class="tab on" data-key aria-current="page">Teleprompter</button>
+        </nav>
+        <!-- the lamps in tab order, then Surface; the latch after them while the prompter plays -->
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Cameras</b> ok</button>
+          <button class="lampchip" id="hdrPrompter" data-key>
+            <i class="lamp ok"></i><b>Prompter</b> <span>ok</span>
+          </button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <button class="lampchip green" id="hdrLatch" data-key hidden>
+            <i class="lamp ok"></i><b>Prompter playing</b> <span id="latchLeft">2:30 left</span>
+          </button>
+          <div class="clock">14:29</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <!-- ================= cluster ================= -->
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">ON SCREEN</div>
+            </div>
+            <div class="state-sub" id="stateSub"></div>
+            <div class="state-meta" id="stateMeta"></div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <div class="runrow">
+            <button class="key play" id="playKey" data-key data-take aria-label="Play">
+              <span class="cap">Play</span><span class="hint" id="playHint">paused at ¶ 8 · press to play</span>
+            </button>
+            <div class="runcol">
+              <button class="key jump" id="backKey" data-key data-take aria-label="Back to the start of the paragraph">
+                <span class="cap">Back</span><span class="hint" id="backHint">to the start of ¶ 8</span>
+              </button>
+              <button class="key jump" id="topKey" data-key data-take aria-label="Top, pauses and goes to the start">
+                <span class="cap">Top</span><span class="hint">pauses · to ¶ 1</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="speed">
+            <div class="head">
+              <span class="label">Speed · this script's own</span><span class="d">5 words/min a press · 40–300</span>
+            </div>
+            <div class="spd">
+              <button class="key" id="slowKey" data-key data-take aria-label="Slower by 5 words a minute">
+                <span class="cap">− 5</span>
+              </button>
+              <div class="spv well"><span class="v" id="spdV">140</span><span class="u">words/min</span></div>
+              <button class="key" id="fastKey" data-key data-take aria-label="Faster by 5 words a minute">
+                <span class="cap">+ 5</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="steps" id="steps">
+            <button class="key" data-key data-take aria-label="Back one line">◂ Line</button>
+            <button class="key" data-key data-take aria-label="Forward one line">Line ▸</button>
+            <button class="key" data-key data-take aria-label="Previous paragraph">◂ Paragraph</button>
+            <button class="key" data-key data-take aria-label="Next paragraph">Paragraph ▸</button>
+            <button class="key" data-key data-take aria-label="Previous cue">◂ Cue</button>
+            <button class="key" data-key data-take aria-label="Next cue">Cue ▸</button>
+          </div>
+
+          <!-- a window of 18 rows around the reading line: 4 read, the one at the line, 13 ahead;
+               the rows outside it are counted in the head, and the whole script is the bay's bar -->
+          <div class="paras">
+            <div class="sec-head">
+              <div class="title">Paragraphs <span id="parasCount">18</span></div>
+              <span class="d" id="parasWin">all shown</span>
+            </div>
+            <div class="plist well" id="plist"></div>
+          </div>
+
+          <div class="actions">
+            <div class="arow">
+              <button class="key" data-key>Open file…</button>
+              <button class="key" data-key>Paste as a new script</button>
+              <button class="key" data-key>New script</button>
+            </div>
+            <div class="arow">
+              <button class="key" id="clearKey" data-key data-take>Clear the prompter · press twice</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ================= bay: the live mirror ================= -->
+        <main class="bay" data-region="bay">
+          <div class="bay-head">
+            <!-- the one Edit script control; it works in every state -->
+            <div class="seg well" role="group" aria-label="The bay shows">
+              <button class="key on" id="segLive" data-key aria-pressed="true">
+                <span class="cap">Live copy</span>
+              </button>
+              <button class="key" id="segEdit" data-key aria-pressed="false">
+                <span class="cap">Edit script</span>
+              </button>
+            </div>
+            <div class="strip well" aria-label="The prompter now">
+              <div class="rd">
+                <span class="label">On the glass</span><span class="v16 name" id="rdScript">02 Interview intro</span
+                ><span class="tagw" id="rdTag"></span>
+              </div>
+              <div class="rd"><span class="label">Place</span><span class="v20" id="rdPlace"></span></div>
+              <div class="rd">
+                <span class="label">Left</span><span class="hero" id="rdLeft"></span><span class="s16" id="rdOf"></span>
+              </div>
+              <div class="rd right" id="rdRunBox">
+                <i class="lamp" id="rdLamp"></i><span class="v16" id="rdRun"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="liverow" id="liverow">
+            <div
+              class="gutter"
+              id="gutter"
+              aria-label="The operator's marks: paragraph numbers and the reading line"
+            ></div>
+            <div
+              class="mirror"
+              id="live"
+              role="img"
+              aria-label="Live copy of the Prompter XL's screen, unmirrored, the same layout scaled"
+              data-picture="prompter"
+            >
+              <div class="xl" id="xl">
+                <div class="col"></div>
+                <div class="dim"></div>
+                <i class="arrow"></i>
+              </div>
+            </div>
+            <!-- page UI over the dimmed copy, not part of the picture: shown only when the glass shows nothing -->
+            <div class="offnote well" id="offnote" hidden>
+              <i class="lamp red"></i><b>NOT ON THE GLASS</b>
+              <p id="offnoteText"></p>
+            </div>
+          </div>
+
+          <div class="nothing" id="nothing" hidden>Nothing on the prompter</div>
+
+          <div class="barblock" id="barblock">
+            <div class="bar-head">
+              <span class="label">The whole script · press anywhere on it to go to the start of that paragraph</span
+              ><span class="d" id="barD"></span>
+            </div>
+            <button
+              class="sbar well"
+              id="sbar"
+              data-key
+              data-take
+              aria-label="The whole script: press to go to the start of the paragraph under the pointer"
+            >
+              <span class="art" id="sbarArt" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="cuerow" id="cuerow">
+            <span class="label">Cues</span>
+            <div class="cuekeys" id="cueKeys"></div>
+            <div class="goto">
+              <span class="gl">Go to paragraph</span
+              ><input
+                class="gofield well"
+                id="goField"
+                placeholder="1–18"
+                inputmode="numeric"
+                aria-label="Paragraph number"
+              /><button class="key" data-key data-take>Go</button>
+            </div>
+          </div>
+
+          <p class="foot-note" id="footNote" hidden></p>
+
+          <div class="editwrap" id="editwrap" hidden>
+            <div class="editor">
+              <div class="ed-bar">
+                <span class="ed-name" id="edName"></span>
+                <button class="key" data-key>Bold</button><button class="key" data-key>Italic</button
+                ><button class="key" data-key>Underline</button><button class="key" data-key>Add cue</button
+                ><button class="key" data-key>Undo</button><button class="key" data-key>Redo</button
+                ><button class="key" data-key>Paste</button>
+              </div>
+              <div class="ed-text well" id="edText" aria-label="The script's text"></div>
+              <div class="ed-status" id="edStatus"></div>
+            </div>
+            <div class="glassnow">
+              <div class="gn-head"><span class="label">On the glass now</span><span class="d" id="gnD"></span></div>
+              <div
+                class="thumb"
+                id="thumb"
+                role="img"
+                aria-label="The Prompter XL's screen, a quarter of its size"
+                data-picture="prompter"
+              ></div>
+              <div class="gn-body" id="gnBody"></div>
+            </div>
+          </div>
+        </main>
+
+        <!-- ================= plate ================= -->
+        <aside class="inspector plate" data-region="plate">
+          <div class="insp-head">
+            <div>
+              <h2 id="selName">02 Interview intro</h2>
+              <div class="sub" id="selSub"></div>
+            </div>
+            <button class="key sm" data-key>Rename</button>
+          </div>
+          <div class="selstatus" id="selStatus"></div>
+          <div class="insp-keys">
+            <button class="key" data-key>Earlier versions · <span id="verCount">4</span></button>
+            <button class="key" id="removeKey" data-key>Remove</button>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">Scripts <span class="d">6 · sorted by name · press to select</span></span
+              ><button class="key sm" data-key aria-label="Removed scripts, 2: restore, or delete for good">
+                Removed · 2
+              </button>
+            </div>
+            <div class="slist" id="slist"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">The look</span><span class="d">one look for the glass · applies at once</span>
+            </div>
+            <div class="ctl-label"><b>Text size</b><span>standard 88 · 48–160 px · capitals 11.5 mm</span></div>
+            <div class="sizerow">
+              <div class="sizev well"><span class="v">88 px</span><span class="s">now</span></div>
+              <button class="key" data-key aria-label="Text size smaller by 4 pixels">
+                <span class="cap">− 4</span>
+              </button>
+              <button class="key" data-key aria-label="Text size larger by 4 pixels">
+                <span class="cap">+ 4</span>
+              </button>
+              <button class="key" data-key>Standard</button>
+            </div>
+            <div class="ctl-label"><b>Line spacing</b><span>1.1–2.0</span></div>
+            <div class="ctl">
+              <div class="hslider well" data-key role="slider" aria-label="Line spacing" aria-valuetext="1.4">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 33.3% - 11.3px)"></div>
+              </div>
+              <div class="v">1.4</div>
+            </div>
+            <div class="ctl-label"><b>Margins</b><span>each side · about 32 characters a line</span></div>
+            <div class="ctl">
+              <div class="hslider well" data-key role="slider" aria-label="Margins" aria-valuetext="12 %">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 40% - 13.6px)"></div>
+              </div>
+              <div class="v">12 %</div>
+            </div>
+            <div class="ctl-label"><b>Reading line</b><span>from the top · 20–60 %</span></div>
+            <div class="ctl">
+              <div class="hslider well" data-key role="slider" aria-label="Reading line" aria-valuetext="35 %">
+                <div class="track"></div>
+                <div class="cap" style="left: calc(17px + 37.5% - 12.75px)"></div>
+              </div>
+              <div class="v">35 %</div>
+            </div>
+            <div class="trow">
+              <span>Text colour <em>on black, always</em></span>
+              <div class="seg well" role="group" aria-label="Text colour">
+                <button class="key on" data-key><span class="cap">White</span></button
+                ><button class="key" data-key><span class="cap">Yellow</span></button>
+              </div>
+            </div>
+            <div class="trow">
+              <span>Dim text already read <em>to 45 %</em></span
+              ><button class="key on tog" data-key aria-pressed="true">On</button>
+            </div>
+            <div class="trow">
+              <span>A line across at the reading line</span
+              ><button class="key tog" data-key aria-pressed="false">Off</button>
+            </div>
+            <div class="trow">
+              <span>Paragraph numbers on the glass</span
+              ><button class="key tog" data-key aria-pressed="false">Off</button>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head">
+              <span class="t">The Prompter XL</span><span class="d">as Windows reports it</span>
+            </div>
+            <div class="fields">
+              <div class="field well"><span class="l">Screen</span><span class="v" id="xfName">Prompter XL</span></div>
+              <div class="field well"><span class="l">Link</span><span class="v" id="xfLink"></span></div>
+              <div class="field well"><span class="l">Resolution</span><span class="v" id="xfRes"></span></div>
+              <div class="field well"><span class="l">Refresh</span><span class="v" id="xfHz"></span></div>
+              <div class="field well"><span class="l">Windows shows it</span><span class="v" id="xfMode"></span></div>
+              <div class="field well">
+                <span class="l">Brightness</span><span class="v muted">not reported by Windows</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-head"><span class="t">Studio Control</span><span class="d">its own windows</span></div>
+            <div class="readouts">
+              <span>The prompter window</span><span class="v" id="xfWin"></span> <span>Studio Control</span
+              ><span class="v">fullscreen on display 3</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Prompter XL <b id="ftXl">1920×1080 · 60 Hz</b></span>
+        <span class="item">On the glass <b id="ftScript">02 Interview intro</b></span>
+        <span class="item">Place <b id="ftPlace"></b></span>
+        <span class="item">Speed <b id="ftSpeed">140 words/min</b></span>
+        <span class="item">Left <b id="ftLeft"></b></span>
+      </footer>
+    </div>
+
+    <!-- mock chrome only: switches the board's state, the bay's view and the theme; not part of the design -->
+    <div class="harness" id="harness" aria-label="Board switcher, mock only">
+      <span class="hl">Board</span>
+      <span id="hStates"></span>
+      <span class="sep"></span>
+      <span id="hViews"></span>
+      <span class="sep"></span>
+      <span id="hThemes"></span>
+      <span class="sep"></span>
+      <button id="hOne" aria-pressed="false">1:1</button>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const board = document.getElementById("board");
+      const $ = (id) => document.getElementById(id);
+      if (params.get("theme")) document.documentElement.dataset.theme = params.get("theme");
+
+      // ---- the scripts ----
+      // Cues (a Word heading, or text in square brackets, on a line of its own) sit before the paragraph they lead
+      // into and are never read aloud, so they do not count as words. span.pw marks the word at the reading line.
+      const LIB = {
+        intro: {
+          name: "02 Interview intro",
+          file: "Interview intro.docx",
+          wpm: 140,
+          on: "14:02", // when it went on the prompter
+          saved: "14:02",
+          versions: 4,
+          place: { p: 8, word: 8 }, // the word at the reading line: ¶ 8, word 9 ("with")
+          cues: { 9: "turn to the guest", 12: "Part 2 · The pilot", 14: "slide 3" }, // ¶ 12's is a Word heading
+          paras: [
+            "Welcome to <i>Leading Through Change</i>, a series from SSE Executive Education about the decisions that shape an organisation when the ground moves under it.",
+            "Every episode starts with one question: what did you have to <b>unlearn</b>? It sounds simple. In our experience it is the hardest question a leader can be asked, because the honest answer is rarely the one on the slides.",
+            "Today we look at a company that had to unlearn almost everything at once: a supplier to the car industry, with three plants, two thousand people and customers who changed their minds about what a car runs on in less than five years.",
+            "When the orders for its oldest product line fell by a third in a single year, the board had two options on the table. Close the plant that made it, or turn it into something nobody in the company had built before.",
+            "They chose the second. What follows is the story of that choice, told by the person who had to carry it out, and who admits she was not sure it would work.",
+            "Before we meet her, a word on how this conversation works. There is no script for the guest. The questions are mine, the answers are hers, and nothing has been rehearsed beyond a cup of coffee this morning.",
+            "We will talk for about twenty minutes. Afterwards you will find the reading list, the case material and the exercises for your own team in the programme portal.",
+            'So let us begin where every change begins: <span class="pw">with</span> a morning when the numbers on the screen <i>no longer</i> matched the story everyone was telling.',
+            "Welcome to the studio. You were head of operations when the orders fell. Take us back to that morning. What did you see <u>first</u>, and who was the first person you called?",
+            "Many leaders describe that moment as a kind of silence. The plan still exists, the meetings still happen, but nobody quite believes the numbers any more. Was it like that for you?",
+            "You went to the plant floor before you went to the board. Why that order? And what did the people on the line already know that the spreadsheets did not?",
+            "Let us talk about the pilot. Six months, one line, twelve volunteers and a product that did not exist yet. Where did the idea come from, and how did you protect it while it was fragile?",
+            "Some of those twelve had worked on the old line for twenty years. What did you ask of them, and what did you promise in return? Which of those promises was the hardest to keep?",
+            "On the screen you can see the first year in numbers. Output fell before it rose. Quality complaints doubled in the second quarter. And yet the board extended the pilot. What convinced them?",
+            "If someone in this programme is facing their own version of that year right now, what is the one thing you would tell them to do on Monday morning, and the one thing to stop?",
+            "Thank you. That is a good place to pause. After the break we look at the people who did not join the pilot, and why theirs turned out to be the more important story.",
+            "For those of you following along, the case material for this part is in module three of the portal. The exercise asks you to map your own organisation's old line and new one.",
+            "Stay with us. We will be back in a moment.",
+          ],
+        },
+        panel: {
+          name: "03 Panel questions",
+          file: "Panel questions.docx",
+          wpm: 140,
+          on: "13:10",
+          saved: "13:05",
+          versions: 3,
+          place: { p: 21, word: 5 }, // ¶ 21, word 6 ("stop")
+          cues: {
+            5: "Part 1 · Seeing it early",
+            11: "Part 2 · People",
+            17: "Part 3 · Money and risk",
+            24: "Part 4 · Measuring",
+            28: "Part 5 · Closing",
+          },
+          paras: [
+            "Welcome back. For the second half of today's session we have three guests with us, and the questions come from you, the participants.",
+            "We collected them in the portal over the last two weeks. There were more than eighty, so we grouped them and chose the ones that came up most often.",
+            "Our guests are Maria, who runs a hospital's operations, Lars, who leads a logistics company, and Priya, who advises boards on risk.",
+            "Each of them will answer in about two minutes. If a question is for all three, I will say so.",
+            "Maria, the first question is for you. How do you know that a change is needed before the numbers tell you?",
+            "Several of you asked a version of this: what is the first conversation you have when you suspect something is wrong?",
+            "Lars, the same question to you. In logistics the numbers arrive every hour. Does that make the early signal easier or harder to hear?",
+            "Priya, you sit with boards. When does a board first hear about a problem, and is that usually too late?",
+            "One participant wrote: my manager says wait for the data. How long should you wait, and how do you argue against waiting?",
+            "A question for all three. Name one sign that tells you a team has stopped telling you the truth.",
+            "Let us turn to people. Maria, how do you keep the ones who are exhausted by the last change?",
+            "Lars, you closed two depots last year. How did you tell the people who were staying, not only the ones who were leaving?",
+            "Priya, what do you look for in the leader of a change, and what makes you worried?",
+            "Several of you asked about middle managers. They carry the change and often hear about it last. What should they be told, and when?",
+            "One participant asked: how do I lead a change I did not choose and do not agree with?",
+            "Maria, a follow-up for you. What do you do when your best people disagree with the plan in public?",
+            "Now the money. Lars, how do you fund a change while the old business still has to pay the bills?",
+            "Priya, how much risk should a board accept in the first year of a change, and who decides?",
+            "Maria, in a hospital the risk is to patients. How does that change how fast you are allowed to move?",
+            "A question for all three. What is the most expensive mistake you have seen in a change, and what would have prevented it?",
+            'Lars, when did you last <span class="pw">stop</span> a project that was already under way? How did you know it was time?',
+            "Priya, what should a board ask for in the first report after a change begins?",
+            "One participant wrote: our change has no budget line. Is that a warning sign or a normal start?",
+            "Let us talk about measuring. Maria, which number do you look at first on a Monday morning?",
+            "Lars, what did you stop measuring when the change began, and did anyone miss it?",
+            "Priya, how do you tell progress from activity in a report?",
+            "Several of you asked how long a change takes before it shows in the results. Is there an honest answer?",
+            "We are close to time. One last question for each of you, and a short answer, please.",
+            "Maria, what do you wish you had known when you started?",
+            "Lars, what would you do differently if you could run last year again?",
+            "Priya, what is the one question every participant should ask their own board next week?",
+            "Thank you all three. Those were honest answers, and that is rarer than it should be.",
+            "The questions we did not have time for are in the portal, with written answers from our guests by Friday.",
+            "The exercise for this module asks you to write down the early signal you are ignoring right now.",
+            "Bring it to your group session next week. We will start there.",
+            "Thank you for watching, and see you in the next session.",
+          ],
+        },
+        outro: {
+          name: "04 Outro",
+          file: "Outro.docx",
+          wpm: 140,
+          on: null,
+          saved: "yesterday 16:40",
+          versions: 2,
+          place: { p: 1, word: 0 }, // never played: its own place is the top
+          cues: { 3: "look at CAM 2" },
+          paras: [
+            "That brings us to the end of this session of <i>Leading Through Change</i>. Thank you for staying with us, and thank you to our guest for her honesty about a year that did not go to plan.",
+            "If you take one thing from today, let it be the question we started with: what did you have to unlearn? Write your own answer down before the week is over, while the conversation is still fresh.",
+            "The case material, the reading list and this week's exercise are in the programme portal under module three. Your group session is on Thursday, and your coach will open it with the exercise, so please bring your notes.",
+            "Next time we look at the other side of change: the people who said no. Why they resisted, what they saw that the leaders did not, and how the organisation was better for listening to them in the end.",
+            "Until then, from all of us at SSE Executive Education, thank you for watching, and good luck on Monday morning.",
+          ],
+        },
+      };
+      // the scripts not drawn in full on this board
+      const OTHERS = [
+        { id: "welcome", name: "01 Welcome", words: 152, wpm: 150 },
+        { id: "retake", name: "Retake lines", words: 108, wpm: 130 },
+        { id: "check", name: "Sound check", words: 64, wpm: 140 },
+      ];
+      // the edits made to 02 Interview intro after it went on the prompter at 14:02 (not-updated, update-armed)
+      const EDITED = {
+        11: "You went to the plant floor before you went to the board. Why that order? And what did the people on the line already know, months before the spreadsheets did?",
+        14: 'On the screen you can see the first year in numbers. Output fell by a fifth before it rose. Quality complaints doubled in the second quarter. And yet the board extended the pilot by a year.<i class="caret"></i> What convinced them?',
+      };
+      const RUNOUT = 10; // s: END sits half a screen (540 px) below the last line; at 140 words/min the text moves about 55 px/s
+      const NOW = 14 * 3600 + 29 * 60; // the clock, 14:29
+
+      // a paragraph's words without its tags, removed until none is left (one pass can leave a tag made of two halves)
+      const plain = (h) => {
+        let text = h;
+        let before;
+        do {
+          before = text;
+          text = text.replace(/<[^>]+>/g, "");
+        } while (text !== before);
+        return text;
+      };
+      const words = (h) => plain(h).split(/\s+/).filter(Boolean).length;
+      // round the whole seconds first, so 59.85 s reads 1:00, never 0:60
+      const mmss = (s) => {
+        s = Math.round(s);
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      };
+      const hhmm = (s) =>
+        `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
+      const sum = (a) => a.reduce((x, y) => x + y, 0);
+      const cuesTxt = (n) => `${n} ${n === 1 ? "cue" : "cues"}`;
+      const EDIT_TOTAL = sum(LIB.intro.paras.map((h, i) => words(EDITED[i + 1] || h)));
+
+      // everything the page says about a script is computed from its text
+      function stats(id, atEnd) {
+        const sc = LIB[id];
+        const W = sc.paras.map(words);
+        const TOTAL = sum(W);
+        const n = sc.paras.length;
+        const place = atEnd ? { p: n, word: W[n - 1] } : sc.place;
+        const READ = atEnd ? TOTAL : sum(W.slice(0, place.p - 1)) + place.word;
+        const PCT = Math.round((READ / TOTAL) * 100);
+        const LEFT = atEnd ? 0 : Math.round(((TOTAL - READ) / sc.wpm) * 60 + RUNOUT);
+        const LENGTH = Math.round((TOTAL / sc.wpm) * 60 + RUNOUT);
+        return Object.assign({}, sc, {
+          id,
+          W,
+          TOTAL,
+          n,
+          place,
+          READ,
+          PCT,
+          LEFT,
+          LENGTH,
+          atEnd: !!atEnd,
+          ncues: Object.keys(sc.cues).length,
+          placeTxt: atEnd ? "END · 100 %" : `¶ ${place.p} of ${n} · ${PCT} %`,
+        });
+      }
+
+      // ---- the Prompter XL's layout (1920×1080; the reading line 35 % from the top = 378 px) ----
+      const LH = 123.2,
+        READ_Y = 378;
+      function buildXL(xl, S) {
+        xl.classList.toggle("blank", !S);
+        const col = xl.querySelector(".col");
+        col.style.transform = "none";
+        if (!S) {
+          col.innerHTML = "";
+          return;
+        }
+        let h = "";
+        S.paras.forEach((p, i) => {
+          const n = i + 1;
+          if (S.cues[n]) h += `<div class="cue" data-cue="${n}">[${S.cues[n]}]</div>`;
+          h += `<p data-n="${n}">${S.atEnd ? p.replace(' class="pw"', "") : p}</p>`;
+        });
+        col.innerHTML = h + `<div class="end">END</div>`;
+      }
+      function layoutXL(xl, S) {
+        const col = xl.querySelector(".col");
+        const at = S.atEnd ? col.querySelector(".end") : col.querySelector(".pw");
+        if (!at) return 0;
+        const centre = at.offsetTop + at.offsetHeight / 2; // the line holding the word (or END) at the reading line
+        const ty = READ_Y - centre;
+        col.style.transform = `translateY(${ty}px)`;
+        xl.querySelector(".dim").style.height = READ_Y - LH / 2 + "px";
+        return ty;
+      }
+      // the operator's marks beside the copy: never drawn on it
+      function drawGutter(xl, ty, S) {
+        const g = $("gutter"),
+          k = 1616 / 1920;
+        if (!S) {
+          g.innerHTML = "";
+          return;
+        }
+        let h = "";
+        xl.querySelectorAll(".col p, .col .cue, .col .end").forEach((el) => {
+          const top = el.offsetTop + ty,
+            bottom = top + el.offsetHeight;
+          if (bottom <= 0 || top >= 1080) return;
+          const kind = el.classList.contains("cue") ? "cue" : el.classList.contains("end") ? "end" : "p";
+          if (top < 0) {
+            if (kind === "p") h += `<span class="gl" style="top:14px">¶ ${el.dataset.n}</span>`;
+            return;
+          }
+          const y = (top + (kind === "p" ? LH / 2 : 43)) * k;
+          if (kind === "cue") h += `<span class="gl cue" style="top:${y}px">cue</span>`;
+          else if (kind === "end") h += `<span class="gl end" style="top:${y}px">END</span>`;
+          else
+            h += `<span class="gl ${!S.atEnd && +el.dataset.n === S.place.p ? "cur" : ""}" style="top:${y}px">¶ ${el.dataset.n}</span>`;
+        });
+        h += `<i class="rmark" style="top:${READ_Y * k}px" aria-label="The reading line"></i>`;
+        g.innerHTML = h;
+      }
+      const xl = $("xl");
+      function drawGlass(S) {
+        buildXL(xl, S);
+        const ty = S ? layoutXL(xl, S) : 0;
+        drawGutter(xl, ty, S);
+        const t = $("thumb");
+        t.innerHTML = "";
+        t.appendChild(xl.cloneNode(true)).removeAttribute("id");
+      }
+
+      // ---- the whole-script bar: one press target; segments, ticks and the marker are pictures ----
+      const ART_W = 1616 - 2 - 9; // the bar's inner width less the art's insets
+      function drawBar(S) {
+        if (!S) {
+          $("sbarArt").innerHTML = "";
+          $("cueKeys").innerHTML = "";
+          return;
+        }
+        let h = "",
+          cum = 0;
+        S.W.forEach((w, i) => {
+          const n = i + 1,
+            l = (cum / S.TOTAL) * 100,
+            pct = (w / S.TOTAL) * 100;
+          const px = (pct / 100) * ART_W - 3;
+          const cls = S.atEnd || n < S.place.p ? "read" : n === S.place.p ? "cur" : "";
+          const part =
+            !S.atEnd && n === S.place.p ? `<i class="part" style="width:${(S.place.word / w) * 100}%"></i>` : "";
+          // a number only where the segment is wide enough to hold it
+          const num = px >= 14 + String(n).length * 8 ? `<span class="sn">${n}</span>` : "";
+          h += `<span class="sp ${cls}" style="left:${l}%;width:calc(${pct}% - 3px)">${part}${num}</span>`;
+          if (S.cues[n]) h += `<i class="cuetick" style="left:${l}%"></i>`;
+          cum += w;
+        });
+        h += `<i class="pmark" style="left:${(S.READ / S.TOTAL) * 100}%"></i>`;
+        $("sbarArt").innerHTML = h;
+        $("barD").textContent = `${S.n} paragraphs · ${S.TOTAL} words · ${cuesTxt(S.ncues)} · ${S.PCT} % read`;
+        $("cueKeys").innerHTML = Object.entries(S.cues)
+          .slice(0, 24)
+          .map(
+            ([n, c]) =>
+              `<button class="key" data-key data-take aria-label="Go to the cue ${c}"><span class="n">¶ ${n}</span><i>${c}</i></button>`
+          )
+          .join("");
+        $("goField").placeholder = `1–${S.n}`;
+      }
+
+      // ---- the paragraph list: a window of 18 rows around the reading line ----
+      const ROWS = 18,
+        BEFORE = 4;
+      function drawList(S) {
+        const el = $("plist");
+        if (!S) {
+          el.innerHTML = `<div class="empty">Nothing on the prompter. The paragraphs of the script on the glass show here.</div>`;
+          $("parasCount").textContent = "none";
+          $("parasWin").textContent = "";
+          return;
+        }
+        const cur = S.atEnd ? S.n : S.place.p;
+        let a = Math.max(1, cur - BEFORE);
+        const b = Math.min(S.n, a + ROWS - 1);
+        a = Math.max(1, b - ROWS + 1);
+        const above = a - 1,
+          below = S.n - b;
+        $("parasCount").textContent = String(S.n);
+        $("parasWin").textContent =
+          above || below
+            ? [above ? (above === 1 ? "¶ 1 above" : `¶ 1–${above} above`) : "", below ? `${below} more below` : ""]
+                .filter(Boolean)
+                .join(" · ")
+            : "all shown";
+        let h = "";
+        for (let n = a; n <= b; n++) {
+          const cls = S.atEnd || n < S.place.p ? "read" : n === S.place.p ? "cur" : "";
+          const cue = S.cues[n] ? `<span class="cw">[${S.cues[n]}]</span> ` : "";
+          h += `<button class="prow ${cls}" data-key data-take aria-label="Go to paragraph ${n}"><span class="pn">${n}</span><span class="pt">${cue}${plain(S.paras[n - 1])}</span><span class="pd">${mmss((S.W[n - 1] / S.wpm) * 60)}</span></button>`;
+        }
+        el.innerHTML = h;
+      }
+
+      // ---- the editor (the bay's second view): the script selected in the plate ----
+      function drawEditor(st, ON, SEL) {
+        const onGlass = !!ON && ON.id === SEL.id;
+        const edited = onGlass && !!st.edited;
+        // the field opens scrolled to the reading line (to the last paragraphs at the end), else at the top
+        const start = !onGlass ? 1 : ON.atEnd ? Math.max(1, SEL.n - 10) : Math.max(1, SEL.place.p - 2);
+        $("edName").innerHTML =
+          `Editing <b>${SEL.name}</b>` +
+          (!onGlass
+            ? `<span>· not on the prompter</span>`
+            : edited
+              ? `<span class="tagw amber"><i class="lamp amber"></i>NOT UPDATED</span>`
+              : `<span class="tagw"><i class="lamp ok"></i>ON PROMPTER</span>`);
+        let h = "";
+        for (let n = start; n <= SEL.n; n++) {
+          if (SEL.cues[n])
+            h += `<div class="ep"><span class="eg"></span><div class="et cuel">[${SEL.cues[n]}]</div></div>`;
+          const changed = edited && !!EDITED[n],
+            cur = onGlass && !ON.atEnd && n === SEL.place.p;
+          const mark = cur ? `<span class="em">reading line</span>` : changed ? `<span class="em">edited</span>` : "";
+          const text = (changed ? EDITED[n] : SEL.paras[n - 1]).replace(' class="pw"', "");
+          h += `<div class="ep ${changed ? "changed" : ""} ${cur ? "cur" : ""}" data-n="${n}"><span class="eg"><span class="en">¶ ${n}</span>${mark}</span><div class="et">${text}</div></div>`;
+        }
+        const box = $("edText");
+        box.innerHTML = h;
+        // say which paragraphs the field shows; the rest of the text scrolls in the field
+        let last = start;
+        box.querySelectorAll(".ep[data-n]").forEach((e) => {
+          if (e.offsetTop + e.offsetHeight <= box.clientHeight - 20) last = +e.dataset.n;
+        });
+        // the mock draws only what the field shows: nothing is cut at its lower edge
+        const lastEl = box.querySelector(`.ep[data-n="${last}"]`);
+        while (lastEl && lastEl.nextElementSibling) lastEl.nextElementSibling.remove();
+        const nWords = edited ? EDIT_TOTAL : SEL.TOTAL;
+        const note = onGlass
+          ? "Studio Control's copy · the glass changes only on Update"
+          : ON
+            ? "Not on the prompter · edits change nothing on the glass"
+            : "Not on the prompter · Put on the prompter shows it";
+        $("edStatus").innerHTML =
+          `<span><b>${nWords}</b> words</span><span><b>${SEL.n}</b> paragraphs</span><span><b>${SEL.ncues}</b> ${SEL.ncues === 1 ? "cue" : "cues"}</span>` +
+          `<span><b>${mmss((nWords / SEL.wpm) * 60 + RUNOUT)}</b> at ${SEL.wpm} words/min</span>` +
+          `<span>¶ ${start}–${last} in view${start > 1 || last < SEL.n ? " · the text scrolls" : ""}</span>` +
+          `<span>Saved <b>${edited ? "14:29" : SEL.saved}</b></span><span class="r">${note}</span>`;
+      }
+      // the column beside the editor: what the glass shows now, a quarter of its size
+      function drawGlassNow(st, ON, SEL, runWord) {
+        const QUARTER =
+          "While you edit, the glass shows here at a quarter of its size; Live copy brings back the full-size copy.";
+        if (!ON) {
+          $("gnD").textContent = "nothing";
+          $("gnBody").innerHTML =
+            `<p class="gn-empty">Nothing on the prompter</p>` +
+            `<p class="gn-note">Put on the prompter puts ${SEL.name} on the glass, paused at ¶ ${SEL.place.p}, its own place. There is nothing for Update to change.</p>`;
+          return;
+        }
+        const onGlass = ON.id === SEL.id,
+          edited = onGlass && !!st.edited;
+        $("gnD").textContent = edited ? `the text of ${ON.on}` : `${ON.name} · since ${ON.on}`;
+        let h = `<div class="gn-read"><span>Place</span><b>${ON.placeTxt} · ${runWord}</b>`;
+        if (onGlass)
+          h +=
+            `<span>Edited since it went on</span>` +
+            (edited ? `<b class="amber">¶ 11 · ¶ 14</b>` : `<b>nothing</b>`) +
+            `<span>At the reading line</span><b>unchanged</b>`;
+        else h += `<span>You are editing</span><b>${SEL.name}</b>`;
+        h += `</div>`;
+        if (edited)
+          h += `<p class="gn-note">The presenter reads the text of ${ON.on} until you update the prompter. On Update, the same words stay at the reading line; the edits are below it. ${QUARTER}</p>`;
+        else if (onGlass)
+          h += `<p class="gn-note">Edits change Studio Control's copy first; the glass keeps the text of ${ON.on} until you update the prompter. ${QUARTER}</p>`;
+        else
+          h += `<p class="gn-note">Edits to ${SEL.name} change nothing on the glass. Replace on the prompter puts it on, at its own place. ${QUARTER}</p>`;
+        if (edited)
+          h += `<div class="gn-head"><span class="label">What Update changes on the glass</span><span class="d">2 paragraphs</span></div>
+                <div class="diff well">
+                  <div class="dp"><span class="dn">¶ 11</span>
+                    <p class="was">…what did the people on the line already know that the spreadsheets did not?</p>
+                    <p class="now">…what did the people on the line already know, months before the spreadsheets did?</p></div>
+                  <div class="dp"><span class="dn">¶ 14</span>
+                    <p class="was">Output fell before it rose. … And yet the board extended the pilot.</p>
+                    <p class="now">Output fell by a fifth before it rose. … And yet the board extended the pilot by a year.</p></div>
+                </div>`;
+        $("gnBody").innerHTML = h;
+      }
+
+      // ---- the plate: the scripts, sorted by name ----
+      function drawScripts(sel, onId) {
+        const rows = Object.keys(LIB)
+          .map((id) => {
+            const S = stats(id);
+            return { id, name: S.name, words: S.TOTAL, wpm: S.wpm };
+          })
+          .concat(OTHERS)
+          .sort((x, y) => x.name.localeCompare(y.name));
+        $("slist").innerHTML = rows
+          .map((s) => {
+            const len = mmss((s.words / s.wpm) * 60 + RUNOUT);
+            const tag = s.id === onId ? `<span class="tag"><i class="lamp ok"></i>ON PROMPTER</span>` : "";
+            return `<button class="key srow ${s.id === sel ? "sel" : ""}" data-key aria-pressed="${s.id === sel}"><span class="name">${s.name}</span><span class="meta">${len} at ${s.wpm} · ${s.words} words</span>${tag}</button>`;
+          })
+          .join("");
+      }
+      const armedKey = (label, a) =>
+        `<button class="key armed" data-key><span>${label}</span><span class="tag">ARMED · press again · ${a.left}</span><i class="count" style="width:${a.pct}%"></i></button>`;
+
+      // ---- states ----
+      const XL_OK = "1920×1080 · 60 Hz · extended";
+      const ARM = { left: "3.9 s", pct: 87 }; // 3.9 s of 4.5 s
+      const shows = (S) => `The Prompter XL shows ${S.name}.`;
+      const paused = (S) => `Paused at paragraph ${S.place.p} of ${S.n}.`;
+      const STATES = {
+        ready: {
+          on: "intro",
+          run: "paused",
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: (S) => `${shows(S)} ${paused(S)}`,
+          meta: (S) => `${XL_OK} · on the glass since ${S.on}`,
+          hdr: ["ok", "ok"],
+        },
+        playing: {
+          on: "intro",
+          run: "playing",
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: (S) => `${shows(S)} Playing at ${S.wpm} words a minute.`,
+          meta: (S) => `${XL_OK} · on the glass since ${S.on}`,
+          hdr: ["ok", "ok"],
+        },
+        "at-the-end": {
+          on: "intro",
+          atEnd: true,
+          run: "end",
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: (S) => `${shows(S)} At the end.`,
+          meta: () => "The scroll stopped at END and stays stopped · TOP or a jump starts a new take",
+          hdr: ["ok", "ok"],
+        },
+        "long-script": {
+          on: "panel",
+          run: "paused",
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: (S) => `${shows(S)} ${paused(S)}`,
+          meta: (S) => `${XL_OK} · on the glass since ${S.on}`,
+          hdr: ["ok", "ok"],
+        },
+        blank: {
+          on: null,
+          sel: "intro",
+          run: "blank",
+          tone: "ok",
+          word: "READY",
+          sub: () => "The Prompter XL is connected and blank. Choose a script and put it on the prompter.",
+          meta: () => XL_OK,
+          actions: (SEL) => [[`Put ${SEL.name} on the prompter`, "primary"]],
+          hdr: ["ok", "ok"],
+        },
+        "not-updated": {
+          on: "intro",
+          run: "paused",
+          tone: "attention",
+          word: "NOT UPDATED",
+          sub: (S) => `${S.name} was edited after it went on the prompter. The prompter still shows the earlier text.`,
+          meta: (S) => `Edited: ¶ 11 and ¶ 14, below the reading line at ¶ ${S.place.p}`,
+          actions: () => [["Update the prompter · press twice", "primary"]],
+          hdr: ["amber", "not updated"],
+          view: "edit",
+          edited: true,
+        },
+        // Update pressed once, on the way-out key: it takes the armed form in place (it stands in for the
+        // armed row, since the armed key is itself in the state display); the plate's Update key is the
+        // same action and counts down with it; a second press on either applies.
+        "update-armed": {
+          on: "intro",
+          run: "paused",
+          tone: "attention",
+          word: "NOT UPDATED",
+          sub: (S) => `${S.name} was edited after it went on the prompter. The prompter still shows the earlier text.`,
+          meta: (S) => `Edited: ¶ 11 and ¶ 14, below the reading line at ¶ ${S.place.p}`,
+          armedUpdate: ARM,
+          hdr: ["amber", "not updated"],
+          view: "edit",
+          edited: true,
+        },
+        armed: {
+          on: "intro",
+          sel: "outro",
+          run: "paused",
+          tone: "ok",
+          word: "ON SCREEN",
+          sub: (S) => `${shows(S)} ${paused(S)}`,
+          armed: Object.assign({ text: "Replace 02 Interview intro with 04 Outro · press again" }, ARM),
+          hdr: ["ok", "ok"],
+        },
+        unplugged: {
+          on: "intro",
+          run: "off",
+          tone: "error",
+          word: "NOT CONNECTED",
+          sub: () =>
+            "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The prompter window is closed and opens on no other screen.",
+          meta: (S) =>
+            `Paused at ¶ ${S.place.p} · the script and the place are kept · jumps, speed and the look still work`,
+          off: "The Prompter XL is not connected, so the presenter sees nothing. This is Studio Control's copy, kept at the place: jumps and speed set where the prompter comes back, paused.",
+          hdr: ["red", "not connected"],
+        },
+        duplicated: {
+          on: "intro",
+          run: "off",
+          tone: "error",
+          word: "DUPLICATED",
+          sub: () =>
+            "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.",
+          meta: (S) => `Paused at ¶ ${S.place.p} · the script and the place are kept`,
+          off: "Windows shows a copy of another screen on the Prompter XL, so Studio Control draws nothing there. This is Studio Control's copy, kept at the place.",
+          hdr: ["red", "duplicated"],
+        },
+        "not-showing": {
+          on: "intro",
+          run: "off",
+          tone: "error",
+          word: "NOT SHOWING",
+          sub: () => "Studio Control could not open its window on the Prompter XL.",
+          meta: () => `Windows' reason: "The device is not ready." · 14:29`,
+          actions: () => [["Try again", ""]],
+          off: "The prompter window is not open, so the presenter sees nothing. This is Studio Control's copy, kept at the place.",
+          hdr: ["red", "not showing"],
+        },
+      };
+
+      function setLock(el, on) {
+        el.classList.toggle("locked", !!on);
+        if (on) el.setAttribute("aria-disabled", "true");
+        else el.removeAttribute("aria-disabled");
+      }
+
+      // the board's own states only: a name from the address is compared with theirs, never used to read one
+      function applyState(requested) {
+        const name = Object.keys(STATES).find((key) => key === requested) || "ready";
+        const s = STATES[name];
+        const ON = s.on ? stats(s.on, s.atEnd) : null; // the script on the prompter
+        const selId = s.sel || s.on || "intro";
+        const SEL = ON && ON.id === selId ? ON : stats(selId); // the script selected in the plate
+        const blank = !ON,
+          off = s.run === "off",
+          playing = s.run === "playing",
+          atEnd = s.run === "end";
+        board.dataset.state = name;
+        board.classList.toggle("offglass", off);
+
+        // the state display: the word, the sentence, the way out, the armed row
+        $("state").className = "state well tone-" + s.tone;
+        $("stateLamp").className = "lamp " + (s.tone === "ok" ? "ok" : s.tone === "attention" ? "amber" : "red");
+        $("stateWord").textContent = s.word;
+        $("stateSub").textContent = s.sub(ON || SEL);
+        $("stateMeta").innerHTML = s.armed
+          ? `<div class="armed-row"><span class="w">ARMED</span><span class="t">${s.armed.text}</span><span class="s">${s.armed.left}</span><span class="bar"><i style="width:${s.armed.pct}%"></i></span></div>`
+          : s.meta
+            ? s.meta(ON || SEL)
+            : "";
+        $("stateActions").innerHTML = s.armedUpdate
+          ? armedKey("Update the prompter", s.armedUpdate).replace('class="key armed"', 'class="key armed state-key"')
+          : (s.actions ? s.actions(SEL) : [])
+              .map(([l, c]) => `<button class="key state-key ${c}" data-key>${l}</button>`)
+              .join("");
+
+        // the shell: the Prompter lamp mirrors the worst state; the latch while the prompter plays
+        const hdr = $("hdrPrompter");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + (s.hdr[0] === "ok" ? "ok" : s.hdr[0]);
+        hdr.querySelector("span").textContent = s.hdr[1];
+        $("hdrLatch").hidden = !playing;
+        if (ON) $("latchLeft").textContent = `${mmss(ON.LEFT)} left`;
+
+        // run keys: PLAY locks while nothing can be read on the glass, and at the end; every run key locks
+        // with nothing on the prompter
+        const play = $("playKey");
+        play.classList.toggle("live", playing);
+        setLock(play, blank || off || atEnd);
+        $("playHint").textContent = blank
+          ? "locked · nothing on the prompter"
+          : name === "unplugged"
+            ? "locked · the Prompter XL is not connected"
+            : name === "duplicated"
+              ? "locked · the script is not drawn on the Prompter XL"
+              : name === "not-showing"
+                ? "locked · the prompter window is not open"
+                : atEnd
+                  ? "locked · at the end · TOP for a new take"
+                  : playing
+                    ? "playing · press to pause"
+                    : `paused at ¶ ${ON.place.p} · press to play`;
+        play.setAttribute("aria-label", playing ? "Play is on, press to pause" : "Play");
+        $("backHint").textContent = ON ? `to the start of ¶ ${ON.place.p}` : "to the start of the paragraph";
+        ["backKey", "topKey", "slowKey", "fastKey", "clearKey"].forEach((id) => setLock($(id), blank));
+        document.querySelectorAll("#steps .key").forEach((k) => setLock(k, blank));
+        $("spdV").textContent = ON ? ON.wpm : "—";
+        drawList(ON);
+
+        // the bay: the live copy, or the editor of the selected script (Edit script works in every state)
+        const view = params.get("view") || s.view || "live";
+        const edit = view === "edit";
+        $("segLive").classList.toggle("on", !edit);
+        $("segEdit").classList.toggle("on", edit);
+        $("segLive").setAttribute("aria-pressed", !edit);
+        $("segEdit").setAttribute("aria-pressed", edit);
+        $("liverow").hidden = false; // lay the glass out while it can be measured, then choose the view
+        drawGlass(ON);
+        drawBar(ON);
+        $("liverow").hidden = edit;
+        $("offnote").hidden = !off;
+        $("offnoteText").textContent = s.off || "";
+        $("barblock").hidden = edit || blank;
+        $("cuerow").hidden = edit || blank;
+        $("nothing").hidden = edit || !blank;
+        $("footNote").hidden = edit || !atEnd;
+        $("footNote").textContent = atEnd
+          ? "At the end: the scroll stopped when END reached the reading line, and PLAY went out. The prompter never loops, never goes back to the top by itself and never moves on to the next script; TOP or a jump starts a new take."
+          : "";
+        $("editwrap").hidden = !edit;
+
+        // the strip over the copy: what is on the glass, the place, time left, and one run word
+        $("rdScript").textContent = ON ? ON.name : "nothing";
+        const tag = $("rdTag");
+        tag.className = "tagw" + (s.edited ? " amber" : "");
+        tag.textContent = ON && s.edited ? "NOT UPDATED" : "";
+        $("rdPlace").textContent = ON ? ON.placeTxt : "—";
+        $("rdLeft").textContent = ON ? mmss(ON.LEFT) : "—";
+        $("rdOf").textContent = !ON
+          ? "nothing to play"
+          : playing
+            ? `of ${mmss(ON.LENGTH)} · ends ${hhmm(NOW + ON.LEFT)}`
+            : atEnd
+              ? `of ${mmss(ON.LENGTH)} · at the end`
+              : `of ${mmss(ON.LENGTH)} · if played from here`;
+        const runWord = !ON
+          ? "Blank"
+          : playing
+            ? "Playing"
+            : off
+              ? "Not on the glass"
+              : atEnd
+                ? "At the end"
+                : "Paused";
+        $("rdRunBox").className = "rd right" + (off ? " red" : playing ? " green" : "");
+        $("rdLamp").className = "lamp " + (playing ? "ok" : off ? "red" : "");
+        $("rdRun").textContent = runWord;
+        if (edit) {
+          drawEditor(s, ON, SEL);
+          drawGlassNow(s, ON, SEL, runWord.toLowerCase());
+        }
+
+        // the plate: the selected script and the key that puts it on the glass
+        drawScripts(SEL.id, ON ? ON.id : null);
+        const onGlass = !!ON && ON.id === SEL.id;
+        $("selName").textContent = SEL.name;
+        $("selSub").textContent =
+          onGlass && s.edited
+            ? `Edited 14:29 · the glass shows the text of ${SEL.on} · ${EDIT_TOTAL} words · Remove waits until the prompter is cleared`
+            : `From ${SEL.file} · ${SEL.n} paragraphs · ${SEL.TOTAL} words · ${cuesTxt(SEL.ncues)} · ${mmss(SEL.LENGTH)} at ${SEL.wpm} · saved ${SEL.saved}` +
+              (blank ? ` · its place ¶ ${SEL.place.p}` : "");
+        $("selStatus").innerHTML = !ON
+          ? `<button class="key primary" data-key>Put on the prompter<span class="hint">· one press, the glass is blank</span></button>`
+          : onGlass && s.edited
+            ? s.armedUpdate
+              ? armedKey("Update the prompter", s.armedUpdate)
+              : `<button class="key primary" data-key>Update the prompter · press twice</button>`
+            : onGlass
+              ? `<div class="onair well"><i class="lamp ok"></i><b>ON PROMPTER</b><span>since ${SEL.on} · unchanged · Remove waits until the prompter is cleared</span></div>`
+              : s.armed
+                ? armedKey("Replace on the prompter", s.armed)
+                : `<button class="key primary" data-key>Replace on the prompter · press twice</button>`;
+        $("verCount").textContent = SEL.versions;
+        setLock($("removeKey"), onGlass);
+        $("removeKey").setAttribute("aria-label", onGlass ? "Remove is locked: clear the prompter first" : "Remove");
+
+        // the Prompter XL, as Windows reports it; a value it cannot report says so
+        const unplugged = name === "unplugged";
+        const nr = (id) => `<span class="v muted" id="${id}">not reported</span>`;
+        $("xfName").outerHTML = unplugged
+          ? `<span class="v muted" id="xfName">Prompter XL · not seen</span>`
+          : `<span class="v" id="xfName">Prompter XL</span>`;
+        $("xfLink").outerHTML = unplugged
+          ? `<span class="v red" id="xfLink"><i class="lamp red"></i>not connected</span>`
+          : `<span class="v" id="xfLink"><i class="lamp ok"></i>connected</span>`;
+        $("xfRes").outerHTML = unplugged ? nr("xfRes") : `<span class="v" id="xfRes">1920×1080</span>`;
+        $("xfHz").outerHTML = unplugged ? nr("xfHz") : `<span class="v" id="xfHz">60 Hz</span>`;
+        $("xfMode").outerHTML = unplugged
+          ? nr("xfMode")
+          : name === "duplicated"
+            ? `<span class="v red" id="xfMode"><i class="lamp red"></i>duplicated</span>`
+            : `<span class="v" id="xfMode">extended</span>`;
+        // Studio Control's own windows: facts it knows, not Windows' reports
+        $("xfWin").textContent = unplugged
+          ? "closed · not moved"
+          : name === "duplicated"
+            ? "not opened"
+            : name === "not-showing"
+              ? "could not open"
+              : blank
+                ? "open · black"
+                : "open · fullscreen";
+
+        // the footer
+        $("ftXl").textContent = unplugged
+          ? "not connected"
+          : name === "duplicated"
+            ? "1920×1080 · 60 Hz · duplicated"
+            : name === "not-showing"
+              ? "1920×1080 · 60 Hz · window not open"
+              : "1920×1080 · 60 Hz";
+        $("ftScript").textContent = !ON ? "nothing" : s.edited ? `${ON.name} · not updated` : ON.name;
+        $("ftPlace").textContent = ON ? ON.placeTxt : "—";
+        $("ftSpeed").textContent = ON ? `${ON.wpm} words/min` : "—";
+        $("ftLeft").textContent = !ON
+          ? "—"
+          : playing
+            ? `${mmss(ON.LEFT)} · ends ${hhmm(NOW + ON.LEFT)}`
+            : mmss(ON.LEFT);
+
+        // the switcher
+        document
+          .querySelectorAll("#hStates button")
+          .forEach((b) => b.setAttribute("aria-pressed", b.dataset.s === name));
+        document
+          .querySelectorAll("#hViews button")
+          .forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === view));
+      }
+
+      // ---- mock chrome: the board switcher, fit to the window (no keys are bound) ----
+      const STATE_NAMES = [
+        "ready",
+        "playing",
+        "at-the-end",
+        "long-script",
+        "blank",
+        "not-updated",
+        "update-armed",
+        "armed",
+        "unplugged",
+        "duplicated",
+        "not-showing",
+      ];
+      const STATE_LABELS = { armed: "replace armed" };
+      const THEMES = ["studio", "graphite", "bone"];
+      let current = params.get("state") || "ready";
+      function setParam(k, v) {
+        if (v === null) params.delete(k);
+        else params.set(k, v);
+        try {
+          history.replaceState(null, "", "?" + params.toString());
+        } catch (e) {
+          /* a board opened as a static copy has no address to keep the state in */
+        }
+      }
+      $("hStates").innerHTML = STATE_NAMES.map(
+        (n) => `<button data-s="${n}">${STATE_LABELS[n] || n.replace(/-/g, " ")}</button>`
+      ).join("");
+      $("hViews").innerHTML = ["live", "edit"].map((v) => `<button data-v="${v}">${v}</button>`).join("");
+      $("hThemes").innerHTML = THEMES.map(
+        (t) => `<button data-t="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`
+      ).join("");
+      const markTheme = () =>
+        document
+          .querySelectorAll("#hThemes button")
+          .forEach((b) => b.setAttribute("aria-pressed", b.dataset.t === document.documentElement.dataset.theme));
+      $("hStates").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        current = b.dataset.s;
+        params.delete("view");
+        setParam("state", current);
+        applyState(current);
+      });
+      const setView = (v) => {
+        setParam("view", v);
+        applyState(current);
+      };
+      $("hViews").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (b) setView(b.dataset.v);
+      });
+      // the bay's own switch works in the mock too
+      $("segLive").addEventListener("click", () => setView("live"));
+      $("segEdit").addEventListener("click", () => setView("edit"));
+      $("hThemes").addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (!b) return;
+        document.documentElement.dataset.theme = b.dataset.t;
+        setParam("theme", b.dataset.t);
+        markTheme();
+      });
+      if (params.get("switcher") === "0") $("harness").hidden = true;
+      let one = false;
+      function fit() {
+        const k = Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        board.style.transform = one || k >= 1 ? "none" : `scale(${k})`;
+      }
+      $("hOne").addEventListener("click", () => {
+        one = !one;
+        $("hOne").setAttribute("aria-pressed", one);
+        fit();
+      });
+      addEventListener("resize", fit);
+      applyState(current);
+      markTheme();
+      fit();
+      // the glass is laid out in Inter; lay it out again once the font has arrived
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => applyState(current));
+    </script>
+  </body>
+</html>

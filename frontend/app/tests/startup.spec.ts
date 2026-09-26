@@ -147,3 +147,32 @@ test("every recovery band names a next step", async ({ page }) => {
   await expect(page.getByText("Install & Update")).toBeVisible();
   await expect(page.getByRole("button", { name: /Export diagnostics/ }).first()).toBeVisible();
 });
+
+// New pages program, Slice 3 (D6, decision 2; the inventory's §7 note 8). The
+// keys on the state display before Studio Control is ready. "Shortcuts", the
+// only key on the startup screens, went with the shortcut guide; the recovery
+// screens keep Retry startup and gain Reset the window layout beside it, the
+// one window command that is not only in Setup / Support. Outside the installed
+// app the native shell is not there, so the key moves nothing and says nothing.
+test("the startup screen has no key (S3)", async ({ page }) => {
+  await openFixture(page, "startup-loading");
+  // Setup's startup screen or the plain one, whichever the shell draws.
+  const display = page.getByTestId(/startup-surface-state-display$/);
+  await expect(display).toContainText("STARTING UP…");
+  await expect(display.getByRole("button")).toHaveCount(0);
+});
+
+test("the recovery screen offers Reset the window layout beside Retry startup (S3, decision 2)", async ({ page }) => {
+  await openFixture(page, "bootstrap-failed");
+  const display = page.getByTestId("setup-recovery-surface-state-display");
+  await expect(display).toContainText("STARTUP FAILED", { timeout: 10000 });
+  await expect(display.getByRole("button")).toHaveText(["Retry startup", "Reset the window layout", "Back to Console"]);
+
+  const reset = page.getByTestId("setup-recovery-window-reset");
+  await reset.click();
+  await expect(reset).toBeEnabled();
+  await expect(page.getByTestId("setup-recovery-feedback")).toHaveCount(0);
+  await expect(display).toContainText("STARTUP FAILED");
+  // Unlike Retry startup, Reset asks nothing first.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});

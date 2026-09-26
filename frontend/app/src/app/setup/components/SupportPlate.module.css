@@ -30,6 +30,20 @@
   white-space: nowrap;
 }
 
+/* New pages program, Slice 3 (decision 2): the window keys under their
+   readout, as the switches sit under theirs — the two layouts side by side,
+   and Reset under them across the row. */
+.windowKeys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.windowKeys > :last-child {
+  grid-column: 1 / -1;
+}
+
 .danger {
   margin-top: auto;
   flex: none;

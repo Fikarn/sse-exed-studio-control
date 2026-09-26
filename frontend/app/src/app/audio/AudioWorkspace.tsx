@@ -12,29 +12,26 @@ import {
   AUDIO_RECALL_PULSE_MS,
 } from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
-import { useAudioKeyboardShortcuts } from "./hooks/useAudioKeyboardShortcuts";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
-import { useAudioPaletteRegistration } from "./hooks/useAudioPaletteRegistration";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioDensityMode, type AudioFeedbackTone } from "./audioFormatting";
 import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
 import {
   audioChannelSupportsPhase,
   buildAudioViewModel,
-  type AudioChannelGroup,
+  toggleChannelGroupSelection,
   type AudioChannelGroupSelectionRequest,
   type AudioChannelGroupSelections,
 } from "./audioViewModel";
 import { AudioCluster } from "./components/AudioCluster";
 import { AudioFooter } from "./components/AudioFooter";
-import { AudioInspector, type PlateSection } from "./components/AudioInspector";
+import { AudioInspector } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
 import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
-import { usePalette } from "../shared/paletteContext";
 
 interface AudioWorkspaceProps {
   appSnapshot: SnapshotRecord | null;
@@ -101,7 +98,6 @@ export type AudioTheme = "studio" | "graphite" | "bone";
 const SYNC_HINT = "Press Sync from TotalMix to pull the current state.";
 
 export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorkspaceProps) {
-  const { register } = usePalette();
   const [activeChannelGroups, setActiveChannelGroups] =
     useState<AudioChannelGroupSelections>(EMPTY_CHANNEL_GROUP_SELECTIONS);
   const [bankIndex, setBankIndex] = useState(0);
@@ -119,15 +115,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const draftStore = draftStoreRef.current;
   const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
-  // Visual overhaul A, Slice 4c: the plate shows every section at once, so this
-  // is no longer which tab is open but which section an accelerator last asked
-  // to see. The token makes the same key twice move the plate twice.
-  const [revealSection, setRevealSection] = useState<PlateSection | null>(null);
-  const [revealToken, setRevealToken] = useState(0);
-  const revealPlateSection = useLiveCallback((section: PlateSection) => {
-    setRevealSection(section);
-    setRevealToken((token) => token + 1);
-  });
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
   // Slice 3c — follow the global theme rather than an audio-local state, so the
@@ -162,7 +149,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex, density]);
 
-  const { armedAction, armOrApplyAction, cancelArmedAction, clearArmedAction } = useAudioArming({
+  // The arm hook also owns the Esc that cancels an arm (new pages program,
+  // Slice 3); the Console binds no other key.
+  const { armedAction, armOrApplyAction, clearArmedAction } = useAudioArming({
     setFeedback,
     resetTriggers: {
       lastRecalledSnapshotId: audioSnapshot?.lastRecalledSnapshotId,
@@ -348,11 +337,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     );
   });
 
-  const saveCurrentSnapshot = useLiveCallback(() => {
-    if (!viewModel?.selectedSnapshot) return;
-    saveSnapshot(viewModel.selectedSnapshot.id);
-  });
-
   const renameSnapshot = useLiveCallback((snapshotId: string, currentName: string) => {
     setTextDialog({ currentName, id: snapshotId, kind: "snapshot" });
   });
@@ -382,40 +366,12 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     );
   });
 
-  const selectChannelGroup = useLiveCallback(({ group, mode, tierId }: AudioChannelGroupSelectionRequest) => {
-    const availableGroups = (tierId === "hardware-inputs"
-      ? viewModel?.hardwareInputs.chips
-      : viewModel?.softwarePlayback.chips
-    )?.map((chip) => chip.id as AudioChannelGroup) ?? [group];
-    setActiveChannelGroups((current) => {
-      const selected = new Set(current[tierId]);
-      if (mode === "invert") {
-        for (const availableGroup of availableGroups) {
-          if (selected.has(availableGroup)) {
-            selected.delete(availableGroup);
-          } else {
-            selected.add(availableGroup);
-          }
-        }
-      } else if (mode === "toggle") {
-        if (selected.has(group)) {
-          selected.delete(group);
-        } else {
-          selected.add(group);
-        }
-      } else {
-        const isActive = selected.has(group);
-        selected.clear();
-        if (!isActive) {
-          selected.add(group);
-        }
-      }
-
-      return {
-        ...current,
-        [tierId]: availableGroups.filter((availableGroup) => selected.has(availableGroup)),
-      };
-    });
+  // New pages program, Slice 3 (decision 10): a plain click switches a chip on
+  // or off, and several chips can be lit at once (Shift+click and Alt+click
+  // went with the other keys held while pointing). Only the clicked chip
+  // changes; a lit chip whose strips are on another bank stays lit.
+  const selectChannelGroup = useLiveCallback((request: AudioChannelGroupSelectionRequest) => {
+    setActiveChannelGroups((current) => toggleChannelGroupSelection(current, request));
     setBankIndex(0);
   });
 
@@ -486,7 +442,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     void store.holdAudioTalkback(request).catch((error) => {
       setFeedback({
         message:
-          error instanceof Error ? error.message : "Talkback could not be changed. Release T and press it again.",
+          error instanceof Error
+            ? error.message
+            : "Talkback could not be changed. Release Talkback and press it again.",
         tone: "error",
       });
     });
@@ -537,6 +495,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     setContextMenu({ channelId, x: event.clientX, y: event.clientY });
   });
 
+  // New pages program, Slice 3 (decision 3): the Inputs heading's ‹ › keys
+  // page both rows, as `[` and `]` did. Without them Line 1–8 (banks 2–3 at
+  // 2560) could not be reached on screen at all.
   const previousBank = useLiveCallback(() => {
     setBankIndex((current) => Math.max(0, current - 1));
   });
@@ -544,62 +505,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const nextBank = useLiveCallback(() => {
     const maxBankIndex = Math.max(0, (viewModel?.totalBanks ?? 1) - 1);
     setBankIndex((current) => Math.min(maxBankIndex, current + 1));
-  });
-
-  const visibleSelectableChannels = useMemo(() => {
-    if (!viewModel) return [];
-    return [...viewModel.hardwareInputs.channels, ...viewModel.softwarePlayback.channels];
-  }, [viewModel]);
-
-  const orderedSelectableSources = useMemo(() => {
-    if (!viewModel) return [];
-    return [
-      ...viewModel.channels
-        .filter((channel) => channel.role !== "playback-pair")
-        .map((channel) => ({ id: channel.id, kind: "channel" as const })),
-      ...viewModel.channels
-        .filter((channel) => channel.role === "playback-pair")
-        .map((channel) => ({ id: channel.id, kind: "channel" as const })),
-      ...viewModel.mixTargets.map((mixTarget) => ({ id: mixTarget.id, kind: "output" as const })),
-    ];
-  }, [viewModel]);
-  useAudioKeyboardShortcuts({
-    cancelArmedAction,
-    clearAllSolo,
-    clearClips,
-    contextMenu,
-    nextBank,
-    orderedSelectableSources,
-    previousBank,
-    recallSnapshot,
-    resetChannelFaderToUnity,
-    saveCurrentSnapshot,
-    selectChannel,
-    selectOutputMixTarget,
-    setContextMenu,
-    revealPlateSection,
-    updateChannel,
-    viewModel,
-    visibleSelectableChannels,
-  });
-
-  useAudioPaletteRegistration({
-    captureSnapshot,
-    clearAllSolo,
-    clearClips,
-    nextBank,
-    previousBank,
-    recallSnapshot,
-    register,
-    renameChannel,
-    resetPeakHolds,
-    saveCurrentSnapshot,
-    selectChannel,
-    selectOutputMixTarget,
-    syncAudio,
-    togglePeakHold,
-    updateChannel,
-    viewModel,
   });
 
   const contextMenuChannel = viewModel?.channels.find((entry) => entry.id === contextMenu?.channelId) ?? null;
@@ -726,7 +631,9 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           draftStore={draftStore}
           getDraftValue={getDraftValue}
           onClearClips={clearClips}
+          onNextBank={nextBank}
           onOpenChannelMenu={openChannelContextMenu}
+          onPreviousBank={previousBank}
           recallReport={recallReport}
           onDismissRecallReport={dismissRecallReport}
           onArmPhantomFromRecall={armPhantomFromRecall}
@@ -756,8 +663,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onResetPeakHolds={resetPeakHolds}
           onSelectMixTarget={selectMixTarget}
           onTogglePeakHold={togglePeakHold}
-          revealSection={revealSection}
-          revealToken={revealToken}
           setDraftValue={setDraftValue}
           onUpdateChannelDynamics={updateChannelDynamics}
           onUpdateChannelEq={updateChannelEq}

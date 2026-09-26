@@ -1,4 +1,4 @@
-import { Key, Lamp } from "@sse/design-system";
+import { Lamp } from "@sse/design-system";
 import type { ShellState } from "@sse/engine-client";
 
 import { formatLifecycleLabel } from "../shellData";
@@ -7,15 +7,11 @@ import stepStyles from "./StartupSteps.module.css";
 import { buildStartupSteps, stepStatusLabel } from "./startupHelpers";
 
 // Visual overhaul A, Slice 7: the cold boot on the same skeleton as every
-// workspace — the state first, the engine's handshake under it, one key.
+// workspace — the state first, the engine's handshake under it. New pages
+// program, Slice 3 (D6): its one key showed the keyboard shortcuts, which are
+// gone, so the display has no key; there is nothing to do but wait.
 
-export function StartupSurface({
-  lifecycle,
-  onShowShortcuts,
-}: {
-  lifecycle: ShellState["lifecycle"];
-  onShowShortcuts: () => void;
-}) {
+export function StartupSurface({ lifecycle }: { lifecycle: ShellState["lifecycle"] }) {
   const steps = buildStartupSteps(lifecycle);
   const done = steps.filter((step) => step.tone !== "neutral").length;
 
@@ -25,7 +21,6 @@ export function StartupSurface({
       word={lifecycle === "ready" ? "READY" : "STARTING UP…"}
       sentence="Connecting to the desk, the rig and the deck. The Console opens once Studio Control is ready."
       meta={`${formatLifecycleLabel(lifecycle)} · ${done} of ${steps.length} startup steps done`}
-      actions={<Key size="small" cap="Shortcuts" hint="?" testId="startup-shortcuts" onClick={onShowShortcuts} />}
       testId="startup-surface"
     >
       <div className={stepStyles.steps} data-testid="startup-steps">

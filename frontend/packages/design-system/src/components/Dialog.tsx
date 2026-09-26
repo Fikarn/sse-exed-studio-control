@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import styles from "./Dialog.module.css";
@@ -32,10 +32,22 @@ function getFocusableElements(container: HTMLElement) {
 // that floats over the scrim with the one large blur, a 24 px title, the
 // sentence in body type and sentence-case verbs on keys. Focus moves in on
 // mount, stays inside on Tab, and returns on unmount; Escape closes.
+//
+// New pages program, Slice 3 review: focus moves in once per opening. The
+// effect used to run again whenever `onClose` changed, and callers pass an
+// inline handler that is new on every render (the shell's clock draws the
+// workspace again every 15 s), so each render pulled focus back to the first
+// field, off the key the operator had tabbed to. Escape reads the latest
+// `onClose` from a ref instead.
 export function Dialog({ actions, body, children, className, labelledBy, onClose, title }: DialogProps) {
   const generatedTitleId = useId();
   const titleId = labelledBy ?? generatedTitleId;
   const dialogRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -48,9 +60,10 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
     (focusables[0] ?? dialog).focus();
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && onClose) {
+      const close = onCloseRef.current;
+      if (event.key === "Escape" && close) {
         event.preventDefault();
-        onClose();
+        close();
         return;
       }
 
@@ -81,7 +94,7 @@ export function Dialog({ actions, body, children, className, labelledBy, onClose
       dialog.removeEventListener("keydown", handleKeyDown);
       previouslyFocused?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   if (typeof document === "undefined") return null;
 

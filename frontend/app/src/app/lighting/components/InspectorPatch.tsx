@@ -58,8 +58,7 @@ export function InspectorPatch({
     return (
       <InspectorSection title="Patch mode">
         <p className={styles.empty}>
-          Choose a fixture on the stage plot to edit its DMX address. Press <kbd className={styles.kbd}>P</kbd> to leave
-          patch mode.
+          Choose a fixture on the stage plot to edit its DMX address. Press Patch to leave patch mode.
         </p>
       </InspectorSection>
     );

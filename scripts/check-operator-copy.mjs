@@ -81,8 +81,9 @@ function walk(dir, out = []) {
   return out;
 }
 
-// Is this string literal something the operator reads?
-function isOperatorFacing(node) {
+// Is this string literal something the operator reads? The new pages program's
+// Slice 3 key-hint guard (`check-no-shortcuts.mjs`) reads strings the same way.
+export function isOperatorFacing(node) {
   const parent = node.parent;
   if (!parent) return false;
   if (ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) return false;
@@ -91,6 +92,22 @@ function isOperatorFacing(node) {
   if (ts.isLiteralTypeNode(parent)) return false;
   if (ts.isJsxAttribute(parent) && SKIP_ATTRIBUTES.has(parent.name.getText())) return false;
   return true;
+}
+
+// Is this literal rendered, or compared against and stored? Anything inside
+// JSX is printed; an operand of a comparison or a `switch` is not.
+export function isPrinted(node) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (ts.isBinaryExpression(current) || ts.isCaseClause(current) || ts.isSwitchStatement(current)) return false;
+    if (
+      ts.isJsxElement(current) ||
+      ts.isJsxSelfClosingElement(current) ||
+      ts.isJsxExpression(current) ||
+      ts.isJsxAttribute(current)
+    )
+      return true;
+  }
+  return false;
 }
 
 /** @returns {Array<{ file: string, line: number, word: string, text: string }>} */
@@ -112,21 +129,6 @@ export function scanSource(text, relativeFile) {
       if (f.printedOnly && loneCode && !printed) continue;
       hits.push({ file: relativeFile, line, word: f.word, text: value.slice(0, 80) });
     }
-  };
-  // Is this literal rendered, or compared against and stored? Anything inside
-  // JSX is printed; an operand of a comparison or a `switch` is not.
-  const isPrinted = (node) => {
-    for (let current = node.parent; current; current = current.parent) {
-      if (ts.isBinaryExpression(current) || ts.isCaseClause(current) || ts.isSwitchStatement(current)) return false;
-      if (
-        ts.isJsxElement(current) ||
-        ts.isJsxSelfClosingElement(current) ||
-        ts.isJsxExpression(current) ||
-        ts.isJsxAttribute(current)
-      )
-        return true;
-    }
-    return false;
   };
   const visit = (node) => {
     if (ts.isJsxText(node)) check(node.getText(), node, true);

@@ -18,11 +18,12 @@ export type AudioChannelGroupSelections = Record<AudioGroupTierId, AudioChannelG
 
 export interface AudioChannelGroupSelectionRequest {
   group: AudioChannelGroup;
-  mode: "single" | "toggle" | "invert";
   tierId: AudioGroupTierId;
 }
 
 export interface AudioTierViewModel {
+  /** "Bank 2 / 3 · ch 5-8 of 12": this row's bank and its own channels (new pages S3). */
+  bankReadout: string;
   channels: AudioChannelEntry[];
   chips: Array<{ id: AudioChannelGroup; label: string; active?: boolean; testId: string }>;
   id: AudioTierId;
@@ -124,47 +125,32 @@ function meteringSourceLabel(source: unknown) {
   return String(source ?? "unknown").toLowerCase() === "rme-totalmix-osc" ? "TotalMix" : String(source ?? "unknown");
 }
 
-export function buildAudioPaletteRegistrationSignature(
-  viewModel: AudioWorkspaceViewModel,
-  selectableChannels: readonly AudioChannelEntry[]
-) {
-  return JSON.stringify({
-    channels: selectableChannels.map((channel) => ({
-      id: channel.id,
-      mute: channel.mute,
-      name: channel.name,
-      role: channel.role,
-      shortName: channel.shortName,
-      solo: channel.solo,
-    })),
-    mixTargets: viewModel.mixTargets.map((mixTarget) => ({
-      id: mixTarget.id,
-      name: mixTarget.name,
-      role: mixTarget.role,
-      shortName: mixTarget.shortName,
-    })),
-    selectedChannel: viewModel.selectedChannel
-      ? {
-          id: viewModel.selectedChannel.id,
-          mute: viewModel.selectedChannel.mute,
-          name: viewModel.selectedChannel.name,
-          phase: viewModel.selectedChannel.phase,
-          solo: viewModel.selectedChannel.solo,
-        }
-      : null,
-    selectedMixTargetId: viewModel.selectedMixTargetId,
-    selectedSnapshot: viewModel.selectedSnapshot
-      ? {
-          id: viewModel.selectedSnapshot.id,
-          name: viewModel.selectedSnapshot.name,
-        }
-      : null,
-    snapshots: viewModel.snapshots.slice(0, 8).map((snapshot) => ({
-      id: snapshot.id,
-      name: snapshot.name,
-      oscIndex: snapshot.oscIndex,
-    })),
-  });
+/**
+ * A click on a row's group chip. New pages program, Slice 3 (decision 10): a
+ * plain click switches the chip on or off, and several chips can be lit at
+ * once — Shift+click (add) and Alt+click (invert) went with the other keys
+ * held while pointing. No chip lit means the row shows every strip. Only the
+ * clicked chip changes: the row's other lit chips stay lit, in the fixed group
+ * order, whichever bank their strips are on (a lit chip shows on every bank,
+ * `visibleTierGroups`); the other row is left as it was. The click used to keep
+ * only the groups the current bank's chips offered, so on the Inputs row, where
+ * a bank at 2560 holds one group, it also switched off a lit chip whose strips
+ * were on another bank.
+ */
+export function toggleChannelGroupSelection(
+  current: AudioChannelGroupSelections,
+  { group, tierId }: AudioChannelGroupSelectionRequest
+): AudioChannelGroupSelections {
+  const lit = new Set(current[tierId]);
+  if (lit.has(group)) {
+    lit.delete(group);
+  } else {
+    lit.add(group);
+  }
+  return {
+    ...current,
+    [tierId]: AUDIO_GROUP_ORDER.filter((groupId) => lit.has(groupId)),
+  };
 }
 
 const AUDIO_GROUP_LABELS: Record<AudioChannelGroup, string> = {
@@ -342,9 +328,16 @@ function orderedGroupsForChannels(channels: AudioChannelEntry[]) {
   return AUDIO_GROUP_ORDER.filter((groupId) => present.has(groupId));
 }
 
+// The chips a row's heading draws, in the fixed group order: the groups of this
+// bank's strips (filtered or not) and every lit group of the row, whichever
+// bank its strips are on. So the heading always says what the row is filtered
+// to, and a lit chip can be switched off from any bank (new pages program,
+// Slice 3, decision 10); it used to draw this bank's groups only. Remote has a
+// chip only while it is lit.
 function visibleTierGroups(channels: AudioChannelEntry[], activeGroups: readonly AudioChannelGroup[]) {
+  const onBank = new Set(channels.map((entry) => getAudioChannelGroup(entry)));
   const active = new Set(activeGroups);
-  return orderedGroupsForChannels(channels).filter((groupId) => groupId !== "remote" || active.has(groupId));
+  return AUDIO_GROUP_ORDER.filter((groupId) => active.has(groupId) || (groupId !== "remote" && onBank.has(groupId)));
 }
 
 function activeGroupsForTier(
@@ -453,7 +446,17 @@ export function buildAudioViewModel({
   const meterSimulationLabel = "TEST METER SIMULATION";
   const meterSimulationDetail = "Test meter simulation · not hardware";
 
+  // New pages program, Slice 3: a row's bank readout counts that row — its
+  // first and last channel on this bank of the channels its chips let through.
+  // It used to print the Inputs bank's first channel, both rows' strip count and
+  // every channel ("ch 5-16 of 18" on bank 2); since the bank keys it shows on
+  // bank 1 too (decision 3).
+  const tierBankReadout = (visible: AudioChannelEntry[], bankSize: number, total: number) => {
+    const first = clampedBankIndex * bankSize + 1;
+    return `Bank ${clampedBankIndex + 1} / ${totalBanks} · ch ${first}-${first + visible.length - 1} of ${total}`;
+  };
   const hardwareInputs: AudioTierViewModel = {
+    bankReadout: tierBankReadout(visibleHardwareInputs, hardwareInputBankSize, hardwareInputChannels.length),
     channels: visibleHardwareInputs,
     chips: visibleTierGroups(
       [...defaultVisibleHardwareInputs, ...visibleHardwareInputs],
@@ -471,6 +474,7 @@ export function buildAudioViewModel({
     testId: "audio-hardware-inputs-tier",
   };
   const softwarePlayback: AudioTierViewModel = {
+    bankReadout: tierBankReadout(visibleSoftwarePlayback, softwarePlaybackBankSize, softwarePlaybackChannels.length),
     channels: visibleSoftwarePlayback,
     chips: visibleTierGroups(
       [...defaultVisibleSoftwarePlayback, ...visibleSoftwarePlayback],

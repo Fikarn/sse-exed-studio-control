@@ -121,8 +121,8 @@ export function InspectorScene({
           <span className={styles.sceneEyebrow}>Active scene</span>
           <h2 className={styles.sceneTitle}>No scene</h2>
           <p className={styles.sceneSub}>
-            No scene is active. Press <kbd className={styles.kbd}>S</kbd> after editing fixtures to save the current rig
-            state as a new scene, or use <strong>Save as new</strong> to name it explicitly.
+            No scene is active. Use <strong>Save scene</strong> to save the current rig state as a new scene, or{" "}
+            <strong>Save as new</strong> to name it.
           </p>
           <div className={styles.sceneActions}>
             {onSaveScene ? (

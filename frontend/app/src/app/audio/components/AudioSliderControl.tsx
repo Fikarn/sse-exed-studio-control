@@ -12,11 +12,15 @@ import styles from "./AudioSliderControl.module.css";
 import { AUDIO_DRAFT_CLEAR_MS } from "../audioConstants";
 import { AUDIO_FADER_UNITY, snapFaderValue } from "../audioFormatting";
 
+// New pages program, Slice 3 (decisions 9 and 10): a focused slider takes the
+// arrows (one step), Page Up / Page Down (five steps) and Home / End, and
+// nothing with Shift, Ctrl or Alt. The Shift five-step, Shift+click to unity and
+// the Ctrl fine drag went; a drag that lands beside unity still settles on it
+// (`snapUnity`), and Enter or a double-click still asks for typed entry.
 export interface AudioSliderControlProps {
   "data-testid"?: string;
   className?: string;
   disabled?: boolean;
-  fineStep?: number;
   label: string;
   max?: number;
   min?: number;
@@ -32,13 +36,10 @@ export interface AudioSliderControlProps {
 
 interface DragState {
   axisSize: number;
-  fine: boolean;
   latestValue: number;
   pointerId: number;
   rectLeft: number;
   rectTop: number;
-  startPointer: number;
-  startValue: number;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -62,7 +63,6 @@ export function AudioSliderControl({
   "data-testid": testId,
   className,
   disabled = false,
-  fineStep,
   label,
   max = 1,
   min = 0,
@@ -90,7 +90,6 @@ export function AudioSliderControl({
   const [isDragging, setIsDragging] = useState(false);
   const span = Math.max(0.00001, max - min);
   const currentValue = clamp(localDraftValue ?? value, min, max);
-  const effectiveFineStep = fineStep ?? step;
   const pct = ((currentValue - min) / span) * 100;
 
   useEffect(() => {
@@ -107,9 +106,9 @@ export function AudioSliderControl({
     []
   );
 
-  const normalizeValue = (nextValue: number, { shouldSnap, valueStep }: { shouldSnap: boolean; valueStep: number }) => {
-    const stepped = quantize(nextValue, valueStep, min, max);
-    return shouldSnap ? snapFaderValue(stepped) : stepped;
+  const normalizeValue = (nextValue: number) => {
+    const stepped = quantize(nextValue, step, min, max);
+    return snapUnity ? snapFaderValue(stepped) : stepped;
   };
 
   const preview = (nextValue: number) => {
@@ -151,13 +150,6 @@ export function AudioSliderControl({
     return min + ((event.clientX - rectLeft) / axisSize) * span;
   };
 
-  const valueFromFineDrag = (event: ReactPointerEvent<HTMLElement>, drag: DragState) => {
-    const pointer = orientation === "vertical" ? event.clientY : event.clientX;
-    const direction = orientation === "vertical" ? -1 : 1;
-    const delta = ((pointer - drag.startPointer) / drag.axisSize) * direction * span * 0.1;
-    return drag.startValue + delta;
-  };
-
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (disabled) return;
     event.preventDefault();
@@ -172,41 +164,18 @@ export function AudioSliderControl({
     }
     lastPointerDownAtRef.current = now;
 
-    if (snapUnity && event.shiftKey) {
-      const unity = clamp(AUDIO_FADER_UNITY, min, max);
-      previewAndCommit(unity);
-      return;
-    }
-
-    const fine = event.metaKey || event.ctrlKey;
     const rect = event.currentTarget.getBoundingClientRect();
-    const axisSize = orientation === "vertical" ? Math.max(1, rect.height) : Math.max(1, rect.width);
-    const nextValue = fine
-      ? currentValue
-      : normalizeValue(
-          valueFromPointer(event, {
-            axisSize,
-            fine,
-            latestValue: currentValue,
-            pointerId: event.pointerId,
-            rectLeft: rect.left,
-            rectTop: rect.top,
-            startPointer: orientation === "vertical" ? event.clientY : event.clientX,
-            startValue: currentValue,
-          }),
-          { shouldSnap: snapUnity, valueStep: step }
-        );
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = {
-      axisSize,
-      fine,
-      latestValue: nextValue,
+    const drag: DragState = {
+      axisSize: orientation === "vertical" ? Math.max(1, rect.height) : Math.max(1, rect.width),
+      latestValue: currentValue,
       pointerId: event.pointerId,
       rectLeft: rect.left,
       rectTop: rect.top,
-      startPointer: orientation === "vertical" ? event.clientY : event.clientX,
-      startValue: currentValue,
     };
+    const nextValue = normalizeValue(valueFromPointer(event, drag));
+    drag.latestValue = nextValue;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = drag;
     setIsDragging(true);
     preview(nextValue);
   };
@@ -216,11 +185,7 @@ export function AudioSliderControl({
     if (!drag || drag.pointerId !== event.pointerId || disabled) return;
     event.preventDefault();
     event.stopPropagation();
-    const rawValue = drag.fine ? valueFromFineDrag(event, drag) : valueFromPointer(event, drag);
-    const nextValue = normalizeValue(rawValue, {
-      shouldSnap: snapUnity,
-      valueStep: drag.fine ? effectiveFineStep : step,
-    });
+    const nextValue = normalizeValue(valueFromPointer(event, drag));
     drag.latestValue = nextValue;
     preview(nextValue);
   };
@@ -252,7 +217,6 @@ export function AudioSliderControl({
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (disabled) return;
 
-    const multiplier = event.shiftKey ? 5 : 1;
     let nextValue: number;
 
     switch (event.key) {
@@ -264,11 +228,11 @@ export function AudioSliderControl({
         return;
       case "ArrowUp":
       case "ArrowRight":
-        nextValue = currentValue + step * multiplier;
+        nextValue = currentValue + step;
         break;
       case "ArrowDown":
       case "ArrowLeft":
-        nextValue = currentValue - step * multiplier;
+        nextValue = currentValue - step;
         break;
       case "PageUp":
         nextValue = currentValue + step * 5;

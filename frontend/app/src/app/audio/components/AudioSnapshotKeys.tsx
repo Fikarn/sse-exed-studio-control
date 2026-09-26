@@ -56,7 +56,6 @@ export function AudioSnapshotKeys({
   return (
     <Section
       title="Snapshots"
-      detail="Shift 1–8"
       className={styles.deck}
       testId="audio-snapshot-deck"
       actions={

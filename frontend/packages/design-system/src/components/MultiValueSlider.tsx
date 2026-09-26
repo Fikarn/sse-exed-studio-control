@@ -13,14 +13,17 @@ export interface MultiValueSliderProps {
   max: number;
   step?: number;
   /** Called whenever the user shifts via slider drag, types a delta
-   *  expression, or resets (Alt+double-click / Backspace / Delete). Returns the
+   *  expression, or resets (a plain double-click on the slider). Returns the
    *  per-value array with the same length and order as `values`. */
   onValuesChange: (next: number[]) => void;
   /** Optional commit callback (debounce-friendly). Receives the same array
    *  shape as `onValuesChange`. */
   onValuesCommit?: (next: number[]) => void;
-  /** Reset target. Alt+double-click — or Backspace/Delete when focused — resets
-   *  ALL values to this (inherited from ScrubSlider). */
+  /** Reset target for the average. A plain double-click on the slider moves
+   *  the average to this value: every value shifts by the same amount, each
+   *  clamped to min–max, so a mixed selection keeps its spread and only a
+   *  uniform one lands on the value. (The double-click is ScrubSlider's, which
+   *  has no typed entry here; typing a number in the field sets every value.) */
   resetValue?: number;
   /** Disabled state. */
   disabled?: boolean;

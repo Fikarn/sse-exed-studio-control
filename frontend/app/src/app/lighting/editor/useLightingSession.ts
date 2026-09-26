@@ -1,13 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { type LightingUiMode, deriveInspectorTab } from "../components/LightingInspector";
 import { asRecord } from "../../shellData";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { InspectorTab } from "../components/LightingInspectorTabs";
 import { useToast } from "../../shared/toastContext";
-import { usePalette } from "../../shared/paletteContext";
 import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { useResizableColumns } from "../useResizableColumns";
 import { useUndoStack } from "../useUndoStack";
+import { UndoTargets } from "../undoTargets";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import type { LightingWorkspaceSurfaceProps } from "../lightingWorkspaceModel";
 import type { LightingRig } from "./useLightingRig";
@@ -18,7 +18,7 @@ import type { LightingRig } from "./useLightingRig";
  *  reaches the rig. */
 export function useLightingSession({ props, rig }: { props: LightingWorkspaceSurfaceProps; rig: LightingRig }) {
   const { appSnapshot } = props;
-  const { scenes, persistedLightingSectionId, selectedFixture, persistedSelectedFixtureId, previewMode } = rig;
+  const { persistedLightingSectionId, selectedFixture, persistedSelectedFixtureId, previewMode } = rig;
   const [uiMode, setUiMode] = useState<LightingUiMode>(() => {
     const initialSectionId = asRecord(asRecord(appSnapshot?.shell)?.lighting)?.currentSectionId;
     return initialSectionId === "palettes-patch" ? "patch" : "recall";
@@ -29,7 +29,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   const [searchQuery, setSearchQuery] = useState("");
 
   const toast = useToast();
-  const palette = usePalette();
   const operatorLayout = useOperatorLayout();
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
@@ -80,14 +79,10 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
 
   const columns = useResizableColumns(operatorLayout.layoutMode);
   const undoStack = useUndoStack();
-
-  // Stable ref to the latest scenes list — undo entries close over this so
-  // they can ref-count against the CURRENT scenes at undo time, not whatever
-  // was visible when the entry was pushed.
-  const scenesRef = useRef(scenes);
-  useEffect(() => {
-    scenesRef.current = scenes;
-  }, [scenes]);
+  // The scenes and fixtures the undo steps act on, followed through the ids an
+  // undo gives them (Slice 3 review, finding 17). The steps read the rig at
+  // undo time from the store (`rigNow`), not from a copy kept here.
+  const [undoTargets] = useState(() => new UndoTargets());
 
   const activeTab =
     activeTabOverride ??
@@ -197,7 +192,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     searchQuery,
     setSearchQuery,
     toast,
-    palette,
     operatorLayout,
     inspectorDrawerOpen,
     setInspectorDrawerOpen,
@@ -224,7 +218,7 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     requestInlineRename,
     columns,
     undoStack,
-    scenesRef,
+    undoTargets,
     activeTab,
     reportError,
     handleTogglePatch,

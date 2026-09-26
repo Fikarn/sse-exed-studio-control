@@ -24,7 +24,6 @@ import {
 } from "./helpers/meter-canvas";
 import { expectWorkspaceMounted, fixtureMap, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
-import { audioPaletteSignatureForSnapshot, cloneValue } from "./helpers/view-models";
 
 // Production readiness S15: the Console's metering cases, moved out of
 // audio.spec.ts by line range — at 1,977 lines that spec had no room left under
@@ -455,38 +454,8 @@ test("holds fixture peak markers until the hold window expires", () => {
   expect(decayedAfterHold.peakHold).toBeGreaterThanOrEqual(0.39);
 });
 
-test("keeps audio command palette registration stable during metering ticks", async () => {
-  const transport = createFixtureTransport({ ...fixtureMap["audio-populated"], audioMeteringActive: true });
-  const baseline = (await transport.request("audio.snapshot")) as AudioSnapshot;
-  const meteringTick = cloneValue(baseline);
-  meteringTick.channels = meteringTick.channels.map((channel, index) => ({
-    ...channel,
-    meterLeft: Math.min(0.98, channel.meterLeft + 0.03 + index * 0.001),
-    meterLevel: Math.min(0.98, channel.meterLevel + 0.02),
-    meterRight: Math.min(0.98, channel.meterRight + 0.025 + index * 0.001),
-    peakHold: Math.min(1, channel.peakHold + 0.04),
-    peakHoldLeft: Math.min(1, channel.peakHoldLeft + 0.04),
-    peakHoldRight: Math.min(1, channel.peakHoldRight + 0.04),
-  }));
-  meteringTick.mixTargets = meteringTick.mixTargets.map((mixTarget) => ({
-    ...mixTarget,
-    meterLeft: Math.min(0.98, mixTarget.meterLeft + 0.02),
-    meterLevel: Math.min(0.98, mixTarget.meterLevel + 0.02),
-    meterRight: Math.min(0.98, mixTarget.meterRight + 0.02),
-    peakHold: Math.min(1, mixTarget.peakHold + 0.04),
-    peakHoldLeft: Math.min(1, mixTarget.peakHoldLeft + 0.04),
-    peakHoldRight: Math.min(1, mixTarget.peakHoldRight + 0.04),
-  }));
-
-  expect(audioPaletteSignatureForSnapshot(meteringTick)).toBe(audioPaletteSignatureForSnapshot(baseline));
-
-  const muteChange = cloneValue(baseline);
-  muteChange.channels = muteChange.channels.map((channel) =>
-    channel.id === "audio-input-9" ? { ...channel, mute: !channel.mute } : channel
-  );
-  expect(audioPaletteSignatureForSnapshot(muteChange)).not.toBe(audioPaletteSignatureForSnapshot(baseline));
-  await transport.dispose();
-});
+// New pages program, Slice 3 (D6): "keeps audio command palette registration
+// stable during metering ticks" went with the command palette.
 
 test("fixture simulated output submix uses TotalMix fader gain curve", async () => {
   const seedTransport = createFixtureTransport({ ...fixtureMap["audio-populated"], audioMeteringActive: false });

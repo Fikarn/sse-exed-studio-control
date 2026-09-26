@@ -122,7 +122,7 @@ Net-new in PR 1 (cross-workspace reuse plausible):
 - `Crest` — wraps the official SSE Executive Education horizontal white logo PNG, `size: "sm" | "md" | "lg"` (36 / 52 / 72 px)
 - `NavItem` — workspace nav button with optional 16 px Lucide icon and active state (gradient background + 3 px glowing underline on `--color-brand-green`); consumed by the new `AppShellFrame` shell header
 - `StatusDot` — semantic status dot, `state: "ok" | "attn" | "err" | "info"`, `size: "sm" | "md"`, `glow?` default on
-- `HealthBar` + `HealthItem` — full-width status strip with N items + optional kbd-shortcut hint
+- `HealthBar` + `HealthItem` — full-width status strip with N items (its kbd-shortcut hint left in the new pages program's Slice 3)
 - `PlotPill` — glass overlay pill with backdrop-blur, `state: "default" | "modified" | "patch"`
 - `PlotMeta` — small mono info chip with backdrop-blur, `tone: "default" | "blue"`
 
@@ -169,6 +169,8 @@ A v2.2.1 operator launching the completed Direction D / premium build sees their
 
 ## 6. Keyboard shortcuts
 
+**Removed on 2026-09-26 (the new pages program, Slice 3, decision D6).** Lighting binds no key of its own and shows no key hint; each action in the table below is a control on the page, except two that went: the quick palette panel (`Cmd/Ctrl+Shift+P`; decision 7 — the plate's Palettes section applies the same palettes with its "Apply <name>" keys) and the shortcut overlay (`?`), which went with the keys it listed. `docs/plans/new-pages-2026-09-s3-inventory.md` names each key's on-screen twin. What the keyboard still does is plain operation: Tab, Enter or Space on the focused control, typing, the arrows on a focused slider, scrub label or talent mark, the keyboard reorder of scene tiles and group chips, and Esc on a dialog, a popup, a rename field or the search field's Recent list. The table is kept as the record of what there was.
+
 | Key                      | Action                                            |
 | ------------------------ | ------------------------------------------------- |
 | `P`                      | Toggle patch overlay                              |
@@ -183,7 +185,7 @@ A v2.2.1 operator launching the completed Direction D / premium build sees their
 | `Cmd+1..4` / `Ctrl+1..4` | Workspace switch (inherited from `OperatorShell`) |
 | `?`                      | Toggle the shortcut overlay (inherited)           |
 
-**De-listed from Cr** (cue-related; gone): `Space` (GO), `Backspace` (back-step), `C` (add cue), `E` (edit cue), and Cr-style section recall on `1`-`9`. Pure digits now recall scene slots; view bookmarks use `Shift+1`-`3` / `Cmd+Shift+1`-`3`.
+**De-listed from Cr** (cue-related; gone): `Space` (GO), `Backspace` (back-step), `C` (add cue), `E` (edit cue), and Cr-style section recall on `1`-`9`. Until Slice 3, pure digits recalled scene slots and `Shift+1`-`3` / `Cmd+Shift+1`-`3` recalled and saved view bookmarks; now a click on a scene tile or "Recall scene" on the plate recalls, the view slots "1"–"3" recall, and right-click on a slot › "Save current view to N" saves.
 
 ## 7. What is explicitly **not** in scope
 

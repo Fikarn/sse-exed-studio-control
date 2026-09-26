@@ -2,9 +2,11 @@ import { SupportPlate } from "../components/SupportPlate";
 import { describeBackupKind, formatBackupTimestamp } from "../../shellData";
 import { APP_VERSION } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
+import { windowKeyActions } from "./windowKeyActions";
 
 /** The plate's wiring: the workstation's facts, the light outputs switch, the
- *  recent actions, theme and scale, and the backup and diagnostics keys. */
+ *  recent actions, theme, scale and the window, and the backup and diagnostics
+ *  keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
   const { backups, lastBackup, busyAction, runtime, recentActions, theme, uiScale, setTheme, setUiScale } =
@@ -38,6 +40,10 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       }}
       onSelectTheme={setTheme}
       onSelectUiScale={setUiScale}
+      // New pages program, Slice 3 (decision 2): the window keys, wired as the
+      // bay's copy of them is (SetupSupportScreen), so a refusal lands in the
+      // message line from either.
+      {...windowKeyActions(performAction)}
       onSetLightOutputsArmed={(armed) => {
         if (armed === lightOutputsArmed) return;
         void performAction("light-outputs", () => setLightOutputsArmed(armed));

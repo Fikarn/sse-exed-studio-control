@@ -35,6 +35,17 @@ This document describes runtime behavior and operator recovery for the native `S
 - If the hardware link stops during a session (the display reads `THE HARDWARE LINK STOPPED`, code `ENGINE_EXITED`), Studio Control restarts it on its own: one, two and four seconds after the first, second and third stop within five minutes. A fourth stop within those five minutes stays on the recovery surface; use Retry startup once the desk and the rig are ready, and export diagnostics if it keeps stopping.
 - One Studio Control runs per workstation. Launching it again brings the running window to the front. If the display reads `STUDIO CONTROL IS ALREADY OPEN` (code `ENGINE_ALREADY_RUNNING`), another copy — possibly one still closing — holds the app-data directory; close it, then start again.
 
+### Keys
+
+Studio Control binds no key of its own (2026-09 new pages, Slice 3): every action is a control on the screen or a key on the Stream Deck, and no screen shows a key or a key hint. The keyboard does what it does in any Windows program:
+
+- Tab moves between controls; Enter or Space presses the control that has focus.
+- Typing fills a field; Enter in a field confirms it, and Esc in a rename field puts the old name back.
+- On a slider, fader or knob that has focus, the arrow keys move it one step, Home and End to its ends, and Page Up and Page Down a larger step where it has one (the Console's knobs and plate sliders and Lighting's sliders do; the strip faders and the Main level do not); Enter opens its typed entry where it has one (the strip faders, the knobs, the Grand master, a fixture's sliders), and typed entry offers "Reset to <default>". A talent mark that has focus moves 0.1 m with the arrow keys.
+- Esc closes a dialog, a right-click menu, the colour picker and the search field's Recent list, and cancels an armed key.
+
+The web view's own keys are switched off, so F5, Ctrl+R and Ctrl+Shift+R never reload the screen during a show, and the find, print, zoom and back keys do nothing; copy, paste and select-all still work in fields. Alt+F4 still asks "Close Studio Control?". The window commands are keys in Setup / Support › Workstation (**Studio fullscreen**, **Windowed**, **Reset the window layout**). When Studio Control is in a window, or on a screen narrower than the studio monitor (display 2 at 125 %), the Workstation plate is not on screen: press **Support** on the Setup / Support cluster, and the same three keys are under the Support screen, in Workstation. **Reset the window layout** is on the recovery screens too. Below that width the plate's other keys (the theme, the UI scale, Restart the hardware link…, the light outputs' Armed and Held) are not on screen: press **Studio fullscreen** first.
+
 ## Lighting Output
 
 The engine streams the lighting state to the commissioned bridge as unicast sACN (ANSI E1.31) on UDP `5568`.
@@ -127,7 +138,7 @@ Audio-page edits are transmitted to TotalMix over the Global OSC remote (send po
 - Channel faders ride `/mix/{in|pb}/{ch}/{out}/faderlin` (linear 0..1, the app's own fader scale; the dB the app prints for a position follows RME's published fader curve, unity at step 836 of 1023) to the requested submix — Main (out 0), Phones 1 (out 8), or Phones 2 (out 10). Output levels ride `/output/{ch}/faderlin`.
 - Mute (`/input|playback|output/{ch}/mute`), solo (`/mix/{in|pb}/{ch}/0/solo`, main submix), phantom (`/input/{ch}/48v`), phase, pad, instrument, and auto-set are absolute 0/1 states.
 - Dim, mono, and talkback are control-room functions (`/controlroom/dim|mainmono|talkback`) — sent for the main out, app-local for the phones targets.
-- Talkback is momentary on every surface: hold the Talkback button or `T` in the app, or `TALK` on the deck. The app re-sends the hold every 750 ms and the engine releases 2 s after the last hold from any surface, so a dropped request, a closed window or an unplugged deck can never leave talkback open, and a click never latches. A graceful engine stop releases an active hold; a hard kill cannot — if the engine dies mid-hold, release talkback in TotalMix.
+- Talkback is momentary on every surface: hold the Talkback button in the app, or `TALK` on the deck. The app re-sends the hold every 750 ms and the engine releases 2 s after the last hold from any surface, so a dropped request, a closed window or an unplugged deck can never leave talkback open, and a click never latches. A graceful engine stop releases an active hold; a hard kill cannot — if the engine dies mid-hold, release talkback in TotalMix.
 - Preamp gain is sent in real dB (`/input/{ch}/gain`) for the front preamps 9-12.
 - The TotalMix Channel Layout gates whether TotalMix accepts control on hidden channels ("Receive on hidden channels" in the Global OSC details); keep the channels the operator drives visible, or enable that option.
 - EQ and Low Cut edits still use the classic page-2 path on the first classic remote; the classic remotes otherwise serve as metering fallback, and the engine keeps pinning their bus/bank each second.
@@ -153,7 +164,7 @@ Layout of the AUDIO deck page:
 - Keys, top row: `→ MAIN`, `→ PH 1`, `→ PH 2` set the active mix target (the same engine-persisted selection as the app's output strips — the tier header "Mix for →" and the deck always agree), and `BANK` cycles which strips the dials drive: inputs (the four front preamps) → playback (pairs 1-4) → outputs (Main / Phones 1 / Phones 2, fourth dial idle).
 - Keys, bottom row: `DIM` toggles control-room dim on Main; `GAIN` switches the input dials between send-fader and whole-dB preamp gain; `TALK` is momentary talkback on Main (hold to talk — the engine auto-releases 2 s after the hold stops arriving, so a lost request can never leave talkback open); `SOLO CLR` clears every solo.
 - Touch strip: one segment per strip — name, level in the same dB the on-screen fader shows, and a drawn fader-position bar with the unity notch at RME's 0 dB fader position (step 836 of 1023, about 82 % of the throw — the same curve the on-screen fader prints). The bar is position, not a level meter. After the 2026-09 fader-curve update, re-export the Companion profile from Setup and re-import it (Full Reset & Import) so the deck picks up the regenerated bar images. Muted strips drop to the ember palette with `MUTED`; the selected strip carries the `•` marker and the amber accent. Tapping a segment selects that channel in the app inspector (deliberately silent — strip swipes can register as taps).
-- Dials: rotate rides the strip's level (`0.01` per detent, the app's keyboard step; detents faster than 80 ms apply ×5 like Shift); push toggles the strip's mute.
+- Dials: rotate rides the strip's level (`0.01` per detent, the step an arrow key gives a focused fader in the app; detents faster than 80 ms apply ×5); push toggles the strip's mute.
 
 State color follows the app's Console vocabulary: the active mix-target key is solid amber, `TALK` turns green while live, `SOLO CLR` turns warn-yellow with the live count, `DIM` and `GAIN` go amber while engaged, and a non-input dial bank tints the `BANK` key. The colors come from Companion feedbacks on custom variables the engine publishes (`lcd_audio_state_*`, `lcd_audio_strip_N_state/level`); the bar graphics are PNG assets rendered by `scripts/deck-assets.py` and embedded in the exported profile.
 
@@ -270,7 +281,7 @@ A band at the foot of the screen — "Studio Control hit a problem in the backgr
 
 ## Recommended Checks Before A Live Session
 
-1. Launch the packaged native app and confirm it reaches the expected target surface, fullscreen on the studio monitor (display 3, 2560×1440 at 100 % scaling — the only size the app is built for). If it opens on the other screen or in a window, run **Reset the window layout** from the command palette (`Ctrl+K`).
+1. Launch the packaged native app and confirm it reaches the expected target surface, fullscreen on the studio monitor (display 3, 2560×1440 at 100 % scaling — the only size the app is built for). If it opens on the other screen or in a window, open Setup / Support, press **Support** on the cluster and press **Reset the window layout** under Workstation (on the studio monitor it is in Workstation on the right; on the recovery screen, if Studio Control stopped there).
 2. Confirm lighting, audio, and support summaries show the expected ready state; the header's Lighting lamp reads `held` if the light outputs are held.
 3. Trigger a test light scene recall if lighting is in scope.
 4. Confirm the Console's state display reads `VERIFIED` and its footer `Metering TotalMix · live` — not simulated, stale, or offline. If it reads `NOT VERIFIED` or `OFFLINE`, run the audio probe; if the meters stay still, press **Sync from TotalMix** ("When the Console's meters stay still" above).
@@ -282,7 +293,7 @@ A band at the foot of the screen — "Studio Control hit a problem in the backgr
 1. Move one fader and toggle one mute in TotalMix — the app strip follows within about a second (the link is reading the desk).
 2. Press **Sync** — the toast reports the values pulled, the badge goes `aligned`, and nothing moves in TotalMix.
 3. Recall the session's opening snapshot — the band reports "N values pushed, N confirmed"; any 48 V difference is listed by channel and is only applied when armed there.
-4. Hold **Talkback** (or `T`, or the deck's `TALK`) — TotalMix's talkback lights and clears on release. If the state display reads `ACTION FAILED` with the code `AUDIO_TALKBACK_REFUSED`, assign the talkback input channel in TotalMix first.
+4. Hold **Talkback** (or the deck's `TALK`) — TotalMix's talkback lights and clears on release. If the state display reads `ACTION FAILED` with the code `AUDIO_TALKBACK_REFUSED`, assign the talkback input channel in TotalMix first.
 5. On the Stream Deck, `→ MAIN` / `DIM` / `TALK` mirror the app; the Companion profile must have been re-imported after the fader-curve update (Setup step 1, Full Reset & Import).
 
 ## Bridge Qualification

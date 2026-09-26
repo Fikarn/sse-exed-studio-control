@@ -45,6 +45,13 @@ export interface UseAudioArmingResult {
  * before kicking off an async store call. Direct callers should always use
  * the canonical `armOrApplyAction` + `cancelArmedAction` pair so the toast is
  * raised consistently.
+ *
+ * Esc cancels the arm (new pages program, Slice 3 — D6 keeps Esc on an armed
+ * action). The hook listens for it only while something is armed, as the
+ * design system's `useArm` does; it used to live in the Console's page-wide
+ * key handler, which went with the keyboard shortcuts. While something is
+ * armed the same listener cancels a held Enter's auto-repeat, so holding Enter
+ * on a focused arm key arms it and never applies it.
  */
 export function useAudioArming({
   now = () => performance.now(),
@@ -110,6 +117,33 @@ export function useAudioArming({
     return true;
   });
 
+  // Why: Esc cancels an armed 48 V change, snapshot recall or snapshot save.
+  // Registered only while something is armed, so an idle Console binds no key.
+  // An Esc a dialog or a menu already took (`defaultPrevented`, or stopped
+  // before it reached the window) closes that and leaves the arm alone, as the
+  // old page-wide handler did.
+  // While armed, the listener also cancels a held Enter's auto-repeat. Enter
+  // presses the focused key again on every repeat, and a held key repeats past
+  // the dwell (Windows starts after about 500 ms by default), so holding Enter
+  // on a focused arm key armed it and then applied it. A cancelled keydown
+  // presses nothing, so a held key only arms (product brief §5: held keys never
+  // auto-repeat into an apply; new pages program, Slice 3, on review). A fresh
+  // Enter is not a repeat and still confirms.
+  const armed = armedAction !== null;
+  useEffect(() => {
+    if (!armed) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Enter" && event.repeat) {
+        event.preventDefault();
+        return;
+      }
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (cancelArmedAction()) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [armed, cancelArmedAction]);
+
   const clearArmedAction = useLiveCallback(() => {
     setArmedAction(null);
   });
@@ -117,8 +151,10 @@ export function useAudioArming({
   const armOrApplyAction = useLiveCallback((candidateInput: Omit<AudioArmedAction, "armedAt">, apply: () => void) => {
     if (armedAction?.key === candidateInput.key) {
       // 2026-09 audit Slice 7: the confirming activation must come after a
-      // minimum dwell. Inside it, the repeat is a double-click, a bounced
-      // pointer or a held key — the arm stays and nothing is applied.
+      // minimum dwell. Inside it, the second activation is a double-click or a
+      // bounced pointer — the arm stays and nothing is applied. A held Enter
+      // repeats past the dwell; the key listener above cancels its repeats, so
+      // they never reach this point.
       if (now() - armedAction.armedAt < AUDIO_ARM_MIN_DWELL_MS) {
         return;
       }

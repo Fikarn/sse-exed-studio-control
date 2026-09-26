@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { ShellStore } from "@sse/engine-client";
 import { Key, PlateHead, Section } from "@sse/design-system";
 
@@ -21,18 +21,16 @@ import {
   type AudioEqUpdate,
   type AudioMixTargetUpdate,
   type AudioSendModeUpdate,
-  type PlateSection,
 } from "./inspector/audioInspectorHelpers";
-
-export type { PlateSection };
 
 // Visual overhaul A, Slice 4c (system §7, plan Slice 4): the plate. Each
 // section keeps the test id its tab panel carried, and says which section it is
-// with `data-plate-section` for the accelerators and the geometry checks. The
-// selected strip's preamp, its send, every mix it feeds, its EQ, its dynamics,
-// its meter and the flags the desk reports — all of it visible at once, with no
-// tab row to hide half of it behind. The accelerators the tabs carried bring
-// their section into view instead.
+// with `data-plate-section` for the geometry checks. The selected strip's
+// preamp, its send, every mix it feeds, its EQ, its dynamics, its meter and the
+// flags the desk reports — all of it visible at once, with no tab row to hide
+// half of it behind. New pages program, Slice 3 (decision 4): the section keys
+// P / Q / E / D / R that scrolled the plate to a section went; the plate
+// scrolls.
 export function AudioInspector({
   armedActionKey,
   clearDraftValueLater,
@@ -45,8 +43,6 @@ export function AudioInspector({
   onResetPeakHolds,
   onSelectMixTarget,
   onTogglePeakHold,
-  revealSection,
-  revealToken,
   setDraftValue,
   onUpdateChannelDynamics,
   onUpdateChannelEq,
@@ -70,10 +66,6 @@ export function AudioInspector({
   onResetPeakHolds: () => void;
   onSelectMixTarget: (mixTargetId: string) => void;
   onTogglePeakHold: () => void;
-  /** The section an accelerator asked for; the plate scrolls it into view. */
-  revealSection: PlateSection | null;
-  /** Bumped on every ask, so pressing the same key twice still moves the plate. */
-  revealToken: number;
   setDraftValue: (key: string, value: number) => void;
   onUpdateChannelDynamics: (request: AudioDynamicsUpdate) => void;
   onUpdateChannelEq: (request: AudioEqUpdate) => void;
@@ -136,14 +128,6 @@ export function AudioInspector({
   const supportsGain = selectedChannel ? audioChannelSupportsGain(selectedChannel) : false;
   const eqOn = selectedChannel ? selectedChannel.eq.enabled : false;
 
-  const plateRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const plate = plateRef.current;
-    if (!plate || !revealSection) return;
-    const target = plate.querySelector<HTMLElement>(`[data-plate-section="${revealSection}"]`);
-    target?.scrollIntoView({ block: "start", behavior: "auto" });
-  }, [revealSection, revealToken]);
-
   const meterKeys = (
     <>
       <Key
@@ -170,7 +154,6 @@ export function AudioInspector({
       data-region="plate"
       data-source-tier={viewModel.selectedSourceTier}
       data-testid="audio-inspector"
-      ref={plateRef}
     >
       {selectedChannel ? (
         <>
@@ -328,7 +311,7 @@ export function AudioInspector({
         </Section>
       ) : (
         <AudioEmptyInspector
-          description="Press 1–8, click a strip, or use the command palette to select a source. Output selection stays active."
+          description="Click a strip to select a source. Output selection stays active."
           title="No channel selected"
         />
       )}

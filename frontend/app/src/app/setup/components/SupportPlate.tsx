@@ -51,6 +51,12 @@ export interface SupportPlateProps {
   onRestoreLatest: () => void;
   onSelectTheme: (theme: OperatorTheme) => void;
   onSelectUiScale: (scale: OperatorUiScale) => void;
+  /** New pages program, Slice 3 (D6, decision 2): the window keys. The native
+   *  shell moves the window and keeps the choice for the next launch; outside
+   *  the installed app they do nothing. */
+  onEnterStudioFullscreen: () => void;
+  onUseWindowedLayout: () => void;
+  onResetWindowLayout: () => void;
   onSetLightOutputsArmed: (armed: boolean) => void;
   /** 2026-09 production readiness, Slice 7 (F20): checks the latest backup
    *  without changing anything; the answer lands in the pilot's feedback. */
@@ -79,6 +85,9 @@ export function SupportPlate({
   onRestoreLatest,
   onSelectTheme,
   onSelectUiScale,
+  onEnterStudioFullscreen,
+  onUseWindowedLayout,
+  onResetWindowLayout,
   onSetLightOutputsArmed,
   onVerifyBackup,
   restoreDisabled,
@@ -123,6 +132,13 @@ export function SupportPlate({
             />
           ))}
         </Segmented>
+        <WindowKeys
+          busy={busy}
+          testIdPrefix="support-window"
+          onEnterStudioFullscreen={onEnterStudioFullscreen}
+          onUseWindowedLayout={onUseWindowedLayout}
+          onResetWindowLayout={onResetWindowLayout}
+        />
         {/* Held is not a blackout: the rig keeps its last look, or does what
             the bridge does when its source goes away. The words say what is
             sent, never what the room looks like. */}
@@ -223,5 +239,56 @@ export function SupportPlate({
         </Key>
       </Danger>
     </div>
+  );
+}
+
+export interface WindowKeysProps {
+  busy?: boolean;
+  /** `support-window` on the plate, `support-bay-window` in the bay. */
+  testIdPrefix: string;
+  onEnterStudioFullscreen: () => void;
+  onUseWindowedLayout: () => void;
+  onResetWindowLayout: () => void;
+}
+
+/**
+ * New pages program, Slice 3 (D6, decision 2): the three window commands the
+ * command palette held, under their readout as the switches sit under theirs.
+ * They are commands, not a switch: nothing reports which layout the window is
+ * in, so no key is lit. A refusal lands in the pilot's message line.
+ *
+ * One row, drawn in two places (review finding 22): in Workstation on the
+ * plate, and in the bay's Support screen while the plate is off screen. Below
+ * the studio surface the plate is not drawn, and that is exactly the window
+ * "Windowed" makes (1600 × 960), the fallback window and display 2. The keys
+ * that bring the studio surface back must be on screen there.
+ */
+export function WindowKeys({
+  busy = false,
+  testIdPrefix,
+  onEnterStudioFullscreen,
+  onUseWindowedLayout,
+  onResetWindowLayout,
+}: WindowKeysProps) {
+  return (
+    <>
+      <Readouts rows={[{ id: "window", label: "Window", value: "kept for the next launch" }]} />
+      <div role="group" aria-label="Window" className={styles.windowKeys} data-testid={`${testIdPrefix}-keys`}>
+        <Key
+          size="small"
+          disabled={busy}
+          testId={`${testIdPrefix}-studio-fullscreen`}
+          onClick={onEnterStudioFullscreen}
+        >
+          Studio fullscreen
+        </Key>
+        <Key size="small" disabled={busy} testId={`${testIdPrefix}-windowed`} onClick={onUseWindowedLayout}>
+          Windowed
+        </Key>
+        <Key size="small" disabled={busy} testId={`${testIdPrefix}-reset`} onClick={onResetWindowLayout}>
+          Reset the window layout
+        </Key>
+      </div>
+    </>
   );
 }

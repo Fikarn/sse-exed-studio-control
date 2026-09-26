@@ -19,9 +19,6 @@ export type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]
 export type SelectedAudioChannel = NonNullable<AudioWorkspaceViewModel["selectedChannel"]>;
 export type AudioEqBand = SelectedAudioChannel["eq"]["bands"][number];
 export type AudioLowCut = SelectedAudioChannel["eq"]["lowCut"];
-// Visual overhaul A, Slice 4c: the plate has no tabs. What the tab ids named is
-// now a section of the plate, and the accelerators bring one into view.
-export type PlateSection = "preamp" | "send" | "sends" | "eq" | "dynamics" | "meter" | "channel" | "output";
 
 /**
  * Pointer-drag anchor used by the EQ graph. Lives in the shared helpers so
@@ -75,16 +72,6 @@ export const EQ_GAIN_MARKERS = [
   { gainDb: 0, label: "0 dB" },
   { gainDb: -20, label: "-20 dB" },
 ] as const;
-
-// The plain-key accelerators the tab strip carried, now pointing at the plate's
-// sections: P/Q the preamp, E the equaliser, D the dynamics, R the sends.
-export const PLATE_SECTION_KEYS: Partial<Record<string, PlateSection>> = {
-  p: "preamp",
-  q: "preamp",
-  e: "eq",
-  d: "dynamics",
-  r: "send",
-};
 
 export function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;

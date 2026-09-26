@@ -1,0 +1,3200 @@
+<!doctype html>
+<html
+  lang="en"
+  data-theme="studio"
+  data-states="ready,recording,rec-joined,stop-armed,format-choose,format-armed,released,rec-released,no-pictures,not-taken,unreachable"
+>
+  <head>
+    <meta charset="utf-8" />
+    <title>Studio Control · Cameras · Concept A — Camera console (3) · 2560×1440</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ==========================================================================
+         CAMERAS in Concept A's language — concept 3, "Camera console" (revised
+         after the critic's review, 2026-09-26). One family with A-lighting,
+         A-cockpit and A-setup: header · cluster (424) · bay · plate (416) ·
+         footer, the same tokens, the three themes, the ?state= switching.
+         Bay: each camera is a vertical strip like the Console's: its picture on
+         top (from vMix over NDI, D17; three equal pictures at 537 × 302), then
+         its values as desk controls — Exposure (ISO, shutter, iris, ND), Colour
+         (white balance, tint), Focus (position or steps, AF once) — each
+         section headed by the mode the camera reports (an auto mode locks the
+         keys it owns, with the reason), a Format line (reported values only),
+         and its lamps (CONNECTED / RELEASED / UNREACHABLE; REC on CAM 1 only).
+         The selected strip carries the neutral keyline; the section the deck's
+         dials drive carries a lit amber DIALS tag (engaged, like a lit cap).
+         Plate (416, right): the selected camera — who holds it and Release /
+         Connect (D13), the 1:1 focus check (one vMix pixel per screen pixel,
+         off the picture, its spot dashed on the picture), Format with the
+         choice list and the arm (D11: the field opens the list, a value arms,
+         a second press on the same value sends it), and what it cannot report.
+         Cluster (424, left): the state display (the worst of the three cameras
+         and the pictures, the sentence, the way out, the armed row); the Stream
+         Deck's CAMERAS page mirrored key for key (D14: CAM 1–3, BANK, REC with
+         STOP?, the touch strip, the four dials drawn as pictures of the deck);
+         the main camera's recording readout (a duration, or "time not known");
+         where the pictures come from; the recent camera actions with Screen /
+         Stream Deck (Appendix B item 10); the standing actions.
+         Item 4 (D16) is answered with three equal 537 × 302 pictures and the
+         plate's 1:1 check; ?plate=0 is the labelled alternative without a plate
+         (675 × 380 pictures, Format and Release in each strip, the 1:1 check in
+         the cluster), so the operator can rule on the trade at D19.
+         Only values a camera reports back are shown; a value it cannot report
+         says so (C0: the BGH1's LUMIX SDK lists no picture profile, LUT or tint
+         and the BGH1 has no ND; the Pocket 6K Pro's Bluetooth protocol has no
+         card time or battery). Nothing on this page changes a camera by itself
+         (D12); a write the camera does not take leaves the camera's value.
+         The pictures are drawn stand-ins (inline SVG, signal like the meter
+         ramp); the captures mask them as they mask the Console's meters (D15
+         rule 3). No key binds anything and no key hint is shown (D6).
+         Material v2, same tokens as the Console and Lighting (blue unused).
+         ?theme=studio|graphite|bone
+         ?plate=0      the alternative without a plate (for D19)
+         ?state=ready|recording|rec-joined|stop-armed|format-choose|format-armed|
+                released|rec-released|no-pictures|not-taken|unreachable
+           ready          all three held, pictures from vMix, CAM 1 selected, dials
+                          on exposure; CAM 3 reports mode A and AWB (keys locked)
+           recording      CAM 1 records: the red REC lamp + word on its strip, the
+                          mirrored REC key and the header latch; the 12m 34s hero;
+                          the plate's Release says REC stays on
+           rec-joined     CAM 1 was already recording when Studio Control connected:
+                          REC shows, the time says "not known", no number invented
+           stop-armed     REC pressed once while recording: STOP? for 3 s; CAM 3 is
+                          selected and REC still acts on CAM 1
+           format-choose  CAM 2's Frame rate field pressed: the values CAM 2 allows
+                          are listed in the plate; choosing is not applying
+           format-armed   50p pressed: that key is armed (ARMED · press again ·
+                          3.9 s, the armed row); a second press on it sends it
+           released       CAM 3 is released to LUMIX Tether (selected): its strip is
+                          locked and reads nothing; Connect takes it back
+           rec-released   CAM 1 released to Bluetooth+ while it records: REC and the
+                          readout lock with the reason; the latch keeps "as of 10:23"
+           no-pictures    vMix is not sending NDI: every picture says so, the
+                          controls still work (a sent ISO waits: "asked 800")
+           not-taken      CAM 3 did not take ISO 800: the doubt mark clears, 640
+                          stays, ACTION FAILED says so, Recent actions records it
+           unreachable    CAM 2 does not answer at 172.16.16.85 (selected): its strip
+                          is locked, the touch strip says the dials do nothing
+         ?harness=0 hides the board's state switcher. It sits below the
+         2560 × 1440 board, outside it; every capture and census run passes
+         ?harness=0 so its buttons are never counted.
+         ========================================================================== */
+      :root {
+        --ui: "Inter", system-ui, sans-serif;
+        --mono: "JetBrains Mono", ui-monospace, monospace;
+        --r4: 4px;
+        --r8: 8px;
+        --r12: 12px;
+        --pill: 999px;
+      }
+      [data-theme="studio"] {
+        --bg: #0b0b0d;
+        --bay: #060607;
+        --panel: #111114;
+        --panel-top: #17171b;
+        --key: #1b1c21;
+        --key-top: #26272e;
+        --well: #000000;
+        --line: rgba(255, 255, 255, 0.09);
+        --line-2: rgba(255, 255, 255, 0.2);
+        --sheen: rgba(255, 255, 255, 0.08);
+        --shade: rgba(0, 0, 0, 0.6);
+        --well-shade: rgba(0, 0, 0, 0.85);
+        --text: #f4f4f5;
+        --text-2: #a6a6ad;
+        --well-text: #f4f4f5;
+        --well-text-2: #a6a6ad;
+        --accent: #f4f4f5;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #3ddc7a;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6161;
+        --red-ink: #230505;
+        --red-text: #ff6b6b;
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --blue-text: #7cc4ff;
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+        --cap: #f4f4f7;
+        --cap-2: #d3d3d9;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #0b0b0d;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eeeef0;
+        --primary-top: #ffffff;
+        --primary-ink: #0b0b0d;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="graphite"] {
+        --bg: #13151a;
+        --bay: #0c0d11;
+        --panel: #1a1d24;
+        --panel-top: #20242c;
+        --key: #262a33;
+        --key-top: #31363f;
+        --well: #07080b;
+        --line: rgba(255, 255, 255, 0.1);
+        --line-2: rgba(255, 255, 255, 0.22);
+        --sheen: rgba(255, 255, 255, 0.09);
+        --shade: rgba(0, 0, 0, 0.55);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #f2f4f8;
+        --text-2: #a9b0bc;
+        --well-text: #f2f4f8;
+        --well-text-2: #a9b0bc;
+        --accent: #f2f4f8;
+        --amber: #f0b35b;
+        --amber-top: #f8c977;
+        --amber-ink: #1a1000;
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --green: #3ddc7a;
+        --green-top: #66e99a;
+        --green-ink: #04200f;
+        --green-text: #46d67c;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --red: #ff6b6b;
+        --red-ink: #230505;
+        --red-text: #ff7676;
+        --bloom-red: rgba(255, 107, 107, 0.5);
+        --blue-text: #8ccaff;
+        --bloom-blue: rgba(140, 202, 255, 0.45);
+        --cap: #eceef3;
+        --cap-2: #c9cdd6;
+        --cap-sheen: rgba(255, 255, 255, 0.7);
+        --cap-line: #13151a;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #eef0f4;
+        --primary-top: #ffffff;
+        --primary-ink: #13151a;
+        --primary-sheen: rgba(255, 255, 255, 0.6);
+      }
+      [data-theme="bone"] {
+        --bg: #f1f0ec;
+        --bay: #e5e4df;
+        --panel: #fbfbfa;
+        --panel-top: #ffffff;
+        --key: #f6f6f4;
+        --key-top: #ffffff;
+        --well: #101012;
+        --line: rgba(0, 0, 0, 0.12);
+        --line-2: rgba(0, 0, 0, 0.3);
+        --sheen: rgba(255, 255, 255, 0.9);
+        --shade: rgba(0, 0, 0, 0.14);
+        --well-shade: rgba(0, 0, 0, 0.8);
+        --text: #1b1b1d;
+        --text-2: #5d5e64;
+        --well-text: #f4f4f5;
+        --well-text-2: #b3b3b8;
+        --accent: #1b1b1d;
+        --amber: #e9a83e;
+        --amber-top: #f4bd5c;
+        --amber-ink: #1a1000;
+        --amber-text: #8a5a00;
+        --bloom-amber: rgba(233, 168, 62, 0.5);
+        --green: #2fbf6a;
+        --green-top: #52d287;
+        --green-ink: #04200f;
+        --green-text: #1a6b36;
+        --bloom-green: rgba(47, 191, 106, 0.4);
+        --red: #c62d2a;
+        --red-ink: #ffffff;
+        --red-text: #b3261e;
+        --bloom-red: rgba(198, 45, 42, 0.35);
+        --blue-text: #0b62c2;
+        --bloom-blue: rgba(11, 98, 194, 0.3);
+        --cap: #2c2d33;
+        --cap-2: #141517;
+        --cap-sheen: rgba(255, 255, 255, 0.18);
+        --cap-line: #ffffff;
+        --bloom-white: rgba(255, 255, 255, 0.45);
+        --primary: #1b1b1d;
+        --primary-top: #2c2c30;
+        --primary-ink: #ffffff;
+        --primary-sheen: rgba(255, 255, 255, 0.14);
+      }
+      [data-theme="studio"],
+      [data-theme="graphite"] {
+        --strip-floor: rgba(255, 255, 255, 0.025);
+        --strip-floor-sel: rgba(255, 255, 255, 0.045);
+      }
+      [data-theme="bone"] {
+        --strip-floor: rgba(255, 255, 255, 0.45);
+        --strip-floor-sel: rgba(255, 255, 255, 0.7);
+      } /* on a light bay a lifted strip is lighter, as a plate is */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        background: var(--bg);
+      }
+      body {
+        font: 500 14px/1.3 var(--ui);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings:
+          "tnum" 1,
+          "cv11" 1;
+      }
+      #board {
+        position: relative;
+        width: 2560px;
+        height: 1440px;
+        overflow: hidden;
+        background: var(--bg);
+        transform-origin: top left;
+        display: grid;
+        grid-template-rows: 56px 1fr 40px;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      .muted {
+        color: var(--text-2);
+      }
+
+      /* ---- material: plates, wells, keys, lamps (copied from the Console) ---- */
+      .plate {
+        background: linear-gradient(180deg, var(--panel-top), var(--panel));
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      /* a well is a black backlit display in every theme, so whatever is printed on it uses the display's own inks */
+      .well {
+        background: var(--well);
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+        --green-text: #3ddc7a;
+        --amber-text: #f0b35b;
+        --red-text: #ff6b6b;
+        --blue-text: #7cc4ff;
+        --bloom-green: rgba(61, 220, 122, 0.5);
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        --bloom-red: rgba(255, 97, 97, 0.5);
+        --bloom-blue: rgba(124, 196, 255, 0.45);
+      }
+      .key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow:
+          inset 0 1px 0 var(--sheen),
+          0 1px 2px var(--shade);
+        color: var(--text);
+        font: 600 14px/1 var(--ui);
+      }
+      .key .cap {
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .key .hint {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key.on {
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        border-color: rgba(0, 0, 0, 0.35);
+        color: var(--amber-ink);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.4),
+          0 0 14px var(--bloom-amber);
+      }
+      .key.on .hint {
+        color: var(--amber-ink);
+      }
+      .key.primary {
+        background: linear-gradient(180deg, var(--primary-top), var(--primary));
+        color: var(--primary-ink);
+        border-color: transparent;
+        box-shadow:
+          inset 0 1px 0 var(--primary-sheen),
+          0 1px 2px var(--shade);
+      }
+      /* the arm (system §7): amber keyline, the black display inside, the countdown bar */
+      .key.armed {
+        --amber-text: #f0b35b;
+        --bloom-amber: rgba(240, 179, 91, 0.45);
+        border: 2px solid var(--amber-text);
+        background: var(--well);
+        box-shadow:
+          inset 0 2px 6px var(--well-shade),
+          0 0 14px var(--bloom-amber);
+        color: var(--well-text);
+        position: relative;
+        overflow: hidden;
+      }
+      .key.armed .tag {
+        font: 600 12px/1 var(--ui);
+        color: var(--amber-text);
+      }
+      .key.armed .count {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 4px;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .lamp {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--pill);
+        background: var(--line-2);
+        flex: none;
+      }
+      .lamp.ok {
+        background: var(--green-text);
+        box-shadow: 0 0 10px var(--bloom-green);
+      }
+      .lamp.amber {
+        background: var(--amber-text);
+        box-shadow: 0 0 10px var(--bloom-amber);
+      }
+      .lamp.red {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .lampword {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .lampword.ok {
+        color: var(--green-text);
+      }
+      .lampword.amber {
+        color: var(--amber-text);
+      }
+      .lampword.red,
+      .lampword.rec {
+        color: var(--red-text);
+      }
+
+      /* ---- shell header: five tabs (D4), no key hints (D6) ---- */
+      .shell {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        padding: 0 24px;
+        border-bottom: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--panel-top), var(--bg));
+      }
+      .crest {
+        width: 30px;
+        height: 30px;
+        border-radius: var(--r8);
+        background: var(--text);
+        color: var(--bg);
+        display: grid;
+        place-items: center;
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .wordmark {
+        font: 600 16px/1 var(--ui);
+        letter-spacing: -0.01em;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .wordmark .sub {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        letter-spacing: 0.02em;
+      }
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-left: 12px;
+      }
+      .tab {
+        height: 36px;
+        padding: 0 14px;
+        border-radius: var(--r8);
+        font: 500 14px/1 var(--ui);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .tab.on {
+        color: var(--text);
+        background: linear-gradient(180deg, var(--key-top), var(--key));
+        border: 1px solid var(--line);
+        box-shadow: inset 0 1px 0 var(--sheen);
+      }
+      .health {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lampchip {
+        height: 32px;
+        padding: 0 12px;
+        border-radius: var(--pill);
+        border: 1px solid var(--line);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .lampchip b {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .lampchip.amber,
+      .lampchip.amber b {
+        color: var(--amber-text);
+      }
+      .lampchip.amber {
+        border-color: var(--amber-text);
+      }
+      .lampchip.red,
+      .lampchip.red b {
+        color: var(--red-text);
+      }
+      .lampchip.red {
+        border-color: var(--red-text);
+      }
+      /* the latches sit apart from the subsystem lamps, after a hairline */
+      .latches {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-left: 12px;
+        margin-left: 4px;
+        border-left: 1px solid var(--line);
+      }
+      .latches[hidden] {
+        display: none;
+      }
+      /* the REC latch: a red lamp and word, as 48 V is on the Console — never a red
+         fill and never a red keyline (only an error chip carries a red outline) */
+      .lampchip.rec {
+        color: var(--text);
+      }
+      .lampchip.rec b {
+        color: var(--red-text);
+        font-family: var(--mono);
+        letter-spacing: 0.04em;
+      }
+      .lampchip.rec span {
+        font: 500 13px/1 var(--mono);
+      }
+      .lampchip[hidden] {
+        display: none;
+      }
+      .clock {
+        font: 500 16px/1 var(--mono);
+        margin-left: 12px;
+      }
+
+      /* ---- body: cluster · bay · plate (the cluster rule, system §2) ---- */
+      .body {
+        display: grid;
+        grid-template-columns: 424px 1fr 416px;
+        min-height: 0;
+      }
+      /* ?plate=0 — the labelled alternative for D19: no plate, the pictures take its 416 px */
+      .noplate .body {
+        grid-template-columns: 424px 1fr;
+      }
+      .noplate .inspector {
+        display: none;
+      }
+      .cluster {
+        border-right: 1px solid var(--line);
+        padding: 16px 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+      }
+      .state {
+        height: 180px;
+        flex: none;
+        border-radius: var(--r12);
+        padding: 14px 16px;
+        color: var(--well-text);
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .state.tone-ok {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%), var(--well);
+      }
+      .state.tone-attention {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%), var(--well);
+      }
+      .state.tone-error {
+        background: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%), var(--well);
+      }
+      .state-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .state .lamp {
+        width: 14px;
+        height: 14px;
+      }
+      .state-word {
+        font: 600 24px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--green-text);
+      }
+      .state.tone-attention .state-word {
+        color: var(--amber-text);
+      }
+      .state.tone-error .state-word {
+        color: var(--red-text);
+      }
+      .state-sub {
+        font: 500 14px/1.35 var(--ui);
+        color: var(--well-text);
+      }
+      .state-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+        align-self: start;
+      }
+      .state-code {
+        font: 500 12px/1.3 var(--mono);
+        color: var(--well-text-2);
+      }
+      .state-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .state-actions .key {
+        min-height: 32px;
+        font-size: 13px;
+      }
+      .armed-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        column-gap: 10px;
+        row-gap: 6px;
+        border: 1px solid var(--amber-text);
+        border-radius: var(--r8);
+        padding: 6px 10px;
+      }
+      .armed-row .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .armed-row .t {
+        font: 500 13px/1.3 var(--ui);
+        color: var(--well-text);
+      }
+      .armed-row .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .armed-row .bar {
+        grid-column: 1 / -1;
+        height: 4px;
+        border-radius: var(--pill);
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      .armed-row .bar i {
+        display: block;
+        height: 100%;
+        background: var(--amber-text);
+        box-shadow: 0 0 8px var(--bloom-amber);
+      }
+      .sec-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .sec-head .title {
+        font: 600 16px/1 var(--ui);
+        display: inline-flex;
+        gap: 8px;
+        align-items: baseline;
+        white-space: nowrap;
+      }
+      .sec-head .title span {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+
+      /* ---- cluster: the Stream Deck's CAMERAS page, key for key (D14) ---- */
+      .deckm {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .dkeys {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .key.dk {
+        flex-direction: column;
+        gap: 8px;
+        min-height: 92px;
+        padding: 0 6px;
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+      /* read during a take: 20 px caps, as TALKBACK's on the Console (system §3) */
+      .key.dk .cap {
+        font-size: 20px;
+      }
+      .key.dk .hint {
+        font: 500 13px/1.25 var(--ui);
+      }
+      .key.dk .bw {
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .dk.empty {
+        min-height: 92px;
+        border: 1px dashed var(--line);
+        border-radius: var(--r8);
+      }
+      .key.dk.rec .rl {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .key.dk.rec .lamp {
+        width: 10px;
+        height: 10px;
+      }
+      .key.dk.rec.recording .cap {
+        color: var(--red-text);
+      }
+      .key.dk.rec.recording .lamp {
+        background: var(--red-text);
+        box-shadow: 0 0 10px var(--bloom-red);
+      }
+      .key.dk.rec .tm {
+        font: 600 13px/1 var(--mono);
+        color: var(--text);
+      }
+      .key.dk.armed {
+        gap: 6px;
+      }
+      .key.dk.armed .cap {
+        color: var(--amber-text);
+      }
+      .key.dk.armed .t2 {
+        font: 500 13px/1.25 var(--ui);
+        color: var(--well-text);
+      }
+      /* REC when CAM 1 is not held: the locked form, the reason on the key and in the readout */
+      .key.dk.rec.nohold {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        cursor: not-allowed;
+      }
+      .key.dk.rec.nohold .cap {
+        color: var(--text);
+      }
+      .key.dk.rec .t2 {
+        font: 500 13px/1.25 var(--ui);
+        color: var(--text-2);
+      }
+      .dstrip {
+        border-radius: var(--r8);
+        padding: 8px 0 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        height: 80px;
+        flex: none;
+      }
+      .ds-cap {
+        padding: 0 12px;
+        font: 500 12px/1 var(--mono);
+        color: var(--well-text-2);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .ds-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .ds-row .s4 {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+        white-space: nowrap;
+      }
+      .ds-row .s4:first-child {
+        border-left: 0;
+      }
+      .s4 .tl {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .s4 .tv {
+        font: 600 16px/1 var(--mono);
+        color: var(--well-text);
+      }
+      .s4.idle .tv {
+        color: var(--well-text-2);
+        font-weight: 500;
+      }
+      .ds-msg {
+        padding: 0 12px;
+        font: 600 14px/1.3 var(--ui);
+      }
+      .ds-msg.red {
+        color: var(--red-text);
+      }
+      .ds-msg.amber {
+        color: var(--amber-text);
+      }
+      .ds-msg span {
+        display: block;
+        font: 400 13px/1.3 var(--ui);
+        color: var(--well-text-2);
+      }
+      .ddials {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .dial {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      /* the deck's dials, drawn as a picture of the deck: flat outlines, not key material
+         (nothing here is pressable on screen); endless encoders, so no pointer */
+      .knob {
+        width: 60px;
+        height: 60px;
+        border-radius: var(--pill);
+        background: none;
+        border: 2px solid var(--line-2);
+        position: relative;
+      }
+      .knob::after {
+        content: "";
+        position: absolute;
+        inset: 12px;
+        border-radius: var(--pill);
+        border: 1px dashed var(--line-2);
+      }
+      .dial .kp {
+        font: 500 12px/1.2 var(--ui);
+        color: var(--text-2);
+        min-height: 15px;
+        text-align: center;
+      }
+      .dial.push .kp {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .dial.idle .knob {
+        opacity: 0.55;
+      }
+
+      /* ---- cluster: the main camera's recording readout ---- */
+      .recbox {
+        height: 136px;
+        overflow: hidden;
+        flex: none;
+        border-radius: var(--r12);
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        color: var(--well-text);
+      }
+      .rb-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        font: 500 13px/1 var(--ui);
+        color: var(--well-text-2);
+      }
+      .rb-top .l {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .rb-top .w {
+        font: 600 14px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--well-text);
+      }
+      .recbox.rec .rb-top .w {
+        color: var(--red-text);
+      }
+      .recbox.rec .rb-hero {
+        color: var(--well-text);
+      }
+      .rb-hero {
+        font: 600 20px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--well-text-2);
+        height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      .recbox.on .rb-hero {
+        font-size: 44px;
+        letter-spacing: -0.02em;
+        color: var(--well-text);
+      }
+      .rb-meta {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+      }
+      /* CAM 1 not held while it recorded: the readout locks (dashed, 55 %); the reason stays full strength */
+      .recbox.locked {
+        border: 1px dashed var(--line-2);
+      }
+      .recbox.locked .rb-top,
+      .recbox.locked .rb-hero {
+        opacity: 0.55;
+      }
+      .recbox.locked .rb-meta {
+        color: var(--well-text);
+      }
+
+      /* ---- cluster: where the pictures come from (D17) ---- */
+      .pix {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .pix .rrow .w {
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .pix .rrow .tm {
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      /* ---- cluster, ?plate=0 only: the 1:1 focus check sits in the cluster's free space ---- */
+      .cloupe {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+      }
+      .noplate .cloupe {
+        display: flex;
+      }
+      .noplate .pix {
+        display: none;
+      }
+
+      /* ---- cluster: recent camera actions ---- */
+      .recent {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .rlist {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .rrow {
+        display: grid;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        min-height: 36px;
+        padding: 0 12px;
+        border-radius: var(--r8);
+        border: 1px solid var(--line);
+      }
+      .rrow .tm {
+        font: 500 13px/1 var(--mono);
+        color: var(--text-2);
+      }
+      .rrow .w {
+        font: 500 14px/1.2 var(--ui);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .rrow .by {
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .actions {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .actions .key {
+        flex: 1;
+        min-height: 40px;
+        white-space: nowrap;
+      }
+
+      /* ---- bay: the three camera strips ---- */
+      .bay {
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+        min-width: 0;
+        background: var(--bay);
+        box-shadow: inset 0 2px 10px var(--well-shade);
+      }
+      .bay-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 32px;
+        flex: none;
+      }
+      .bay-head .t {
+        font: 600 14px/1 var(--ui);
+      }
+      .bay-head .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .bay-head .right {
+        margin-left: auto;
+      }
+      .cams {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        min-height: 0;
+      }
+      .cam {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 10px 8px;
+        border-radius: var(--r12);
+        border: 1px solid transparent;
+        background: var(--strip-floor);
+        min-height: 0;
+        min-width: 0;
+      }
+      .cam.sel {
+        border-color: var(--accent);
+        background: var(--strip-floor-sel);
+      }
+      .c-head {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        column-gap: 12px;
+        height: 56px;
+        flex: none;
+      }
+      .key.c-id {
+        min-height: 44px;
+        min-width: 96px;
+        padding: 0 14px;
+      }
+      .key.c-id .cap {
+        font-size: 20px;
+      }
+      .c-name {
+        font: 600 16px/1.15 var(--ui);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .c-sub {
+        font: 400 13px/1.2 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 4px;
+      }
+      .c-lamps {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 10px;
+      }
+
+      /* the picture: a backlit well at 16:9 */
+      .pic {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: var(--r8);
+        overflow: hidden;
+        flex: none;
+      }
+      .pic svg.scene {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .guides {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .guides i {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.24);
+      }
+      .guides .v1,
+      .guides .v2 {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+      }
+      .guides .v1 {
+        left: 33.333%;
+      }
+      .guides .v2 {
+        left: 66.667%;
+      }
+      .guides .h1,
+      .guides .h2 {
+        left: 0;
+        right: 0;
+        height: 1px;
+      }
+      .guides .h1 {
+        top: 33.333%;
+      }
+      .guides .h2 {
+        top: 66.667%;
+      }
+      .guides .safe {
+        inset: 5%;
+        background: none;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      .guides .cx {
+        left: calc(50% - 12px);
+        top: 50%;
+        width: 24px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .guides .cy {
+        top: calc(50% - 12px);
+        left: 50%;
+        width: 1px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.55);
+      }
+      .lmark {
+        position: absolute;
+        border: 1px dashed rgba(255, 255, 255, 0.85);
+        pointer-events: none;
+      }
+      /* the 1:1 focus check: its own well off the picture (the plate, or the cluster at ?plate=0),
+         so it never covers the thirds or the safe area; its spot is the dashed mark on the picture */
+      .loupe {
+        position: relative;
+        width: 100%;
+        border-radius: var(--r8);
+        overflow: hidden;
+        flex: none;
+      }
+      .loupe svg {
+        display: block;
+      }
+      .lcap {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .pbadge {
+        position: absolute;
+        top: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        border-radius: var(--r4);
+        background: rgba(0, 0, 0, 0.72);
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: #f4f4f5;
+      }
+      .pbadge.rec {
+        right: 10px;
+        color: #ff6b6b;
+      }
+      .loupe .ll {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        padding: 4px 6px;
+        border-radius: var(--r4);
+        background: rgba(0, 0, 0, 0.72);
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: #f4f4f5;
+      }
+      .nopic {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        text-align: center;
+        padding: 24px;
+        background: var(--well);
+        color: var(--well-text);
+      }
+      .nopic .np-w {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font: 600 16px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+      }
+      .nopic .np-s {
+        font: 500 14px/1.35 var(--ui);
+      }
+      .nopic .np-m {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--well-text-2);
+      }
+      .nopics .pic svg.scene,
+      .nopics .pic .guides,
+      .nopics .pic .lmark,
+      .nopics .pic .pbadge,
+      .nopics .loupe svg,
+      .nopics .loupe .ll {
+        display: none;
+      }
+      .nopics .pic .nopic,
+      .nopics .loupe .nopic {
+        display: flex;
+      }
+      .loupe .nopic {
+        padding: 16px;
+        gap: 8px;
+      }
+
+      .p-tools {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+        flex: none;
+      }
+      .p-tools .key {
+        min-height: 32px;
+        padding: 0 12px;
+        font: 600 13px/1 var(--ui);
+      }
+      .p-tools .src {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 12px/1 var(--mono);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .nopics .p-tools .key {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        color: var(--text);
+        cursor: not-allowed;
+      }
+
+      /* sections: exposure, colour, focus, format */
+      .sec {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: none;
+      }
+      .sec .sh {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 20px;
+      }
+      .sec .sh .t {
+        font: 600 16px/1 var(--ui);
+      }
+      .sec .sh .d {
+        font: 400 13px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+      }
+      /* where a turn of the deck's dials lands: the ENGAGED form (a small lit amber cap, amber
+         fill + amber ink, as the deck's lit CAM key), never the lamp + word that means "look here" */
+      .sec .sh .dtag {
+        margin-left: auto;
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 8px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--amber-top), var(--amber));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        color: var(--amber-ink);
+        font: 600 12px/1 var(--mono);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .expo {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .cell {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+      .cell .l {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        font: 500 12px/1 var(--ui);
+        color: var(--text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .cell .l .ask {
+        text-transform: none;
+        letter-spacing: 0;
+        font-weight: 600;
+        color: var(--amber-text);
+      }
+      .rd {
+        height: 56px;
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font: 600 20px/1 var(--mono);
+        color: var(--well-text);
+        white-space: nowrap;
+      }
+      .cell.pending .rd {
+        border: 1px dashed var(--amber-text);
+        color: var(--amber-text);
+      }
+      /* a write the camera did not take: the doubt mark is gone, the camera's value stays, and the
+         readout says what was not taken under it (display inks, so the red holds in every theme) */
+      .rd .kept {
+        display: block;
+        margin-top: 6px;
+        font: 600 12px/1 var(--ui);
+        color: var(--red-text);
+        text-align: center;
+      }
+      .cell.kept .rd {
+        flex-direction: column;
+      }
+      /* the camera reports an auto mode for this value: no number of ours, the keys lock */
+      .cell.auto .rd,
+      .ctl.auto .v {
+        color: var(--well-text-2);
+      }
+      .ctl.auto .v {
+        color: var(--text-2);
+      }
+      .steps {
+        display: flex;
+        gap: 6px;
+      }
+      .steps .key,
+      .ctl .key,
+      .fsteps .key {
+        flex: 1;
+        min-height: 44px;
+        padding: 0;
+        font: 600 16px/1 var(--mono);
+      }
+      /* not reported, or not in this camera: a dashed tag in place of the well, never a value */
+      .na {
+        border: 1px dashed var(--line-2);
+        border-radius: var(--r8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 0 12px;
+        font: 500 13px/1.3 var(--ui);
+        color: var(--text-2);
+      }
+      .cell .na {
+        height: 106px;
+      }
+      .ctl {
+        display: grid;
+        grid-template-columns: 112px minmax(0, 1fr) 84px 44px 44px;
+        align-items: center;
+        gap: 8px;
+        min-height: 44px;
+      }
+      .ctl .n {
+        font: 600 14px/1 var(--ui);
+      }
+      .ctl .v {
+        font: 600 20px/1 var(--mono);
+        text-align: right;
+        white-space: nowrap;
+      }
+      .ctl .na,
+      .ctl .fsteps {
+        grid-column: 2 / -1;
+      }
+      .ctl .na {
+        height: 44px;
+        justify-content: flex-start;
+      }
+      .fsteps {
+        display: flex;
+        gap: 6px;
+      }
+      .fsteps .key {
+        font: 600 14px/1 var(--ui);
+      }
+      .hslider {
+        position: relative;
+        height: 44px;
+        border-radius: var(--r8);
+      }
+      .hslider .track {
+        position: absolute;
+        left: 17px;
+        right: 17px;
+        top: 50%;
+        height: 4px;
+        margin-top: -2px;
+        background: var(--line-2);
+        border-radius: var(--pill);
+      }
+      .hslider.cct .track {
+        height: 8px;
+        margin-top: -4px;
+        background: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+      }
+      .hslider .unity {
+        position: absolute;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        left: 50%;
+        margin-left: -1px;
+        background: var(--well-text);
+      }
+      .hslider .cap {
+        position: absolute;
+        top: 9px;
+        width: 34px;
+        height: 26px;
+        margin-left: -17px;
+        border-radius: var(--r4);
+        background: linear-gradient(180deg, var(--cap), var(--cap-2));
+        box-shadow:
+          inset 0 1px 0 var(--cap-sheen),
+          0 2px 4px var(--shade);
+      }
+      .hslider .cap::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--cap-line);
+      }
+      .hslider .ends {
+        position: absolute;
+        inset: 0 22px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 2px;
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        pointer-events: none;
+      }
+      .frow {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 44px;
+      }
+      .frow .key {
+        min-height: 44px;
+        min-width: 140px;
+      }
+      .frow .fnote {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+      }
+      .fmt {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      /* a Format field is a key that opens the camera's list (label over value, so long values fit) */
+      .key.fld {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+        min-height: 56px;
+        padding: 0 14px;
+      }
+      .key.fld .l,
+      .fld.na .l {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .key.fld .v {
+        font: 600 16px/1 var(--mono);
+        white-space: nowrap;
+      }
+      .key.fld.on .l {
+        color: var(--amber-ink);
+      }
+      .fld.na {
+        min-height: 56px;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 14px;
+        text-align: left;
+      }
+      /* the list a Format field opens: the values the camera allows; a value arms, a second press on it sends */
+      .choice {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid var(--line-2);
+        border-radius: var(--r8);
+      }
+      .ch-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .ch-head .t {
+        font: 600 14px/1.2 var(--ui);
+        white-space: nowrap;
+      }
+      .ch-head .d {
+        font: 400 13px/1.2 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .ch-keys {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .noplate .ch-keys {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .key.chv {
+        justify-content: space-between;
+        min-height: 56px;
+        padding: 0 12px;
+      }
+      .key.chv .v {
+        font: 600 16px/1 var(--mono);
+      }
+      .key.chv .now {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .key.chv.armed {
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 6px;
+      }
+      .key.chv.armed .v {
+        color: var(--well-text);
+      }
+      /* a narrow armed key splits the canonical words over two lines: ARMED · press again / value · time */
+      .key.chv.armed .row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        align-self: stretch;
+      }
+      .key.chv.armed .s {
+        font: 600 14px/1 var(--mono);
+        color: var(--amber-text);
+      }
+      .ch-note {
+        font: 500 13px/1.35 var(--ui);
+      }
+
+      /* a strip's foot: the Format it reports (read only), who holds it, and why it is locked */
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .field {
+        min-height: 48px;
+        border-radius: var(--r8);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        min-width: 0;
+      }
+      .field .l {
+        font: 500 12px/1 var(--ui);
+        color: var(--well-text-2);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .field .v {
+        font: 600 16px/1.15 var(--mono);
+        color: var(--well-text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .field.nr {
+        border: 1px dashed var(--line-2);
+      }
+      .field.nr .l {
+        color: var(--text-2);
+      }
+      .field.nr .v {
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .c-foot {
+        margin-top: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        flex: none;
+      }
+      .c-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+      }
+      .c-link .lk {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+        min-width: 0;
+      }
+      .c-link .key {
+        margin-left: auto;
+        flex: none;
+        white-space: nowrap;
+        min-height: 36px;
+        font-size: 13px;
+      }
+      /* a locked strip's one reason: a fixed two-line note, so longer copy can never push the foot out */
+      .c-note {
+        height: 58px;
+        overflow: hidden;
+        border: 1px solid var(--amber-text);
+        background: rgba(240, 179, 91, 0.06);
+        border-radius: var(--r8);
+        padding: 10px 12px;
+        font: 500 13px/1.35 var(--ui);
+      }
+      .c-note b {
+        font: 600 13px/1 var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--amber-text);
+        margin-right: 6px;
+      }
+      .c-note.red {
+        border-color: var(--red-text);
+        background: rgba(255, 97, 97, 0.06);
+      }
+      .c-note.red b {
+        color: var(--red-text);
+      }
+
+      /* locked (system §7): a released or unreachable camera refuses every write — every key AND
+         every slider takes the dashed outline at 55 %; nothing was read, so no value and no cap */
+      .locked .key[data-take],
+      .key[data-take].auto-lock {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border-style: dashed;
+        border-color: var(--line-2);
+        color: var(--text);
+        cursor: not-allowed;
+      }
+      .locked .hslider[data-take],
+      .hslider[data-take].auto-lock {
+        opacity: 0.55;
+        background: transparent;
+        box-shadow: none;
+        border: 1px dashed var(--line-2);
+        cursor: not-allowed;
+      }
+      .locked .hslider .cap,
+      .hslider.auto-lock .cap {
+        display: none;
+      }
+      .locked .rd {
+        color: var(--well-text-2);
+      }
+      .locked .field.well .v {
+        color: var(--well-text-2);
+      }
+
+      /* ---- plate (416, right): the selected camera (system §7, PlateHead + Sections) ---- */
+      .inspector {
+        border-left: 1px solid var(--line);
+        padding: 20px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 0;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .insp-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .insp-head h2 {
+        font: 600 24px/1.1 var(--ui);
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+      }
+      .insp-head .sub {
+        font: 400 13px/1.3 var(--ui);
+        color: var(--text-2);
+        margin-top: 6px;
+      }
+      .insp-head .lampword {
+        margin-top: 6px;
+      }
+      .isec {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .isec-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .isec-head .t {
+        font: 600 16px/1 var(--ui);
+        white-space: nowrap;
+      }
+      .isec-head .d {
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+        white-space: nowrap;
+      }
+      .readouts {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 16px;
+        row-gap: 10px;
+        align-items: center;
+        font: 500 13px/1.2 var(--ui);
+        color: var(--text-2);
+      }
+      .readouts .v {
+        font: 600 14px/1.2 var(--mono);
+        color: var(--text);
+        text-align: right;
+        white-space: nowrap;
+      }
+      .readouts .v.amber {
+        color: var(--amber-text);
+      }
+      .readouts .v.red {
+        color: var(--red-text);
+      }
+      .insp-keys {
+        display: flex;
+        gap: 8px;
+      }
+      .insp-keys .key {
+        flex: 1;
+        min-height: 40px;
+      }
+      .inote {
+        font: 400 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .inote.warn {
+        color: var(--text);
+      }
+      /* what the camera cannot report sits at the plate's foot, where Lighting keeps its bottom slot */
+      .isec.foot {
+        margin-top: auto;
+      }
+      .nrl {
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .nrl li {
+        display: grid;
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 12px;
+        font: 400 13px/1.35 var(--ui);
+        color: var(--text-2);
+      }
+      .nrl li b {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      /* ---- footer: telemetry only; the hints are gone (D6) ---- */
+      .footer {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 0 24px;
+        border-top: 1px solid var(--line);
+        background: linear-gradient(180deg, var(--bg), var(--panel));
+        font: 500 13px/1 var(--ui);
+        color: var(--text-2);
+      }
+      .footer .item b {
+        color: var(--text);
+        font-weight: 600;
+        font-family: var(--mono);
+      }
+      .footer .right {
+        margin-left: auto;
+      }
+
+      /* ---- the board's harness: below the 2560 × 1440 board (fit() keeps it under the scaled
+         board), never drawn over it; not part of the app; captures and census pass ?harness=0 ---- */
+      #harness {
+        position: absolute;
+        top: 1452px;
+        left: 12px;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 8px;
+        border-radius: var(--r8);
+        background: #0b0b0d;
+        font: 500 12px/1 var(--ui);
+      }
+      #harness[hidden] {
+        display: none;
+      }
+      #harness .hnote {
+        font: 500 13px/1.35 var(--ui);
+        color: #d3d3d9;
+        max-width: 1200px;
+      }
+      #harness button {
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: var(--r4);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: #1b1c21;
+        color: #f4f4f5;
+        font: 500 12px/1 var(--ui);
+      }
+      #harness button[aria-pressed="true"] {
+        background: #f4f4f5;
+        color: #0b0b0d;
+      }
+      #hToggle {
+        border-style: dashed !important;
+      }
+      #hPanel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border-radius: var(--r8);
+        border: 1px dashed #a6a6ad;
+        background: #0b0b0d;
+        color: #f4f4f5;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+      }
+      #hPanel[hidden] {
+        display: none;
+      }
+      #hPanel .hrow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      #hPanel .h {
+        width: 56px;
+        color: #a6a6ad;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- the three pictures: drawn stand-ins for the NDI frames vMix sends (1920 × 1080), shared by the strips and the 1:1 loupe -->
+    <svg aria-hidden="true" style="position: absolute; width: 0; height: 0; overflow: hidden">
+      <defs>
+        <radialGradient id="s1bg" cx="50%" cy="36%" r="75%">
+          <stop offset="0" stop-color="#3a4654" />
+          <stop offset="0.55" stop-color="#1c232c" />
+          <stop offset="1" stop-color="#0b0e12" />
+        </radialGradient>
+        <radialGradient id="s1key" cx="22%" cy="30%" r="50%">
+          <stop offset="0" stop-color="#ffcf9a" stop-opacity="0.2" />
+          <stop offset="1" stop-color="#ffcf9a" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="s1bokW">
+          <stop offset="0" stop-color="#ffd7a0" stop-opacity="0.55" />
+          <stop offset="0.7" stop-color="#ffd7a0" stop-opacity="0.18" />
+          <stop offset="1" stop-color="#ffd7a0" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="s1bokC">
+          <stop offset="0" stop-color="#9cc3ff" stop-opacity="0.45" />
+          <stop offset="1" stop-color="#9cc3ff" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="s1skin" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#e2ae8c" />
+          <stop offset="0.6" stop-color="#c58e6e" />
+          <stop offset="1" stop-color="#8e5f48" />
+        </linearGradient>
+        <linearGradient id="s1jacket" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#36425c" />
+          <stop offset="0.5" stop-color="#232c3d" />
+          <stop offset="1" stop-color="#131923" />
+        </linearGradient>
+        <linearGradient id="s1hair" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#4a3528" />
+          <stop offset="1" stop-color="#1c130e" />
+        </linearGradient>
+        <linearGradient id="s2wall" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2b323b" />
+          <stop offset="1" stop-color="#1d2229" />
+        </linearGradient>
+        <linearGradient id="s2floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1f2328" />
+          <stop offset="1" stop-color="#0e1013" />
+        </linearGradient>
+        <linearGradient id="s2screen" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#23405c" />
+          <stop offset="1" stop-color="#121d29" />
+        </linearGradient>
+        <radialGradient id="s2soft">
+          <stop offset="0" stop-color="#fff3dc" stop-opacity="0.26" />
+          <stop offset="1" stop-color="#fff3dc" stop-opacity="0" />
+        </radialGradient>
+        <radialGradient id="s3bg" cx="50%" cy="40%" r="75%">
+          <stop offset="0" stop-color="#252c38" />
+          <stop offset="1" stop-color="#0b0d11" />
+        </radialGradient>
+        <linearGradient id="s3skin" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#cdb4ad" />
+          <stop offset="0.55" stop-color="#a88f88" />
+          <stop offset="1" stop-color="#6f5b56" />
+        </linearGradient>
+        <radialGradient id="s3glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#8fb8ff" stop-opacity="0.2" />
+          <stop offset="1" stop-color="#8fb8ff" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="s3sweater" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#474e5a" />
+          <stop offset="1" stop-color="#262a31" />
+        </linearGradient>
+        <linearGradient id="s3desk" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3a3129" />
+          <stop offset="1" stop-color="#1f1a16" />
+        </linearGradient>
+      </defs>
+
+      <!-- CAM 1 · the main camera: the presenter, head and shoulders, a shelf behind -->
+      <symbol id="s1" viewBox="0 0 1920 1080">
+        <rect width="1920" height="1080" fill="url(#s1bg)" />
+        <rect x="1330" y="170" width="480" height="560" fill="#161c23" />
+        <rect x="1330" y="330" width="480" height="10" fill="#2b333d" />
+        <rect x="1330" y="520" width="480" height="10" fill="#2b333d" />
+        <g id="s1books"></g>
+        <g fill="#1d2e24">
+          <ellipse cx="250" cy="700" rx="46" ry="140" transform="rotate(-24 250 700)" />
+          <ellipse cx="330" cy="690" rx="44" ry="150" transform="rotate(18 330 690)" />
+          <ellipse cx="200" cy="780" rx="40" ry="110" transform="rotate(-48 200 780)" />
+          <ellipse cx="380" cy="780" rx="40" ry="110" transform="rotate(46 380 780)" />
+          <ellipse cx="290" cy="640" rx="36" ry="130" />
+        </g>
+        <rect x="210" y="860" width="160" height="160" rx="12" fill="#2a2420" />
+        <circle cx="300" cy="290" r="96" fill="url(#s1bokW)" />
+        <circle cx="1660" cy="130" r="48" fill="url(#s1bokW)" />
+        <circle cx="1560" cy="620" r="40" fill="url(#s1bokC)" />
+        <circle cx="120" cy="120" r="54" fill="url(#s1bokC)" />
+        <rect width="1920" height="1080" fill="url(#s1key)" />
+        <!-- the presenter -->
+        <path d="M 906 500 L 1014 500 L 1030 660 L 890 660 Z" fill="#b98166" />
+        <path
+          d="M 420 1080 C 450 860 580 720 800 672 L 900 650 L 1020 650 L 1120 672 C 1340 720 1470 860 1500 1080 Z"
+          fill="url(#s1jacket)"
+        />
+        <path d="M 884 652 L 960 870 L 1036 652 Z" fill="#dfe3e8" />
+        <path d="M 884 652 L 926 740 L 960 690 L 994 740 L 1036 652" fill="none" stroke="#aab1ba" stroke-width="3" />
+        <path d="M 820 676 L 884 652 L 958 905 L 930 910 Z" fill="#1a2231" />
+        <path d="M 1100 676 L 1036 652 L 962 905 L 990 910 Z" fill="#121824" />
+        <circle cx="866" cy="760" r="7" fill="#c9a45a" />
+        <ellipse cx="960" cy="540" rx="64" ry="20" fill="#7d513d" opacity="0.6" />
+        <ellipse cx="842" cy="398" rx="18" ry="34" fill="#c08a6c" />
+        <ellipse cx="1078" cy="398" rx="18" ry="34" fill="#94634b" />
+        <ellipse cx="960" cy="390" rx="120" ry="150" fill="url(#s1skin)" />
+        <path
+          d="M 838 400 C 822 250 900 212 975 214 C 1062 218 1112 268 1084 400 C 1072 320 1030 290 965 286 C 902 284 858 318 838 400 Z"
+          fill="url(#s1hair)"
+        />
+        <g fill="none" stroke="#5a4232" stroke-width="1.6" stroke-linecap="round">
+          <path d="M 868 300 C 900 262 952 250 1000 256" />
+          <path d="M 878 312 C 918 276 980 268 1036 282" />
+          <path d="M 898 300 C 942 270 1004 272 1058 304" />
+          <path d="M 852 350 C 864 300 900 270 948 262" />
+          <path d="M 1070 350 C 1066 306 1040 276 1000 264" />
+          <path d="M 920 290 C 960 276 1010 282 1046 300" />
+        </g>
+        <g fill="none" stroke="#3a281f" stroke-linecap="round">
+          <path d="M 890 352 Q 918 340 946 350" stroke-width="7" />
+          <path d="M 974 350 Q 1002 340 1030 352" stroke-width="7" />
+          <path
+            d="M 894 348 L 900 342 M 906 345 L 912 339 M 918 344 L 924 338 M 930 345 L 936 340"
+            stroke-width="1.4"
+          />
+          <path
+            d="M 986 345 L 992 340 M 998 344 L 1004 338 M 1010 345 L 1016 339 M 1022 348 L 1028 342"
+            stroke-width="1.4"
+          />
+        </g>
+        <ellipse cx="918" cy="382" rx="17" ry="8.5" fill="#f1e9e4" />
+        <ellipse cx="1002" cy="382" rx="17" ry="8.5" fill="#efe6e0" />
+        <circle cx="918" cy="382" r="7.5" fill="#5b4332" />
+        <circle cx="1002" cy="382" r="7.5" fill="#5b4332" />
+        <circle cx="918" cy="382" r="3.6" fill="#140d0a" />
+        <circle cx="1002" cy="382" r="3.6" fill="#140d0a" />
+        <circle cx="920.5" cy="379.5" r="1.8" fill="#ffffff" />
+        <circle cx="1004.5" cy="379.5" r="1.8" fill="#ffffff" />
+        <g fill="none" stroke="#4a3126" stroke-width="2" stroke-linecap="round">
+          <path d="M 899 378 Q 918 368 937 378" />
+          <path d="M 983 378 Q 1002 368 1021 378" />
+          <path
+            d="M 903 374 L 900 369 M 910 371 L 908 365 M 918 370 L 918 364 M 926 371 L 928 365 M 933 374 L 936 369"
+            stroke-width="1.2"
+          />
+          <path
+            d="M 987 374 L 984 369 M 994 371 L 992 365 M 1002 370 L 1002 364 M 1010 371 L 1012 365 M 1017 374 L 1020 369"
+            stroke-width="1.2"
+          />
+        </g>
+        <path
+          d="M 960 392 Q 952 430 944 442 Q 958 450 972 444"
+          fill="none"
+          stroke="#8a5a44"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+        <path d="M 924 482 Q 960 498 996 482" fill="none" stroke="#8c4a3e" stroke-width="5" stroke-linecap="round" />
+        <g fill="#a8745a">
+          <circle cx="896" cy="420" r="1.6" />
+          <circle cx="904" cy="428" r="1.3" />
+          <circle cx="890" cy="432" r="1.4" />
+          <circle cx="1022" cy="420" r="1.5" />
+          <circle cx="1030" cy="430" r="1.3" />
+          <circle cx="1016" cy="434" r="1.4" />
+        </g>
+        <path d="M 1072 330 Q 1092 400 1070 470" fill="none" stroke="#ffe6c9" stroke-width="3" opacity="0.45" />
+      </symbol>
+
+      <!-- CAM 2 · a BGH1: the set, wider — two chairs, a table, the wall screen -->
+      <symbol id="s2" viewBox="0 0 1920 1080">
+        <rect width="1920" height="700" fill="url(#s2wall)" />
+        <rect y="700" width="1920" height="380" fill="url(#s2floor)" />
+        <rect y="696" width="1920" height="6" fill="#323a44" />
+        <rect x="640" y="150" width="640" height="360" rx="8" fill="#0d1116" stroke="#2c343e" stroke-width="4" />
+        <rect x="660" y="170" width="600" height="320" fill="url(#s2screen)" />
+        <rect x="700" y="404" width="300" height="18" rx="4" fill="#e8edf3" opacity="0.7" />
+        <rect x="700" y="432" width="200" height="12" rx="4" fill="#9fb2c8" opacity="0.6" />
+        <circle cx="190" cy="270" r="230" fill="url(#s2soft)" />
+        <circle cx="1730" cy="270" r="230" fill="url(#s2soft)" />
+        <g stroke="#3a3f47" stroke-width="8" stroke-linecap="round">
+          <line x1="190" y1="990" x2="190" y2="330" />
+          <line x1="190" y1="990" x2="120" y2="1050" />
+          <line x1="190" y1="990" x2="260" y2="1050" />
+          <line x1="1730" y1="990" x2="1730" y2="330" />
+          <line x1="1730" y1="990" x2="1660" y2="1050" />
+          <line x1="1730" y1="990" x2="1800" y2="1050" />
+        </g>
+        <rect x="100" y="200" width="180" height="140" rx="8" fill="#e9e3d6" />
+        <rect x="1640" y="200" width="180" height="140" rx="8" fill="#e9e3d6" />
+        <ellipse cx="960" cy="880" rx="640" ry="120" fill="#24282e" />
+        <rect x="640" y="540" width="160" height="200" rx="22" fill="#2e3542" />
+        <rect x="628" y="730" width="184" height="44" rx="12" fill="#384050" />
+        <rect x="1120" y="540" width="160" height="200" rx="22" fill="#2e3542" />
+        <rect x="1108" y="730" width="184" height="44" rx="12" fill="#384050" />
+        <g stroke="#15181d" stroke-width="8" stroke-linecap="round">
+          <line x1="646" y1="774" x2="640" y2="880" />
+          <line x1="794" y1="774" x2="800" y2="880" />
+          <line x1="1126" y1="774" x2="1120" y2="880" />
+          <line x1="1274" y1="774" x2="1280" y2="880" />
+        </g>
+        <ellipse cx="960" cy="760" rx="100" ry="24" fill="#4a3d31" />
+        <rect x="953" y="760" width="14" height="110" fill="#3a3027" />
+        <ellipse cx="960" cy="872" rx="60" ry="12" fill="#2c251f" />
+        <rect x="930" y="728" width="22" height="34" rx="4" fill="#dfe3e8" opacity="0.8" />
+        <path d="M 690 760 L 700 900 L 728 900 L 742 790 L 776 790 L 800 900 L 828 900 L 812 760 Z" fill="#1b212c" />
+        <ellipse cx="712" cy="904" rx="22" ry="8" fill="#0d0f12" />
+        <ellipse cx="816" cy="904" rx="22" ry="8" fill="#0d0f12" />
+        <path d="M 668 750 C 668 640 694 600 722 592 L 780 592 C 806 600 830 640 830 750 Z" fill="#243049" />
+        <path
+          d="M 812 640 C 850 690 870 720 900 742"
+          fill="none"
+          stroke="#243049"
+          stroke-width="26"
+          stroke-linecap="round"
+        />
+        <ellipse cx="750" cy="548" rx="36" ry="44" fill="#c99273" />
+        <path d="M 714 546 C 710 498 792 494 788 546 C 778 520 726 520 714 546 Z" fill="#2c1f18" />
+        <g fill="#1d2e24">
+          <ellipse cx="1520" cy="610" rx="34" ry="110" transform="rotate(-20 1520 610)" />
+          <ellipse cx="1580" cy="600" rx="34" ry="120" transform="rotate(16 1580 600)" />
+          <ellipse cx="1550" cy="560" rx="28" ry="110" />
+        </g>
+        <rect x="1500" y="700" width="110" height="120" rx="10" fill="#2a2420" />
+      </symbol>
+
+      <!-- CAM 3 · a BGH1 facing the operator: the operator at the desk, lit by the screens -->
+      <symbol id="s3" viewBox="0 0 1920 1080">
+        <rect width="1920" height="1080" fill="url(#s3bg)" />
+        <rect x="1400" y="120" width="380" height="460" fill="#1b2431" />
+        <g id="s3blinds" stroke="#2a3647" stroke-width="6"></g>
+        <rect x="160" y="260" width="300" height="520" rx="6" fill="#14171c" />
+        <g id="s3rack"></g>
+        <path d="M 912 600 L 1008 600 L 1022 790 L 898 790 Z" fill="#8f7770" />
+        <path
+          d="M 540 1080 C 560 890 690 790 860 770 L 1060 770 C 1230 790 1360 890 1380 1080 Z"
+          fill="url(#s3sweater)"
+        />
+        <path d="M 900 776 Q 960 820 1020 776" fill="none" stroke="#5a616d" stroke-width="6" />
+        <ellipse cx="850" cy="510" rx="16" ry="30" fill="#a88f88" />
+        <ellipse cx="1070" cy="510" rx="16" ry="30" fill="#7a6660" />
+        <ellipse cx="960" cy="500" rx="108" ry="136" fill="url(#s3skin)" />
+        <path
+          d="M 852 470 C 846 360 910 330 965 332 C 1030 334 1080 370 1070 470 C 1052 420 1010 396 962 396 C 910 396 868 420 852 470 Z"
+          fill="#2b2622"
+        />
+        <path d="M 842 520 C 826 318 1094 318 1078 520" fill="none" stroke="#1b1d22" stroke-width="20" />
+        <rect x="818" y="470" width="40" height="92" rx="16" fill="#202329" />
+        <rect x="1062" y="470" width="40" height="92" rx="16" fill="#202329" />
+        <g fill="none" stroke="#2a211d" stroke-linecap="round" stroke-width="6">
+          <path d="M 892 452 Q 918 442 944 450" />
+          <path d="M 976 450 Q 1002 442 1028 452" />
+        </g>
+        <ellipse cx="918" cy="490" rx="13" ry="7" fill="#e7e2e2" />
+        <ellipse cx="1002" cy="490" rx="13" ry="7" fill="#e3dede" />
+        <circle cx="918" cy="490" r="5.5" fill="#2b2622" />
+        <circle cx="1002" cy="490" r="5.5" fill="#2b2622" />
+        <rect
+          x="886"
+          y="470"
+          width="66"
+          height="42"
+          rx="12"
+          fill="rgba(150,190,255,0.16)"
+          stroke="#15171b"
+          stroke-width="6"
+        />
+        <rect
+          x="968"
+          y="470"
+          width="66"
+          height="42"
+          rx="12"
+          fill="rgba(150,190,255,0.16)"
+          stroke="#15171b"
+          stroke-width="6"
+        />
+        <line x1="952" y1="486" x2="968" y2="486" stroke="#15171b" stroke-width="5" />
+        <path
+          d="M 960 506 Q 954 540 946 550 Q 958 558 970 552"
+          fill="none"
+          stroke="#6b5550"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+        <path d="M 930 584 Q 960 596 990 584" fill="none" stroke="#6e4a46" stroke-width="5" stroke-linecap="round" />
+        <ellipse cx="960" cy="560" rx="540" ry="440" fill="url(#s3glow)" />
+        <rect y="900" width="1920" height="180" fill="url(#s3desk)" />
+        <rect y="896" width="1920" height="6" fill="#4a4038" />
+        <rect x="330" y="930" width="280" height="120" rx="12" fill="#121317" />
+        <g id="s3deck"></g>
+        <path
+          d="M 1560 1080 L 1470 800 L 1300 720"
+          fill="none"
+          stroke="#1d2026"
+          stroke-width="14"
+          stroke-linecap="round"
+        />
+        <rect x="1236" y="690" width="90" height="46" rx="20" fill="#26292f" transform="rotate(-18 1281 713)" />
+      </symbol>
+    </svg>
+
+    <div id="board" data-concept="A-cameras-3">
+      <header class="shell" data-region="header">
+        <div class="crest">SSE</div>
+        <div class="wordmark">Studio Control<span class="sub">SSE Executive Education</span></div>
+        <nav class="tabs">
+          <button class="tab" data-key>Setup / Support</button>
+          <button class="tab" data-key>Lighting</button>
+          <button class="tab" data-key>Audio</button>
+          <button class="tab on" data-key aria-current="page">Cameras</button>
+          <button class="tab" data-key>Teleprompter</button>
+        </nav>
+        <div class="health">
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Lighting</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Audio</b> ok</button>
+          <button class="lampchip" id="hdrCams" data-key><i class="lamp ok"></i><b>Cameras</b> <span>ok</span></button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Teleprompter</b> ok</button>
+          <button class="lampchip" data-key><i class="lamp ok"></i><b>Surface</b> ok</button>
+          <!-- the latches, apart from the lamps: REC while CAM 1 records (a red lamp + word, no red keyline) -->
+          <div class="latches" id="latches" hidden>
+            <button class="lampchip rec" id="hdrRec" data-key aria-label="CAM 1 is recording; opens Cameras">
+              <i class="lamp red"></i><b>REC</b> <span id="hdrRecT">CAM 1 · 12m 34s</span>
+            </button>
+          </div>
+          <div class="clock">10:24</div>
+        </div>
+      </header>
+
+      <div class="body">
+        <!-- ================= cluster ================= -->
+        <aside class="cluster plate" data-region="cluster">
+          <div class="state well tone-ok" id="state" data-region="state">
+            <div class="state-top">
+              <i class="lamp ok" id="stateLamp"></i>
+              <div class="state-word" id="stateWord">CONNECTED</div>
+            </div>
+            <div class="state-sub" id="stateSub"></div>
+            <div class="state-meta" id="stateMeta"></div>
+            <div class="state-actions" id="stateActions"></div>
+          </div>
+
+          <!-- the deck's CAMERAS page, key for key: the same eight places, the touch strip, the four dials -->
+          <section class="deckm" data-region="deck">
+            <div class="sec-head">
+              <div class="title">Stream Deck <span>CAMERAS page · the same keys as the deck</span></div>
+            </div>
+            <div class="dkeys" id="dkeys"></div>
+            <div class="dstrip well" id="dstrip" aria-label="The deck's touch strip"></div>
+            <div class="ddials" id="ddials" aria-hidden="true"></div>
+          </section>
+
+          <div class="recbox well" id="recbox" data-region="recording"></div>
+
+          <!-- where the pictures come from (D17): vMix's NDI outputs, received on this PC only -->
+          <section class="pix" data-region="pictures">
+            <div class="sec-head">
+              <div class="title">Pictures <span>from vMix over NDI · on this PC only</span></div>
+            </div>
+            <div class="rlist" id="pixList"></div>
+          </section>
+
+          <!-- ?plate=0 only: the 1:1 focus check takes the cluster's free space -->
+          <section class="cloupe" id="cloupe" data-region="focus-check"></section>
+
+          <section class="recent">
+            <div class="sec-head">
+              <div class="title">Recent actions <span>records, armed changes, release</span></div>
+            </div>
+            <div class="rlist" id="recent"></div>
+          </section>
+
+          <div class="actions">
+            <button class="key primary" data-key>Read all cameras</button>
+            <button class="key" data-key>Open camera setup</button>
+          </div>
+        </aside>
+
+        <!-- ================= bay: the three camera strips ================= -->
+        <main class="bay" data-region="cameras">
+          <div class="bay-head">
+            <span class="t">Cameras</span
+            ><span class="d">pictures from vMix over NDI · values as each camera reports them</span>
+            <span class="d right" id="bayRight">last read 10:24:31</span>
+          </div>
+          <div class="cams" id="cams"></div>
+        </main>
+
+        <!-- ================= plate: the selected camera ================= -->
+        <aside class="inspector plate" id="plate" data-region="inspector"></aside>
+      </div>
+
+      <footer class="footer" data-region="footer">
+        <span class="item">Pictures <b id="ftPics">vMix · NDI · 3 of 3</b></span>
+        <span class="item">CAM 1 <b id="ftC1">Bluetooth · connected</b></span>
+        <span class="item">CAM 2 <b id="ftC2">172.16.16.85 · connected</b></span>
+        <span class="item">CAM 3 <b id="ftC3">172.16.16.30 · connected</b></span>
+        <span class="item">Dials <b id="ftDials">CAM 1 · exposure</b></span>
+        <span class="item right">Recording <b id="ftRec">CAM 1 · off</b></span>
+      </footer>
+    </div>
+
+    <!-- the board's own state switcher: not part of the app; it sits below the 2560 × 1440 board -->
+    <div id="harness" aria-label="Board states (mock harness)">
+      <div class="hnote" id="hNote"></div>
+      <button id="hToggle" type="button" aria-expanded="false">Board states</button>
+      <div id="hPanel" hidden>
+        <div class="hrow" id="hStates"><span class="h">State</span></div>
+        <div class="hrow" id="hThemes"><span class="h">Theme</span></div>
+        <div class="hrow" id="hLayouts"><span class="h">Layout</span></div>
+        <div class="hrow">
+          <span class="h">Scale</span><button type="button" id="hOne" aria-pressed="false">1:1</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(location.search);
+      const board = document.getElementById("board");
+
+      // ---- the scene details that are easier to generate than to write out ----
+      (function scenes() {
+        const books = [];
+        const tints = ["#5a4038", "#3d4a5c", "#6b5a3a", "#2f4a45", "#5c3a44", "#4a5563", "#6a6152", "#39434f"];
+        let x = 1352;
+        for (let i = 0; x < 1780; i++) {
+          const w = 18 + ((i * 7) % 14),
+            h = 58 + ((i * 13) % 26);
+          books.push(`<rect x="${x}" y="${330 - h}" width="${w}" height="${h}" fill="${tints[i % tints.length]}"/>`);
+          x += w + 3;
+        }
+        x = 1360;
+        for (let i = 3; x < 1640; i++) {
+          const w = 20 + ((i * 5) % 12),
+            h = 60 + ((i * 11) % 24);
+          books.push(`<rect x="${x}" y="${520 - h}" width="${w}" height="${h}" fill="${tints[i % tints.length]}"/>`);
+          x += w + 3;
+        }
+        books.push(`<ellipse cx="1720" cy="486" rx="34" ry="36" fill="#3a4a44"/>`);
+        document.getElementById("s1books").innerHTML = books.join("");
+        let blinds = "";
+        for (let y = 144; y < 580; y += 28) blinds += `<line x1="1400" y1="${y}" x2="1780" y2="${y}"/>`;
+        document.getElementById("s3blinds").innerHTML = blinds;
+        let rack = "";
+        for (let i = 0; i < 7; i++) {
+          const y = 280 + i * 70;
+          rack += `<rect x="176" y="${y}" width="268" height="54" rx="4" fill="#1d2127"/>`;
+          rack += `<circle cx="200" cy="${y + 27}" r="5" fill="${i % 3 === 1 ? "#f0b35b" : "#3ddc7a"}" opacity="0.8"/>`;
+          rack += `<rect x="224" y="${y + 20}" width="${80 + ((i * 37) % 120)}" height="14" rx="3" fill="#2a3039"/>`;
+        }
+        document.getElementById("s3rack").innerHTML = rack;
+        let deck = "";
+        for (let r = 0; r < 2; r++)
+          for (let c = 0; c < 4; c++)
+            deck += `<rect x="${346 + c * 64}" y="${944 + r * 44}" width="54" height="36" rx="6" fill="${r === 0 && c === 0 ? "#f0b35b" : "#262a33"}"/>`;
+        document.getElementById("s3deck").innerHTML = deck;
+      })();
+
+      // ---- the three cameras (studio facts; the names, roles and addresses are Setup's) ----
+      // null means the camera cannot report the value (C0), never "unknown for now".
+      // expMode / wbMode / focusMode are the modes the camera reports; an auto mode locks the keys it owns.
+      const CAMS = [
+        {
+          n: 1,
+          id: "CAM 1",
+          tag: "Main",
+          title: "Main · Blackmagic Pocket 6K Pro",
+          model: "Blackmagic Pocket Cinema Camera 6K Pro",
+          path: "HDMI into the DeckLink 8K Pro",
+          sub: "Bluetooth · HDMI into the DeckLink 8K Pro",
+          link: "Bluetooth · paired",
+          addr: "Bluetooth",
+          app: "Bluetooth+",
+          scene: "s1",
+          guides: true,
+          vmix: "vMix input 1",
+          spot: { x: 960, y: 400 },
+          expMode: "manual · auto exposure off",
+          wbMode: "Kelvin",
+          focusMode: "manual · AF once where the lens allows",
+          iso: "400",
+          shutter: "180°",
+          iris: "f/2.8",
+          nd: "2 stops",
+          ndShort: "2 st",
+          wb: 3600,
+          tint: 2,
+          focus: 42,
+          res: "4K DCI",
+          fps: "25p",
+          profile: "Film",
+          lut: "Extended Video",
+          codec: "Blackmagic RAW 8:1",
+          nr: [
+            ["Card time left", "not in the Bluetooth protocol"],
+            ["Battery", "not in the Bluetooth protocol"],
+            ["A manual lens", "reports no iris or focus: both read “not reported by this lens”, and AF once locks"],
+          ],
+        },
+        {
+          n: 2,
+          id: "CAM 2",
+          tag: "Wide",
+          title: "Wide · Panasonic BGH1",
+          model: "Panasonic BGH1",
+          path: "HDMI → SDI into the DeckLink",
+          sub: "Network · 172.16.16.85 · PoE",
+          link: "Network · 172.16.16.85",
+          addr: "172.16.16.85",
+          app: "LUMIX Tether",
+          scene: "s2",
+          guides: true,
+          vmix: "vMix input 2",
+          spot: { x: 750, y: 560 },
+          expMode: "mode M",
+          wbMode: "WB mode K",
+          focusMode: "MF · stepped",
+          iso: "800",
+          shutter: "1/50",
+          iris: "f/4.0",
+          nd: null,
+          wb: 3600,
+          tint: null,
+          focus: null,
+          res: "UHD",
+          fps: "25p",
+          profile: null,
+          lut: null,
+          nr: [
+            ["Tint (G–M)", "the LUMIX SDK lists white balance only"],
+            ["Profile, LUT", "not in the LUMIX SDK"],
+            ["Focus position", "the LUMIX SDK steps near and far"],
+            ["ND", "no ND filter in the BGH1"],
+            ["Recording", "only CAM 1 records; the BGH1s do not"],
+          ],
+        },
+        {
+          n: 3,
+          id: "CAM 3",
+          tag: "Operator",
+          title: "Operator · Panasonic BGH1",
+          model: "Panasonic BGH1",
+          path: "HDMI into the Cam Link 4K",
+          sub: "Network · 172.16.16.30 · PoE",
+          link: "Network · 172.16.16.30",
+          addr: "172.16.16.30",
+          app: "LUMIX Tether",
+          scene: "s3",
+          guides: false,
+          vmix: "vMix input 3",
+          spot: { x: 960, y: 490 },
+          expMode: "mode A · the camera sets the shutter",
+          shutterAuto: true,
+          wbMode: "AWB · the camera sets it",
+          wbAuto: true,
+          focusMode: "MF · stepped",
+          iso: "640",
+          shutter: "auto",
+          iris: "f/2.8",
+          nd: null,
+          wb: null,
+          tint: null,
+          focus: null,
+          res: "UHD",
+          fps: "25p",
+          profile: null,
+          lut: null,
+          nr: [
+            ["Tint (G–M)", "the LUMIX SDK lists white balance only"],
+            ["Profile, LUT", "not in the LUMIX SDK"],
+            ["Focus position", "the LUMIX SDK steps near and far"],
+            ["ND", "no ND filter in the BGH1"],
+            ["Recording", "only CAM 1 records; the BGH1s do not"],
+          ],
+        },
+      ];
+      const BANKS = ["exposure", "colour", "focus"];
+      const REC_T = "12m 34s"; // a duration (system §9), counted from the REC start CAM 1 reported
+      const RECENT_BASE = [
+        ["10:06", "Frame rate 25p · CAM 2", "Screen"],
+        ["09:58", "REC stop · CAM 1", "Stream Deck"],
+        ["09:44", "REC start · CAM 1", "Screen"],
+        ["09:40", "Connect · CAM 3", "Screen"],
+        ["09:31", "Release · CAM 3", "Screen"],
+      ];
+      const SUB_HELD = "Studio Control holds all three cameras. Pictures from vMix over NDI.";
+      // the frame rates a BGH1 offers at UHD, as the camera would list them (open question: does the SDK list them?)
+      const CHOOSE_FPS = {
+        cam: 2,
+        field: "fps",
+        label: "Frame rate",
+        now: "25p",
+        allows: "at UHD",
+        values: ["23.98p", "24p", "25p", "29.97p", "50p", "59.94p"],
+      };
+
+      // ---- the states that matter on this page ----
+      const STATES = {
+        ready: {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: SUB_HELD,
+          meta: "3 of 3 cameras answering · 3 of 3 pictures · CAM 1 not recording",
+          sel: 1,
+          bank: "exposure",
+          rec: "off",
+          pics: true,
+          hdr: ["ok", "ok"],
+        },
+        recording: {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: SUB_HELD,
+          meta: `CAM 1 recording ${REC_T} · Blackmagic RAW 8:1 · 3 of 3 pictures`,
+          sel: 1,
+          bank: "exposure",
+          rec: "on",
+          pics: true,
+          hdr: ["ok", "ok"],
+          recent: [["10:12", "REC start · CAM 1", "Stream Deck"], ...RECENT_BASE],
+        },
+        "rec-joined": {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: SUB_HELD,
+          meta: "CAM 1 was already recording at 10:20, when Studio Control connected; its start was not reported.",
+          sel: 1,
+          bank: "exposure",
+          rec: "joined",
+          pics: true,
+          hdr: ["ok", "ok"],
+        },
+        "stop-armed": {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: SUB_HELD,
+          armed: { t: "Stop REC on CAM 1 · press again", left: "2.1 s", pct: 70 },
+          sel: 3,
+          bank: "exposure",
+          rec: "armed",
+          pics: true,
+          hdr: ["ok", "ok"],
+          recent: [["10:12", "REC start · CAM 1", "Stream Deck"], ...RECENT_BASE],
+        },
+        "format-choose": {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: "Choosing is not applying: the value you press arms, and only a second press on it sends it to CAM 2.",
+          meta: "vMix loses CAM 2's picture while the camera switches; its input may need to follow.",
+          choose: { ...CHOOSE_FPS },
+          sel: 2,
+          bank: "colour",
+          rec: "off",
+          pics: true,
+          hdr: ["ok", "ok"],
+        },
+        "format-armed": {
+          tone: "ok",
+          word: "CONNECTED",
+          sub: "vMix loses CAM 2's picture while the camera switches; its input may need to follow.",
+          armed: { t: "50p on CAM 2 · press again", left: "3.9 s", pct: 97 },
+          choose: { ...CHOOSE_FPS, armed: { v: "50p", left: "3.9 s", pct: 97 } },
+          sel: 2,
+          bank: "colour",
+          rec: "off",
+          pics: true,
+          hdr: ["ok", "ok"],
+        },
+        released: {
+          tone: "attention",
+          word: "RELEASED",
+          sub: "CAM 3 is with LUMIX Tether. Studio Control sends nothing to it and reads nothing from it.",
+          meta: "Connect takes it back and changes no setting.",
+          actions: [["Connect CAM 3", "primary"]],
+          links: { 3: "released" },
+          sel: 3,
+          bank: "exposure",
+          rec: "off",
+          pics: true,
+          hdr: ["amber", "CAM 3 released"],
+          recent: [["10:23", "Release · CAM 3", "Screen"], ...RECENT_BASE],
+        },
+        "rec-released": {
+          tone: "attention",
+          word: "RELEASED",
+          sub: "CAM 1 is with Bluetooth+ and was recording. Stop it there: REC here and on the deck cannot reach it.",
+          meta: "Connect takes it back and changes no setting.",
+          actions: [["Connect CAM 1", "primary"]],
+          links: { 1: "released" },
+          sel: 1,
+          bank: "exposure",
+          rec: "nohold",
+          pics: true,
+          hdr: ["amber", "CAM 1 released"],
+          recent: [
+            ["10:23", "Release · CAM 1 (REC on)", "Screen"],
+            ["10:12", "REC start · CAM 1", "Stream Deck"],
+            ...RECENT_BASE,
+          ],
+        },
+        "no-pictures": {
+          tone: "attention",
+          word: "NO PICTURES",
+          sub: "vMix is not sending the cameras over NDI.",
+          meta: "The controls still work. Start vMix, or turn on NDI for Cameras / Calls / Audio Inputs in its Settings › Outputs.",
+          actions: [["Look again", ""]],
+          sel: 3,
+          bank: "focus",
+          rec: "off",
+          pics: false,
+          pending: { cam: 3, field: "iso", asked: "800" },
+          hdr: ["amber", "no pictures"],
+        },
+        "not-taken": {
+          tone: "error",
+          word: "ACTION FAILED",
+          sub: "CAM 3 did not take ISO 800 and kept 640; the camera wins. Nothing more was sent.",
+          code: "Asked 10:24:12 · CAM 3 still answers reads",
+          actions: [
+            ["Read CAM 3 again", ""],
+            ["Dismiss", ""],
+          ],
+          sel: 3,
+          bank: "exposure",
+          rec: "off",
+          pics: true,
+          kept: { cam: 3, field: "iso", asked: "800" },
+          hdr: ["red", "CAM 3 action failed"],
+          recent: [["10:24", "ISO 800 not taken · CAM 3", "Stream Deck"], ...RECENT_BASE],
+        },
+        unreachable: {
+          tone: "error",
+          word: "UNREACHABLE",
+          sub: "CAM 2 does not answer at 172.16.16.85. Check its cable and PoE, or whether LUMIX Tether has it.",
+          code: "Last answer 10:21:07 · CAM 1 and CAM 3 unaffected",
+          actions: [
+            ["Try CAM 2 again", "primary"],
+            ["Open Setup", ""],
+          ],
+          links: { 2: "unreachable" },
+          sel: 2,
+          bank: "exposure",
+          rec: "off",
+          pics: true,
+          hdr: ["red", "CAM 2 unreachable"],
+        },
+      };
+
+      // the 1:1 focus check: one vMix (NDI) pixel per screen pixel, so the crop is the well's inner size
+      const LOUPE = { plate: { w: 381, h: 214 }, cluster: { w: 389, h: 218 } };
+      let layout = params.get("plate") === "0" ? "noplate" : "plate";
+      const loupeSize = () => (layout === "plate" ? LOUPE.plate : LOUPE.cluster);
+
+      const linkOf = (st, n) => (st.links && st.links[n]) || "connected";
+      const lampWord = (link) =>
+        link === "connected"
+          ? ["ok", "CONNECTED"]
+          : link === "released"
+            ? ["amber", "RELEASED"]
+            : ["red", "UNREACHABLE"];
+      const pct = (p) => `calc(17px + ${p.toFixed(2)}% - ${((p / 100) * 34).toFixed(2)}px)`;
+      const dis = (lock) => (lock ? ` aria-disabled="true"` : "");
+      const stepKeys = (what, lock) =>
+        `<button class="key ${lock ? "auto-lock" : ""}" data-key data-take${dis(lock)} aria-label="${what} down one step">−</button><button class="key ${lock ? "auto-lock" : ""}" data-key data-take${dis(lock)} aria-label="${what} up one step">+</button>`;
+      // a slider: focusable (D6 keeps the arrow keys on a focused slider), its value as the camera reports it
+      const slider = (o) =>
+        `<div class="hslider well ${o.cls || ""} ${o.lock ? "auto-lock" : ""}" data-key data-take role="slider" tabindex="0" aria-label="${o.label}" aria-valuemin="${o.min}" aria-valuemax="${o.max}"${o.now != null ? ` aria-valuenow="${o.now}"` : ""} aria-valuetext="${o.text}"${dis(o.lock)}><div class="track"></div>${o.unity ? `<div class="unity"></div>` : ""}${o.ends ? `<div class="ends"><span>near</span><span>far</span></div>` : ""}${o.pos != null ? `<div class="cap" style="left:${pct(o.pos)}"></div>` : ""}</div>`;
+
+      // the 1:1 well and the dashed spot it shows, drawn on the selected camera's picture
+      function loupeHTML(c) {
+        const L = loupeSize();
+        const x0 = c.spot.x - Math.floor(L.w / 2),
+          y0 = c.spot.y - Math.floor(L.h / 2);
+        return `<div class="loupe well" style="height:${L.h + 2}px"><svg viewBox="${x0} ${y0} ${L.w} ${L.h}" width="${L.w}" height="${L.h}" aria-label="${c.id} at 1:1, the dashed spot"><use href="#${c.scene}" width="1920" height="1080"/></svg><span class="ll">1:1 · ${c.id}</span><div class="nopic"><span class="np-w"><i class="lamp amber"></i>NO PICTURE</span><span class="np-s">vMix is not sending ${c.id} over NDI.</span></div></div>`;
+      }
+      function spotMark(c) {
+        const L = loupeSize();
+        const x0 = c.spot.x - Math.floor(L.w / 2),
+          y0 = c.spot.y - Math.floor(L.h / 2);
+        return `<i class="lmark" style="left:${((x0 / 1920) * 100).toFixed(3)}%;top:${((y0 / 1080) * 100).toFixed(3)}%;width:${((L.w / 1920) * 100).toFixed(3)}%;height:${((L.h / 1080) * 100).toFixed(3)}%"></i>`;
+      }
+
+      // Format as keys (D11): the field opens the list of values the camera allows; a value arms;
+      // a second press on the same value sends it. In the plate, or in the strip at ?plate=0.
+      function formatKeys(c, st, locked, where) {
+        const ch = st.choose && st.choose.cam === c.n && !locked ? st.choose : null;
+        const fld = (label, val, field) => {
+          if (val === null)
+            return `<div class="fld na"><span class="l">${label}</span><span>not in the LUMIX SDK</span></div>`;
+          const open = !!ch && ch.field === field;
+          return `<button class="key fld ${open ? "on" : ""}" data-key data-take aria-haspopup="true" aria-expanded="${open}" aria-label="${c.id} ${label} ${locked ? "not read" : val}: shows the values ${c.id} allows"><span class="l">${label}</span><span class="v">${locked ? "—" : val}</span></button>`;
+        };
+        const fields = `<div class="fmt">${fld("Resolution", c.res, "res")}${fld("Frame rate", c.fps, "fps")}${fld("Profile", c.profile, "profile")}${fld("LUT", c.lut, "lut")}</div>`;
+        if (!ch) return fields;
+        const keys = ch.values
+          .map((val) => {
+            if (ch.armed && ch.armed.v === val)
+              return `<button class="key chv armed" data-key data-take aria-label="${ch.label} ${val} on ${c.id}: armed, press again within ${ch.armed.left} to send"><span class="tag">ARMED · press again</span><span class="row"><span class="v">${val}</span><span class="s">${ch.armed.left}</span></span><i class="count" style="width:${ch.armed.pct}%"></i></button>`;
+            if (val === ch.now)
+              return `<button class="key chv" data-key aria-current="true" aria-label="${ch.label} ${val}: what ${c.id} reports now"><span class="v">${val}</span><span class="now">now</span></button>`;
+            return `<button class="key chv" data-key data-take aria-label="${ch.label} ${val}: press to arm; nothing is sent yet"><span class="v">${val}</span></button>`;
+          })
+          .join("");
+        if (where === "strip")
+          return `<div class="ch-keys" role="group" aria-label="${ch.label} values ${c.id} allows">${keys}</div>`;
+        return `${fields}<div class="choice" role="group" aria-label="${ch.label} values ${c.id} allows"><div class="ch-head"><span class="t">${ch.label} · ${c.id}</span><span class="d">the values it allows ${ch.allows}</span></div><div class="ch-keys">${keys}</div><div class="ch-note">Choosing is not applying: the value you press arms, and a second press on the same key sends it.</div></div>`;
+      }
+
+      // ---- one camera strip ----
+      function camHTML(c, st) {
+        const link = linkOf(st, c.n);
+        const locked = link !== "connected";
+        const sel = st.sel === c.n;
+        const rec = c.n === 1 ? st.rec : "off";
+        const v = (x) => (locked ? "—" : x);
+        const pend = st.pending && st.pending.cam === c.n ? st.pending : null;
+        const kept = st.kept && st.kept.cam === c.n ? st.kept : null;
+        const lw = lampWord(link);
+        // the dial target: a small lit amber cap (engaged), not a lamp + word
+        const dtag = (bank) => (sel && !locked && st.bank === bank ? `<span class="dtag">Dials</span>` : "");
+        // a section's head: its title and the mode the camera reports (nothing when nothing is read)
+        const sh = (t, bank, d) =>
+          `<div class="sh"><span class="t">${t}</span>${d && !locked ? `<span class="d">${d}</span>` : ""}${dtag(bank)}</div>`;
+
+        // exposure: four desk cells; an auto mode shows "auto" and locks its keys
+        const cell = (label, val, naText, field, auto) => {
+          if (val === null)
+            return `<div class="cell"><div class="l">${label}</div><div class="na">${naText}</div></div>`;
+          const p = !!pend && pend.field === field && !locked;
+          const k = !!kept && kept.field === field && !locked;
+          const a = !!auto && !locked;
+          const tag = p ? `<span class="ask">asked ${pend.asked}</span>` : "";
+          const keptLine = k ? `<span class="kept">${kept.asked} not taken</span>` : "";
+          return `<div class="cell ${p ? "pending" : ""} ${k ? "kept" : ""} ${a ? "auto" : ""}"><div class="l"><span>${label}</span>${tag}</div><div class="rd well">${v(val)}${keptLine}</div><div class="steps">${stepKeys(`${c.id} ${label}`, a)}</div></div>`;
+        };
+        const expo = `<section class="sec">${sh("Exposure", "exposure", c.expMode)}<div class="expo">${cell("ISO", c.iso, "", "iso")}${cell("Shutter", c.shutter, "", "shutter", c.shutterAuto)}${cell("Iris", c.iris, "", "iris")}${cell("ND", c.nd, "No ND filter in the BGH1", "nd")}</div></section>`;
+
+        // colour: white balance on the colour-temperature track (AWB: no Kelvin to place, the row locks), tint
+        const wbAuto = !!c.wbAuto && !locked;
+        const wbPos = locked || wbAuto ? null : ((c.wb - 2500) / 7500) * 100;
+        const wbText = locked ? "not read" : wbAuto ? "AWB, set by the camera" : `${c.wb} K`;
+        const wbRow = `<div class="ctl ${wbAuto ? "auto" : ""}"><span class="n">White balance</span>${slider({ cls: "cct", label: `${c.id} white balance`, min: 2500, max: 10000, now: wbPos == null ? null : c.wb, text: wbText, pos: wbPos, lock: wbAuto })}<span class="v">${locked ? "—" : wbAuto ? "AWB" : c.wb + " K"}</span>${stepKeys(`${c.id} white balance`, wbAuto)}</div>`;
+        const tintTxt = (t) => (t > 0 ? "+" : "") + t;
+        const tintRow =
+          c.tint === null
+            ? `<div class="ctl"><span class="n">Tint</span><div class="na">Not reported · the LUMIX SDK lists white balance only</div></div>`
+            : `<div class="ctl"><span class="n">Tint</span>${slider({ label: `${c.id} tint`, min: -50, max: 50, now: locked ? null : c.tint, text: locked ? "not read" : tintTxt(c.tint), pos: locked ? null : 50 + c.tint, unity: true })}<span class="v">${v(tintTxt(c.tint))}</span>${stepKeys(`${c.id} tint`)}</div>`;
+        const colour = `<section class="sec">${sh("Colour", "colour", c.wbMode)}${wbRow}${tintRow}</section>`;
+
+        // focus: lens travel the Pocket's lens reports; the BGH1 is stepped near and far
+        const fstep = (t, what) =>
+          `<button class="key" data-key data-take aria-label="${c.id} focus ${what}">${t}</button>`;
+        const focusRow =
+          c.focus === null
+            ? `<div class="ctl"><span class="n">Focus</span><div class="fsteps">${fstep("‹‹ Near", "big step near")}${fstep("‹ Near", "small step near")}${fstep("Far ›", "small step far")}${fstep("Far ››", "big step far")}</div></div>`
+            : `<div class="ctl"><span class="n">Focus</span>${slider({ label: `${c.id} focus`, min: 0, max: 100, now: locked ? null : c.focus, text: locked ? "not read" : `${c.focus} % of the lens travel`, pos: locked ? null : c.focus, ends: true })}<span class="v">${v(c.focus + " %")}</span>${stepKeys(`${c.id} focus`)}</div>`;
+        const focusNote =
+          c.focus === null
+            ? "Position not reported · the LUMIX SDK steps near and far"
+            : "Lens travel as the lens reports it, not a distance";
+        const focus = `<section class="sec">${sh("Focus", "focus", c.focusMode)}${focusRow}<div class="frow"><button class="key" data-key data-take aria-label="${c.id} one-shot autofocus">AF once</button><span class="fnote">${focusNote}</span></div></section>`;
+
+        // format: with the plate, the strip prints what the camera reports and the plate changes it;
+        // at ?plate=0 the strip carries the keys, the list and the arm itself
+        const ch = st.choose && st.choose.cam === c.n && !locked ? st.choose : null;
+        const fField = (label, val) =>
+          val === null
+            ? `<div class="field nr"><span class="l">${label}</span><span class="v">not in the LUMIX SDK</span></div>`
+            : `<div class="field well"><span class="l">${label}</span><span class="v">${v(val)}</span></div>`;
+        const format =
+          layout === "plate"
+            ? `<section class="sec">${sh("Format", null, "as the camera reports it")}<div class="fields">${fField("Resolution", c.res)}${fField("Frame rate", c.fps)}${fField("Profile", c.profile)}${fField("LUT", c.lut)}</div></section>`
+            : `<section class="sec">${sh("Format", null, ch ? `${ch.label} · the values ${c.id} allows ${ch.allows} · choosing is not applying` : "a change needs a second press")}${formatKeys(c, st, locked, "strip")}</section>`;
+
+        // the picture, its guides, the dashed 1:1 spot (selected camera) and the REC badge
+        const guides = c.guides
+          ? `<div class="guides"><i class="v1"></i><i class="v2"></i><i class="h1"></i><i class="h2"></i><i class="safe"></i><i class="cx"></i><i class="cy"></i></div>`
+          : "";
+        const badge =
+          rec === "on" || rec === "armed"
+            ? `<span class="pbadge rec"><i class="lamp red"></i>REC ${REC_T}</span>`
+            : rec === "joined"
+              ? `<span class="pbadge rec"><i class="lamp red"></i>REC</span>`
+              : rec === "nohold"
+                ? `<span class="pbadge rec"><i class="lamp red"></i>REC as of 10:23</span>`
+                : "";
+        const pic = `<div class="pic well"><svg class="scene" viewBox="0 0 1920 1080" aria-label="${c.id} picture from vMix"><use href="#${c.scene}"/></svg>${guides}${sel ? spotMark(c) : ""}${badge}<div class="nopic"><span class="np-w"><i class="lamp amber"></i>NO PICTURE</span><span class="np-s">vMix is not sending ${c.id} over NDI.</span><span class="np-m">Studio Control looks on this PC only. The controls below still work.</span></div></div>`;
+        const tools = `<div class="p-tools"><button class="key ${c.guides ? "on" : ""}" data-key aria-pressed="${c.guides}">Guides</button><button class="key" data-key aria-pressed="false">Peaking</button><button class="key" data-key aria-pressed="false">Zebras</button><span class="src"><i class="lamp ${st.pics ? "ok" : "amber"}"></i>${st.pics ? `NDI · vMix · 1920 × 1080 · 25p` : "no NDI picture from vMix"}</span></div>`;
+
+        // head: the select key, the names, the lamps (REC on the main camera only)
+        const recWord =
+          c.n !== 1
+            ? ""
+            : rec === "off"
+              ? `<span class="lampword"><i class="lamp"></i>REC off</span>`
+              : rec === "joined"
+                ? `<span class="lampword rec"><i class="lamp red"></i>REC</span>`
+                : rec === "nohold"
+                  ? `<span class="lampword rec"><i class="lamp red"></i>REC as of 10:23</span>`
+                  : `<span class="lampword rec"><i class="lamp red"></i>REC ${REC_T}</span>`;
+        const head = `<div class="c-head"><button class="key c-id" data-key aria-pressed="${sel}" aria-label="Select ${c.id}; the plate and the deck's dials follow"><span class="cap">${c.id}</span></button><div style="min-width:0"><div class="c-name">${c.title}</div><div class="c-sub">${c.sub}</div></div><div class="c-lamps"><span class="lampword ${lw[0]}"><i class="lamp ${lw[0]}"></i>${lw[1]}</span>${recWord}</div></div>`;
+
+        // foot: who holds it; a locked strip gives its one reason in a fixed two-line note
+        const recNow = c.n === 1 && (rec === "on" || rec === "armed" || rec === "joined");
+        const note =
+          link === "released"
+            ? `<div class="c-note"><b>RELEASED</b>${c.app} may connect to ${c.id}.${c.n === 1 && rec === "nohold" ? " A recording stays as it was: stop it there." : ""} Studio Control reads nothing from it until Connect.</div>`
+            : link === "unreachable"
+              ? `<div class="c-note red"><b>UNREACHABLE</b>No answer from ${c.addr} since 10:21:07. Is it powered over PoE, or does ${c.app} have it? Its picture is not affected.</div>`
+              : "";
+        let linkLine;
+        if (layout === "plate")
+          linkLine =
+            link === "connected"
+              ? `<span class="lk"><i class="lamp ok"></i>${c.link} · held by Studio Control</span>`
+              : link === "released"
+                ? `<span class="lk"><i class="lamp amber"></i>Released to ${c.app} at 10:23</span>`
+                : `<span class="lk"><i class="lamp red"></i>${c.addr} · no answer</span>`;
+        else
+          linkLine =
+            link === "connected"
+              ? `<span class="lk"><i class="lamp ok"></i>${recNow ? `${c.addr} · held · after Release, REC stays on and REC here cannot reach it` : `${c.link} · held by Studio Control`}</span><button class="key" data-key>Release to ${c.app}</button>`
+              : link === "released"
+                ? `<span class="lk"><i class="lamp amber"></i>Released · ${c.app} may connect</span><button class="key primary" data-key>Connect</button>`
+                : `<span class="lk"><i class="lamp red"></i>${c.link} · no answer</span><button class="key" data-key>Try again</button>`;
+        const foot = `<div class="c-foot">${note}<div class="c-link">${linkLine}</div></div>`;
+
+        return `<article class="cam ${sel ? "sel" : ""} ${locked ? "locked" : ""}" data-cam="${c.n}" aria-label="${c.id}">${head}${pic}${tools}${expo}${colour}${focus}${format}${foot}</article>`;
+      }
+
+      // ---- the plate: the selected camera ----
+      function renderPlate(st) {
+        const el = document.getElementById("plate");
+        if (layout !== "plate") {
+          el.innerHTML = "";
+          return;
+        }
+        const c = CAMS[st.sel - 1];
+        const link = linkOf(st, c.n);
+        const locked = link !== "connected";
+        const lw = lampWord(link);
+        const recNow = c.n === 1 && (st.rec === "on" || st.rec === "armed" || st.rec === "joined");
+        el.className = "inspector plate" + (locked ? " locked" : "");
+
+        const head = `<div class="insp-head"><div style="min-width:0"><h2>${c.id} · ${c.tag}</h2><div class="sub">${c.model} · ${c.path}</div></div><span class="lampword ${lw[0]}"><i class="lamp ${lw[0]}"></i>${lw[1]}</span></div>`;
+
+        // who holds it (D13): Release hands it to its own app, Connect takes it back and changes no setting
+        let rows, key, note;
+        if (link === "connected") {
+          rows = [
+            ["Connection", c.link],
+            ["Held by", "Studio Control"],
+            ["Last read", "10:24:31"],
+          ];
+          key = `<button class="key" data-key>Release to ${c.app}</button>`;
+          note = recNow
+            ? `<div class="inote warn">REC stays on. After Release, REC here and on the deck cannot reach ${c.id}: stop it in ${c.app}.</div>`
+            : `<div class="inote">Studio Control then sends nothing and reads nothing, and ${c.app} may connect. Connect takes it back and changes no setting.</div>`;
+        } else if (link === "released") {
+          rows = [
+            ["Connection", c.link.replace(" · paired", "")],
+            ["Held by", `${c.app} may connect`, "amber"],
+            ["Released", "10:23"],
+          ];
+          key = `<button class="key primary" data-key>Connect ${c.id}</button>`;
+          note = `<div class="inote">Connect takes ${c.id} back, reads it again and changes no setting.</div>`;
+        } else {
+          rows = [
+            ["Connection", c.link],
+            ["Answer", "none since 10:21:07", "red"],
+            ["Picture", "from vMix, not affected"],
+          ];
+          key = `<button class="key primary" data-key>Try ${c.id} again</button>`;
+          note = `<div class="inote">Trying again only reads. Is it powered over PoE, or does ${c.app} have it?</div>`;
+        }
+        const linkSec = `<section class="isec"><div class="isec-head"><span class="t">Link</span><span class="d">who holds ${c.id}</span></div><div class="readouts">${rows.map(([a, b, t]) => `<span>${a}</span><span class="v ${t || ""}">${b}</span>`).join("")}</div><div class="insp-keys">${key}</div>${note}</section>`;
+
+        const check = `<section class="isec"><div class="isec-head"><span class="t">Focus check</span><span class="d">1:1 · one vMix pixel per screen pixel</span></div>${loupeHTML(c)}<div class="lcap">${st.pics ? `The dashed spot on ${c.id}'s picture; press the picture to move it. Detail as vMix sends it (1920 × 1080), not the sensor's.` : `Nothing to check until vMix sends ${c.id} over NDI. The controls still work.`}</div></section>`;
+
+        const fmt = `<section class="isec"><div class="isec-head"><span class="t">Format</span><span class="d">a change needs a second press</span></div>${formatKeys(c, st, locked, "plate")}</section>`;
+
+        const nr = `<section class="isec foot"><div class="isec-head"><span class="t">What ${c.id} cannot report</span><span class="d">never shown as a value</span></div><ul class="nrl">${c.nr.map(([a, b]) => `<li><b>${a}</b><span>${b}</span></li>`).join("")}</ul></section>`;
+
+        el.innerHTML = head + linkSec + check + fmt + nr;
+      }
+
+      // ---- the deck's CAMERAS page (D14), mirrored ----
+      function deckSegs(c, bank) {
+        const idle = { l: "idle", v: "—", idle: true, kp: "idle" };
+        if (bank === "exposure")
+          return [
+            { l: "ISO", v: c.iso, kp: "turn" },
+            c.shutterAuto
+              ? { l: "Shutter", v: "auto", idle: true, kp: "mode A" }
+              : { l: "Shutter", v: c.shutter, kp: "turn" },
+            { l: "Iris", v: c.iris, kp: "turn" },
+            c.nd ? { l: "ND", v: c.ndShort, kp: "turn" } : { l: "ND", v: "—", idle: true, kp: "no ND" },
+          ];
+        if (bank === "colour")
+          return [
+            c.wbAuto
+              ? { l: "White bal.", v: "AWB", idle: true, kp: "AWB mode" }
+              : { l: "White bal.", v: c.wb + " K", kp: "turn" },
+            c.tint === null
+              ? { l: "Tint", v: "—", idle: true, kp: "not reported" }
+              : { l: "Tint", v: (c.tint > 0 ? "+" : "") + c.tint, kp: "turn" },
+            idle,
+            idle,
+          ];
+        return [
+          c.focus === null
+            ? { l: "Focus", v: "—", kp: "steps · push AF", push: true }
+            : { l: "Focus", v: c.focus + " %", kp: "push · AF once", push: true },
+          idle,
+          idle,
+          idle,
+        ];
+      }
+      function renderDeck(st) {
+        const c = CAMS[st.sel - 1];
+        const link = linkOf(st, st.sel);
+        const next = BANKS[(BANKS.indexOf(st.bank) + 1) % 3];
+        const camKeys = CAMS.map(
+          (k) =>
+            `<button class="key dk ${st.sel === k.n ? "on" : ""}" data-key data-take aria-pressed="${st.sel === k.n}" aria-label="${k.id}: the dials drive it"><span class="cap">${k.id}</span><span class="hint">${k.tag}</span></button>`
+        ).join("");
+        const bankKey = `<button class="key dk" data-key data-take aria-label="Bank: ${st.bank}; press for ${next}"><span class="cap">Bank</span><span class="bw">${st.bank}</span></button>`;
+        let rec;
+        if (st.rec === "armed")
+          rec = `<button class="key dk armed" data-key data-take aria-label="Stop recording on CAM 1: armed, press again"><span class="cap">STOP?</span><span class="t2">press again<br />${st.armed.left}</span><i class="count" style="width:${st.armed.pct}%"></i></button>`;
+        else if (st.rec === "on")
+          rec = `<button class="key dk rec recording" data-key data-take aria-label="REC: CAM 1 recording, ${REC_T}; press twice to stop"><span class="rl"><i class="lamp"></i><span class="cap">REC</span></span><span class="hint">CAM 1</span><span class="tm">${REC_T}</span></button>`;
+        else if (st.rec === "joined")
+          rec = `<button class="key dk rec recording" data-key data-take aria-label="REC: CAM 1 recording, time not known; press twice to stop"><span class="rl"><i class="lamp"></i><span class="cap">REC</span></span><span class="hint">CAM 1</span></button>`;
+        else if (st.rec === "nohold")
+          rec = `<button class="key dk rec nohold" data-key data-take aria-disabled="true" aria-label="REC: locked; CAM 1 is with Bluetooth+, stop the recording there"><span class="rl"><i class="lamp"></i><span class="cap">REC</span></span><span class="t2">CAM 1<br />released</span></button>`;
+        else
+          rec = `<button class="key dk rec" data-key data-take aria-label="REC: start recording on CAM 1"><span class="rl"><i class="lamp"></i><span class="cap">REC</span></span><span class="hint">CAM 1</span></button>`;
+        const empty = `<div class="dk empty" aria-hidden="true"></div>`;
+        document.getElementById("dkeys").innerHTML = camKeys + bankKey + empty + empty + empty + rec;
+
+        const segs = deckSegs(c, st.bank);
+        const strip = document.getElementById("dstrip");
+        if (link !== "connected") {
+          strip.innerHTML =
+            link === "released"
+              ? `<div class="ds-cap">${c.id} · ${st.bank}</div><div class="ds-msg amber">${c.id} is released to ${c.app}<span>${c.n === 1 ? "The dials and REC do nothing until you press Connect." : "The dials do nothing until you press Connect."}</span></div>`
+              : `<div class="ds-cap">${c.id} · ${st.bank}</div><div class="ds-msg red">${c.id} does not answer<span>The dials do nothing until it answers.</span></div>`;
+        } else {
+          strip.innerHTML = `<div class="ds-cap">${c.id} · ${st.bank}</div><div class="ds-row">${segs.map((s) => `<div class="s4 ${s.idle ? "idle" : ""}"><span class="tl">${s.l}</span><span class="tv">${s.v}</span></div>`).join("")}</div>`;
+        }
+        document.getElementById("ddials").innerHTML = segs
+          .map(
+            (s) =>
+              `<div class="dial ${s.idle || link !== "connected" ? "idle" : ""} ${s.push && link === "connected" ? "push" : ""}"><i class="knob"></i><span class="kp">${link === "connected" ? s.kp : "—"}</span></div>`
+          )
+          .join("");
+      }
+
+      // ---- the main camera's recording readout: a duration, or "time not known" — never an invented number ----
+      function renderRec(st) {
+        const r = st.rec;
+        const box = document.getElementById("recbox");
+        const live = r === "on" || r === "armed";
+        box.className =
+          "recbox well" +
+          (live ? " on rec" : "") +
+          (r === "joined" ? " rec" : "") +
+          (r === "nohold" ? " rec locked" : "");
+        const T = {
+          on: [REC_T, "Counted from 10:12, when CAM 1 reported REC · card time not reported over Bluetooth"],
+          joined: [
+            "Recording · time not known",
+            "Already recording when Studio Control connected at 10:20; the start was not reported.",
+          ],
+          nohold: [
+            "Last reported: recording",
+            "As of 10:23, when CAM 1 went to Bluetooth+. Stop it there: REC here and on the deck cannot reach it.",
+          ],
+          off: [
+            "Not recording",
+            "Card time not reported over Bluetooth. REC acts on CAM 1, whichever camera the dials drive.",
+          ],
+        }[live ? "on" : r];
+        box.innerHTML = `<div class="rb-top"><span class="l"><i class="lamp ${r === "off" ? "" : "red"}"></i><span class="w">REC</span>CAM 1 · the main camera</span><span>${CAMS[0].codec}</span></div><div class="rb-hero">${T[0]}</div><div class="rb-meta">${T[1]}</div>`;
+      }
+
+      // ---- where the pictures come from, and the 1:1 check in the cluster at ?plate=0 ----
+      function renderPix(st) {
+        document.getElementById("pixList").innerHTML = CAMS.map(
+          (c) =>
+            `<div class="rrow"><span class="tm">${c.id}</span><span class="w">${c.vmix} · ${st.pics ? "1920 × 1080 · 25p" : "not sent"}</span><span class="lampword ${st.pics ? "ok" : "amber"}"><i class="lamp ${st.pics ? "ok" : "amber"}"></i>${st.pics ? "RECEIVED" : "MISSING"}</span></div>`
+        ).join("");
+        const cl = document.getElementById("cloupe");
+        if (layout !== "noplate") {
+          cl.innerHTML = "";
+          return;
+        }
+        const c = CAMS[st.sel - 1];
+        cl.innerHTML = `<div class="sec-head"><div class="title">Focus check <span>${c.id} · 1:1, one vMix pixel per screen pixel</span></div></div>${loupeHTML(c)}<div class="lcap">${st.pics ? `The dashed spot on ${c.id}'s picture; press the picture to move it.` : `Nothing to check until vMix sends ${c.id} over NDI.`}</div>`;
+      }
+
+      // ---- recent actions ----
+      function renderRecent(st) {
+        document.getElementById("recent").innerHTML = (st.recent || RECENT_BASE)
+          .slice(0, layout === "plate" ? 5 : 4)
+          .map(
+            ([t, w, by]) =>
+              `<div class="rrow"><span class="tm">${t}</span><span class="w">${w}</span><span class="by">${by}</span></div>`
+          )
+          .join("");
+      }
+
+      let stateName = "ready";
+      function applyState(name) {
+        stateName = Object.keys(STATES).find((key) => key === name) || "ready";
+        const s = STATES[stateName];
+        board.dataset.state = stateName;
+        board.dataset.layout = layout;
+        board.classList.toggle("nopics", !s.pics);
+        board.classList.toggle("noplate", layout === "noplate");
+
+        // the state display
+        const st = document.getElementById("state");
+        st.className = "state well tone-" + s.tone;
+        document.getElementById("stateLamp").className =
+          "lamp " + (s.tone === "ok" ? "ok" : s.tone === "attention" ? "amber" : "red");
+        document.getElementById("stateWord").textContent = s.word;
+        document.getElementById("stateSub").textContent = s.sub;
+        const meta = document.getElementById("stateMeta");
+        if (s.armed)
+          meta.innerHTML = `<div class="armed-row"><span class="w">ARMED</span><span class="t">${s.armed.t}</span><span class="s">${s.armed.left}</span><span class="bar"><i style="width:${s.armed.pct}%"></i></span></div>`;
+        else if (s.code) meta.innerHTML = `<span class="state-code">${s.code}</span>`;
+        else meta.textContent = s.meta || "";
+        document.getElementById("stateActions").innerHTML = (s.actions || [])
+          .map(([label, cls]) => `<button class="key state-key ${cls}" data-key>${label}</button>`)
+          .join("");
+
+        // the strips, the plate, the deck, the recording readout, the lists
+        document.getElementById("cams").innerHTML = CAMS.map((c) => camHTML(c, s)).join("");
+        renderPlate(s);
+        document
+          .querySelectorAll(".cam.locked [data-take], .inspector.locked [data-take]")
+          .forEach((el) => el.setAttribute("aria-disabled", "true"));
+        if (!s.pics)
+          document.querySelectorAll(".p-tools .key").forEach((el) => el.setAttribute("aria-disabled", "true"));
+        renderDeck(s);
+        renderRec(s);
+        renderPix(s);
+        renderRecent(s);
+
+        // the shell: the Cameras lamp names the camera; the REC latch sits apart, with the latches
+        const hdr = document.getElementById("hdrCams");
+        hdr.className = "lampchip " + (s.hdr[0] === "ok" ? "" : s.hdr[0]);
+        hdr.querySelector(".lamp").className = "lamp " + (s.hdr[0] === "ok" ? "ok" : s.hdr[0]);
+        hdr.querySelector("span").textContent = s.hdr[0] === "ok" ? "ok" : "· " + s.hdr[1];
+        const latch = {
+          on: `CAM 1 · ${REC_T}`,
+          armed: `CAM 1 · ${REC_T}`,
+          joined: "CAM 1 · time not known",
+          nohold: "CAM 1 · as of 10:23",
+        }[s.rec];
+        document.getElementById("latches").hidden = !latch;
+        document.getElementById("hdrRec").hidden = !latch;
+        if (latch) document.getElementById("hdrRecT").textContent = latch;
+
+        // the footer
+        document.getElementById("ftPics").textContent = s.pics ? "vMix · NDI · 3 of 3" : "none · vMix is not sending";
+        const ft = (n, addr) => `${addr} · ${linkOf(s, n)}`;
+        document.getElementById("ftC1").textContent = ft(1, "Bluetooth");
+        document.getElementById("ftC2").textContent = ft(2, "172.16.16.85");
+        document.getElementById("ftC3").textContent = ft(3, "172.16.16.30");
+        document.getElementById("ftDials").textContent = `CAM ${s.sel} · ${s.bank}`;
+        document.getElementById("ftRec").textContent =
+          s.rec === "off"
+            ? "CAM 1 · off"
+            : s.rec === "joined"
+              ? "CAM 1 · time not known"
+              : s.rec === "nohold"
+                ? "CAM 1 · as of 10:23, released"
+                : `CAM 1 · ${REC_T}`;
+
+        syncHarness();
+      }
+
+      // ---- the harness: theme, state and layout from the URL, a switcher below the board, fit to the window ----
+      const THEMES = ["studio", "graphite", "bone"];
+      if (THEMES.includes(params.get("theme"))) document.documentElement.dataset.theme = params.get("theme");
+      const harness = document.getElementById("harness");
+      if (params.get("harness") === "0") harness.hidden = true;
+      const hPanel = document.getElementById("hPanel");
+      const hToggle = document.getElementById("hToggle");
+      hToggle.addEventListener("click", () => {
+        hPanel.hidden = !hPanel.hidden;
+        hToggle.setAttribute("aria-expanded", String(!hPanel.hidden));
+      });
+      function setParam(k, val) {
+        const p = new URLSearchParams(location.search);
+        if (val === null) p.delete(k);
+        else p.set(k, val);
+        history.replaceState(null, "", "?" + p.toString());
+      }
+      Object.keys(STATES).forEach((name) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = name;
+        b.dataset.state = name;
+        b.addEventListener("click", () => {
+          setParam("state", name);
+          applyState(name);
+        });
+        document.getElementById("hStates").appendChild(b);
+      });
+      THEMES.forEach((t) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = t[0].toUpperCase() + t.slice(1);
+        b.dataset.theme = t;
+        b.addEventListener("click", () => {
+          document.documentElement.dataset.theme = t;
+          setParam("theme", t);
+          syncHarness();
+        });
+        document.getElementById("hThemes").appendChild(b);
+      });
+      [
+        ["plate", "Plate 416 · this concept"],
+        ["noplate", "No plate · alternative for D19 (?plate=0)"],
+      ].forEach(([l, label]) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.dataset.layout = l;
+        b.addEventListener("click", () => {
+          layout = l;
+          setParam("plate", l === "noplate" ? "0" : null);
+          applyState(stateName);
+        });
+        document.getElementById("hLayouts").appendChild(b);
+      });
+      const NOTES = {
+        plate:
+          "Concept 3 · Camera console. This layout keeps the plate (416): three equal pictures at 537 × 302 and the selected camera's 1:1 focus check in the plate are this concept's answer to Appendix B item 4. Layout › No plate is the alternative for D19. Captures and census runs pass ?harness=0.",
+        noplate:
+          "ALTERNATIVE for D19 (?plate=0): no plate — three pictures at 675 × 380, Format and Release in each strip, the 1:1 focus check in the cluster. It breaks the cluster rule (system §2); the default layout keeps it.",
+      };
+      function syncHarness() {
+        document
+          .querySelectorAll("#hStates button")
+          .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.state === stateName)));
+        document
+          .querySelectorAll("#hThemes button")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", String(b.dataset.theme === document.documentElement.dataset.theme))
+          );
+        document
+          .querySelectorAll("#hLayouts button")
+          .forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
+        document.getElementById("hNote").textContent = NOTES[layout];
+      }
+      let one = false;
+      function fit() {
+        const k = one ? 1 : Math.min(1, innerWidth / 2560, innerHeight / 1440);
+        board.style.transform = k >= 1 ? "none" : `scale(${k})`;
+        harness.style.top = Math.round(1440 * k + 12) + "px"; // always just below the board, never over it
+      }
+      document.getElementById("hOne").addEventListener("click", (e) => {
+        one = !one;
+        e.currentTarget.setAttribute("aria-pressed", String(one));
+        fit();
+      });
+      addEventListener("resize", fit);
+      applyState(params.get("state") || "ready");
+      fit();
+    </script>
+  </body>
+</html>

@@ -49,6 +49,12 @@ export interface StagePlotProps {
    *  even when the engine snapshot's intensity overlay coincidentally matches
    *  another fixture's stored values. */
   highlightOverlayFixtureIds?: ReadonlySet<string>;
+  /** New pages program, Slice 3 (decision 10): the toolbar's Add to selection
+   *  key. While it is lit, a click (or Enter / Space) on a marker is additive —
+   *  it adds the fixture to the selection or takes it out — and so is a box
+   *  drag; a click on the empty plot clears the selection either way. */
+  addToSelection?: boolean;
+  onAddToSelectionChange?: (next: boolean) => void;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
   onRotationCommit?: (fixtureId: string, rotationDegrees: number) => void;
@@ -60,14 +66,15 @@ export interface StagePlotProps {
   /** Right-click "Delete" — parent shows the confirm dialog. */
   onRequestDeleteFixture?: (id: string, name: string) => void;
   /** Marquee result — fixture ids inside the released selection rectangle.
-   *  When `additive`, the parent merges with the existing multi-select. */
+   *  When `additive` (Add to selection lit), the parent merges with the
+   *  existing multi-select. */
   onMarqueeSelect?: (fixtureIds: readonly string[], options: { additive: boolean }) => void;
   onTalentMarkPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
   /** F10 — empty-state CTA. When provided and `fixtures.length === 0`, the
    *  empty state renders a primary "Add fixture" button that fires this. */
   onAddFixture?: () => void;
-  /** Wave 31 — viewport hook lifted to the workspace so keyboard shortcuts
-   *  can reach the bookmark API. Required. */
+  /** Wave 31 — viewport hook lifted to the workspace; the toolbar's view slots
+   *  reach the bookmark API through it. Required. */
   viewport: StagePlotViewport;
   /** Wave 31 — I9 chip-hover signal. When set, the matching marker
    *  renders a soft pulse so the chip ↔ marker pairing reads at a
@@ -93,7 +100,6 @@ interface PlotPosition {
 }
 
 interface TransientFixturePosition extends PlotPosition {
-  altKey: boolean;
   id: string;
   phase: "dragging" | "committing";
 }
@@ -143,6 +149,8 @@ export function StagePlot({
   searchQuery = "",
   identifyingFixtureIds,
   highlightOverlayFixtureIds,
+  addToSelection = false,
+  onAddToSelectionChange,
   onSelectFixture,
   onPositionCommit,
   onRotationCommit,
@@ -222,15 +230,15 @@ export function StagePlot({
   const [transientPosition, setTransientPosition] = useState<TransientFixturePosition | null>(null);
   const [transientRotation, setTransientRotation] = useState<TransientFixtureRotation | null>(null);
   const dragState = transientPosition?.phase === "dragging" ? transientPosition : null;
-  const handleFixtureDragMove = useCallback((id: string, xMeters: number, yMeters: number, altKey: boolean) => {
-    setTransientPosition({ altKey, id, phase: "dragging", xMeters, yMeters });
+  const handleFixtureDragMove = useCallback((id: string, xMeters: number, yMeters: number) => {
+    setTransientPosition({ id, phase: "dragging", xMeters, yMeters });
   }, []);
   const handleFixtureDragEnd = useCallback((id: string, committedPosition: PlotPosition | null) => {
     if (!committedPosition) {
       setTransientPosition((current) => (current?.id === id ? null : current));
       return;
     }
-    setTransientPosition({ altKey: false, id, phase: "committing", ...committedPosition });
+    setTransientPosition({ id, phase: "committing", ...committedPosition });
   }, []);
   const handleFixtureRotationMove = useCallback((id: string, rotationDegrees: number) => {
     setTransientRotation({ id, phase: "dragging", rotationDegrees });
@@ -313,9 +321,11 @@ export function StagePlot({
   );
 
   // F2 — marquee selection on plain left-drag. Pan is now middle-mouse only.
-  // Hit-test resolves on pointerup against the current fixture positions.
+  // Hit-test resolves on pointerup against the current fixture positions. With
+  // Add to selection lit the box adds to the selection instead of replacing it.
   const marquee = useMarqueeSelection({
     svgRef: viewport.svgRef,
+    additive: addToSelection,
     onCommit: (ids, options) => {
       onMarqueeSelect?.(ids, options);
     },
@@ -327,13 +337,13 @@ export function StagePlot({
       }),
   });
 
-  // F9 — alignment guide derivation. When a drag is in progress and the
-  // user isn't holding Alt (free-positioning), surface horizontal +
-  // vertical lines through any other fixture whose axis falls within 0.1 m
-  // of the dragged fixture. The guides are advisory; the snap-to-0.5 m
-  // semantic in FixtureMarker.finishDrag still wins on commit.
+  // F9 — alignment guide derivation. When a drag is in progress, surface
+  // horizontal + vertical lines through any other fixture whose axis falls
+  // within 0.1 m of the dragged fixture. The guides are advisory; the
+  // snap-to-0.5 m semantic in FixtureMarker.finishDrag still wins on commit
+  // (every drag snaps: new pages program, Slice 3, decision 10).
   const alignmentGuides = useMemo(() => {
-    if (!dragState || dragState.altKey) return { vertical: [], horizontal: [] };
+    if (!dragState) return { vertical: [], horizontal: [] };
     const verticalSet = new Set<number>();
     const horizontalSet = new Set<number>();
     for (let i = 0; i < fixtures.length; i += 1) {
@@ -374,9 +384,6 @@ export function StagePlot({
       role="application"
       aria-label="Lighting stage plot"
     >
-      <div className={styles.srOnly}>
-        Stage plot. Use Tab to focus a fixture, then arrow keys to nudge its position. Hold Shift for 0.5 m steps.
-      </div>
       <div className={styles.plotToneOverlay} aria-hidden="true" />
       {!patchMode && activeSceneName ? (
         <div className={styles.plotPillSlot}>
@@ -559,7 +566,7 @@ export function StagePlot({
                 identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
                 highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
                 chipHovered={chipHoverFixtureId === fixture.id}
-                onSelect={(id, options) => onSelectFixture(id, options)}
+                onSelect={(id) => onSelectFixture(id, { additive: addToSelection })}
                 onPositionCommit={onPositionCommit}
                 onRotationCommit={onRotationCommit}
                 onRequestRename={onRequestRenameFixture}
@@ -574,9 +581,9 @@ export function StagePlot({
           })}
 
           {/* F9 — smart-guide alignment lines. Only render when a fixture
-              drag is in progress and Alt isn't held. Stroke is non-scaling
-              so the guides remain crisp under any zoom level. */}
-          {dragState && !dragState.altKey ? (
+              drag is in progress. Stroke is non-scaling so the guides remain
+              crisp under any zoom level. */}
+          {dragState ? (
             <g pointerEvents="none">
               {alignmentGuides.vertical.map((xMeters) => (
                 <line
@@ -662,6 +669,8 @@ export function StagePlot({
         onSaveViewBookmark={viewport.saveViewBookmark}
         onRecallViewBookmark={viewport.recallViewBookmark}
         onClearViewBookmark={viewport.clearViewBookmark}
+        addToSelection={addToSelection}
+        onAddToSelectionChange={onAddToSelectionChange}
       />
 
       {fixtures.length === 0 ? (

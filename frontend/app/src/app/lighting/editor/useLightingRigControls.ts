@@ -1,35 +1,29 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import type { LightingPaletteSnapshot, LightingPaletteKind } from "@sse/engine-client";
+import type { LightingPaletteKind } from "@sse/engine-client";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import { asRecord } from "../../shellData";
-import { lightingPaletteMatchesQuery, type LightingWorkspaceSurfaceProps } from "../lightingWorkspaceModel";
+import { pushUndoOutcomeToast, type LightingWorkspaceSurfaceProps } from "../lightingWorkspaceModel";
 import type { LightingRig } from "./useLightingRig";
 import type { LightingSession } from "./useLightingSession";
 import type { LightingSceneEditor } from "./useLightingSceneEditor";
-import type { LightingFixtureEditor } from "./useLightingFixtureEditor";
 
-/** The rig-wide controls: groups, palettes (and the quick palette panel), the
- *  grand master, all power and the emergency cut. */
+/** The rig-wide controls: groups, palettes, the grand master, all power, the
+ *  emergency cut, and the Undo key. */
 export function useLightingRigControls({
   props,
   rig,
   session,
   sceneEditor,
-  fixtureEditor,
 }: {
   props: LightingWorkspaceSurfaceProps;
   rig: LightingRig;
   session: LightingSession;
   sceneEditor: LightingSceneEditor;
-  fixtureEditor: LightingFixtureEditor;
 }) {
   const { lightingSnapshot, store } = props;
-  const { groups, fixtureEntries, palettes, previewMode } = rig;
-  const { palette, startBusy, toast, finishBusy, uiMode, selectedGroupId, setSelectedGroupId, reportError } = session;
+  const { groups, fixtureEntries, previewMode } = rig;
+  const { startBusy, toast, finishBusy, uiMode, selectedGroupId, setSelectedGroupId, reportError, undoStack } = session;
   const { activeScene } = sceneEditor;
-  const { selectedFixtureIds } = fixtureEditor;
-  const [paletteQuickOpen, setPaletteQuickOpen] = useState(false);
-  const [paletteQuickQuery, setPaletteQuickQuery] = useState("");
 
   const snapshotGrandMaster = lightingSnapshot?.grandMaster ?? 100;
   const [grandMasterDraft, setGrandMasterDraft] = useState(snapshotGrandMaster);
@@ -101,33 +95,6 @@ export function useLightingRigControls({
     });
   }, [groups, fixtureEntries, activeScene]);
 
-  const paletteQuickQueryNormalized = paletteQuickQuery.trim().toLowerCase();
-
-  const paletteById = useMemo(() => new Map(palettes.map((entry) => [entry.id, entry])), [palettes]);
-  const recentQuickPalettes = useMemo(
-    () =>
-      palette.recentActionIds
-        .filter((id) => id.startsWith("lighting:palette:"))
-        .map((id) => paletteById.get(id.slice("lighting:palette:".length)))
-        .filter((entry): entry is LightingPaletteSnapshot => Boolean(entry))
-        .filter((entry, index, entries) => entries.findIndex((candidate) => candidate.id === entry.id) === index)
-        .filter((entry) => lightingPaletteMatchesQuery(entry, paletteQuickQueryNormalized))
-        .slice(0, 6),
-    [palette.recentActionIds, paletteById, paletteQuickQueryNormalized]
-  );
-  const filteredQuickPalettes = useMemo(
-    () => palettes.filter((entry) => lightingPaletteMatchesQuery(entry, paletteQuickQueryNormalized)),
-    [palettes, paletteQuickQueryNormalized]
-  );
-  const quickIntensityPalettes = useMemo(
-    () => filteredQuickPalettes.filter((entry) => entry.kind === "intensity"),
-    [filteredQuickPalettes]
-  );
-  const quickCctPalettes = useMemo(
-    () => filteredQuickPalettes.filter((entry) => entry.kind === "cct"),
-    [filteredQuickPalettes]
-  );
-
   const handleCreateGroup = useLiveCallback(async (name: string) => {
     startBusy("group-create");
     try {
@@ -184,7 +151,6 @@ export function useLightingRigControls({
           patchModeActive: uiMode === "patch",
         })
       );
-      palette.pushRecent(`lighting:palette:${paletteId}`);
       toast.push({ message: String(result?.summary ?? "Palette applied."), tone: "ok" });
     } catch (error) {
       reportError(error, "Palette apply failed.");
@@ -337,24 +303,21 @@ export function useLightingRigControls({
     }
   });
 
-  const paletteQuickDisabled = uiMode === "patch" || selectedFixtureIds.size === 0;
-  const paletteQuickStatus =
-    uiMode === "patch"
-      ? "Exit patch mode to apply"
-      : selectedFixtureIds.size === 0
-        ? "Select fixtures to apply"
-        : `${selectedFixtureIds.size} selected`;
+  // New pages program, Slice 3 (decision 5): the Undo key in the Rig section
+  // undoes the newest of the last 25 steps (Save scene, Delete scene, Add
+  // fixture, Delete fixture) and reports it as the messages' Undo does.
+  const handleUndo = useLiveCallback(async () => {
+    startBusy("undo");
+    try {
+      pushUndoOutcomeToast(toast, await undoStack.undo());
+    } finally {
+      finishBusy("undo");
+    }
+  });
+
   return {
-    paletteQuickOpen,
-    setPaletteQuickOpen,
-    paletteQuickQuery,
-    setPaletteQuickQuery,
     grandMasterDraft,
     railGroupEntries,
-    recentQuickPalettes,
-    filteredQuickPalettes,
-    quickIntensityPalettes,
-    quickCctPalettes,
     handleCreateGroup,
     handleReorderGroup,
     handleSetGroupColor,
@@ -368,8 +331,7 @@ export function useLightingRigControls({
     handleEmergencyCut,
     handleToggleAllPower,
     handleToggleGroupPower,
-    paletteQuickDisabled,
-    paletteQuickStatus,
+    handleUndo,
   };
 }
 

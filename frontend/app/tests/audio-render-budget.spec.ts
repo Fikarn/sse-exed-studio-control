@@ -80,43 +80,30 @@ test("idle meter ticks do not bump the audio inspector render counter", async ({
   expect(delta).toBeLessThanOrEqual(3);
 });
 
-test("moving between plate sections does not multiply the audio inspector render count", async ({ page }) => {
+test("scrolling the plate between its sections does not re-render the audio inspector", async ({ page }) => {
   // Visual overhaul A, Slice 4c. Old: "switching tabs does not multiply the
   // audio inspector render count" — the test clicked each tab and read
-  // `aria-selected`. New: the accelerators move the plate between its sections.
-  // Reason: the plate has no tab row; the same keys are the way around it, and
-  // the budget they must stay inside is the same.
+  // `aria-selected`. Then: the accelerators moved the plate between its
+  // sections.
+  // New pages program, Slice 3 (decision 4). Old name: "moving between plate
+  // sections does not multiply the audio inspector render count"; E / D / R /
+  // P brought each section to the plate's top, a state change that rendered
+  // the plate (Δ > 0, ≤ 7). New: the plate is scrolled to each section, and a
+  // scroll must render nothing (the idle budget, ≤ 3). Reason: the section keys
+  // went with no replacement — the plate shows every section and scrolls — so
+  // what is left to guard is that moving around the plate costs no renders.
   await openSettledConsole(page, "audio-selected-channel");
 
   const baseline = await getInspectorRenderCount(page);
   expect(baseline).not.toBeNull();
 
-  const sectionAtTop = async () =>
-    page.evaluate(() => {
-      const plate = document.querySelector('[data-testid="audio-inspector"]');
-      if (!plate) return null;
-      const top = plate.getBoundingClientRect().top;
-      let best: { id: string; delta: number } | null = null;
-      for (const section of plate.querySelectorAll<HTMLElement>("[data-plate-section]")) {
-        const delta = Math.abs(section.getBoundingClientRect().top - top);
-        if (!best || delta < best.delta) best = { id: section.dataset.plateSection ?? "", delta };
-      }
-      return best?.id ?? null;
-    });
-
-  for (const [key, section] of [
-    ["KeyE", "eq"],
-    ["KeyD", "dynamics"],
-    ["KeyR", "send"],
-    ["KeyP", "preamp"],
-  ] as const) {
-    await page.keyboard.press(key);
-    await expect.poll(sectionAtTop).toBe(section);
+  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+    const target = page.locator(`[data-plate-section="${section}"]`);
+    await target.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
+    await expect(target).toBeInViewport();
   }
 
   const afterSections = await getInspectorRenderCount(page);
   expect(afterSections).not.toBeNull();
-  const delta = afterSections! - baseline!;
-  expect(delta).toBeGreaterThan(0);
-  expect(delta).toBeLessThanOrEqual(7);
+  expect(afterSections! - baseline!).toBeLessThanOrEqual(3);
 });

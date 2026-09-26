@@ -6,9 +6,12 @@ import styles from "./Slider.module.css";
 // horizontal Slider and a vertical Groove, both wells with a cap that rides
 // the whole target column (the probe lesson: the pointer target is the full
 // column the cap rides in, so the cap never leaves it). Drag, wheel, arrow
-// keys (Shift ×5), Home / End; the host owns commit-on-release and typed
-// entry. A locked slider keeps its geometry and loses its fill; a doubted
-// value carries a dashed amber keyline.
+// keys, Home / End; the host owns commit-on-release and typed entry. A locked
+// slider keeps its geometry and loses its fill; a doubted value carries a
+// dashed amber keyline. New pages program, Slice 3 (decisions 9 and 10): a
+// focused slider takes the arrows (one step), Home and End and nothing with
+// Shift, Ctrl or Alt — the Shift ×5 step and the Shift + press jump to unity
+// are gone.
 
 export interface SliderBaseProps {
   /** 0..1 position. */
@@ -18,7 +21,7 @@ export interface SliderBaseProps {
   onCommit?: (value: number) => void;
   /** Where the unity notch sits, 0..1; omit for none. */
   unity?: number;
-  /** Arrow step, 0..1 (default 0.01); Shift multiplies by 5. */
+  /** Arrow step, 0..1 (default 0.01). */
   step?: number;
   locked?: boolean;
   doubt?: boolean;
@@ -34,8 +37,8 @@ export interface SliderBaseProps {
    */
   onRequestTypedEntry?: () => void;
   /**
-   * Unity discipline (the Console's faders): Shift + press jumps to unity, and
-   * a value that lands within `unitySnap` of it settles on it exactly.
+   * Unity discipline (the Console's faders): a value that lands within
+   * `unitySnap` of unity settles on it exactly.
    */
   snapUnity?: boolean;
   /** How close a drag must land to unity to settle on it (0..1). */
@@ -84,20 +87,13 @@ function useSliderInteraction(
         onRequestTypedEntry();
         return;
       }
-      if (snapUnity && event.shiftKey) {
-        event.preventDefault();
-        latest.current = unity;
-        onChange?.(unity);
-        onCommit?.(unity);
-        return;
-      }
       event.currentTarget.setPointerCapture(event.pointerId);
       dragging.current = true;
       const next = settle(fractionFromPointer(event.currentTarget, event));
       latest.current = next;
       onChange?.(next);
     },
-    [fractionFromPointer, locked, onChange, onCommit, onRequestTypedEntry, settle, snapUnity, unity]
+    [fractionFromPointer, locked, onChange, onRequestTypedEntry, settle]
   );
   const onPointerMove = useCallback(
     (event: PointerEvent<HTMLElement>) => {
@@ -125,10 +121,9 @@ function useSliderInteraction(
         onRequestTypedEntry();
         return;
       }
-      const delta = step * (event.shiftKey ? 5 : 1);
       let next: number | null = null;
-      if (event.key === "ArrowUp" || event.key === "ArrowRight") next = value + delta;
-      else if (event.key === "ArrowDown" || event.key === "ArrowLeft") next = value - delta;
+      if (event.key === "ArrowUp" || event.key === "ArrowRight") next = value + step;
+      else if (event.key === "ArrowDown" || event.key === "ArrowLeft") next = value - step;
       else if (event.key === "Home") next = 0;
       else if (event.key === "End") next = 1;
       if (next === null) return;

@@ -26,12 +26,15 @@ const EXPECTED_INSPECTOR_FILES = [
   "frontend/app/src/app/audio/components/inspector/AudioInspectorSendsTab.tsx",
 ];
 
+// New pages program, Slice 3 (D6). Old: the list also named
+// useAudioKeyboardShortcuts.ts and useAudioPaletteRegistration.ts. New: both
+// are gone. Reason: the Console binds no key of its own and the command palette
+// went; the one key the Console keeps — Esc on an armed action — lives in
+// useAudioArming.ts.
 const EXPECTED_HOOK_FILES = [
   "frontend/app/src/app/audio/hooks/useAudioArming.ts",
   "frontend/app/src/app/audio/hooks/useAudioInspectorEqState.ts",
-  "frontend/app/src/app/audio/hooks/useAudioKeyboardShortcuts.ts",
   "frontend/app/src/app/audio/hooks/useAudioOptimisticSettings.ts",
-  "frontend/app/src/app/audio/hooks/useAudioPaletteRegistration.ts",
 ];
 
 // Visual overhaul A, Slice 4a. Old: the list named AudioHealthBar.module.css
@@ -91,11 +94,10 @@ const EXPECTED_TAB_BOUNDARY_CSS_MODULES = [
   "frontend/app/src/app/audio/components/AudioTieredMixer.module.css",
 ];
 
-// Why: the palette-registration hook came in at 369 lines on first extract;
-// the 14 fixed palette actions + per-channel solo/mute actions were moved to
-// a pure builder so the hook itself fits under the ≤ 200 hook budget. If the
-// builder gets re-inlined the hook overflows silently.
-const EXPECTED_HOOK_HELPER_FILES = ["frontend/app/src/app/audio/hooks/buildAudioPaletteActions.ts"];
+// New pages program, Slice 3 (D6). Old: a list of hook helpers named
+// buildAudioPaletteActions.ts, the palette registration's pure builder, and a
+// test per entry. New: the list and its tests are gone. Reason: the builder went
+// with the command palette, and it was the only hook helper.
 
 test.describe("audio code-health Slice 5 file structure", () => {
   for (const relative of EXPECTED_INSPECTOR_FILES) {
@@ -135,13 +137,6 @@ test.describe("audio code-health Slice 5 file structure", () => {
 
   for (const relative of EXPECTED_TAB_BOUNDARY_CSS_MODULES) {
     test(`tab-boundary CSS module: ${path.basename(relative)} exists`, () => {
-      const absolute = path.join(repoRoot, relative);
-      expect(existsSync(absolute), `${relative} should exist after the Slice 5 close-out`).toBe(true);
-    });
-  }
-
-  for (const relative of EXPECTED_HOOK_HELPER_FILES) {
-    test(`hook helper: ${path.basename(relative)} exists`, () => {
       const absolute = path.join(repoRoot, relative);
       expect(existsSync(absolute), `${relative} should exist after the Slice 5 close-out`).toBe(true);
     });
