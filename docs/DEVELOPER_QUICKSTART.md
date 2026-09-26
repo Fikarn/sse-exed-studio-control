@@ -10,12 +10,12 @@ Within one hour, you should be able to:
 - understand the shell/engine boundary
 - launch the selected Tauri app locally
 - run the normal development checks
-- know which release gates require macOS or Windows target hosts
+- know which release gates require the Windows target host
 - avoid the historical Qt fallback path, which has been retired
 
 ## Architecture In One Minute
 
-The app is a local-first desktop console for one fixed studio workstation.
+The app is a local-first desktop console for one fixed studio workstation: Windows, fullscreen at `2560x1440` on an external monitor, and nothing else (the operator's ruling of 2026-09-26).
 
 - `frontend/` and `native/tauri-shell/` implement the selected Tauri 2 + React 19.2 + TypeScript + Vite operator shell.
 - `native/rust-engine/` owns persistence, domain state, device policy, and device I/O.
@@ -36,11 +36,10 @@ Required for normal development:
 
 Required for release packaging and target-host evidence:
 
-- Qt Installer Framework 4.7 tools: `binarycreator` and `repogen`
-- macOS Apple Silicon host for macOS release evidence
-- Windows 11 `x64` host for Windows release evidence
+- Qt Installer Framework tools: `binarycreator` and `repogen`
+- Windows 11 `x64` host for release evidence
 
-Public signing and notarization are intentionally out of scope for this repo's current deployment model. GitHub Actions provides required pull-request hygiene; tagged release acceptance remains local and target-host based.
+Public code signing is intentionally out of scope for this repo's current deployment model. GitHub Actions provides required pull-request hygiene; tagged release acceptance remains local and target-host based.
 
 ## First Clone
 
@@ -94,17 +93,9 @@ npm run native:foundation
 
 Do not run `tauri:setup-support:qualify`, `tauri:workspaces:qualify`, Playwright preview, or the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) concurrently. Those lanes use fixed localhost ports and concurrent servers make the evidence invalid.
 
-## Visual Review On Retina MacBooks
+## Visual Review
 
-The production target is fullscreen `2560x1440` on a fixed second monitor. Retina MacBook logical resolution is not a valid layout authority.
-
-For built-in-display development, use the scaled studio preview workflow from [DEVELOPMENT.md](./DEVELOPMENT.md):
-
-- build and serve the front end, then open it with `?operatorReview=studio` in the address (the steps are in DEVELOPMENT.md; since the new pages program's Slice 3 the address is the only way in — the app has no command palette and does not remember the preview)
-- review the proportional `2560x1440` studio canvas scaled into the current window
-- drop `operatorReview=studio` from the address before judging native compact/windowed behavior
-- keep `npm run tauri:visual:review` as the repeatable capture lane
-- do not accept `studioFull` composition decisions from the unscaled Retina logical desktop
+The production target is fullscreen `2560x1440` on the fixed studio monitor, and it is the only layout: judge operator-visible changes there. `npm run tauri:visual:review` is the repeatable capture lane, and `npm run frontend:playwright:test` on the studio workstation compares the win32 captures at `2560x1440` before each push (CI compares none; [DEVELOPMENT.md §2b](./DEVELOPMENT.md)).
 
 ## Validation Matrix
 
@@ -118,9 +109,9 @@ Use the smallest gate that covers the risk.
 | Protocol artifacts                | `npm run protocol:check`                                                                 |
 | Rust engine logic                 | `npm run native:check`, `npm run native:test`                                            |
 | Shell startup/integration         | `npm run tauri:foundation`, `npm run native:foundation`                                  |
-| Operator-visible layout           | `npm run tauri:visual:review` plus scaled studio preview or fixed-monitor human review   |
+| Operator-visible layout           | `npm run tauri:visual:review` plus fixed-monitor human review                            |
 | Persistence/recovery/release risk | `npm run native:acceptance`, then target-host release gates if release-critical          |
-| Release metadata or packaging     | `npm run release:verify` plus macOS/Windows target-host release gates                    |
+| Release metadata or packaging     | `npm run release:verify` plus the Windows target-host release gates                      |
 
 ## Core Command Reference
 
@@ -169,12 +160,6 @@ npm run native:foundation
 
 Local development checks do not replace target-host evidence.
 
-Use macOS Apple Silicon for:
-
-```bash
-npm run native:release:mac:local
-```
-
 Use Windows 11 `x64` for:
 
 ```powershell
@@ -191,18 +176,7 @@ npm run doctor:release
 
 ## QtIFW Setup
 
-For local macOS installer packaging, install QtIFW into ignored local tooling:
-
-```bash
-python3 -m venv .tools/aqtinstall-venv
-.tools/aqtinstall-venv/bin/python -m pip install --upgrade pip aqtinstall
-mkdir -p .tools/aqt-home
-HOME="$PWD/.tools/aqt-home" .tools/aqtinstall-venv/bin/aqt install-tool mac desktop tools_ifw qt.tools.ifw.47 -O .tools/qt-ifw
-export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"
-export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"
-```
-
-On Windows, set the equivalent PowerShell environment variables:
+Point the release lanes at the Windows QtIFW tools with these PowerShell environment variables:
 
 ```powershell
 $env:SSE_QT_IFW_BINARYCREATOR = "C:\Qt\Tools\QtInstallerFramework\4.11\bin\binarycreator.exe"
@@ -223,7 +197,7 @@ For a deeper ignored-local cleanup before handoff or evidence collection:
 npm run clean:local
 ```
 
-`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It does not remove `.tools/`.
+`clean:local` removes ignored local debris such as generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It does not remove `.tools/`.
 
 Both commands keep `release/native` when a packaged app is in it — on a workstation that runs Studio Control from the repository that folder is the installed app — and say so. `npm run clean -- --include-release` removes it too, and refuses while the app is running; `--dry-run` removes nothing. Details in [DEVELOPMENT.md §4a](./DEVELOPMENT.md).
 
@@ -245,7 +219,6 @@ For major upgrades:
 - `doctor` warns about Node: use `nvm use 24` for target-host alignment.
 - `doctor:release` fails on QtIFW: set `SSE_QT_IFW_BINARYCREATOR` and `SSE_QT_IFW_REPOGEN`.
 - Windows evidence says the worktree is dirty: remove generated evidence or rerun only after committing/stashing source changes.
-- The app looks compressed on a Retina MacBook: do not judge `studioFull` composition until the page is open with `?operatorReview=studio`, or until you are on the fixed studio monitor.
 
 ## Do Not Touch Without A Plan
 
@@ -253,4 +226,4 @@ For major upgrades:
 - Do not reintroduce a Qt shell/fallback runtime without a new architecture decision.
 - Do not change on-disk formats without an explicit migration and rollback plan.
 - Do not treat GitHub Actions as release evidence; tagged release acceptance is local/target-host based.
-- Do not add public signing/notarization as part of normal feature work.
+- Do not add public code signing as part of normal feature work.

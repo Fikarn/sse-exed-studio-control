@@ -66,21 +66,13 @@ npm run frontend:foundation
 npm run tauri:foundation
 npm run tauri:setup-support:qualify
 npm run tauri:workspaces:qualify
-npm run native:package:mac:local
-npm run native:package:mac:smoke
-npm run native:package:mac:clean-smoke
 npm run native:package:win:local
 npm run native:package:win:smoke
 npm run native:package:win:clean-smoke
-npm run native:installer:mac:prepare
-npm run native:installer:mac:local
 npm run native:installer:win:prepare
 npm run native:installer:win:local
-npm run native:update-repo:mac:prepare
-npm run native:update-repo:mac:local
 npm run native:update-repo:win:prepare
 npm run native:update-repo:win:local
-npm run native:release:mac:local
 npm run native:release:win:local
 npm run native:acceptance
 ```
@@ -100,15 +92,13 @@ npm run tauri:setup-support:qualify
 npm run tauri:workspaces:qualify
 npm run tauri:visual:review
 npm run tauri:cutover:candidate
-npm run tauri:package:mac:ifw-staged
-npm run tauri:package:mac:ifw-local
 npm run tauri:package:win:ifw-staged
 npm run tauri:package:win:ifw-local
 npm run tauri:package:win:evidence
 npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
 ```
 
-`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, a database backup verified and restored through the running shell (`database-restore`: the graceful restart's `shutdown` backup is verified — junk beside it is called junk — then restored; the store restarts the link on `requiresRestart`, the bootstrap moves the backup into place and keeps the old file as `replaced` — 2026-09 production readiness, Slice 7), degraded startup/recovery posture (a blocked app-data directory and a corrupt database, the latter restored from the recovery surface through the engine's recovery mode and restarted into the restored data), an engine ended from outside (`engine-crash`: `ENGINE_EXITED` on the recovery surface within two seconds, then the automatic restart with a new process — 2026-09 production readiness, Slice 5) and a second copy of the shell launched while the first is up (`second-instance`: refused by the single-instance plugin — within 5 s on Windows and macOS, on Linux only after GTK's start-up, which waits about 30 s on the AT-SPI bus lookup under xvfb — or by the engine's `engine.lock` on a Linux session without a D-Bus session bus). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting and Audio mutations across restart persistence. Since the new pages program's Slice 1 the setup-support lane follows a snapshot slot of the Console, found by name, through the archive restore, the restart, the database restore and the recovery restore (it followed the Planning projects); the workspaces lane dropped its Planning round-trip and checks the Lighting fixture and recalled scene after its restart; both save Lighting as the page to come back to.
+`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, a database backup verified and restored through the running shell (`database-restore`: the graceful restart's `shutdown` backup is verified — junk beside it is called junk — then restored; the store restarts the link on `requiresRestart`, the bootstrap moves the backup into place and keeps the old file as `replaced` — 2026-09 production readiness, Slice 7), degraded startup/recovery posture (a blocked app-data directory and a corrupt database, the latter restored from the recovery surface through the engine's recovery mode and restarted into the restored data), an engine ended from outside (`engine-crash`: `ENGINE_EXITED` on the recovery surface within two seconds, then the automatic restart with a new process — 2026-09 production readiness, Slice 5) and a second copy of the shell launched while the first is up (`second-instance`: refused by the single-instance plugin — within 5 s on Windows, on CI's Linux runner only after GTK's start-up, which waits about 30 s on the AT-SPI bus lookup under xvfb — or by the engine's `engine.lock` on a Linux session without a D-Bus session bus). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting and Audio mutations across restart persistence. Since the new pages program's Slice 1 the setup-support lane follows a snapshot slot of the Console, found by name, through the archive restore, the restart, the database restore and the recovery restore (it followed the Planning projects); the workspaces lane dropped its Planning round-trip and checks the Lighting fixture and recalled scene after its restart; both save Lighting as the page to come back to.
 
 Both Tauri qualification lanes and Playwright preview use the fixed local port `127.0.0.1:4173` with strict port binding. Do not run them concurrently with each other or with the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`); a stale or competing server makes the result invalid.
 
@@ -118,29 +108,17 @@ The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN
 
 `npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially. None of those lanes calls the dev parity-fixture method; a session that needs it builds the engine with `npm run native:engine:build:dev-fixtures` first.
 
-`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting and Audio screenshots at `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit, compact overflow reachability, narrow inspector drawer behavior, stage minimum bounds, and CSS-viewport-driven layout mode selection. Audio visual review also captures Scaled Studio Preview evidence for the key audio fixtures with `operatorReview=studio` and records preview fidelity metrics in the summary. This complements, but does not replace, live human review with Scaled Studio Preview or the fixed studio monitor.
+`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting and Audio screenshots at `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit and stage minimum bounds. The captures are compared with the committed win32 baselines on Windows only (§2b). This complements, but does not replace, live human review on the fixed studio monitor.
 
-`npm run tauri:package:mac:ifw-staged` and `npm run tauri:package:win:ifw-staged` are Checkpoint C hardening lanes for historical/pre-switch replacement-shell evidence. They stage the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, run the packaged Tauri smoke test, prepare QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verify staged payload parity. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`.
+`npm run tauri:package:win:ifw-staged` is a Checkpoint C hardening lane for historical/pre-switch replacement-shell evidence. It stages the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, runs the packaged Tauri smoke test, prepares QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verifies staged payload parity. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`.
 
-`npm run native:release:mac:local` and `npm run native:release:win:local` are the target-host shipping packaging gates for the selected runtime when QtIFW tools are installed. They build the packaged app, real offline installer with `binarycreator`, real maintenance-tool update repository with `repogen`, verify full artifacts, install through QtIFW, verify the installed shell launches against the bundled engine, verify the maintenance tool can see the package and repository, purge through the maintenance tool, reinstall, and verify operator data survives. `npm run tauri:package:mac:ifw-local` and `npm run tauri:package:win:ifw-local` remain candidate-evidence lanes under `release/tauri-candidate*`.
+`npm run native:release:win:local` is the target-host shipping packaging gate for the selected runtime when QtIFW tools are installed. It builds the packaged app, real offline installer with `binarycreator`, real maintenance-tool update repository with `repogen`, verifies full artifacts, installs through QtIFW, verifies the installed shell launches against the bundled engine, verifies the maintenance tool can see the package and repository, purges through the maintenance tool, reinstalls, and verifies operator data survives. `npm run tauri:package:win:ifw-local` remains a candidate-evidence lane under `release/tauri-candidate*`.
 
-For local macOS QtIFW tools, install into ignored project tooling:
-
-```bash
-python3 -m venv .tools/aqtinstall-venv
-.tools/aqtinstall-venv/bin/python -m pip install --upgrade pip aqtinstall
-mkdir -p .tools/aqt-home
-HOME="$PWD/.tools/aqt-home" .tools/aqtinstall-venv/bin/aqt install-tool mac desktop tools_ifw qt.tools.ifw.47 -O .tools/qt-ifw
-export SSE_QT_IFW_BINARYCREATOR="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/binarycreator"
-export SSE_QT_IFW_REPOGEN="$PWD/.tools/qt-ifw/Tools/QtInstallerFramework/4.7/bin/repogen"
-npm run native:release:mac:local
-```
-
-Use the matching Windows QtIFW tools on a Windows 11 `x64` host for `npm run native:release:win:evidence -- --issue-url <active-issue-url>` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence -- --issue-url <active-issue-url>` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
+Use the Windows QtIFW tools on the Windows 11 `x64` host for `npm run native:release:win:evidence -- --issue-url <active-issue-url>` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence -- --issue-url <active-issue-url>` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
 
 ### 2b. Visual review
 
-When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result with the built-in scaled studio preview workflow or the fixed studio monitor:
+When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result on the fixed studio monitor:
 
 ```bash
 npm run tauri:visual:review
@@ -149,60 +127,17 @@ npm run tauri:visual:review
 Required selected-runtime workflow:
 
 1. build and validate the selected Tauri shell
-2. capture repeatable `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` visual evidence with `tauri:visual:review`
+2. capture repeatable `2560x1440` visual evidence with `tauri:visual:review`
 3. launch the real app when human inspection is needed
-4. open the page with `?operatorReview=studio` (Scaled Studio Preview, below) to review the `2560x1440` studio canvas proportionally on the current display
-5. compare against the intended operator state before accepting the change
+4. compare against the intended operator state before accepting the change
 
-Treat raw window width alone as an invalid authority for operator layout. The primary target is fullscreen `2560x1440` on the permanent second monitor.
+**Operator ruling, 2026-09-26 (the new pages program's D22): Studio Control always runs at `2560x1440`, fullscreen on an external display, on a Windows machine, and nothing is designed, fixed, tested or verified for another size or system.** Slice SW removed what existed only for them: the smaller layouts (compact chrome and density, the Console's compact banks, Lighting's narrow drawer), Scaled Studio Preview, the windowed layout, the size-only Playwright cases, the captures at other sizes and on Linux and macOS, and the macOS packaging. Do not add any of it back. (The ruling of 2026-09-18, which kept the other sizes' and systems' guards, and the decision of 2026-09-23, which made a board change refresh its linux capture, ended with that slice.)
 
-**Operator ruling, 2026-09-18: only the Windows build and only `2560x1440` matter.** The Linux and macOS captures, the macOS release-evidence runner and the smaller-viewport guards (`audio-legibility`, `viewport-contract`, the captures below `2560x1440`) stay where they are, but nobody works on them: if one turns red for a reason that is not also a Windows `2560x1440` reason, say so, record it, and move on — and ask before deleting such a guard. The win32 gates at `2560x1440` (the 81 UI-contract boards, the win32 visual-review and Storybook captures, both Tauri qualification lanes on the workstation) are the ones that count. One exception (operator decision, 2026-09-23): `frontend-e2e` is a required check, so a change that moves a board refreshes its `linux` capture too, from the branch push run's `playwright-test-results` artifact, before it merges (the production readiness ledger, Baseline refresh procedure); `darwin` and the win32 captures at other sizes stay as they are.
-
-Responsive operator modes are based on logical viewport/CSS pixels, not physical monitor pixels or Retina/Windows backing scale:
-
-- `studioFull`: `>=1920x1080`, the full live-operation rail/stage/inspector layout.
-- `desktopCompact`: `>=1440x900`, a compact three-pane layout with reduced chrome and overflowed secondary controls.
-- `narrowUtility`: `>=1280x800`, a utility layout with rail + stage and a right inspector drawer.
-- `constrained`: below `1280x800`, for development diagnostics only.
-
-`1280x800` is supported for utility work, not as the full simultaneous show-control surface. Panel-level scroll inside rails, inspectors, or drawers is acceptable in compact modes; document-level scroll is not.
+**Captures.** The committed captures are win32 only, at `2560x1440`: 19 from `visual-review.spec.ts` and 40 from `storybook.spec.ts`, under `frontend/app/tests/__visual__/` (see its README). Playwright compares them on Windows only — on any other system `ignoreSnapshots` is on and the capture-only Storybook spec is skipped — so CI's `frontend-e2e`, on Linux, compares none, and the UI contract samples contrast only on Windows (§2c). Run `npm run frontend:playwright:test` on the studio workstation before each push: it builds first and checks both. When a change moves a board, refresh its captures there: `npm run build --workspace frontend/app && npm run frontend:storybook:build`, copy the `*-diff.png` files out of `frontend/app/test-results` (the update run replaces them), then `cd frontend/app && npm exec playwright test visual-review.spec.ts storybook.spec.ts -- --update-snapshots=changed` (narrow with `-g "<title words>"`; titles are joined by spaces, not `›`), and inspect every changed PNG before `git add`. A board that goes loses its captures.
 
 Do not accept stale live evidence. If the current Tauri visual review output or live screenshot does not clearly correspond to the operator state being checked, regenerate it before continuing.
 
-#### Built-in display review on Retina Macs
-
-Retina MacBook panels can have enough physical pixels for the target operator surface while still exposing a much smaller logical desktop. The current built-in 14-inch M5 display exposes roughly `1512x982` logical points at `2.0` backing scale (`3024x1964` backing pixels), so a native `2560x1440` logical Tauri window cannot fit on the desktop.
-
-Use **Scaled Studio Preview** for normal built-in-display human review. Since the new pages program's Slice 3 (2026-09) it opens only from the page's address, `?operatorReview=studio` (the command palette that also opened it is gone, and the app no longer remembers the choice), so it is a browser review:
-
-1. Build the front end (`npm run build --workspace frontend/app`) and serve it with `npm run preview --workspace frontend/app -- --host 127.0.0.1 --port 4180 --strictPort` (not `4173`, which Playwright binds; §2c, Fixtures).
-2. Open `http://127.0.0.1:4180/?fixture=audio-populated&transport=fixture&operatorReview=studio` (any fixture id from `frontend/packages/test-fixtures/src/fixtures.json`).
-3. Review the proportional `2560x1440` studio canvas scaled into the current window.
-4. Drop `operatorReview=studio` from the address before judging native compact/windowed behavior.
-
-The installed app and `npm run tauri:dev` never show Studio Preview: nothing on their screens opens it.
-
 `npm run tauri:dev` starts Vite and the selected Tauri shell; it does not rebuild `studio-control-engine`. If the dev shell lands on Incident Recovery immediately after protocol or engine changes, run `npm run native:engine:build` and relaunch `npm run tauri:dev`.
-
-Scaled Studio Preview deliberately preserves studio layout mode, aspect ratio, and proportions while reducing physical size. It is valid for composition, relative density, toolbar fit, rail/stage/inspector balance, drawer behavior, and operator flow inspection. It is not a substitute for real physical-size readability or final studio-monitor ergonomics.
-
-When changing CSS for a studio surface, keep Scaled Studio Preview fidelity in mind. Rules that decide operator density or compactness should be scoped to the logical operator surface, for example the shell/operator root container, so the scaled preview keeps the same effective layout as native `2560x1440`. Global viewport media queries may incorrectly treat the preview host window as a compact device and distort the studio-full layout; keep global media rules for truly global concerns such as `prefers-reduced-motion`.
-
-Check the current machine state with the direct Swift probe:
-
-```bash
-swift -e 'import AppKit; import CoreGraphics; for screen in NSScreen.screens { if let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber { let id = CGDirectDisplayID(truncating: number); if let mode = CGDisplayCopyDisplayMode(id) { print("id=\(id) frame=\(Int(screen.frame.width))x\(Int(screen.frame.height)) points=\(mode.width)x\(mode.height) pixels=\(mode.pixelWidth)x\(mode.pixelHeight) backing=\(Double(screen.backingScaleFactor)) builtin=\(CGDisplayIsBuiltin(id) != 0)") } } }'
-```
-
-Use native windowed mode on the built-in display for compact-mode interaction review. Do not sign off the `studioFull` operator composition from the unscaled native MacBook viewport; it is a compact logical surface, not the studio surface.
-
-BetterDisplay flexible scaling or virtual-screen mirroring remains an optional fallback, not the standard workflow. Use it only when you specifically need an OS-level exact logical review surface.
-
-Reference docs:
-
-- Apple display resolution settings: <https://support.apple.com/en-afri/guide/mac-help/change-your-displays-resolution-mchl86d72b76/26/mac/26>
-- Apple high-resolution rendering model: <https://developer.apple.com/library/archive/documentation/GraphicsAnimation/Conceptual/HighResolutionOSX/Explained/Explained.html>
-- BetterDisplay flexible scaling and virtual-screen workflow: <https://github.com/waydabber/BetterDisplay/wiki/Fully-scalable-HiDPI-desktop>
 
 ### 2c. The UI contract (visual overhaul A)
 
@@ -218,13 +153,15 @@ slices, each with a Status line saying what landed, what moved, and what was
 deliberately left. Read the slice status before changing a surface it names — it
 usually explains why something is the way it is.
 
-**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 66 boards —
-22 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
+**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 63 boards —
+21 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
 measures each one: type floor and distinct sizes, font families, pixel-sampled
 text contrast, pointer-target size, radii, shadows and blur, gradients, running
 animations at idle, chrome heights, page scroll, targets off the viewport, and a
 forbidden-word scan of the rendered copy. Each board's numbers are ratcheted in
 `frontend/app/tests/ui-contract.ratchets.json`: a measure may fall, never rise.
+Contrast is sampled on Windows only: CI's Linux runner measures the rest, so the
+workstation's run before each push (§2b, Captures) is the one that checks it.
 
 ```bash
 # from frontend/app — measures every board and writes the report + artifacts
@@ -281,7 +218,7 @@ npm run test --workspace @sse/design-system          # incl. the CSS-literal all
   measurement finds it. Slice 11's 9.5 → 12 px raise silently pushed all 38 dBFS
   meter marks off the meters and clipped `PRE FADER` on the 1920 fallback. After
   a type change, re-run the workspace spec and sweep every leaf text node for
-  `range.width > content width` on each fixture at 2560 and at 1920.
+  `range.width > content width` on each fixture at 2560.
 - To give a control a 24 px pointer target without moving the layout, grow the
   element and pay it back with a matching negative margin, painting the visible
   part on `::before`. `ScrubSlider` and `ScrubLabel` are the worked examples.
@@ -316,9 +253,10 @@ npm run test --workspace @sse/design-system          # incl. the CSS-literal all
 
 **Fixtures.** Every board is a fixture id from
 `frontend/packages/test-fixtures/src/fixtures.json`, and any of them opens in the
-browser at `/?fixture=<id>&transport=fixture` (add `&theme=graphite|bone` and
-`&operatorReview=studio`). That URL against a preview server is the fastest way to
-look at a state by hand — no engine, no Tauri shell:
+browser at `/?fixture=<id>&transport=fixture` (add `&theme=graphite|bone`). That
+URL against a preview server is the fastest way to look at a state by hand — no
+engine, no Tauri shell; the page is drawn for `2560x1440` only, so look at it full
+screen on the studio monitor (F11 in the browser):
 
 ```bash
 npm run build --workspace @sse/frontend-app
@@ -478,7 +416,7 @@ Before listing a case, find out why it fails: download the run's `playwright-tes
 
 #### Pull Request CI
 
-Every branch push triggers the ten-job workflow, once per commit (since 2026-09-25, Dependabot's branches included; a pull request reads the checks on its head commit, so it no longer runs the same commit again, and a pull request from a fork gets no run — to merge one, push its head commit to a branch of this repository, which puts the ten checks on that commit). Rust caches are saved from `main` only; branches read main's, and each job installs only the Rust `native/rust-toolchain.toml` names (`.github/actions/setup-rust`), so a new Rust on the runner image does not change the cache key. The workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `supply-chain`, `frontend-e2e`, `rust`, `rust-coverage`, `tauri-foundation`, and `qualification`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `frontend-test` runs `frontend:test:coverage` (Vitest across the frontend workspaces, once, with the coverage floors of production readiness Slice 13); `supply-chain` (production readiness Slice 12) runs the npm audit gate, the date check on `native/deny.toml`'s ignored advisories and `cargo deny check` — see "Supply chain" above; it reads today's advisory databases, so it can turn red on a push that changed nothing; `frontend-e2e` checks the quarantine list, then runs Playwright's `default` project (`frontend:playwright:test:blocking`, which includes the `visual-review.spec.ts` and `storybook.spec.ts` baselines) and fails on it, then the `quarantine` project in a step that reports and never fails the job — see "Quarantined Playwright cases" above — and uploads the Playwright report plus snapshot diffs as the `playwright-report`, `playwright-test-results` and `playwright-quarantine` artifacts; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:test`, `native:test:dev-fixtures` and `native:acceptance` (the acceptance harness runs the engine in simulated audio input mode by default, so the audio probe passes honestly, sync and recall answer from the simulated console, and nothing is ever written to a real TotalMix — the same default applies on the workstation; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` opts into the live lane, which binds the real Global OSC remote, confirms every write by read-back, touches only unused surfaces (Phones 2, playback 7/8) and restores them in a `finally`; `native:test` runs unsimulated so the probe's no-traffic failure test stays honest); `rust-coverage` (production readiness Slice 13) runs `rust:coverage`, the instrumented `cargo test --workspace` with its line-coverage floor; `tauri-foundation` runs `tauri:foundation` (protocol generate → engine build → Tauri build → smoke); `qualification` runs `tauri:setup-support:qualify` and `tauri:workspaces:qualify` under `xvfb` with extended timeouts and the audio-probe skipped; it starts with the other jobs, on a Rust cache of its own, and is the longest job. These jobs are required merge hygiene on `main`. A second workflow, [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml), runs only on a `v*` tag or by hand and builds the packaged bundle, its SHA256 manifest and its SBOMs on clean Windows and macOS runners ([RELEASE.md §Release Evidence](./RELEASE.md#release-evidence-ci)); it publishes nothing. Target-host release evidence on macOS Apple Silicon and Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
+Every branch push triggers the ten-job workflow, once per commit (since 2026-09-25, Dependabot's branches included; a pull request reads the checks on its head commit, so it no longer runs the same commit again, and a pull request from a fork gets no run — to merge one, push its head commit to a branch of this repository, which puts the ten checks on that commit). Rust caches are saved from `main` only; branches read main's, and each job installs only the Rust `native/rust-toolchain.toml` names (`.github/actions/setup-rust`), so a new Rust on the runner image does not change the cache key. The workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `supply-chain`, `frontend-e2e`, `rust`, `rust-coverage`, `tauri-foundation`, and `qualification`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `frontend-test` runs `frontend:test:coverage` (Vitest across the frontend workspaces, once, with the coverage floors of production readiness Slice 13); `supply-chain` (production readiness Slice 12) runs the npm audit gate, the date check on `native/deny.toml`'s ignored advisories and `cargo deny check` — see "Supply chain" above; it reads today's advisory databases, so it can turn red on a push that changed nothing; `frontend-e2e` checks the quarantine list, then runs Playwright's `default` project (`frontend:playwright:test:blocking`: every behaviour spec and the UI contract, on the Linux runner with no screenshot comparison and no contrast sampling — the captures and the contrast are checked on the studio workstation before each push, §2b) and fails on it, then the `quarantine` project in a step that reports and never fails the job — see "Quarantined Playwright cases" above — and uploads the Playwright report plus traces as the `playwright-report`, `playwright-test-results` and `playwright-quarantine` artifacts; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:test`, `native:test:dev-fixtures` and `native:acceptance` (the acceptance harness runs the engine in simulated audio input mode by default, so the audio probe passes honestly, sync and recall answer from the simulated console, and nothing is ever written to a real TotalMix — the same default applies on the workstation; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` opts into the live lane, which binds the real Global OSC remote, confirms every write by read-back, touches only unused surfaces (Phones 2, playback 7/8) and restores them in a `finally`; `native:test` runs unsimulated so the probe's no-traffic failure test stays honest); `rust-coverage` (production readiness Slice 13) runs `rust:coverage`, the instrumented `cargo test --workspace` with its line-coverage floor; `tauri-foundation` runs `tauri:foundation` (protocol generate → engine build → Tauri build → smoke); `qualification` runs `tauri:setup-support:qualify` and `tauri:workspaces:qualify` under `xvfb` with extended timeouts and the audio-probe skipped; it starts with the other jobs, on a Rust cache of its own, and is the longest job. These jobs are required merge hygiene on `main`. A second workflow, [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml), runs only on a `v*` tag or by hand and builds the packaged bundle, its SHA256 manifest and its SBOMs on a clean Windows runner ([RELEASE.md §Release Evidence](./RELEASE.md#release-evidence-ci)); it publishes nothing. Target-host release evidence on Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
 
 ### 4a. Cleanup
 
@@ -494,9 +432,9 @@ Use the deeper local cleanup before handoff or evidence collection:
 npm run clean:local
 ```
 
-`clean:local` removes ignored local debris such as `.DS_Store`, `.swift-module-cache`, generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
+`clean:local` removes ignored local debris such as generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
 
-**The packaged app is kept.** `release/` is not only build output: on a workstation that runs Studio Control from the repository — the studio workstation does — `release/native/<platform>/` is the installed app, and nothing in the repository can rebuild that exact build. Both commands therefore keep the whole `release/native` folder whenever a packaged shell or engine executable is anywhere inside it (a `windows.production-keep` folder left by a packaging lane counts), remove everything else as before — the other children of `release/` included — and say what they kept, with each file's size and date. `npm run clean -- --include-release` (or `clean:local`) removes the app as well; it refuses, before removing anything at all, while a process is running from that folder or when the running processes cannot be listed. `--dry-run` prints what would happen and removes nothing. A mistyped option stops the command instead of falling back to a plain clean. Until 2026-09-18 both commands deleted `release/` whole, the installed app with it; `scripts/clean.test.mjs` holds the rule, in temporary directories only. `scripts/native-package.mjs` is a different matter and is **not** guarded: it rebuilds `release/native/<platform>` by design, so on the workstation it runs only with that folder moved aside first (the procedure in the production readiness ledger).
+**The packaged app is kept.** `release/` is not only build output: on a workstation that runs Studio Control from the repository — the studio workstation does — `release/native/windows/` is the installed app, and nothing in the repository can rebuild that exact build. Both commands therefore keep the whole `release/native` folder whenever a packaged shell or engine executable is anywhere inside it (a `windows.production-keep` folder left by a packaging lane counts), remove everything else as before — the other children of `release/` included — and say what they kept, with each file's size and date. `npm run clean -- --include-release` (or `clean:local`) removes the app as well; it refuses, before removing anything at all, while a process is running from that folder or when the running processes cannot be listed. `--dry-run` prints what would happen and removes nothing. A mistyped option stops the command instead of falling back to a plain clean. Until 2026-09-18 both commands deleted `release/` whole, the installed app with it; `scripts/clean.test.mjs` holds the rule, in temporary directories only. `scripts/native-package.mjs` is a different matter and is **not** guarded: it rebuilds `release/native/windows` by design, so on the workstation it runs only with that folder moved aside first (the procedure in the production readiness ledger).
 
 ## Recommended Development Rules
 

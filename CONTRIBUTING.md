@@ -82,7 +82,7 @@ npm run doctor:release
 npm run release:verify
 ```
 
-Release packaging and installer evidence must run on the relevant target host. macOS Apple Silicon and Windows 11 `x64` release hosts build and verify their own QtIFW installers, update repositories, checksums, and continuity evidence.
+Release packaging and installer evidence must run on the target host. The Windows 11 `x64` release host builds and verifies the QtIFW installer, update repository, checksums, and continuity evidence; there is no other target (Studio Control runs only on Windows, at `2560x1440`).
 
 ## Repo Conventions
 
