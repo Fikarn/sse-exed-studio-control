@@ -166,9 +166,3 @@
   flex: 1;
   white-space: nowrap;
 }
-
-/* Below the studio surface the cluster spends less air; nothing is dropped. */
-:global([data-operator-layout-root][data-chrome="compact"]) .cluster {
-  gap: 12px;
-  padding: 12px;
-}

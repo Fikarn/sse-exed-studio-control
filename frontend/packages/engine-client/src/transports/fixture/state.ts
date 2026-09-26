@@ -112,37 +112,30 @@ export function legacyStageFromRunnerStage(runnerStage: RunnerStage, hasComplete
   return "setup-required";
 }
 
+// New pages program, Slice SW (D22): the folders the Windows build uses
+// (`native/rust-engine/src/bootstrap.rs`: app data under %APPDATA%, with
+// `backups`, `exports`, `logs` and the database in it), for a user named
+// Studio. The log file keeps the double's own name: the build's `engine.log`
+// would print a word the operator never reads (system §9).
+const FIXTURE_APP_DATA_DIR = "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native";
+
 export function ensurePaths(state: MutableFixtureState) {
   const runtime = asRecord(state.appSnapshot.runtime) ?? {};
   const paths = asRecord(runtime.paths) ?? {};
   runtime.paths = {
-    appDataDir:
-      typeof paths.appDataDir === "string"
-        ? paths.appDataDir
-        : "/Users/operator/Library/Application Support/SSE ExEd Studio Control",
-    backupDir:
-      typeof paths.backupDir === "string"
-        ? paths.backupDir
-        : "/Users/operator/Library/Application Support/SSE ExEd Studio Control/backups",
-    dbPath:
-      typeof paths.dbPath === "string"
-        ? paths.dbPath
-        : "/Users/operator/Library/Application Support/SSE ExEd Studio Control/studio-control.sqlite3",
+    appDataDir: typeof paths.appDataDir === "string" ? paths.appDataDir : FIXTURE_APP_DATA_DIR,
+    backupDir: typeof paths.backupDir === "string" ? paths.backupDir : `${FIXTURE_APP_DATA_DIR}\\backups`,
+    dbPath: typeof paths.dbPath === "string" ? paths.dbPath : `${FIXTURE_APP_DATA_DIR}\\studio-control.sqlite3`,
     // 2026-09 production readiness, Slice 4 (F15): the diagnostics folder the
     // Support surfaces open; the engine reports it as `runtime.paths.exportsDir`.
-    exportsDir:
-      typeof paths.exportsDir === "string"
-        ? paths.exportsDir
-        : "/Users/operator/Library/Application Support/SSE ExEd Studio Control/exports",
+    exportsDir: typeof paths.exportsDir === "string" ? paths.exportsDir : `${FIXTURE_APP_DATA_DIR}\\exports`,
     logFilePath:
-      typeof paths.logFilePath === "string"
-        ? paths.logFilePath
-        : "/Users/operator/Library/Logs/SSE ExEd Studio Control/studio-control.log",
-    logsDir: typeof paths.logsDir === "string" ? paths.logsDir : "/Users/operator/Library/Logs/SSE ExEd Studio Control",
+      typeof paths.logFilePath === "string" ? paths.logFilePath : `${FIXTURE_APP_DATA_DIR}\\logs\\studio-control.log`,
+    logsDir: typeof paths.logsDir === "string" ? paths.logsDir : `${FIXTURE_APP_DATA_DIR}\\logs`,
     updateRepositoryPath:
       typeof paths.updateRepositoryPath === "string"
         ? paths.updateRepositoryPath
-        : "/Users/operator/Downloads/SSE-ExEd-Studio-Control-Native-macOS-UpdateRepository.zip",
+        : "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
   };
   state.appSnapshot.runtime = runtime;
 }
@@ -935,7 +928,7 @@ export function buildFixtureBackupEntry(state: MutableFixtureState) {
   return {
     kind: "archive",
     name: fileName,
-    path: `${backupDir}/${fileName}`,
+    path: `${backupDir}\\${fileName}`,
     sizeBytes: 4096,
     modifiedAt,
   };

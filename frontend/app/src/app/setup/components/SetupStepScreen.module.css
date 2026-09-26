@@ -1,6 +1,6 @@
-/* Visual overhaul A, Slice 7: the commissioning step as a screen. Two columns
-   at the studio surface, one below it; the screen is the height its step needs,
-   so the bay's floor stays visible under it and nothing scrolls to be reached. */
+/* Visual overhaul A, Slice 7: the commissioning step as a screen, in two
+   columns; the screen is the height its step needs, so the bay's floor stays
+   visible under it and nothing scrolls to be reached. */
 
 .frame {
   flex: none;
@@ -183,88 +183,4 @@
   white-space: nowrap;
   font: 600 var(--font-size-label) / 1 var(--font-family-mono);
   color: var(--display-text);
-}
-
-/* Below the studio surface the step is one column and spends less air: the
-   record rows stand two across, the note gives way, and the step still needs
-   no scroll (A-setup.html's 1280 board). */
-:global([data-operator-layout-root][data-chrome="compact"]) .step {
-  grid-template-columns: minmax(0, 1fr);
-  row-gap: 12px;
-  padding: 16px 20px 20px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .title {
-  margin-top: 6px;
-  font-size: var(--font-size-2xl);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .lead {
-  max-width: none;
-  margin-top: 10px;
-  font-size: var(--font-size-body);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .rules {
-  max-width: none;
-  gap: 6px;
-  margin-top: 14px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .rule {
-  font-size: var(--font-size-label);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .rule > span:first-child {
-  margin-top: 5px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .facts {
-  max-width: none;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .card {
-  gap: 6px;
-  padding: 10px 12px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .cardValue {
-  font-size: var(--font-size-label);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .go {
-  gap: 8px;
-  margin-top: 16px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .go > button {
-  min-height: 40px;
-  padding: 0 14px;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .note {
-  display: none;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .record {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding-top: 0;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .recordHeading {
-  grid-column: 1 / -1;
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .row {
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: var(--font-size-label);
-}
-
-:global([data-operator-layout-root][data-chrome="compact"]) .rowValue {
-  font-size: var(--font-size-label);
 }

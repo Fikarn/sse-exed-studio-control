@@ -119,7 +119,7 @@ function hardwareLinkOldExportRefusal(fileName: string): string {
 function openDoubleWithOldExport(fileName = "db.json") {
   const scenario = cloneJson(getFixtureScenario("setup-required") as JsonObject) as FixtureScenario;
   const support = scenario.supportSnapshot as JsonObject;
-  const path = `${String(support.backupDir)}/${fileName}`;
+  const path = `${String(support.backupDir)}\\${fileName}`;
   support.backups = [{ kind: "archive", name: fileName, path, sizeBytes: 2048, modifiedAt: 1776841920000 }];
   const transport = createFixtureTransport(scenario);
   const events: EventName[] = [];
@@ -160,7 +160,7 @@ describe("the fixture double and an export from the old Studio Control (db.json)
   it("answers a db.json that is not in the backups folder as any file not found", async () => {
     const { request } = openDouble();
     const backupDir = String((await request("support.snapshot")).backupDir);
-    const missing = `${backupDir}/db.json`;
+    const missing = `${backupDir}\\db.json`;
 
     for (const method of ["support.backup.verify", "support.backup.restore"] as const) {
       await expect(request(method, { path: missing })).rejects.toThrow(`Backup file was not found: ${missing}`);

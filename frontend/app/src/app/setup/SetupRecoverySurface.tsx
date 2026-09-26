@@ -469,13 +469,6 @@ export function SetupRecoverySurface({
           <div className={styles.setupIncidentSectionLabel}>Install & Update</div>
           <div className={styles.setupIncidentInfoList}>
             <div>
-              <strong>macOS</strong>
-              <span>
-                If the app is blocked, right-click the app, choose Open, then confirm once to clear Gatekeeper for
-                future launches.
-              </span>
-            </div>
-            <div>
               <strong>Windows</strong>
               <span>If SmartScreen intervenes, choose More info, then Run anyway.</span>
             </div>

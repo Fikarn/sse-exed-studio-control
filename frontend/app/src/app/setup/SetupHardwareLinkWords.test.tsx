@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { useSyncExternalStore } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { createFixtureTransport, createShellStore, type JsonObject, type ShellStore } from "@sse/engine-client";
 import { getFixtureScenario } from "@sse/test-fixtures";
@@ -78,29 +78,6 @@ async function renderRunner(controlSurface: JsonObject, runnerStage: "import" | 
 function rowLamp(label: string) {
   return screen.getByText(label).querySelector("[data-lamp]")?.getAttribute("data-lamp");
 }
-
-beforeAll(() => {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-  );
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    addEventListener() {},
-    addListener() {},
-    dispatchEvent() {
-      return false;
-    },
-    matches: false,
-    media: query,
-    onchange: null,
-    removeEventListener() {},
-    removeListener() {},
-  }));
-});
 
 afterEach(() => {
   cleanup();

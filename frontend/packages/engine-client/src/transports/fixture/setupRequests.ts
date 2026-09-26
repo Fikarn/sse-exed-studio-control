@@ -320,7 +320,7 @@ export function handleFixtureSetupRequest(
         baseUrl,
         fileName: "sse-exed-studio-control-native-fixture.companionconfig",
         pageCount,
-        path: `${asString(asRecord(runtime.paths)?.appDataDir)}/exports/sse-exed-studio-control-native-fixture.companionconfig`,
+        path: `${asString(asRecord(runtime.paths)?.appDataDir)}\\exports\\sse-exed-studio-control-native-fixture.companionconfig`,
       };
     }
     default:

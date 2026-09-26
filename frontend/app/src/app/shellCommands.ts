@@ -68,6 +68,8 @@ export async function exportShellDiagnostics(report: Record<string, JsonValue>) 
 // the recovery screens. A refusal ("No monitor is available for
 // studio fullscreen.") reaches the screen as an `Error` carrying the shell's
 // sentence, like `openShellPath`'s. Outside the installed app they do nothing.
+// Slice SW (D22): the windowed layout and its command went; the shell always
+// shows the screen fullscreen.
 
 /** Studio fullscreen on the studio monitor, remembered for the next launch. */
 export async function enterStudioFullscreen() {
@@ -76,17 +78,6 @@ export async function enterStudioFullscreen() {
       await invoke("shell_enter_studio_fullscreen");
     } catch (error) {
       throw toError(error, "Studio fullscreen did not start.");
-    }
-  }
-}
-
-/** The window centred at its windowed size, remembered for the next launch. */
-export async function switchToWindowedLayout() {
-  if (tauriAvailable()) {
-    try {
-      await invoke("shell_use_windowed_layout");
-    } catch (error) {
-      throw toError(error, "The windowed layout did not start.");
     }
   }
 }
@@ -124,7 +115,7 @@ export async function confirmShellClose() {
 }
 
 /** Forgets the saved window, then goes to studio fullscreen on the studio
- *  monitor, or to the windowed layout when there is none. */
+ *  monitor, or on the display the window is on when there is none. */
 export async function resetWindowLayout() {
   if (tauriAvailable()) {
     try {

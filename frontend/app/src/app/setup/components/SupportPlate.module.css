@@ -31,17 +31,14 @@
 }
 
 /* New pages program, Slice 3 (decision 2): the window keys under their
-   readout, as the switches sit under theirs — the two layouts side by side,
-   and Reset under them across the row. */
+   readout, as the switches sit under theirs, each across the row. Slice SW
+   (D22): Studio fullscreen takes the row it shared with Windowed, so the row
+   keeps its height and Reset its place under it. */
 .windowKeys {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   margin-top: 6px;
-}
-
-.windowKeys > :last-child {
-  grid-column: 1 / -1;
 }
 
 .danger {
