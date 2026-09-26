@@ -11,7 +11,6 @@ import {
 
 import { AUDIO_ARM_MIN_DWELL_MS } from "../src/app/audio/audioConstants";
 import {
-  NARROW_PREAMP_ASPECT_RATIO,
   expectAudioInspectorPanelsFit,
   expectAudioLaneCardsInsideTierGrids,
   expectAudioOverviewProcessingStack,
@@ -67,9 +66,9 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
   await expect(workspace).toHaveAttribute("data-output-role", "main-out");
-  // 2026-09 audit Slice 9: the 2560 surface is desktop density — six playback
-  // pairs on the first bank.
-  await expect(workspace).toHaveAttribute("data-density", "desktop");
+  // 2026-09 audit Slice 9: the 2560 surface has six playback pairs on the first
+  // bank. New pages program, Slice SW (D22): the Console has one density now,
+  // so `data-density` went and the count is the check.
   await expect(
     page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
   ).toHaveCount(6);
@@ -1122,87 +1121,15 @@ test("inspector preamp gain knob only reports whole-dB values", async ({ page })
   expect(Number.isInteger(Number(stepped)), `keyboard gain ${stepped} must be a whole dB`).toBe(true);
 });
 
-test("renders audio scaled studio preview as the 2560 studio surface", async ({ page }) => {
-  const readAudioLayoutDetails = async () =>
-    page.evaluate(() => {
-      const root = document.querySelector("[data-operator-layout-root]");
-      const tieredMixer = document.querySelector('[data-testid="audio-tiered-mixer"]');
-      const hostLane = document.querySelector('[data-testid="audio-strip-audio-input-9"]');
-      return {
-        hostLaneColumns: hostLane ? getComputedStyle(hostLane).gridTemplateColumns : null,
-        hostLaneRows: hostLane ? getComputedStyle(hostLane).gridTemplateRows : null,
-        root: root
-          ? {
-              layoutHeight: root.getAttribute("data-layout-height"),
-              layoutMode: root.getAttribute("data-layout-mode"),
-              layoutWidth: root.getAttribute("data-layout-width"),
-              reviewSurface: root.getAttribute("data-review-surface"),
-            }
-          : null,
-        tierRows: tieredMixer ? getComputedStyle(tieredMixer).gridTemplateRows : null,
-      };
-    });
-
+// New pages program, Slice SW (D22). Two cases went with the sizes they were
+// about — "renders audio scaled studio preview as the 2560 studio surface"
+// (Studio Preview) and "keeps the full audio workspace visible at the 1920x1080
+// fallback size" — and their geometry guards are this case's, on the studio
+// screen itself: the preview ran most of them on the 2560 layout drawn at ~59 %,
+// the fallback case the rest at 1920 × 1080.
+test("keeps the full audio workspace visible and inside its boxes at 2560x1440", async ({ page }) => {
   await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
-  // Visual overhaul A, Slice 4b. Old: the parity check measured the strip's
-  // preamp knob (`role="slider"`, 1:1). New: it measures the strip's gain key.
-  // Reason: the strip's gain is a key now; what the check is for — the scaled
-  // studio preview lays the strip out exactly as the native surface does — is
-  // unchanged, and it now compares the two surfaces to each other rather than
-  // to a constant.
-  const nativeHostGain = page.getByTestId("audio-lane-gain-audio-input-9");
-  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
-  await expect(nativeHostGain).toBeVisible();
-  const nativeDetails = await readAudioLayoutDetails();
-  const nativeGainBox = await nativeHostGain.boundingBox();
-  expect(nativeGainBox, "native gain key should have a box").not.toBeNull();
-  await expectDbfsScaleLabelsInsideMeters(page, "native 2560 studio surface");
-
-  await page.setViewportSize({ width: 1512, height: 982 });
-  await openFixture(page, "audio-populated", { operatorReview: "studio" });
-  await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
-  // Slice 9: the preview measures its 2560 logical root, so density stays desktop.
-  await expect(page.getByTestId("audio-workspace")).toHaveAttribute("data-density", "desktop");
-  const previewDetails = await readAudioLayoutDetails();
-  expect(previewDetails.root).toMatchObject({
-    layoutHeight: "1440",
-    layoutMode: "studioFull",
-    layoutWidth: "2560",
-    reviewSurface: "studioPreview",
-  });
-  expect(previewDetails.tierRows).toBe(nativeDetails.tierRows);
-  expect(previewDetails.hostLaneColumns).toBe(nativeDetails.hostLaneColumns);
-  expect(previewDetails.hostLaneRows).toBe(nativeDetails.hostLaneRows);
-  // 2026-05-27 redesign: the dense canvas context bar was slimmed — the
-  // canvasBarLabel ("Editing …") and canvasSelectedMeta ("routed to main out")
-  // elements were removed, so the studio-preview parity check drops them and
-  // keeps the load-bearing layout-geometry equivalence above.
-  await expectAudioLaneCardsInsideTierGrids(page);
-
-  const previewHostGain = page.getByTestId("audio-lane-gain-audio-input-9");
-  const previewGainBox = await previewHostGain.boundingBox();
-  expect(previewGainBox, "preview gain key should have a box").not.toBeNull();
-  expect(
-    previewGainBox!.width / previewGainBox!.height,
-    "the preview lays the gain key out as the native surface does"
-  ).toBeCloseTo(nativeGainBox!.width / nativeGainBox!.height, 1);
-
-  await page.getByTestId("audio-strip-audio-input-9").click();
-  await expectAudioStudioSideRailsFilled(page);
-  await expectAudioOverviewProcessingStack(page, "scaled studio preview selected-channel", 82);
-  await expectDbfsScaleLabelsInsideMeters(page, "scaled studio preview selected-channel");
-  await expectAspectRatio(
-    page.getByTestId("audio-inspector-hardware-mini").getByRole("slider", { name: "Host preamp gain" }),
-    NARROW_PREAMP_ASPECT_RATIO,
-    "studio preview inspector narrow preamp"
-  );
-  await expectSnapshotActionsDoNotOverlapContent(page, "snapshot-show-open");
-});
-
-test("keeps the full audio workspace visible at the 1920x1080 fallback size", async ({ page }) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
-  await openFixture(page, "audio-1920-fallback");
 
   const workspace = page.getByTestId("audio-workspace");
   await expect(workspace).toBeVisible();
@@ -1212,29 +1139,26 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
   await expect(page.getByTestId("audio-software-playback-tier")).toBeVisible();
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toBeVisible();
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
-  // 2026-05-27 redesign: the new top bar adds a "Snapshot" pill, so a bare
+  // 2026-05-27 redesign: the top bar adds a "Snapshot" pill, so a bare
   // workspace.getByText("Snapshots") risks a strict-mode clash. Scope to the
   // snapshot deck's own header.
   await expect(page.getByTestId("audio-snapshot-deck").getByText("Snapshots")).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Touch" })).toHaveCount(0);
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
-  // 2026-09 audit Slice 9 (operator decision 6): below 2200 px the Console runs
-  // at compact density — 4 inputs, 4 playback pairs, 3 outputs per bank, a
-  // 380 px inspector — and no tier, the mixer, the inspector or the workspace
-  // scrolls sideways. The old test read the document only; the tiers scroll
-  // inside overflow-x:auto grids under an overflow:hidden shell, so it never
-  // saw the 1920 overflow the audit found.
-  await expect(workspace).toHaveAttribute("data-density", "compact");
+  // A bank at 2560 × 1440: 4 inputs, 6 playback pairs, 3 outputs.
   await expect(
     page.locator('[data-testid="audio-tier-lanes-hardware-inputs"] [data-testid^="audio-strip-"]')
   ).toHaveCount(4);
   await expect(
     page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
-  ).toHaveCount(4);
+  ).toHaveCount(6);
   await expect(
     page.locator('[data-testid="audio-tier-lanes-hardware-outputs"] > [data-testid^="audio-output-"]')
   ).toHaveCount(3);
+  // 2026-09 audit Slice 9: no tier, the mixer, the plate or the workspace
+  // scrolls sideways. The tiers scroll inside overflow-x:auto grids under an
+  // overflow:hidden shell, so a document read never sees a lane overflow; each
+  // is read by its own scroll width.
   for (const testId of [
     "audio-tier-lanes-hardware-inputs",
     "audio-tier-lanes-software-playback",
@@ -1243,77 +1167,56 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
     "audio-inspector",
     "audio-workspace",
   ]) {
-    await expectNoHorizontalOverflow(page.getByTestId(testId), `1920 ${testId}`);
+    await expectNoHorizontalOverflow(page.getByTestId(testId), `2560 ${testId}`);
   }
-  // Visual overhaul A, Slice 4a. Old: "1920 inspector width should be 380 px".
-  // New (Slice 4c): 360 px, the mock's plate at the 1920 fallback. Reason: the
-  // cluster takes its width off the left of the shell and the plate takes the
-  // mock's, and the bay holds its banked strips between them without scrolling
-  // sideways. The 2560×1440 deliverable (D4) is unchanged.
-  const inspectorBox = await readRequiredBox(page, "audio-inspector");
-  expect(Math.abs(inspectorBox.width - 360), "1920 plate width should be 360 px").toBeLessThanOrEqual(1);
-  // The other two playback pairs are one bank away. New pages program, Slice 3
-  // (decision 3). Old: `]` paged there and `[` came back. New: the Inputs
-  // heading's Next bank and Previous bank keys. Reason: the Console binds no
-  // key; the bank keys are the on-screen twin this slice added.
-  await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toHaveCount(0);
-  await page.getByTestId("audio-bank-next").click();
-  await expect(page.getByTestId("audio-strip-audio-playback-9-10")).toBeVisible();
-  await expectNoHorizontalOverflow(page.getByTestId("audio-tier-lanes-software-playback"), "1920 playback bank 2");
-  await page.getByTestId("audio-bank-previous").click();
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
+  // Plan D4: the plate is 416 px at 2560 × 1440.
+  const plateBox = await readRequiredBox(page, "audio-inspector");
+  expect(Math.abs(plateBox.width - 416), "the plate should be 416 px wide").toBeLessThanOrEqual(1);
 
-  await expectAudioWorkspaceGeometry(page);
   await expectAudioLaneCardsInsideTierGrids(page);
-  await expectDbfsScaleLabelsInsideMeters(page, "1920 fallback");
-  // Visual overhaul A, Slice 4b: the strip's gain is a key, and at the fallback
-  // size it still fits its row (old: the knob's 1:1 aspect).
-  const fallbackGainBox = await page.getByTestId("audio-lane-gain-audio-input-9").boundingBox();
-  expect(fallbackGainBox, "1920 fallback gain key should have a box").not.toBeNull();
-  expect(fallbackGainBox!.height, "1920 fallback gain key keeps its target height").toBeGreaterThanOrEqual(24);
+  await expectDbfsScaleLabelsInsideMeters(page, "2560 studio surface");
+  // Visual overhaul A, Slice 4b: the strip's gain is a key, and it keeps its
+  // target height.
+  const gainBox = await page.getByTestId("audio-lane-gain-audio-input-9").boundingBox();
+  expect(gainBox, "the strip's gain key should have a box").not.toBeNull();
+  expect(gainBox!.height, "the strip's gain key keeps its target height").toBeGreaterThanOrEqual(24);
+
   await page.getByTestId("audio-strip-audio-input-9").click();
-  // 2026-05-27 redesign: the rail Trust panel and rail Snapshot panel are
-  // gone. The chrome at 1920 now hangs the equivalent facts on the AudioTopBar
-  // (OSC / Metering stat cluster) and keeps the snapshot deck inline under
-  // the mixer (no panel wrapper). Assert the new bars are visible at the
-  // 1920 fallback breakpoint.
-  // Visual overhaul A, Slice 4a. Old: `audio-topbar` visible and
-  // `audio-monitor-bar` visible. New: the cluster (`audio-monitor-bar` on the
-  // cluster root) and the shell footer (`audio-health-bar`) are visible and no
-  // top bar exists. Reason: the Console's chrome moved into the cluster and the
-  // shared footer, so the top bar is gone at every size, not only at 2560.
+  // Visual overhaul A, Slice 4a: the Console's chrome is the cluster and the
+  // shell footer; there is no top bar.
   await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
   await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
-  // 2026-05-27 redesign: the Overview mini-preview cards (eq-mini / dynamics-mini
-  // / sends-mini) were replaced by the EQ / Dyn / Routing tabs; assert those are
-  // present for the selected channel at the 1920 fallback.
-  // Visual overhaul A, Slice 4c: they are sections of the plate, all present at
-  // the fallback size too — the plate scrolls, it does not hide.
+  // Visual overhaul A, Slice 4c: every section of the plate is present; the
+  // plate scrolls, it does not hide.
   for (const section of ["eq", "dynamics", "send", "meter", "channel"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
   }
-  await expectAudioStudioSideRailsFilled(page, 32);
-  await expectAudioOverviewProcessingStack(page, "1920 fallback selected-channel", 40);
+  await expectAudioStudioSideRailsFilled(page);
+  await expectAudioOverviewProcessingStack(page, "2560 selected-channel", 82);
+  await expectDbfsScaleLabelsInsideMeters(page, "2560 selected-channel");
+  // The plate's preamp knob (AudioKnob) is square.
+  await expectAspectRatio(
+    page.getByTestId("audio-inspector-hardware-mini").getByRole("slider", { name: "Host preamp gain" }),
+    1,
+    "the plate's preamp knob"
+  );
   await expectSnapshotActionsDoNotOverlapContent(page, "snapshot-show-open");
   await expectAudioInspectorPanelsFit(page);
 
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
   await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
-  await expectDbfsScaleLabelsInsideMeters(page, "1920 fallback output inspector");
+  await expectDbfsScaleLabelsInsideMeters(page, "2560 output plate");
   for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);
   }
-  // Visual overhaul A, Slice 4c. Old: the two long facts (Clock, Metering) were
-  // measured on the retired overview card. New: they are the shell footer's
-  // telemetry, measured there. Reason: those facts moved to the footer in
-  // Slice 4a and the overview cards are gone with the tab row; the guard is the
-  // same one — a long value must not overflow its box at the fallback size.
+  // Visual overhaul A, Slice 4c: the long facts (Clock, Metering) are the
+  // shell footer's telemetry; a long value must not overflow its box.
   const footerFacts = page.getByTestId("audio-footer-telemetry").locator("span");
   const footerFactCount = await footerFacts.count();
   expect(footerFactCount, "footer telemetry should be rendered").toBeGreaterThan(0);
   for (let index = 0; index < footerFactCount; index += 1) {
-    await expectNoElementOverflow(footerFacts.nth(index), `1920 footer fact ${index + 1}`);
+    await expectNoElementOverflow(footerFacts.nth(index), `2560 footer fact ${index + 1}`);
   }
   await expectNoDocumentScroll(page);
 });
@@ -1324,8 +1227,11 @@ test("keeps the full audio workspace visible at the 1920x1080 fallback size", as
 // the viewport edge — the centered mixer never reaches it — so this locks
 // the clamp with synthetic edge coordinates dispatched at the strip's
 // contextmenu handler, exactly how the close-out probe verified it live.
+// New pages program, Slice SW (D22): at the edges of the studio screen,
+// 2560 × 1440 (old: 1280 × 800). Each edge probe is 10 px in, closer than the
+// menu's own size, so the menu has to flip to stay on screen.
 test("strip context menu clamps to the viewport at the edges", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.setViewportSize({ width: 2560, height: 1440 });
   await openFixture(page, "audio-populated");
   await expect(page.locator('[data-testid^="audio-strip-"]').first()).toBeVisible();
 
@@ -1346,12 +1252,12 @@ test("strip context menu clamps to the viewport at the edges", async ({ page }) 
     expect(box, `${label}: menu has a box`).not.toBeNull();
     expect(box!.x, `${label}: fits left`).toBeGreaterThanOrEqual(0);
     expect(box!.y, `${label}: fits top`).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width, `${label}: fits right`).toBeLessThanOrEqual(1281);
-    expect(box!.y + box!.height, `${label}: fits bottom`).toBeLessThanOrEqual(801);
+    expect(box!.x + box!.width, `${label}: fits right`).toBeLessThanOrEqual(2561);
+    expect(box!.y + box!.height, `${label}: fits bottom`).toBeLessThanOrEqual(1441);
   };
 
-  await probe(640, 400, "center");
-  await probe(1270, 400, "right edge");
-  await probe(640, 790, "bottom edge");
-  await probe(1270, 790, "corner");
+  await probe(1280, 720, "center");
+  await probe(2550, 720, "right edge");
+  await probe(1280, 1430, "bottom edge");
+  await probe(2550, 1430, "corner");
 });

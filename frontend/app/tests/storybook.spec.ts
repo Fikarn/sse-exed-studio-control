@@ -14,8 +14,14 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // per story.
 //
 // Baselines live next to the per-surface specs under
-// `tests/__visual__/storybook.spec.ts-snapshots/`, platform-suffixed so
-// macOS dev and Linux CI each own their copy.
+// `tests/__visual__/storybook.spec.ts-snapshots/`: the win32 captures at
+// 2560×1440, the only ones there are.
+//
+// New pages program, Slice SW (D22): Studio Control runs on Windows at
+// 2560×1440, and this spec does nothing but capture, so it runs on Windows
+// only. It is skipped, not quarantined: the gate is checked on the workstation
+// before each push (`frontend/app/tests/__visual__/README.md`).
+test.skip(process.platform !== "win32", "the Storybook captures are the Windows workstation's (D22)");
 
 const STORYBOOK_BASE = "http://127.0.0.1:6007";
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");

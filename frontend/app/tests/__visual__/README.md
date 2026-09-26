@@ -1,52 +1,49 @@
 # Visual baselines
 
-Committed Playwright `toHaveScreenshot` baselines for the operator shell. The
-diff gate runs on every PR via the `frontend-e2e` job in
-[`.github/workflows/dev-checks.yml`](../../../../.github/workflows/dev-checks.yml).
+Committed Playwright `toHaveScreenshot` captures of the operator shell
+(`visual-review.spec.ts`) and of every Storybook story (`storybook.spec.ts`).
+Studio Control runs on Windows at 2560×1440 and nowhere else (decision D22,
+new pages program, Slice SW), so these are the win32 captures at 2560×1440 and
+nothing else.
 
 ## Layout
 
 ```
-__visual__/<spec-filename>-snapshots/<arg>-<platform>.png
+__visual__/<spec-filename>-snapshots/<arg>-win32.png
 ```
 
-`<platform>` is the value of Node's `process.platform` (`darwin`, `linux`,
-`win32`). The path layout is controlled by `snapshotPathTemplate` in
-[`playwright.config.ts`](../../playwright.config.ts).
+The `-win32` suffix is Node's `process.platform`, added by `snapshotPathTemplate`
+in [`playwright.config.ts`](../../playwright.config.ts). There are 59:
 
-## Why platform-suffixed?
+- `visual-review.spec.ts-snapshots/` — 19: Setup, the recovery screen
+  (`protocol-mismatch`), Lighting and the Console at 2560×1440, the same four
+  in Graphite and Bone, and seven designed states (Lighting empty and
+  unreachable, Setup degraded, the Console's four warning bands).
+- `storybook.spec.ts-snapshots/` — 40: one per story; the shell stories paint
+  full 2560×1440 frames.
 
-Chromium's font and antialiasing pipeline differs between macOS (local dev)
-and Linux (CI), so committing a single PNG would either fail locally or fail
-in CI. Each platform owns the baseline files it generates.
+## Where they are compared
 
-In practice this repo's contributors land in one of two buckets:
+On the Windows workstation, by the local Playwright lane, before every push:
+`npm run frontend:playwright:test` (it builds the app and Storybook first).
 
-- **macOS** — `npm run frontend:playwright:test` validates the `*-darwin.png`
-  baselines.
-- **Linux / CI** — the GitHub Actions runner validates the `*-linux.png`
-  baselines.
+CI compares none of them. Its `frontend-e2e` job runs on a Linux runner, where
+`ignoreSnapshots` is on (`playwright.config.ts`), `storybook.spec.ts` is
+skipped, and the UI contract takes no screenshot and samples no contrast
+(`helpers/ui-contract/measure.mjs`). Every other check in those specs runs
+there as everywhere.
 
-## Refreshing baselines
+## Refreshing captures
 
-When an intentional UI change lands, regenerate baselines and commit the new
-PNGs:
+Only for a change that is meant to move them, and only for the captures it
+explains:
 
-```sh
-cd frontend/app
-npm exec playwright test visual-review.spec.ts -- --update-snapshots
-```
+1. Build first: `npm run build --workspace frontend/app && npm run frontend:storybook:build`.
+2. Run the lane; copy the `*-diff.png` files out of `frontend/app/test-results/`
+   before the update run replaces them.
+3. `cd frontend/app && npm exec playwright test visual-review.spec.ts storybook.spec.ts -- --update-snapshots=changed`
+4. Inspect every changed PNG before `git add`, and commit the captures on their
+   own.
 
-This rewrites baselines for the current platform only. The other platform's
-baselines refresh when CI (or a contributor on that OS) reruns with
-`--update-snapshots` — usually as a separate commit on the same PR.
-
-## Bootstrapping a missing platform
-
-The first PR to introduce visual baselines (`plan PR 1`) committed macOS
-baselines. The first CI run on Linux fails because no `*-linux.png` exists;
-Playwright writes the new screenshots into `frontend/app/test-results/` which
-the `frontend-e2e` job uploads as an artifact. Download that artifact, copy
-the `*-actual.png` files into this folder renamed to drop the `-actual`
-suffix, and push as a follow-up commit. The second CI run then validates
-against them.
+A capture whose case goes is deleted with it. Never run Playwright and a
+qualification lane at the same time.

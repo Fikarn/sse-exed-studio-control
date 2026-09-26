@@ -7,6 +7,13 @@ import { sampleContrast } from "./contrast.mjs";
 import { decodePng } from "./png.mjs";
 import { CHROME_TOLERANCE_PX, D4_CHROME, FIXTURE_NOW, SURFACE, TARGETS, fixtureUrl, isPreReady } from "./boards.mjs";
 
+// New pages program, Slice SW (D22): Studio Control runs on Windows, so the
+// contrast sampled from a screenshot is Windows' pixels alone. Off Windows (CI's
+// Linux runner) no screenshot is taken, the contrast measures are null and the
+// ratchet does not judge them; every other measure is the DOM's and is checked
+// everywhere.
+export const SAMPLES_CONTRAST = process.platform === "win32";
+
 /**
  * Navigate a page to a fixture board and let it settle: hydration, the theme
  * attribute, fonts, then one second for transitions to end so the idle
@@ -49,17 +56,21 @@ export async function openBoard(page, fixture, theme) {
 
 /**
  * @param {import("@playwright/test").Page} page
- * @returns {Promise<{ census: ReturnType<typeof censusInPage>, measures: object, png: Buffer }>}
+ * @returns {Promise<{ census: ReturnType<typeof censusInPage>, contrast: ReturnType<typeof sampleContrast> | null, measures: ReturnType<typeof summarize>, png: Buffer | null }>}
  */
 export async function measureBoard(page) {
   const census = await page.evaluate(censusInPage);
+  if (!SAMPLES_CONTRAST) return { census, contrast: null, png: null, measures: summarize(census, null) };
   const png = await page.screenshot({ type: "png", fullPage: false, animations: "allow" });
   const decoded = decodePng(png);
   const contrast = sampleContrast(decoded, census.texts);
   return { census, contrast, png, measures: summarize(census, contrast) };
 }
 
-/** The numbers the gate ratchets and the census prints, from one census. */
+/**
+ * The numbers the gate ratchets and the census prints, from one census.
+ * `contrast` is null where it is not sampled (off Windows).
+ */
 export function summarize(c, contrast) {
   const enabled = c.targets.filter((t) => !t.disabled);
   const take = enabled.filter((t) => t.take);
@@ -93,8 +104,8 @@ export function summarize(c, contrast) {
     minTake: take.reduce((m, t) => Math.min(m, t.minSide), 999),
     radii: c.radii.map(([r, n]) => `${r}:${n}`).join(" "),
     radiiOff: c.radiiOff,
-    contrastMeasured: contrast.measured,
-    contrastFails: contrast.fails.length,
+    contrastMeasured: contrast === null ? null : contrast.measured,
+    contrastFails: contrast === null ? null : contrast.fails.length,
     shadows: c.light.shadows,
     shadowNegative: c.light.outerNegativeOffset,
     blurOver8: c.light.outerBlurOver8,
@@ -118,12 +129,16 @@ export function summarize(c, contrast) {
 }
 
 // The ratchet a board must satisfy: counts may only fall, floors only rise.
-// Returns the list of violations (empty when the board holds its ratchet).
+// Returns the list of violations (empty when the board holds its ratchet). A
+// count that was not measured (null) is a violation, never a pass: the one
+// measure left unmeasured on purpose, the contrast off Windows, is skipped by
+// name below.
 export function checkRatchet(measures, ratchet) {
   const problems = [];
   const atMost = (key) => {
     if (ratchet[key] === undefined) return;
-    if (measures[key] > ratchet[key]) problems.push(`${key}: ${measures[key]} > ratchet ${ratchet[key]}`);
+    if (measures[key] === null || measures[key] > ratchet[key])
+      problems.push(`${key}: ${measures[key]} > ratchet ${ratchet[key]}`);
   };
   const atLeast = (key) => {
     if (ratchet[key] === undefined || ratchet[key] === null) return;
@@ -136,7 +151,8 @@ export function checkRatchet(measures, ratchet) {
   atMost("radiiOff");
   atMost("smallTargets");
   atMost("smallTake");
-  atMost("contrastFails");
+  // Slice SW (D22): sampled from Windows' pixels only (SAMPLES_CONTRAST).
+  if (SAMPLES_CONTRAST) atMost("contrastFails");
   atMost("shadowNegative");
   atMost("blurOver8Unlit");
   atMost("gradientsOff");

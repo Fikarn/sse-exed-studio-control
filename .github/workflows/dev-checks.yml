@@ -122,11 +122,15 @@ jobs:
           # native/rust-toolchain.toml pins this; the action's image has to match it.
           rust-version: "1.95.0"
 
-  # plan PR 1 / workstream B1 + B2 (consolidated).
-  # `frontend:playwright:test` now includes the `visual-review.spec.ts`
-  # baseline diff (workstream A1), so this single job covers both the
-  # `frontend-e2e` and `visual-review` jobs from the plan — sharing the
-  # Vite preview server boot cost as B2 suggests.
+  # plan PR 1 / workstream B1 + B2 (consolidated): one job runs the whole
+  # Playwright suite, sharing the Vite preview server boot cost as B2 suggests.
+  # New pages program, Slice SW (D22): Studio Control runs on Windows at
+  # 2560x1440, so on this Linux runner the suite compares no screenshot
+  # (`ignoreSnapshots` off Windows, frontend/app/playwright.config.ts), skips
+  # the capture-only `storybook.spec.ts` and samples no contrast in the UI
+  # contract; every behaviour case runs. The win32 captures and the contrast are
+  # checked on the workstation before each push. Storybook is still built: the
+  # UI contract measures the A-primitive stories here too.
   frontend-e2e:
     runs-on: ubuntu-latest
     steps:
@@ -182,7 +186,7 @@ jobs:
           path: frontend/app/playwright-report/
           if-no-files-found: ignore
           retention-days: 14
-      - name: Upload Playwright test results (visual diffs + traces)
+      - name: Upload Playwright test results (traces + failure screenshots)
         if: always()
         uses: actions/upload-artifact@v4
         with:

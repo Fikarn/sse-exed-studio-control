@@ -110,3 +110,33 @@ test("mute / solo buttons carry design-system tooltips", async ({ page }) => {
   const tooltip = muteButton.locator('xpath=ancestor::span[1]/following-sibling::*[@role="tooltip"]').first();
   await expect(tooltip).toHaveText("Mute Host");
 });
+
+// New pages program, Slice SW: a strip key's tooltip opens inwards across its
+// keys row and holds its words. It used to be as narrow as its key, so
+// "Playback" spilled out of it — at the lane's last strip, past the lane, which
+// then scrolled 4 px: a scrollbar under Playback at 2560 × 1440.
+test("a strip key's tooltip holds its words inside the strip, and the lane does not scroll", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+  const lane = page.getByTestId("audio-tier-lanes-software-playback");
+  await expect(lane).toBeVisible();
+  const readScroll = () => lane.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }));
+  const atRest = await readScroll();
+  expect(atRest.scroll, "the Playback lane does not scroll at rest").toBeLessThanOrEqual(atRest.client);
+
+  const lastStrip = lane.locator(":scope > *").last();
+  for (const name of [/^Mute Playback 11\/12$/, /^Solo Playback 11\/12$/]) {
+    const key = lastStrip.getByRole("button", { name });
+    await key.hover();
+    const tooltip = key.locator('xpath=ancestor::span[1]/following-sibling::*[@role="tooltip"]').first();
+    await expect(tooltip).toHaveCSS("opacity", "1");
+    const [bubble, strip] = await Promise.all([tooltip.boundingBox(), lastStrip.boundingBox()]);
+    expect(bubble!.x, `${name} tooltip starts inside the strip`).toBeGreaterThanOrEqual(strip!.x - 0.5);
+    expect(bubble!.x + bubble!.width, `${name} tooltip ends inside the strip`).toBeLessThanOrEqual(
+      strip!.x + strip!.width + 0.5
+    );
+    const words = await tooltip.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }));
+    expect(words.scroll, `${name} tooltip holds its words`).toBeLessThanOrEqual(words.client);
+    const shown = await readScroll();
+    expect(shown.scroll, `the lane does not scroll while ${name} shows its tooltip`).toBeLessThanOrEqual(shown.client);
+  }
+});
