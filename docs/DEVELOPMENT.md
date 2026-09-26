@@ -151,7 +151,7 @@ Required selected-runtime workflow:
 1. build and validate the selected Tauri shell
 2. capture repeatable `1280x800`, `1440x900`, `1600x960`, `1728x1117`, `1920x1080`, and `2560x1440` visual evidence with `tauri:visual:review`
 3. launch the real app when human inspection is needed
-4. use **Studio Preview: Enter 2560x1440 Review** from the command palette to review the `2560x1440` studio canvas proportionally on the current display
+4. open the page with `?operatorReview=studio` (Scaled Studio Preview, below) to review the `2560x1440` studio canvas proportionally on the current display
 5. compare against the intended operator state before accepting the change
 
 Treat raw window width alone as an invalid authority for operator layout. The primary target is fullscreen `2560x1440` on the permanent second monitor.
@@ -173,13 +173,14 @@ Do not accept stale live evidence. If the current Tauri visual review output or 
 
 Retina MacBook panels can have enough physical pixels for the target operator surface while still exposing a much smaller logical desktop. The current built-in 14-inch M5 display exposes roughly `1512x982` logical points at `2.0` backing scale (`3024x1964` backing pixels), so a native `2560x1440` logical Tauri window cannot fit on the desktop.
 
-Use **Scaled Studio Preview** for normal built-in-display human review:
+Use **Scaled Studio Preview** for normal built-in-display human review. Since the new pages program's Slice 3 (2026-09) it opens only from the page's address, `?operatorReview=studio` (the command palette that also opened it is gone, and the app no longer remembers the choice), so it is a browser review:
 
-1. Build the Rust engine with `npm run native:engine:build` if `native/target/debug/studio-control-engine` is missing or stale, then run the app with `npm run tauri:dev`.
-2. Open the command palette with `Ctrl+K` (`⌘K` on macOS).
-3. Run `Studio Preview: Enter 2560x1440 Review`.
-4. Review the proportional `2560x1440` studio canvas scaled into the current window.
-5. Run `Studio Preview: Exit Review` before judging native compact/windowed behavior.
+1. Build the front end (`npm run build --workspace frontend/app`) and serve it with `npm run preview --workspace frontend/app -- --host 127.0.0.1 --port 4173`.
+2. Open `http://127.0.0.1:4173/?fixture=audio-populated&transport=fixture&operatorReview=studio` (any fixture id from `frontend/packages/test-fixtures/src/fixtures.json`).
+3. Review the proportional `2560x1440` studio canvas scaled into the current window.
+4. Drop `operatorReview=studio` from the address before judging native compact/windowed behavior.
+
+The installed app and `npm run tauri:dev` never show Studio Preview: nothing on their screens opens it.
 
 `npm run tauri:dev` starts Vite and the selected Tauri shell; it does not rebuild `studio-control-engine`. If the dev shell lands on Incident Recovery immediately after protocol or engine changes, run `npm run native:engine:build` and relaunch `npm run tauri:dev`.
 
@@ -339,12 +340,14 @@ workspace, left the screen in the new pages program's Slice 1
 (`docs/plans/new-pages-2026-09.md`). The two large workspaces are assemblers:
 
 - Lighting — `lighting/LightingWorkspace.tsx` over `lighting/useLightingEditor.ts`,
-  which composes the six hooks in `lighting/editor/` (rig, session, scene editor,
-  fixture editor, rig controls, commands); the render is the six components in
-  `lighting/regions/` (cluster, plate, bay, quick palette, bottom strips, dialogs),
-  and `lighting/lightingWorkspaceModel.ts` holds the module-level helpers.
+  which composes the five hooks in `lighting/editor/` (rig, session, scene editor,
+  fixture editor, rig controls — the sixth, the commands hook with the page's key
+  handlers and palette entries, went in the new pages program's Slice 3); the
+  render is the five components in `lighting/regions/` (cluster, plate, bay,
+  bottom strips, dialogs — the quick palette panel went in Slice 3 too), and
+  `lighting/lightingWorkspaceModel.ts` holds the module-level helpers.
 - Setup / Support — `setup/SetupSupportPilot.tsx` over `setup/useSetupPilot.ts`,
-  `setup/pilot/` (state, actions, shortcuts, chrome), the runner's four steps in
+  `setup/pilot/` (state, actions, chrome), the runner's four steps in
   `setup/steps/` and `setup/support/` (the support screen, the dialogs, and
   `SetupWorkstationPlate.tsx` with Recent actions and the light-outputs switch).
 

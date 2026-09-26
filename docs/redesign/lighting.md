@@ -122,7 +122,7 @@ Net-new in PR 1 (cross-workspace reuse plausible):
 - `Crest` — wraps the official SSE Executive Education horizontal white logo PNG, `size: "sm" | "md" | "lg"` (36 / 52 / 72 px)
 - `NavItem` — workspace nav button with optional 16 px Lucide icon and active state (gradient background + 3 px glowing underline on `--color-brand-green`); consumed by the new `AppShellFrame` shell header
 - `StatusDot` — semantic status dot, `state: "ok" | "attn" | "err" | "info"`, `size: "sm" | "md"`, `glow?` default on
-- `HealthBar` + `HealthItem` — full-width status strip with N items + optional kbd-shortcut hint
+- `HealthBar` + `HealthItem` — full-width status strip with N items (its kbd-shortcut hint left in the new pages program's Slice 3)
 - `PlotPill` — glass overlay pill with backdrop-blur, `state: "default" | "modified" | "patch"`
 - `PlotMeta` — small mono info chip with backdrop-blur, `tone: "default" | "blue"`
 
@@ -168,6 +168,8 @@ Two engine-side observations from Phase 0 are baked into D's design rather than 
 A v2.2.1 operator launching the completed Direction D / premium build sees their fixtures, groups, scenes, orders, pins, color tags, and preview-independent live state preserved. Cue keys are migrated away by the Direction D cleanup, and palette defaults are seeded once during the v5 -> v6 migration. Backward-compat downgrade from v6 to pre-palette code is unsupported by policy — operators do not roll back releases on the fixed studio host.
 
 ## 6. Keyboard shortcuts
+
+**Removed on 2026-09-26 (the new pages program, Slice 3, decision D6).** Lighting binds no key of its own and shows no key hint; every action in the table below is a control on the page, and `docs/plans/new-pages-2026-09-s3-inventory.md` names each key's on-screen twin. What the keyboard still does is plain operation: Tab, Enter or Space on the focused control, typing, the arrows on a focused slider, scrub label or talent mark, the keyboard reorder of scene tiles and group chips, and Esc on a dialog, a popup, a rename field or the search field's Recent list. The table is kept as the record of what there was.
 
 | Key                      | Action                                            |
 | ------------------------ | ------------------------------------------------- |

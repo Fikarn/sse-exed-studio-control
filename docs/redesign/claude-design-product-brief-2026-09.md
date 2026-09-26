@@ -2,6 +2,8 @@
 
 This document is for a designer who has never seen the product. It contains only requirements and verified facts: who uses it, on what hardware, what the software must do, what the engine can and cannot report, and what fails the operator today. It contains no visual direction. Layout, hierarchy, type, colour, material, motion, iconography, component design, copy tone and the look of the themes are yours to decide and to defend, one decision at a time, in terms of the operator.
 
+**Since written (the new pages program, `docs/plans/new-pages-2026-09.md`):** Planning is gone (Slices 1 and 2, 2026-09-25), so the Planning paragraph below describes a workspace that no longer exists; and Studio Control binds no key of its own (Slice 3, 2026-09-26, decision D6) — no workspace keys, no command palette, no shortcut guide, no talkback key, no key hints. Every action is a control on the screen or a key on the Stream Deck; the keyboard does only plain operation (Tab, Enter or Space on the focused control, typing, the arrows on a focused slider or list, Esc on a dialog, a popup or an armed key). Two pages are being added, Cameras and Teleprompter.
+
 ## 1. The operator and the room
 
 - One person operates a small recording studio at SSE Executive Education (Stockholm School of Economics). They record and stream executive-education sessions: a host, a co-host, guests, sometimes a remote participant.
@@ -33,7 +35,7 @@ The product has a shell holding four workspaces. Their feature sets are fixed; t
 
 **Planning.** Projects (title, status todo / in progress / blocked / done, priority P0–P2, description) and tasks (title, project, scheduled start and duration, due date, priority, labels, checklist, notes, a timer that tracks time). Two views: a board by status and a day timeline (09:00–22:00) with a now marker; an unscheduled tray; search and filters; new project; a time report (tracked time by project and task); backup. Keyboard-first operation.
 
-**Shell.** Workspace switching (Ctrl+1–4), a command palette (Ctrl+K), a shortcut guide (?), a per-subsystem health readout visible from every workspace, restart the engine bridge (confirm), close the app (confirm; closing ends the console link, TotalMix keeps its state, lights hold their last levels, the deck goes idle). Startup shows progress while the engine starts; recovery surfaces exist for a protocol mismatch or a failed start with diagnostics and restore.
+**Shell.** Workspace switching (the header tabs; since the new pages program's Slice 3 no keys), a per-subsystem health readout visible from every workspace, restart the engine bridge (confirm), close the app (confirm; closing ends the console link, TotalMix keeps its state, lights hold their last levels, the deck goes idle). Startup shows progress while the engine starts; recovery surfaces exist for a protocol mismatch or a failed start with diagnostics and restore.
 
 ## 4. The engine's truth: every state the UI may show
 
@@ -67,7 +69,7 @@ Commissioning: `setup-required`, ready, degraded; per step done / current / pend
 
 These behaviours are engine-enforced and must be legible on screen:
 
-- **Momentary hold.** Talkback and identify bursts engage while held and release on let-go; the engine auto-releases 2 s after the last hold; a click never latches. Talkback is `T` on the keyboard and `TALK` on the deck.
+- **Momentary hold.** Talkback and identify bursts engage while held and release on let-go; the engine auto-releases 2 s after the last hold; a click never latches. Talkback is `TALK` on the deck (its `T` key left in the new pages program's Slice 3).
 - **Toggle.** Mute, solo, dim, mono, lighting on, fixture on: one press flips; the screen shows the optimistic result at once, then the engine's confirmation; a value the desk kept different flips back and is reported as Adjusted.
 - **Continuous.** Faders, gain, intensity, colour temperature, grand master: drag, wheel, arrow keys (Shift ×5), double-click to default, typed entry; commits throttled while dragging, final on release.
 - **Arm-then-apply.** 48 V phantom, snapshot recall, snapshot overwrite, scene overwrite: the first press arms, a second press on the same control at least 350 ms later applies, anything else or a 4.5 s timeout disarms; only one thing is armed at a time; the deck mirrors the arm. Held keys never auto-repeat into an apply.

@@ -19,7 +19,7 @@ Every workspace is one grid: **header · cluster · bay · plate · footer**. Th
 | State display | a black display, fixed height: lamp + word, the engine's sentence, the way-out key; nothing below it moves |    180 |      168 | 140          |
 | Bay           | the recessed floor the workspace's picture sits on: strips, the plot, the timeline, the step screen        |   rest |     rest | rest         |
 | Plate         | plate, right: the selection (strip, fixture, task) or Support; a drawer only in the fallback layouts       |    416 |      360 | drawer 360   |
-| Footer        | telemetry as `Label value` items and the shortcut hints                                                    |     40 |       36 | 32           |
+| Footer        | telemetry as `Label value` items and one action key (no key hints since the new pages program's Slice 3)   |     40 |       36 | 32           |
 
 The operator ruled on 2026-09-07 that `2560×1440` is the only surface that matters. The live-minimum and utility columns stay for the record (the mocks still lay out for them as a fallback) but are not deliverables or gates; density never comes from the type, the sizes stay.
 
@@ -29,7 +29,7 @@ Inter for everything read as language, JetBrains Mono (tabular) for values, stat
 
 | Step       | Size | Where                                                                           |
 | ---------- | ---: | ------------------------------------------------------------------------------- |
-| tick       |   12 | scale ticks, eyebrows, secondary meta, kbd hints — the floor; never read to act |
+| tick       |   12 | scale ticks, eyebrows, secondary meta — the floor; never read to act            |
 | label      |   13 | labels and rows read to act, hints, sub-lines                                   |
 | body       |   14 | body, command keys, table rows, the engine's sentences                          |
 | name       |   15 | list names: snapshots, projects, steps                                          |
@@ -61,15 +61,15 @@ The deck: amber means engaged on screen and on the deck's `→ MAIN`, `DIM`, `GA
 
 One light from above; five levels; displays are backlit in every theme.
 
-|  Level | Name    | Recipe (tokens)                                                                              | Lives there                                                                    |
-| -----: | ------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-|     −1 | Bay     | `--bay` floor, `inset 0 2px 10px well-shade`                                                 | the strips, the plot, the timeline, the step screen                            |
-|      0 | Chassis | `--bg`, flat                                                                                 | the floor between regions                                                      |
-|     +1 | Plate   | `linear-gradient(panel-top, panel)`, `inset 0 1px 0 sheen`                                   | cluster, plate, header, footer                                                 |
-|      — | Well    | `--well` (black), `inset 0 2px 6px well-shade, inset 0 -1px 0 white/5 %`, display inks       | the state display, readouts, sliders, grooves, meters, fields, screens         |
-|     +2 | Key     | `linear-gradient(key-top, key)`, `inset 0 1px 0 sheen, 0 1px 2px shade`, 1 px hairline       | every pressable thing                                                          |
-| +2 lit | Lit key | the role fill's gradient, `inset 0 1px 0 white/40 %`, a 14 px (amber) or 18 px (green) bloom | engaged, live                                                                  |
-|     +3 | Drawer  | plate recipe + `0 12px 32px black/60 %`                                                      | dialogs, the palette, toasts (to be drawn); the drawer in the fallback layouts |
+|  Level | Name    | Recipe (tokens)                                                                              | Lives there                                                            |
+| -----: | ------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+|     −1 | Bay     | `--bay` floor, `inset 0 2px 10px well-shade`                                                 | the strips, the plot, the timeline, the step screen                    |
+|      0 | Chassis | `--bg`, flat                                                                                 | the floor between regions                                              |
+|     +1 | Plate   | `linear-gradient(panel-top, panel)`, `inset 0 1px 0 sheen`                                   | cluster, plate, header, footer                                         |
+|      — | Well    | `--well` (black), `inset 0 2px 6px well-shade, inset 0 -1px 0 white/5 %`, display inks       | the state display, readouts, sliders, grooves, meters, fields, screens |
+|     +2 | Key     | `linear-gradient(key-top, key)`, `inset 0 1px 0 sheen, 0 1px 2px shade`, 1 px hairline       | every pressable thing                                                  |
+| +2 lit | Lit key | the role fill's gradient, `inset 0 1px 0 white/40 %`, a 14 px (amber) or 18 px (green) bloom | engaged, live                                                          |
+|     +3 | Drawer  | plate recipe + `0 12px 32px black/60 %`                                                      | dialogs, toasts (to be drawn); the drawer in the fallback layouts      |
 
 Blooms are the only glows: lit lamps (10 px), lit keys, the meter peak (6 px) and the meter's emissive under-layer (a blurred copy of the ramp). The state display carries a radial tint of its own tone at ≤ 16 %. Gradients are material (plates, keys, caps at ≤ 6 % luminance difference) or signal (the ramp, the colour-temperature track); never decoration. The census enforces: no outer shadow with a negative offset; blur over 8 px only on a lit element or the drawer; four radii (4 · 8 · 12 · pill).
 
@@ -92,7 +92,7 @@ Nothing on an idle surface animates (measured: 0 running animations on every boa
 
 Workspaces compose these and never re-implement them; the design system owns them. Test ids are extended, never renamed.
 
-- **Shell**: `Header` (crest, product, `Tab` ×4, `LampChip` ×3 mirroring the worst state each workspace shows, `Latch` chips, the clock), `Footer` (`Label value` items, hint kbds, one action slot).
+- **Shell**: `Header` (crest, product, `Tab` ×4, `LampChip` ×3 mirroring the worst state each workspace shows, `Latch` chips, the clock), `Footer` (`Label value` items, one action slot; the hint kbds left in the new pages program's Slice 3).
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys; fixed height (180 px); the armed row), `Latch` row, `Section` (title + count + header keys), `Actions` row.
 - **Keys** (one primitive, modes as props): `command`, `primary`, `danger` (red keyline, ≤ 1 per surface), `toggle` (rest / engaged amber), `momentary` (live green for the hold), `arm` (armed: amber keyline, `ARMED · press again · 3.9 s`, countdown bar, the state display's armed row), `hazard` (48 V: red lamp + word), `locked` (dashed, 55 %, `aria-disabled`, reason in the display and the tier header), `segmented` (a well with lit keys; the deck's short caps at 1280), `cap` (mono uppercase) vs `label` (sentence case).
 - **Lamps**: `Lamp` (8 px, lit with bloom / unlit), `LampChip` (header), `LampWord` (in rows and tags).
@@ -116,7 +116,7 @@ Every word is the engine's or the fixture's; the sentence is printed verbatim; a
 
 ## 9. Copy
 
-Sentence case for commands (verb + object), the deck's words on key caps (mono, uppercase), the engine's words for states. Name the hardware: TotalMix, the UFX III, the bridge, the deck, Companion, the rig. Never engine, backend, transport, IPC in operator copy; "snapshot" only for the Console's scene primitive; "Engine log" stays as the feature's name until the engine copy pass renames it. Numbers carry sign and unit (`-3.8 dB`, `+2.1 dB`, `32 dB`, `3200 K`, `76 %`, `18:24`, `85 min` / `85m` at 1280, `1h 18m`, `U1`, `192.168.1.80`). Every state sentence says what happened and what to do; the way out is a key in the same display.
+Sentence case for commands (verb + object), the deck's words on key caps (mono, uppercase), the engine's words for states. Name the hardware: TotalMix, the UFX III, the bridge, the deck, Companion, the rig. Never engine, backend, transport, IPC in operator copy; "snapshot" only for the Console's scene primitive; "Engine log" stays as the feature's name until the engine copy pass renames it. Numbers carry sign and unit (`-3.8 dB`, `+2.1 dB`, `32 dB`, `3200 K`, `76 %`, `18:24`, `85 min` / `85m` at 1280, `1h 18m`, `U1`, `192.168.1.80`). Every state sentence says what happened and what to do; the way out is a key in the same display. No surface shows a key, a key glyph or a key hint, and every action has a control on the screen (the new pages program's Slice 3, D6, 2026-09-26): the keyboard does only what it does in any program — Tab, Enter or Space on the focused control, typing, the arrows on a focused slider or list, Esc on a dialog, a popup or an armed key. `scripts/check-no-shortcuts.mjs` holds it at 0.
 
 ## 10. Measures (the gates the plan turns into tests)
 
