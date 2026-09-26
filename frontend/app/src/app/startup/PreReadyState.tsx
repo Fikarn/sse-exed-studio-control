@@ -22,7 +22,7 @@ export interface PreReadyStateProps {
   code?: ReactNode;
   /** Counts and stage, on one line. */
   meta?: ReactNode;
-  /** The way out: retry, open the log, show the shortcuts. */
+  /** The way out: retry startup, reset the window layout. None while starting. */
   actions?: ReactNode;
   children?: ReactNode;
   testId?: string;

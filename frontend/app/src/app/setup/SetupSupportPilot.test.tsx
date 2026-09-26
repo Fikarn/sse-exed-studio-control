@@ -6,7 +6,17 @@ import { createFixtureTransport, createShellStore, type JsonObject, type ShellSt
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { OperatorLayoutProvider } from "../OperatorLayoutProvider";
+import { enterStudioFullscreen, resetWindowLayout, switchToWindowedLayout } from "../shellCommands";
 import { SetupSupportPilot } from "./SetupSupportPilot";
+
+// The window commands are the native shell's; here they are stand-ins that
+// answer as the shell would, so a test can make one refuse.
+vi.mock("../shellCommands", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../shellCommands")>()),
+  enterStudioFullscreen: vi.fn(async () => {}),
+  resetWindowLayout: vi.fn(async () => {}),
+  switchToWindowedLayout: vi.fn(async () => {}),
+}));
 
 // 2026-09 production readiness, Slice 7 (F20): the Support plate's "Verify
 // latest" key asks the hardware link to check the latest backup without
@@ -37,7 +47,6 @@ function PilotOnStore({
         lightOutputsArmed={state.lightingSnapshot ? state.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={false}
         onRequestRestart={() => {}}
-        onShowShortcuts={() => {}}
         store={store}
         supportSnapshot={supportSnapshot}
       />
@@ -235,6 +244,67 @@ describe("SetupSupportPilot light outputs and recent actions", () => {
     const store = await renderPilot((snapshot) => ({ ...(snapshot ?? {}), recentEvents: [{ id: "x" }, null, 7] }));
     expect(screen.getByTestId("support-recent-actions-empty").textContent).toContain("Nothing yet");
     expect(screen.queryAllByTestId("support-recent-action")).toHaveLength(0);
+    await store.dispose();
+  });
+});
+
+// New pages program, Slice 3 (D6, decision 2): the three window commands the
+// command palette held are keys in Workstation, in a row after UI scale. The
+// native shell moves the window and says nothing when it does; a refusal comes
+// back with the shell's sentence and lands in the pilot's message line, as
+// every other Setup / Support failure does.
+describe("SetupSupportPilot window keys", () => {
+  const windowKeys = [
+    { testId: "support-window-studio-fullscreen", label: "Studio fullscreen", command: enterStudioFullscreen },
+    { testId: "support-window-windowed", label: "Windowed", command: switchToWindowedLayout },
+    { testId: "support-window-reset", label: "Reset the window layout", command: resetWindowLayout },
+  ];
+
+  afterEach(() => {
+    cleanup();
+    for (const { command } of windowKeys) vi.mocked(command).mockClear();
+  });
+
+  it("Workstation shows the three window keys after UI scale; a key that works says nothing", async () => {
+    const store = await renderPilot();
+    const group = screen.getByRole("group", { name: "Window" });
+    expect(screen.getByTestId("support-workstation").contains(group)).toBe(true);
+    expect(
+      within(group)
+        .getAllByRole("button")
+        .map((key) => key.textContent)
+    ).toEqual(windowKeys.map(({ label }) => label));
+    const scale = screen.getByTestId("support-scale-switch");
+    expect(scale.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    for (const { testId, command } of windowKeys) {
+      await waitFor(() => expect((screen.getByTestId(testId) as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(screen.getByTestId(testId));
+      await waitFor(() => expect(command).toHaveBeenCalledTimes(1));
+    }
+    await waitFor(() => expect((screen.getByTestId("support-window-reset") as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByTestId("setup-feedback")).toBeNull();
+    await store.dispose();
+  });
+
+  it("a refusal shows in the message line with the native shell's sentence", async () => {
+    const store = await renderPilot();
+    // Sentences of the kind the native shell refuses with (`main.rs`).
+    const refusals = [
+      "No monitor is available for studio fullscreen.",
+      "Failed to center fallback window: access denied.",
+      "Failed to remove shell window preferences: access denied.",
+    ];
+
+    for (const [index, { testId, command }] of windowKeys.entries()) {
+      vi.mocked(command).mockRejectedValueOnce(new Error(refusals[index]));
+      await waitFor(() => expect((screen.getByTestId(testId) as HTMLButtonElement).disabled).toBe(false));
+      fireEvent.click(screen.getByTestId(testId));
+      await waitFor(() => {
+        expect(screen.getByTestId("setup-feedback").textContent).toContain(refusals[index]);
+      });
+      expect(screen.getByTestId("setup-feedback").getAttribute("data-tone")).toBe("error");
+    }
     await store.dispose();
   });
 });

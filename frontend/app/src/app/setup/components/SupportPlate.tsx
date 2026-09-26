@@ -51,6 +51,12 @@ export interface SupportPlateProps {
   onRestoreLatest: () => void;
   onSelectTheme: (theme: OperatorTheme) => void;
   onSelectUiScale: (scale: OperatorUiScale) => void;
+  /** New pages program, Slice 3 (D6, decision 2): the window keys. The native
+   *  shell moves the window and keeps the choice for the next launch; outside
+   *  the installed app they do nothing. */
+  onEnterStudioFullscreen: () => void;
+  onUseWindowedLayout: () => void;
+  onResetWindowLayout: () => void;
   onSetLightOutputsArmed: (armed: boolean) => void;
   /** 2026-09 production readiness, Slice 7 (F20): checks the latest backup
    *  without changing anything; the answer lands in the pilot's feedback. */
@@ -79,6 +85,9 @@ export function SupportPlate({
   onRestoreLatest,
   onSelectTheme,
   onSelectUiScale,
+  onEnterStudioFullscreen,
+  onUseWindowedLayout,
+  onResetWindowLayout,
   onSetLightOutputsArmed,
   onVerifyBackup,
   restoreDisabled,
@@ -123,6 +132,22 @@ export function SupportPlate({
             />
           ))}
         </Segmented>
+        {/* New pages program, Slice 3 (D6, decision 2): the three window
+            commands the command palette held. They are commands, not a switch:
+            nothing reports which layout the window is in, so no key is lit. A
+            refusal lands in the pilot's message line. */}
+        <Readouts rows={[{ id: "window", label: "Window", value: "kept for the next launch" }]} />
+        <div role="group" aria-label="Window" className={styles.windowKeys} data-testid="support-window-keys">
+          <Key size="small" disabled={busy} testId="support-window-studio-fullscreen" onClick={onEnterStudioFullscreen}>
+            Studio fullscreen
+          </Key>
+          <Key size="small" disabled={busy} testId="support-window-windowed" onClick={onUseWindowedLayout}>
+            Windowed
+          </Key>
+          <Key size="small" disabled={busy} testId="support-window-reset" onClick={onResetWindowLayout}>
+            Reset the window layout
+          </Key>
+        </div>
         {/* Held is not a blackout: the rig keeps its last look, or does what
             the bridge does when its source goes away. The words say what is
             sent, never what the room looks like. */}

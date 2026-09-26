@@ -47,7 +47,6 @@ export interface SetupSupportPilotProps {
   lightOutputsArmed: boolean | null;
   liveTransportRequested: boolean;
   onRequestRestart: () => void;
-  onShowShortcuts: () => void;
   store: ShellStore;
   supportSnapshot: SnapshotRecord | null;
 }
@@ -208,20 +207,6 @@ export function feedbackStatus(feedback: ActionFeedback | null) {
   }
 
   return feedback.tone === "ok" ? "ok" : feedback.tone === "error" ? "error" : "info";
-}
-
-export function nextControlId(controls: ControlSurfaceControl[], selectedControlId: string | null, direction: -1 | 1) {
-  if (controls.length === 0) {
-    return null;
-  }
-
-  const currentIndex = controls.findIndex((control) => control.id === selectedControlId);
-  if (currentIndex === -1) {
-    return controls[0]?.id ?? null;
-  }
-
-  const nextIndex = (currentIndex + direction + controls.length) % controls.length;
-  return controls[nextIndex]?.id ?? null;
 }
 
 export function toJsonValue(value: unknown): JsonValue {

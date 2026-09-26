@@ -10,7 +10,6 @@ import {
   probeChecks,
   type FeedbackTone,
   toJsonValue,
-  nextControlId,
   runnerStepOrder,
   type SetupSupportPilotProps,
 } from "../setupPilotModel";
@@ -18,7 +17,7 @@ import type { SetupPilotState } from "./useSetupPilotState";
 
 /** What the operator can run from Setup / Support: save the import profile,
  *  the probes, publish, export / verify / restore a backup, hold or arm the
- *  light outputs, export diagnostics, and the step and control selection. */
+ *  light outputs, export diagnostics, and the step selection. */
 export function useSetupPilotActions({ props, state }: { props: SetupSupportPilotProps; state: SetupPilotState }) {
   const {
     store,
@@ -44,9 +43,6 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     isReady,
     checks,
     setPublishOverridePrompt,
-    selectedPageControls,
-    selectedControlId,
-    setSelectedControlId,
     stepIndex,
     setPendingStepId,
   } = state;
@@ -325,13 +321,6 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     void performAction("publish-setup", () => publishSetup());
   });
 
-  const moveControlSelection = useLiveCallback((direction: -1 | 1) => {
-    const nextId = nextControlId(selectedPageControls, selectedControlId, direction);
-    if (nextId) {
-      setSelectedControlId(nextId);
-    }
-  });
-
   const moveStepSelection = useLiveCallback((direction: -1 | 1) => {
     const nextIndex = Math.min(Math.max(stepIndex + direction, 0), runnerStepOrder.length - 1);
     void activateStep(runnerStepOrder[nextIndex]!);
@@ -363,7 +352,6 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     exportDiagnostics,
     primaryActionLabel,
     invokePrimaryAction,
-    moveControlSelection,
     moveStepSelection,
     requestStepSelection,
   };

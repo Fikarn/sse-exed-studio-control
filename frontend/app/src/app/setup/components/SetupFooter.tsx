@@ -1,11 +1,10 @@
 import { Footer } from "@sse/design-system";
 
-import { formatShortcut } from "../../shared/shortcutGlyphs";
-
 // Visual overhaul A, Slice 7 (system §2): Setup's footer is the shell's. It
 // says where commissioning stands without the operator leaving the step they
 // are on: which step, how the probes came back, what commissioning is, and what
-// version of the app is running.
+// version of the app is running. New pages program, Slice 3 (D6): it prints no
+// key hints — Studio Control binds no key of its own.
 
 export interface SetupFooterProps {
   appVersion: string;
@@ -38,14 +37,8 @@ export function SetupFooter({
         { id: "commissioning", label: "Commissioning", value: commissioningWord },
         { id: "app", label: "App", value: appVersion },
       ]}
-      hints={[
-        { kbd: formatShortcut(["mod", "K"]), label: "Command palette" },
-        { kbd: "?", label: "Shortcuts" },
-        { kbd: formatShortcut(["mod", "3"]), label: "Back to the console" },
-      ]}
       testId="setup-health-bar"
       itemsTestId="setup-footer-telemetry"
-      hintsTestId="setup-footer-shortcuts"
     />
   );
 }

@@ -1,7 +1,5 @@
 import { Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
 
-import { formatShortcut } from "../../shared/shortcutGlyphs";
-
 import type { CommissioningCheck } from "../../shellData";
 import type { SetupState } from "../setupState";
 import styles from "./SetupCluster.module.css";
@@ -191,10 +189,11 @@ export function SetupCluster({
           <Key size="small" disabled={busy} testId="setup-engine-log" onClick={onOpenEngineLog}>
             Engine log
           </Key>
+          {/* New pages program, Slice 3 (D6): the key stays; its small print,
+              the key that did the same, went with that key. */}
           <Key
             size="small"
             cap="Console"
-            hint={formatShortcut(["mod", "3"])}
             disabled={!canReturnToConsole}
             aria-label="Back to the console"
             testId="setup-back-to-console"

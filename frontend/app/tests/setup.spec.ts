@@ -416,3 +416,192 @@ test("Recent actions lists what was done on the Lighting page, newest first, fro
     await expect(rows.nth(index)).toHaveAttribute("data-source", "ui");
   }
 });
+
+// ---------------------------------------------------------------------------
+// New pages program, Slice 3 (D6; docs/plans/new-pages-2026-09-s3-inventory.md):
+// Setup binds no key of its own. Shift+S, Tab stepping, Enter anywhere, J / K
+// and 1–4 went, with every hint that named a key; the keyboard does what it
+// does everywhere else. "Skip ahead?" is a standard confirm (decision 11), and
+// the three window commands the command palette held are keys in Workstation
+// (decision 2).
+// ---------------------------------------------------------------------------
+
+test("Runner and Support, the Map step and Restart the hardware link, by pointer (S3)", async ({ page }) => {
+  // Moved here from shell.spec.ts's keyboard case, whose keys went: what it
+  // reached by Shift+S, Tab, 2, K, Shift+Tab and Ctrl+Shift+R is reached by the
+  // keys on screen.
+  await openFixture(page, "setup-required");
+  await expectWorkspaceMounted(page, "setup");
+  const cluster = page.getByTestId("setup-cluster");
+
+  await cluster.getByTestId("setup-mode-support").click();
+  await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
+  await cluster.getByTestId("setup-mode-runner").click();
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+
+  // A later step asks first.
+  await cluster.getByRole("tab", { name: /Map bindings/ }).click();
+  await page.getByRole("dialog", { name: "Skip ahead?" }).getByRole("button", { name: "Skip ahead" }).click();
+  await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
+  const map = page.getByTestId("setup-screen-map");
+  await expect(map.getByRole("button", { name: /^Light 1 ?button$/ })).toHaveAttribute("data-selected", "true");
+
+  // The page tabs name the page and nothing else (they printed "LIGHTS 1" and
+  // "AUDIO 2", the number keys that chose them).
+  const lights = map.getByRole("button", { name: "LIGHTS", exact: true });
+  const audio = map.getByRole("button", { name: "AUDIO", exact: true });
+  await expect(lights).toHaveText("LIGHTS");
+  await expect(audio).toHaveText("AUDIO");
+
+  // A deck page by its tab, a control by its key.
+  await audio.click();
+  await expect(audio).toHaveAttribute("data-active", "true");
+  await expect(map.getByRole("button", { name: /^Channel 1 ?button$/ })).toHaveAttribute("data-selected", "true");
+  await map.getByRole("button", { name: /^Channel 2 ?button$/ }).click();
+  await expect(map.getByRole("button", { name: /^Channel 2 ?button$/ })).toHaveAttribute("data-selected", "true");
+  await expect(map.getByText(/Channel action 2 is mapped/)).toBeVisible();
+
+  // Back a step at a time with the back key.
+  await page.getByTestId("setup-step-back").click();
+  await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
+  await page.getByTestId("setup-step-back").click();
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+
+  // Restart the hardware link is the plate's red key; it asks first, and Esc
+  // closes the question.
+  await page.getByTestId("support-restart-bridge").click();
+  const restart = page.getByRole("dialog", { name: "Restart the hardware link?" });
+  await expect(restart).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(restart).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+});
+
+test("the Runner binds no key: Shift+S types in a field, Tab moves focus, Enter off a key runs nothing (S3)", async ({
+  page,
+}) => {
+  await openFixture(page, "setup-required");
+  await expectWorkspaceMounted(page, "setup");
+  const importHeading = page.getByRole("heading", { name: "Import the Companion profile" });
+  const primary = page.getByTestId("setup-step-primary");
+
+  // A capital S typed into a field reaches the field. It used to flip Runner
+  // and Support and be swallowed, e.g. while typing C:\Users\Stora Studion.
+  const field = page.getByLabel("Server base URL");
+  await field.fill("");
+  await field.press("Shift+S");
+  await expect(field).toHaveValue("S");
+  await expect(importHeading).toBeVisible();
+  await expect(page.getByTestId("setup-mode-runner")).toHaveAttribute("aria-pressed", "true");
+
+  // Tab moves focus to the next key and leaves the step where it is. It used
+  // to step the runner, and focus never moved.
+  await primary.focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("setup-download-companion")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(primary).toBeFocused();
+  await expect(importHeading).toBeVisible();
+  await expect(page.getByTestId("setup-step-import")).toHaveAttribute("data-standing", "current");
+
+  // Enter with focus off every key runs nothing. It used to run the step's
+  // main key (here Download profile, which also opens Probe hardware)
+  // whatever had focus.
+  await importHeading.click();
+  await page.keyboard.press("Enter");
+  await expect(primary).toHaveText("Download profile");
+  await expect(importHeading).toBeVisible();
+  await expect(page.getByTestId("setup-feedback")).toHaveCount(0);
+
+  // Enter on the focused key presses it, as a click does.
+  await primary.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
+});
+
+test('"Skip ahead?" takes focus when it opens, and Esc closes it without skipping (S3, decision 11)', async ({
+  page,
+}) => {
+  await openFixture(page, "setup-required");
+  await expectWorkspaceMounted(page, "setup");
+  const cluster = page.getByTestId("setup-cluster");
+  const publishStep = cluster.getByRole("tab", { name: /Publish/ });
+
+  await publishStep.click();
+  const dialog = page.getByRole("dialog", { name: "Skip ahead?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("Preceding steps haven't been confirmed.");
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+  await expect(cluster.getByTestId("setup-step-import")).toHaveAttribute("data-standing", "current");
+  await expect(publishStep).toBeFocused();
+
+  // Cancel does the same; the confirm key skips.
+  await publishStep.click();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+  await publishStep.click();
+  await dialog.getByRole("button", { name: "Skip ahead" }).click();
+  await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
+});
+
+test("Workstation's window keys sit after UI scale, and in the browser they do nothing (S3, decision 2)", async ({
+  page,
+}) => {
+  await openFixture(page, "setup-ready");
+  await expectWorkspaceMounted(page, "setup");
+  const plate = page.getByTestId("support-plate");
+  const windowKeys = plate.getByRole("group", { name: "Window" });
+  await expect(windowKeys.getByRole("button")).toHaveText(["Studio fullscreen", "Windowed", "Reset the window layout"]);
+  await expect(plate.getByTestId("support-workstation")).toContainText("kept for the next launch");
+
+  const scaleBox = await plate.getByTestId("support-scale-switch").boundingBox();
+  const windowBox = await windowKeys.boundingBox();
+  expect(scaleBox).not.toBeNull();
+  expect(windowBox).not.toBeNull();
+  expect(windowBox!.y).toBeGreaterThanOrEqual(scaleBox!.y + scaleBox!.height);
+
+  // Outside the installed app the native shell is not there: a press moves
+  // nothing and says nothing — no message, no error.
+  for (const testId of ["support-window-studio-fullscreen", "support-window-windowed", "support-window-reset"]) {
+    const key = plate.getByTestId(testId);
+    await key.click();
+    await expect(key).toBeEnabled();
+    await expect(page.getByTestId("setup-feedback")).toHaveCount(0);
+  }
+  await expect(page.getByRole("heading", { name: "Publish" })).toBeVisible();
+
+  // The new row keeps the plate on screen: every key within 2560 × 1440, the
+  // plate unscrolled, the red key last.
+  const fits = await plate.evaluate((element) => element.scrollHeight <= element.clientHeight);
+  expect(fits, "the Support plate must not scroll at 2560x1440").toBe(true);
+  const dangerBox = await plate.getByTestId("support-restart-bridge").boundingBox();
+  expect(dangerBox).not.toBeNull();
+  expect(dangerBox!.y + dangerBox!.height).toBeLessThanOrEqual(1440);
+  expect(windowBox!.y + windowBox!.height).toBeLessThan(dangerBox!.y);
+});
+
+test("Setup prints no key hints: the footer, the Console key, the bay head (S3)", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  await expectWorkspaceMounted(page, "setup");
+
+  // The footer keeps its telemetry and loses "Ctrl+K Command palette", "?
+  // Shortcuts" and "Ctrl+3 Back to the console".
+  const footer = page.getByTestId("setup-health-bar");
+  await expect(footer).toContainText("Commissioning");
+  for (const hint of ["Command palette", "Shortcuts", "Back to the console", "Ctrl"]) {
+    await expect(footer).not.toContainText(hint);
+  }
+  await expect(page.getByTestId("setup-footer-shortcuts")).toHaveCount(0);
+
+  // The Console key stays; its small print "Ctrl+3" went.
+  await expect(page.getByTestId("setup-back-to-console")).toHaveText("Console");
+
+  // The bay head's Shortcuts key went with the shortcut guide.
+  await expect(page.getByTestId("setup-screen-publish")).not.toContainText("Shortcuts");
+});

@@ -151,7 +151,6 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     selectedPage?.buttons.find((control) => control.id === selectedControlId) ??
     selectedPage?.dials.find((control) => control.id === selectedControlId) ??
     null;
-  const selectedPageControls = selectedPage ? [...selectedPage.buttons, ...selectedPage.dials] : [];
 
   const runtime = asRecord(appSnapshot?.runtime);
   const runtimePaths = asRecord(runtime?.paths);
@@ -250,7 +249,6 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     setRestorePath,
     selectedPage,
     selectedControl,
-    selectedPageControls,
     runtime,
     runtimePaths,
     controlSurface,
