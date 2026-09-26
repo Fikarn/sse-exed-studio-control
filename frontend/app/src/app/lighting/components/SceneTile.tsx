@@ -50,8 +50,8 @@ export interface SceneTileProps {
   onRecall: (sceneId: string) => void;
   /** When provided, renders an inline pin / unpin button. */
   onPin?: (sceneId: string, pinned: boolean) => void;
-  /** Inline-rename commit handler. When provided, double-click on the tile
-   *  name (or pressing F2 when the tile is focused) opens an inline editor. */
+  /** Inline-rename commit handler. When provided, a double-click on the tile
+   *  name, or Rename in its right-click menu, opens an inline editor. */
   onRename?: (sceneId: string, newName: string) => void | Promise<void>;
   /** When true, marks this tile's rename action as in-flight. */
   renameBusy?: boolean;
@@ -201,16 +201,10 @@ export function SceneTile({
     });
   }
 
+  // Enter presses the focused tile, as a click does: it recalls the scene
+  // (D8). New pages program, Slice 3: F2 no longer opens the rename — a
+  // double-click on the name or Rename in the right-click menu does.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    // F2 mirrors the desktop convention for "rename selected row" (Linear,
-    // Notion, every file manager). Works when the tile has keyboard focus
-    // and an onRename handler is wired.
-    if (onRename && event.key === "F2") {
-      event.preventDefault();
-      event.stopPropagation();
-      renameRef.current?.beginEdit();
-      return;
-    }
     // Space inside dnd-kit's sortable enters keyboard-drag mode, so don't
     // intercept it here when sortable is enabled.
     if (event.key === "Enter" || (event.key === " " && !sortable)) {
@@ -221,12 +215,12 @@ export function SceneTile({
 
   // dnd-kit's `listeners` carry an `onKeyDown` of their own (the keyboard
   // sensor's activator). Spread after `handleKeyDown`, it replaced it: Enter
-  // picked the tile up for a drag instead of recalling the scene, and F2 never
-  // reached the rename. The tile's own keys go first; the sensor sees only the
-  // keys they leave alone (Space picks the tile up). Only keys pressed on the
-  // tile at rest count: a key typed inside it (the rename's input) is the
-  // input's, and while the tile is being dragged every key is the sensor's
-  // (Enter and Space drop it, Esc puts it back), heard on the document.
+  // picked the tile up for a drag instead of recalling the scene. The tile's
+  // own keys go first; the sensor sees only the keys they leave alone (Space
+  // picks the tile up). Only keys pressed on the tile at rest count: a key
+  // typed inside it (the rename's input) is the input's, and while the tile is
+  // being dragged every key is the sensor's (Enter and Space drop it, Esc puts
+  // it back), heard on the document.
   const { onKeyDown: sortableKeyDown, ...sortableListeners } = listeners ?? {};
   const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget || isDragging) return;

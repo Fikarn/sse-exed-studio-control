@@ -217,7 +217,7 @@ export function SceneRail({
   // - PointerSensor for mouse / touch / pen drag, with an 8 px activation
   //   distance so plain clicks (recall) don't accidentally start a drag.
   // - KeyboardSensor for accessibility — Tab to the tile, Space to pick up,
-  //   arrow keys to move, Space to drop.
+  //   arrow keys to move, Space to drop (a focused list, kept under D6).
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -257,9 +257,7 @@ export function SceneRail({
         </div>
       );
     }
-    return (
-      <p className={styles.empty}>No scenes saved yet. Press S after editing fixtures to save the current state.</p>
-    );
+    return <p className={styles.empty}>No scenes saved yet.</p>;
   }
 
   if (needle && filteredScenes.length === 0) {

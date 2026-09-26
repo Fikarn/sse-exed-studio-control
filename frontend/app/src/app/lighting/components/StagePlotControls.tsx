@@ -3,7 +3,6 @@ import { Bookmark, Minus, Plus, RotateCcw } from "lucide-react";
 
 import { ContextMenu, SegmentedControl, Tooltip, type ContextMenuItem } from "@sse/design-system";
 
-import { formatShortcut } from "../../shared/shortcutGlyphs";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { StagePlotZoomMode, ViewBookmarks, ViewBookmarkSlot } from "../useStagePlotViewport";
 
@@ -28,6 +27,12 @@ export interface StagePlotControlsProps {
   onSaveViewBookmark?: (slot: ViewBookmarkSlot) => void;
   onRecallViewBookmark?: (slot: ViewBookmarkSlot) => void;
   onClearViewBookmark?: (slot: ViewBookmarkSlot) => void;
+  /** New pages program, Slice 3 (decision 10): the Add to selection key. While
+   *  it is lit, a click on a fixture adds it to the selection or takes it out,
+   *  and a box drag adds to the selection. When `onAddToSelectionChange` is
+   *  omitted the key is not rendered. */
+  addToSelection?: boolean;
+  onAddToSelectionChange?: (next: boolean) => void;
 }
 
 const SLOTS: readonly ViewBookmarkSlot[] = [0, 1, 2];
@@ -54,6 +59,8 @@ export function StagePlotControls({
   onSaveViewBookmark,
   onRecallViewBookmark,
   onClearViewBookmark,
+  addToSelection = false,
+  onAddToSelectionChange,
 }: StagePlotControlsProps) {
   const [menu, setMenu] = useState<{ slot: ViewBookmarkSlot; x: number; y: number } | null>(null);
   const bookmarksEnabled = Boolean(viewBookmarks && onSaveViewBookmark && onRecallViewBookmark);
@@ -95,6 +102,24 @@ export function StagePlotControls({
       data-material="plate"
       data-level="float"
     >
+      {onAddToSelectionChange ? (
+        <span className={styles.selectionGroup}>
+          <Tooltip
+            content="While lit, a click on a fixture adds it to the selection or takes it out, and a box adds its fixtures"
+            placement="top"
+          >
+            <button
+              type="button"
+              className={`${styles.modeButton} ${addToSelection ? styles.modeButtonActive : ""}`}
+              onClick={() => onAddToSelectionChange(!addToSelection)}
+              aria-pressed={addToSelection}
+              data-testid="lighting-add-to-selection"
+            >
+              Add to selection
+            </button>
+          </Tooltip>
+        </span>
+      ) : null}
       <span className={styles.renderModeGroup}>
         <SegmentedControl
           label="Stage plot render mode"
@@ -169,8 +194,8 @@ export function StagePlotControls({
           {SLOTS.map((slot) => {
             const filled = Boolean(viewBookmarks?.[slot]);
             const tooltip = filled
-              ? `Recall view ${slot + 1} · Shift+${slot + 1}. Right-click for options.`
-              : `Empty slot ${slot + 1}. Right-click to save current view · ${formatShortcut(["mod", "shift", String(slot + 1)])}.`;
+              ? `Recall view ${slot + 1}. Right-click for options.`
+              : `Empty slot ${slot + 1}. Right-click to save the current view.`;
             return (
               <Tooltip key={slot} content={tooltip} placement="top">
                 <button

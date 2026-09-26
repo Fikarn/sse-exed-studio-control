@@ -27,12 +27,12 @@ export interface InspectorFixtureBulkProps {
   onBulkCctValues: (values: ReadonlyArray<BulkFixtureValue>) => void;
   onBulkCctPreview?: (values: ReadonlyArray<BulkFixtureValue>, phase: FixtureValuePreviewPhase) => void;
   /**
-   * Click → focus this fixture as the single primary selection.
-   * Shift-click → toggle the fixture out of the bulk extras (cannot remove
-   * the persisted primary; click another fixture first to swap primaries).
+   * Click → focus this fixture as the single primary selection. Taking a
+   * fixture out of the selection is the × on the selection strip (new pages
+   * program, Slice 3, decision 10: no key held while pointing).
    * Optional — when omitted the chips render non-interactive.
    */
-  onSelectFixture?: (fixtureId: string, options?: { additive?: boolean }) => void;
+  onSelectFixture?: (fixtureId: string) => void;
 }
 
 function intersectCctRange(fixtures: readonly LightingFixtureSnapshot[]): { min: number; max: number } {
@@ -132,8 +132,8 @@ export function InspectorFixtureBulk({
                 <button
                   type="button"
                   className={`${styles.sceneFixtureChip} ${styles.sceneFixtureChipButton}`}
-                  onClick={(event) => onSelectFixture(fixture.id, { additive: event.shiftKey })}
-                  aria-label={`${fixture.name} — click to focus, shift-click to remove from selection`}
+                  onClick={() => onSelectFixture(fixture.id)}
+                  aria-label={`${fixture.name} — click to focus`}
                 >
                   <span className={styles.sceneFixtureName}>{fixture.name}</span>
                   <span className={styles.sceneFixtureLevel}>
@@ -144,9 +144,7 @@ export function InspectorFixtureBulk({
             );
           })}
         </ul>
-        <span className={styles.helpText}>
-          Click a chip to focus that fixture · Shift-click to remove it from the selection.
-        </span>
+        <span className={styles.helpText}>Click a chip to focus that fixture.</span>
       </InspectorSection>
 
       <InspectorSection title="Bulk intensity">
@@ -189,7 +187,7 @@ export function InspectorFixtureBulk({
           <Button onClick={onClearSelection} variant="ghost" size="compact">
             Clear selection
           </Button>
-          <span className={styles.helpText}>Press Esc or click empty plot to clear.</span>
+          <span className={styles.helpText}>Or click the empty plot to clear.</span>
         </div>
       </InspectorSection>
     </>

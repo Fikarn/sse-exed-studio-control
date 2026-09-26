@@ -7,7 +7,6 @@ import type {
   LightingFixtureSnapshot,
 } from "@sse/engine-client";
 
-import { formatShortcut } from "../../shared/shortcutGlyphs";
 import { lightingFixtureColorHex } from "../lightingHelpers";
 import { lightingFixtureChannelCount } from "../lightingPatch";
 
@@ -32,8 +31,8 @@ export interface DMXCompactStripProps {
   bridgeReachable: boolean;
   /** Universe label shown at the strip's left edge. */
   universe: number;
-  /** Click any cell (or the strip body outside cells) to open the full
-   *  ⌘⇧M monitor dialog. */
+  /** Click any cell (or the strip body outside cells) to open the full DMX
+   *  monitor dialog. */
   onOpenMonitor: () => void;
   /** Hide the strip — either via the small × on the right edge or via the
    *  health bar toggle. */
@@ -74,7 +73,7 @@ function lookupFixtureCct(
  * cell brightness, fixture lookup drives CCT-tinted color when patched.
  *
  * Hover any cell → tooltip shows `Ch NNN · {fixtureName} · {channelLabel} ·
- * {value}`. Click any cell → opens the full ⌘⇧M monitor dialog (delegating
+ * {value}`. Click any cell → opens the full DMX monitor dialog (delegating
  * to the existing surface so we don't duplicate UI).
  */
 export function DMXCompactStrip({
@@ -101,7 +100,7 @@ export function DMXCompactStrip({
   // gets meaningful width on a typical rig (~24 patched channels out of
   // 512). Interesting = part of any patched fixture's address range OR
   // currently firing a non-zero value (catches stuck / unexpected output
-  // even on unpatched addresses; the full ⌘⇧M monitor still shows the
+  // even on unpatched addresses; the full DMX monitor still shows the
   // whole 512-channel universe for power users).
   const cells = useMemo<ChannelCell[]>(() => {
     const includeChannel = new Set<string>();
@@ -285,7 +284,7 @@ export function DMXCompactStrip({
         className={styles.expandButton}
         onClick={onOpenMonitor}
         aria-label="Open full DMX monitor"
-        title={`Open full DMX monitor (${formatShortcut(["mod", "shift", "M"])})`}
+        title="Open full DMX monitor"
       >
         <Maximize2 aria-hidden="true" size={11} strokeWidth={2} />
       </button>

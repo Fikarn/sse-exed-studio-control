@@ -1,7 +1,6 @@
 import styles from "./LightingWorkspace.module.css";
 import { LightingClusterRegion } from "./regions/LightingClusterRegion";
 import { LightingBayRegion } from "./regions/LightingBayRegion";
-import { LightingPaletteQuickPanel } from "./regions/LightingPaletteQuickPanel";
 import { LightingBottomStrips } from "./regions/LightingBottomStrips";
 import { ShellRegion } from "@sse/design-system";
 import { LightingFooter } from "./components/LightingFooter";
@@ -39,7 +38,6 @@ export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
           the same place in every workspace. */}
       <LightingClusterRegion editor={editor} />
       <LightingBayRegion editor={editor} />
-      <LightingPaletteQuickPanel editor={editor} />
       <LightingBottomStrips editor={editor} />
       <ShellRegion region="footer">
         <LightingFooter

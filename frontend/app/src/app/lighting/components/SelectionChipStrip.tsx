@@ -13,8 +13,7 @@ export interface SelectionChipStripProps {
    *  fixture snapshots in `fixtures` order so the chip ordering is stable
    *  across re-renders. */
   selectedFixtures: readonly LightingFixtureSnapshot[];
-  /** Click chip = additive toggle out of the selection set. Mirrors the
-   *  bulk inspector's shift-click semantic. */
+  /** Click chip (or its ×) = take the fixture out of the selection set. */
   onRemoveFromSelection: (fixtureId: string) => void;
   /** Clear the entire selection. Renders an explicit "Clear" affordance at
    *  the strip's right edge. */

@@ -27,13 +27,18 @@ export interface UseMarqueeSelectionOptions {
    *  rectangle is computed in viewBox space so it stays correct under any
    *  zoom/pan applied to the inner <g>. */
   svgRef: RefObject<SVGSVGElement | null>;
+  /** Whether a box merges with the existing selection instead of replacing it:
+   *  the plot toolbar's Add to selection key (new pages program, Slice 3,
+   *  decision 10 — no key held while pointing). Read when the drag starts. */
+  additive?: boolean;
   /** Called once on pointerup with the ids inside the rectangle and whether
-   *  Shift was held (= additive merge with existing selection). Empty `ids`
+   *  the box was additive (= merge with the existing selection). Empty `ids`
    *  with `additive: false` means "clear selection". */
   onCommit: (ids: readonly string[], options: { additive: boolean }) => void;
   /** Pure-click clear — fired when pointerup happens without crossing the
-   *  click threshold AND Shift was not held. Lets the parent reset the
-   *  single-selection without depending on a 0-result marquee. */
+   *  click threshold. Lets the parent reset the selection without depending
+   *  on a 0-result marquee; a click on the empty plot clears it whether or not
+   *  Add to selection is lit. */
   onBackgroundClick?: () => void;
   /** Provides the current fixture hit-targets for hit-testing on commit.
    *  Called only on pointerup so it's cheap to recompute. */
@@ -47,8 +52,8 @@ export interface MarqueeSelection {
   onPointerUp: (event: ReactPointerEvent<SVGSVGElement>) => void;
   /** Currently active marquee rectangle (viewBox coords). null when not dragging. */
   rect: MarqueeRect | null;
-  /** Whether the active marquee was started with Shift (additive). Useful for
-   *  rendering a slightly different visual when adding to selection. */
+  /** Whether the active marquee adds to the selection. Useful for rendering a
+   *  slightly different visual when adding to selection. */
   additive: boolean;
 }
 
@@ -65,7 +70,8 @@ interface DragState {
 /**
  * Marquee (rubber-band) selection on the stage plot. Plain left-drag in
  * empty space draws a rectangle and selects all fixtures whose centers
- * fall inside it on release. Shift+left-drag merges with existing selection.
+ * fall inside it on release. With `additive` (the Add to selection key lit)
+ * the rectangle merges with the existing selection instead.
  *
  * Math runs in viewBox cm via `svg.getScreenCTM()` so the rectangle stays
  * correct under any zoom/pan transform applied to the inner content <g> —
@@ -75,7 +81,7 @@ interface DragState {
  * stop propagation so this hook only receives true background events.
  */
 export function useMarqueeSelection(options: UseMarqueeSelectionOptions): MarqueeSelection {
-  const { svgRef, onCommit, onBackgroundClick, resolveTargets } = options;
+  const { svgRef, additive: additiveOption = false, onCommit, onBackgroundClick, resolveTargets } = options;
   const dragRef = useRef<DragState | null>(null);
   const [rect, setRect] = useState<MarqueeRect | null>(null);
   const [additive, setAdditive] = useState(false);
@@ -111,11 +117,11 @@ export function useMarqueeSelection(options: UseMarqueeSelectionOptions): Marque
         startInnerX: inner.x,
         startInnerY: inner.y,
         movedPx: 0,
-        additive: event.shiftKey,
+        additive: additiveOption,
       };
-      setAdditive(event.shiftKey);
+      setAdditive(additiveOption);
     },
-    [clientToInner]
+    [additiveOption, clientToInner]
   );
 
   const onPointerMove = useCallback(
@@ -151,11 +157,9 @@ export function useMarqueeSelection(options: UseMarqueeSelectionOptions): Marque
       setAdditive(false);
 
       if (wasClick) {
-        // Plain click on background (no rectangle): treat as deselect unless
-        // Shift was held (additive click is a no-op — leaves selection alone).
-        if (!wasAdditive) {
-          onBackgroundClick?.();
-        }
+        // Click on the background (no rectangle): deselect, whether or not
+        // the box would have added to the selection.
+        onBackgroundClick?.();
         return;
       }
       if (!releasedRect) return;

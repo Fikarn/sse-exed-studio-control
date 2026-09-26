@@ -17,6 +17,8 @@ import {
   clampStudioMeters,
   toShellTalentMarks,
   pushUndoOutcomeToast,
+  scenesSavedWithAddedFixture,
+  type AddedFixtureState,
   type LightingWorkspaceSurfaceProps,
 } from "../lightingWorkspaceModel";
 import type { LightingRig } from "./useLightingRig";
@@ -73,14 +75,21 @@ export function useLightingFixtureEditor({
 
   // Frontend-only multi-select. The persisted single id (read from snapshot)
   // is the "primary" focus that's synced to the engine; the set tracks the
-  // additional shift-click selections so the bulk inspector can edit them
-  // together. Cleared on workspace switch / hot reload by being state.
+  // fixtures added to the selection alongside it (Add to selection, or a box
+  // drag) so the bulk inspector can edit them together. Cleared on workspace
+  // switch / hot reload by being state.
   const [extraSelectedFixtureIds, setExtraSelectedFixtureIds] = useState<ReadonlySet<string>>(() => new Set());
+  // New pages program, Slice 3 (decision 10): the plot toolbar's Add to
+  // selection key. While it is lit, a click (or Enter / Space) on a marker adds
+  // that fixture to the selection or takes it out, and a box drag adds to the
+  // selection; while it is off, a click selects only that fixture and a box
+  // replaces the selection. It replaces the keys held while pointing.
+  const [addToSelection, setAddToSelection] = useState(false);
   // Mirror identify-burst pulses on the plot marker. 1.2 s window matches
   // engine identify.rs default. Cleared by setTimeout in handleIdentifyBurst.
   const [identifyingIds, setIdentifyingIds] = useState<ReadonlySet<string>>(() => new Set());
   // Wave 29 — Find sequence pulse timers. Each call to handleIdentifyFind
-  // schedules 2N timers (start + stop per fixture); cleared on Esc /
+  // schedules 2N timers (start + stop per fixture); cleared on Stop /
   // workspace switch / new sequence start so prior runs don't leak through.
   const findSequenceTimersRef = useRef<number[]>([]);
   const clearFindSequenceTimers = useCallback(() => {
@@ -88,6 +97,17 @@ export function useLightingFixtureEditor({
       window.clearTimeout(handle);
     }
     findSequenceTimersRef.current = [];
+  }, []);
+  // New pages program, Slice 3 (decision 6): while a Find runs, the Find key
+  // reads "Stop". It runs from the hardware link's reply until the last flash
+  // ends, a timer mirroring the flashes the link scheduled.
+  const [findRunning, setFindRunning] = useState(false);
+  const findEndTimerRef = useRef<number | null>(null);
+  const clearFindEndTimer = useCallback(() => {
+    if (findEndTimerRef.current !== null) {
+      window.clearTimeout(findEndTimerRef.current);
+      findEndTimerRef.current = null;
+    }
   }, []);
 
   const setFixtureValuePreview = useCallback(
@@ -222,20 +242,28 @@ export function useLightingFixtureEditor({
   });
 
   // F2 — marquee commit handler. `ids` is the full set inside the released
-  // rectangle. With `additive: true` (Shift+marquee) the existing extras +
-  // primary are preserved and the new ids merge in; otherwise the persisted
-  // single-selection is replaced by the rectangle's first hit (or cleared if
-  // empty) and extras carry the rest.
+  // rectangle. With `additive: true` (Add to selection lit) the existing
+  // extras + primary are preserved and the new ids merge in — the first of
+  // them becoming the primary when nothing is focused yet, so the plate shows
+  // the selection; otherwise the persisted single-selection is replaced by the
+  // rectangle's first hit (or cleared if empty) and extras carry the rest.
   const handleMarqueeSelect = useLiveCallback(async (ids: readonly string[], options: { additive: boolean }) => {
     if (options.additive) {
-      if (ids.length === 0) return;
+      const incoming = ids.filter((id) => id !== persistedSelectedFixtureId);
+      if (incoming.length === 0) return;
+      setSelectedGroupId(null);
+      const promoted = persistedSelectedFixtureId === null ? incoming[0]! : null;
       setExtraSelectedFixtureIds((prev) => {
         const next = new Set(prev);
-        for (const id of ids) {
-          if (id !== persistedSelectedFixtureId) next.add(id);
+        for (const id of incoming) {
+          if (id !== promoted) next.add(id);
         }
+        if (promoted !== null) next.delete(promoted);
         return next;
       });
+      if (promoted !== null) {
+        await store.updateLightingSettings({ selectedFixtureId: promoted });
+      }
       return;
     }
     // Replace mode. Empty marquee clears all selections (single + extras).
@@ -254,6 +282,35 @@ export function useLightingFixtureEditor({
     }
   });
 
+  // Wave 31 — I9 remove-from-selection. The chip's × means "take this fixture
+  // out of the selection", and so does a click on a selected marker while Add
+  // to selection is lit. When removing the primary we promote the first extra
+  // so the inspector still has a focused fixture; if no extras remain,
+  // primary clears to null.
+  const handleRemoveFromSelection = useLiveCallback(async (fixtureId: string) => {
+    if (fixtureId === persistedSelectedFixtureId) {
+      const promoted = Array.from(extraSelectedFixtureIds).find((id) => id !== fixtureId) ?? null;
+      if (promoted !== null) {
+        setExtraSelectedFixtureIds((prev) => {
+          const next = new Set(prev);
+          next.delete(promoted);
+          return next;
+        });
+      }
+      try {
+        await store.updateLightingSettings({ selectedFixtureId: promoted });
+      } catch (error) {
+        reportError(error, "Selection update failed.");
+      }
+      return;
+    }
+    setExtraSelectedFixtureIds((prev) => {
+      const next = new Set(prev);
+      next.delete(fixtureId);
+      return next;
+    });
+  });
+
   const handleSelectFixture = useLiveCallback(
     async (fixtureId: string | null, options: { additive?: boolean } = {}) => {
       const { additive = false } = options;
@@ -263,22 +320,20 @@ export function useLightingFixtureEditor({
         setExtraSelectedFixtureIds(new Set());
         if (operatorLayout.isNarrow) setInspectorDrawerOpen(false);
       } else if (additive) {
+        // Add to selection (decision 10): a fixture already in the selection
+        // comes out of it, the focused one included; any other joins it. The
+        // focused fixture stays focused, so the engine is not asked to change
+        // it — unless nothing is focused yet, when the fixture that joins
+        // becomes the focused one and the plate shows the selection.
         if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
-        // Toggle the clicked id in the extras set. The persisted single id
-        // stays as-is so the engine still knows which fixture is "focused";
-        // the bulk inspector renders from persisted ∪ extras.
-        setExtraSelectedFixtureIds((prev) => {
-          const next = new Set(prev);
-          if (next.has(fixtureId) && fixtureId !== persistedSelectedFixtureId) {
-            next.delete(fixtureId);
-          } else if (fixtureId !== persistedSelectedFixtureId) {
-            next.add(fixtureId);
-          }
-          return next;
-        });
-        // Skip the engine sync — additive clicks shouldn't change which
-        // fixture is "primary".
-        return;
+        if (fixtureId === persistedSelectedFixtureId || extraSelectedFixtureIds.has(fixtureId)) {
+          await handleRemoveFromSelection(fixtureId);
+          return;
+        }
+        if (persistedSelectedFixtureId !== null) {
+          setExtraSelectedFixtureIds((prev) => new Set(prev).add(fixtureId));
+          return;
+        }
       } else {
         setExtraSelectedFixtureIds(new Set());
         if (operatorLayout.isNarrow) setInspectorDrawerOpen(true);
@@ -306,10 +361,9 @@ export function useLightingFixtureEditor({
     [fixtures, selectedFixtureIds]
   );
 
-  // Wave 31 — stage plot viewport hook lifted to the workspace level so
-  // keyboard shortcuts (Shift+1/2/3 recall, ⌘⇧1/2/3 save) and other
-  // workspace-level affordances can reach the bookmark API. StagePlot
-  // consumes the same instance via its `viewport` prop. handleSelectFixture
+  // Wave 31 — stage plot viewport hook lifted to the workspace level; StagePlot
+  // consumes the same instance via its `viewport` prop (the view slots' keys
+  // on the plot toolbar reach the bookmark API through it). handleSelectFixture
   // is `useLiveCallback`-stable so closing over it is safe.
   const stagePlotViewport = useStagePlotViewport({
     // DENSITY-04 — the full-bleed studioFull view now rests on the content frame
@@ -325,36 +379,6 @@ export function useLightingFixtureEditor({
   // for the soft pulse ring. Null when no chip is hovered or the strip
   // isn't mounted (selection empty).
   const [chipHoverFixtureId, setChipHoverFixtureId] = useState<string | null>(null);
-
-  // Wave 31 — I9 remove-from-selection. Distinct from `handleSelectFixture`'s
-  // additive-toggle path (which preserves the persisted primary by design
-  // for the bulk inspector). Here the operator's intent is unambiguous: the
-  // chip's × means "take this fixture out of the selection". When removing
-  // the primary we promote the first extra so the inspector still has a
-  // focused fixture; if no extras remain, primary clears to null.
-  const handleRemoveFromSelection = useLiveCallback(async (fixtureId: string) => {
-    if (fixtureId === persistedSelectedFixtureId) {
-      const promoted = Array.from(extraSelectedFixtureIds).find((id) => id !== fixtureId) ?? null;
-      if (promoted !== null) {
-        setExtraSelectedFixtureIds((prev) => {
-          const next = new Set(prev);
-          next.delete(promoted);
-          return next;
-        });
-      }
-      try {
-        await store.updateLightingSettings({ selectedFixtureId: promoted });
-      } catch (error) {
-        reportError(error, "Selection update failed.");
-      }
-      return;
-    }
-    setExtraSelectedFixtureIds((prev) => {
-      const next = new Set(prev);
-      next.delete(fixtureId);
-      return next;
-    });
-  });
 
   const handleAddFixture = useLiveCallback(
     async (fixtureSpec: {
@@ -373,34 +397,47 @@ export function useLightingFixtureEditor({
         if (createdFixtureId) {
           await store.updateLightingSettings({ selectedFixtureId: createdFixtureId });
 
-          // Push undo: deleting the just-created fixture. Refuses if any
-          // scene saved AFTER this push references the fixture (the engine
-          // captures fixture id on save), since deletion would orphan that
-          // saved-state entry.
-          let currentId = createdFixtureId;
+          // Push undo: deleting the just-created fixture. Refuses if a scene
+          // saved after the add holds the fixture (`scenesSavedWithAddedFixture`:
+          // the fixture the hardware link put into every scene on the add does
+          // not count), since the delete would take it out of that saved state.
+          const sceneIdsAtAdd = new Set(scenesRef.current.map((scene) => scene.id));
+          const addedControlValues = asRecord(createdFixture?.controlValues) ?? {};
+          const added: AddedFixtureState = {
+            intensity: Number(createdFixture?.intensity),
+            cct: Number(createdFixture?.cct),
+            on: createdFixture?.on === true,
+            controlValues: Object.fromEntries(
+              Object.entries(addedControlValues).filter(
+                (entry): entry is [string, number] => typeof entry[1] === "number"
+              )
+            ),
+          };
           undoStack.push({
             label: `Add fixture ${fixtureSpec.name}`,
             undo: async () => {
-              const refs = scenesRef.current.reduce(
-                (sum, scene) => sum + scene.fixtureStates.filter((state) => state.fixtureId === currentId).length,
-                0
-              );
+              const refs = scenesSavedWithAddedFixture(scenesRef.current, createdFixtureId, sceneIdsAtAdd, added);
               if (refs > 0) {
                 throw new UndoRefusedError(
                   `fixture is referenced by ${refs} scene${refs === 1 ? "" : "s"} saved after it was added`
                 );
               }
-              await store.deleteLightingFixture(currentId);
-            },
-            redo: async () => {
-              const redoResult = asRecord(await store.createLightingFixture(fixtureSpec));
-              const redoCreated = asRecord(redoResult?.fixture);
-              const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
-              if (newId) currentId = newId;
+              await store.deleteLightingFixture(createdFixtureId);
             },
           });
         }
-        toast.push({ message: String(result?.summary ?? "Fixture added."), tone: "ok" });
+        // New pages program, Slice 3 (decision 5): "Fixture added." carries an
+        // Undo like the messages of the other three steps.
+        toast.push({
+          message: String(result?.summary ?? "Fixture added."),
+          tone: "ok",
+          action: createdFixtureId
+            ? {
+                label: "Undo",
+                onClick: () => void undoStack.undo().then((outcome) => pushUndoOutcomeToast(toast, outcome)),
+              }
+            : undefined,
+        });
       } catch (error) {
         reportError(error, "Lighting fixture create failed.");
       } finally {
@@ -630,6 +667,7 @@ export function useLightingFixtureEditor({
     const stepMs = 500;
     const durationMs = 400;
     clearFindSequenceTimers();
+    clearFindEndTimer();
     startBusy("identify-find");
     try {
       await store.startLightingIdentifySequence(ids, stepMs, durationMs);
@@ -637,6 +675,15 @@ export function useLightingFixtureEditor({
         message: `Finding ${ids.length} fixture${ids.length === 1 ? "" : "s"}…`,
         tone: "ok",
       });
+      // The Find key reads "Stop" until the last flash ends.
+      setFindRunning(true);
+      findEndTimerRef.current = window.setTimeout(
+        () => {
+          findEndTimerRef.current = null;
+          setFindRunning(false);
+        },
+        (ids.length - 1) * stepMs + durationMs
+      );
       ids.forEach((id, idx) => {
         const startHandle = window.setTimeout(() => {
           setIdentifyingIds((prev) => {
@@ -664,14 +711,34 @@ export function useLightingFixtureEditor({
     }
   });
 
-  // Wave 29 — Esc / workspace-switch cleanup. Clears highlight + solo
-  // overlays in the engine and cancels any in-flight Find sequence pulse
-  // timers. Each IPC is gated on whether there's anything to clear so
-  // a quiet Esc doesn't burn round-trips. useLiveCallback semantics keep
-  // the gate readings fresh.
+  // New pages program, Slice 3 (decision 6): the Find key reads "Stop" while a
+  // Find runs, and pressing it stops the sequence, the flashes still waiting
+  // included (the page-wide Esc that did this is gone). The pulse rings and the
+  // key go back only once the hardware link has stopped the flashes; if it
+  // could not, the key still reads "Stop" and says to press it again.
+  const handleStopFind = useLiveCallback(async () => {
+    startBusy("identify-find-stop");
+    try {
+      await store.clearLightingIdentifyBursts();
+      clearFindSequenceTimers();
+      clearFindEndTimer();
+      setIdentifyingIds(() => new Set());
+      setFindRunning(false);
+    } catch (error) {
+      reportError(error, "Could not stop the Find sequence. Press Stop again.");
+    } finally {
+      finishBusy("identify-find-stop");
+    }
+  });
+
+  // Workspace-switch cleanup. Clears highlight + solo overlays in the engine
+  // and stops a running Find, its pulse timers included. Each IPC is gated on
+  // whether there's anything to clear so a quiet switch doesn't burn
+  // round-trips. useLiveCallback semantics keep the gate readings fresh.
   const clearOverlaysAndSequence = useLiveCallback(async () => {
-    const hadTimers = findSequenceTimersRef.current.length > 0;
+    const findWasRunning = findSequenceTimersRef.current.length > 0 || findEndTimerRef.current !== null;
     clearFindSequenceTimers();
+    clearFindEndTimer();
     if (identifyingIds.size > 0) {
       setIdentifyingIds(() => new Set());
     }
@@ -679,14 +746,16 @@ export function useLightingFixtureEditor({
       try {
         await store.highlightLightingFixtures([], "off");
       } catch (error) {
-        reportError(error, "Could not clear Highlight and Solo. Press Esc to try again.");
+        reportError(error, "Could not clear Highlight and Solo. Press the lit key again.");
       }
     }
-    if (hadTimers) {
+    if (findWasRunning) {
       try {
         await store.clearLightingIdentifyBursts();
       } catch (error) {
-        reportError(error, "Could not stop the Find sequence. Press Esc to try again.");
+        // The Lighting page is gone, and with it the Stop key; the flashes the
+        // hardware link scheduled end by themselves.
+        reportError(error, "Could not stop the Find sequence. It ends by itself.");
       }
     }
   });
@@ -716,7 +785,6 @@ export function useLightingFixtureEditor({
       }
       if (target) {
         const snapshot = { ...target };
-        let currentId = fixtureId;
         undoStack.push({
           label: `Delete fixture ${snapshot.name}`,
           undo: async () => {
@@ -734,7 +802,6 @@ export function useLightingFixtureEditor({
             const created = asRecord(result?.fixture);
             const newId = typeof created?.id === "string" ? created.id : null;
             if (newId) {
-              currentId = newId;
               await store.updateLightingFixture({
                 fixtureId: newId,
                 intensity: snapshot.intensity,
@@ -747,9 +814,6 @@ export function useLightingFixtureEditor({
                 beamAngleDegrees: snapshot.beamAngleDegrees ?? null,
               });
             }
-          },
-          redo: async () => {
-            await store.deleteLightingFixture(currentId);
           },
         });
       }
@@ -860,25 +924,10 @@ export function useLightingFixtureEditor({
     }
   });
 
-  const handleFixtureNudge = useLiveCallback(async (deltaXMeters: number, deltaYMeters: number) => {
-    if (previewMode) {
-      toast.push({ message: "Exit preview to move fixtures on the plot.", tone: "attention" });
-      return;
-    }
-    const fixture = persistedSelectedFixtureId
-      ? fixtures.find((candidate) => candidate.id === persistedSelectedFixtureId)
-      : null;
-    if (!fixture) return;
-    const baseX = fixture.spatialX ?? 0;
-    const baseY = fixture.spatialY ?? 0;
-    // Round to 0.05 m so float drift doesn't accumulate across many nudges.
-    const nextX = Math.round((baseX + deltaXMeters) * 20) / 20;
-    const nextY = Math.round((baseY + deltaYMeters) * 20) / 20;
-    void handleFixtureSpatialCommit(fixture.id, { spatialX: nextX, spatialY: nextY });
-  });
   return {
     studioLayout,
-    setExtraSelectedFixtureIds,
+    addToSelection,
+    setAddToSelection,
     identifyingIds,
     setFixtureValuePreview,
     setBulkFixtureValuePreview,
@@ -905,14 +954,14 @@ export function useLightingFixtureEditor({
     handleToggleHighlight,
     handleToggleSolo,
     handleIdentifyFind,
-    clearOverlaysAndSequence,
+    findRunning,
+    handleStopFind,
     handleDeleteFixture,
     handleBulkTogglePower,
     handleBulkIntensityValues,
     handleBulkCctValues,
     handleFixtureSpatialCommit,
     handleAssignFixtureGroup,
-    handleFixtureNudge,
   };
 }
 

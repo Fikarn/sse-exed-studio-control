@@ -4,7 +4,6 @@ import { asRecord } from "../../shellData";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { InspectorTab } from "../components/LightingInspectorTabs";
 import { useToast } from "../../shared/toastContext";
-import { usePalette } from "../../shared/paletteContext";
 import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { useResizableColumns } from "../useResizableColumns";
 import { useUndoStack } from "../useUndoStack";
@@ -29,7 +28,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   const [searchQuery, setSearchQuery] = useState("");
 
   const toast = useToast();
-  const palette = usePalette();
   const operatorLayout = useOperatorLayout();
   const [inspectorDrawerOpen, setInspectorDrawerOpen] = useState(false);
   // Set-based busy tracking so parallel mutations (e.g. renaming Scene B
@@ -197,7 +195,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     searchQuery,
     setSearchQuery,
     toast,
-    palette,
     operatorLayout,
     inspectorDrawerOpen,
     setInspectorDrawerOpen,

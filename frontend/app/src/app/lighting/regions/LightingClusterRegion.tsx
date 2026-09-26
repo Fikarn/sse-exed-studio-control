@@ -24,9 +24,17 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     handleToggleGroupPower,
     handleReorderGroup,
     handleSetGroupColor,
+    handleUndo,
   } = editor.rigControls;
-  const { selectedFixtureIds, handleIdentifyFind, handleToggleHighlight, handleToggleSolo, stagePlotActiveScene } =
-    editor.fixtureEditor;
+  const {
+    selectedFixtureIds,
+    handleIdentifyFind,
+    findRunning,
+    handleStopFind,
+    handleToggleHighlight,
+    handleToggleSolo,
+    stagePlotActiveScene,
+  } = editor.fixtureEditor;
   const {
     lastSavedLabel,
     previewDirty,
@@ -68,6 +76,7 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     setCreateGroupOpen,
     requestInlineRename,
     setConfirmDeleteGroup,
+    undoStack,
   } = editor.session;
   return (
     <ShellRegion region="cluster">
@@ -81,6 +90,9 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
         grandMaster={grandMasterDraft}
         groups={railGroupEntries}
         hasSelection={selectedFixtureIds.size > 0}
+        findRunning={findRunning}
+        undoLabel={undoStack.nextLabel}
+        undoBusy={busyActions.has("undo")}
         highlightActive={highlightActive}
         lastRecalledLabel={lastSavedLabel ?? null}
         patchMode={uiMode === "patch"}
@@ -102,6 +114,8 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
         onEmergencyCut={requestEmergencyCut}
         onGrandMasterChange={handleGrandMasterChange}
         onIdentifyFind={() => void handleIdentifyFind()}
+        onStopFind={() => void handleStopFind()}
+        onUndo={() => void handleUndo()}
         onOpenDmxMonitor={() => setDmxMonitorOpen(true)}
         onOpenInspector={operatorLayout.isNarrow ? () => setInspectorDrawerOpen(true) : undefined}
         onOpenSetup={() => void store.setWorkspace("setup")}

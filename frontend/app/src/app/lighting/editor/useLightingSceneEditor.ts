@@ -44,7 +44,6 @@ export function useLightingSceneEditor({
     toast,
     finishBusy,
     uiMode,
-    palette,
     undoStack,
     operatorLayout,
     setInspectorDrawerOpen,
@@ -198,9 +197,9 @@ export function useLightingSceneEditor({
   const modifiedSceneId = !previewMode && isSceneModified && activeSceneId ? activeSceneId : null;
 
   // Unsaved-changes guard. When the active scene is drifted, intercept any
-  // workspace switch (including ⌘1-3, A, ⇧S keyboard shortcuts) with a
-  // confirmation dialog. The guard fn returns a Promise resolved by the
-  // user's click on the dialog.
+  // workspace switch (the header's tabs, Setup's keys) with a confirmation
+  // dialog. The guard fn returns a Promise resolved by the user's click on
+  // the dialog.
   const pendingLeaveResolveRef = useRef<((allowed: boolean) => void) | null>(null);
   const [showLeavePrompt, setShowLeavePrompt] = useState(false);
   const promptForLeave = useCallback(() => {
@@ -381,9 +380,7 @@ export function useLightingSceneEditor({
       const created = asRecord(result?.scene);
       const createdId = typeof created?.id === "string" ? created.id : null;
       if (createdId) {
-        // I6 — push the newly-saved scene into the palette recents ring so
-        // it surfaces at the top of the empty-query palette immediately.
-        palette.pushRecent(`lighting:recall:${createdId}`);
+        // I6 — the newly-saved scene heads the search field's Recent list.
         pushRecentScene(createdId);
         // Pull the fresh scene from the result so we render its true saved
         // state (the snapshot may not have updated yet).
@@ -395,28 +392,14 @@ export function useLightingSceneEditor({
         const next = withSceneThumbUpserted(sceneThumbsRef.current, createdId, dataUri);
         await persistSceneThumbs(next);
         setLastSavedAt(new Date());
-        // Push undo: deleting the just-created scene. Engine has no API to
-        // recreate a scene with an explicit fixtureStates snapshot, so this
-        // entry is single-use — once undone it disappears (no redo path).
-        let currentSceneId = createdId;
-        const sceneName = name;
-        const cachedDataUri = dataUri;
+        // Push undo: deleting the just-created scene. Once undone the entry
+        // is gone; there is no redo (new pages program, Slice 3, decision 5).
         undoStack.push({
-          label: `Save scene ${sceneName}`,
+          label: `Save scene ${name}`,
           undo: async () => {
-            await store.deleteLightingScene(currentSceneId);
-            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, currentSceneId);
+            await store.deleteLightingScene(createdId);
+            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, createdId);
             await persistSceneThumbs(cleared);
-          },
-          redo: async () => {
-            const redoResult = asRecord(await store.createLightingScene({ name: sceneName }));
-            const redoCreated = asRecord(redoResult?.scene);
-            const newId = typeof redoCreated?.id === "string" ? redoCreated.id : null;
-            if (newId) {
-              currentSceneId = newId;
-              const refreshed = withSceneThumbUpserted(sceneThumbsRef.current, newId, cachedDataUri);
-              await persistSceneThumbs(refreshed);
-            }
           },
         });
       }
@@ -502,7 +485,6 @@ export function useLightingSceneEditor({
       const next = withSceneThumbRemoved(sceneThumbsRef.current, sceneId);
       await persistSceneThumbs(next);
       if (targetSnapshot) {
-        let currentSceneId = sceneId;
         undoStack.push({
           label: `Delete scene ${targetSnapshot.name}`,
           undo: async () => {
@@ -516,7 +498,6 @@ export function useLightingSceneEditor({
             const created = asRecord(result?.scene);
             const restoredId = typeof created?.id === "string" ? created.id : null;
             if (restoredId) {
-              currentSceneId = restoredId;
               if (targetSnapshot.pinned) {
                 await store.pinLightingScene(restoredId, true);
               }
@@ -528,11 +509,6 @@ export function useLightingSceneEditor({
               );
               await persistSceneThumbs(restoredThumbs);
             }
-          },
-          redo: async () => {
-            await store.deleteLightingScene(currentSceneId);
-            const cleared = withSceneThumbRemoved(sceneThumbsRef.current, currentSceneId);
-            await persistSceneThumbs(cleared);
           },
         });
       }
@@ -581,16 +557,12 @@ export function useLightingSceneEditor({
   const handleRecallScene = useLiveCallback(async (sceneId: string) => {
     if (uiMode === "patch") {
       toast.push({
-        message: "Patch mode is on. Press P to leave it, then recall the scene.",
+        message: "Patch mode is on. Press Patch to leave it, then recall the scene.",
         tone: "attention",
       });
       return;
     }
-    // Wave 28a / I6 — push the scene into the cross-workspace ⌘K recents
-    // ring so the palette's empty-query view surfaces recent recalls. Done
-    // here (not only when invoked via palette) so rail-driven recalls also
-    // populate recents.
-    palette.pushRecent(`lighting:recall:${sceneId}`);
+    // I6 — every recall heads the search field's Recent list.
     pushRecentScene(sceneId);
     // Wave 30b — click is the user's commitment to a scene; cancel any
     // hover preview synchronously so the inspector doesn't show a stale

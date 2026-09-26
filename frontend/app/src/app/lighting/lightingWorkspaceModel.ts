@@ -5,7 +5,6 @@ import type {
   LightingSnapshot,
   ShellStore,
   ShellTalentMark,
-  LightingPaletteSnapshot,
   LightingFixtureSnapshot,
   LightingSceneSnapshot,
 } from "@sse/engine-client";
@@ -21,7 +20,6 @@ export interface LightingWorkspaceSurfaceProps {
   store: ShellStore;
 }
 
-export const RECALL_FADE_PRESETS_MS = [0, 1000, 2000, 5000] as const;
 export const RECENT_SCENE_LIMIT = 8;
 export const FIXTURE_VALUE_PREVIEW_TIMEOUT_MS = 1800;
 
@@ -80,15 +78,6 @@ export function formatRecallFade(ms: number): string {
   return `${Number.isInteger(seconds) ? seconds.toFixed(0) : seconds.toFixed(1)} s`;
 }
 
-export function formatLightingPaletteQuickValue(palette: LightingPaletteSnapshot): string {
-  return palette.kind === "intensity" ? `${Math.round(palette.value)} %` : `${Math.round(palette.value)} K`;
-}
-
-export function lightingPaletteMatchesQuery(palette: LightingPaletteSnapshot, query: string): boolean {
-  if (!query) return true;
-  return `${palette.name} ${palette.kind} ${formatLightingPaletteQuickValue(palette)}`.toLowerCase().includes(query);
-}
-
 export function fixturesWithSceneState(
   fixtures: readonly LightingFixtureSnapshot[],
   scene: LightingSceneSnapshot
@@ -122,25 +111,66 @@ export function fixtureValuePreviewMatches(
   }
 }
 
+/** A fixture as it was when it was added: what the hardware link put into every
+ *  scene for it. */
+export interface AddedFixtureState {
+  intensity: number;
+  cct: number;
+  on: boolean;
+  controlValues: Readonly<Record<string, number>>;
+}
+
+/** How many scenes hold an added fixture as a save put it there. The Undo of
+ *  "Add fixture" deletes the fixture again, and a delete takes it out of every
+ *  scene. When a fixture is added the hardware link puts it into every scene
+ *  there is, as it was added (`append_fixture_to_scenes`); that is not a save,
+ *  and it does not stop the undo. A scene saved after the fixture was added, or
+ *  saved again with the fixture changed, does: the delete would take the
+ *  fixture out of that saved state. (New pages program, Slice 3: before this,
+ *  every scene counted, so the undo was refused whenever a scene existed.) */
+export function scenesSavedWithAddedFixture(
+  scenes: readonly LightingSceneSnapshot[],
+  fixtureId: string,
+  sceneIdsAtAdd: ReadonlySet<string>,
+  added: AddedFixtureState
+): number {
+  const changed = (state: LightingSceneSnapshot["fixtureStates"][number]) => {
+    if (state.on !== added.on) return true;
+    if (Math.abs(state.intensity - added.intensity) > 0.5) return true;
+    if (Math.abs(state.cct - added.cct) > 25) return true;
+    const keys = new Set([...Object.keys(state.controlValues ?? {}), ...Object.keys(added.controlValues)]);
+    for (const key of keys) {
+      if (Math.abs((state.controlValues?.[key] ?? 0) - (added.controlValues[key] ?? 0)) > 0.5) return true;
+    }
+    return false;
+  };
+  return scenes.filter((scene) =>
+    scene.fixtureStates.some(
+      (state) => state.fixtureId === fixtureId && (!sceneIdsAtAdd.has(scene.id) || changed(state))
+    )
+  ).length;
+}
+
 /** Result-aware toast helper for surfacing UndoOutcome to the operator. The
  *  undo stack returns a tagged result; this maps every variant to a toast so
- *  rejections (UndoRefusedError) and errors don't silently disappear. */
+ *  rejections (UndoRefusedError) and errors don't silently disappear. The Undo
+ *  key and the Undo on a step's own message both report through it. */
 export function pushUndoOutcomeToast(toast: ToastApi, outcome: UndoOutcome): void {
   if (outcome.kind === "noop") return;
   if (outcome.kind === "ok") {
-    toast.push({ tone: "info", message: `Undid: ${outcome.label}.` });
+    toast.push({ tone: "ok", message: `Undid ‘${outcome.label}’.` });
     return;
   }
   if (outcome.kind === "rejected") {
     toast.push({
       tone: "attention",
-      message: `Cannot undo "${outcome.label}" — ${outcome.reason}.`,
+      message: `Cannot undo ‘${outcome.label}’: ${outcome.reason}.`,
     });
     return;
   }
   toast.push({
     tone: "error",
-    message: `Undo failed for "${outcome.label}". The operation is still applied.`,
+    message: `Undo failed for ‘${outcome.label}’. The step is still in place.`,
   });
 }
 

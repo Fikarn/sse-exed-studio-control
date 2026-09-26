@@ -11,8 +11,11 @@ import styles from "./LightingSearchField.module.css";
 
 // Visual overhaul A, Slice 5: the search the rig is filtered by, and the scenes
 // most recently recalled hanging under it — the toolbar's field and its recent
-// list, moved into the cluster with their keys intact (focus it with the search
-// shortcut, arrow through the recents, Enter recalls).
+// list, moved into the cluster. In the field, the arrows walk the Recent list
+// (opening it), Enter recalls the scene lit in it, and Esc closes it: a focused
+// list, kept under D6. New pages program, Slice 3 (decision 11): Enter recalls
+// a scene only while the Recent list is open — with the list closed it used to
+// recall the most recent scene live, with nothing on screen to say so.
 
 export interface LightingRecentScene {
   id: string;
@@ -38,6 +41,12 @@ export function LightingSearchField({
   const [recentOpen, setRecentOpen] = useState(false);
   const [recentActiveIndex, setRecentActiveIndex] = useState(0);
   const canShowRecent = searchQuery.trim().length === 0 && recentScenes.length > 0;
+  // The list's content, scene by scene. Every lighting refresh hands the field
+  // a new array of the same scenes; that is not a change, so it neither
+  // re-opens a list Esc closed nor moves the lit row (decision 11: Enter
+  // recalls only while the list is open, so the list stays as the operator
+  // left it).
+  const recentKey = recentScenes.map((scene) => scene.id).join("\n");
 
   useEffect(() => {
     if (!canShowRecent) {
@@ -48,7 +57,7 @@ export function LightingSearchField({
     if (document.activeElement === inputRef.current) {
       setRecentOpen(true);
     }
-  }, [canShowRecent, recentScenes]);
+  }, [canShowRecent, recentKey]);
 
   const recallRecent = (sceneId: string) => {
     onRecallRecentScene?.(sceneId);
@@ -77,6 +86,7 @@ export function LightingSearchField({
       return;
     }
     if (event.key === "Enter") {
+      if (!recentOpen) return;
       event.preventDefault();
       const target = recentScenes[recentActiveIndex] ?? recentScenes[0];
       if (target) recallRecent(target.id);

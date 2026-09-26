@@ -141,13 +141,19 @@ export function InspectorFixture({
   const definition = getFixtureDefinition(catalog, fixture);
   const mode = getFixtureMode(definition, fixture.modeId);
   const cctRange = lightingFixtureCctRange(fixture, catalog);
+  // The defaults the typed entry's Reset key goes back to.
+  const intensityDefault = 100;
+  const cctDefault = Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100;
   const [intensityDraft, setIntensityDraft] = useState(fixture.intensity);
   const [cctDraft, setCctDraft] = useState(fixture.cct);
   const [controlDrafts, setControlDrafts] = useState<Record<string, number>>(fixture.controlValues);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // CONTROLS-02: typed numeric entry. A ScrubSlider's bare double-click / Enter
   // opens this dialog (the slider asks via onRequestNumericValue; the inspector
-  // owns the open state + commit).
+  // owns the open state + commit). New pages program, Slice 3 (decision 8): the
+  // dialog carries the way back to a control's default — "Reset to 100 %" for
+  // intensity, the middle of the range for CCT, the catalog default for a
+  // control — since the reset keys held on the sliders are gone.
   const [numberDialog, setNumberDialog] = useState<
     null | { kind: "intensity" } | { kind: "cct" } | { kind: "control"; controlId: string }
   >(null);
@@ -402,7 +408,6 @@ export function InspectorFixture({
                         setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
                         onControlValuesCommit?.(fixture.id, { [control.id]: rounded });
                       }}
-                      resetValue={control.defaultValue}
                       onRequestNumericValue={() => {
                         setNumberDialog({ kind: "control", controlId: control.id });
                         return null;
@@ -432,7 +437,6 @@ export function InspectorFixture({
               value={intensityDraft}
               onChange={handleIntensityChange}
               onCommit={commitIntensity}
-              resetValue={100}
               onRequestNumericValue={() => {
                 setNumberDialog({ kind: "intensity" });
                 return null;
@@ -457,7 +461,6 @@ export function InspectorFixture({
               value={cctDraft}
               onChange={handleCctChange}
               onCommit={commitCct}
-              resetValue={Math.round((cctRange.min + cctRange.max) / 2 / 100) * 100}
               onRequestNumericValue={() => {
                 setNumberDialog({ kind: "cct" });
                 return null;
@@ -675,6 +678,7 @@ export function InspectorFixture({
           max={100}
           step={1}
           suffix="%"
+          resetValue={intensityDefault}
           onConfirm={(value) => {
             handleIntensityChange(value);
             commitIntensity(value);
@@ -692,6 +696,7 @@ export function InspectorFixture({
           max={cctRange.max}
           step={100}
           suffix="K"
+          resetValue={cctDefault}
           onConfirm={(value) => {
             handleCctChange(value);
             commitCct(value);
@@ -709,6 +714,7 @@ export function InspectorFixture({
           max={numberDialogControl.max}
           step={numberDialogControl.step}
           suffix={numberDialogControl.unit ?? undefined}
+          resetValue={numberDialogControl.defaultValue}
           onConfirm={(value) => {
             const rounded = Math.round(value);
             setControlDrafts((draft) => ({ ...draft, [numberDialogControl.id]: rounded }));
