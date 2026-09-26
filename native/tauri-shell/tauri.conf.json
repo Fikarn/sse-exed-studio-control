@@ -14,10 +14,8 @@
       {
         "label": "main",
         "title": "SSE ExEd Studio Control",
-        "width": 1600,
-        "height": 960,
-        "minWidth": 1280,
-        "minHeight": 800,
+        "width": 2560,
+        "height": 1440,
         "resizable": true,
         "dragDropEnabled": false
       }
@@ -30,6 +28,6 @@
   },
   "bundle": {
     "active": false,
-    "icon": ["icons/icon.png", "icons/icon.ico", "icons/icon.icns"]
+    "icon": ["icons/icon.png", "icons/icon.ico"]
   }
 }

@@ -8,12 +8,12 @@
 # exception is a decision with a date on it and never a permanent mute.
 
 [graph]
-# What is built anywhere: the two operator targets and the Linux runners that
-# compile and test every push. The Android, iOS and wasm arms of the Tauri tree
-# are never compiled here and are left out of every check.
+# What is built anywhere: the operator's Windows target and the Linux runners
+# that compile and test every push. The macOS, Android, iOS and wasm arms of
+# the Tauri tree are never compiled here and are left out of every check (new
+# pages program, Slice SW, D22: Studio Control runs on Windows only).
 targets = [
     "x86_64-pc-windows-msvc",
-    "aarch64-apple-darwin",
     "x86_64-unknown-linux-gnu",
 ]
 # `dev-fixtures`, `ts-rs` and `test-bridge` are built by the lanes, so their
@@ -30,7 +30,7 @@ unmaintained = "workspace"
 unsound = "all"
 yanked = "deny"
 ignore = [
-    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 `VariantStrIter` is unsound; the fix is glib 0.20, which Tauri 2's GTK3 stack (gtk 0.18) cannot take. Linux only: compiled on the CI runners, never in the Windows or macOS bundles the operator runs, and nothing here iterates a GVariant string array. review by 2026-12-15" },
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 `VariantStrIter` is unsound; the fix is glib 0.20, which Tauri 2's GTK3 stack (gtk 0.18) cannot take. Linux only: compiled on the CI runners, never in the Windows build the operator runs, and nothing here iterates a GVariant string array. review by 2026-12-15" },
 ]
 
 [licenses]

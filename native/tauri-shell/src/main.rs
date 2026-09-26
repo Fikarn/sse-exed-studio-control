@@ -20,10 +20,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::RequestEnvelope;
-use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Monitor, PhysicalPosition,
-    PhysicalSize, WebviewWindow,
-};
+use tauri::{AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 struct EngineState {
     /// Shared with the blocking tasks the async commands hand their waits to
@@ -78,13 +75,6 @@ struct ShellStartupFailure {
     stage: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-enum ShellLaunchMode {
-    StudioFullscreen,
-    Windowed,
-}
-
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LogicalSizeSnapshot {
@@ -117,25 +107,31 @@ struct AvailableMonitorSnapshot {
     scale_factor: f64,
 }
 
+/// `shell-window-layout.json`: the display the window was last on, where the
+/// next launch shows the screen. New pages program, Slice SW (D22): the
+/// windowed layout's fields (`launchMode`, `lastLogicalSize`,
+/// `lastLogicalPosition`) are no longer written. A file an older build wrote
+/// still loads — serde skips the fields this struct does not name — and
+/// whichever layout it saved opens fullscreen on its display.
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ShellWindowPreferences {
-    launch_mode: ShellLaunchMode,
-    last_logical_size: Option<LogicalSizeSnapshot>,
-    last_logical_position: Option<LogicalPositionSnapshot>,
     fullscreen: bool,
     monitor: Option<MonitorSnapshot>,
     scale_factor: Option<f64>,
     updated_at_epoch_seconds: u64,
 }
 
+/// Where the shell shows the screen, always fullscreen (new pages program,
+/// Slice SW, D22).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SavedWindowRecoveryAction {
-    FallbackWindowed,
-    Restore {
-        launch_mode: ShellLaunchMode,
-        monitor_index: usize,
-    },
+enum FullscreenDisplay {
+    /// The display the window was last on: its index among the monitors.
+    Saved(usize),
+    /// The 2560×1440 display: its index among the monitors.
+    Studio(usize),
+    /// Neither is there: the display the window is on.
+    Current,
 }
 
 fn read_arg_value(args: &[String], name: &str) -> Option<String> {
@@ -162,7 +158,11 @@ fn window_preferences_path(app: &AppHandle) -> Result<PathBuf, String> {
 fn read_window_preferences(app: &AppHandle) -> Option<ShellWindowPreferences> {
     let path = window_preferences_path(app).ok()?;
     let payload = read_to_string(path).ok()?;
-    serde_json::from_str(&payload).ok()
+    parse_window_preferences(&payload)
+}
+
+fn parse_window_preferences(payload: &str) -> Option<ShellWindowPreferences> {
+    serde_json::from_str(payload).ok()
 }
 
 fn write_window_preferences(
@@ -268,28 +268,21 @@ fn saved_monitor_index_from_snapshots(
         .position(|monitor| available_monitor_matches_snapshot(monitor, saved))
 }
 
-fn saved_window_recovery_action(
+/// The shell's one rule, over snapshots of the monitors so it can be tested
+/// without a window: the saved display when it is there (matched by name, else
+/// by its geometry), else the 2560×1440 display, else the display the window
+/// is on.
+fn fullscreen_display(
     monitors: &[AvailableMonitorSnapshot],
-    preferences: &ShellWindowPreferences,
-) -> SavedWindowRecoveryAction {
-    match saved_monitor_index_from_snapshots(monitors, preferences.monitor.as_ref()) {
-        Some(monitor_index) => SavedWindowRecoveryAction::Restore {
-            launch_mode: preferences.launch_mode,
-            monitor_index,
-        },
-        None => SavedWindowRecoveryAction::FallbackWindowed,
+    saved: Option<&MonitorSnapshot>,
+) -> FullscreenDisplay {
+    if let Some(index) = saved_monitor_index_from_snapshots(monitors, saved) {
+        return FullscreenDisplay::Saved(index);
     }
-}
-
-#[cfg(test)]
-fn saved_monitor_is_unavailable(
-    monitors: &[AvailableMonitorSnapshot],
-    preferences: &ShellWindowPreferences,
-) -> bool {
-    preferences
-        .monitor
-        .as_ref()
-        .is_some_and(|saved| saved_monitor_index_from_snapshots(monitors, Some(saved)).is_none())
+    monitors
+        .iter()
+        .position(|monitor| monitor_matches_logical_size(monitor, 2560, 1440))
+        .map_or(FullscreenDisplay::Current, FullscreenDisplay::Studio)
 }
 
 fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
@@ -324,72 +317,22 @@ fn window_scale_factor(window: &WebviewWindow) -> f64 {
         .unwrap_or(1.0)
 }
 
-fn capture_current_window_preferences(
-    app: &AppHandle,
-    window: &WebviewWindow,
-    launch_mode_override: Option<ShellLaunchMode>,
-) -> ShellWindowPreferences {
-    let existing = read_window_preferences(app);
-    let scale_factor = window_scale_factor(window);
-    let fullscreen = window.is_fullscreen().unwrap_or(false);
-    let launch_mode = launch_mode_override
-        .or_else(|| existing.as_ref().map(|preferences| preferences.launch_mode))
-        .unwrap_or(if fullscreen {
-            ShellLaunchMode::StudioFullscreen
-        } else {
-            ShellLaunchMode::Windowed
-        });
-
-    let last_logical_size = window.inner_size().ok().map(|size| LogicalSizeSnapshot {
-        width: size.width as f64 / scale_factor,
-        height: size.height as f64 / scale_factor,
-    });
-    let last_logical_position =
-        window
-            .outer_position()
-            .ok()
-            .map(|position| LogicalPositionSnapshot {
-                x: position.x as f64 / scale_factor,
-                y: position.y as f64 / scale_factor,
-            });
-
+fn capture_current_window_preferences(window: &WebviewWindow) -> ShellWindowPreferences {
     ShellWindowPreferences {
-        launch_mode,
-        last_logical_size,
-        last_logical_position,
-        fullscreen,
+        fullscreen: window.is_fullscreen().unwrap_or(false),
         monitor: window
             .current_monitor()
             .ok()
             .flatten()
             .map(|monitor| monitor_snapshot(&monitor)),
-        scale_factor: Some(scale_factor),
+        scale_factor: Some(window_scale_factor(window)),
         updated_at_epoch_seconds: now_epoch_seconds(),
     }
 }
 
-fn persist_current_window_preferences(
-    app: &AppHandle,
-    window: &WebviewWindow,
-    launch_mode_override: Option<ShellLaunchMode>,
-) {
-    let preferences = capture_current_window_preferences(app, window, launch_mode_override);
+fn persist_current_window_preferences(app: &AppHandle, window: &WebviewWindow) {
+    let preferences = capture_current_window_preferences(window);
     let _ = write_window_preferences(app, &preferences);
-}
-
-fn apply_centered_windowed_layout(window: &WebviewWindow) -> Result<(), String> {
-    window
-        .set_fullscreen(false)
-        .map_err(|error| format!("Failed to leave fullscreen: {error}"))?;
-    window
-        .set_size(LogicalSize::new(1600.0, 960.0))
-        .map_err(|error| format!("Failed to set fallback window size: {error}"))?;
-    window
-        .center()
-        .map_err(|error| format!("Failed to center fallback window: {error}"))?;
-    window
-        .show()
-        .map_err(|error| format!("Failed to show fallback window: {error}"))
 }
 
 fn write_smoke_status(status_path: Option<&str>, status: Value) {
@@ -816,35 +759,29 @@ async fn shell_open_path(path: String) -> Result<(), String> {
     .await
 }
 
-/// Hands an allowed path to the platform's opener. The original spelling is
-/// used rather than the canonical one: Explorer does not take the `\\?\`
-/// prefix `canonicalize` produces on Windows.
+/// Hands an allowed path to Explorer. The original spelling is used rather
+/// than the canonical one: Explorer does not take the `\\?\` prefix
+/// `canonicalize` produces on Windows.
 fn open_path_with_system(target: &Path) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    let mut command = {
-        let mut command = Command::new("open");
-        command.arg(target);
-        command
-    };
+    #[cfg(windows)]
+    {
+        Command::new("explorer")
+            .arg(target)
+            .spawn()
+            .map_err(|error| format!("Failed to open path {}: {error}", target.display()))?;
+        Ok(())
+    }
 
-    #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut command = Command::new("explorer");
-        command.arg(target);
-        command
-    };
-
-    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
-    let mut command = {
-        let mut command = Command::new("xdg-open");
-        command.arg(target);
-        command
-    };
-
-    command
-        .spawn()
-        .map_err(|error| format!("Failed to open path {}: {error}", target.display()))?;
-    Ok(())
+    // New pages program, Slice SW (D22): Studio Control runs on Windows only.
+    // The Linux CI runners compile the shell, and none of their lanes opens a
+    // folder.
+    #[cfg(not(windows))]
+    {
+        Err(format!(
+            "{} was not opened: Studio Control opens folders on Windows only.",
+            target.display()
+        ))
+    }
 }
 
 /// UTC wall-clock time as `YYYY-MM-DDTHH-MM-SS-mmmZ` — the shape the engine's
@@ -1030,29 +967,37 @@ async fn shell_test_bridge_export_diagnostics_to(
     .await
 }
 
-fn monitor_matches_logical_size(monitor: &Monitor, target_width: u32, target_height: u32) -> bool {
-    let scale_factor = monitor.scale_factor();
+fn monitor_matches_logical_size(
+    monitor: &AvailableMonitorSnapshot,
+    target_width: u32,
+    target_height: u32,
+) -> bool {
+    let scale_factor = monitor.scale_factor;
     if !scale_factor.is_finite() || scale_factor <= 0.0 {
         return false;
     }
 
-    let logical_width = (monitor.size().width as f64 / scale_factor).round() as u32;
-    let logical_height = (monitor.size().height as f64 / scale_factor).round() as u32;
+    let logical_width = (monitor.physical_size.width / scale_factor).round() as u32;
+    let logical_height = (monitor.physical_size.height / scale_factor).round() as u32;
     logical_width == target_width && logical_height == target_height
 }
 
-fn preferred_review_monitor(window: &WebviewWindow) -> Option<Monitor> {
-    let monitors = window.available_monitors().ok()?;
-    monitors
+/// The monitor `fullscreen_display` names — the saved display (`saved`), else
+/// the studio monitor, else the display the window is on. When the system
+/// lists no monitors, only the last is left.
+fn fullscreen_monitor(window: &WebviewWindow, saved: Option<&MonitorSnapshot>) -> Option<Monitor> {
+    let monitors = window.available_monitors().unwrap_or_default();
+    let monitor_snapshots = monitors
         .iter()
-        .find(|monitor| monitor_matches_logical_size(monitor, 2560, 1440))
-        .cloned()
-        .or_else(|| {
-            monitors
-                .iter()
-                .find(|monitor| monitor_matches_logical_size(monitor, 1920, 1080))
-                .cloned()
-        })
+        .map(available_monitor_snapshot)
+        .collect::<Vec<_>>();
+    let listed = match fullscreen_display(&monitor_snapshots, saved) {
+        FullscreenDisplay::Saved(index) | FullscreenDisplay::Studio(index) => {
+            monitors.get(index).cloned()
+        }
+        FullscreenDisplay::Current => None,
+    };
+    listed.or_else(|| window.current_monitor().ok().flatten())
 }
 
 fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<(), String> {
@@ -1074,110 +1019,43 @@ fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<
         .map_err(|error| format!("Failed to enter fullscreen: {error}"))
 }
 
-fn route_window_to_preferred_monitor(window: &WebviewWindow) -> Result<(), String> {
-    let Some(monitor) = preferred_review_monitor(window) else {
-        return apply_centered_windowed_layout(window);
-    };
-
+/// Shows the screen fullscreen on the monitor `fullscreen_monitor` picks.
+fn route_window_fullscreen(
+    window: &WebviewWindow,
+    saved: Option<&MonitorSnapshot>,
+) -> Result<(), String> {
+    let monitor = fullscreen_monitor(window, saved)
+        .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
     route_window_to_monitor(window, &monitor)
 }
 
-fn restore_saved_window_layout(
-    window: &WebviewWindow,
-    preferences: &ShellWindowPreferences,
-) -> Result<bool, String> {
-    let monitors = window
-        .available_monitors()
-        .map_err(|error| format!("Failed to list monitors for saved window restore: {error}"))?;
-    let monitor_snapshots = monitors
-        .iter()
-        .map(available_monitor_snapshot)
-        .collect::<Vec<_>>();
-
-    let (launch_mode, monitor) = match saved_window_recovery_action(&monitor_snapshots, preferences)
-    {
-        SavedWindowRecoveryAction::FallbackWindowed => {
-            apply_centered_windowed_layout(window)?;
-            return Ok(false);
-        }
-        SavedWindowRecoveryAction::Restore {
-            launch_mode,
-            monitor_index,
-        } => {
-            let monitor = monitors.get(monitor_index).ok_or_else(|| {
-                "Saved window monitor restore index was unavailable after matching.".to_string()
-            })?;
-            (launch_mode, monitor)
-        }
-    };
-
-    match launch_mode {
-        ShellLaunchMode::StudioFullscreen => {
-            route_window_to_monitor(window, monitor)?;
-            Ok(true)
-        }
-        ShellLaunchMode::Windowed => {
-            window
-                .set_fullscreen(false)
-                .map_err(|error| format!("Failed to leave fullscreen: {error}"))?;
-            if let Some(size) = preferences.last_logical_size.as_ref() {
-                window
-                    .set_size(LogicalSize::new(size.width, size.height))
-                    .map_err(|error| format!("Failed to restore saved window size: {error}"))?;
-            } else {
-                window
-                    .set_size(LogicalSize::new(1600.0, 960.0))
-                    .map_err(|error| format!("Failed to set default window size: {error}"))?;
-            }
-            if let Some(position) = preferences.last_logical_position.as_ref() {
-                window
-                    .set_position(LogicalPosition::new(position.x, position.y))
-                    .map_err(|error| format!("Failed to restore saved window position: {error}"))?;
-            } else {
-                window
-                    .center()
-                    .map_err(|error| format!("Failed to center restored window: {error}"))?;
-            }
-            window
-                .show()
-                .map_err(|error| format!("Failed to show restored window: {error}"))?;
-            Ok(true)
-        }
-    }
-}
-
+/// New pages program, Slice SW (D22): the shell always shows the screen
+/// fullscreen — on the display it was last on when that display is there,
+/// else on the 2560×1440 display, else on the display the window is on. Until
+/// then a saved windowed layout was restored as it was, and a missing display
+/// (or no saved file and neither a 2560×1440 nor a 1920×1080 monitor) opened
+/// the windowed layout, 1600 × 960 and centred.
 fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewWindow) {
-    let restored = read_window_preferences(app)
-        .as_ref()
-        .map(|preferences| restore_saved_window_layout(window, preferences).unwrap_or(false));
-
-    match restored {
-        Some(true) => persist_current_window_preferences(app, window, None),
-        Some(false) => {
-            persist_current_window_preferences(app, window, Some(ShellLaunchMode::Windowed))
-        }
-        None => {
-            if route_window_to_preferred_monitor(window).is_ok() {
-                let mode = if window.is_fullscreen().unwrap_or(false) {
-                    ShellLaunchMode::StudioFullscreen
-                } else {
-                    ShellLaunchMode::Windowed
-                };
-                persist_current_window_preferences(app, window, Some(mode));
-            }
-        }
+    let saved = read_window_preferences(app).and_then(|preferences| preferences.monitor);
+    match route_window_fullscreen(window, saved.as_ref()) {
+        Ok(()) => persist_current_window_preferences(app, window),
+        Err(detail) => log_shell_line(
+            app,
+            &format!("The window did not go fullscreen at launch: {detail}"),
+        ),
     }
 }
 
 /// The one window-command refusal that is already the operator's sentence.
 const NO_MONITOR_FOR_STUDIO_FULLSCREEN: &str = "No monitor is available for studio fullscreen.";
 
-/// The three window commands: keys in Setup / Support › Workstation, and the
+/// The two window commands: keys in Setup / Support › Workstation, and the
 /// reset on the recovery screens too (new pages program, Slice 3, decision 2).
+/// The windowed layout's command went with the windowed layout in Slice SW
+/// (D22).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum WindowCommand {
     StudioFullscreen,
-    WindowedLayout,
     ResetLayout,
 }
 
@@ -1186,7 +1064,6 @@ impl WindowCommand {
     fn log_name(self) -> &'static str {
         match self {
             WindowCommand::StudioFullscreen => "Studio fullscreen",
-            WindowCommand::WindowedLayout => "Windowed layout",
             WindowCommand::ResetLayout => "Window layout reset",
         }
     }
@@ -1200,7 +1077,6 @@ fn window_command_refusal(command: WindowCommand, detail: &str) -> String {
     let sentence = match command {
         WindowCommand::StudioFullscreen if detail == NO_MONITOR_FOR_STUDIO_FULLSCREEN => detail,
         WindowCommand::StudioFullscreen => "Studio fullscreen did not start.",
-        WindowCommand::WindowedLayout => "The windowed layout did not start.",
         WindowCommand::ResetLayout => "The window layout was not reset.",
     };
     sentence.to_string()
@@ -1229,45 +1105,28 @@ fn log_shell_line(app: &AppHandle, message: &str) {
         .log_shell_line("SHELL", message);
 }
 
+/// Fullscreen on the studio monitor, else on the display the window is on,
+/// remembered for the next launch.
 #[tauri::command]
 fn shell_enter_studio_fullscreen(app: AppHandle) -> Result<(), String> {
     run_window_command(&app, WindowCommand::StudioFullscreen, || {
         let window = main_window(&app)?;
-        let monitor = preferred_review_monitor(&window)
-            .or_else(|| window.current_monitor().ok().flatten())
-            .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
-        route_window_to_monitor(&window, &monitor)?;
-        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
+        route_window_fullscreen(&window, None)?;
+        persist_current_window_preferences(&app, &window);
         Ok(())
     })
 }
 
-#[tauri::command]
-fn shell_use_windowed_layout(app: AppHandle) -> Result<(), String> {
-    run_window_command(&app, WindowCommand::WindowedLayout, || {
-        let window = main_window(&app)?;
-        apply_centered_windowed_layout(&window)?;
-        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
-        Ok(())
-    })
-}
-
+/// Forgets the saved display, then goes fullscreen as Studio fullscreen does.
+/// Until Slice SW a workstation without a studio monitor got the windowed
+/// layout here.
 #[tauri::command]
 fn shell_reset_window_layout(app: AppHandle) -> Result<(), String> {
     run_window_command(&app, WindowCommand::ResetLayout, || {
         let window = main_window(&app)?;
         remove_window_preferences(&app)?;
-        if let Some(monitor) = preferred_review_monitor(&window) {
-            route_window_to_monitor(&window, &monitor)?;
-            persist_current_window_preferences(
-                &app,
-                &window,
-                Some(ShellLaunchMode::StudioFullscreen),
-            );
-        } else {
-            apply_centered_windowed_layout(&window)?;
-            persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
-        }
+        route_window_fullscreen(&window, None)?;
+        persist_current_window_preferences(&app, &window);
         Ok(())
     })
 }
@@ -1346,8 +1205,8 @@ fn main() {
         // its arguments to the running shell, which brings its window
         // forward, and exits. The engine's own lock on
         // `<app-data>/engine.lock` guards the database and the light
-        // outputs even where this plugin cannot (a Linux session without a
-        // D-Bus session bus).
+        // outputs even where this plugin cannot (a Linux CI runner's session
+        // without a D-Bus session bus).
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             focus_main_window(app);
         }))
@@ -1392,7 +1251,7 @@ fn main() {
                     ) {
                         return;
                     }
-                    persist_current_window_preferences(&app_handle, &window_for_events, None);
+                    persist_current_window_preferences(&app_handle, &window_for_events);
                 });
             }
             Ok(())
@@ -1407,7 +1266,6 @@ fn main() {
         shell_open_path,
         shell_export_diagnostics,
         shell_enter_studio_fullscreen,
-        shell_use_windowed_layout,
         shell_reset_window_layout,
         shell_confirm_close,
         shell_test_bridge_config,
@@ -1425,7 +1283,6 @@ fn main() {
         shell_open_path,
         shell_export_diagnostics,
         shell_enter_studio_fullscreen,
-        shell_use_windowed_layout,
         shell_reset_window_layout,
         shell_confirm_close
     ]);
@@ -1465,7 +1322,8 @@ mod shell_window_command_tests {
     // fullscreen: …", "Failed to set fallback window size: …", "Failed to
     // position window on monitor: …". New: one sentence per command in the
     // app's words; the detail goes to shell.log. The missing monitor is said as
-    // it always was.
+    // it always was. Slice SW (D22): the windowed layout's command, and the
+    // details only it gave, went with the windowed layout.
     #[test]
     fn window_command_refusals_are_the_operators_sentences() {
         assert_eq!(
@@ -1480,10 +1338,6 @@ mod shell_window_command_tests {
             "Main Tauri window is unavailable.",
             r"Failed to remove shell window preferences C:\Users\operator\AppData\Roaming\com.sse.exedstudiocontrol\shell-window-layout.json: Access is denied. (os error 5)",
             "Failed to resolve Tauri config directory: unknown path",
-            "Failed to leave fullscreen: the underlying handle is not available",
-            "Failed to set fallback window size: the underlying handle is not available",
-            "Failed to center fallback window: the underlying handle is not available",
-            "Failed to show fallback window: the underlying handle is not available",
             "Failed to position window on monitor: the underlying handle is not available",
             "Failed to size window for monitor: the underlying handle is not available",
             "Failed to enter fullscreen: the underlying handle is not available",
@@ -1492,10 +1346,6 @@ mod shell_window_command_tests {
             (
                 WindowCommand::StudioFullscreen,
                 "Studio fullscreen did not start.",
-            ),
-            (
-                WindowCommand::WindowedLayout,
-                "The windowed layout did not start.",
             ),
             (
                 WindowCommand::ResetLayout,
@@ -1755,9 +1605,6 @@ mod shell_window_preferences_tests {
 
     fn preferences_with_monitor(monitor: Option<MonitorSnapshot>) -> ShellWindowPreferences {
         ShellWindowPreferences {
-            launch_mode: ShellLaunchMode::StudioFullscreen,
-            last_logical_size: Some(logical_size(2560.0, 1440.0)),
-            last_logical_position: Some(logical_position(0.0, 0.0)),
             fullscreen: true,
             monitor,
             scale_factor: Some(1.0),
@@ -1765,57 +1612,37 @@ mod shell_window_preferences_tests {
         }
     }
 
-    #[test]
-    fn shell_window_preferences_saved_monitor_missing_falls_back_to_windowed_layout() {
-        let preferences = preferences_with_monitor(Some(saved_monitor(
+    fn studio_review_saved() -> ShellWindowPreferences {
+        preferences_with_monitor(Some(saved_monitor(
             Some("Studio Review"),
             (2560.0, 0.0),
             (2560.0, 1440.0),
             1.0,
-        )));
-        let available = [available_monitor(
-            Some("Laptop"),
-            (0.0, 0.0),
-            (1728.0, 1117.0),
-            2.0,
-        )];
-
-        assert_eq!(
-            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
-            None
-        );
-        assert_eq!(
-            saved_window_recovery_action(&available, &preferences),
-            SavedWindowRecoveryAction::FallbackWindowed
-        );
-        assert!(saved_monitor_is_unavailable(&available, &preferences));
+        )))
     }
 
+    // New pages program, Slice SW (D22): the screen is always fullscreen — on
+    // the display it was last on when that display is there, else on the
+    // 2560×1440 display, else on the display the window is on. Until then a
+    // missing display opened the windowed layout, and a 1920×1080 monitor
+    // stood in for the studio one.
     #[test]
     fn shell_window_preferences_saved_monitor_matches_by_name() {
-        let preferences = preferences_with_monitor(Some(saved_monitor(
-            Some("Studio Review"),
-            (2560.0, 0.0),
-            (2560.0, 1440.0),
-            1.0,
-        )));
+        let preferences = studio_review_saved();
         let available = [
-            available_monitor(Some("Laptop"), (0.0, 0.0), (1728.0, 1117.0), 2.0),
-            available_monitor(Some("Studio Review"), (100.0, 100.0), (1920.0, 1080.0), 2.0),
+            available_monitor(Some("Studio"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
+            available_monitor(Some("Studio Review"), (100.0, 100.0), (1920.0, 1080.0), 1.0),
         ];
 
         assert_eq!(
             saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
             Some(1)
         );
+        // The display it was last on comes before the studio display.
         assert_eq!(
-            saved_window_recovery_action(&available, &preferences),
-            SavedWindowRecoveryAction::Restore {
-                launch_mode: ShellLaunchMode::StudioFullscreen,
-                monitor_index: 1,
-            }
+            fullscreen_display(&available, preferences.monitor.as_ref()),
+            FullscreenDisplay::Saved(1)
         );
-        assert!(!saved_monitor_is_unavailable(&available, &preferences));
     }
 
     #[test]
@@ -1827,7 +1654,7 @@ mod shell_window_preferences_tests {
             1.0,
         )));
         let available = [
-            available_monitor(Some("Laptop"), (0.0, 0.0), (1728.0, 1117.0), 2.0),
+            available_monitor(Some("Side"), (0.0, 0.0), (1920.0, 1080.0), 1.0),
             available_monitor(Some("Renamed Studio"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
         ];
 
@@ -1836,33 +1663,128 @@ mod shell_window_preferences_tests {
             Some(1)
         );
         assert_eq!(
-            saved_window_recovery_action(&available, &preferences),
-            SavedWindowRecoveryAction::Restore {
-                launch_mode: ShellLaunchMode::StudioFullscreen,
-                monitor_index: 1,
-            }
+            fullscreen_display(&available, preferences.monitor.as_ref()),
+            FullscreenDisplay::Saved(1)
         );
-        assert!(!saved_monitor_is_unavailable(&available, &preferences));
     }
 
     #[test]
-    fn shell_window_preferences_without_saved_monitor_uses_safe_windowed_fallback() {
-        let preferences = preferences_with_monitor(None);
-        let available = [available_monitor(
-            Some("Laptop"),
-            (0.0, 0.0),
-            (1728.0, 1117.0),
-            2.0,
-        )];
+    fn shell_window_preferences_saved_monitor_missing_goes_to_the_studio_display() {
+        let preferences = studio_review_saved();
+        let available = [
+            available_monitor(Some("Side"), (0.0, 0.0), (1920.0, 1080.0), 1.0),
+            available_monitor(Some("Studio"), (1920.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
 
         assert_eq!(
             saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
             None
         );
         assert_eq!(
-            saved_window_recovery_action(&available, &preferences),
-            SavedWindowRecoveryAction::FallbackWindowed
+            fullscreen_display(&available, preferences.monitor.as_ref()),
+            FullscreenDisplay::Studio(1)
         );
-        assert!(!saved_monitor_is_unavailable(&available, &preferences));
+        // A file that saved no display, and no file at all, go there too.
+        assert_eq!(
+            fullscreen_display(&available, preferences_with_monitor(None).monitor.as_ref()),
+            FullscreenDisplay::Studio(1)
+        );
+        assert_eq!(
+            fullscreen_display(&available, None),
+            FullscreenDisplay::Studio(1)
+        );
+    }
+
+    #[test]
+    fn shell_window_preferences_without_saved_or_studio_monitor_use_the_current_display() {
+        // The studio display is 2560×1440 in logical pixels: a 2560×1440 panel
+        // at 125 % is 2048×1152 and is not it, and a 1920×1080 one no longer
+        // stands in for it.
+        let preferences = studio_review_saved();
+        let available = [
+            available_monitor(Some("Side"), (0.0, 0.0), (1920.0, 1080.0), 1.0),
+            available_monitor(
+                Some("Studio at 125 %"),
+                (1920.0, 0.0),
+                (2560.0, 1440.0),
+                1.25,
+            ),
+        ];
+
+        for saved in [preferences.monitor.as_ref(), None] {
+            assert_eq!(
+                fullscreen_display(&available, saved),
+                FullscreenDisplay::Current
+            );
+        }
+        // No monitor listed at all.
+        assert_eq!(
+            fullscreen_display(&[], preferences.monitor.as_ref()),
+            FullscreenDisplay::Current
+        );
+    }
+
+    // Slice SW (D22): a file an older build wrote still loads — the windowed
+    // layout's too — and opens fullscreen on its display. What is written now
+    // carries the display and none of the windowed layout's fields.
+    #[test]
+    fn shell_window_preferences_from_an_older_build_still_load() {
+        let windowed = r#"{
+  "launchMode": "windowed",
+  "lastLogicalSize": { "width": 1600.0, "height": 960.0 },
+  "lastLogicalPosition": { "x": 3040.0, "y": 240.0 },
+  "fullscreen": false,
+  "monitor": {
+    "name": "\\\\.\\DISPLAY3",
+    "physicalPosition": { "x": 2560.0, "y": 0.0 },
+    "physicalSize": { "width": 2560.0, "height": 1440.0 },
+    "logicalSize": { "width": 2560.0, "height": 1440.0 },
+    "scaleFactor": 1.0
+  },
+  "scaleFactor": 1.0,
+  "updatedAtEpochSeconds": 1790000000
+}"#;
+        let studio_fullscreen = windowed
+            .replace(r#""windowed""#, r#""studioFullscreen""#)
+            .replace(r#""fullscreen": false"#, r#""fullscreen": true"#);
+        let available = [
+            available_monitor(Some(r"\\.\DISPLAY1"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
+            available_monitor(Some(r"\\.\DISPLAY3"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
+
+        for payload in [windowed, studio_fullscreen.as_str()] {
+            let preferences =
+                parse_window_preferences(payload).expect("an older build's file loads");
+            assert_eq!(
+                fullscreen_display(&available, preferences.monitor.as_ref()),
+                FullscreenDisplay::Saved(1),
+                "{payload}"
+            );
+        }
+
+        let no_display = r#"{"launchMode":"windowed","lastLogicalSize":null,"lastLogicalPosition":null,"fullscreen":false,"monitor":null,"scaleFactor":null,"updatedAtEpochSeconds":1}"#;
+        let preferences =
+            parse_window_preferences(no_display).expect("a file without a display loads");
+        assert_eq!(
+            fullscreen_display(&available, preferences.monitor.as_ref()),
+            FullscreenDisplay::Studio(0)
+        );
+
+        let written = serde_json::to_value(preferences_with_monitor(Some(saved_monitor(
+            Some(r"\\.\DISPLAY3"),
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        ))))
+        .expect("the preferences serialise");
+        for gone in ["launchMode", "lastLogicalSize", "lastLogicalPosition"] {
+            assert!(written.get(gone).is_none(), "{gone} is still written");
+        }
+        let read_back =
+            parse_window_preferences(&written.to_string()).expect("what is written loads");
+        assert_eq!(
+            fullscreen_display(&available, read_back.monitor.as_ref()),
+            FullscreenDisplay::Saved(1)
+        );
     }
 }
