@@ -1,6 +1,6 @@
 # The Teleprompter: what it does (2026-09-26)
 
-Status: the designer's proposal for D20 (open), written in C0 on branch `new-pages/c0-boards` for the operator to review with the Teleprompter boards in `docs/redesign/assets/concepts/` (D19). This text says what the operator can do and see; the boards show where it sits. Where the two differ, the review settles it. No source, token or test was edited. Once approved, this is the scope of Part C's Teleprompter slice (D21 proposes that slice first).
+Status: approved by the operator on 2026-09-26 (the ledger's D20), with board 1, "Live mirror" (`docs/redesign/assets/concepts/A-teleprompter-1.html`, D19), and the answers in §14. Written in C0 on branch `new-pages/c0-boards` as the designer's proposal. This text says what the operator can do and see; the board shows where it sits, and where the two differ the board wins: the editor opens in the bay (Edit script, with a quarter-size copy of the glass), the time left sits over the copy, the scripts list is in the plate, and the text size keys are in the look. It is the scope of Part C's Teleprompter slices, Slices 4–7 (the Teleprompter first, D21).
 
 Sources: the ledger `docs/plans/new-pages-2026-09.md`: D4 (the tab order), D9 (the page), D11 (what is armed), D12 (what must never happen), D14 (the PROMPTER deck page), D15 rule 4 (only the live app draws on the Prompter XL), C0's Prompter XL finding, and Appendix B items 13–17 (the walk). The system: `system-a-2026-09.md` (the cluster rule, the arm, the state vocabulary, the copy rules). The operator's interview of 2026-09-24: the operator at the PC runs the main camera's prompter; Studio Control draws the script; Word and text import were assumed but not confirmed.
 
@@ -34,7 +34,7 @@ As on every page, nothing on it shows a key or a key hint (D6).
 
 ### 3.1 Where a script comes from: both paste and file, with Word as the main path
 
-- **Open file…** reads a Word document (`.docx`) or a plain text file (`.txt`). Word, because scripts are usually written in it and the interview assumed it (to confirm, §14). Plain text, because every program can save it. Studio Control reads the file itself: Word does not have to be installed, and nothing is sent anywhere. Studio Control keeps its own copy of the text and never changes, locks or watches the file.
+- **Open file…** reads a Word document (`.docx`) or a plain text file (`.txt`). Word, because scripts are usually written in it and the interview assumed it (confirmed, §14). Plain text, because every program can save it. Studio Control reads the file itself: Word does not have to be installed, and nothing is sent anywhere. Studio Control keeps its own copy of the text and never changes, locks or watches the file.
 - **Paste as a new script** takes the text on the Windows clipboard. When the clipboard holds formatting (copied from Word, a browser or Google Docs), the Word rules below apply; otherwise the text is plain.
 - **New script** opens an empty script in the editor, for a short script or a quick fix.
 
@@ -68,7 +68,7 @@ A script is named after its file, without the extension. A pasted script is name
 
 ### 3.3 How scripts are kept
 
-- **In the saved data** (schema 9, the ledger's provisional Teleprompter slice): each script's text and name, the name of the file it came from, when it was made and changed, and its own place and speed (§5).
+- **In the saved data** (schema 9, the ledger's Slice 4): each script's text and name, the name of the file it came from, when it was made and changed, and its own place and speed (§5).
 - **Saved as you type.** An edit reaches the saved data within a second, and the editor shows `Saved 14:02`. There is no Save key and nothing to forget.
 - **The list is sorted by name**, with numbers in their natural order (`2` before `10`). A running order is therefore a matter of naming: `01 Intro`, `02 Guest`, `03 Outro`. Each row shows the name, the length at the script's own speed, and `ON PROMPTER` on the script the prompter shows.
 - **Earlier versions.** Every import, and every time a script's text goes onto the prompter (put on, replaced, updated), keeps that text as a version. Each script keeps its last 20 versions. One press brings a version back as the script's text. If that script is on the prompter, the prompter keeps what it shows until Update (§5.5).
@@ -82,18 +82,18 @@ A script is named after its file, without the extension. A pasted script is name
 
 The prompter has one look, not one per script: there is one presenter and one glass. All sizes are pixels on the Prompter XL's 1920×1080 screen, where a pixel is 0.18 mm. Every change applies at once with one press, and the words at the reading line stay where they are (§5.2).
 
-| Setting           | Standard                                                     | Range                                                     | Why                                                                                                                                                                                                                                                  |
-| ----------------- | ------------------------------------------------------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Text              | Inter, medium weight, left-aligned, no hyphenation           | —                                                         | Inter is the app's own face and has å, ä and ö. A medium weight survives the glass, which loses light. Ragged-right text reads faster than justified text, and a word broken across two lines stops the eye                                          |
-| Text size         | 88 px, which makes capitals about 11.5 mm                    | 48–160 px in 4 px steps                                   | 11.5 mm capitals are about 20 arcminutes at 2 m, above ISO 9241-303's minimum for reading (the measure the system uses for words read during a take). At 3 m the same 20 arcminutes needs about 132 px. The presenter's distance is still open (§14) |
-| Line spacing      | 1.4                                                          | 1.1–2.0                                                   | enough space to hold a line while it moves                                                                                                                                                                                                           |
-| Paragraph space   | half a line                                                  | fixed                                                     | a new thought is visible before it arrives                                                                                                                                                                                                           |
-| Margins           | 12 % each side                                               | 0–30 %                                                    | a narrow column keeps the eyes still: about 32 characters a line at the standard size, so the camera sees little eye movement                                                                                                                        |
-| Colours           | white text on black                                          | white or yellow text; the background is always black      | black gives off no light, so the glass shows only the words. A lit background floods the glass and makes the presenter squint                                                                                                                        |
-| Cues              | a second colour (light blue), 70 % size, italic, in brackets | fixed                                                     | reads as a direction and is never read aloud                                                                                                                                                                                                         |
-| Reading line      | an arrow at the left edge, 35 % from the top                 | 20–60 % from the top; a thin line across (off by default) | the eye returns to the same height, near the lens behind the glass's centre. A line across the text can hide descenders                                                                                                                              |
-| Text already read | dimmed to 45 % above the reading line                        | on / off                                                  | after looking away, the presenter finds the place at a glance                                                                                                                                                                                        |
-| Paragraph numbers | off on the prompter (always shown on the operator's side)    | on / off                                                  | when they are on, "from paragraph 7" means the same thing to both people                                                                                                                                                                             |
+| Setting           | Standard                                                     | Range                                                     | Why                                                                                                                                                                                                                                               |
+| ----------------- | ------------------------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Text              | Inter, medium weight, left-aligned, no hyphenation           | —                                                         | Inter is the app's own face and has å, ä and ö. A medium weight survives the glass, which loses light. Ragged-right text reads faster than justified text, and a word broken across two lines stops the eye                                       |
+| Text size         | 88 px, which makes capitals about 11.5 mm                    | 48–160 px in 4 px steps                                   | 11.5 mm capitals are about 20 arcminutes at 2 m, above ISO 9241-303's minimum for reading (the measure the system uses for words read during a take). At 3 m the same 20 arcminutes needs about 132 px. The presenter stands about 2 m away (§14) |
+| Line spacing      | 1.4                                                          | 1.1–2.0                                                   | enough space to hold a line while it moves                                                                                                                                                                                                        |
+| Paragraph space   | half a line                                                  | fixed                                                     | a new thought is visible before it arrives                                                                                                                                                                                                        |
+| Margins           | 12 % each side                                               | 0–30 %                                                    | a narrow column keeps the eyes still: about 32 characters a line at the standard size, so the camera sees little eye movement                                                                                                                     |
+| Colours           | white text on black                                          | white or yellow text; the background is always black      | black gives off no light, so the glass shows only the words. A lit background floods the glass and makes the presenter squint                                                                                                                     |
+| Cues              | a second colour (light blue), 70 % size, italic, in brackets | fixed                                                     | reads as a direction and is never read aloud                                                                                                                                                                                                      |
+| Reading line      | an arrow at the left edge, 35 % from the top                 | 20–60 % from the top; a thin line across (off by default) | the eye returns to the same height, near the lens behind the glass's centre. A line across the text can hide descenders                                                                                                                           |
+| Text already read | dimmed to 45 % above the reading line                        | on / off                                                  | after looking away, the presenter finds the place at a glance                                                                                                                                                                                     |
+| Paragraph numbers | off on the prompter (always shown on the operator's side)    | on / off                                                  | when they are on, "from paragraph 7" means the same thing to both people                                                                                                                                                                          |
 
 The **standard size** is set in the look. During a take, − / + and the deck's size dial move the size away from it. That size is saved too, so a restart keeps it. Standard, or a push of the size dial, returns to the standard size. The readout shows both, for example `96 px · standard 88`.
 
@@ -115,7 +115,7 @@ Studio Control adds nothing else to the glass: no clock, no messages and no logo
 | `BACK`       | `BACK`                                                     | `BACK`                                        | goes to the start of the paragraph at the reading line; from that paragraph's first line, to the start of the paragraph before. It is the "again from the top of that" key |
 | `TOP`        | `TOP`                                                      | `TOP`                                         | pauses and puts the first line at the reading line, ready for a new take                                                                                                   |
 | Paragraphs   | ◂ Paragraph · Paragraph ▸; the script bar; Go to paragraph | paragraph dial, one paragraph a detent        | goes to the start of that paragraph                                                                                                                                        |
-| Cues         | ◂ Cue · Cue ▸; the cue keys                                | (spare keys, §14)                             | goes to that cue                                                                                                                                                           |
+| Cues         | ◂ Cue · Cue ▸; the cue keys                                | `◂ CUE` · `CUE ▸` (§14)                       | goes to that cue                                                                                                                                                           |
 | Text size    | − / + (4 px each); Standard                                | size dial; a push returns to the standard     | changes the size and keeps the words at the reading line                                                                                                                   |
 
 Every control in this table is one press (D11). None of them starts the scroll. A jump keeps scrolling if the prompter was scrolling and stays paused if it was paused; only `TOP` pauses. A jump moves the text in 0.2 s: too short to read, long enough to see which way the text went.
@@ -126,7 +126,7 @@ Speed is the presenter's pace in words a minute, from 40 to 300; a new script st
 
 At the standard look and 140 words a minute, the text moves about 55 px a second, just under a pixel a frame at 60 Hz.
 
-Why words a minute and not a 1–10 scale: time left means the same whatever the size, and a pace can be written on a script ("this one is 150"). The choice is still open (§14).
+Why words a minute and not a 1–10 scale: time left means the same whatever the size, and a pace can be written on a script ("this one is 150"). Decided: words a minute (§14).
 
 ### 5.2 The place
 
@@ -163,7 +163,7 @@ The bay shows the Prompter XL's screen as the glass gets it, unmirrored, at 1,68
 
 - It is the same layout scaled down, never a second layout: the lines break in the same places, the reading arrow sits at the same height, and the dimming is the same.
 - Nothing is drawn on it that the presenter does not see. The operator's own marks (numbers, the place, the time) sit around it.
-- It keeps showing the script when the Prompter XL is not connected, and the state display says so. The live copy is part of Studio Control's page on display 3 and never a window of its own; D12 is about the presenter's screen.
+- When the Prompter XL is not connected it keeps showing the script, dimmed and marked "Not on the glass", and the state display says so. The live copy is part of Studio Control's page on display 3 and never a window of its own; D12 is about the presenter's screen.
 - When nothing is on the prompter, the live copy is black, with one line under it: `Nothing on the prompter`.
 - For the §10 measures it counts as a picture, like a camera picture: its type is the presenter's, not the page's.
 
@@ -191,7 +191,7 @@ On Update, the same words stay at the reading line. If the paragraph at the read
 
 ## 7. The Prompter XL's screen
 
-- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window is fullscreen and borderless, with no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script never appears on any other screen or window: not display 3, not display 2 (D12, D15 rule 4).
+- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window is fullscreen and borderless, with no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script is never shown for the presenter on any other screen or window, display 2 included; on display 3 it appears only as the Teleprompter page's own copy (§6.1; D12 as amended; D15 rule 4).
 - **Plugged in.** The window opens by itself and shows what the prompter held, paused. Studio Control's own window stays on display 3; if Windows moves it while rearranging screens, Studio Control puts it back.
 - **Unplugged.** The window closes; it is not moved anywhere. The scroll pauses at the place, and `NOT CONNECTED` says so. `PLAY` locks and shows its reason ("the Prompter XL is not connected"): nothing scrolls where nobody can read it. Jumps, speed, size and the editor keep working on the live copy, and the place they set is where the prompter comes back.
 - **Plugged back in.** The script returns at the same place, paused (Appendix B item 14).
@@ -228,7 +228,7 @@ The Stream Deck + has four dials, a touch strip over them, and eight keys.
 | 3. Text size | 4 px a detent          | back to the standard | `3:12 LEFT` (after a turn, the size for 2 s) |
 | 4. Paragraph | one paragraph a detent | —                    | the script's name                            |
 
-- **Keys:** `PLAY` (lit green while scrolling), `BACK`, `TOP`, and the page key in the chain (D5). The other keys stay dark (§14).
+- **Keys:** `PLAY` (lit green while scrolling), `BACK`, `TOP`, `◂ CUE`, `CUE ▸` and the page key in the chain (D5); the other keys stay dark (§14).
 - **Screen-only (D14):** putting a script on, replacing, updating and clearing it; editing; the look.
 - **Not connected:** while the Prompter XL is not connected, `PLAY` and the speed dial's push show the deck's locked grey, and the strip says `XL NOT CONNECTED`.
 - **Nothing on the prompter:** every prompter control is grey.
@@ -264,38 +264,40 @@ Delete for good… asks in a dialog, like Delete fixture… on Lighting.
 - **Follow the presenter's voice.** It would scroll by itself (D12). It would also need a microphone and a speech model on this PC, and it mishears names and pauses. The operator sets the pace (D9).
 - **Give the presenter a remote** (foot pedal, hand clicker). The operator runs the prompter (D9). Those remotes are keyboards to Windows, and Studio Control binds no keys (D6).
 - **Mirror or flip.** The Prompter XL flips the picture itself; a second flip would make the text read backwards.
-- **Show the script on another prompter, screen, preview window, phone or tablet.** D12 forbids it, and the prompter needs no network at all.
+- **Show the script to the presenter on another prompter, screen, preview window, phone or tablet.** D12 forbids it (the operator's copy on the page is the one exception, D12 as amended), and the prompter needs no network at all.
 - **Edit live on the glass, or reload a changed file by itself.** Either would move the text under the presenter's eyes.
 - **Stop at cues, loop, rewind at the end, or start with a recording** (`REC` or vMix). Each would be a scroll or a jump the operator did not make.
 - **Keep Word's look.** Fonts and colours are chosen for a page, not for a glass 2 m away. The look is set once, for the presenter.
 - **Import PDF, `.doc` or RTF, or anything from the network** (§3.1).
 - **Show the presenter a clock, a countdown or messages.** The glass carries the script only; the operator's time left is on the page and the deck.
 - **Set the Prompter XL's brightness or other settings.** Windows does not report them, and only reported values are shown.
-- **Keep several looks.** There is one presenter and one look (§14).
+- **Keep several looks.** There is one presenter and one look.
 
 ## 13. What the walk checks (Appendix B)
 
-| Item | Check                                                                                                                                         |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 13   | The script reads right in the glass (not mirrored), shows nowhere else, and Studio Control stays fullscreen on display 3                      |
-| 14   | Unplugged, the page says `NOT CONNECTED` and no other screen shows the script. Plugged back in, the script returns at the same place, paused  |
-| 15   | A `.docx` and pasted text load, and the import sentence counts what was left out. Replacing the script on the prompter needs the second press |
-| 16   | Play, pause, speed, position, size and the jumps work from the page and from the deck, and the scroll is smooth at the speeds used            |
-| 17   | After Studio Control is closed and reopened, the script and the place are still there, paused                                                 |
+| Item | Check                                                                                                                                                                                                                                                                            |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13   | The script reads right in the glass (not mirrored) and on no other screen but the page's own copy; Studio Control stays fullscreen on display 3; with Studio Control closed, the Prompter XL shows a black desktop; Camera Hub's own prompter feature is off, if it is installed |
+| 14   | Unplugged, the page says `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script. Plugged back in, the script returns at the same place, paused                                                                                        |
+| 15   | A `.docx` and pasted text load, and the import sentence counts what was left out. Replacing the script on the prompter needs the second press                                                                                                                                    |
+| 16   | Play, pause, speed, position, size and the jumps work from the page and from the deck, and the scroll is smooth at the speeds used                                                                                                                                               |
+| 17   | After Studio Control is closed and reopened, the script and the place are still there, paused                                                                                                                                                                                    |
 
 One risk to walk on purpose, under item 16: a full-screen scroll changes every frame, and DisplayLink compresses each changed frame on this PC's processor. The standard look (black background, plain text) is the cheapest picture it can carry, but only the walk can show the scroll is smooth. It should be walked with the Cameras page open and decoding its three pictures.
 
 ## 14. Open questions for the operator
 
-1. Where do the scripts come from today: Word, Google Docs, or the home-built program? Does that program hold scripts worth bringing over, and in what format?
-2. How far from the glass is the presenter? That distance sets the standard size: 88 px is comfortable to about 2 m, and 3 m needs about 132 px for the same comfort.
-3. Should speed be in words a minute (proposed) or on a plain 1–10 scale?
-4. Should `BACK` go to the start of the paragraph (proposed) or back a fixed few lines?
-5. Should a jump keep the text scrolling (proposed), or always pause it?
-6. White or yellow text? Should text already read be dimmed (proposed: on)?
-7. The PROMPTER page has spare keys. Should they be `◂ CUE` and `CUE ▸`? And is a `PLAY` key needed on the CAMERAS page, for a take run from the Cameras tab?
-8. Is a Blank key wanted (one press hides the text for a moment and keeps the place), or is Clear enough?
-9. Is the Prompter XL always plugged in? If it is put away between shows, a red `NOT CONNECTED` stays in the header all day, and amber would fit better.
-10. Does Elgato Camera Hub run on this PC (it installs the DisplayLink driver)? If so, its own prompter feature must stay off, or two programs will draw on one screen.
-11. When Studio Control is closed, the Prompter XL shows the Windows desktop. Should that screen get a black desktop background?
-12. Is a "fit to time" key wanted, which sets the speed so the script ends in a given time (say 3:00)?
+Answered by the operator on 2026-09-26; where the question carried a recommendation, the operator took it.
+
+1. Where do the scripts come from today: Word, Google Docs, or the home-built program? Does that program hold scripts worth bringing over, and in what format? **Answer:** Word documents and text pasted from e-mail or the web. Nothing comes over from the home-built program; `.docx`, `.txt` and paste stay as §3.1 has them.
+2. How far from the glass is the presenter? That distance sets the standard size: 88 px is comfortable to about 2 m, and 3 m needs about 132 px for the same comfort. **Answer:** about 2 m, so the standard size stays 88 px.
+3. Should speed be in words a minute (proposed) or on a plain 1–10 scale? **Answer:** words a minute.
+4. Should `BACK` go to the start of the paragraph (proposed) or back a fixed few lines? **Answer:** the start of the paragraph.
+5. Should a jump keep the text scrolling (proposed), or always pause it? **Answer:** a jump keeps the scroll as it was; only `TOP` pauses.
+6. White or yellow text? Should text already read be dimmed (proposed: on)? **Answer:** white by default (yellow stays in the look), and text already read is dimmed.
+7. The PROMPTER page has spare keys. Should they be `◂ CUE` and `CUE ▸`? And is a `PLAY` key needed on the CAMERAS page, for a take run from the Cameras tab? **Answer:** `◂ CUE` and `CUE ▸` on the PROMPTER page; no `PLAY` on the CAMERAS page.
+8. Is a Blank key wanted (one press hides the text for a moment and keeps the place), or is Clear enough? **Answer:** no: Clear (press twice) keeps the script and its place, and Put on the prompter brings it back.
+9. Is the Prompter XL always plugged in? If it is put away between shows, a red `NOT CONNECTED` stays in the header all day, and amber would fit better. **Answer:** always plugged in, so `NOT CONNECTED` stays red.
+10. Does Elgato Camera Hub run on this PC (it installs the DisplayLink driver)? If so, its own prompter feature must stay off, or two programs will draw on one screen. **Answer:** a walk check (Appendix B item 13): if Camera Hub is installed, its own prompter feature is off.
+11. When Studio Control is closed, the Prompter XL shows the Windows desktop. Should that screen get a black desktop background? **Answer:** yes, a black background, set by hand in Windows (Studio Control never changes Windows' settings); a walk check (Appendix B item 13).
+12. Is a "fit to time" key wanted, which sets the speed so the script ends in a given time (say 3:00)? **Answer:** not now.
