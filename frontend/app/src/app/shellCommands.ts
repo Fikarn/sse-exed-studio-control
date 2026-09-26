@@ -63,15 +63,31 @@ export async function exportShellDiagnostics(report: Record<string, JsonValue>) 
   return "diagnostics-fixture.json";
 }
 
+// New pages program, Slice 3 (D6, decision 2): the three window commands left
+// the palette for keys in Setup / Support › Workstation and, for the reset, on
+// the recovery screens. A refusal ("No monitor is available for
+// studio fullscreen.") reaches the screen as an `Error` carrying the shell's
+// sentence, like `openShellPath`'s. Outside the installed app they do nothing.
+
+/** Studio fullscreen on the studio monitor, remembered for the next launch. */
 export async function enterStudioFullscreen() {
   if (tauriAvailable()) {
-    await invoke("shell_enter_studio_fullscreen");
+    try {
+      await invoke("shell_enter_studio_fullscreen");
+    } catch (error) {
+      throw toError(error, "Studio fullscreen did not start.");
+    }
   }
 }
 
+/** The window centred at its windowed size, remembered for the next launch. */
 export async function switchToWindowedLayout() {
   if (tauriAvailable()) {
-    await invoke("shell_use_windowed_layout");
+    try {
+      await invoke("shell_use_windowed_layout");
+    } catch (error) {
+      throw toError(error, "The windowed layout did not start.");
+    }
   }
 }
 
@@ -107,8 +123,14 @@ export async function confirmShellClose() {
   }
 }
 
+/** Forgets the saved window, then goes to studio fullscreen on the studio
+ *  monitor, or to the windowed layout when there is none. */
 export async function resetWindowLayout() {
   if (tauriAvailable()) {
-    await invoke("shell_reset_window_layout");
+    try {
+      await invoke("shell_reset_window_layout");
+    } catch (error) {
+      throw toError(error, "The window layout was not reset.");
+    }
   }
 }

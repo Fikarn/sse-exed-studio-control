@@ -4,28 +4,18 @@ import { Mic, Sliders, Sun } from "lucide-react";
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
 
-import { formatShortcut } from "./shared/shortcutGlyphs";
 import styles from "./OperatorShell.module.css";
 import { createShellEnvironment } from "./createShellEnvironment";
-import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvider";
-import { OPERATOR_UI_SCALES } from "./operatorLayout";
-import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone, isEditableTarget } from "./shellData";
+import { OperatorLayoutProvider } from "./OperatorLayoutProvider";
+import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone } from "./shellData";
 import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
-import {
-  confirmShellClose,
-  enterStudioFullscreen,
-  onShellCloseRequested,
-  resetWindowLayout,
-  switchToWindowedLayout,
-} from "./shellCommands";
+import { confirmShellClose, onShellCloseRequested } from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
 import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
-import { PaletteProvider, usePalette } from "./shared/paletteContext";
 import { ShellDialog } from "./shared/ShellDialog";
-import { ShortcutOverlay } from "./shared/ShortcutOverlay";
 import { ToastProvider } from "./shared/toastContext";
 import { useLiveCallback } from "./shared/useLiveCallback";
 import { RecoverySurface } from "./startup/RecoverySurface";
@@ -52,17 +42,24 @@ const CLOSE_DIALOG_BODY =
 
 export type ShellEnvironment = ReturnType<typeof createShellEnvironment>;
 
+// New pages program, Slice 3 (D4, D6): the header tabs are the way between the
+// workspaces. They print no key hint — Studio Control binds no key of its own.
+const WORKSPACES = [
+  { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
+  { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
+  { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
+] as const;
+
 export function OperatorShell({ environment }: { environment?: ShellEnvironment }) {
-  // Toast portal hosts cross-workspace bottom-right notifications + the ⌘K
-  // command palette. Both mount once at the shell root so every workspace
-  // (and any startup/recovery surface) inherits the same stacks.
+  // The toast portal hosts cross-workspace bottom-right notifications. It
+  // mounts once at the shell root so every workspace (and any startup /
+  // recovery surface) inherits the same stack. New pages program, Slice 3
+  // (D6): the palette that mounted beside it is gone.
   return (
     <ToastProvider>
-      <PaletteProvider>
-        <OperatorLayoutProvider>
-          <OperatorShellInner environment={environment} />
-        </OperatorLayoutProvider>
-      </PaletteProvider>
+      <OperatorLayoutProvider>
+        <OperatorShellInner environment={environment} />
+      </OperatorLayoutProvider>
     </ToastProvider>
   );
 }
@@ -72,14 +69,11 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   // so it can forward uncaught window errors to the store; tests and stories
   // render the shell without one.
   const environment = useMemo(() => providedEnvironment ?? createShellEnvironment(), [providedEnvironment]);
-  const palette = usePalette();
-  const { reviewSurface, setReviewSurface, setTheme, setUiScale } = useOperatorLayout();
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
   const setupModalActive = activeWorkspace === "setup";
   const [confirmIntent, setConfirmIntent] = useState<ConfirmIntent>(null);
-  const [showShortcutGuide, setShowShortcutGuide] = useState(false);
   // Slice 9 (F10): advanced by "Reload this area"; with the area's name it is
   // the workspace boundary's key.
   const [areaReloads, setAreaReloads] = useState(0);
@@ -135,8 +129,10 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     setConfirmIntent("restart-engine");
   });
 
-  const showShortcuts = useLiveCallback(() => {
-    setShowShortcutGuide(true);
+  // Esc closes the shell's dialogs wherever focus is (ShellDialog listens on
+  // the window while it is up); Cancel does the same.
+  const cancelConfirm = useLiveCallback(() => {
+    setConfirmIntent(null);
   });
 
   const performRestart = useLiveCallback(async () => {
@@ -185,215 +181,13 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     };
   }, [environment.store]);
 
-  // Register cross-workspace ⌘K actions. Workspace-specific actions (lighting
-  // recall, save changes, etc.) live in their respective workspaces and
-  // register from there with `when` predicates so they only surface when the
-  // workspace is active.
-  useEffect(() => {
-    const uiScaleActions = OPERATOR_UI_SCALES.map((scale) => ({
-      id: `system:ui-scale:${scale}`,
-      label: `Set UI scale to ${scale} %`,
-      group: "System",
-      keywords: ["ui", "scale", "density", "compact", String(scale)],
-      action: () => setUiScale(scale),
-    }));
-
-    return palette.register([
-      {
-        id: "workspace:setup",
-        label: "Switch to Setup / Support",
-        group: "Workspace",
-        keywords: ["setup", "support", "pilot"],
-        shortcut: formatShortcut(["shift", "S"]),
-        action: () => void tryNavigateWorkspace("setup"),
-      },
-      {
-        id: "workspace:lighting",
-        label: "Switch to Lighting",
-        group: "Workspace",
-        keywords: ["lighting", "lights", "rig"],
-        shortcut: formatShortcut(["mod", "2"]),
-        action: () => void tryNavigateWorkspace("lighting"),
-      },
-      {
-        id: "workspace:audio",
-        label: "Switch to Audio",
-        group: "Workspace",
-        keywords: ["audio", "mixer", "sound"],
-        shortcut: "A",
-        action: () => void tryNavigateWorkspace("audio"),
-      },
-      {
-        id: "system:restart-engine",
-        label: "Restart the hardware link",
-        group: "System",
-        keywords: ["restart", "reset", "bridge", "recover"],
-        shortcut: formatShortcut(["mod", "shift", "R"]),
-        action: () => setConfirmIntent("restart-engine"),
-      },
-      // Visual overhaul A, Slice 4 (plan D5, D12): the Console's private theme
-      // switch is gone; the theme is the program's, set from the palette and
-      // from Support › Workstation.
-      ...(["studio", "graphite", "bone"] as const).map((themeId) => ({
-        id: `system:theme:${themeId}`,
-        label: `Switch to the ${themeId[0]!.toUpperCase()}${themeId.slice(1)} theme`,
-        group: "System",
-        keywords: ["theme", "studio", "graphite", "bone", "light", "dark", themeId],
-        action: () => setTheme(themeId),
-      })),
-      {
-        id: "system:show-shortcuts",
-        label: "Show keyboard shortcuts",
-        group: "System",
-        keywords: ["help", "shortcuts", "keys"],
-        shortcut: "?",
-        action: () => setShowShortcutGuide(true),
-      },
-      {
-        id: "system:enter-studio-fullscreen",
-        label: "Enter studio fullscreen",
-        group: "Window",
-        keywords: ["studio", "fullscreen", "monitor", "window"],
-        action: () => void enterStudioFullscreen(),
-      },
-      {
-        id: "system:use-windowed-layout",
-        label: "Use the windowed layout",
-        group: "Window",
-        keywords: ["windowed", "layout", "resize", "monitor"],
-        action: () => void switchToWindowedLayout(),
-      },
-      {
-        id: "system:reset-window-layout",
-        label: "Reset the window layout",
-        group: "Window",
-        keywords: ["reset", "window", "layout", "monitor"],
-        action: () => void resetWindowLayout(),
-      },
-      {
-        id: "system:enter-studio-preview",
-        label: "Enter Studio Preview at 2560 × 1440",
-        group: "Window",
-        keywords: ["studio", "preview", "scaled", "review", "2560", "1440", "layout"],
-        when: () => reviewSurface !== "studioPreview",
-        action: () => setReviewSurface("studioPreview"),
-      },
-      {
-        id: "system:exit-studio-preview",
-        label: "Exit Studio Preview",
-        group: "Window",
-        keywords: ["studio", "preview", "scaled", "review", "native", "layout"],
-        when: () => reviewSurface === "studioPreview",
-        action: () => setReviewSurface("native"),
-      },
-      ...uiScaleActions,
-    ]);
-  }, [palette, reviewSurface, setReviewSurface, setTheme, setUiScale, tryNavigateWorkspace]);
-
-  const workspaces = useMemo(
-    () =>
-      [
-        {
-          id: "setup",
-          label: "Setup / Support",
-          meta: "pilot",
-          icon: <Sliders size={16} />,
-          hint: formatShortcut(["mod", "1"]),
-        },
-        {
-          id: "lighting",
-          label: "Lighting",
-          meta: "primary",
-          icon: <Sun size={16} />,
-          hint: formatShortcut(["mod", "2"]),
-        },
-        { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} />, hint: formatShortcut(["mod", "3"]) },
-      ] as const,
-    []
-  );
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented) {
-        return;
-      }
-
-      if (event.key === "Escape") {
-        if (confirmIntent) {
-          setConfirmIntent(null);
-          event.preventDefault();
-          return;
-        }
-
-        if (showShortcutGuide) {
-          setShowShortcutGuide(false);
-          event.preventDefault();
-        }
-        return;
-      }
-
-      // ⌘K / Ctrl+K — open command palette. Active even when an editable
-      // target has focus (Linear / VS Code convention) so operators can
-      // jump from the toolbar search into the palette without re-focusing.
-      // R2-GLO-02: single-modal posture — opening the palette dismisses the
-      // shortcut guide so two modal surfaces never stack.
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
-        setShowShortcutGuide(false);
-        palette.setOpen(true);
-        event.preventDefault();
-        return;
-      }
-
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      if (!event.metaKey && !event.ctrlKey && !event.altKey && event.shiftKey && event.key.toLowerCase() === "s") {
-        if (activeWorkspace !== "setup") {
-          void tryNavigateWorkspace("setup");
-          event.preventDefault();
-        }
-        return;
-      }
-
-      if (!event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "a") {
-        if (activeWorkspace !== "audio") {
-          void tryNavigateWorkspace("audio");
-          event.preventDefault();
-        }
-        return;
-      }
-
-      if (
-        (event.key === "?" || (event.key === "/" && event.shiftKey)) &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey
-      ) {
-        setShowShortcutGuide((current) => !current);
-        event.preventDefault();
-        return;
-      }
-
-      const modifier = event.metaKey || event.ctrlKey;
-      if (modifier && ["1", "2", "3"].includes(event.key)) {
-        const nextWorkspace = workspaces[Number(event.key) - 1]?.id;
-        if (nextWorkspace) {
-          void tryNavigateWorkspace(nextWorkspace);
-          event.preventDefault();
-        }
-        return;
-      }
-
-      if (modifier && event.shiftKey && event.key.toLowerCase() === "r") {
-        setConfirmIntent("restart-engine");
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeWorkspace, confirmIntent, palette, showShortcutGuide, tryNavigateWorkspace, workspaces]);
+  // New pages program, Slice 3 (D6): the shell binds no key of its own. The
+  // palette, its registrations and the window key handler (the workspace keys,
+  // the palette and guide keys, the restart key) are gone; every one of them
+  // had an on-screen twin — the header tabs, "Restart the hardware link…" in
+  // Setup / Support › Support, "Retry startup", Workstation's theme and UI
+  // scale — and the window commands are keys in Workstation and on the
+  // recovery screens. Escape still closes the shell's dialogs (ShellDialog).
 
   const shellExperience = deriveShellExperience(shellState);
 
@@ -431,7 +225,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
       <ShellDialog
         body={CLOSE_DIALOG_BODY}
         confirmLabel="Close Studio Control"
-        onCancel={() => setConfirmIntent(null)}
+        onCancel={cancelConfirm}
         onConfirm={() => void performClose()}
         title="Close Studio Control?"
       />
@@ -443,7 +237,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         <ShellDialog
           body="Retry startup with the paths Studio Control is set to use. If it fails again, export diagnostics before you change any saved data or connection settings."
           confirmLabel="Retry startup"
-          onCancel={() => setConfirmIntent(null)}
+          onCancel={cancelConfirm}
           onConfirm={() => void performRestart()}
           title="Retry startup?"
         />
@@ -451,7 +245,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         <ShellDialog
           body="Restarting reconnects Studio Control to the desk, the rig and the deck. The hardware link and the Stream Deck drop for a few seconds and come back on their own; TotalMix and the lights keep their current state."
           confirmLabel="Restart the hardware link"
-          onCancel={() => setConfirmIntent(null)}
+          onCancel={cancelConfirm}
           onConfirm={() => void performRestart()}
           title="Restart the hardware link?"
         />
@@ -486,7 +280,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   // What the workspace boundary calls the area it wraps (Slice 9).
   const areaLabel =
     shellExperience === "ready"
-      ? (workspaces.find((workspace) => workspace.id === activeWorkspace)?.label ?? "This area")
+      ? (WORKSPACES.find((workspace) => workspace.id === activeWorkspace)?.label ?? "This area")
       : shellExperience === "recovery"
         ? "Recovery"
         : "Startup";
@@ -497,15 +291,9 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
 
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
-    surface = (
-      <SetupStartupSurface
-        appSnapshot={shellState.appSnapshot}
-        lifecycle={shellState.lifecycle}
-        onShowShortcuts={showShortcuts}
-      />
-    );
+    surface = <SetupStartupSurface appSnapshot={shellState.appSnapshot} lifecycle={shellState.lifecycle} />;
   } else if (shellExperience === "startup") {
-    surface = <StartupSurface lifecycle={shellState.lifecycle} onShowShortcuts={showShortcuts} />;
+    surface = <StartupSurface lifecycle={shellState.lifecycle} />;
   } else if (setupModalActive && shellExperience === "ready") {
     surface = (
       <SetupSurface
@@ -516,7 +304,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         lightOutputsArmed={shellState.lightingSnapshot ? shellState.lightingSnapshot.outputArmed !== false : null}
         liveTransportRequested={environment.liveTransportRequested}
         onRequestRestart={requestRestart}
-        onShowShortcuts={showShortcuts}
         store={environment.store}
         supportSnapshot={deferredSupportSnapshot}
       />
@@ -529,7 +316,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         healthSnapshot={shellState.healthSnapshot}
         liveTransportRequested={environment.liveTransportRequested}
         onRequestRestart={requestRestart}
-        onShowShortcuts={showShortcuts}
         store={environment.store}
         supportSnapshot={deferredSupportSnapshot}
       />
@@ -540,7 +326,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         failure={shellState.startupFailure}
         healthSnapshot={shellState.healthSnapshot}
         onRequestRestart={requestRestart}
-        onShowShortcuts={showShortcuts}
       />
     );
   } else if (activeWorkspace === "lighting") {
@@ -577,7 +362,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
         tabsDisabled={tabsDisabled}
-        workspaces={workspaces}
+        workspaces={WORKSPACES}
         onMonitorItemClick={(item) => {
           // Health chips open Setup / Support; latched chips jump to the
           // workspace that owns the latched state (same-target clicks no-op).
@@ -610,7 +395,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
           </WorkspaceErrorBoundary>
         </div>
       </AppShellFrame>
-      {showShortcutGuide ? <ShortcutOverlay onClose={() => setShowShortcutGuide(false)} /> : null}
       {restartDialog}
       {closeDialog}
     </>

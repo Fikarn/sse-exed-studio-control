@@ -1,54 +1,78 @@
 import { expect, test } from "@playwright/test";
 
-import { modifierShortcut } from "./helpers/modifier-shortcut";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // plan PR 4 / workstream D4: shell-level specs split out of
-// operator-shell.spec.ts. Covers shell-wide keyboard overlays + workspace
-// switching shortcuts that aren't tied to any single workspace.
+// operator-shell.spec.ts. Covers the shell's own chrome and dialogs that aren't
+// tied to any single workspace.
+//
+// New pages program, Slice 3 (D6): Studio Control binds no key of its own. Old:
+// "supports shell keyboard overlays and workspace switching" drove the shortcut
+// guide (?), Setup's Runner and Support (Shift+S), its steps (Tab, Shift+Tab),
+// the Map's page and control keys (2, K), the restart dialog (Ctrl+Shift+R) and
+// Ctrl+2. New: the two cases below reach the same things by clicks. Reason:
+// the keys are gone (inventory §3) and every one had an on-screen twin; the
+// guide went with the keys it listed. The palette's two cases and "shortcut
+// labels follow the host platform" went with the palette and the hints.
 
-test("supports shell keyboard overlays and workspace switching", async ({ page }) => {
+test("Restart the hardware link… in Setup / Support asks first; Esc and Cancel keep the link", async ({ page }) => {
   await openFixture(page, "setup-required");
-
   await expectWorkspaceMounted(page, "setup");
-  await page.keyboard.press("Shift+/");
-  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeHidden();
+  const restartKey = page.getByTestId("support-restart-bridge");
+  const dialog = page.getByRole("dialog", { name: "Restart the hardware link?" });
 
-  await page.keyboard.press("Shift+S");
+  await restartKey.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("TotalMix and the lights keep their current state");
+  // A click beside the dialog takes focus off it; Esc still closes it (the
+  // shell's window key handler that used to catch this is gone).
+  await page.mouse.click(8, 8);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  await restartKey.click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
+});
+
+test("Setup's modes, steps and the Map's pages and deck keys answer clicks", async ({ page }) => {
+  await openFixture(page, "setup-required");
+  await expectWorkspaceMounted(page, "setup");
+
+  await page.getByTestId("setup-mode-support").click();
   await expect(page.getByRole("heading", { name: "Backup and recovery" })).toBeVisible();
-  await page.keyboard.press("Shift+S");
+  await page.getByTestId("setup-mode-runner").click();
   await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 
-  await page.keyboard.press("Tab");
+  // Import, then Probe, then Map, the way the operator walks them.
+  await page.getByRole("button", { name: "Download profile" }).click();
+  await expect(page.getByText(/Exported Companion profile to/)).toBeVisible();
+  await page.getByRole("tab", { name: /Probe hardware/i }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
+  await page.getByLabel("Lighting bridge IP").fill("192.168.1.80");
+  await page.getByTestId("setup-run-all-probes").click();
+  await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
 
-  await page.keyboard.press("Tab");
   // New pages program, Slice 2: the deck's pages are LIGHTS and AUDIO (PROJECTS and
   // TASKS left with Planning), so page 1 opens on "Light 1" and page 2 is AUDIO.
-  await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
-  await expect(page.getByText("Light 1").last()).toBeVisible();
+  const deckKey = (label: string) =>
+    page
+      .getByTestId("setup-deck-keys")
+      .locator("button")
+      .filter({ has: page.getByText(label, { exact: true }) });
+  await expect(deckKey("Light 1")).toHaveAttribute("data-selected", "true");
 
-  await page.keyboard.press("Digit2");
-  await expect(page.getByText("Channel 1").last()).toBeVisible();
+  await page.getByRole("button", { name: /^AUDIO/ }).click();
+  await expect(deckKey("Channel 1")).toHaveAttribute("data-selected", "true");
 
-  await page.keyboard.press("KeyK");
-  await expect(page.getByText("Channel 2").last()).toBeVisible();
+  await deckKey("Channel 2").click();
+  await expect(deckKey("Channel 2")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("Channel 1")).toHaveAttribute("data-selected", "false");
 
-  await page.keyboard.press("Shift+Tab");
+  await page.getByRole("button", { name: /^Back to Probe hardware/ }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();
-
-  await page.keyboard.press("Shift+Tab");
-  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
-
-  await page.keyboard.press(modifierShortcut("Shift+KeyR"));
-  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeHidden();
-
-  await page.keyboard.press(modifierShortcut("Digit2"));
-  await expect(page.getByRole("heading", { name: "Import the Companion profile" })).toBeVisible();
 });
 
 declare global {
@@ -90,59 +114,11 @@ test("closing the window asks for confirmation; Cancel and Escape keep the sessi
   await expect(workspace).toBeVisible();
 });
 
-// R2-A (round-2 audit, R2-GLO-01): the palette is a modal — Tab must never
-// walk focus out to the page behind it, Escape must close it from wherever
-// focus sits, and focus must return to the invoker on close. The pre-fix
-// palette failed all three (probe transcript in
-// docs/archive/program-ux-audit-round-2-2026-06-10.md).
-test("command palette traps focus, closes on Escape from anywhere, and restores focus", async ({ page }) => {
-  await openFixture(page, "lighting-populated");
-
-  // Park focus on a known invoker first so restore is observable.
-  const lightingTab = page.getByRole("button", { name: "Lighting", exact: true });
-  await lightingTab.focus();
-
-  await page.keyboard.press(modifierShortcut("KeyK"));
-  const palette = page.getByRole("dialog", { name: "Command palette" });
-  await expect(palette).toBeVisible();
-
-  // Tab repeatedly: focus must stay inside the dialog every step.
-  for (let i = 0; i < 5; i += 1) {
-    await page.keyboard.press("Tab");
-    const inDialog = await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'));
-    expect(inDialog, `focus must stay inside the palette after Tab #${i + 1}`).toBe(true);
-  }
-
-  // Escape closes — even though focus has been tabbed around.
-  await page.keyboard.press("Escape");
-  await expect(palette).toBeHidden();
-
-  // Focus returns to the invoker.
-  await expect(lightingTab).toBeFocused();
-});
-
-// R2-A (R2-GLO-02): single-modal posture — opening the palette dismisses the
-// shortcut guide instead of stacking two live modals.
-test("opening the palette dismisses the shortcut guide", async ({ page }) => {
-  await openFixture(page, "lighting-populated");
-
-  await expectWorkspaceMounted(page, "lighting");
-  await page.keyboard.press("Shift+/");
-  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeVisible();
-
-  await page.keyboard.press(modifierShortcut("KeyK"));
-  await expect(page.getByRole("dialog", { name: "Command palette" })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Keyboard shortcuts" })).toBeHidden();
-
-  const dialogCount = await page.evaluate(() => document.querySelectorAll('[role="dialog"]').length);
-  expect(dialogCount, "exactly one modal surface may be live").toBe(1);
-});
-
 // GLO-02 / CHROME-03 (the S2 "UI-scale escape" deferral, closed): the operator
 // scale tokens are defined for `.root` AND for body[data-operator-scale-host]
 // in one grouped rule, so overlays that portal to document.body (dialogs,
-// palette, context menu, color picker, shortcut guide, toasts) now track the
-// operator UI scale instead of silently falling back to unscaled DS tokens.
+// drawers, context menu, color picker, toasts) now track the operator UI scale
+// instead of silently falling back to unscaled DS tokens.
 test("operator UI scale reaches portaled overlays", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("app.operator.uiScale", "125");
@@ -208,37 +184,6 @@ test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
   await expect(driftChip).toHaveCount(0);
 });
 
-// 2026-09 audit remediation, Slice 12: shortcut hints render for the host OS.
-// The studio workstation is Windows; the Mac glyphs used to appear everywhere
-// with "(Ctrl+K on Windows)" footnotes.
-test("shortcut labels follow the host platform", async ({ page }) => {
-  const apple = process.platform === "darwin";
-  const paletteLabel = apple ? "⌘K" : "Ctrl+K";
-  const monitorLabel = apple ? "⌘⇧M" : "Ctrl+Shift+M";
-
-  await openFixture(page, "audio-populated");
-  await expect(page.locator("[data-health-bar] kbd").first()).toHaveText(paletteLabel);
-
-  await page.keyboard.press("Shift+/");
-  const overlay = page.getByRole("dialog", { name: "Keyboard shortcuts" });
-  await expect(overlay).toBeVisible();
-  const paletteRow = overlay.locator("li", { hasText: "Open command palette" }).first();
-  await expect(paletteRow.locator("kbd").first()).toHaveText(apple ? "⌘" : "Ctrl");
-  await expect(overlay.getByText(/Ctrl\+K on Windows/)).toHaveCount(0);
-  await expect(overlay.getByText(/Ctrl substitutes/)).toHaveCount(0);
-  await page.keyboard.press("Escape");
-  await expect(overlay).toBeHidden();
-
-  await page.keyboard.press(modifierShortcut("KeyK"));
-  const palette = page.getByRole("dialog", { name: /command palette/i });
-  await expect(palette).toBeVisible();
-  await expect(palette.getByText(apple ? "⌘⇧R" : "Ctrl+Shift+R", { exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-
-  await openFixture(page, "lighting-populated");
-  await expect(page.locator("[data-health-bar] kbd", { hasText: monitorLabel })).toHaveCount(1);
-});
-
 // Visual overhaul A, Slice 2 (plan D1, finding C3): the header lamp mirrors
 // the worst state its workspace shows — `ACTION FAILED` is red in the header
 // too. Until the state display lands (Slice 4), the workspace's state is its
@@ -291,6 +236,11 @@ test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
 // renders; the shell must survive it, Audio must stay usable, the failure must
 // reach the attention band, and "Reload this area" must bring Lighting back
 // once the fault is gone.
+// New pages program, Slice 3 (D6). Old: Ctrl+Shift+R raised "Restart the
+// hardware link?" over the failed area. New: the window's close request raises
+// "Close Studio Control?", and Esc closes it. Reason: the key is gone; the
+// close request is the shell dialog that every surface can still raise, and
+// Setup's restart key is not on this page.
 test("workspace crash keeps shell alive", async ({ page }) => {
   await openFixture(page, "audio-populated", { crash: "lighting" });
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
@@ -308,9 +258,11 @@ test("workspace crash keeps shell alive", async ({ page }) => {
   await expect(nav.getByRole("button", { name: "Lighting", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
   await expect(page.getByTestId("shell-lamp-audio")).toBeVisible();
-  await page.keyboard.press(modifierShortcut("Shift+KeyR"));
-  await expect(page.getByRole("dialog", { name: "Restart the hardware link?" })).toBeVisible();
+  await page.evaluate(() => window.__SSE_TEST_REQUEST_CLOSE__?.());
+  const closeDialog = page.getByRole("dialog", { name: "Close Studio Control?" });
+  await expect(closeDialog).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(closeDialog).toBeHidden();
   await expect(band).toContainText("1 problem since");
 
   // Audio is one tab away and works.
@@ -391,6 +343,8 @@ test("lazy workspace loads", async ({ page }) => {
 
   // A workspace whose chunk is in hand mounts in the commit that asks for it:
   // the shell's loading surface is never drawn on the way to the Console.
+  // New pages program, Slice 3 (D6). Old: Ctrl+3 asked for the Console. New:
+  // a click on the "Audio" tab. Reason: the key is gone; the tab is its twin.
   await page.evaluate(() => {
     const seen = { loading: false };
     (window as unknown as { __sawWorkspaceLoading: typeof seen }).__sawWorkspaceLoading = seen;
@@ -398,7 +352,10 @@ test("lazy workspace loads", async ({ page }) => {
       if (document.querySelector('[data-testid="workspace-loading"]')) seen.loading = true;
     }).observe(document.body, { childList: true, subtree: true });
   });
-  await page.keyboard.press(modifierShortcut("Digit3"));
+  await page
+    .getByRole("navigation", { name: "Workspace navigation" })
+    .getByRole("button", { name: "Audio", exact: true })
+    .click();
   await expectWorkspaceMounted(page, "audio");
   expect(
     await page.evaluate(

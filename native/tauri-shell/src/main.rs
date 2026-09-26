@@ -1169,37 +1169,168 @@ fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewWindow) {
     }
 }
 
+/// The one window-command refusal that is already the operator's sentence.
+const NO_MONITOR_FOR_STUDIO_FULLSCREEN: &str = "No monitor is available for studio fullscreen.";
+
+/// The three window commands: keys in Setup / Support › Workstation, and the
+/// reset on the recovery screens too (new pages program, Slice 3, decision 2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WindowCommand {
+    StudioFullscreen,
+    WindowedLayout,
+    ResetLayout,
+}
+
+impl WindowCommand {
+    /// What shell.log calls the command.
+    fn log_name(self) -> &'static str {
+        match self {
+            WindowCommand::StudioFullscreen => "Studio fullscreen",
+            WindowCommand::WindowedLayout => "Windowed layout",
+            WindowCommand::ResetLayout => "Window layout reset",
+        }
+    }
+}
+
+/// The sentence the operator reads when a window command did not finish. The
+/// screens show a refusal as it stands, so it says in the app's words what
+/// did not happen; the detail — the webview's own error, a file path — goes
+/// to shell.log. Only the fullscreen command's missing monitor is said as is.
+fn window_command_refusal(command: WindowCommand, detail: &str) -> String {
+    let sentence = match command {
+        WindowCommand::StudioFullscreen if detail == NO_MONITOR_FOR_STUDIO_FULLSCREEN => detail,
+        WindowCommand::StudioFullscreen => "Studio fullscreen did not start.",
+        WindowCommand::WindowedLayout => "The windowed layout did not start.",
+        WindowCommand::ResetLayout => "The window layout was not reset.",
+    };
+    sentence.to_string()
+}
+
+/// Runs a window command; a failure is logged in full and answered with the
+/// operator's sentence.
+fn run_window_command(
+    app: &AppHandle,
+    command: WindowCommand,
+    run: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    run().map_err(|detail| {
+        log_shell_line(
+            app,
+            &format!("{} did not finish: {detail}", command.log_name()),
+        );
+        window_command_refusal(command, &detail)
+    })
+}
+
+/// One line in shell.log, through the handle the engine's stderr shares.
+fn log_shell_line(app: &AppHandle, message: &str) {
+    app.state::<EngineState>()
+        .bridge
+        .log_shell_line("SHELL", message);
+}
+
 #[tauri::command]
 fn shell_enter_studio_fullscreen(app: AppHandle) -> Result<(), String> {
-    let window = main_window(&app)?;
-    let monitor = preferred_review_monitor(&window)
-        .or_else(|| window.current_monitor().ok().flatten())
-        .ok_or_else(|| "No monitor is available for studio fullscreen.".to_string())?;
-    route_window_to_monitor(&window, &monitor)?;
-    persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
-    Ok(())
+    run_window_command(&app, WindowCommand::StudioFullscreen, || {
+        let window = main_window(&app)?;
+        let monitor = preferred_review_monitor(&window)
+            .or_else(|| window.current_monitor().ok().flatten())
+            .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
+        route_window_to_monitor(&window, &monitor)?;
+        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
+        Ok(())
+    })
 }
 
 #[tauri::command]
 fn shell_use_windowed_layout(app: AppHandle) -> Result<(), String> {
-    let window = main_window(&app)?;
-    apply_centered_windowed_layout(&window)?;
-    persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
-    Ok(())
+    run_window_command(&app, WindowCommand::WindowedLayout, || {
+        let window = main_window(&app)?;
+        apply_centered_windowed_layout(&window)?;
+        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
+        Ok(())
+    })
 }
 
 #[tauri::command]
 fn shell_reset_window_layout(app: AppHandle) -> Result<(), String> {
-    let window = main_window(&app)?;
-    remove_window_preferences(&app)?;
-    if let Some(monitor) = preferred_review_monitor(&window) {
-        route_window_to_monitor(&window, &monitor)?;
-        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::StudioFullscreen));
-    } else {
-        apply_centered_windowed_layout(&window)?;
-        persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
+    run_window_command(&app, WindowCommand::ResetLayout, || {
+        let window = main_window(&app)?;
+        remove_window_preferences(&app)?;
+        if let Some(monitor) = preferred_review_monitor(&window) {
+            route_window_to_monitor(&window, &monitor)?;
+            persist_current_window_preferences(
+                &app,
+                &window,
+                Some(ShellLaunchMode::StudioFullscreen),
+            );
+        } else {
+            apply_centered_windowed_layout(&window)?;
+            persist_current_window_preferences(&app, &window, Some(ShellLaunchMode::Windowed));
+        }
+        Ok(())
+    })
+}
+
+/// New pages program, Slice 3, decision 12: the one guard against keys Studio
+/// Control does not bind itself. The screen runs in WebView2, which has keys of
+/// its own — reload (F5, Ctrl+R, Ctrl+Shift+R), find (Ctrl+F, F3), print
+/// (Ctrl+P), zoom, back and forward, the developer tools. With its browser
+/// accelerator keys switched off none of them acts on the operator's screen
+/// during a show, while the keys that move and edit — Home, End, Page Up, Page
+/// Down, cut, copy, paste, select-all and undo in text fields — keep working.
+/// The guard binds no function; the page sees nothing of it. A refusal is one
+/// line in shell.log and the shell carries on with WebView2's defaults.
+///
+/// Called from `.setup`, which runs on the main thread, where `with_webview`
+/// runs its closure at once: after the webview is built and before the event
+/// loop delivers its first `NavigationStarting`. That matters, because WebView2
+/// applies most settings changed after `NavigationStarting` only from the next
+/// top-level navigation — and the operator's screen never navigates again.
+#[cfg(windows)]
+fn switch_off_browser_keys(app: &AppHandle, window: &WebviewWindow) {
+    let app_for_webview = app.clone();
+    let queued = window.with_webview(move |webview| {
+        if let Err(error) = set_browser_accelerator_keys_off(&webview.controller()) {
+            log_browser_keys_left_on(&app_for_webview, &error.to_string());
+        }
+    });
+    if let Err(error) = queued {
+        log_browser_keys_left_on(app, &error.to_string());
     }
-    Ok(())
+}
+
+/// `ICoreWebView2Controller` → `CoreWebView2` → `Settings` →
+/// `ICoreWebView2Settings3::SetAreBrowserAcceleratorKeysEnabled(false)`, the
+/// setting wry applies when a webview is built with its browser accelerator
+/// keys off (Tauri does not expose that option).
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn set_browser_accelerator_keys_off(
+    controller: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller,
+) -> windows::core::Result<()> {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+    use windows::core::Interface;
+
+    // SAFETY: `controller` is the live controller Tauri passes to
+    // `with_webview`, on the thread that owns the webview. These are two COM
+    // getters and one setter on it, each checked through the `Result` the
+    // bindings return; the interfaces are reference-counted and released when
+    // they drop at the end of this function.
+    unsafe {
+        let settings = controller.CoreWebView2()?.Settings()?;
+        settings
+            .cast::<ICoreWebView2Settings3>()?
+            .SetAreBrowserAcceleratorKeysEnabled(false)
+    }
+}
+
+#[cfg(windows)]
+fn log_browser_keys_left_on(app: &AppHandle, error: &str) {
+    log_shell_line(
+        app,
+        &format!("WebView2's browser keys stayed on (reload, find, print, zoom): {error}"),
+    );
 }
 
 fn main() {
@@ -1226,6 +1357,11 @@ fn main() {
         })
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
+                // Decision 12: WebView2's own reload, find, print and zoom
+                // keys go off first — before WebView2 delivers the page's
+                // first NavigationStarting, and before the window shows.
+                #[cfg(windows)]
+                switch_off_browser_keys(app.handle(), &window);
                 let _ = window.show();
                 let app_handle = app.handle().clone();
                 restore_or_route_initial_window(&app_handle, &window);
@@ -1315,6 +1451,71 @@ mod shell_close_policy_tests {
         assert_eq!(close_policy(false, Some("1")), ClosePolicy::Allow);
         assert_eq!(close_policy(false, Some(" 1 ")), ClosePolicy::Allow);
         assert_eq!(close_policy(true, Some("0")), ClosePolicy::Allow);
+    }
+}
+
+#[cfg(test)]
+mod shell_window_command_tests {
+    use super::*;
+
+    // New pages program, Slice 3 (decision 2): the window commands are keys on
+    // the operator's screens now, and a refusal is shown as it stands. Old: the
+    // shell's own errors — "Main Tauri window is unavailable.", "Failed to
+    // remove shell window preferences <path>: …", "Failed to leave
+    // fullscreen: …", "Failed to set fallback window size: …", "Failed to
+    // position window on monitor: …". New: one sentence per command in the
+    // app's words; the detail goes to shell.log. The missing monitor is said as
+    // it always was.
+    #[test]
+    fn window_command_refusals_are_the_operators_sentences() {
+        assert_eq!(
+            window_command_refusal(
+                WindowCommand::StudioFullscreen,
+                NO_MONITOR_FOR_STUDIO_FULLSCREEN
+            ),
+            "No monitor is available for studio fullscreen."
+        );
+
+        let details = [
+            "Main Tauri window is unavailable.",
+            r"Failed to remove shell window preferences C:\Users\operator\AppData\Roaming\com.sse.exedstudiocontrol\shell-window-layout.json: Access is denied. (os error 5)",
+            "Failed to resolve Tauri config directory: unknown path",
+            "Failed to leave fullscreen: the underlying handle is not available",
+            "Failed to set fallback window size: the underlying handle is not available",
+            "Failed to center fallback window: the underlying handle is not available",
+            "Failed to show fallback window: the underlying handle is not available",
+            "Failed to position window on monitor: the underlying handle is not available",
+            "Failed to size window for monitor: the underlying handle is not available",
+            "Failed to enter fullscreen: the underlying handle is not available",
+        ];
+        for (command, sentence) in [
+            (
+                WindowCommand::StudioFullscreen,
+                "Studio fullscreen did not start.",
+            ),
+            (
+                WindowCommand::WindowedLayout,
+                "The windowed layout did not start.",
+            ),
+            (
+                WindowCommand::ResetLayout,
+                "The window layout was not reset.",
+            ),
+        ] {
+            for detail in details {
+                let refusal = window_command_refusal(command, detail);
+                assert_eq!(refusal, sentence, "{command:?} refusing {detail:?}");
+                for word in ["Tauri", "fallback", "Failed", "error", "engine", "\\"] {
+                    assert!(!refusal.contains(word), "{refusal:?} carries {word:?}");
+                }
+            }
+        }
+
+        // The missing-monitor sentence is the fullscreen command's alone.
+        assert_eq!(
+            window_command_refusal(WindowCommand::ResetLayout, NO_MONITOR_FOR_STUDIO_FULLSCREEN),
+            "The window layout was not reset."
+        );
     }
 }
 

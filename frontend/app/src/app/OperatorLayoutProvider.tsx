@@ -25,7 +25,9 @@ import {
 import styles from "./OperatorLayoutProvider.module.css";
 
 const UI_SCALE_STORAGE_KEY = "app.operator.uiScale";
-const REVIEW_SURFACE_STORAGE_KEY = "app.operator.reviewSurface";
+/** Where builds before new pages Slice 3 remembered Studio Preview. Nothing
+ *  reads it now; the provider removes it once on start. */
+const RETIRED_REVIEW_SURFACE_STORAGE_KEY = "app.operator.reviewSurface";
 const THEME_STORAGE_KEY = "app.operator.theme";
 
 export type OperatorTheme = "studio" | "graphite" | "bone";
@@ -40,8 +42,8 @@ interface OperatorLayoutContextValue {
   setUiScale: Dispatch<SetStateAction<OperatorUiScale>>;
   theme: OperatorTheme;
   setTheme: Dispatch<SetStateAction<OperatorTheme>>;
+  /** Fixed for the session by the address (`?operatorReview=studio`). */
   reviewSurface: OperatorReviewSurface;
-  setReviewSurface: Dispatch<SetStateAction<OperatorReviewSurface>>;
   reviewScale: number;
   reviewTargetWidth: number | null;
   reviewTargetHeight: number | null;
@@ -61,14 +63,18 @@ function readStoredUiScale(): OperatorUiScale {
   return isOperatorUiScale(parsed) ? parsed : 100;
 }
 
-function readStoredReviewSurface(): OperatorReviewSurface {
+// New pages program, Slice 3 (D6, decision 1): Studio Preview draws the
+// 2560 × 1440 screen scaled into a smaller window, for design review on a
+// laptop. It leaves the operator's screens: only the address opens it
+// (`?operatorReview=studio`, as the tests and reviews do), nothing on screen
+// enters or leaves it, and the choice is no longer remembered — a remembered
+// preview with no way out would stick.
+function readRequestedReviewSurface(): OperatorReviewSurface {
   if (typeof window === "undefined") return "native";
   const params = new URL(window.location.href).searchParams;
   const requested = params.get("operatorReview") ?? params.get("reviewSurface");
-  if (requested === "studio" || requested === "studioPreview") return "studioPreview";
-  if (requested === "native") return "native";
-  const stored = window.localStorage.getItem(REVIEW_SURFACE_STORAGE_KEY);
-  return isOperatorReviewSurface(stored) ? stored : "native";
+  if (requested === "studio") return "studioPreview";
+  return isOperatorReviewSurface(requested) ? requested : "native";
 }
 
 function readStoredTheme(): OperatorTheme {
@@ -100,7 +106,7 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     typeof window === "undefined" ? 1 : window.devicePixelRatio
   );
   const [uiScale, setUiScale] = useState<OperatorUiScale>(readStoredUiScale);
-  const [reviewSurface, setReviewSurface] = useState<OperatorReviewSurface>(readStoredReviewSurface);
+  const [reviewSurface] = useState<OperatorReviewSurface>(readRequestedReviewSurface);
   const [theme, setTheme] = useState<OperatorTheme>(readStoredTheme);
 
   const reviewEnabled = reviewSurface === "studioPreview";
@@ -167,9 +173,9 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(UI_SCALE_STORAGE_KEY, String(uiScale));
   }, [uiScale]);
 
-  // Overlays (dialogs, palette, context menu, color picker, shortcut guide,
-  // toasts) portal to document.body, outside the `.root` scope that defines
-  // the --operator-* scale tokens. Stamp body so the grouped rule in
+  // Overlays (dialogs, drawers, context menu, color picker, toasts) portal to
+  // document.body, outside the `.root` scope that defines the --operator-*
+  // scale tokens. Stamp body so the grouped rule in
   // OperatorLayoutProvider.module.css also resolves there — same single token
   // source, never a :root copy (the S2 regression).
   useEffect(() => {
@@ -182,10 +188,11 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
     };
   }, [uiScale]);
 
+  // A preview remembered by an older build is forgotten once, on start.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(REVIEW_SURFACE_STORAGE_KEY, reviewSurface);
-  }, [reviewSurface]);
+    window.localStorage.removeItem(RETIRED_REVIEW_SURFACE_STORAGE_KEY);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -218,7 +225,6 @@ export function OperatorLayoutProvider({ children }: { children: ReactNode }) {
       reviewSurface,
       reviewTargetHeight: reviewTarget?.height ?? null,
       reviewTargetWidth: reviewTarget?.width ?? null,
-      setReviewSurface,
       setTheme,
       setUiScale,
       theme,
