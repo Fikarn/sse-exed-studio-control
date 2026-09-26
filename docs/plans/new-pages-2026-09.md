@@ -355,9 +355,9 @@ Validation (the assistant, workstation, 2026-09-25, after the Tauri smoke's hard
 
 ## Slice 3 — No keyboard shortcuts
 
-Status: planned.
+Status: planned (next: the operator's twelve decisions on the inventory).
 
-First step, shown to the operator before any code changes (D6): the inventory — every key the program binds and every palette command, beside the on-screen control that does the same. One without a twin gets a control or is dropped with the operator's OK.
+First step, shown to the operator before any code changes (D6): the inventory — every key the program binds and every palette command, beside the on-screen control that does the same. One without a twin gets a control or is dropped with the operator's OK. Drawn up on 2026-09-26 while the operator was away (six read-only surveyors, one per area, and a completeness critic; nothing changed): [`new-pages-2026-09-s3-inventory.md`](./new-pages-2026-09-s3-inventory.md) — twelve decisions, each with a recommendation, then every key that goes with its on-screen twin, what stays under D6, the hints and the tests. It also found an Enter in Lighting's empty search field that recalls a scene live while the list is closed, and that only Ctrl+Shift+R of the web view's own reload keys is blocked today, by accident.
 
 Scope:
 
