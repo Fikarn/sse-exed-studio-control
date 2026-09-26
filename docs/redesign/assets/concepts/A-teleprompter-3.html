@@ -2472,8 +2472,9 @@
         else el.removeAttribute("aria-disabled");
       }
 
-      function applyState(name) {
-        if (!STATES[name]) name = "ready";
+      // the board's own states only: a name from the address is compared with theirs, never used to read one
+      function applyState(requested) {
+        const name = Object.keys(STATES).find((key) => key === requested) || "ready";
         const s = STATES[name];
         STATE = s;
         s.xl = s.xl || "ok";

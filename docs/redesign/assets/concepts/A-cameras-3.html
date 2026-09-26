@@ -3036,7 +3036,7 @@
 
       let stateName = "ready";
       function applyState(name) {
-        stateName = STATES[name] ? name : "ready";
+        stateName = Object.keys(STATES).find((key) => key === name) || "ready";
         const s = STATES[stateName];
         board.dataset.state = stateName;
         board.dataset.layout = layout;

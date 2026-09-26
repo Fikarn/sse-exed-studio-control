@@ -2325,7 +2325,8 @@
       const P = new URLSearchParams(location.search);
       const $ = (id) => document.getElementById(id);
       const board = $("board");
-      let stateName = STATES[P.get("state")] ? P.get("state") : "held";
+      // the board's own states only: a name from the address is compared with theirs, never used to read one
+      let stateName = Object.keys(STATES).find((key) => key === P.get("state")) || "held";
       let hero = 1, // the camera in the big frame: what the operator looks at
         drive = 1, // the camera the plate and the deck's dials set: the deck's CAM 1–3
         bank = "exposure",
@@ -2347,7 +2348,7 @@
       }
 
       function applyState(name) {
-        stateName = STATES[name] ? name : "held";
+        stateName = Object.keys(STATES).find((key) => key === name) || "held";
         const s = STATES[stateName];
         hero = s.hero || 1;
         drive = s.drive || hero;

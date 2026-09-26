@@ -2312,7 +2312,16 @@
       const RUNOUT = 10; // s: END sits half a screen (540 px) below the last line; at 140 words/min the text moves about 55 px/s
       const NOW = 14 * 3600 + 29 * 60; // the clock, 14:29
 
-      const plain = (h) => h.replace(/<[^>]+>/g, "");
+      // a paragraph's words without its tags, removed until none is left (one pass can leave a tag made of two halves)
+      const plain = (h) => {
+        let text = h;
+        let before;
+        do {
+          before = text;
+          text = text.replace(/<[^>]+>/g, "");
+        } while (text !== before);
+        return text;
+      };
       const words = (h) => plain(h).split(/\s+/).filter(Boolean).length;
       // round the whole seconds first, so 59.85 s reads 1:00, never 0:60
       const mmss = (s) => {
@@ -2727,8 +2736,9 @@
         else el.removeAttribute("aria-disabled");
       }
 
-      function applyState(name) {
-        if (!STATES[name]) name = "ready";
+      // the board's own states only: a name from the address is compared with theirs, never used to read one
+      function applyState(requested) {
+        const name = Object.keys(STATES).find((key) => key === requested) || "ready";
         const s = STATES[name];
         const ON = s.on ? stats(s.on, s.atEnd) : null; // the script on the prompter
         const selId = s.sel || s.on || "intro";

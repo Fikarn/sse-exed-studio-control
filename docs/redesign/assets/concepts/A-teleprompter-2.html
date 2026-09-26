@@ -2779,8 +2779,9 @@
         el.querySelector("span").textContent = text;
       }
 
-      function applyState(name) {
-        if (!STATES[name]) name = "paused";
+      // the board's own states only: a name from the address is compared with theirs, never used to read one
+      function applyState(requested) {
+        const name = Object.keys(STATES).find((key) => key === requested) || "paused";
         const s = STATES[name];
         const sc = s.on ? BY_ID[s.on] : null; // the script on the prompter
         const sel = s.sel ? BY_ID[s.sel] : null; // the script in the editor
