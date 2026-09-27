@@ -7,10 +7,11 @@ import { PLAIN, finishedParagraph, makeRun, paragraphText, sanitizeText, type Ru
 // A paste that held formatting: the clipboard's HTML, from Word, a browser or Google
 // Docs (the proposal §3.1 and §3.2; the hardware link's `prompter/import/html.rs`).
 // A small reader, not a browser: it keeps the paragraphs (p, div, li, table cells), a
-// line break (br), bold, italic and underline (b, strong, i, em, u and the `style`
+// line break (br), bold, italic and underline (b, strong, i, em, cite, u and the `style`
 // properties font-weight, font-style and text-decoration, which override the tag, as
 // Google Docs' `<b style="font-weight:normal">` wrapper needs), a heading as a cue, a
-// bullet as "– " and a number as "N. ". Styles, scripts and comments are skipped.
+// bullet as "– " and a number as "N. ". Styles, scripts and comments are skipped. The
+// editor's Paste (`prompter.paste.convert`, Slice 6b) reads with it too.
 
 const BLOCKS = new Set([
   "address",
@@ -65,12 +66,16 @@ function attributes(source: string): Record<string, string> {
   return found;
 }
 
-/** The marks inside an element: its parent's, the tag's, then its `style`'s. */
+/**
+ * The marks inside an element: its parent's, the tag's, then its `style`'s, as the hardware
+ * link's `child_frame` sets them. An `<ins>` is a tracked insertion taken as accepted, not an
+ * underline; a declaration's `!important` is read past.
+ */
 function marksOf(name: string, attrs: Record<string, string>, parent: RunMarks): RunMarks {
   const marks = { ...parent };
   if (name === "b" || name === "strong") marks.bold = true;
-  if (name === "i" || name === "em") marks.italic = true;
-  if (name === "u" || name === "ins") marks.underline = true;
+  if (name === "i" || name === "em" || name === "cite") marks.italic = true;
+  if (name === "u") marks.underline = true;
   for (const declaration of (attrs.style ?? "").split(";")) {
     const colon = declaration.indexOf(":");
     if (colon < 0) continue;
@@ -78,14 +83,16 @@ function marksOf(name: string, attrs: Record<string, string>, parent: RunMarks):
     const value = declaration
       .slice(colon + 1)
       .trim()
-      .toLowerCase();
+      .toLowerCase()
+      .replace(/(?:!important)+$/, "")
+      .trim();
     if (property === "font-weight") {
-      const weight = Number.parseInt(value, 10);
-      if (value.startsWith("bold")) marks.bold = true;
+      // `font_weight_is_bold`: a word, or a whole number (600 and over is bold).
+      if (value === "bold" || value === "bolder") marks.bold = true;
       else if (value === "normal" || value === "lighter") marks.bold = false;
-      else if (Number.isFinite(weight)) marks.bold = weight >= 600;
+      else if (/^\+?[0-9]+$/.test(value) && Number(value) <= 0xffffffff) marks.bold = Number(value) >= 600;
     } else if (property === "font-style") {
-      if (value === "italic" || value.startsWith("oblique")) marks.italic = true;
+      if (value.startsWith("italic") || value.startsWith("oblique")) marks.italic = true;
       else if (value === "normal") marks.italic = false;
     } else if (property === "text-decoration" || property === "text-decoration-line") {
       if (value.includes("underline")) marks.underline = true;

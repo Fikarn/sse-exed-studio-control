@@ -64,6 +64,7 @@ export const REQUEST_METHODS = [
   "prompter.jump",
   "prompter.layout.report",
   "prompter.look.update",
+  "prompter.paste.convert",
   "prompter.pause",
   "prompter.play",
   "prompter.putOn",

@@ -535,3 +535,146 @@ describe("the double's paste reads as the hardware link's", () => {
     );
   });
 });
+
+// Slice 6b (the operator's answer of 2026-09-27: keep the formatting): the editor's Paste,
+// `prompter.paste.convert`, held to the hardware link's `prompter/tests_scripts.rs`
+// (`the_editors_paste_*`): the paste's reader, limits and refusals, answered as paragraphs
+// the editor inserts at its cursor; it keeps nothing and raises nothing.
+describe("the double's editor paste", () => {
+  const plain = (text: string) => ({ text, bold: false, italic: false, underline: false });
+
+  // `the_editors_paste_keeps_the_emphasis_and_headings_as_cues`.
+  it("keeps the emphasis and headings as cues, in the shape an edit takes", async () => {
+    const { call, script } = openPrompterDouble();
+    const converted = await call("prompter.paste.convert", {
+      html: "<h2>Guest</h2><p>Good evening and <b>welcome</b>, <i>dear</i> <u>viewers</u></p><img src='a.png'>",
+      text: "Guest\n\nGood evening and welcome, dear viewers",
+    });
+    expect(converted).toEqual({
+      paragraphs: [
+        { runs: [plain("[Guest]")] },
+        {
+          runs: [
+            plain("Good evening and "),
+            { text: "welcome", bold: true, italic: false, underline: false },
+            plain(", "),
+            { text: "dear", bold: false, italic: true, underline: false },
+            plain(" "),
+            { text: "viewers", bold: false, italic: false, underline: true },
+          ],
+        },
+      ],
+      sentence: "Imported the pasted text: 2 paragraphs, 7 words, 1 cue. Left out: 1 picture.",
+    });
+
+    // The editor splices them into its text and sends the whole script back.
+    const id = await script("Talk", ["Before."]);
+    const paragraphs = [{ runs: [plain("Before.")] }, ...(converted.paragraphs as JsonObject[])];
+    await call("prompter.script.edit", { scriptId: id, paragraphs });
+    const saved = await call("prompter.script.snapshot", { scriptId: id });
+    expect(saved.paragraphs).toEqual(paragraphs);
+    expect(saved.cues).toEqual([{ paragraph: 1, word: 0, text: "Guest" }]);
+  });
+
+  // `the_editors_paste_falls_back_to_the_plain_text`.
+  it("falls back to the plain text when the HTML holds no word", async () => {
+    const { call } = openPrompterDouble();
+    const text = "Plain  words\r\n\r\n[PAUSE]";
+    const pastes: JsonObject[] = [{ html: "<p>&nbsp;</p><img src='a.png'>", text }, { text }, { html: null, text }];
+    for (const params of pastes) {
+      expect(await call("prompter.paste.convert", params), JSON.stringify(params)).toEqual({
+        paragraphs: [{ runs: [plain("Plain words")] }, { runs: [plain("[PAUSE]")] }],
+        sentence: "Imported the pasted text: 2 paragraphs, 3 words, 1 cue.",
+      });
+    }
+  });
+
+  // `the_editors_paste_refuses_what_the_paste_refuses`.
+  it("refuses what the paste refuses, in the same words", async () => {
+    const { refused, snapshot } = openPrompterDouble();
+    const half = "a".repeat(MAX_IMPORT_BYTES / 2 + 1);
+    const cases: Array<[JsonObject, string]> = [
+      [{ html: "<p> </p>", text: "  \n " }, "The pasted text has no text in it."],
+      [{}, "The pasted text has no text in it."],
+      [{ html: half, text: half }, "The pasted text is 21 MB; Studio Control takes pastes up to 20 MB."],
+      [
+        { text: "word ".repeat(30_001) },
+        "The pasted text has 30,001 words; a script can have up to 30,000. Split it into shorter scripts.",
+      ],
+      [
+        { text: "a".repeat(MAX_SCRIPT_TEXT_BYTES + 1) },
+        "The pasted text holds more text than a script can hold (2 MB). Split it into shorter scripts.",
+      ],
+    ];
+    for (const [params, sentence] of cases) {
+      const refusal = await refused("prompter.paste.convert", params);
+      expect(refusal).toEqual({ code: "PROMPTER_IMPORT_REFUSED", sentence });
+      expect(await refused("prompter.script.paste", params), "the paste refuses it alike").toEqual(refusal);
+    }
+    expect(await refused("prompter.paste.convert", { html: 7, text: "x" })).toEqual({
+      code: "INVALID_PARAMS",
+      sentence: "html must be a string.",
+    });
+    expect((await snapshot()).scripts).toEqual([]);
+  });
+
+  // `the_editors_paste_keeps_nothing_and_raises_nothing` and
+  // `the_editors_paste_raises_no_event_and_is_not_a_recent_action`.
+  it("keeps nothing, raises nothing and is not a Recent action", async () => {
+    const { transport, call, script, edit, snapshot, events } = openPrompterDouble();
+    const id = await script("On air", ["Words on the glass."]);
+    await call("prompter.putOn", { scriptId: id });
+    await edit(id, ["Edited, not updated."]);
+    const state = async () => {
+      const glass = await call("prompter.glass.snapshot");
+      const { ageMs: _age, ...anchor } = glass.anchor as JsonObject;
+      const support = (await transport.request("support.snapshot", {})) as JsonObject;
+      return {
+        scripts: (await snapshot()).scripts,
+        script: await call("prompter.script.snapshot", { scriptId: id }),
+        glass: { ...glass, anchor },
+        rows: support.recentEvents,
+      };
+    };
+    const before = await state();
+    expect((before.script.versions as JsonObject[]).map((version) => version.reason)).toEqual(["put-on"]);
+    expect((before.rows as JsonObject[])[0], "the newest row is the put-on").toMatchObject({
+      domain: "prompter",
+      action: "put-on",
+    });
+    const seen = events.length;
+
+    expect(await call("prompter.paste.convert", { html: "<p><b>New</b> words</p>", text: "New words" })).toEqual({
+      paragraphs: [{ runs: [{ text: "New", bold: true, italic: false, underline: false }, plain(" words")] }],
+      sentence: "Imported the pasted text: 1 paragraph, 2 words, 0 cues.",
+    });
+    await expect(call("prompter.paste.convert", { text: " " })).rejects.toThrow("The pasted text has no text in it.");
+    expect(events.slice(seen), "no prompter.changed, no app.changed").toEqual([]);
+    expect(await state()).toEqual(before);
+  });
+
+  // The hardware link's `a_style_attribute_overrides_the_elements_own_emphasis`: the same
+  // markup, the same runs (an insertion is a tracked change, not an underline).
+  it("reads emphasis as the hardware link's reader does", () => {
+    const markup =
+      '<p><b>bold <span style="font-weight: normal !important">normal</span></b> <span style="FONT-WEIGHT:600">six</span> <span style="font-weight:lighter">light</span> <i style="font-style:normal">upright</i> <u style="text-decoration-line:none">plain</u> <strong>strong</strong> <em>em</em> <cite>cite</cite> <ins>ins</ins></p>';
+    const run = (text: string, bold: boolean, italic: boolean, underline: boolean) => ({
+      text,
+      bold,
+      italic,
+      underline,
+    });
+    expect(readHtml(markup)[0]!.runs).toEqual([
+      run("bold ", true, false, false),
+      run("normal ", false, false, false),
+      run("six", true, false, false),
+      run(" light upright plain ", false, false, false),
+      run("strong", true, false, false),
+      run(" ", false, false, false),
+      run("em", false, true, false),
+      run(" ", false, false, false),
+      run("cite", false, true, false),
+      run(" ins", false, false, false),
+    ]);
+  });
+});

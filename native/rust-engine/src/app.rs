@@ -585,6 +585,7 @@ impl EngineApp {
             "prompter.script.snapshot" => self.dispatch_prompter(request),
             "prompter.script.import" => self.dispatch_prompter(request),
             "prompter.script.paste" => self.dispatch_prompter(request),
+            "prompter.paste.convert" => self.dispatch_prompter(request),
             "prompter.script.create" => self.dispatch_prompter(request),
             "prompter.script.rename" => self.dispatch_prompter(request),
             "prompter.script.edit" => self.dispatch_prompter(request),

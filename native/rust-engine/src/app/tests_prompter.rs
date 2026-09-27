@@ -129,6 +129,53 @@ fn a_change_raises_prompter_changed_with_the_anchor() {
     assert!(cleared.events[0]["payload"]["anchor"].is_null());
 }
 
+// Slice 6b: the editor's Paste converts the clipboard and answers; with a
+// script on the glass it raises no event — neither `prompter.changed` nor
+// `app.changed` — and, answered or refused, leaves no Recent actions row.
+#[test]
+fn the_editors_paste_raises_no_event_and_is_not_a_recent_action() {
+    let test_dir = TestDir::new("prompter-paste-convert");
+    let app = app_for(&test_dir);
+    let script =
+        result(&app, "prompter.script.create", json!({ "name": "Talk" }))["scriptId"].clone();
+    result(&app, "prompter.putOn", json!({ "scriptId": script }));
+    let rows = || {
+        list_recent_actions(&app.runtime.db_path, 50)
+            .expect("the action log should read")
+            .len()
+    };
+    let rows_before = rows();
+    assert_eq!(rows_before, 1, "put on");
+
+    let converted = request(
+        &app,
+        "prompter.paste.convert",
+        json!({ "html": "<p><u>Pasted</u> words</p>", "text": "Pasted words" }),
+    );
+    assert!(converted.response.ok, "{:?}", converted.response.error);
+    assert_eq!(
+        converted.response.result.as_ref().expect("a result")["paragraphs"][0]["runs"][0],
+        json!({ "text": "Pasted", "bold": false, "italic": false, "underline": true })
+    );
+    assert!(converted.events.is_empty(), "{:?}", converted.events);
+
+    let refused = request(&app, "prompter.paste.convert", json!({ "text": " " }));
+    assert_eq!(
+        refused
+            .response
+            .error
+            .as_ref()
+            .and_then(|error| error["code"].as_str()),
+        Some("PROMPTER_IMPORT_REFUSED")
+    );
+    assert!(refused.events.is_empty());
+    assert_eq!(rows(), rows_before);
+    assert_eq!(
+        crate::action_log::ui_method_class("prompter.paste.convert"),
+        Some(crate::action_log::UiMethodClass::NotAnAction)
+    );
+}
+
 // Slice 4: `teleprompter` is a page the hardware link keeps; until the slice
 // `settings.update` refused it.
 #[test]
