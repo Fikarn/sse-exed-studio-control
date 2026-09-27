@@ -38,6 +38,7 @@ import {
   invalid,
   layoutLines,
   optionalText,
+  prompterCheck,
   readGlassSnapshot,
   readScriptSnapshot,
   readSnapshot,
@@ -45,6 +46,15 @@ import {
   textParam,
   wholeParam,
 } from "./prompterReads";
+import {
+  playRefusal,
+  sameCheck,
+  sameScreen,
+  screenDraws,
+  screenFromReport,
+  screenState,
+  screenSummary,
+} from "./prompterScreen";
 import {
   SIZE_MAX_PX,
   SIZE_MIN_PX,
@@ -77,6 +87,7 @@ import {
   type StoredScript,
 } from "./prompterState";
 import { NOT_HANDLED, type FixtureRequestContext, type FixtureRequestResult } from "./requestContext";
+import { applyPrompterHealth } from "./state";
 
 // The Teleprompter's `prompter.*` methods as the hardware link answers them
 // (`native/rust-engine/src/prompter/commands.rs`, new pages program, Slice 4): the same
@@ -86,6 +97,10 @@ import { NOT_HANDLED, type FixtureRequestContext, type FixtureRequestResult } fr
 // script's end `PLAY` is refused until a jump moves the place back; replacing what the
 // prompter shows needs `replace: true`; an edit never reaches the glass before Update;
 // the script on the prompter cannot be removed; only a removed script is deleted for good.
+// Slice 5a adds the Prompter XL as the shell reports it (`prompterScreen.ts`): `PLAY` is
+// refused while nothing is drawn on the glass, a scroll pauses when the glass goes, and a
+// request after which `checks.prompter` says something else also raises `app.changed {
+// reason: "health" }`, so the header's lamp follows.
 
 interface Answer {
   result: JsonValue;
@@ -419,6 +434,9 @@ const notLaidOut = () =>
 
 function playRequest(prompter: FixturePrompter, now: number): Answer {
   const glass = glassOf(prompter);
+  // Slice 5a: nothing scrolls where nobody can read it (the proposal §7).
+  const refusal = playRefusal(prompter.screen);
+  if (refusal) throw refusal;
   if (glass.atEnd(now)) {
     throw new EngineRequestError(
       "PROMPTER_AT_END",
@@ -659,6 +677,28 @@ function layoutRequest(prompter: FixturePrompter, params: JsonObject, now: numbe
   return answer({ accepted: true }, "laid-out");
 }
 
+/**
+ * `prompter.screen.report { found, duplicated?, width?, height?, refreshHz?, windowError? }`:
+ * the Prompter XL as the shell found it in Windows' display configuration (Slice 5a). When
+ * the glass is no longer drawn, a scroll pauses where it is — its place kept, the next
+ * `PLAY` refused until the glass is back — and plugging back in leaves it paused (D12:
+ * nothing scrolls by itself). A report that changes nothing raises nothing.
+ */
+function screenRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
+  const screen = screenFromReport(params);
+  if (sameScreen(screen, prompter.screen)) return answer({ screen: screenSummary(screen), paused: false });
+  prompter.screen = screen;
+  let paused = false;
+  const glass = prompter.glass;
+  if (!screenDraws(screenState(screen)) && glass?.playing) {
+    // As `prompter.pause` does: saved where the 0.3 s ease stops the text.
+    glass.pause(now);
+    saveThisPlace(prompter, glass.restingPlace(now));
+    paused = true;
+  }
+  return answer({ screen: screenSummary(screen), paused }, "screen");
+}
+
 function answerRequest(prompter: FixturePrompter, method: RequestMethod, params: JsonObject, now: number): Answer {
   switch (method) {
     case "prompter.snapshot":
@@ -697,12 +737,27 @@ function answerRequest(prompter: FixturePrompter, method: RequestMethod, params:
       return lookRequest(prompter, params, now);
     case "prompter.layout.report":
       return layoutRequest(prompter, params, now);
+    case "prompter.screen.report":
+      return screenRequest(prompter, params, now);
     default:
       return scriptRequest(prompter, method, params, now);
   }
 }
 
-/** The Teleprompter's requests: every `prompter.*` method, settling the clock first as the hardware link does. */
+/** The three reads: they leave `checks.prompter` as it was, so it is not compared around them. */
+const READS: ReadonlySet<RequestMethod> = new Set([
+  "prompter.snapshot",
+  "prompter.glass.snapshot",
+  "prompter.script.snapshot",
+]);
+
+/**
+ * The Teleprompter's requests: every `prompter.*` method, settling the clock first as the
+ * hardware link does. `checks.prompter` is worked out before and after every request but a
+ * read (`handle_prompter_request`); when it says something else after it, the health
+ * snapshot takes it and `app.changed { reason: "health" }` follows the request's own
+ * `prompter.changed` (`dispatch_prompter`).
+ */
 export function handleFixturePrompterRequest(
   context: FixtureRequestContext,
   method: RequestMethod,
@@ -714,9 +769,15 @@ export function handleFixturePrompterRequest(
   const now = Date.now();
   settlePrompter(prompter, now);
   try {
+    const before = READS.has(method) ? null : prompterCheck(prompter);
     const { result, reason } = answerRequest(prompter, method, params, now);
+    const healthChanged = before !== null && !sameCheck(before, prompterCheck(prompter));
     if (reason !== null) {
       context.emit("prompter.changed", { reason, anchor: glassAnchor(prompter, now) });
+    }
+    if (healthChanged) {
+      applyPrompterHealth(context.state);
+      context.emit("app.changed", { reason: "health" });
     }
     return result;
   } finally {

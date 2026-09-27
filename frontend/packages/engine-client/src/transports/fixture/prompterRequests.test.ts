@@ -37,6 +37,19 @@ describe("the fixture double's prompter: what the glass shows", () => {
       glass: null,
       scripts: [],
       removed: [],
+      // Slice 5a: the double starts after the shell's first report (`prompterScreen.ts`).
+      screen: {
+        state: "connected",
+        word: "CONNECTED",
+        tone: "ok",
+        reported: true,
+        draws: true,
+        width: 1920,
+        height: 1080,
+        refreshHz: 60,
+        windowError: null,
+        sentence: "The Prompter XL is connected: 1920×1080 at 60 Hz.",
+      },
     });
     const shown = await call("prompter.glass.snapshot");
     expect(shown).toMatchObject({
