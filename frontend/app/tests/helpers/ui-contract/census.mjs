@@ -63,6 +63,40 @@ export function censusInPage() {
     const cs = getComputedStyle(el);
     return cs.visibility !== "hidden" && cs.display !== "none";
   };
+  // New pages program, the workstation catch-up: the part of a text's box its
+  // clipping ancestors leave on screen — a scrolled field (the Teleprompter's
+  // editor opens at the reading line) or any box with `overflow` other than
+  // visible — so contrast is sampled where the text is seen, not on whatever
+  // is drawn where a scrolled-out line would be. Null when nothing of it is
+  // left. An absolutely positioned box escapes the static ancestors between it
+  // and its containing block, and a fixed one every ancestor.
+  const visibleBox = (el, r) => {
+    let x0 = r.left;
+    let y0 = r.top;
+    let x1 = r.right;
+    let y1 = r.bottom;
+    let position = getComputedStyle(el).position;
+    for (let a = el.parentElement; a && a !== document.documentElement && position !== "fixed"; a = a.parentElement) {
+      const acs = getComputedStyle(a);
+      const escapes = position === "absolute" && acs.position === "static";
+      if (!escapes) {
+        const ar = a.getBoundingClientRect();
+        const left = ar.left + a.clientLeft;
+        const top = ar.top + a.clientTop;
+        if (acs.overflowX !== "visible") {
+          x0 = Math.max(x0, left);
+          x1 = Math.min(x1, left + a.clientWidth);
+        }
+        if (acs.overflowY !== "visible") {
+          y0 = Math.max(y0, top);
+          y1 = Math.min(y1, top + a.clientHeight);
+        }
+        if (acs.position !== "static") position = acs.position;
+      }
+    }
+    if (x1 - x0 < 1 || y1 - y0 < 1) return null;
+    return { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
+  };
   // Allowed radii per system §5: 4 · 8 · 12 · pill. A pill is any radius at or
   // above 999 px or a 50 % circle; 0 is "no radius" and not counted.
   const radiusAllowed = (value) => {
@@ -201,6 +235,7 @@ export function censusInPage() {
     weights.set(cs.fontWeight, (weights.get(cs.fontWeight) || 0) + 1);
     textColors.add(color);
     if (cs.textTransform === "uppercase") upper++;
+    const seen = visibleBox(el, r);
     texts.push({
       el: ident(el),
       text: txt.slice(0, 50),
@@ -209,10 +244,13 @@ export function censusInPage() {
       family: fam,
       transform: cs.textTransform,
       color,
-      x: Math.round(r.left),
-      y: Math.round(r.top),
-      w: Math.round(r.width),
-      h: Math.round(r.height),
+      // The box on screen (`visibleBox`); a text scrolled or clipped out of
+      // sight keeps its full box and says so, and its contrast is not sampled.
+      clippedOut: seen === null,
+      x: seen ? seen.x : Math.round(r.left),
+      y: seen ? seen.y : Math.round(r.top),
+      w: seen ? seen.w : Math.round(r.width),
+      h: seen ? seen.h : Math.round(r.height),
       bgSelf: alpha(cs.backgroundColor) > 0 || /inset/.test(cs.boxShadow) || parseFloat(cs.borderTopWidth) > 0,
       opacity: +eff.toFixed(2),
       disabled,

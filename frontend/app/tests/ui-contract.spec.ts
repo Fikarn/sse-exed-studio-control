@@ -248,3 +248,38 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
     });
   }
 });
+
+// New pages program, the workstation catch-up: the census measures a text where
+// it is on screen. The Teleprompter's editor opens scrolled to the reading line,
+// and in Bone the lines scrolled out of its dark field lay over the light header
+// and footer, where the sampler read them as white on white — four failures no
+// operator could see. A field scrolled over a light page holds the rule.
+test.describe("UI contract — the census", () => {
+  test("measures a scrolled field's text only where the field shows it", async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 600 });
+    const lines = Array.from({ length: 10 }, (_, i) => `<p style="margin:0;height:60px">Line ${i + 1}</p>`).join("");
+    await page.setContent(
+      `<!doctype html><html><body style="margin:0;background:rgb(242,242,238);font:20px/1.5 sans-serif">` +
+        `<div style="height:100px"></div>` +
+        `<div id="field" style="height:200px;overflow:auto;background:rgb(16,16,18);color:rgb(244,244,245)">${lines}</div>` +
+        `</body></html>`
+    );
+    // The field shows its content from 150 to 350: lines 3 and 6 in part, 4 and 5 whole.
+    await page.evaluate(() => {
+      document.getElementById("field")!.scrollTop = 150;
+    });
+    const { census, contrast } = await measureBoard(page);
+    const texts = census.texts as Array<{ text: string; clippedOut: boolean; y: number; h: number }>;
+    const line = (n: number) => texts.find((t) => t.text === `Line ${n}`);
+    for (const n of [1, 2, 7, 8, 9, 10]) expect(line(n)?.clippedOut, `Line ${n}`).toBe(true);
+    for (const n of [3, 4, 5, 6]) expect(line(n)?.clippedOut, `Line ${n}`).toBe(false);
+    expect([line(3)?.y, line(3)?.h]).toEqual([100, 30]);
+    expect([line(4)?.y, line(4)?.h]).toEqual([130, 60]);
+    expect([line(6)?.y, line(6)?.h]).toEqual([250, 50]);
+    // On Windows the sampler reads the four lines on screen against the dark field.
+    if (SAMPLES_CONTRAST) {
+      expect(contrast?.measured).toBe(4);
+      expect(worstContrast(contrast, 6, " · ")).toBe("");
+    }
+  });
+});
