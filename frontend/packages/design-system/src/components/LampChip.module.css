@@ -57,4 +57,16 @@
   .error .word {
     color: var(--role-red-text);
   }
+
+  /* A green latch: something running that the operator started, shown on
+     every page (the prompter scrolling; new pages program, Slice 6a). A lamp
+     that is well needs no keyline; a latch that is well has one. */
+  .ok[data-latch] {
+    border-color: var(--role-green-text);
+  }
+
+  .ok[data-latch] .label,
+  .ok[data-latch] .word {
+    color: var(--role-green-text);
+  }
 }

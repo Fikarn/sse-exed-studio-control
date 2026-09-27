@@ -4,11 +4,28 @@ import { enterStudioFullscreen, resetWindowLayout } from "../../shellCommands";
 import { APP_VERSION } from "../setupPilotModel";
 import type { SetupPilot } from "../useSetupPilot";
 
+/** The Prompter XL as `health.snapshot`'s `checks.prompter` carries it (new pages
+ *  program, Slice 6a): its word, its mode, its tone; `null` before it is known. */
+export function prompterXlRow(
+  healthSnapshot: Record<string, unknown> | null
+): { value: string; tone: "ok" | "attention" | "error" } | null {
+  const checks = healthSnapshot?.checks;
+  const check = checks && typeof checks === "object" ? (checks as Record<string, unknown>).prompter : undefined;
+  const screen = check && typeof check === "object" ? (check as Record<string, unknown>).screen : undefined;
+  if (!screen || typeof screen !== "object") return null;
+  const { word, tone, width, height, refreshHz } = screen as Record<string, unknown>;
+  if (typeof word !== "string") return null;
+  const parts = [word.toLowerCase()];
+  if (typeof width === "number" && typeof height === "number") parts.push(`${width}×${height}`);
+  if (typeof refreshHz === "number") parts.push(`${refreshHz} Hz`);
+  return { value: parts.join(" · "), tone: tone === "error" ? "error" : tone === "attention" ? "attention" : "ok" };
+}
+
 /** The plate's wiring: the workstation's facts, the light outputs switch, the
  *  recent actions, theme, scale and the window, and the backup and diagnostics
  *  keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
-  const { commissioningSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
+  const { commissioningSnapshot, healthSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
   const { backups, lastBackup, busyAction, runtime, recentActions, theme, uiScale, setTheme, setUiScale } =
     editor.state;
   const { engineLogPath, openEngineLog } = editor.chrome;
@@ -25,6 +42,7 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       hardwareProfile={String(commissioningSnapshot?.hardwareProfile ?? "Unavailable")}
       lastBackupLabel={lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "no backup exported yet"}
       lightOutputsArmed={lightOutputsArmed}
+      prompterXl={prompterXlRow(healthSnapshot)}
       protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "2")}
       recentActions={recentActions}
       restoreDisabled={!lastBackup}

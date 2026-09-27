@@ -82,7 +82,10 @@ try {
       try {
         await openBoard(page, fixture, theme);
         const { census, contrast, png, measures } = await measureBoard(page);
-        fs.writeFileSync(path.join(OUT, `${name}.png`), png);
+        // Off Windows no screenshot is taken (contrast is sampled on Windows
+        // only, Slice SW), so there is no PNG to write; the board's other
+        // figures are still measured and seeded (new pages program, D23).
+        if (png) fs.writeFileSync(path.join(OUT, `${name}.png`), png);
         fs.writeFileSync(
           path.join(OUT, `${name}.json`),
           JSON.stringify({ name, fixture, theme, measures, contrast, census })
@@ -90,9 +93,11 @@ try {
         rows.push({ name, ...measures });
         ratchets[name] = ratchetFrom(measures);
         contrastLines.push(
-          `- **${name}**: ${contrast.fails.length} failing of ${contrast.measured} measured text nodes`
+          contrast
+            ? `- **${name}**: ${contrast.fails.length} failing of ${contrast.measured} measured text nodes`
+            : `- **${name}**: not sampled (contrast is sampled on Windows only)`
         );
-        for (const f of contrast.fails.slice(0, 20))
+        for (const f of contrast?.fails.slice(0, 20) ?? [])
           contrastLines.push(`  - ${f.ratio}:1 ${f.size}px w${f.weight} "${f.text}" ${f.el} fg ${f.color} bg ${f.bg}`);
         console.log(
           name.padEnd(40),

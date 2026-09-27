@@ -113,7 +113,13 @@ export function censusInPage() {
   const bigBlurUnlitEls = [];
   const backdropEls = [];
   const copy = [];
+  // New pages program, Slice 6a: a picture (`data-picture`) is measured as a
+  // picture, not as the page — the Teleprompter's copy of the glass draws the
+  // presenter's text at the presenter's size (the proposal §6.1), like a
+  // camera picture — so nothing inside one is counted: its type, its colours,
+  // its radii or its words. The element that holds it still is.
   for (const el of root.querySelectorAll("*")) {
+    if (el.parentElement?.closest("[data-picture]")) continue;
     const r = el.getBoundingClientRect();
     if (!vis(el, r)) continue;
     const cs = getComputedStyle(el);

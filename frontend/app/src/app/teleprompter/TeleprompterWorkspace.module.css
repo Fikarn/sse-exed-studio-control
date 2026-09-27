@@ -1,0 +1,12 @@
+/* The Teleprompter page (new pages program, Slice 6a): the bay's own content
+   fills the shell's bay; the cluster, the plate and the footer portal into
+   the shell's regions. */
+
+.workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+.waiting {
+  height: 100%;
+}

@@ -62,7 +62,9 @@ async function settle(page: Page) {
   await page.waitForTimeout(150);
 }
 
-async function open(page: Page, fixture: string, workspace: "setup" | "lighting" | "audio") {
+type Workspace = "setup" | "lighting" | "audio" | "teleprompter";
+
+async function open(page: Page, fixture: string, workspace: Workspace) {
   await openFixture(page, fixture);
   await expectWorkspaceMounted(page, workspace);
   await settle(page);
@@ -86,12 +88,7 @@ async function expectNoKeyGlyphs(page: Page, where: string) {
 // Presses each key on a freshly opened page and expects nothing to move. A
 // key that moved something is named (a soft failure, so one run names them
 // all) and the page is opened again for the next key.
-async function expectKeysDoNothing(
-  page: Page,
-  fixture: string,
-  workspace: "setup" | "lighting" | "audio",
-  keys: readonly string[]
-) {
+async function expectKeysDoNothing(page: Page, fixture: string, workspace: Workspace, keys: readonly string[]) {
   await open(page, fixture, workspace);
   for (const key of keys) {
     const before = await readScreenState(page);
@@ -187,6 +184,37 @@ test.describe("No key does anything (new pages S3, D6)", () => {
       "j",
       "k",
       "2",
+    ]);
+  });
+
+  // New pages program, Slice 6a: the keys a teleprompter program usually binds
+  // — Space to play, the arrows and Page Up / Page Down to step, Home for the
+  // top, B for back, + and − for the speed, [ and ] for the size.
+  test("the Teleprompter: Space, the arrows, Page Up and Down, Home and End, B, + and −, [ and ]", async ({ page }) => {
+    await open(page, "teleprompter-ready", "teleprompter");
+    await expectNoKeyGlyphs(page, "the Teleprompter");
+    await expectKeysDoNothing(page, "teleprompter-ready", "teleprompter", [
+      "Space",
+      "ArrowDown",
+      "ArrowUp",
+      "PageDown",
+      "PageUp",
+      "Home",
+      "End",
+      "b",
+      "t",
+      "p",
+      "Equal",
+      "Minus",
+      "Shift+Equal",
+      "[",
+      "]",
+      "1",
+      "Control+4",
+      "Control+k",
+      "?",
+      "Enter",
+      "Escape",
     ]);
   });
 

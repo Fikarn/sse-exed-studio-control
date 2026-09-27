@@ -46,6 +46,8 @@ const WORKSPACE_MARKS = {
   setup: "setup-workspace",
   lighting: "lighting-stage",
   audio: "audio-monitor-bar",
+  // New pages program, Slice 6a.
+  teleprompter: "teleprompter-bay",
 } as const;
 
 export async function expectWorkspaceMounted(

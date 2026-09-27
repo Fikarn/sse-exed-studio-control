@@ -1,0 +1,145 @@
+/* The Teleprompter's cluster (new pages program, Slice 6a): board 1's left
+   column. The state display first and fixed, the take under it, the paragraph
+   list taking what is left, the standing actions at the foot. Every value is
+   a token or a board dimension. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+/* PLAY across two rows beside BACK over TOP, 104 px high. */
+.take {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-rows: 48px 48px;
+  gap: 8px;
+  flex: none;
+}
+
+.play {
+  grid-row: 1 / span 2;
+}
+
+.speed {
+  display: grid;
+  grid-template-columns: 72px 1fr 72px;
+  gap: 8px;
+  height: 56px;
+}
+
+.speedReadout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 16px;
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.speedReadout b {
+  color: var(--display-text);
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+
+/* The paragraph list takes the room between the steps and the standing
+   actions; it never scrolls (a longer script shows a window of it). */
+.paragraphs {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.paragraphList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 4px;
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  list-style: none;
+}
+
+.paragraphRow {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-ctl);
+  background: none;
+  color: var(--display-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.paragraphRow:hover {
+  border-color: var(--display-text2);
+}
+
+.paragraphRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.paragraphRow[data-current] {
+  border-color: var(--display-text);
+}
+
+.paragraphNumber {
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  text-align: center;
+}
+
+.paragraphText {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.paragraphCue {
+  color: var(--role-blue-text);
+}
+
+.paragraphLength {
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+}
+
+/* Open file… beside, and Clear under it across the cluster (board 1). */
+.standing {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  flex: none;
+}
+
+.clear {
+  grid-column: 1 / -1;
+}
+
+.fileInput {
+  display: none;
+}

@@ -140,7 +140,12 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
       }
       return store.setSetupSection(command.section);
     case "setWorkspace":
-      if (command.workspaceId !== "setup" && command.workspaceId !== "lighting" && command.workspaceId !== "audio") {
+      if (
+        command.workspaceId !== "setup" &&
+        command.workspaceId !== "lighting" &&
+        command.workspaceId !== "audio" &&
+        command.workspaceId !== "teleprompter"
+      ) {
         throw new Error("setWorkspace requires a supported workspaceId.");
       }
       return store.setWorkspace(command.workspaceId);

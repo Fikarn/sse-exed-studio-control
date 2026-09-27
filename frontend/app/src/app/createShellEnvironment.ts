@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-const CRASH_TARGETS: readonly WorkspaceId[] = ["setup", "lighting", "audio"];
+const CRASH_TARGETS: readonly WorkspaceId[] = ["setup", "lighting", "audio", "teleprompter"];
 
 export function createShellEnvironment() {
   const url = new URL(window.location.href);

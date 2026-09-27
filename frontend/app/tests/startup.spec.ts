@@ -90,14 +90,15 @@ test("startup-loading fixture hides every operator workspace surface", async ({ 
   const nav = page.getByRole("navigation", { name: "Workspace navigation" });
   await expect(nav).toBeVisible();
   // New pages program, Slice 1: three tabs, and no others. Old: four, the
-  // fourth being Planning.
-  const tabLabels = ["Setup / Support", "Lighting", "Audio"];
+  // fourth being Planning. Slice 6a: four again, the Teleprompter after Audio.
+  const tabLabels = ["Setup / Support", "Lighting", "Audio", "Teleprompter"];
   await expect(nav.getByRole("button")).toHaveCount(tabLabels.length);
   for (const label of tabLabels) {
     await expect(nav.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-disabled", "true");
   }
   await expect(page.getByTestId("audio-workspace")).toHaveCount(0);
   await expect(page.getByTestId("lighting-stage")).toHaveCount(0);
+  await expect(page.getByTestId("teleprompter-workspace")).toHaveCount(0);
 });
 
 test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page }) => {

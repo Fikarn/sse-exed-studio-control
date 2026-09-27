@@ -102,6 +102,9 @@ describe("ShellErrorBoundary", () => {
           "lighting.dmxMonitor.snapshot": null,
           "lighting.fixtureCatalog.snapshot": null,
           "lighting.snapshot": { fixtures: [], groups: "none", scenes: [] },
+          // The Teleprompter's (new pages program, Slice 6a): absent, as a console with none.
+          "prompter.snapshot": null,
+          "prompter.glass.snapshot": null,
         };
         return method in typed ? (typed[method] ?? null) : { protocol: "2" };
       },

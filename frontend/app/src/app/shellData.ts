@@ -530,6 +530,30 @@ export function healthCheckTone(status: unknown): StatusToneLike {
 export interface LatchedShellState {
   lightingSceneDrift: boolean;
   audioSolo: boolean;
+  /** New pages program, Slice 6a: while the prompter scrolls, the time left
+   *  (`3:12`), for the green `Prompter playing` latch on every page; `null`
+   *  otherwise. */
+  prompterPlaying?: string | null;
+}
+
+/** `checks.prompter` (new pages program, Slices 5a and 6a): the worse of the
+ *  Prompter XL's state and `NOT UPDATED`, with its own word. */
+interface PrompterLampCheck {
+  status?: string;
+  word?: string;
+}
+
+/** The Prompter lamp's word: the hardware link's word for the state in the
+ *  header's lower case (`not connected`, `not updated`), `ready` when all is
+ *  well, `pending` before the first health snapshot. */
+export function prompterLampWord(check: PrompterLampCheck | null | undefined): string {
+  if (!check || typeof check.status !== "string") {
+    return "pending";
+  }
+  if (check.status === "ok" || typeof check.word !== "string" || check.word.length === 0) {
+    return statusLabelFor(check, "pending");
+  }
+  return check.word.toLowerCase();
 }
 
 /** Visual overhaul A, Slice 2 (plan D1, finding C3): what each workspace
@@ -578,8 +602,10 @@ export function buildMonitorItems(
 ) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
-      ? (healthSnapshot.checks as Record<string, { status?: string; summary?: string }>)
+      ? (healthSnapshot.checks as Record<string, { status?: string; summary?: string; word?: string } | null>)
       : {};
+  // The hardware link sends `null` when it could not read the prompter's check (Slice 5a).
+  const prompterCheck = checks.prompter ?? undefined;
 
   const lamp = (
     id: "lighting" | "audio",
@@ -601,12 +627,20 @@ export function buildMonitorItems(
     };
   };
   const items = [
-    lamp("lighting", "Lighting", checks.lighting, workspaceTones?.lighting),
-    lamp("audio", "Audio", checks.audio, workspaceTones?.audio),
+    lamp("lighting", "Lighting", checks.lighting ?? undefined, workspaceTones?.lighting),
+    lamp("audio", "Audio", checks.audio ?? undefined, workspaceTones?.audio),
+    // New pages program, Slice 6a (D19): the Teleprompter's lamp, before the deck's.
+    {
+      id: "prompter",
+      label: "Prompter",
+      detail: prompterLampWord(prompterCheck),
+      status: healthCheckTone(prompterCheck?.status),
+    },
     {
       id: "surface",
-      label: "Deck",
-      detail: statusLabelFor(checks.controlSurface, "pending"),
+      // D19 and the boards: `Surface` (Slice 6's first step 3, 2026-09-27).
+      label: "Surface",
+      detail: statusLabelFor(checks.controlSurface ?? undefined, "pending"),
       // Why: previously fell back to "info" (blue) while sibling subsystems
       // (lighting, audio) fell back to "attention" — that asymmetry rendered
       // Surface's pending dot blue and the others yellow on the same page,
@@ -638,6 +672,17 @@ export function buildMonitorItems(
       detail: "latched",
       status: "attention",
       target: "Audio",
+    });
+  }
+  // New pages program, Slice 6a: a green latch while the prompter scrolls,
+  // on every page, which opens the Teleprompter (the proposal §2).
+  if (latched?.prompterPlaying) {
+    items.push({
+      id: "latched:prompter-playing",
+      label: "Prompter playing",
+      detail: `${latched.prompterPlaying} left`,
+      status: "ok",
+      target: "Teleprompter",
     });
   }
 

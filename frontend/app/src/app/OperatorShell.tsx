@@ -1,5 +1,5 @@
 import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Mic, Sliders, Sun } from "lucide-react";
+import { Mic, ScrollText, Sliders, Sun } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
@@ -11,6 +11,7 @@ import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone } from "./shel
 import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
+import { formatDuration, usePrompterTimeLeft } from "./teleprompter/prompterTime";
 import { confirmShellClose, onShellCloseRequested } from "./shellCommands";
 import { useTauriShellTestBridge } from "./tauriShellTestBridge";
 import { attemptLeaveCurrentWorkspace } from "./lighting/useUnsavedScenePrompt";
@@ -48,6 +49,8 @@ const WORKSPACES = [
   { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
   { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
   { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
+  // New pages program, Slice 6a (D4): after Audio (Slice 9 puts Cameras before it).
+  { id: "teleprompter", label: "Teleprompter", meta: "primary", icon: <ScrollText size={16} /> },
 ] as const;
 
 export function OperatorShell({ environment }: { environment?: ShellEnvironment }) {
@@ -95,6 +98,11 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
     () => (shellState.audioSnapshot?.channels ?? []).some((channel) => channel.solo),
     [shellState.audioSnapshot]
   );
+  // New pages program, Slice 6a: while the prompter scrolls, a green latch on
+  // every page with the time left, counted down once a second.
+  const prompterGlass = shellState.prompterSnapshot?.glass ?? null;
+  const prompterTimeLeft = usePrompterTimeLeft(prompterGlass);
+  const prompterPlaying = prompterGlass?.playing && prompterTimeLeft !== null ? formatDuration(prompterTimeLeft) : null;
 
   // Deterministic-capture marker: the audio snapshot hydrates on its own
   // refresh machine after bootstrap, so chrome derived from it (the GLO-09
@@ -260,22 +268,28 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const operatorModeUnlocked =
     String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
   const tabsDisabled = shellExperience !== "ready";
-  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio"] : [];
+  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "teleprompter"] : [];
   const monitorItems = buildMonitorItems(
     shellState.healthSnapshot,
-    { lightingSceneDrift, audioSolo },
+    { lightingSceneDrift, audioSolo, prompterPlaying },
     shellExperience === "ready" ? workspaceTones : undefined
   );
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
   // footer regions once it has moved onto the cluster rule. The Console did in
-  // Slice 4, Lighting in Slice 5 and Setup in Slice 7.
+  // Slice 4, Lighting in Slice 5 and Setup in Slice 7; the Teleprompter was
+  // built on it (new pages program, Slice 6a), and is the first to fill the
+  // shell's own plate (the others draw theirs inside the bay).
   // The pre-ready surfaces render their own frame (they are not workspaces).
   const workspaceRegions =
     shellExperience === "ready" &&
-    (activeWorkspace === "audio" || activeWorkspace === "lighting" || activeWorkspace === "setup")
+    (activeWorkspace === "audio" ||
+      activeWorkspace === "lighting" ||
+      activeWorkspace === "setup" ||
+      activeWorkspace === "teleprompter")
       ? ("slot" as const)
       : undefined;
+  const plateRegion = shellExperience === "ready" && activeWorkspace === "teleprompter" ? ("slot" as const) : undefined;
 
   // What the workspace boundary calls the area it wraps (Slice 9).
   const areaLabel =
@@ -288,6 +302,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const SetupSurface = workspaceChunks.setup.Surface;
   const LightingSurface = workspaceChunks.lighting.Surface;
   const AudioSurface = workspaceChunks.audio.Surface;
+  const TeleprompterSurface = workspaceChunks.teleprompter.Surface;
 
   let surface: ReactNode;
   if (setupModalActive && shellExperience === "startup") {
@@ -338,11 +353,20 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         store={environment.store}
       />
     );
+  } else if (activeWorkspace === "teleprompter") {
+    surface = (
+      <TeleprompterSurface
+        healthSnapshot={shellState.healthSnapshot}
+        prompterGlassSnapshot={shellState.prompterGlassSnapshot}
+        prompterSnapshot={shellState.prompterSnapshot}
+        store={environment.store}
+      />
+    );
   } else {
-    // The Console. Setup is drawn above in every shell state and Lighting just
-    // above, so Audio is the one workspace left to reach this branch (new pages
-    // program, D1: a page saved while Planning was open reads as the
-    // Console).
+    // The Console. Setup is drawn above in every shell state, and Lighting and
+    // the Teleprompter just above, so Audio is the one workspace left to reach
+    // this branch (new pages program, D1: a page saved while Planning was open
+    // reads as the Console).
     surface = (
       <AudioSurface
         appSnapshot={shellState.appSnapshot}
@@ -358,6 +382,7 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         activeWorkspace={activeWorkspace}
         clock={clock}
         cluster={workspaceRegions}
+        plate={plateRegion}
         footer={workspaceRegions}
         disabledWorkspaces={disabledWorkspaces}
         monitorItems={monitorItems}
@@ -367,7 +392,13 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
           // Health chips open Setup / Support; latched chips jump to the
           // workspace that owns the latched state (same-target clicks no-op).
           const target =
-            item.id === "latched:scene-drift" ? "lighting" : item.id === "latched:solo" ? "audio" : "setup";
+            item.id === "latched:scene-drift"
+              ? "lighting"
+              : item.id === "latched:solo"
+                ? "audio"
+                : item.id === "latched:prompter-playing"
+                  ? "teleprompter"
+                  : "setup";
           void tryNavigateWorkspace(target);
         }}
         onWorkspaceChange={(workspaceId) => {

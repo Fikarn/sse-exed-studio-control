@@ -5,7 +5,9 @@ import styles from "./LampChip.module.css";
 // Visual overhaul A, Slice 2 (system §7): the header chip — a lamp, the
 // subsystem's name and its state word within 8 px. `attention` chips are
 // amber-keylined, `error` chips red; a latch (Solo, Scene unsaved) is an
-// attention chip that names a latched state rather than a subsystem.
+// attention chip that names a latched state rather than a subsystem, and a
+// green one (Prompter playing, new pages program Slice 6a) names something
+// running.
 export interface LampChipProps {
   label: string;
   word?: string;

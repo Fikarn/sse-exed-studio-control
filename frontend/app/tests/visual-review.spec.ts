@@ -11,7 +11,14 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // only (`ignoreSnapshots` in playwright.config.ts) — on CI's Linux runner these
 // cases make their other checks and compare no screenshot.
 
-const FIXTURES = ["setup-ready", "protocol-mismatch", "lighting-populated", "audio-populated"] as const;
+// New pages program, Slice 6a: the Teleprompter joins with its ready board.
+const FIXTURES = [
+  "setup-ready",
+  "protocol-mismatch",
+  "lighting-populated",
+  "audio-populated",
+  "teleprompter-ready",
+] as const;
 
 interface Viewport {
   readonly width: number;
@@ -186,7 +193,13 @@ test.describe(`viewport ${STUDIO.label}`, () => {
 // canvas-dark quirk): the theme attribute lands post-mount, and the screenshot
 // stabilizer could grab the pre-flip frame on the canvas-heavy mixer — so wait
 // until the attribute + the themed background are live before capturing.
-const PER_THEME_FIXTURES = ["setup-ready", "lighting-populated", "protocol-mismatch", "audio-populated"] as const;
+const PER_THEME_FIXTURES = [
+  "setup-ready",
+  "lighting-populated",
+  "protocol-mismatch",
+  "audio-populated",
+  "teleprompter-ready",
+] as const;
 const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
 
 async function settleTheme(page: Page, theme: (typeof NON_STUDIO_THEMES)[number]) {
@@ -232,6 +245,11 @@ const STATE_FIXTURES = [
   "audio-offline",
   "audio-action-failed",
   "lighting-dmx-unreachable",
+  // New pages program, Slice 6a: the Teleprompter's first run, the Prompter XL
+  // gone, and a script edited after it went on.
+  "teleprompter-empty",
+  "teleprompter-not-connected",
+  "teleprompter-not-updated",
 ] as const;
 
 test.describe("state coverage", () => {
