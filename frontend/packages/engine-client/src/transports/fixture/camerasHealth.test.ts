@@ -128,11 +128,12 @@ describe("the fixture double's Cameras lamp: the whole status", () => {
     simulatedCameras(transport).stopAnswering(2);
     const health = (await transport.request("health.snapshot", {})) as JsonObject;
     expect(health.status).toBe("attention");
-    expect(String(health.summary)).toMatch(
-      new RegExp(
-        ` Prompter: Windows does not see the Prompter XL\\..* Cameras: ${CAM2_UNREACHABLE.replace(/\./g, "\\.")}$`
-      )
-    );
+    // Plain text, not a pattern built from the sentence: the Prompter XL's part first, the cameras' last.
+    const summary = String(health.summary);
+    const prompter = summary.indexOf(" Prompter: Windows does not see the Prompter XL.");
+    expect(prompter).toBeGreaterThanOrEqual(0);
+    expect(summary.endsWith(` Cameras: ${CAM2_UNREACHABLE}`)).toBe(true);
+    expect(summary.lastIndexOf(" Cameras: ")).toBeGreaterThan(prompter);
   });
 
   it("leaves a whole status that was already attention as it was, and keeps the check through a sync", async () => {
