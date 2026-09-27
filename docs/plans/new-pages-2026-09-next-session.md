@@ -89,7 +89,11 @@ Part C's Slices 5–13 were written for one workstation. Put a re-cut to the ope
 - **Read what is locked from the prompter's state:** `glass`, `atEnd`, `laidOut`, `notUpdated`. Refused requests throw an `EngineRequestError` with the code and the sentence, on both transports.
 - **Arming stays on the page.** Replacing what the prompter shows needs `replace: true`, which the page's second press sends; Update and Clear are armed the same way.
 - **Files and pastes.** A file reaches the hardware link as its name and its base64 bytes (the page's own `<input type="file">`), and a paste as the clipboard's `text/html` and `text/plain`.
-- **The fixture double behaves like the hardware link,** except that it reads no `.docx`. Its clock and its import are held to the same cases.
+- **The fixture double behaves like the hardware link,** except that:
+  - it reads no `.docx`;
+  - its HTML paste reader keeps Word's tracked deletions, footnotes and comments.
+
+  Its clock is held to the same motion cases, and its page list to `shell_settings.rs`.
 
 ## The workstation catch-up (for the next workstation session)
 

@@ -674,6 +674,59 @@ Validation before the push (2026-09-27, on the studio workstation):
 - the live app (shell 17156, engine 12268 on 38201), TotalMix FX and Companion untouched throughout;
 - `native:acceptance` and the qualification lanes left to CI, as the rules have them.
 
+**Push and review (2026-09-27).** #225 was opened at the push of `8ae1731`, with the operator's go-ahead asked there; it was given the same day ("Yes, merge when green"). On the push run 36306473342, nine checks were green and CodeQL was clean (its only annotations are a runner notice). The tenth, `rust`, failed in `native:acceptance`: "support.backup.export reported format 6, expected 5". The lanes' expected format was fixed in `61d97d3`, and `scripts/native-lanes.test.mjs` now holds it to `support.rs`.
+
+Three reviewers covered what CI does not: the prompter's rules and data safety, the import on hostile input, and the fixture double's parity with the hardware link. The assistant checked every high and medium finding against the code it cites, in place of separate skeptics, to keep the run lean. Every one held. They were fixed on the branch before the merge:
+
+- **Rules and data:**
+  - M1: Clear, Replace and the archive saved an unupdated script's place against its edited text; it is now carried across.
+  - M2: Update landed in the wrong paragraph when an edit and a cut met; it now matches by likeness.
+  - M3: a failed save turned PAUSE into an error while the text scrolled on; saves are now best-effort.
+  - M4: a new size moved the reading line by up to a line. The anchor now carries `wordOffset` in place of `lineFraction`.
+  - Lows: END unannounced when a request found it first; the pause saved before its ease stopped; `nextParagraph` went backwards; two views' layouts could drift a paused place (the first report wins); a script of cues alone ran through at once; the dangling `Update` wording.
+  - The rework found and fixed one bug of its own: a no-layout motion inside a word was dropped.
+- **Import:**
+  - High 1 (`model.rs`): cue counting was quadratic, and a paragraph of 30,000 cue lines stalled the hardware link. Now one pass.
+  - High 2: zip lookups were quadratic over thousands of header parts. Now indexed, capped at 64 parts, and a zip of over 10,000 entries is refused.
+  - Mediums: the text size was unbounded (now collapsed white space and a 2 MB cap); Word's tracked deletions came in from pasted HTML; Word's footnotes and comments came in from pasted HTML.
+  - Lows: attribute memory; lists sharing one definition; style bold, italic and underline; numbers without a stop; a non-Word compound file; hidden text; the paste's size sentence; embedded documents (`718dcb9`, 14 tests that fail on the old code).
+- **Parity:**
+  - High: the live transport dropped a refusal's code while the double kept it. Both now throw an `EngineRequestError` with the code.
+  - Medium: the double's END timer slept without a layout.
+  - Lows: END unannounced; three wrong claims in `v1.md`; name order by code point.
+
+Commits: `6544927` (hardware link), `61d97d3` (lanes, D23, `v1.md`), `718dcb9` (import), `71fda9b` (docs) and `fe0d529` (the double).
+
+Tests changed in the review (old → new → reason):
+
+1. `prompter/clock/tests.rs` `a_new_look_keeps_the_words_at_the_reading_line`: "the line holding word 10" → word 19.4 kept to within 0.01 word through three new layouts. The anchor carries words now (M4).
+2. `prompter/clock/tests.rs` `a_layout_arriving_mid_scroll_carries_the_motion_on`: the paragraph after 20 s → the word within 0.1 after a realistic 200 ms. Over a long wait, words and pixels drift apart by the paragraph gaps.
+3. The clock tests' calls moved from `place_at(..).0`, `jump(place, fraction)` and `Motion { place, fraction }` to `place_at`, `jump(paragraph, word_offset)` and `Motion { paragraph, word_offset }`.
+4. `prompter/import/tests.rs`:
+   - `line_breaks_white_space_and_entities`: `keep   its` → `keep its` (white space collapsed);
+   - `a_style_attribute_overrides_the_elements_own_emphasis`: `<ins>` is no longer underlined;
+   - the bare compound-file header: password-protected → not a `.docx` (moved into the finding-10 test).
+5. The fixture double's tests:
+   - "steps one line": `placeAtPosition` → `wordsAtPosition`;
+   - the new-look test: split in two, as in Rust;
+   - "finds the text at END on the next request too": no `at-end` → `at-end` once (L1);
+   - "goes where BACK…": the last `nextParagraph` → refused `PROMPTER_NO_PARAGRAPH`;
+   - "reads the clipboard's HTML": a lone no-break space stays.
+
+After the review:
+
+- engine 539 tests;
+- engine-client 206 tests;
+- app 186, design system 179, tokens 15;
+- script tests 186.
+
+Known differences left in the fixture double, by design:
+
+- it reads no `.docx`;
+- its HTML paste reader is simpler: it keeps Word's tracked deletions, footnotes and comments, and does not number Word list items without a stop;
+- its saves cannot fail;
+- its ids are a counter.
+
 The import, by one agent in a worktree of its own (`import/`, 49 tests: 42 cases, five property tests of 256 inputs each over the zip, the `.docx` built from Word's elements in any nesting, damaged bytes, `.txt` and HTML, and two worst cases — tables nested 50,000 deep, hostile pastes). Beyond the proposal's §3.2 it:
 
 - trims white space at the ends of every line in all three readers;
