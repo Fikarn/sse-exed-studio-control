@@ -39,6 +39,7 @@ import {
   layoutLines,
   optionalText,
   prompterCheck,
+  prompterStatusPart,
   readGlassSnapshot,
   readScriptSnapshot,
   readSnapshot,
@@ -46,15 +47,7 @@ import {
   textParam,
   wholeParam,
 } from "./prompterReads";
-import {
-  playRefusal,
-  sameCheck,
-  sameScreen,
-  screenDraws,
-  screenFromReport,
-  screenState,
-  screenSummary,
-} from "./prompterScreen";
+import { playRefusal, sameScreen, screenDraws, screenFromReport, screenState, screenSummary } from "./prompterScreen";
 import {
   SIZE_MAX_PX,
   SIZE_MIN_PX,
@@ -744,12 +737,25 @@ function answerRequest(prompter: FixturePrompter, method: RequestMethod, params:
   }
 }
 
-/** The three reads: they leave `checks.prompter` as it was, so it is not compared around them. */
-const READS: ReadonlySet<RequestMethod> = new Set([
-  "prompter.snapshot",
-  "prompter.glass.snapshot",
-  "prompter.script.snapshot",
+/**
+ * The requests that can change `checks.prompter` or the whole status's part of it
+ * (`changes_the_check`): the Prompter XL, or what the glass shows against the script's text
+ * and name. The check is compared around these only, as the hardware link does.
+ */
+const CHANGES_THE_CHECK: ReadonlySet<RequestMethod> = new Set([
+  "prompter.screen.report",
+  "prompter.putOn",
+  "prompter.update",
+  "prompter.clear",
+  "prompter.script.edit",
+  "prompter.script.rename",
+  "prompter.script.import",
+  "prompter.script.version.bringBack",
 ]);
+
+/** The check and the whole status's part of it, compared whole (`PrompterHealthCheck` with its `counted`). */
+const healthState = (prompter: FixturePrompter) =>
+  JSON.stringify({ check: prompterCheck(prompter), part: prompterStatusPart(prompter) });
 
 /**
  * The Teleprompter's requests: every `prompter.*` method, settling the clock first as the
@@ -769,9 +775,9 @@ export function handleFixturePrompterRequest(
   const now = Date.now();
   settlePrompter(prompter, now);
   try {
-    const before = READS.has(method) ? null : prompterCheck(prompter);
+    const before = CHANGES_THE_CHECK.has(method) ? healthState(prompter) : null;
     const { result, reason } = answerRequest(prompter, method, params, now);
-    const healthChanged = before !== null && !sameCheck(before, prompterCheck(prompter));
+    const healthChanged = before !== null && before !== healthState(prompter);
     if (reason !== null) {
       context.emit("prompter.changed", { reason, anchor: glassAnchor(prompter, now) });
     }

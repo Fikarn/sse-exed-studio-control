@@ -233,11 +233,19 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
     let control_surface = build_control_surface_health_check(runtime);
     let sqlite_version = read_sqlite_version(&runtime.db_path)?;
     let engine = effective_entries(&registry_entries(), unix_now_secs());
+    // The Teleprompter's lamp (Slice 5a). A check that cannot be read is
+    // `null` and a `WARN` line, never a failed snapshot: a fault of the
+    // prompter's alone must not stop Studio Control's start (review of the
+    // slice's push).
     let prompter = if runtime.storage_ready {
-        Some(
-            crate::prompter::prompter_health_check(&runtime.db_path)
-                .map_err(|error| format!("The prompter's check could not be read: {error:?}"))?,
-        )
+        crate::prompter::prompter_health_check(&runtime.db_path)
+            .map_err(|error| {
+                crate::diagnostics::log_event(
+                    crate::diagnostics::LogLevel::Warn,
+                    &format!("Prompter: its check could not be read: {error:?}"),
+                );
+            })
+            .ok()
     } else {
         None
     };
@@ -313,8 +321,8 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
             "lighting": lighting,
             "audio": audio,
             "controlSurface": control_surface,
-            // Slice 5a: the Prompter XL and `NOT UPDATED`; `null` while the
-            // saved data is not usable.
+            // Slice 5a: the Prompter XL and `NOT UPDATED`; `null` when the
+            // prompter cannot be read.
             "prompter": serde_json::to_value(&prompter)?,
             "engine": serde_json::to_value(&engine)?,
         }

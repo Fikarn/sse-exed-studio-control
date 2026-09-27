@@ -12,7 +12,9 @@ import type { PrompterParagraph } from "@sse/engine-client";
 // - A word is a run of characters that are not white space, across runs of
 //   different emphasis (`un` + bold `learn` is one word).
 // - A cue is a `[` and the next `]` on the same line; a `[` with no `]` before
-//   the line ends is text. A word that is all cue is drawn in the cue colour.
+//   the line ends is text. A cue is drawn in the cue colour, where it stands,
+//   even when a word has more than the cue (`[smile].`); a word that is all
+//   cue is not read.
 // - A line that holds a cue and nothing else is a cue line: the cue colour,
 //   italic, at 70 % of the size (the proposal §4.1).
 
@@ -21,6 +23,8 @@ export interface GlassPiece {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  /** Inside a cue: drawn in the cue colour, where it stands (the proposal §4.2). */
+  cue: boolean;
 }
 
 export interface GlassWord {
@@ -50,6 +54,7 @@ interface Char {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  cue: boolean;
 }
 
 // The hardware link reads white space as Rust's `char::is_whitespace`; after
@@ -75,10 +80,22 @@ function piecesOf(chars: readonly Char[]): GlassPiece[] {
   const pieces: GlassPiece[] = [];
   for (const entry of chars) {
     const last = pieces[pieces.length - 1];
-    if (last && last.bold === entry.bold && last.italic === entry.italic && last.underline === entry.underline) {
+    if (
+      last &&
+      last.bold === entry.bold &&
+      last.italic === entry.italic &&
+      last.underline === entry.underline &&
+      last.cue === entry.cue
+    ) {
       last.text += entry.ch;
     } else {
-      pieces.push({ text: entry.ch, bold: entry.bold, italic: entry.italic, underline: entry.underline });
+      pieces.push({
+        text: entry.ch,
+        bold: entry.bold,
+        italic: entry.italic,
+        underline: entry.underline,
+        cue: entry.cue,
+      });
     }
   }
   return pieces;
@@ -89,13 +106,17 @@ export function glassParagraph(paragraph: PrompterParagraph, index: number): Gla
   // Characters by code point, as the hardware link walks them.
   const chars: Char[] = [];
   for (const run of paragraph.runs) {
-    for (const ch of run.text) chars.push({ ch, bold: run.bold, italic: run.italic, underline: run.underline });
+    for (const ch of run.text)
+      chars.push({ ch, bold: run.bold, italic: run.italic, underline: run.underline, cue: false });
   }
   // Which characters sit inside a cue, in one pass (the cues are in order and
   // apart), so a paragraph of thousands of cue lines costs no more than its
   // length (Slice 4's review found the quadratic walk in the hardware link).
   const cueChar = new Array<boolean>(chars.length).fill(false);
   for (const [start, end] of cueRanges(chars)) cueChar.fill(true, start, end);
+  chars.forEach((entry, at) => {
+    entry.cue = cueChar[at];
+  });
 
   const lines: GlassLine[] = [{ tokens: [], cueLine: false }];
   const lineChars: Char[][] = [[]];
@@ -138,7 +159,9 @@ export function glassParagraph(paragraph: PrompterParagraph, index: number): Gla
       .join("")
       .trim();
     // `cue_targets`: the trimmed line is exactly one cue.
-    const lineCues = cueRanges([...trimmed].map((ch) => ({ ch, bold: false, italic: false, underline: false })));
+    const lineCues = cueRanges(
+      [...trimmed].map((ch) => ({ ch, bold: false, italic: false, underline: false, cue: false }))
+    );
     line.cueLine =
       trimmed.length >= 2 && lineCues.length === 1 && lineCues[0][0] === 0 && lineCues[0][1] === [...trimmed].length;
   });

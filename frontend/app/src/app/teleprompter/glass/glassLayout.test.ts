@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { glassMetrics, layoutFromMeasure, lineAt, positionOf } from "./glassLayout";
+import { glassMetrics, layoutFromMeasure, layoutProblem, lineAt, positionOf, type GlassLayout } from "./glassLayout";
 import { paragraph, standardLook } from "./glassStoryScript";
 import { glassParagraphs } from "./glassText";
 
@@ -34,6 +34,61 @@ describe("the glass's metrics", () => {
     expect(numbered.arrowLeft + 46 + 24).toBeCloseTo(
       numbered.columnLeft - numbered.numberGap - 3 * 0.62 * numbered.numberSize
     );
+  });
+});
+
+describe("the glass's metrics, continued", () => {
+  it("keep room for the script's last paragraph number beside the arrow", () => {
+    const look = standardLook({ paragraphNumbers: true, marginPercent: 0 });
+    const few = glassMetrics(look, 160, 12);
+    const many = glassMetrics(look, 160, 1_001);
+    // A fourth digit moves the text one digit further in; the arrow stays clear of it.
+    expect(many.columnLeft - few.columnLeft).toBeCloseTo(0.62 * many.numberSize);
+    expect(many.arrowLeft + 46 + 24).toBeCloseTo(many.columnLeft - many.numberGap - 4 * 0.62 * many.numberSize);
+  });
+});
+
+describe("what the hardware link would refuse (Layout::new)", () => {
+  const line = (paragraph: number, word: number, top: number) => ({ paragraph, word, top, height: LINE });
+  const layout = (overrides: Partial<GlassLayout> = {}): GlassLayout => ({
+    key: "g1-l0",
+    lines: [line(0, 0, 0), line(0, 3, 100), line(1, 0, 250), line(2, 0, 400)],
+    endTop: 1_000,
+    pxPerReadWord: 10,
+    paragraphWords: [5, 0, 2],
+    ...overrides,
+  });
+
+  it("takes a layout in order, every paragraph with a line and END below", () => {
+    expect(layoutProblem(layout())).toBeNull();
+    // Half a pixel of overlap is a measure's wobble, and taken.
+    expect(
+      layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 3, 99.6), line(1, 0, 250), line(2, 0, 400)] }))
+    ).toBeNull();
+  });
+
+  it("refuses what the hardware link refuses", () => {
+    expect(layoutProblem(layout({ lines: [] }))).toBe("no lines");
+    expect(layoutProblem(layout({ lines: [line(0, 1, 0)] }))).toMatch(/first line/);
+    // An empty paragraph one line tall with the next less than half a pixel short of it (review of Slice 5a's push).
+    expect(layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 3, 100), line(1, 0, 250), line(2, 0, 349.2)] }))).toBe(
+      "the lines are not in order"
+    );
+    // A glass measured while it was not drawn: every top 0.
+    expect(layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 3, 0), line(1, 0, 0), line(2, 0, 0)] }))).toBe(
+      "the lines are not in order"
+    );
+    expect(
+      layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 5, 100), line(1, 0, 250), line(2, 0, 400)] }))
+    ).toMatch(/past its paragraph's words/);
+    expect(layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 3, 100), line(2, 0, 400)] }))).toBe(
+      "a paragraph does not start on a line of its own"
+    );
+    expect(layoutProblem(layout({ lines: [line(0, 0, 0), line(0, 3, 100), line(1, 0, 250)] }))).toBe(
+      "a paragraph has no line"
+    );
+    expect(layoutProblem(layout({ endTop: 450 }))).toBe("END is not below");
+    expect(layoutProblem(layout({ lines: [line(0, 0, -1)] }))).toBe("a line has no top");
   });
 });
 

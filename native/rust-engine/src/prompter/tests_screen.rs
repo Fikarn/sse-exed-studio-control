@@ -210,3 +210,34 @@ fn the_check_follows_the_screen_and_not_updated() {
     assert!(update.health_changed);
     assert!(prompter_health_check(prompter.path()).unwrap().ok);
 }
+
+// Review of the slice's push: the check is compared only around the
+// requests that can change it, and never fails one. A pause acts on the
+// glass even when the saved scripts cannot be read (before, the comparison
+// read the glass's script first and failed the pause with STORAGE_ERROR while
+// the text scrolled on).
+#[test]
+fn a_pause_acts_even_when_the_scripts_cannot_be_read() {
+    let prompter = TestPrompter::new("screen-unreadable");
+    on_the_glass(&prompter);
+    prompter.call("prompter.play", json!({}));
+    let connection = crate::storage::open_connection(prompter.path()).expect("a connection");
+    connection
+        .execute_batch("ALTER TABLE prompter_scripts RENAME TO prompter_scripts_away;")
+        .expect("the scripts' table moves away");
+    let reply = prompter
+        .reply("prompter.pause", json!({}))
+        .expect("the pause acts");
+    assert_eq!(reply.reason, Some("paused"));
+    assert!(!reply.anchor.expect("an anchor").playing);
+    assert!(!reply.health_changed, "a take's control reads no check");
+    // A request that can change the check says it may have, when it cannot
+    // read it, rather than failing for it.
+    let report = prompter
+        .reply("prompter.screen.report", json!({ "found": false }))
+        .expect("the report is taken");
+    assert!(report.health_changed);
+    connection
+        .execute_batch("ALTER TABLE prompter_scripts_away RENAME TO prompter_scripts;")
+        .expect("the scripts' table comes back");
+}

@@ -11,7 +11,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
 ## Start here
 
-1. `git log --oneline -5`: `main` holds Slice 4 (#225) or later.
+1. `git log --oneline -5`: `main` holds Slice 5a (#226) or later. If it does not, #226's review and merge come first.
 2. Read `AGENTS.md` (`CLAUDE.md` points there).
 3. In the ledger, read:
    - the `Status:` and `Tracking:` paragraphs;
@@ -37,6 +37,8 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
   A slice that moves boards merges from the cloud once its ten checks are green, you have reviewed your own renders at 2560×1440, and the operator has given the go-ahead. The win32 captures of every board you moved are refreshed later, in one workstation catch-up.
 
+- **In review:** Slice 5a, #226 (the glass, and the Prompter XL's state in the hardware link), built in the cloud on 2026-09-27.
+- **Next:** Slice 6, the Teleprompter page. Its first steps, in its section of the ledger, go to the operator before its code: among them the editor's keys under D6, and the deck lamp's word (Deck or Surface).
 - **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each); a low Dependabot alert (#7) on `main`; and D18's two checks, which gate Slice 13.
 - **On the workstation:** the live app stays `main`'s build of `98bbb06` (schema 7) until the program's close-out. The live data then goes from schema 7 to 9, or to 10 once Slice 8 lands, in one start. The Appendix B walk happens there, on the program's last build.
 
@@ -56,30 +58,32 @@ Each cloud slice's own first steps are in its section of the ledger and are put 
 - **Runs here:** `npm ci`, then:
   - `npm run lint`, `npm run frontend:typecheck`, `npm run frontend:test` (with its coverage floors), `npm run scripts:test`, `npm run format:check` and `npm run protocol:check`;
   - `node scripts/check-operator-copy.mjs`, which holds at 0;
-  - the Playwright behaviour specs and the UI contract, after `npm run build --workspace frontend/app && npm run frontend:storybook:build` (Linux Chromium: `npx playwright install --with-deps chromium`). Off Windows, Playwright compares no screenshot (`ignoreSnapshots`) and the UI contract samples no contrast; every other §10 measure runs.
+  - the Playwright behaviour specs and the UI contract, after `npm run build --workspace frontend/app && npm run frontend:storybook:build` (the browser: see "Playwright's browser" below; never download one here). Off Windows, Playwright compares no screenshot (`ignoreSnapshots`) and the UI contract samples no contrast; every other §10 measure runs.
 - **Rust:** `cargo test -p studio-control-engine` and `cargo clippy -p studio-control-engine --all-targets -- -D warnings` need only the toolchain `native/rust-toolchain.toml` pins and a C compiler for the bundled SQLite. The shell crate (`native/tauri-shell`) also needs the Linux packages in `.github/actions/setup-tauri-linux/action.yml`; `apt-get install` of that list worked in the session of 2026-09-27, and `npm run rust:clippy` and `npm run native:test` (so `dev:check`) then run whole. Delete the `native/tauri-shell/gen/schemas/linux-schema.json` a Linux build leaves: it is not committed.
-- **The shell for Windows:** `rustup target add x86_64-pc-windows-msvc`, then from `native/`: `cargo check -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc` and `cargo clippy -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc --all-targets -- -D warnings`. A type-check and lint of the `cfg(windows)` code, nothing linked or run (proven on 2026-09-27; the build script's "GNU compiler is not supported" warning is harmless). Part C's **Rescope:** makes it the condition of any cloud change to the shell.
-- **Playwright's browser:** the pinned Playwright wants a newer Chromium than the container's `/opt/pw-browsers` holds, and the container must not download one. Make a scratch folder with `chromium_headless_shell-<its build>/chrome-headless-shell-linux64/chrome-headless-shell` and `chromium-<its build>/chrome-linux64/chrome`, each a link to `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (the build number is in the first launch error), point `PLAYWRIGHT_BROWSERS_PATH` at it, and run through the npm scripts (`npm run playwright:test --workspace frontend/app -- --project=default`), never the runner script by hand: from outside npm it finds another Playwright on the path.
+- **The shell for Windows:** `rustup target add x86_64-pc-windows-msvc`, then from `native/`: `cargo check -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc` and `cargo clippy -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc --all-targets -- -D warnings`. Run `rustup target add` from `native/` too, so it adds the target to the toolchain `native/rust-toolchain.toml` pins. A type-check and lint of the `cfg(windows)` code, nothing linked or run (proven on 2026-09-27; the build script's "GNU compiler is not supported" warning is harmless). Part C's **Rescope:** makes it the condition of any cloud change to the shell.
+- **Playwright's browser:** the pinned Playwright wants a newer Chromium than the container's `/opt/pw-browsers` holds, and the container must not download one. Make a scratch folder with `chromium_headless_shell-<its build>/chrome-headless-shell-linux64/chrome-headless-shell`, a link to `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`, and `chromium-<its build>/chrome-linux64/chrome`, a link to `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (the build number is in the first launch error; the folders the container holds may differ), point `PLAYWRIGHT_BROWSERS_PATH` at it, and run through the npm scripts (`npm run playwright:test --workspace frontend/app -- --project=default`), never the runner script by hand: from outside npm it finds another Playwright on the path. A run on another Chromium build is a check, not proof: CI's `frontend-e2e` stays the authority.
 - **Vitest** runs from the workspace's own folder (`npm run test --workspace …`, or `npx vitest run` in `frontend/app`): from the repository root, `--root frontend/app` refuses the glass's font asset import (`…woff2?url`).
 - **Your own visual review replaces the win32 captures until the catch-up.** Render each board you make or move at 2560×1440 in Studio, Graphite and Bone with a Playwright script of your own, in the scratch directory and never committed. Look at the renders, compare them with the boards, and say in the pull request what you checked.
   - The app runs without the hardware link at `/?fixture=<id>&transport=fixture&theme=graphite|bone`.
-  - The fixtures are in `frontend/packages/test-fixtures/src/fixtures.json`. The prompter's double starts empty in every scenario, so the new pages need scenarios of their own.
+  - The fixtures are in `frontend/packages/test-fixtures/src/fixtures.json`. The prompter's double starts with no scripts and the Prompter XL connected in every scenario, so the new pages need scenarios of their own; a scenario's `prompterScreen` (a `prompter.screen.report`'s params, or `"unreported"`) says otherwise.
 - **Not possible here:**
   - the live app and the studio hardware;
-  - Windows-only code (it compiles on the workstation only);
+  - Windows-only code at run time: the cloud type-checks and lints the shell for Windows (above) but links and runs nothing, so NDI, Bluetooth, the LUMIX SDK and the Prompter XL's window (Slice 5b) stay on the workstation;
   - packaging and signing;
   - the qualification lanes, which run in CI only;
   - the win32 captures: do not delete, refresh or commit any `*-win32.png`;
   - pushing a tag or deleting a branch, since a cloud session can push only its own branch. List the archive tags a merge needs in the ledger, and the next workstation session pushes them.
 
-## The contract the front end builds on (Slice 4)
+## The contract the front end builds on (Slices 4 and 5a)
 
 `native/protocol/v1.md` › Teleprompter has all of it. The points a page or the glass must hold:
 
 - **The clock runs in the hardware link.** Only the front end has the fonts, so the view that draws the glass reports its layout (`prompter.layout.report`). The first report for a key wins, and a report for an older key is ignored.
 - **The anchor.** A view draws the motion from the anchor in `prompter.changed` and in the snapshots: `position(t) = min(position + pxPerReadWord · words(ageMs + t), endPosition)`, computed by `motion.ts`. A view with another layout places the text from `place.paragraph` and `wordOffset` (a share of the line's words).
 - **The place is words, never pixels.** The prompter is paused after every start and restore, stops by itself only at `END`, and says so with `reason: "at-end"`.
-- **Read what is locked from the prompter's state:** `glass`, `atEnd`, `laidOut`, `notUpdated`. Refused requests throw an `EngineRequestError` with the code and the sentence, on both transports.
+- **Read what is locked from the prompter's state:** `glass`, `atEnd`, `laidOut`, `notUpdated`, and (Slice 5a) `screen.draws`: `PLAY` is refused as `PROMPTER_NOT_ON_GLASS` while nothing is drawn on the Prompter XL. Refused requests throw an `EngineRequestError` with the code and the sentence, on both transports.
+- **The Prompter XL's state (Slice 5a)** is in `prompter.snapshot`'s `screen` and in `health.snapshot`'s `checks.prompter`, which is the worse of the screen's state and `NOT UPDATED` and drives the header's lamp; `app.changed { reason: "health" }` says when it changed. Only a state the shell has reported raises the whole status, and then to attention at most; `NOT UPDATED` lights the lamp only. Show the words and sentences as the hardware link gives them.
+- **The glass (Slice 5a)** is one component, `frontend/app/src/app/teleprompter/glass/PrompterGlass`, for the Prompter XL's window (Slice 5b) and the page's copy (Slice 6). Its `onLayout` gives what `prompter.layout.report` carries: for each layout key once the fonts are ready, and again, at most once a second, when an anchor for that key has no position (the hardware link restarted, or a report was lost). It sends only a layout the hardware link would take. Its text and geometry are read again only when the key changes. It is a picture (`data-picture`): Slice 6 makes the UI contract's census skip `[data-picture]`, since the glass's type is the presenter's (the proposal §6.1), and wires `onLayout` to `prompter.layout.report`.
 - **Arming stays on the page.** Replacing what the prompter shows needs `replace: true`, which the page's second press sends; Update and Clear are armed the same way.
 - **Files and pastes.** A file reaches the hardware link as its name and its base64 bytes (the page's own `<input type="file">`), and a paste as the clipboard's `text/html` and `text/plain`.
 - **The fixture double behaves like the hardware link,** except that:

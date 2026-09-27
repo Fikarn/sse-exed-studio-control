@@ -658,11 +658,27 @@ async fn engine_start(
         })
 }
 
+/// Requests only the shell sends to the hardware link, never the page: what
+/// the shell reads of Windows (the new pages program's Slice 5a — the Prompter
+/// XL, as Windows' display configuration shows it, sent from Slice 5b). A page
+/// that could send it could unlock `PLAY` with nothing drawn on the glass.
+const SHELL_ONLY_METHODS: &[&str] = &["prompter.screen.report"];
+
+fn page_may_send(method: &str) -> bool {
+    !SHELL_ONLY_METHODS.contains(&method)
+}
+
 #[tauri::command]
 async fn engine_request(
     state: tauri::State<'_, EngineState>,
     request: RequestEnvelope,
 ) -> Result<studio_control_protocol::ResponseEnvelope, String> {
+    if !page_may_send(&request.method) {
+        return Err(format!(
+            "{} is sent by Studio Control's shell, not by the page.",
+            request.method
+        ));
+    }
     let bridge = Arc::clone(&state.bridge);
     off_main_thread(move || bridge.request(request)).await
 }
@@ -1290,6 +1306,28 @@ fn main() {
     builder
         .run(tauri::generate_context!())
         .expect("failed to run tauri shell");
+}
+
+#[cfg(test)]
+mod shell_only_method_tests {
+    use super::*;
+
+    // New pages program, Slice 5a (review of its push): the Prompter XL's
+    // state reaches the hardware link from the shell alone; the page's
+    // request path refuses it, and nothing else.
+    #[test]
+    fn the_page_cannot_report_the_prompter_xl() {
+        assert!(!page_may_send("prompter.screen.report"));
+        for method in [
+            "prompter.play",
+            "prompter.layout.report",
+            "prompter.snapshot",
+            "health.snapshot",
+            "settings.update",
+        ] {
+            assert!(page_may_send(method), "{method}");
+        }
+    }
 }
 
 #[cfg(test)]

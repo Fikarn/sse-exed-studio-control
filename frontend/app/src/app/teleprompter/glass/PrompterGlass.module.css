@@ -10,6 +10,22 @@
   overflow: hidden;
   background: var(--prompter-glass-floor);
   contain: strict;
+  /* Nothing the view around it sets reaches the text, so every view breaks
+     every line alike (the first layout reported for a key is the one the
+     clock runs on). */
+  direction: ltr;
+  font-kerning: auto;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-variation-settings: normal;
+  letter-spacing: normal;
+  line-break: auto;
+  text-indent: 0;
+  text-rendering: auto;
+  text-transform: none;
+  white-space: normal;
+  word-break: normal;
+  word-spacing: normal;
 }
 
 .screen {
@@ -51,9 +67,10 @@
   position: relative;
   margin: 0;
   /* Half a line between paragraphs. Padding, not margin, so nothing
-     collapses and every paragraph's top is where it is measured. */
+     collapses and every paragraph's top is where it is measured; an empty
+     paragraph is a line and its gap (the box includes its padding). */
   padding: 0 0 var(--glass-gap);
-  min-height: var(--glass-line);
+  min-height: calc(var(--glass-line) + var(--glass-gap));
 }
 
 .paragraph b {
@@ -80,11 +97,13 @@
 }
 
 /* A line that holds a cue and nothing else: the second colour, italic, at
-   70 % of the size, in a line of the same height as the text's. */
+   70 % of the size, in a line of the same height as the text's (set at the
+   line's top, so the smaller face does not make the line taller). */
 .cueLine {
   color: var(--prompter-glass-cue);
   font-size: var(--glass-cue-size);
   font-style: italic;
+  vertical-align: top;
 }
 
 /* A paragraph number, when the look shows them: hung in the left margin,

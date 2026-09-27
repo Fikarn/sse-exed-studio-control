@@ -29,9 +29,9 @@ describe("the glass's text", () => {
     ]);
     const unlearn = cut.lines[0].tokens.find((token) => token.kind === "word" && token.word.index === 5);
     expect(unlearn?.kind === "word" && unlearn.word.pieces).toEqual([
-      { text: "un", bold: false, italic: false, underline: false },
-      { text: "learn", bold: true, italic: false, underline: false },
-      { text: "?", bold: false, italic: false, underline: false },
+      { text: "un", bold: false, italic: false, underline: false, cue: false },
+      { text: "learn", bold: true, italic: false, underline: false, cue: false },
+      { text: "?", bold: false, italic: false, underline: false, cue: false },
     ]);
   });
 
@@ -61,6 +61,34 @@ describe("the glass's text", () => {
       [7, false],
     ]);
     expect(cut.lines[0].cueLine).toBe(false);
+  });
+
+  it("marks the cue inside a word that has more than the cue, and still reads the word", () => {
+    const cut = glassParagraph(paragraph("Hello [smile]. (see [slide 3])"), 0);
+    const pieces = cut.lines[0].tokens.flatMap((token) =>
+      token.kind === "word"
+        ? [[token.word.cue, token.word.pieces.map((piece) => [piece.text, piece.cue])] as const]
+        : []
+    );
+    expect(pieces).toEqual([
+      [false, [["Hello", false]]],
+      [
+        false,
+        [
+          ["[smile]", true],
+          [".", false],
+        ],
+      ],
+      [false, [["(see", false]]],
+      [true, [["[slide", true]]],
+      [
+        false,
+        [
+          ["3]", true],
+          [")", false],
+        ],
+      ],
+    ]);
   });
 
   it("closes a cue only on its own line", () => {

@@ -13,7 +13,8 @@
 //! than attention, while the lamp itself goes red. Answered again the same
 //! day, after CI's qualification lane found that the unreported state made
 //! every lane's and test's status attention: only a state the shell has
-//! reported counts toward the whole status.
+//! reported counts toward the whole status; and at the review, `NOT UPDATED`
+//! lights the lamp only (an edit waiting for Update is work, not a fault).
 
 use crate::prompter::PrompterError;
 use serde::Serialize;
@@ -127,8 +128,10 @@ impl PrompterScreen {
     }
 
     /// `prompter.screen.report { found, duplicated?, width?, height?,
-    /// refreshHz?, windowError? }`. A screen that was found carries its size
-    /// and refresh rate.
+    /// refreshHz?, windowError? }`. A screen that was found carries its size;
+    /// its refresh rate may be missing (Windows can report none) or a
+    /// fraction (59.94), and is kept in whole hertz. A window error is kept
+    /// only when it is what the state says (not while duplicated).
     pub(crate) fn from_report(params: &Value) -> Result<Self, PrompterError> {
         let found = params
             .get("found")
@@ -160,23 +163,29 @@ impl PrompterScreen {
                 )))
             }
         };
+        let refresh_hz = match params.get("refreshHz") {
+            None | Some(Value::Null) => None,
+            Some(_) => Some(positive(params, "refreshHz")?),
+        };
         Ok(Self {
             reported: true,
             found,
             duplicated,
             width: Some(positive(params, "width")?),
             height: Some(positive(params, "height")?),
-            refresh_hz: Some(positive(params, "refreshHz")?),
-            window_error,
+            refresh_hz,
+            window_error: window_error.filter(|_| !duplicated),
         })
     }
 
-    /// `1920×1080 · 60 Hz`, once a screen was found.
+    /// `1920×1080 at 60 Hz`, or `1920×1080` when Windows gave no refresh
+    /// rate, once a screen was found.
     fn mode(&self) -> Option<String> {
         match (self.width, self.height, self.refresh_hz) {
             (Some(width), Some(height), Some(refresh)) => {
                 Some(format!("{width}×{height} at {refresh} Hz"))
             }
+            (Some(width), Some(height), None) => Some(format!("{width}×{height}")),
             _ => None,
         }
     }
@@ -245,15 +254,17 @@ impl PrompterScreen {
     }
 }
 
+/// A size or a rate the shell read from Windows: a number above 0, kept in
+/// whole units (a refresh rate of 59.94 Hz is 60).
 fn positive(params: &Value, key: &str) -> Result<u32, PrompterError> {
     params
         .get(key)
-        .and_then(Value::as_u64)
-        .and_then(|value| u32::try_from(value).ok())
-        .filter(|value| *value > 0 && *value <= 100_000)
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite() && *value >= 0.5 && *value <= 100_000.0)
+        .map(|value| value.round() as u32)
         .ok_or_else(|| {
             PrompterError::Invalid(format!(
-                "{key} must be a whole number above 0 when the screen was found."
+                "{key} must be a number above 0 when the screen was found."
             ))
         })
 }
@@ -299,7 +310,8 @@ pub struct PrompterHealthCheck {
     #[serde(rename = "notUpdated")]
     pub not_updated: bool,
     pub screen: PrompterScreenSummary,
-    /// What the whole status takes from it, and the sentence that says why;
+    /// What the whole status takes from it — a Prompter XL state the shell
+    /// has reported, never `NOT UPDATED` — and the sentence that says why;
     /// `None` when nothing counts (`whole_status`).
     #[serde(skip)]
     #[cfg_attr(feature = "ts-rs", ts(skip))]
@@ -325,19 +337,16 @@ impl PrompterHealthCheck {
             ),
             _ => (screen.tone, screen.word.clone(), screen.sentence.clone()),
         };
-        // Only a state the shell has reported counts toward the whole
-        // status; `NOT UPDATED` always does. Each counts as attention.
-        let screen_counts = screen.reported && screen.tone > PrompterCheckTone::Ok;
-        let counted = match &not_updated {
-            Some(sentence) if !screen_counts || screen.tone <= PrompterCheckTone::Attention => {
-                Some((PrompterCheckTone::Attention, sentence.clone()))
-            }
-            _ if screen_counts => Some((
+        // Only a Prompter XL state the shell has reported counts toward the
+        // whole status, as attention at most; `NOT UPDATED` lights the lamp
+        // only (the operator's answers of 2026-09-27, after CI and at the
+        // review).
+        let counted = (screen.reported && screen.tone > PrompterCheckTone::Ok).then(|| {
+            (
                 screen.tone.min(PrompterCheckTone::Attention),
                 screen.sentence.clone(),
-            )),
-            _ => None,
-        };
+            )
+        });
         Self {
             ok: status == PrompterCheckTone::Ok,
             status,
@@ -350,9 +359,10 @@ impl PrompterHealthCheck {
     }
 
     /// What the whole status takes from it (first step 1): no worse than
-    /// attention, since the sound and the light are unaffected, and nothing
-    /// from a Prompter XL the shell has not reported yet (answered after CI's
-    /// qualification lane found every lane's status raised by it).
+    /// attention, since the sound and the light are unaffected; nothing from
+    /// a Prompter XL the shell has not reported yet (answered after CI's
+    /// qualification lane found every lane's status raised by it), and
+    /// nothing from `NOT UPDATED` (answered at the review).
     pub(crate) fn whole_status(&self) -> PrompterCheckTone {
         self.counted
             .as_ref()
@@ -429,6 +439,28 @@ mod tests {
         assert_eq!(gone.width, None, "a screen that is gone has no size");
     }
 
+    // Review of the slice's push: Windows reports a refresh rate as a
+    // fraction, or none; either is kept, never a refused report that would
+    // leave a good Prompter XL NOT CONNECTED.
+    #[test]
+    fn a_refresh_rate_may_be_a_fraction_or_missing() {
+        let fraction =
+            report(json!({ "found": true, "width": 1920.0, "height": 1080, "refreshHz": 59.94 }));
+        assert_eq!(fraction.state(), PrompterScreenState::Connected);
+        assert_eq!(fraction.refresh_hz, Some(60));
+        let missing = report(json!({ "found": true, "width": 1920, "height": 1080 }));
+        assert_eq!(missing.state(), PrompterScreenState::Connected);
+        assert_eq!(missing.refresh_hz, None);
+        assert_eq!(
+            missing.sentence(),
+            "The Prompter XL is connected: 1920×1080."
+        );
+        let duplicated = report(
+            json!({ "found": true, "duplicated": true, "windowError": "no", "width": 1920, "height": 1080 }),
+        );
+        assert_eq!(duplicated.window_error, None, "not what the state says");
+    }
+
     #[test]
     fn only_a_drawn_glass_lets_the_text_scroll() {
         for (params, plays) in [
@@ -462,6 +494,8 @@ mod tests {
             json!({}),
             json!({ "found": "yes" }),
             json!({ "found": true }),
+            json!({ "found": true, "width": 1920 }),
+            json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 0 }),
             json!({ "found": true, "width": 0, "height": 1080, "refreshHz": 60 }),
             json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60, "duplicated": 1 }),
             json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60, "windowError": " " }),
@@ -518,7 +552,8 @@ mod tests {
 
     // Answered after CI's qualification lane: a Prompter XL the shell has not
     // reported yet reads NOT CONNECTED on its lamp and locks PLAY, and leaves
-    // the whole status alone; NOT UPDATED still counts.
+    // the whole status alone; and at the review: NOT UPDATED lights the lamp
+    // only.
     #[test]
     fn only_a_reported_state_counts_toward_the_whole_status() {
         let unreported = PrompterScreen::default();
@@ -530,20 +565,24 @@ mod tests {
 
         let edited = PrompterHealthCheck::new(&unreported, Some("Intro"));
         assert_eq!(edited.word, "NOT CONNECTED", "the lamp shows the worse");
-        assert_eq!(edited.whole_status(), PrompterCheckTone::Attention);
-        assert!(edited
-            .whole_status_sentence()
-            .unwrap()
-            .starts_with("Intro was edited"));
+        assert_eq!(edited.whole_status(), PrompterCheckTone::Ok);
+        let full = report(json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }));
+        let waiting = PrompterHealthCheck::new(&full, Some("Intro"));
+        assert_eq!(waiting.word, "NOT UPDATED", "the lamp says so");
+        assert_eq!(
+            waiting.whole_status(),
+            PrompterCheckTone::Ok,
+            "an edit waiting for Update is work, not a fault"
+        );
 
         let low = report(json!({ "found": true, "width": 1280, "height": 720, "refreshHz": 60 }));
-        let check = PrompterHealthCheck::new(&low, None);
+        let check = PrompterHealthCheck::new(&low, Some("Intro"));
+        assert_eq!(check.word, "NOT UPDATED");
         assert_eq!(check.whole_status(), PrompterCheckTone::Attention);
         assert!(check
             .whole_status_sentence()
             .unwrap()
             .starts_with("Windows runs the Prompter XL at 1280×720."));
-        let full = report(json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }));
         assert_eq!(
             PrompterHealthCheck::new(&full, None).whole_status(),
             PrompterCheckTone::Ok

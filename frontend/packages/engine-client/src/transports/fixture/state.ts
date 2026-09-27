@@ -910,8 +910,8 @@ export function applyPrompterHealth(state: MutableFixtureState) {
   const checks = asRecord(state.healthSnapshot.checks) ?? {};
   checks.prompter = check;
   state.healthSnapshot.checks = checks;
-  // Only a Prompter XL the shell has reported counts, and NOT UPDATED; when either
-  // does, the summary says so, as the hardware link's does.
+  // Only a Prompter XL state the shell has reported counts (NOT UPDATED lights the lamp
+  // only); when one does, the summary says so, as the hardware link's does.
   const part = prompterStatusPart(prompter);
   state.healthSnapshot.status = withPrompterStatus(state.healthStatusBeforePrompter, part?.tone ?? "ok");
   state.healthSnapshot.summary = part

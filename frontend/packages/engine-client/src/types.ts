@@ -294,9 +294,10 @@ export interface FixtureScenario {
   controlSurfaceSnapshot?: JsonObject;
   startupDelayMs?: number;
   startupFailure?: JsonObject;
-  /** The Prompter XL the double starts with, as a `prompter.screen.report`'s params;
-   *  without it, connected at 1920×1080, 60 Hz (new pages program, Slice 5a). */
-  prompterScreen?: JsonObject;
+  /** The Prompter XL the double starts with, as a `prompter.screen.report`'s params, or
+   *  `"unreported"` as every start of the hardware link begins; without it, connected at
+   *  1920×1080, 60 Hz (new pages program, Slice 5a). */
+  prompterScreen?: JsonObject | "unreported";
 }
 
 export interface EngineTransport {

@@ -1,4 +1,13 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 import type { PrompterAnchor, PrompterLayoutLine, PrompterLook, PrompterParagraph } from "@sse/engine-client";
 
@@ -10,6 +19,7 @@ import {
   GLASS_WIDTH,
   glassMetrics,
   layoutFromMeasure,
+  layoutProblem,
   type GlassLayout,
   type GlassMetrics,
   type MeasuredParagraph,
@@ -30,12 +40,22 @@ import styles from "./PrompterGlass.module.css";
 // the presenter does not read — no clock, no message, no logo; the operator's
 // marks sit around the page's copy, never on it (the proposal §4.2, §6.1).
 //
-// It reports its layout once for each `layoutKey`, when the fonts are ready
+// It reports its layout for each `layoutKey` once the fonts are ready
 // (`prompter.layout.report`; the first report for a key is the one the clock
-// runs on). It holds no prompter state: the place, the pace and playing are
-// the hardware link's, and the glass only draws the last anchor it was given
-// with the time since it came. Between frames it touches no React state: each
-// frame moves the text column with a transform.
+// runs on), and again when an anchor says the hardware link has none for that
+// key (after it restarts, or when a report was lost), at most once a second.
+// It reports only a layout the hardware link would take (`layoutProblem`): one
+// measured while the glass was not drawn is measured again once it is. The
+// text is cut again only when it says something else, and the layout is
+// measured again only when the key, the text or the look's geometry changes,
+// so a new object of the same paragraphs or look, or a colour, costs no
+// measure. (A key can come back with other text after a restore of the saved
+// data, so the text is compared, not only the key.)
+//
+// It holds no prompter state: the place, the pace and playing are the
+// hardware link's, and the glass only draws the last anchor it was given with
+// the time since it came. Between frames it touches no React state: each frame
+// moves the text column with a transform.
 
 /** What is on the glass: the text as it went on, the look and the take's size. */
 export interface PrompterGlassText {
@@ -59,7 +79,7 @@ export interface PrompterGlassProps {
   anchor: PrompterAnchor | null;
   /** The width it is drawn at, in the page's pixels; the height keeps 16:9. */
   width: number;
-  /** Called once for each `layoutKey`, when the fonts are ready. */
+  /** Called for each `layoutKey` when the fonts are ready, and again when the anchor says the hardware link has no layout for it. */
   onLayout?: (report: PrompterGlassLayoutReport) => void;
   /** Draws the anchor at its own moment and never animates: a still, for Storybook and the tests. */
   still?: boolean;
@@ -67,12 +87,17 @@ export interface PrompterGlassProps {
   testId?: string;
 }
 
-function wordContent(word: GlassWord): ReactNode {
+/** A report again for a key the hardware link has no layout for waits at least this long after the last. */
+const REPORT_AGAIN_MS = 1000;
+
+/** A word's pieces; a cue in it is drawn in the cue colour where it stands, unless the whole line is the cue. */
+function wordContent(word: GlassWord, cueLine: boolean): ReactNode {
   return word.pieces.map((piece, index) => {
     let node: ReactNode = piece.text;
     if (piece.underline) node = <u>{node}</u>;
     if (piece.italic) node = <i>{node}</i>;
     if (piece.bold) node = <b>{node}</b>;
+    if (piece.cue && !cueLine) node = <span className={styles.cue}>{node}</span>;
     return <Fragment key={index}>{node}</Fragment>;
   });
 }
@@ -93,12 +118,8 @@ function paragraphNodes(text: readonly GlassParagraph[], numbers: boolean): Reac
               token.kind === "space" ? (
                 " "
               ) : (
-                <span
-                  key={tokenIndex}
-                  data-w={token.word.index}
-                  className={token.word.cue && !line.cueLine ? styles.cue : undefined}
-                >
-                  {wordContent(token.word)}
+                <span key={tokenIndex} data-w={token.word.index}>
+                  {wordContent(token.word, line.cueLine)}
                 </span>
               )
             )}
@@ -131,20 +152,33 @@ function metricVariables(metrics: GlassMetrics): CSSProperties {
   } as CSSProperties;
 }
 
-/** Measures the laid-out column: each paragraph's top and each word's centre, and `END`'s top. */
+/**
+ * Measures the laid-out column: each paragraph's top and each word's centre,
+ * and `END`'s top. A word that wraps stands on the line of its first piece, so
+ * it is measured from its first box on the screen, brought back to the glass's
+ * pixels (the glass is drawn scaled).
+ */
 function measureColumn(
   column: HTMLElement,
   key: string,
   metrics: GlassMetrics,
   text: readonly GlassParagraph[]
 ): GlassLayout {
+  const box = column.getBoundingClientRect();
+  const scale = column.offsetWidth > 0 && box.width > 0 ? box.width / column.offsetWidth : 1;
   const measured: MeasuredParagraph[] = [];
   column.querySelectorAll<HTMLElement>("[data-p]").forEach((paragraph) => {
     const top = paragraph.offsetTop;
+    const paragraphTop = paragraph.getBoundingClientRect().top;
     const wordCentres: number[] = [];
-    // A word's `offsetTop` is from its paragraph, which is positioned.
     paragraph.querySelectorAll<HTMLElement>("[data-w]").forEach((word) => {
-      wordCentres.push(top + word.offsetTop + word.offsetHeight / 2);
+      const first = word.getClientRects()[0];
+      // Without a box on the screen, a word's `offsetTop` is from its paragraph, which is positioned.
+      wordCentres.push(
+        first
+          ? top + (first.top + first.height / 2 - paragraphTop) / scale
+          : top + word.offsetTop + word.offsetHeight / 2
+      );
     });
     measured.push({ top, wordCentres });
   });
@@ -157,11 +191,11 @@ function measureColumn(
 registerGlassItalic();
 
 /** Resolves when the faces the glass draws with are loaded, so its layout is final. */
-async function fontsReady(metrics: GlassMetrics): Promise<void> {
+async function fontsReady(sizePx: number): Promise<void> {
   const fonts = typeof document === "undefined" ? undefined : document.fonts;
   if (!fonts) return;
-  const size = `${metrics.sizePx}px`;
-  const cue = `${metrics.sizePx * CUE_SCALE}px`;
+  const size = `${sizePx}px`;
+  const cue = `${sizePx * CUE_SCALE}px`;
   try {
     await Promise.all([
       fonts.load(`500 ${size} "Inter Variable"`),
@@ -176,21 +210,60 @@ async function fontsReady(metrics: GlassMetrics): Promise<void> {
 }
 
 export function PrompterGlass({ text, anchor, width, onLayout, still = false, label, testId }: PrompterGlassProps) {
-  const paragraphs = text?.paragraphs;
+  const layoutKey = text?.layoutKey ?? null;
   const look = text?.look;
   const sizePx = text?.sizePx;
-  const layoutKey = text?.layoutKey ?? null;
-  const glassText = useMemo(() => (paragraphs ? glassParagraphs(paragraphs) : []), [paragraphs]);
-  const metrics = useMemo(() => (look && sizePx ? glassMetrics(look, sizePx) : null), [look, sizePx]);
+  // The text, cut again only when it says something else: a new array of the
+  // same paragraphs (a snapshot fetched again) costs a comparison, not a measure.
+  const paragraphs = text?.paragraphs;
+  const said = useMemo(() => JSON.stringify(paragraphs ?? []), [paragraphs]);
+  const [cut, setCut] = useState(() => ({ said, text: glassParagraphs(paragraphs ?? []) }));
+  if (cut.said !== said) setCut({ said, text: glassParagraphs(paragraphs ?? []) });
+  const glassText = cut.text;
+  const paragraphCount = glassText.length;
+
+  // The look's geometry, from its values rather than the object that carries them.
+  const spacing = look?.lineSpacingPercent;
+  const margin = look?.marginPercent;
   const numbers = look?.paragraphNumbers ?? false;
+  const reading = look?.readingLinePercent;
   const dim = look?.dimReadText ?? false;
+  const metrics = useMemo(
+    () =>
+      spacing !== undefined && margin !== undefined && reading !== undefined && sizePx
+        ? glassMetrics(
+            {
+              lineSpacingPercent: spacing,
+              marginPercent: margin,
+              paragraphNumbers: numbers,
+              readingLinePercent: reading,
+            },
+            sizePx,
+            paragraphCount
+          )
+        : null,
+    [spacing, margin, numbers, reading, sizePx, paragraphCount]
+  );
+  // What the layout depends on; the reading line, the colours and the dimming do not.
+  const geometry = metrics
+    ? [metrics.sizePx, metrics.lineHeight, metrics.marginPx, metrics.columnLeft, numbers].join(" ")
+    : null;
   const column = useMemo(() => paragraphNodes(glassText, numbers), [glassText, numbers]);
 
+  const frameElementRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
   const readRef = useRef<HTMLDivElement>(null);
   const layoutRef = useRef<GlassLayout | null>(null);
   const anchorRef = useRef<{ anchor: PrompterAnchor | null; receivedAt: number }>({ anchor: null, receivedAt: 0 });
-  const reportedRef = useRef<string | null>(null);
+  /** The key whose fonts are ready, so its measure is final. */
+  const readyRef = useRef<string | null>(null);
+  /** The last report: its key, the text it laid out and when. */
+  const reportedRef = useRef<{ key: string | null; text: readonly GlassParagraph[] | null; at: number }>({
+    key: null,
+    text: null,
+    at: 0,
+  });
+  const againRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
 
   const report = useLiveCallback((layout: PrompterGlassLayoutReport) => onLayout?.(layout));
@@ -222,41 +295,93 @@ export function PrompterGlass({ text, anchor, width, onLayout, still = false, la
     if (!draw()) frameRef.current = requestAnimationFrame(step);
   });
 
-  // The layout: measured before the first paint so the text is drawn in
-  // place, and again, then reported, once the fonts are ready.
-  useLayoutEffect(() => {
+  const measure = useLiveCallback((): GlassLayout | null => {
     const columnElement = columnRef.current;
     if (!layoutKey || !metrics || !columnElement) {
       layoutRef.current = null;
-      return;
+      return null;
     }
-    layoutRef.current = measureColumn(columnElement, layoutKey, metrics, glassText);
+    const layout = measureColumn(columnElement, layoutKey, metrics, glassText);
+    layoutRef.current = layout;
     run();
+    return layout;
+  });
+
+  // Measures and reports a layout the hardware link would take: `again` sends
+  // it even when this key was reported before.
+  const measureAndReport = useLiveCallback((again: boolean) => {
+    const layout = measure();
+    if (!layout || !layoutKey || layoutProblem(layout) !== null) return;
+    if (reportedRef.current.key === layoutKey && reportedRef.current.text === glassText && !again) return;
+    reportedRef.current = { key: layoutKey, text: glassText, at: performance.now() };
+    report({ layoutKey, lines: layout.lines, endTop: layout.endTop });
+  });
+
+  // An anchor for this key with no position: the hardware link has no layout
+  // for it (it restarted, or a report was lost). Once the fonts are ready, the
+  // layout is measured and reported again, at most once a second.
+  const reportAgainIfAsked = useLiveCallback(() => {
+    const current = anchorRef.current.anchor;
+    if (!current || current.position !== null || current.layoutKey !== layoutKey) return;
+    if (readyRef.current !== layoutKey || againRef.current !== null) return;
+    const wait = Math.max(reportedRef.current.at + REPORT_AGAIN_MS - performance.now(), 0);
+    againRef.current = window.setTimeout(() => {
+      againRef.current = null;
+      const latest = anchorRef.current.anchor;
+      if (latest && latest.position === null && latest.layoutKey === layoutKey) measureAndReport(true);
+    }, wait);
+  });
+
+  // The layout: measured before the first paint so the text is drawn in
+  // place, and again, then reported, once the fonts are ready.
+  useLayoutEffect(() => {
+    readyRef.current = null;
+    measure();
+    if (!layoutKey || geometry === null || !sizePx) return;
     let cancelled = false;
-    void fontsReady(metrics).then(() => {
-      if (cancelled || !columnRef.current) return;
-      const layout = measureColumn(columnRef.current, layoutKey, metrics, glassText);
-      layoutRef.current = layout;
-      run();
-      if (reportedRef.current !== layoutKey) {
-        reportedRef.current = layoutKey;
-        report({ layoutKey, lines: layout.lines, endTop: layout.endTop });
-      }
+    void fontsReady(sizePx).then(() => {
+      if (cancelled) return;
+      readyRef.current = layoutKey;
+      measureAndReport(false);
+      reportAgainIfAsked();
     });
     return () => {
       cancelled = true;
     };
-  }, [layoutKey, metrics, glassText, numbers, run, report]);
+  }, [layoutKey, glassText, geometry, sizePx, measure, measureAndReport, reportAgainIfAsked]);
 
   // A new anchor: drawn from the moment it came.
   useLayoutEffect(() => {
     anchorRef.current = { anchor, receivedAt: performance.now() };
     run();
-  }, [anchor, still, dim, run]);
+    reportAgainIfAsked();
+  }, [anchor, run, reportAgainIfAsked]);
+
+  // The reading line, the dimming or a still: drawn again, the anchor's moment kept.
+  useLayoutEffect(() => {
+    run();
+  }, [metrics, dim, still, run]);
+
+  // A glass that was not drawn when it was measured (in a hidden view) is
+  // measured, and reported, once it is.
+  const measureIfUnreported = useLiveCallback(() => {
+    const reported = reportedRef.current;
+    if (layoutKey && readyRef.current === layoutKey && (reported.key !== layoutKey || reported.text !== glassText)) {
+      measureAndReport(false);
+    }
+  });
+  useEffect(() => {
+    const frameElement = frameElementRef.current;
+    if (!frameElement || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => measureIfUnreported());
+    observer.observe(frameElement);
+    return () => observer.disconnect();
+  }, [measureIfUnreported]);
 
   useEffect(
     () => () => {
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      if (againRef.current !== null) window.clearTimeout(againRef.current);
     },
     []
   );
@@ -265,6 +390,7 @@ export function PrompterGlass({ text, anchor, width, onLayout, still = false, la
   const yellow = look?.textColour === "yellow";
   return (
     <div
+      ref={frameElementRef}
       className={styles.frame}
       style={{ width, height: (width * GLASS_HEIGHT) / GLASS_WIDTH }}
       role="img"

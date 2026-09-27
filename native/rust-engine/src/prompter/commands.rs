@@ -49,15 +49,7 @@ pub(crate) fn handle_prompter_request(
     params: &Value,
 ) -> Result<PrompterReply, PrompterError> {
     with_prompter(db_path, |prompter, connection, now| {
-        let reads = matches!(
-            method,
-            "prompter.snapshot" | "prompter.glass.snapshot" | "prompter.script.snapshot"
-        );
-        let check_before = if reads {
-            None
-        } else {
-            Some(health_check(prompter, connection)?)
-        };
+        let check_before = changes_the_check(method).then(|| checked(prompter, connection));
         let (result, reason) = match method {
             "prompter.snapshot" => (
                 serde_json::to_value(read_snapshot(prompter, connection, now)?)?,
@@ -104,7 +96,9 @@ pub(crate) fn handle_prompter_request(
             }
         };
         let health_changed = match check_before {
-            Some(before) => health_check(prompter, connection)? != before,
+            Some(Some(before)) => checked(prompter, connection).as_ref() != Some(&before),
+            // The check could not be read before: say it may have changed.
+            Some(None) => true,
             None => false,
         };
         Ok(PrompterReply {
@@ -126,6 +120,38 @@ fn health_check(
         &prompter.screen,
         glass_edited_name(prompter, connection)?.as_deref(),
     ))
+}
+
+/// The requests that can change `checks.prompter` (the Prompter XL, or what
+/// the glass shows against the script's text and name); the check is compared
+/// around these only. A take's controls, the look and the reads cannot, so a
+/// dial turn costs no read of the script (review of Slice 5a's push).
+fn changes_the_check(method: &str) -> bool {
+    matches!(
+        method,
+        "prompter.screen.report"
+            | "prompter.putOn"
+            | "prompter.update"
+            | "prompter.clear"
+            | "prompter.script.edit"
+            | "prompter.script.rename"
+            | "prompter.script.import"
+            | "prompter.script.version.bringBack"
+    )
+}
+
+/// The check for the before-and-after comparison. It never fails a request:
+/// a read that fails is a `WARN` line, and the request goes on (a pause above
+/// all must act on the glass whatever the disk does; `runtime.rs`).
+fn checked(prompter: &Prompter, connection: &Connection) -> Option<PrompterHealthCheck> {
+    health_check(prompter, connection)
+        .map_err(|error| {
+            log_event(
+                LogLevel::Warn,
+                &format!("Prompter: its check could not be read: {error:?}"),
+            );
+        })
+        .ok()
 }
 
 /// `checks.prompter` for `health.snapshot`.

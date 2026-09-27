@@ -223,7 +223,7 @@ export function prompterCheck(prompter: FixturePrompter): PrompterHealthCheck {
 
 /** What the whole status takes from the prompter, and why (`whole_status`, `whole_status_sentence`). */
 export function prompterStatusPart(prompter: FixturePrompter) {
-  return wholeStatusPart(prompter.screen, glassEditedName(prompter));
+  return wholeStatusPart(prompter.screen);
 }
 
 /** `prompter.glass.snapshot`: what the glass draws. */

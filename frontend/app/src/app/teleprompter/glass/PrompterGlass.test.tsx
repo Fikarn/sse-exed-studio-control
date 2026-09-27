@@ -1,12 +1,30 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { INTERVIEW_INTRO, paragraph, standardLook, storyAnchor } from "./glassStoryScript";
 import { PrompterGlass, type PrompterGlassText } from "./PrompterGlass";
 
 // The glass as a component (new pages program, Slice 5a). jsdom lays nothing
 // out, so the layout's numbers are the helpers' to prove (`glassLayout.test.ts`);
-// here: what it draws, and that it reports its layout once for each key.
+// here: what it draws, and when it reports its layout. Where a test needs a
+// layout, `layOut` stands in for the browser: each paragraph 400 px below the
+// last, its words on its first line, `END` far below.
+
+/** Lays the glass out as a browser would, as far as the glass measures it; answers how often a top was read. */
+function layOut(): { reads: () => number } {
+  let reads = 0;
+  vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (this: HTMLElement) {
+    reads += 1;
+    const paragraph = this.getAttribute("data-p");
+    if (paragraph !== null) return Number(paragraph) * 400;
+    return this.hasAttribute("data-end") ? 10_000 : 0;
+  });
+  return { reads: () => reads };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function text(overrides: Partial<PrompterGlassText> = {}): PrompterGlassText {
   return {
@@ -63,6 +81,7 @@ describe("PrompterGlass", () => {
   });
 
   it("reports its layout once for each key, every paragraph with a line", async () => {
+    layOut();
     const onLayout = vi.fn();
     const { rerender } = render(
       <PrompterGlass text={text()} anchor={storyAnchor()} width={1920} onLayout={onLayout} />
@@ -88,6 +107,136 @@ describe("PrompterGlass", () => {
     );
     await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(2));
     expect(onLayout.mock.calls[1][0].layoutKey).toBe("g1-l1");
+  });
+
+  it("reports no layout the hardware link would refuse: one measured while the glass is not drawn", async () => {
+    const onLayout = vi.fn();
+    render(<PrompterGlass text={text()} anchor={storyAnchor()} width={1920} onLayout={onLayout} />);
+    // jsdom draws nothing: every top is 0.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onLayout).not.toHaveBeenCalled();
+  });
+
+  it("reports again, at most once a second, when an anchor says the hardware link has no layout for its key", async () => {
+    layOut();
+    const onLayout = vi.fn();
+    const laidOut = storyAnchor({ layoutKey: "g1-l0", position: 0, place: { paragraph: 0, word: 0 }, wordOffset: 0 });
+    const { rerender } = render(<PrompterGlass text={text()} anchor={laidOut} width={1920} onLayout={onLayout} />);
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(1));
+
+    // The hardware link restarted: the same key, and no layout for it.
+    rerender(<PrompterGlass text={text()} anchor={{ ...laidOut, position: null }} width={1920} onLayout={onLayout} />);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(onLayout).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(2), { timeout: 2000 });
+    expect(onLayout.mock.calls[1][0]).toEqual(onLayout.mock.calls[0][0]);
+
+    // Laid out again: nothing more is sent.
+    rerender(<PrompterGlass text={text()} anchor={{ ...laidOut }} width={1920} onLayout={onLayout} />);
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+    expect(onLayout).toHaveBeenCalledTimes(2);
+  });
+
+  it("measures again only when the key or the geometry changes, never for a new object of the same look", async () => {
+    const { reads } = layOut();
+    const onLayout = vi.fn();
+    const { rerender } = render(<PrompterGlass text={text()} anchor={null} width={1920} onLayout={onLayout} />);
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(1));
+    const measured = reads();
+    // A fresh text of the same paragraphs and look, then the reading line and the colour: the same key.
+    rerender(<PrompterGlass text={text()} anchor={null} width={1920} onLayout={onLayout} />);
+    rerender(
+      <PrompterGlass
+        text={text({ look: standardLook({ readingLinePercent: 40, textColour: "yellow", dimReadText: false }) })}
+        anchor={null}
+        width={1920}
+        onLayout={onLayout}
+      />
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(reads()).toBe(measured);
+    expect(onLayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports again for a key that comes back with other text, as after a restore of the saved data", async () => {
+    layOut();
+    const onLayout = vi.fn();
+    const { rerender } = render(<PrompterGlass text={text()} anchor={null} width={1920} onLayout={onLayout} />);
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(1));
+    rerender(
+      <PrompterGlass
+        text={text({ paragraphs: [paragraph("One."), paragraph("Two."), paragraph("Three.")] })}
+        anchor={null}
+        width={1920}
+        onLayout={onLayout}
+      />
+    );
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(2));
+    expect(onLayout.mock.calls[1][0].lines.map((line: { paragraph: number }) => line.paragraph)).toEqual([0, 1, 2]);
+  });
+
+  it("keeps an anchor's moment when only the dimming changes", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    // Playing at 60 words a minute, 10 px a word, from the top of this layout.
+    const playing = storyAnchor({
+      layoutKey: "g1-l0",
+      place: { paragraph: 0, word: 0 },
+      wordOffset: 0,
+      position: 0,
+      endPosition: 5_000,
+      pxPerReadWord: 10,
+      playing: true,
+      fromWpm: 60,
+      toWpm: 60,
+    });
+    const { container, rerender } = render(<PrompterGlass text={text()} anchor={playing} width={1920} />);
+    const column = container.querySelector<HTMLElement>("[data-p]")!.parentElement!;
+    const shiftAt = () => Number(/translate3d\(0, (-?[\d.]+)px, 0\)/.exec(column.style.transform)?.[1]);
+    const start = shiftAt();
+    now += 4_000;
+    rerender(
+      <PrompterGlass text={text({ look: standardLook({ dimReadText: false }) })} anchor={playing} width={1920} />
+    );
+    // Four words on: 40 px further up, not back at the anchor's own place.
+    expect(start - shiftAt()).toBeCloseTo(40);
+  });
+
+  it("stands a word that wraps on the line of its first piece", async () => {
+    layOut();
+    // The word's box spans two lines; its first piece is on the first.
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute("data-w") ? 250 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
+      const rects = this.hasAttribute("data-w") ? [new DOMRect(0, 10, 1400, 100), new DOMRect(0, 133, 300, 100)] : [];
+      return Object.assign(rects, { item: (index: number) => rects[index] ?? null }) as unknown as DOMRectList;
+    });
+    const onLayout = vi.fn();
+    render(
+      <PrompterGlass
+        text={text({ paragraphs: [paragraph("Arbetsmarknadsdepartementet"), paragraph("")] })}
+        anchor={null}
+        width={1920}
+        onLayout={onLayout}
+      />
+    );
+    await waitFor(() => expect(onLayout).toHaveBeenCalledTimes(1));
+    expect(onLayout.mock.calls[0][0].lines[0]).toMatchObject({ paragraph: 0, word: 0, top: 0 });
+  });
+
+  it("draws a cue in the cue colour where it stands, inside a word too", () => {
+    const { container } = render(
+      <PrompterGlass
+        text={text({ paragraphs: [paragraph("Hello [smile]. Welcome.")] })}
+        anchor={null}
+        width={1920}
+        still
+      />
+    );
+    const cued = [...container.querySelectorAll("[data-w] span")].map((node) => node.textContent);
+    expect(cued).toEqual(["[smile]"]);
   });
 
   it("draws the place from the anchor with a transform, and dims the read text only when the look says so", () => {

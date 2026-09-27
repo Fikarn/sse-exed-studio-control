@@ -23,9 +23,9 @@ const ARROW_GAP = 64;
 const ARROW_GAP_TO_NUMBER = 24;
 /** The arrow is never closer than this to the glass's edge. */
 const EDGE = 8;
-/** A paragraph number's size, and room for three of its digits. */
+/** A paragraph number's size, and a digit's width: room is kept for three digits, or the script's last number's. */
 const NUMBER_SCALE = 0.6;
-const NUMBER_DIGITS_EM = 3 * 0.62;
+const DIGIT_EM = 0.62;
 
 /** The look in the glass's pixels. */
 export interface GlassMetrics {
@@ -52,12 +52,20 @@ export interface GlassMetrics {
   endGap: number;
 }
 
-export function glassMetrics(look: PrompterLook, sizePx: number): GlassMetrics {
+/** What of the look the glass's geometry reads (a `PrompterLook` is one). */
+export type GlassLook = Pick<
+  PrompterLook,
+  "lineSpacingPercent" | "marginPercent" | "paragraphNumbers" | "readingLinePercent"
+>;
+
+/** `paragraphs` is how many the text has: its last number needs room beside the arrow. */
+export function glassMetrics(look: GlassLook, sizePx: number, paragraphs = 0): GlassMetrics {
   const lineHeight = (sizePx * look.lineSpacingPercent) / 100;
   const marginPx = (GLASS_WIDTH * look.marginPercent) / 100;
   const numberSize = sizePx * NUMBER_SCALE;
   const numberGap = sizePx * 0.3;
-  const numbersRoom = look.paragraphNumbers ? numberSize * NUMBER_DIGITS_EM + numberGap : 0;
+  const digits = Math.max(3, String(paragraphs).length);
+  const numbersRoom = look.paragraphNumbers ? numberSize * digits * DIGIT_EM + numberGap : 0;
   const arrowGap = look.paragraphNumbers ? ARROW_GAP_TO_NUMBER : ARROW_GAP;
   const columnLeft = Math.max(marginPx, EDGE + ARROW_WIDTH + arrowGap + numbersRoom);
   return {
@@ -142,6 +150,42 @@ export function layoutFromMeasure(
     pxPerReadWord: first ? (textBottom - first.top) / Math.max(paceWords, 1) : 0,
     paragraphWords: text.map((paragraph) => paragraph.wordCount),
   };
+}
+
+/**
+ * Why the hardware link would refuse this layout, in `Layout::new`'s order
+ * (`clock.rs`), or `null` when it would take it. The glass reports only a
+ * layout it would take: one measured while the glass was not drawn (every top
+ * 0) is measured again rather than sent.
+ */
+export function layoutProblem(layout: GlassLayout): string | null {
+  const { lines, paragraphWords } = layout;
+  const first = lines[0];
+  if (!first) return "no lines";
+  if (first.paragraph !== 0 || first.word !== 0) return "the first line does not start the first paragraph";
+  let started = 0;
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const previous = index > 0 ? lines[index - 1] : null;
+    if (!Number.isFinite(line.top) || !Number.isFinite(line.height) || line.top < 0) return "a line has no top";
+    if (line.height <= 0 || line.height > 10_000) return "a line has no height";
+    const words = paragraphWords[line.paragraph];
+    if (words === undefined) return "a line names a paragraph the text does not have";
+    if (line.word > 0 && line.word >= words) return "a line starts past its paragraph's words";
+    if (previous) {
+      const after =
+        line.paragraph > previous.paragraph || (line.paragraph === previous.paragraph && line.word > previous.word);
+      if (!after || line.top < previous.top + previous.height - 0.5) return "the lines are not in order";
+    }
+    if (!previous || previous.paragraph !== line.paragraph) {
+      if (line.paragraph !== started || line.word !== 0) return "a paragraph does not start on a line of its own";
+      started += 1;
+    }
+  }
+  if (started !== paragraphWords.length) return "a paragraph has no line";
+  const last = lines[lines.length - 1];
+  if (!Number.isFinite(layout.endTop) || layout.endTop < last.top + last.height - 0.5) return "END is not below";
+  return null;
 }
 
 /** The last index whose value is at or before `limit` (`partition_point` less one). */

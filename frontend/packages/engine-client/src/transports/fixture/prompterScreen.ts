@@ -105,17 +105,20 @@ function screenTone(state: PrompterScreenState): PrompterCheckTone {
 // (kept here so that the prompter's state can read this module without a loop).
 const invalid = (message: string) => new EngineRequestError("INVALID_PARAMS", message);
 
-/** A found screen's size or refresh rate (`positive`): a whole number above 0, at most 100 000. */
+/** A found screen's size or refresh rate (`positive`): a number above 0, kept in whole units (59.94 Hz is 60). */
 function positive(params: JsonObject, key: string): number {
   const value = params[key];
-  if (typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 100_000) return value;
-  throw invalid(`${key} must be a whole number above 0 when the screen was found.`);
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0.5 && value <= 100_000) {
+    return Math.round(value);
+  }
+  throw invalid(`${key} must be a number above 0 when the screen was found.`);
 }
 
 /**
  * `prompter.screen.report { found, duplicated?, width?, height?, refreshHz?, windowError? }`
- * (`from_report`). A screen that was found carries its size and refresh rate; one that was
- * not has none, whatever else the report says.
+ * (`from_report`). A screen that was found carries its size; its refresh rate may be missing
+ * or a fraction, kept in whole hertz; a window error is kept only when it is what the state
+ * says (not while duplicated). One that was not found has none, whatever else it says.
  */
 export function screenFromReport(params: JsonObject): PrompterScreen {
   const found = params.found;
@@ -127,22 +130,25 @@ export function screenFromReport(params: JsonObject): PrompterScreen {
   if (reason !== null && (typeof reason !== "string" || reason.trim() === "")) {
     throw invalid("windowError must be a sentence.");
   }
+  const refresh = params.refreshHz ?? null;
   return {
     reported: true,
     found,
     duplicated: duplicated === true,
     width: positive(params, "width"),
     height: positive(params, "height"),
-    refreshHz: positive(params, "refreshHz"),
-    windowError: reason === null ? null : Array.from(reason.trim()).slice(0, MAX_REASON_CHARS).join(""),
+    refreshHz: refresh === null ? null : positive(params, "refreshHz"),
+    windowError:
+      reason === null || duplicated === true ? null : Array.from(reason.trim()).slice(0, MAX_REASON_CHARS).join(""),
   };
 }
 
-/** `1920×1080 at 60 Hz`, once a screen was found. */
+/** `1920×1080 at 60 Hz`, or `1920×1080` when Windows gave no refresh rate, once a screen was found. */
 function screenMode(screen: PrompterScreen): string | null {
-  return screen.width !== null && screen.height !== null && screen.refreshHz !== null
-    ? `${screen.width}×${screen.height} at ${screen.refreshHz} Hz`
-    : null;
+  if (screen.width === null || screen.height === null) return null;
+  return screen.refreshHz === null
+    ? `${screen.width}×${screen.height}`
+    : `${screen.width}×${screen.height} at ${screen.refreshHz} Hz`;
 }
 
 /** The state's sentence (the proposal §8): what happened and what to do. */
@@ -225,45 +231,32 @@ export function prompterHealthCheck(screen: PrompterScreen, edited: string | nul
 }
 
 /**
- * What the whole status takes from the Prompter XL and `NOT UPDATED`, and the sentence
- * that says why (`PrompterHealthCheck`'s `counted`): no worse than attention (first step
- * 1), since the sound and the light are unaffected, and nothing from a Prompter XL the
- * shell has not reported yet (answered after CI's qualification lane found every lane's
- * status raised by it); `NOT UPDATED` always counts. `null` when nothing counts.
+ * What the whole status takes from the Prompter XL, and the sentence that says why
+ * (`PrompterHealthCheck`'s `counted`): a state the shell has reported, as attention at most
+ * (first step 1; an unreported one counts for nothing, answered after CI's qualification
+ * lane), and never `NOT UPDATED`, which lights the lamp only (answered at the review).
+ * `null` when nothing counts.
  */
-export function wholeStatusPart(
-  screen: PrompterScreen,
-  edited: string | null
-): { tone: PrompterCheckTone; sentence: string } | null {
+export function wholeStatusPart(screen: PrompterScreen): { tone: PrompterCheckTone; sentence: string } | null {
   const summary = screenSummary(screen);
-  const screenCounts = summary.reported && summary.tone !== "ok";
-  if (edited !== null && (!screenCounts || TONE_RANK[summary.tone] <= TONE_RANK.attention)) {
-    return {
-      tone: "attention",
-      sentence: `${edited} was edited after it went on the prompter. The prompter still shows the earlier text.`,
-    };
-  }
-  if (screenCounts) return { tone: "attention", sentence: summary.sentence };
-  return null;
+  return summary.reported && summary.tone !== "ok" ? { tone: "attention", sentence: summary.sentence } : null;
 }
 
 /** What the whole status takes (`whole_status`). */
-export function wholeStatus(screen: PrompterScreen, edited: string | null): PrompterCheckTone {
-  return wholeStatusPart(screen, edited)?.tone ?? "ok";
-}
-
-/** Whether two checks say the same (the hardware link compares them whole): every field is built in the same order. */
-export function sameCheck(left: PrompterHealthCheck, right: PrompterHealthCheck): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+export function wholeStatus(screen: PrompterScreen): PrompterCheckTone {
+  return wholeStatusPart(screen)?.tone ?? "ok";
 }
 
 /**
- * The Prompter XL a scenario starts with: connected at its own size, or what the
- * scenario's `prompterScreen` — a `prompter.screen.report`'s params — says. A
- * `prompterScreen` the shell could not send is the scenario's mistake, and says so.
+ * The Prompter XL a scenario starts with: connected at its own size, `"unreported"` (as
+ * every start of the hardware link begins until the shell reports), or what the scenario's
+ * `prompterScreen` — a `prompter.screen.report`'s params — says. A `prompterScreen` the
+ * shell could not send is the scenario's mistake, and says so.
  */
 export function scenarioScreen(value: unknown): PrompterScreen {
   if (value === undefined) return connectedScreen();
+  // As every start of the hardware link begins until the shell reports (first step 2).
+  if (value === "unreported") return unreportedScreen();
   const params = asRecord(value);
   if (!params) throw new Error("prompterScreen must be an object: a prompter.screen.report's params");
   try {

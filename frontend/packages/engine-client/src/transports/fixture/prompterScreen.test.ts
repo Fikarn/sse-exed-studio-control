@@ -122,7 +122,7 @@ describe("the fixture double's Prompter XL: where it starts", () => {
     expect(await healthOf(low.call)).toMatchObject({ status: "attention", check: { word: "LOW RESOLUTION" } });
 
     expect(() => createFixtureTransport(scenarioWith({ found: true }))).toThrow(
-      "prompterScreen is not a report the shell could send: width must be a whole number above 0 when the screen was found."
+      "prompterScreen is not a report the shell could send: width must be a number above 0 when the screen was found."
     );
     expect(() => createFixtureTransport(scenarioWith("connected"))).toThrow("prompterScreen must be an object");
   });
@@ -205,14 +205,15 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
   // screen.rs's `a_report_that_is_not_one_is_refused`: refused, and nothing changes.
   it("refuses a report that is not one, and changes nothing", async () => {
     const { refused, snapshot, events } = openPrompterDouble();
-    const width = "width must be a whole number above 0 when the screen was found.";
+    const width = "width must be a number above 0 when the screen was found.";
     for (const [params, sentence] of [
       [{}, "found must be true or false."],
       [{ found: "yes" }, "found must be true or false."],
       [{ found: true }, width],
       [{ ...FULL, width: 0 }, width],
-      [{ ...FULL, width: 1920.5 }, width],
-      [{ ...FULL, refreshHz: 100_001 }, "refreshHz must be a whole number above 0 when the screen was found."],
+      [{ ...FULL, width: 0.4 }, width],
+      [{ ...FULL, refreshHz: 100_001 }, "refreshHz must be a number above 0 when the screen was found."],
+      [{ ...FULL, refreshHz: 0 }, "refreshHz must be a number above 0 when the screen was found."],
       [{ ...FULL, duplicated: 1 }, "duplicated must be true or false."],
       [{ ...FULL, windowError: " " }, "windowError must be a sentence."],
       [{ ...FULL, windowError: 3 }, "windowError must be a sentence."],
@@ -364,6 +365,39 @@ describe("the fixture double's Prompter XL: the take", () => {
   });
 });
 
+describe("the fixture double's Prompter XL: what Windows may report", () => {
+  // screen.rs's `a_refresh_rate_may_be_a_fraction_or_missing` (review of the slice's push).
+  it("keeps a refresh rate that is a fraction or missing, and a window error only when it is the state", () => {
+    const fraction = screenFromReport({ found: true, width: 1920, height: 1080, refreshHz: 59.94 });
+    expect(screenState(fraction)).toBe("connected");
+    expect(fraction.refreshHz).toBe(60);
+    const missing = screenFromReport({ found: true, width: 1920, height: 1080 });
+    expect(missing.refreshHz).toBeNull();
+    expect(screenSentence(missing)).toBe("The Prompter XL is connected: 1920×1080.");
+    const duplicated = screenFromReport({
+      found: true,
+      duplicated: true,
+      windowError: "no",
+      width: 1920,
+      height: 1080,
+    });
+    expect(duplicated.windowError).toBeNull();
+    expect(() => screenFromReport({ found: true, width: 1920, height: 1080, refreshHz: 0 })).toThrow(
+      "refreshHz must be a number above 0 when the screen was found."
+    );
+  });
+
+  it("starts a scenario unreported when it says so, and leaves the whole status alone", async () => {
+    const scenario: FixtureScenario = { ...getFixtureScenario("setup-ready"), prompterScreen: "unreported" };
+    const { call } = openPrompterDouble(scenario);
+    const health = await call("health.snapshot");
+    const check = (health.checks as JsonObject).prompter as JsonObject;
+    expect(check).toMatchObject({ word: "NOT CONNECTED", status: "error" });
+    expect((check.screen as JsonObject).reported).toBe(false);
+    expect(health.summary).not.toMatch(/Prompter:/);
+  });
+});
+
 describe("the fixture double's Prompter XL: the lamp", () => {
   // screen.rs's `the_check_is_the_worse_of_the_screen_and_not_updated`.
   it("makes the check the worse of the screen and NOT UPDATED", () => {
@@ -371,7 +405,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
     const check = prompterHealthCheck(full, null);
     expect(check.ok).toBe(true);
     expect(check.word).toBe("CONNECTED");
-    expect(wholeStatus(full, null)).toBe("ok");
+    expect(wholeStatus(full)).toBe("ok");
 
     const edited = prompterHealthCheck(full, "Intro");
     expect(edited).toMatchObject({ ok: false, status: "attention", word: "NOT UPDATED", notUpdated: true });
@@ -385,26 +419,22 @@ describe("the fixture double's Prompter XL: the lamp", () => {
 
     const gone = prompterHealthCheck(screenFromReport(GONE), "Intro");
     expect(gone).toMatchObject({ status: "error", word: "NOT CONNECTED", notUpdated: true });
-    expect(wholeStatus(screenFromReport(GONE), "Intro"), "the whole status goes no worse than attention").toBe(
-      "attention"
-    );
-    expect(wholeStatusPart(screenFromReport(GONE), "Intro")?.sentence).toBe(screenSentence(screenFromReport(GONE)));
+    expect(wholeStatus(screenFromReport(GONE)), "the whole status goes no worse than attention").toBe("attention");
+    expect(wholeStatusPart(screenFromReport(GONE))?.sentence).toBe(screenSentence(screenFromReport(GONE)));
   });
 
   // screen.rs's `only_a_reported_state_counts_toward_the_whole_status` (answered after CI's
-  // qualification lane found every lane's status raised by an unreported Prompter XL).
-  it("counts only a reported state toward the whole status, and NOT UPDATED always", () => {
+  // qualification lane found every lane's status raised by an unreported Prompter XL, and at
+  // the review: NOT UPDATED lights the lamp only).
+  it("counts only a reported Prompter XL state toward the whole status, never NOT UPDATED", () => {
     const unreported = unreportedScreen();
     expect(prompterHealthCheck(unreported, null)).toMatchObject({ word: "NOT CONNECTED", status: "error" });
-    expect(wholeStatusPart(unreported, null)).toBeNull();
-    expect(wholeStatus(unreported, null)).toBe("ok");
-    const edited = wholeStatusPart(unreported, "Intro");
-    expect(edited?.tone).toBe("attention");
-    expect(edited?.sentence).toMatch(/^Intro was edited/);
-    expect(wholeStatusPart(screenFromReport(LOW), null)?.sentence).toMatch(
-      /^Windows runs the Prompter XL at 1280×720\./
-    );
-    expect(wholeStatus(screenFromReport(FULL), null)).toBe("ok");
+    expect(wholeStatusPart(unreported)).toBeNull();
+    expect(wholeStatus(unreported)).toBe("ok");
+    const full = screenFromReport(FULL);
+    expect(prompterHealthCheck(full, "Intro").word, "the lamp says so").toBe("NOT UPDATED");
+    expect(wholeStatus(full), "an edit waiting for Update is work, not a fault").toBe("ok");
+    expect(wholeStatusPart(screenFromReport(LOW))?.sentence).toMatch(/^Windows runs the Prompter XL at 1280×720\./);
   });
 
   // `health.rs`'s `the_prompter_raises_the_whole_status_no_further_than_attention`.
@@ -439,7 +469,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
       ["app.changed", "health"],
     ]);
     const edited = await healthOf(call);
-    expect(edited.status).toBe("attention");
+    expect(edited.status, "NOT UPDATED lights the lamp only").toBe("ok");
     expect(edited.check).toMatchObject({ ok: false, status: "attention", word: "NOT UPDATED", notUpdated: true });
     expect(edited.check.summary).toBe(
       "Talk was edited after it went on the prompter. The prompter still shows the earlier text."
@@ -599,7 +629,7 @@ describe("the fixture double's Prompter XL: the hardware link's words", () => {
       [{ found: true, width: 1920, height: 1080, refreshHz: 60, windowError: " " }, null],
       [{ found: true, height: 1080, refreshHz: 60 }, "width"],
       [{ found: true, width: 1920, refreshHz: 60 }, "height"],
-      [{ found: true, width: 1920, height: 1080 }, "refreshHz"],
+      [{ found: true, width: 1920, height: 1080, refreshHz: 0 }, "refreshHz"],
     ] as const) {
       const sentence = refusalOf(params as JsonObject);
       expect(inScreenRs(sentence, [], key === null ? {} : { key }), sentence).toBe(true);
