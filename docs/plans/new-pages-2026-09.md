@@ -64,6 +64,7 @@ The existing ones (`scripts/check-slice-rescope.mjs`, `npm run protocol:check`, 
 - S1–S2: `tests/contract.rs` refuses a `planning.` method or event; a migration test proves schema 8 drops the four tables and the settings and turns a saved Planning page into the Console.
 - S3: `scripts/check-no-shortcuts.mjs`, in `scripts:test`, fails on a key listener or key handler outside the places it lists with their reasons (the dialogs, the drawer, the popups, the two arms' Esc, focused sliders, lists and fields), on any modifier-key read but a dialog's Shift+Tab trap, on a `<kbd>`, `aria-keyshortcuts`, `accessKey` or a name about shortcuts, and on a key hint in operator copy; it also holds the native shell's WebView2 setting and its one `#[allow(unsafe_code)]`. `frontend/app/tests/no-shortcuts.spec.ts` presses every key the program bound and expects the screen not to move.
 - SW: Playwright compares captures on Windows only (`ignoreSnapshots` off Windows, so no capture can be refreshed from another system); the UI contract samples contrast on Windows only (`SAMPLES_CONTRAST`) and skips that measure by name elsewhere; off Windows the Storybook spec checks only that each story loads and paints. The 2560 cases that took over from the size-only ones hold the Console, Lighting, Setup and the recovery screens to no scroll and to their boxes at 2560×1440, and a strip key's tooltip to its strip. The shell's `fullscreen_display` tests hold the window's one rule (the saved display, else the 2560×1440 display, else the one the window is on) and an older build's window file.
+- S4: `setupRequests.test.ts` reads `WORKSPACES` and the page refusal out of `shell_settings.rs`, so the fixture double cannot accept a page the hardware link refuses; `prompter/clock/motion-cases.json` holds the hardware link's clock and the front end's `motion.ts` to the same cases; `storage/tests_schema_9.rs` takes the live data's schema 7 to 9 in one start; `action_log`'s classification test wants a class and, when recorded, an example for every `prompter.*` method.
 - Part C: the camera and prompter rules as tests — the prompter window opens only on a screen named `Prompter XL` (S5); a test build refuses a camera address that is not on this PC (S8); no Bluetooth call is reachable from a test, and nothing writes the Pocket 6K Pro's status characteristic (S11).
 
 ## Program shape
@@ -560,7 +561,7 @@ Common to every slice:
 
 ### Slice 4 — Teleprompter: the scripts and the prompter in the hardware link
 
-Status: in progress (next: the operator's answers to the first steps). Branch `new-pages/s4-teleprompter-link`, cut from `main` at `9af8028` on 2026-09-27.
+Status: in progress (next: the push, the review and the operator's go-ahead). Branch `new-pages/s4-teleprompter-link`, cut from `main` at `9af8028` on 2026-09-27.
 
 The scripts and the prompter in the saved data (schema 9): each script's text as paragraphs (bold, italic, underline, cues), its name, the file it came from, when it was made and changed, and its own speed and place; its last 20 versions; the removed scripts; the one look; what the glass shows (the script and its text as it went on, so an edit waits for Update). The `prompter.*` methods and a `prompter.changed` event: put on, replace, update, clear; play, pause, speed, the jumps (line, paragraph, cue, `BACK`, `TOP`), the text size and the look; new, rename, edit, remove, restore, delete for good, bring a version back. The place is words (a paragraph and a word), never pixels. The prompter is paused after every start (opening, a restart, a crash, a restore); nothing but the operator's controls moves the place; at a script's end play is refused until a jump moves the place back, and play never jumps (D12, D19). Recent actions: put on, replaced, updated, cleared, with Screen or Stream Deck. Backups: the archive goes to format 6 with the scripts, their versions, the removed ones, the look and each script's place and speed; Verify counts the scripts; a restore adds scripts and never removes or overwrites one (a differing text comes back as an earlier version). The fixture double gains all of it, so the page can be built on it.
 
@@ -578,6 +579,114 @@ First step, before any code, recorded under this heading with its boundary impac
 4. **Splitting `native/rust-engine/src/support/tests.rs` (1,933 lines).** (a) **A move-only split first (recommended).** Slice 2's archive-format section (about 530 lines: the format 4 and 5 tests and their helpers) moves to `support/tests_formats.rs`, and the shared helpers (`TestDir`, the seeders) move to `support/test_support.rs`, in a commit that only moves code (checked with `git diff --color-moved`). The format-6 tests then land in `tests_formats.rs`. The prompter's part of the archive lives in the new prompter module with its own tests, so `support.rs` (1,350 lines) grows only by its calls. (b) **A new file only.** The format-6 tests go into `support/tests_format_6.rs`, and `tests.rs` stays at about 1,933 lines, so Slice 8's format 7 meets the same wall. (c) **A directory module** (`support/tests/`, one file per topic). It is more churn than the slice needs.
 
 **Answered by the operator on 2026-09-27, each as recommended:** the clock runs in layout units (1a); a file reaches the hardware link through the page's own file picker, as a name and its bytes (2a); the page reads the clipboard, with the permission granted to the main window only (3a); and `support/tests.rs` is split by a move-only commit first (4a). The shell's clipboard permission goes in with Slice 6's page, where a press first uses it; Slice 5's glass window never gets it, and a test holds that. Slice 4 brings the contract and the hardware link's side of both routes.
+
+**Built (2026-09-27).** In the hardware link, `native/rust-engine/src/prompter/`:
+
+- `model.rs`: paragraphs of runs, words, cues, read words and the limits.
+- `look.rs`: the one look and its ranges.
+- `clock.rs`: the layout, the motion, the anchor and the END stop, with the cases in `clock/motion-cases.json` that the front end's formula is held to.
+- `runtime.rs`: one prompter for each saved data, loaded paused, and the live app's clock thread.
+- `store.rs`: the SQL.
+- `edits.rs`: a place across an edit or an Update.
+- `commands.rs`: the twenty-two methods.
+- `snapshot.rs`: the three reads.
+- `archive.rs`: format 6's part.
+- `import/`: `.docx` over a zip reader of its own, `.txt`, and pasted HTML or text.
+
+Wiring outside that folder:
+
+- storage: schema 9.
+- `support.rs`: format 6.
+- `app.rs`: the dispatch arms, the restore's pause, and `prompter.changed`.
+- `action_log.rs`: the rows and the classification.
+- `shell_settings.rs`: `WORKSPACES`.
+- `main.rs`: the clock thread.
+- `engine_events.rs`: the event.
+- protocol and contract: the event and the twenty-two methods.
+- `v1.md`: a Teleprompter section and the lines it changes.
+- `CHANGELOG.md`.
+
+The miniz_oxide, quick-xml and base64 crates, each already in the lock file, join the hardware link's dependencies.
+
+Settled while building, each within the design:
+
+1. The clock refuses `PLAY` and a line step before a layout is reported (`PROMPTER_NOT_LAID_OUT`). The ledger's text said only that the line steps wait. Without a layout the scroll's pixels do not exist, and the glass or the page's copy reports one as soon as it draws (Slice 5 locks `PLAY` while the Prompter XL is not connected).
+2. Replacing what the prompter shows needs `replace: true` (`PROMPTER_REPLACE_NOT_CONFIRMED`). The page's second press sends it, so a one-press slip cannot change the glass (D11).
+3. An archive restore brings back the look and the text size. The glass's text, and its script's place, it never touches. The prompter stops where it is, paused, and a look that came back keeps the words at the reading line.
+4. A database backup's Verify sentence is unchanged; only the archive counts scripts.
+5. The editor's own Paste (Slice 6) will send what it reads to the editor, not as a new script. If it needs the hardware link's HTML reader, that is a contract change for Slice 6.
+6. The fixture double does not read a `.docx`; it answers with a sentence that says so. The hardware link's reader is tested in Rust.
+7. The layout is kept in memory and reported again after every start. The key `g<text revision>-l<look revision>` is stored, so a report from before a restart cannot be taken for a later one.
+8. A blank line in pasted HTML (`<br><br>`, as e-mail and web pages often part their paragraphs) ends a paragraph, as an empty line does in a `.txt`. A single break stays a line break, and a table cell or a heading keeps its lines. The two readers (hardware link and fixture double) agree on this. They also agree on round brackets inside a heading, and on counting a paste's pictures as left out.
+9. For Slice 6: the page's own transport passes a refusal's sentence but not its code (`tauriTransport.ts` throws a plain `Error`, as before this slice). The fixture double's refusals carry the code. The page should therefore read what it locks from the prompter's state — `glass`, `atEnd`, `laidOut`, `notUpdated` — and not from the codes, unless Slice 6 passes the code through.
+
+Gates before the change: `settings.update` refused `teleprompter` (`shell_settings.rs`'s test held the three-page sentence). The saved data was schema 8, with tests pinning 8. A new archive was format 5. The contract had no `prompter.*` method, and `tests/contract.rs` would refuse a dispatch arm the contract lacks.
+
+Tests added that fail without the slice:
+
+- the prompter's own tests: the model, the look, the clock and its motion cases, the edits, the names' order, `tests_glass.rs` and `tests_scripts.rs`;
+- `storage/tests_schema_9.rs` (2);
+- `shell_settings::the_teleprompter_is_a_page_to_open`;
+- `app/tests_prompter.rs` (5: the rows, the event, the page, format 6's restore, an older archive);
+- `action_log::the_prompter_rows_are_what_the_glass_shows`;
+- the import's own tests;
+- the fixture double's tests.
+
+Tests changed (old → new → reason):
+
+1. `storage/tests.rs` `initialize_database_applies_the_schema_and_defaults_without_planning`: schema 8 → 9. A new database takes step 9.
+2. `storage/tests.rs` `migrate_v6_to_v7_after_snapshot`: v6, v5 and a new database end at 8 with versions 1–8 (and at the second start) → 9 with 1–9. Every road goes one step further.
+3. `storage/tests_schema_8.rs` `migrate_v7_to_v8_drops_planning_after_snapshot`: 8 and 1–8, twice → 9 and 1–9. The same start goes on to 9.
+4. `storage/tests_schema_8.rs` `migrate_v7_to_v8_keeps_every_other_saved_page`: 8 → 9. Same reason.
+5. `storage/tests_schema_8.rs` `a_database_from_a_newer_build_is_refused_by_name`: a schema-9 database refused by a build "supporting up to 8" → a schema-10 database refused "up to 9". Schema 9 is this build's.
+6. `support/tests_formats.rs` `a_new_archive_is_format_5_and_carries_no_planning` → `a_new_archive_carries_no_planning`: format 5 and "Backup archive, format 5, exported T." → format 6 and "…, exported T, with 0 scripts.". Format 6, whose Verify counts the scripts.
+7. `support/tests_formats.rs` `database_backups_of_schema_7_and_8_restore_and_a_newer_one_is_refused` → `…_7_and_9_…`: this build's backup at 8 and a refused 9 → 9 and a refused 10, and the next start ends at 9. Its schema-7 copies (`make_schema_7_backup`) also lose step 9's tables.
+8. `support/tests_formats.rs` `format_4_archive` (a helper): it now takes the `prompter` part out, since format 4 had none. No assertion changed.
+9. `shell_settings.rs` `new_saved_data_and_a_saved_planning_page_open_the_console`: "workspace must be one of: lighting, audio, setup" → "…, teleprompter". The sentence lists the new page.
+10. `action_log/tests.rs` `ui_examples`: three examples added (`prompter.putOn`, `update`, `clear`). The test wants one for every recorded method.
+11. `frontend/packages/engine-client/src/store/createShellStore.test.ts`: the expected refreshes gain `"prompter.changed": []`. The map is typed by the event names.
+12. `frontend/packages/engine-client/src/transports/fixture/setupRequests.test.ts` "exports a format-5 archive and verifies it as one" → "…format-6 archive…, counting its scripts": format 5 and "…exported T." → format 6 and "…, with 0 scripts.". The hardware link writes format 6. The format-4 Verify case adds `script` to the words its sentence must not hold.
+13. `frontend/packages/engine-client/src/transports/fixture/actionLog.test.ts`: cases added for `prompter.putOn` (put on and replaced), `update`, `clear` and an unknown action. Its guard wants a case for every method the hardware link records.
+14. `native/rust-engine/src/prompter/import/tests.rs` `hostile_pastes_read_in_one_pass` (new in this slice): 200,000 breaks in one paragraph → the paragraphs `a` and `b`. A blank line ends a paragraph (8, above), and the case still proves the reader takes one pass.
+
+The fixture double, by a second agent (`frontend/packages/engine-client/src/`):
+
+- `prompter/motion.ts`: the view's formula, held to `motion-cases.json`;
+- `transports/fixture/prompter{Model,Clock,State,Reads,Requests,Import,Html}.ts`: a port of the hardware link's rules, sentences and codes;
+- the format-6 archive part in `setupRequests.ts`;
+- `settings.update` accepting only the four pages, with the hardware link's refusal, under a guard that reads `WORKSPACES` and the refusal out of `shell_settings.rs`;
+- the three Recent actions rows;
+- 182 engine-client tests (123 before, one of them failing on the hardware link's new recorded methods).
+
+Where it differs, by design:
+
+- script ids are a counter, so fixture runs repeat;
+- the place is saved on each request rather than by a thread;
+- a `.docx` is refused with "…the fixture double reads .txt files and pasted text; a Word document is read by the hardware link.";
+- a malformed `paragraphs` or `lines` answers with the hardware link's opening words, without serde's own ending.
+
+Validation before the push (2026-09-27, on the studio workstation):
+
+- `npm run dev:check`: 10 steps in 53.3 s — engine 516 tests, contract 7, engine-client 182, scripts, lint, types, format, protocol, file health, clippy with warnings denied;
+- `npm run native:engine:build`;
+- `npm run frontend:playwright:test`: 364 cases passed, captures included, and no board moved;
+- the live app (shell 17156, engine 12268 on 38201), TotalMix FX and Companion untouched throughout;
+- `native:acceptance` and the qualification lanes left to CI, as the rules have them.
+
+The import, by one agent in a worktree of its own (`import/`, 49 tests: 42 cases, five property tests of 256 inputs each over the zip, the `.docx` built from Word's elements in any nesting, damaged bytes, `.txt` and HTML, and two worst cases — tables nested 50,000 deep, hostile pastes). Beyond the proposal's §3.2 it:
+
+- trims white space at the ends of every line in all three readers;
+- turns square brackets inside a heading into round ones, so the heading stays one cue;
+- refuses a compound file that holds a `WordDocument` stream and no `EncryptedPackage` as Word's old format, since it is a `.doc` renamed;
+- also reads Word's template and macro-enabled documents (their text only);
+- keeps a numbered marker Word writes into pasted HTML (`2.`, `b)`), so numbered lists are not flattened to dashes;
+- follows numbering set by a paragraph style, with its overrides;
+- drops a table row marked deleted;
+- counts formatting changes as tracked changes;
+- reads only the first `mc:Choice`;
+- skips equations and ruby text;
+- puts a numbered heading's number inside its cue (`[1. Intro]`);
+- caps the headers' and footers' unpacking at 32 MB and HTML nesting at 512.
 
 ### Slice 5 — Teleprompter: the glass and the Prompter XL's window
 
