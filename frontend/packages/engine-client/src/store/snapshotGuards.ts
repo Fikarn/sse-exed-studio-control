@@ -42,6 +42,14 @@ function listProblem(record: JsonObject, field: string, options: { ids: boolean;
   return null;
 }
 
+function objectProblem(record: JsonObject, field: string, options: { nullable?: boolean } = {}): string | null {
+  const value = record[field];
+  if (value === null && options.nullable) {
+    return null;
+  }
+  return isRecord(value) ? null : `${field} is not an object`;
+}
+
 function firstProblem(...problems: Array<string | null>): string | null {
   return problems.find((problem) => problem !== null) ?? null;
 }
@@ -81,6 +89,17 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
         listProblem(value, "mixTargets", { ids: true }),
         listProblem(value, "snapshots", { ids: true, optional: true })
       );
+    case "prompter":
+      return firstProblem(
+        listProblem(value, "scripts", { ids: true }),
+        listProblem(value, "removed", { ids: true }),
+        objectProblem(value, "look"),
+        objectProblem(value, "screen"),
+        objectProblem(value, "glass", { nullable: true }),
+        isRecord(value.glass) ? listProblem(value.glass, "cues", { ids: false }) : null
+      );
+    case "prompterGlass":
+      return firstProblem(listProblem(value, "paragraphs", { ids: false }), objectProblem(value, "look"));
     default:
       return null;
   }

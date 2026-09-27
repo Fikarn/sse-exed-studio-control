@@ -39,8 +39,11 @@ describe("domainRefresh", () => {
       expect(domains, name).not.toContain("lightingFixtureCatalog");
       expect(domains.includes("controlSurface"), name).toBe(name === "opening setup");
     }
+    // The glass's text follows the prompter's snapshot (Slice 6a), never an event of its own.
     expect([...CHANGEABLE_DOMAINS].sort()).toEqual(
-      ALL_DOMAINS.filter((domain) => domain !== "lightingFixtureCatalog" && domain !== "controlSurface").sort()
+      ALL_DOMAINS.filter(
+        (domain) => domain !== "lightingFixtureCatalog" && domain !== "controlSurface" && domain !== "prompterGlass"
+      ).sort()
     );
   });
 
@@ -48,7 +51,8 @@ describe("domainRefresh", () => {
     for (const domain of ALL_DOMAINS) {
       expect(REQUEST_METHODS).toContain(DOMAIN_REQUESTS[domain]);
     }
-    expect(ALL_DOMAINS).toHaveLength(9);
+    // Nine, and the Teleprompter's two since the new pages program's Slice 6a.
+    expect(ALL_DOMAINS).toHaveLength(11);
   });
 
   it("maps a request by its own name before its prefix", () => {

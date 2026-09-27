@@ -140,7 +140,7 @@ function newScriptName(prompter: FixturePrompter): string {
   }
 }
 
-function newScript(
+export function newScript(
   prompter: FixturePrompter,
   name: string,
   sourceFileName: string | null,
@@ -342,7 +342,7 @@ function releaseGlass(prompter: FixturePrompter, now: number) {
 }
 
 /** `prompter.putOn { scriptId, replace? }`: on the glass, paused at its own place — the top when left at its end. */
-function putOnRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
+export function putOnRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
   const id = textParam(params, "scriptId");
   const replace = flagParam(params, "replace");
   const script = keptScript(prompter, id);
@@ -576,7 +576,7 @@ function textSizeRequest(prompter: FixturePrompter, params: JsonObject, now: num
 }
 
 /** `PrompterLook::updated`: each named field in range, or the whole update is refused and nothing changes. */
-function updatedLook(look: PrompterLook, params: JsonObject): PrompterLook {
+export function updatedLook(look: PrompterLook, params: JsonObject): PrompterLook {
   const next = { ...look };
   const keys = Object.keys(params)
     .filter((key) => params[key] !== undefined)

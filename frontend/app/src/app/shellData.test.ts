@@ -145,3 +145,51 @@ describe("the header lamps read the hardware link's own words", () => {
     expect(fixture.deck).toEqual({ detail: "ready", status: "ok" });
   });
 });
+
+// New pages program, Slice 6a: the Teleprompter in the header — its lamp from
+// `checks.prompter` before the deck's, the deck's lamp called Surface (D19),
+// and the green latch while the prompter scrolls.
+describe("the header's Prompter lamp, Surface lamp and playing latch", () => {
+  const byId = (items: ReturnType<typeof buildMonitorItems>, id: string) => items.find((item) => item.id === id);
+
+  it("orders the lamps Lighting, Audio, Prompter, Surface, and calls the deck's lamp Surface", () => {
+    const items = buildMonitorItems({ checks: {} }, undefined, undefined);
+    expect(items.map((item) => item.label)).toEqual(["Lighting", "Audio", "Prompter", "Surface"]);
+  });
+
+  it("reads the Prompter lamp from checks.prompter in the hardware link's word", () => {
+    const lamp = (prompter: unknown) =>
+      byId(buildMonitorItems({ checks: { prompter } } as never, undefined, undefined), "prompter");
+    expect(lamp({ status: "ok", word: "CONNECTED" })).toMatchObject({ detail: "ready", status: "ok" });
+    expect(lamp({ status: "error", word: "NOT CONNECTED" })).toMatchObject({
+      detail: "not connected",
+      status: "error",
+    });
+    expect(lamp({ status: "attention", word: "NOT UPDATED" })).toMatchObject({
+      detail: "not updated",
+      status: "attention",
+    });
+    // Absent, or `null` when the hardware link could not read it: pending, as the other lamps before a check.
+    expect(lamp(undefined)).toMatchObject({ detail: "pending", status: "attention" });
+    expect(lamp(null)).toMatchObject({ detail: "pending", status: "attention" });
+  });
+
+  it("shows a green latch with the time left only while the prompter scrolls", () => {
+    const playing = buildMonitorItems(
+      { checks: {} },
+      { lightingSceneDrift: false, audioSolo: false, prompterPlaying: "3:12" }
+    );
+    expect(byId(playing, "latched:prompter-playing")).toEqual({
+      id: "latched:prompter-playing",
+      label: "Prompter playing",
+      detail: "3:12 left",
+      status: "ok",
+      target: "Teleprompter",
+    });
+    const paused = buildMonitorItems(
+      { checks: {} },
+      { lightingSceneDrift: false, audioSolo: false, prompterPlaying: null }
+    );
+    expect(byId(paused, "latched:prompter-playing")).toBeUndefined();
+  });
+});

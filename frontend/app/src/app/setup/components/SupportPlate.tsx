@@ -37,6 +37,10 @@ export interface SupportPlateProps {
   /** 2026-09 production readiness, Slice 11 (F31): whether the light outputs
    *  are armed, as the lighting state says; `null` until it has been read. */
   lightOutputsArmed: boolean | null;
+  /** New pages program, Slice 6a: the Prompter XL as Windows reports it
+   *  (`connected · 1920×1080 · 60 Hz`), with its tone; `null` before the
+   *  hardware link has said. */
+  prompterXl?: { value: string; tone: "ok" | "attention" | "error" } | null;
   protocolVersion: string;
   /** Slice 11 (F30): the action log's newest rows, newest first. */
   recentActions: readonly RecentAction[];
@@ -71,6 +75,7 @@ export function SupportPlate({
   hardwareProfile,
   lastBackupLabel,
   lightOutputsArmed,
+  prompterXl = null,
   protocolVersion,
   recentActions,
   theme,
@@ -185,6 +190,19 @@ export function SupportPlate({
             onClick={() => onSetLightOutputsArmed(false)}
           />
         </Segmented>
+        {prompterXl ? (
+          <Readouts
+            data-testid="support-prompter-xl"
+            rows={[
+              {
+                id: "prompter-xl",
+                label: "Prompter XL",
+                value: prompterXl.value,
+                tone: prompterXl.tone === "ok" ? undefined : prompterXl.tone,
+              },
+            ]}
+          />
+        ) : null}
       </Section>
 
       <Section

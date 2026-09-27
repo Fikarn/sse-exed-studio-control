@@ -1,6 +1,23 @@
 import fixtureMap from "./fixtures.json";
+import { expandPrompterRecord, type CompactPrompterRecord, type FixturePrompterSeedRecord } from "./prompterScripts";
 
-type FixtureScenarioRecord = (typeof fixtureMap)[keyof typeof fixtureMap];
+export {
+  INTERVIEW_INTRO,
+  PROMPTER_SCRIPTS,
+  expandPrompterRecord,
+  paragraph,
+  type CompactPrompterRecord,
+  type FixtureParagraph,
+  type FixturePrompterSeedRecord,
+  type FixtureRun,
+  type FixtureScriptSeed,
+} from "./prompterScripts";
+
+type RawScenarioRecord = (typeof fixtureMap)[keyof typeof fixtureMap];
+type WithoutKey<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+// New pages program, Slice 6a: `fixtures.json` names a scenario's scripts
+// (`CompactPrompterRecord`); the scenario carries the double's seed they make.
+type FixtureScenarioRecord = WithoutKey<RawScenarioRecord, "prompter"> & { prompter?: FixturePrompterSeedRecord };
 type FixtureMap = Record<string, FixtureScenarioRecord>;
 
 function cloneFixture<T>(value: T): T {
@@ -185,8 +202,23 @@ function buildAudioNoSendFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
+/** Every scenario of `fixtures.json`, its `prompter` (the scripts by name) made the double's seed. */
+function expandedFixtureMap(): FixtureMap {
+  return Object.fromEntries(
+    Object.entries(fixtureMap).map(([id, record]) => {
+      const { prompter, ...rest } = record as RawScenarioRecord & { prompter?: CompactPrompterRecord };
+      return [
+        id,
+        (prompter === undefined
+          ? rest
+          : { ...rest, prompter: expandPrompterRecord(id, prompter) }) as FixtureScenarioRecord,
+      ];
+    })
+  );
+}
+
 const derivedFixtureMap: FixtureMap = {
-  ...fixtureMap,
+  ...expandedFixtureMap(),
   "audio-populated": {
     ...cloneFixture(fixtureMap["audio-populated"]),
     audioMeteringActive: true,

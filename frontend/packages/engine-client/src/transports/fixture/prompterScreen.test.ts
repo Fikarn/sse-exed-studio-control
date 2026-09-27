@@ -84,7 +84,11 @@ describe("the fixture double's Prompter XL: where it starts", () => {
   // first report (first step 2); the double stands for it after that report.
   it("starts every scenario with the Prompter XL connected, and moves no board's status", async () => {
     for (const id of fixtureIds) {
-      const transport = createFixtureTransport(getFixtureScenario(id));
+      // Slice 6a: a scenario that says otherwise — its own Prompter XL, or a script edited
+      // after it went on — is held to what it says in `prompterSeed.test.ts`.
+      const scenario: FixtureScenario = getFixtureScenario(id);
+      if (scenario.prompterScreen !== undefined || scenario.prompter?.notUpdated === true) continue;
+      const transport = createFixtureTransport(scenario);
       const health = (await transport.request("health.snapshot", {})) as JsonObject;
       const check = (health.checks as JsonObject).prompter as JsonObject;
       expect(check, id).toMatchObject({ ok: true, status: "ok", word: "CONNECTED", notUpdated: false });

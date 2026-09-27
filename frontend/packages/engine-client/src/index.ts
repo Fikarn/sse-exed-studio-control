@@ -1,4 +1,4 @@
-export { createShellStore, useAudioMeterFrame, useShellSnapshot } from "./store/createShellStore";
+export { createShellStore, prompterGlassIsStale, useAudioMeterFrame, useShellSnapshot } from "./store/createShellStore";
 export type { ShellStoreOptions } from "./store/createShellStore";
 export { EVENT_DOMAIN_REFRESH } from "./store/domainRefresh";
 export type { DomainKey } from "./store/domainRefresh";
@@ -23,6 +23,8 @@ export type {
   CommissioningUpdateRequest,
   EngineLaunchInfo,
   EngineTransport,
+  FixturePrompterScriptSeed,
+  FixturePrompterSeed,
   FixtureScenario,
   AudioClipClearRequest,
   AudioMeterEntry,
@@ -38,6 +40,12 @@ export type {
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,
+  PrompterJumpRequest,
+  PrompterLayoutReportRequest,
+  PrompterLookUpdateRequest,
+  PrompterScriptImportRequest,
+  PrompterSpeedRequest,
+  PrompterTextSizeRequest,
   RecoveryState,
   RunnerStage,
   ShellState,
@@ -114,6 +122,10 @@ export type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
 export type { PrompterRun } from "./generated/snapshots/PrompterRun";
 export type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
 export type { PrompterScriptSummary } from "./generated/snapshots/PrompterScriptSummary";
+export type { PrompterScreenState } from "./generated/snapshots/PrompterScreenState";
+export type { PrompterScreenSummary } from "./generated/snapshots/PrompterScreenSummary";
+export type { PrompterHealthCheck } from "./generated/snapshots/PrompterHealthCheck";
+export type { PrompterCheckTone } from "./generated/snapshots/PrompterCheckTone";
 export type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 export type { PrompterTextColour } from "./generated/snapshots/PrompterTextColour";
 export type { PrompterVersionSummary } from "./generated/snapshots/PrompterVersionSummary";
