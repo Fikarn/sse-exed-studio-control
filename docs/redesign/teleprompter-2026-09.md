@@ -56,7 +56,7 @@ Not offered:
 - Word headings, which become cues (§4.2).
 - bullets and numbering, as a dash or the number.
 
-**Dropped:** fonts, sizes, colours, highlighting, pictures, text boxes, headers and footers, footnotes and comments. A table's cells come in row by row, one paragraph each. Tracked changes come in as if accepted.
+**Dropped:** fonts, sizes, colours, highlighting, pictures, text boxes, embedded documents, headers and footers, footnotes and comments, and text hidden in Word. A table's cells come in row by row, one paragraph each. Tracked changes come in as if accepted. (Embedded documents and hidden text were added in Slice 4's review, 2026-09-27; embedded documents are counted in the import sentence.)
 
 The import sentence counts what was left out, for example: "Imported Interview intro.docx: 18 paragraphs, 1,240 words, 3 cues. Left out: 2 pictures, 1 comment. Tracked changes were taken as accepted."
 
