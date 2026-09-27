@@ -23,8 +23,8 @@ mod txt;
 mod zip;
 
 use crate::prompter::model::{
-    counted, cue_targets, format_count, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
-    MAX_SCRIPT_WORDS,
+    counted, cue_spans, cue_targets, format_count, sanitize_text, word_count, PrompterParagraph,
+    PrompterRun, MAX_IMPORT_BYTES, MAX_SCRIPT_WORDS,
 };
 
 /// What a file or a paste held, ready to become a script.
@@ -229,5 +229,84 @@ pub(crate) fn import_sentence(source: &str, imported: &ImportedText) -> String {
     sentence
 }
 
+/// A paragraph as every reader hands it on: each run sanitized
+/// (`sanitize_text`), the white space at both ends of each line taken off (a
+/// ragged edge on the glass, which no source means), line breaks at the
+/// paragraph's start and end taken off, neighbouring runs of the same emphasis
+/// joined. `None` when no word is left: Word and HTML use empty paragraphs for
+/// spacing, and a script keeps none.
+fn finished_paragraph(runs: Vec<PrompterRun>) -> Option<PrompterParagraph> {
+    let mut out: Vec<PrompterRun> = Vec::with_capacity(runs.len());
+    // White space and line breaks wait for the next character that is not
+    // white space, so none end a line or the paragraph: (run, character).
+    // Line breaks wait only at a line's start and white space only after a
+    // character, so `waiting` holds one kind or the other.
+    let mut waiting: Vec<(usize, char)> = Vec::new();
+    let mut at_line_start = true;
+    let mut has_text = false;
+    for run in runs {
+        let text = sanitize_text(&run.text);
+        out.push(PrompterRun {
+            text: String::with_capacity(text.len()),
+            ..run
+        });
+        let index = out.len() - 1;
+        for character in text.chars() {
+            if character == '\n' {
+                if !at_line_start {
+                    // The white space that ended the line.
+                    waiting.clear();
+                }
+                if has_text {
+                    waiting.push((index, '\n'));
+                }
+                at_line_start = true;
+            } else if character.is_whitespace() {
+                if !at_line_start {
+                    waiting.push((index, character));
+                }
+            } else {
+                for (run, waiting) in waiting.drain(..) {
+                    out[run].text.push(waiting);
+                }
+                out[index].text.push(character);
+                at_line_start = false;
+                has_text = true;
+            }
+        }
+    }
+    let paragraph = PrompterParagraph { runs: out }.normalized();
+    (!paragraph.is_blank()).then_some(paragraph)
+}
+
+/// A Word heading or an HTML `h1`–`h6` as a cue (§4.2): its words on one line
+/// in square brackets, so the heading is a jump target. A heading that already
+/// is one cue stays as it is; square brackets inside any other become round
+/// ones, so the cue cannot end early. The emphasis goes: a cue is drawn in the
+/// cue colour and never read aloud.
+fn cue_paragraph(runs: &[PrompterRun]) -> Option<PrompterParagraph> {
+    let text: String = runs.iter().map(|run| run.text.as_str()).collect();
+    let text = sanitize_text(&text);
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.is_empty() {
+        return None;
+    }
+    let line = words.join(" ");
+    if cue_spans(&line) == [(0, line.len())] {
+        return Some(PrompterParagraph::plain(line));
+    }
+    let inside = line.replace('[', "(").replace(']', ")");
+    Some(PrompterParagraph::plain(format!("[{inside}]")))
+}
+
+#[cfg(test)]
+mod test_support;
+
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod docx_tests;
+
+#[cfg(test)]
+mod fuzz;
