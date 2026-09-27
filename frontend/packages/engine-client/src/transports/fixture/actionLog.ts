@@ -1,6 +1,7 @@
 // Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
+import { cameraModel } from "./camerasModel";
 import { asArray, asBoolean, asNumber, asRecord } from "./json";
 import type { MutableFixtureState } from "./state";
 
@@ -22,6 +23,14 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "audio.snapshot.recall",
   "audio.solo.clearAll",
   "audio.talkback.hold",
+  // The cameras (new pages program, Slice 8): the record's start and stop, the format and
+  // the look, and who holds a camera.
+  "cameras.connect",
+  "cameras.format.set",
+  "cameras.look.set",
+  "cameras.record.start",
+  "cameras.record.stop",
+  "cameras.release",
   "commissioning.check.run",
   "lighting.fixture.create",
   "lighting.fixture.delete",
@@ -56,9 +65,19 @@ export const PREVIEW_AWARE_UI_METHODS: readonly RequestMethod[] = [
 /** How many rows `support.snapshot` carries (`RECENT_ACTIONS_LIMIT`). */
 export const RECENT_ACTIONS_LIMIT = 50;
 
+/** The cameras' rows' actions (Slice 8). */
+export const CAMERA_ACTIONS = {
+  "cameras.record.start": "recording-started",
+  "cameras.record.stop": "recording-stopped",
+  "cameras.format.set": "format-changed",
+  "cameras.look.set": "look-changed",
+  "cameras.release": "released",
+  "cameras.connect": "held-again",
+} as const;
+
 /** One row before it is stored: which part of the studio, what, on what, and the sentence the operator reads. */
 export interface UiActionRow {
-  domain: "lighting" | "audio" | "setup" | "prompter";
+  domain: "lighting" | "audio" | "setup" | "prompter" | "cameras";
   action: string;
   target: string;
   detail: string;
@@ -387,6 +406,23 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
           detail: (text(result, ["sentence"]) ?? "The prompter changed").replace(/\.+$/, ""),
         },
       ];
+    }
+
+    // The cameras (Slice 8): the record's start and stop, the format and the look, Release,
+    // and Connect when the camera is held again (not one that still does not answer); the
+    // answer names the camera and carries the sentence, and the row keeps it as the operator
+    // read it, its full stop included.
+    case "cameras.record.start":
+    case "cameras.record.stop":
+    case "cameras.format.set":
+    case "cameras.look.set":
+    case "cameras.release":
+    case "cameras.connect": {
+      const camera = wholeNumber(result, ["camera"]);
+      const detail = text(result, ["sentence"]);
+      if ((camera !== 1 && camera !== 2 && camera !== 3) || detail === null) return [];
+      if (method === "cameras.connect" && text(result, ["state"]) !== "held") return [];
+      return [{ domain: "cameras", action: CAMERA_ACTIONS[method], target: cameraModel(camera).tag, detail }];
     }
     default:
       return [];

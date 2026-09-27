@@ -1,0 +1,444 @@
+// Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
+// hardware link that Playwright and the browser fixture mode run against. Test-only.
+import type { CameraChoice } from "../../generated/snapshots/CameraChoice";
+import type { CameraHealthEntry } from "../../generated/snapshots/CameraHealthEntry";
+import type { CameraLevel } from "../../generated/snapshots/CameraLevel";
+import type { CameraSetupSummary } from "../../generated/snapshots/CameraSetupSummary";
+import type { CameraSnapshot } from "../../generated/snapshots/CameraSnapshot";
+import type { CameraState } from "../../generated/snapshots/CameraState";
+import type { CameraValues } from "../../generated/snapshots/CameraValues";
+import type { CamerasHealthCheck } from "../../generated/snapshots/CamerasHealthCheck";
+import type { CamerasSnapshot } from "../../generated/snapshots/CamerasSnapshot";
+import {
+  CAMERA_NUMBERS,
+  CHOICE_SETTINGS,
+  LEVEL_SETTINGS,
+  cameraModel,
+  isReported,
+  type CameraNumber,
+  type ChoiceSetting,
+  type LevelSetting,
+} from "./camerasModel";
+import {
+  STATE_RANK,
+  STATE_TONES,
+  STATE_WORDS,
+  heldSentence,
+  noLinkSentence,
+  notSetUpSentence,
+  releasedSentence,
+  unreachableSentence,
+} from "./camerasWords";
+import type { MutableFixtureState } from "./state";
+
+// The cameras as the hardware link holds them (`native/rust-engine/src/cameras/`, new pages
+// program, Slice 8): Setup's part in the saved data (an address or a pairing, and the vMix
+// input), who holds each camera (D13: held, or released in memory until it is connected
+// again), the selection (D19: CAM 1 after a start), and what each camera last reported.
+//
+// Each camera's link is the simulated one — the double stands for every test, lane and
+// scratch run (`SSE_CAMERAS_SIMULATED=1`) — unless a scenario says `simulated: false`, as
+// the live app is until Slices 11 and 13: a set-up camera then reads UNREACHABLE, with no
+// link to it yet. The simulated camera ("the body") holds its own values, answers or not,
+// and counts what it is sent (D12: nothing is sent by itself); the hardware link reads it
+// and keeps what it read. A held camera that answers is read before every request; one
+// that stops answering keeps what it last reported and when (`readAt`), as doubt; a
+// released or never-read camera has no values.
+
+/** What a camera reports, or `null` where it does not (or does not record here). */
+export interface CameraReport {
+  choices: Record<ChoiceSetting, string | null>;
+  levels: Record<LevelSetting, number | null>;
+  displayLutOn: boolean | null;
+  recording: boolean | null;
+}
+
+/** The simulated camera inside the hardware link: no network, no radio. */
+export interface SimulatedCamera {
+  report: CameraReport;
+  answering: boolean;
+  /** How many commands it has been sent (D12: only a press sends). */
+  sent: number;
+}
+
+/** What the hardware link read from a camera, and when. */
+export interface CameraRead {
+  report: CameraReport;
+  /** Its timecode when it was read, if it reports one. */
+  timecode: string | null;
+  at: number;
+}
+
+/** Why a camera did not answer the last time it was read: it did not, or there is no link to it yet. */
+export type LinkFailure = "no-answer" | "no-link";
+
+/** The hardware link's side of one camera (`CameraRuntime`). */
+export interface HeldCamera {
+  /** CAM 2's or CAM 3's address; `null` for CAM 1 and until it is entered. */
+  address: string | null;
+  /** CAM 1 is paired. */
+  paired: boolean;
+  vmixInput: number;
+  /** Handed back to the iPad or LUMIX Tether, in memory only. */
+  released: boolean;
+  /** What it last reported, and when; `null` when never read since the start, or released. */
+  read: CameraRead | null;
+  /** Why it did not answer the last time it was read; `null` while it answers. */
+  failure: LinkFailure | null;
+  /** When the hardware link saw the take start; `null` when it started before it looked. */
+  startedAt: number | null;
+}
+
+/** What reading a camera again found (`Transition`): each is a `cameras.changed` reason. */
+export type Transition = "reported" | "unreachable" | "reachable";
+
+export interface FixtureCameras {
+  /** The simulated link (`SSE_CAMERAS_SIMULATED=1`); without it no camera has a link yet. */
+  simulated: boolean;
+  selected: CameraNumber;
+  held: Record<CameraNumber, HeldCamera>;
+  bodies: Record<CameraNumber, SimulatedCamera>;
+}
+
+/** What the simulated camera starts with (board 2). */
+export function startingReport(camera: CameraNumber): CameraReport {
+  const model = cameraModel(camera);
+  const choices = {} as Record<ChoiceSetting, string | null>;
+  for (const setting of CHOICE_SETTINGS) {
+    const choice = model.choices[setting];
+    choices[setting] = isReported(choice) ? choice.start : null;
+  }
+  const levels = {} as Record<LevelSetting, number | null>;
+  for (const setting of LEVEL_SETTINGS) {
+    const level = model.levels[setting];
+    levels[setting] = isReported(level) ? level.start : null;
+  }
+  return {
+    choices,
+    levels,
+    displayLutOn: isReported(model.displayLutOn) ? model.displayLutOn.start : null,
+    recording: model.records ? false : null,
+  };
+}
+
+function cloneReport(report: CameraReport): CameraReport {
+  return {
+    choices: { ...report.choices },
+    levels: { ...report.levels },
+    displayLutOn: report.displayLutOn,
+    recording: report.recording,
+  };
+}
+
+/** New saved data holds none (D15 rule 1): every camera not set up, its vMix input its number. */
+function notSetUp(camera: CameraNumber): HeldCamera {
+  return {
+    address: null,
+    paired: false,
+    vmixInput: camera,
+    released: false,
+    read: null,
+    failure: null,
+    startedAt: null,
+  };
+}
+
+const doubles = new WeakMap<MutableFixtureState, FixtureCameras>();
+
+/** The double's cameras, made the first time a scenario's double asks for them. */
+export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
+  let cameras = doubles.get(state);
+  if (!cameras) {
+    cameras = {
+      simulated: true,
+      selected: 1,
+      held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
+      bodies: {
+        1: { report: startingReport(1), answering: true, sent: 0 },
+        2: { report: startingReport(2), answering: true, sent: 0 },
+        3: { report: startingReport(3), answering: true, sent: 0 },
+      },
+    };
+    doubles.set(state, cameras);
+  }
+  return cameras;
+}
+
+/** CAM 1 once it is paired, CAM 2 and CAM 3 once their address is entered. */
+export function isSetUp(cameras: FixtureCameras, camera: CameraNumber): boolean {
+  const held = cameras.held[camera];
+  return camera === 1 ? held.paired : held.address !== null;
+}
+
+export function cameraState(cameras: FixtureCameras, camera: CameraNumber): CameraState {
+  if (!isSetUp(cameras, camera)) return "not-set-up";
+  if (cameras.held[camera].released) return "released";
+  return cameras.held[camera].failure !== null ? "unreachable" : "held";
+}
+
+/** An unreachable camera's sentence: it does not answer, or there is no link to it yet. */
+export function unreachableSentenceOf(cameras: FixtureCameras, camera: CameraNumber): string {
+  const model = cameraModel(camera);
+  return cameras.held[camera].failure === "no-link"
+    ? noLinkSentence(model)
+    : unreachableSentence(model, cameras.held[camera].address);
+}
+
+export function cameraSentence(cameras: FixtureCameras, camera: CameraNumber): string {
+  const model = cameraModel(camera);
+  switch (cameraState(cameras, camera)) {
+    case "held":
+      return heldSentence(model);
+    case "released":
+      return releasedSentence(model);
+    case "not-set-up":
+      return notSetUpSentence(model);
+    case "unreachable":
+      return unreachableSentenceOf(cameras, camera);
+  }
+}
+
+/** A time-of-day timecode at 25 frames a second, `HH:MM:SS:FF`, from the double's clock (UTC). */
+export function timecodeAt(now: number): string {
+  const date = new Date(now);
+  const two = (value: number) => String(value).padStart(2, "0");
+  return `${two(date.getUTCHours())}:${two(date.getUTCMinutes())}:${two(date.getUTCSeconds())}:${two(
+    Math.floor(date.getUTCMilliseconds() / 40)
+  )}`;
+}
+
+/** The same values, whatever the timecode says: a timecode that moved is not a change the camera made. */
+function sameValues(left: CameraReport, right: CameraReport): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** What the camera's link answers: what it reports, or why it does not. */
+function linkRead(cameras: FixtureCameras, camera: CameraNumber): CameraReport | LinkFailure {
+  if (!cameras.simulated) return "no-link";
+  const body = cameras.bodies[camera];
+  return body.answering ? cloneReport(body.report) : "no-answer";
+}
+
+/**
+ * Reads a set-up camera that is not released (`Cameras::read`), and says what changed: a
+ * value it changed itself, a held camera that stopped answering — it keeps what it last
+ * reported, and when (D19) — or one that answers again. A take it reports that it did not
+ * report at the last answer started while the hardware link looked (`startedAt`); one
+ * running at the first answer after a start, a connect or an unreachable spell started
+ * before it looked.
+ */
+export function readCamera(cameras: FixtureCameras, camera: CameraNumber, now: number): Transition | null {
+  const held = cameras.held[camera];
+  if (!isSetUp(cameras, camera) || held.released) return null;
+  const wasUnreachable = held.failure !== null;
+  const read = linkRead(cameras, camera);
+  if (typeof read === "string") {
+    held.failure = read;
+    return wasUnreachable ? null : "unreachable";
+  }
+  const last = held.read;
+  const changed = last !== null && !sameValues(last.report, read);
+  const answeredBefore = last !== null && !wasUnreachable;
+  const was = last?.report.recording ?? null;
+  held.startedAt =
+    read.recording === true && answeredBefore && was === true
+      ? held.startedAt
+      : read.recording === true && answeredBefore && was === false
+        ? now
+        : null;
+  held.read = { report: read, timecode: cameraModel(camera).timecodeReported ? timecodeAt(now) : null, at: now };
+  held.failure = null;
+  return wasUnreachable ? "reachable" : changed ? "reported" : null;
+}
+
+/** Reads every held (and every unreachable) camera again; what changed, camera by camera. */
+export function readHeldCameras(cameras: FixtureCameras, now: number): Array<[CameraNumber, Transition]> {
+  return CAMERA_NUMBERS.flatMap((camera) => {
+    const transition = readCamera(cameras, camera, now);
+    return transition === null ? [] : [[camera, transition] as [CameraNumber, Transition]];
+  });
+}
+
+/** Stops reading it: what it reported is no longer shown (a release, or a camera whose setup changed). */
+export function forgetRead(cameras: FixtureCameras, camera: CameraNumber) {
+  const held = cameras.held[camera];
+  held.read = null;
+  held.failure = null;
+  held.startedAt = null;
+}
+
+/** What the camera last reported; `null` when it has not been read since the start, or it is released. */
+export function lastReport(cameras: FixtureCameras, camera: CameraNumber): CameraReport | null {
+  return cameras.held[camera].read?.report ?? null;
+}
+
+export function setupSummary(cameras: FixtureCameras, camera: CameraNumber): CameraSetupSummary {
+  const held = cameras.held[camera];
+  return {
+    setUp: isSetUp(cameras, camera),
+    address: camera === 1 ? null : held.address,
+    paired: camera === 1 ? held.paired : false,
+    vmixInput: held.vmixInput,
+  };
+}
+
+function cameraValues(camera: CameraNumber, report: CameraReport | null): CameraValues {
+  const model = cameraModel(camera);
+  const choice = (setting: ChoiceSetting): CameraChoice => {
+    const entry = model.choices[setting];
+    if (!isReported(entry)) {
+      return { reported: false, value: null, options: [], unavailable: [], notReported: entry.notReported };
+    }
+    const resolution = report?.choices.resolution ?? null;
+    return {
+      reported: true,
+      value: report?.choices[setting] ?? null,
+      options: [...entry.options],
+      unavailable:
+        setting === "frameRate" && resolution !== null
+          ? (model.unavailableFrameRates[resolution] ?? []).map((unavailable) => ({ ...unavailable }))
+          : [],
+      notReported: null,
+    };
+  };
+  const level = (setting: LevelSetting): CameraLevel => {
+    const entry = model.levels[setting];
+    if (!isReported(entry)) {
+      return { reported: false, value: null, min: 0, max: 0, step: 0, unit: "", notReported: entry.notReported };
+    }
+    return {
+      reported: true,
+      value: report?.levels[setting] ?? null,
+      min: entry.min,
+      max: entry.max,
+      step: entry.step,
+      unit: entry.unit,
+      notReported: null,
+    };
+  };
+  const lutOn = model.displayLutOn;
+  return {
+    iso: choice("iso"),
+    shutter: choice("shutter"),
+    iris: choice("iris"),
+    nd: choice("nd"),
+    whiteBalance: level("whiteBalance"),
+    tint: level("tint"),
+    focus: level("focus"),
+    resolution: choice("resolution"),
+    frameRate: choice("frameRate"),
+    dynamicRange: choice("dynamicRange"),
+    displayLut: choice("displayLut"),
+    displayLutOn: isReported(lutOn)
+      ? { reported: true, value: report?.displayLutOn ?? null, notReported: null }
+      : { reported: false, value: null, notReported: lutOn.notReported },
+  };
+}
+
+const iso = (at: number | null) => (at === null ? null : new Date(at).toISOString());
+
+/** One camera as `cameras.snapshot` carries it: only what it reported, never what was merely sent (D10). */
+export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): CameraSnapshot {
+  const model = cameraModel(camera);
+  const state = cameraState(cameras, camera);
+  const held = cameras.held[camera];
+  const read = held.read;
+  const recording = model.records ? (read?.report.recording ?? null) : null;
+  return {
+    camera,
+    tag: model.tag,
+    model: model.model,
+    link: model.link,
+    setup: setupSummary(cameras, camera),
+    state,
+    word: STATE_WORDS[state],
+    tone: STATE_TONES[state],
+    sentence: cameraSentence(cameras, camera),
+    readAt: iso(read?.at ?? null),
+    values: cameraValues(camera, read?.report ?? null),
+    auto: { ...model.auto },
+    focusSteps: model.focusSteps,
+    recording: {
+      records: model.records,
+      recording,
+      timecode: read?.timecode ?? null,
+      timecodeReported: model.timecodeReported,
+      startedAt: recording === true ? iso(held.startedAt) : null,
+      cardTimeLeft: null,
+      cardTimeNotReported: model.cardTimeNotReported,
+    },
+  };
+}
+
+/** `cameras.snapshot`: the selection and the three cameras. */
+export function camerasSnapshot(cameras: FixtureCameras): CamerasSnapshot {
+  return {
+    selected: cameras.selected,
+    cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),
+  };
+}
+
+/** CAM 1 reports recording: a held one now, an unreachable one as it last did (doubt). */
+export function cam1Recording(cameras: FixtureCameras): boolean {
+  return lastReport(cameras, 1)?.recording === true;
+}
+
+function healthEntry(cameras: FixtureCameras, camera: CameraNumber): CameraHealthEntry {
+  const state = cameraState(cameras, camera);
+  return {
+    camera,
+    tag: cameraModel(camera).tag,
+    state,
+    word: STATE_WORDS[state],
+    tone: STATE_TONES[state],
+    sentence: cameraSentence(cameras, camera),
+  };
+}
+
+/**
+ * `checks.cameras` in `health.snapshot`: the worst camera's tone, word and sentence — the
+ * highest state in `CameraState`'s order, the lowest camera number among equals — and
+ * whether CAM 1 records.
+ */
+export function camerasHealthCheck(cameras: FixtureCameras): CamerasHealthCheck {
+  const entries = CAMERA_NUMBERS.map((camera) => healthEntry(cameras, camera));
+  const worst = entries.reduce((worse, entry) => (STATE_RANK[entry.state] > STATE_RANK[worse.state] ? entry : worse));
+  return {
+    ok: worst.tone === "ok",
+    status: worst.tone,
+    word: worst.word,
+    summary: worst.sentence,
+    recording: cam1Recording(cameras),
+    cameras: entries,
+  };
+}
+
+/**
+ * What the whole status takes from the cameras, and the sentence that says why: a set-up,
+ * unreleased camera that does not answer raises it to attention at most (the slice's first
+ * step 3); a camera not set up or released lights the Cameras lamp only. The first such
+ * camera's sentence; `null` when none counts.
+ */
+export function camerasStatusPart(cameras: FixtureCameras): { tone: "attention"; sentence: string } | null {
+  const camera = CAMERA_NUMBERS.find((number) => cameraState(cameras, number) === "unreachable");
+  return camera === undefined ? null : { tone: "attention", sentence: cameraSentence(cameras, camera) };
+}
+
+// ---------------------------------------------------------------------------
+// The backup archive's part (format 7)
+// ---------------------------------------------------------------------------
+
+/** Each camera's address and vMix input; the pairing is Windows' own and stays with this PC. */
+export interface ArchivedCamera {
+  camera: CameraNumber;
+  address: string | null;
+  vmixInput: number;
+}
+
+export function buildCamerasArchive(cameras: FixtureCameras): ArchivedCamera[] {
+  return CAMERA_NUMBERS.map((camera) => ({
+    camera,
+    address: camera === 1 ? null : cameras.held[camera].address,
+    vmixInput: cameras.held[camera].vmixInput,
+  }));
+}

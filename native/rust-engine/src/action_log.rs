@@ -47,6 +47,9 @@ pub(crate) const DOMAIN_AUDIO: &str = "audio";
 pub(crate) const DOMAIN_SETUP: &str = "setup";
 /// The Teleprompter (new pages program, Slice 4): what the glass shows.
 pub(crate) const DOMAIN_PROMPTER: &str = "prompter";
+/// The cameras (new pages program, Slice 8): a take, a format, a look, who
+/// holds a camera.
+pub(crate) const DOMAIN_CAMERAS: &str = "cameras";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ActionSource {
@@ -222,6 +225,14 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "audio.snapshot.recall",
     "audio.solo.clearAll",
     "audio.talkback.hold",
+    // The cameras (Slice 8): a take's start and stop, a format and a look
+    // change, and who holds a camera.
+    "cameras.connect",
+    "cameras.format.set",
+    "cameras.look.set",
+    "cameras.record.start",
+    "cameras.record.stop",
+    "cameras.release",
     "commissioning.check.run",
     "lighting.fixture.create",
     "lighting.fixture.delete",
@@ -313,6 +324,17 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     // keeps nothing; the edit that follows saves them, and is not a row
     // either.
     "prompter.paste.convert",
+    // The cameras' reads, the selection (D19), a press on a setting — a take
+    // has as many as the Teleprompter's controls — and Setup's addresses,
+    // pairing and vMix inputs (Slice 8).
+    "cameras.auto",
+    "cameras.select",
+    "cameras.set",
+    "cameras.setup.forget",
+    "cameras.setup.pair",
+    "cameras.setup.update",
+    "cameras.snapshot",
+    "cameras.step",
     // The shell's own settings, files.
     "commissioning.update",
     "dev.parityFixture.load",
@@ -790,6 +812,40 @@ pub(crate) fn ui_actions(
                 action,
                 text(result, "/name").unwrap_or("Prompter"),
                 detail.trim_end_matches('.').to_string(),
+            )]
+        }
+
+        // The cameras (Slice 8): the record's start and stop, the format and
+        // the look, Release, and Connect when the camera is held again; the
+        // result carries the sentence, and the row keeps it as the operator
+        // read it (`v1.md`'s "Cameras" section).
+        "cameras.record.start"
+        | "cameras.record.stop"
+        | "cameras.format.set"
+        | "cameras.look.set"
+        | "cameras.release"
+        | "cameras.connect" => {
+            let action = match method {
+                "cameras.record.start" => "recording-started",
+                "cameras.record.stop" => "recording-stopped",
+                "cameras.format.set" => "format-changed",
+                "cameras.look.set" => "look-changed",
+                "cameras.release" => "released",
+                _ if text(result, "/state") == Some("held") => "held-again",
+                _ => return Vec::new(),
+            };
+            let (Some(camera), Some(detail)) = (
+                result.get("camera").and_then(Value::as_u64),
+                text(result, "/sentence"),
+            ) else {
+                return Vec::new();
+            };
+            vec![ActionRecord::new(
+                ActionSource::Ui,
+                DOMAIN_CAMERAS,
+                action,
+                format!("CAM {camera}"),
+                detail,
             )]
         }
         _ => Vec::new(),

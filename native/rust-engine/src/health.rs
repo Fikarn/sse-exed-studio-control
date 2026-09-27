@@ -191,6 +191,14 @@ pub(crate) fn with_prompter_status(status: &'static str, prompter: &str) -> &'st
     }
 }
 
+/// The whole status with the cameras' part (the new pages program's Slice 8,
+/// first step 3): a held camera that does not answer makes it no worse than
+/// attention — the header's `Cameras` lamp itself goes red — and a camera not
+/// set up or released lights the lamp only.
+pub(crate) fn with_cameras_status(status: &'static str, raises: bool) -> &'static str {
+    with_prompter_status(status, if raises { "attention" } else { "ok" })
+}
+
 /// `error` when the saved data is not usable or an entry says so,
 /// `attention` when something could not bind, `warning` when a backup is
 /// late or failed, `ok` otherwise.
@@ -249,6 +257,20 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
     } else {
         None
     };
+    // The Cameras lamp (new pages program, Slice 8), read as the
+    // prompter's is: `null` and a `WARN` line when it cannot be read.
+    let cameras = if runtime.storage_ready {
+        crate::cameras::cameras_health_check(&runtime.db_path, runtime.cameras_simulated)
+            .map_err(|error| {
+                crate::diagnostics::log_event(
+                    crate::diagnostics::LogLevel::Warn,
+                    &format!("Cameras: their check could not be read: {error:?}"),
+                );
+            })
+            .ok()
+    } else {
+        None
+    };
     let status = match &prompter {
         Some(check) => with_prompter_status(
             derive_status(&engine, runtime.storage_ready),
@@ -256,6 +278,12 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         ),
         None => derive_status(&engine, runtime.storage_ready),
     };
+    let status = with_cameras_status(
+        status,
+        cameras
+            .as_ref()
+            .is_some_and(|check| check.raises_whole_status()),
+    );
     let lighting_summary = lighting.summary.clone();
     let audio_summary = audio.summary.clone();
     let control_surface_summary = control_surface
@@ -284,6 +312,15 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         .and_then(|check| check.whole_status_sentence())
     {
         Some(sentence) => format!("{health_summary} Prompter: {sentence}"),
+        None => health_summary,
+    };
+    // Slice 8: a held camera that does not answer is part of the whole
+    // status, and the summary says which, as the prompter's does.
+    let health_summary = match cameras
+        .as_ref()
+        .and_then(|check| check.whole_status_sentence())
+    {
+        Some(sentence) => format!("{health_summary} Cameras: {sentence}"),
         None => health_summary,
     };
     Ok(json!({
@@ -324,6 +361,9 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
             // Slice 5a: the Prompter XL and `NOT UPDATED`; `null` when the
             // prompter cannot be read.
             "prompter": serde_json::to_value(&prompter)?,
+            // Slice 8: the three cameras' states and whether CAM 1 records;
+            // `null` when they cannot be read.
+            "cameras": serde_json::to_value(&cameras)?,
             "engine": serde_json::to_value(&engine)?,
         }
     }))
@@ -542,6 +582,20 @@ mod tests {
         assert_eq!(with_prompter_status("error", "attention"), "error");
     }
 
+    // The new pages program's Slice 8, first step 3: the cameras take the
+    // whole status no further than attention, and never lower it.
+    #[test]
+    fn the_cameras_raise_the_whole_status_no_further_than_attention() {
+        use super::with_cameras_status;
+        assert_eq!(with_cameras_status("ok", false), "ok");
+        assert_eq!(with_cameras_status("ok", true), "attention");
+        assert_eq!(with_cameras_status("warning", true), "attention");
+        assert_eq!(with_cameras_status("attention", true), "attention");
+        assert_eq!(with_cameras_status("error", true), "error");
+        assert_eq!(with_cameras_status("error", false), "error");
+        assert_eq!(with_cameras_status("warning", false), "warning");
+    }
+
     #[test]
     fn health_summary_includes_all_native_domains() {
         let summary = format_health_summary(
@@ -605,6 +659,7 @@ mod tests {
                 integrity_check: String::from("ok"),
             },
             control_surface_token: String::from("bridge-token-for-tests"),
+            cameras_simulated: true,
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 base_url: String::from("http://127.0.0.1:38201"),
                 port: 38201,

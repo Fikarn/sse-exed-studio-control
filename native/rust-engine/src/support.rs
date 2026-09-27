@@ -3,6 +3,7 @@ use crate::app_state::{
     COMMISSIONING_COMPLETED_KEY, COMMISSIONING_STAGE_KEY, HARDWARE_PROFILE_KEY,
 };
 use crate::bootstrap::RuntimeContext;
+use crate::cameras::archive::{build_cameras_archive, restore_cameras_archive, ArchivedCamera};
 use crate::commissioning::{
     read_commissioning_snapshot, retire_planning_probe_message, AUDIO_RECEIVE_PORT_KEY,
     AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY, LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
@@ -53,7 +54,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// take's text size. Verify counts the scripts. A restore adds scripts and
 /// never removes or overwrites one, and never changes what the prompter
 /// shows. An older archive has no such part and leaves the scripts alone.
-pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 6;
+///
+/// Format 7 (new pages program, Slice 8): the archive carries the cameras'
+/// part, `cameras` (`cameras::archive`): each camera's address and vMix input
+/// — CAM 1's pairing is Windows' own and stays with this PC. A restore writes
+/// them, keeps this PC's pairing and sends nothing to a camera; Verify names
+/// the part. An archive of format 6 or older leaves the cameras' setup as it
+/// is.
+pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 7;
 const SUPPORT_BACKUP_ARCHIVE_TYPE: &str = "native-support-backup";
 /// The two JSON archive names in the backups directory: the operator's
 /// exports and the rollback copies a restore writes first.
@@ -248,6 +256,9 @@ struct SupportBackupArchive {
     /// Format 6: the Teleprompter's scripts and look; absent before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     prompter: Option<PrompterArchive>,
+    /// Format 7: each camera's address and vMix input; absent before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cameras: Option<Vec<ArchivedCamera>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -455,6 +466,7 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                 exported_at,
                 holds_planning_rows,
                 scripts,
+                cameras,
             }) if format_version <= SUPPORT_BACKUP_FORMAT_VERSION => SupportBackupVerification {
                 ok: true,
                 kind: request.kind,
@@ -462,15 +474,7 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                 format_version: Some(format_version),
                 schema_version: None,
                 detail: with_planning_note(
-                    match scripts {
-                        Some(scripts) => format!(
-                            "Backup archive, format {format_version}, exported {exported_at}, with {}.",
-                            counted(scripts, "script", "scripts")
-                        ),
-                        None => format!(
-                            "Backup archive, format {format_version}, exported {exported_at}."
-                        ),
-                    },
+                    archive_sentence(format_version, &exported_at, scripts, cameras),
                     holds_planning_rows,
                 ),
             },
@@ -529,6 +533,32 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
     }
 }
 
+/// Verify's sentence for an archive it can restore, naming the parts it
+/// holds: the Teleprompter's scripts (format 6) and the cameras' setup
+/// (format 7).
+fn archive_sentence(
+    format_version: i64,
+    exported_at: &str,
+    scripts: Option<usize>,
+    cameras: bool,
+) -> String {
+    let parts = [
+        scripts.map(|scripts| counted(scripts, "script", "scripts")),
+        cameras.then(|| String::from("the cameras' setup")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
+    if parts.is_empty() {
+        format!("Backup archive, format {format_version}, exported {exported_at}.")
+    } else {
+        format!(
+            "Backup archive, format {format_version}, exported {exported_at}, with {}.",
+            parts.join(" and ")
+        )
+    }
+}
+
 fn newer_archive_sentence(format_version: i64) -> String {
     format!(
         "This backup archive was written by a newer Studio Control (format {format_version}; this app reads up to format {SUPPORT_BACKUP_FORMAT_VERSION}). Update the app, or restore an older backup."
@@ -576,6 +606,8 @@ struct ArchiveFacts {
     holds_planning_rows: bool,
     /// Format 6: how many scripts the Teleprompter's part holds.
     scripts: Option<usize>,
+    /// Format 7: the archive holds the cameras' setup.
+    cameras: bool,
 }
 
 fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
@@ -603,6 +635,7 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
             .pointer("/prompter/scripts")
             .and_then(Value::as_array)
             .map(Vec::len),
+        cameras: parsed.get("cameras").is_some_and(Value::is_array),
     })
 }
 
@@ -947,7 +980,9 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
     }
     let exported_at = current_timestamp(&runtime.db_path)?;
     let storage_format_version = read_storage_format_version(&runtime.db_path)?;
-    let prompter = build_prompter_archive(&open_connection(&runtime.db_path)?)?;
+    let connection = open_connection(&runtime.db_path)?;
+    let prompter = build_prompter_archive(&connection)?;
+    let cameras = build_cameras_archive(&connection)?;
 
     Ok(SupportBackupArchive {
         archive_type: String::from(SUPPORT_BACKUP_ARCHIVE_TYPE),
@@ -988,6 +1023,7 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
         shell: shell_snapshot,
         settings,
         prompter: Some(prompter),
+        cameras: Some(cameras),
     })
 }
 
@@ -1016,6 +1052,12 @@ fn restore_native_support_archive(
         .as_ref()
         .map(|prompter| restore_prompter_archive(&transaction, prompter))
         .transpose()?;
+    // Format 7 (Slice 8): the cameras' addresses and vMix inputs, in the same
+    // transaction; nothing is sent to a camera. An older archive leaves the
+    // cameras' setup as it is.
+    if let Some(cameras) = &archive.cameras {
+        restore_cameras_archive(&transaction, cameras)?;
+    }
 
     transaction.commit()?;
 

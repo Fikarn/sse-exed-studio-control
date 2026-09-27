@@ -3,6 +3,8 @@ import { handleFixtureLightingRequest } from "./fixture/lightingRequests";
 import { handleFixtureAudioRequest } from "./fixture/audioRequests";
 import { handleFixtureSetupRequest } from "./fixture/setupRequests";
 import { handleFixturePrompterRequest } from "./fixture/prompterRequests";
+import { bindFixtureCameras, handleFixtureCamerasRequest } from "./fixture/camerasRequests";
+import { seedFixtureCameras } from "./fixture/camerasSeed";
 import { seedFixturePrompter } from "./fixture/prompterSeed";
 import { disposeFixturePrompter } from "./fixture/prompterState";
 import type { FixtureScenario, EngineTransport } from "../types";
@@ -33,6 +35,7 @@ const FIXTURE_REQUEST_HANDLERS: readonly FixtureRequestHandler[] = [
   handleFixtureAudioRequest,
   handleFixtureSetupRequest,
   handleFixturePrompterRequest,
+  handleFixtureCamerasRequest,
 ];
 
 export function createFixtureTransport(scenario: FixtureScenario): EngineTransport {
@@ -44,6 +47,10 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
   // `prompterRequests.ts`, which reads `state.ts`, and the double keeps its modules free
   // of loops.
   seedFixturePrompter(state, scenario.prompter);
+  // New pages program, Slice 8: the cameras the scenario starts with — none set up without
+  // a seed (D15 rule 1) — read at once and sent nothing, before the first sync works out
+  // `checks.cameras`.
+  seedFixtureCameras(state, scenario.cameras);
   const audioMeteringActive = scenario.audioMeteringActive === true;
   const startupDelayMs = typeof scenario.startupDelayMs === "number" ? scenario.startupDelayMs : 0;
   const startupFailure =
@@ -134,7 +141,7 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
     }
   };
 
-  return {
+  const transport: EngineTransport = {
     async initialize() {
       const emitStartupEvent = () => {
         startupTimeoutId = null;
@@ -194,4 +201,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
       listeners.clear();
     },
   };
+  // The simulated cameras' test hooks (`simulatedCameras` in `fixture/camerasRequests.ts`):
+  // a value changed on the camera's body, a camera that stops answering, what it was sent.
+  bindFixtureCameras(transport, context);
+  return transport;
 }

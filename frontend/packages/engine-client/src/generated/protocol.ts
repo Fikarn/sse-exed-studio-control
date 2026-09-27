@@ -89,6 +89,20 @@ export const REQUEST_METHODS = [
   "support.backup.restore",
   "support.backup.verify",
   "support.snapshot",
+  "cameras.snapshot",
+  "cameras.select",
+  "cameras.set",
+  "cameras.step",
+  "cameras.auto",
+  "cameras.format.set",
+  "cameras.look.set",
+  "cameras.record.start",
+  "cameras.record.stop",
+  "cameras.release",
+  "cameras.connect",
+  "cameras.setup.update",
+  "cameras.setup.pair",
+  "cameras.setup.forget",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
 
@@ -96,6 +110,7 @@ export const EVENT_NAMES = [
   "app.changed",
   "audio.changed",
   "audio.meters",
+  "cameras.changed",
   "commissioning.changed",
   "engine.exited",
   "engine.ready",

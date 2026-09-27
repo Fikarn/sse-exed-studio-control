@@ -258,6 +258,55 @@ describe("the fixture double's action log", () => {
       [row("prompter", "cleared", "Prompter", "Cleared the prompter")],
     ],
     ["prompter.clear", {}, { action: "something else", name: "Talk" }, []],
+    // The cameras (Slice 8): the answer's sentence, full stop and all, on the camera's tag
+    // (`ui_actions`' cameras arm); Connect only when the camera is held again.
+    [
+      "cameras.record.start",
+      {},
+      { camera: 1, recording: true, sentence: "CAM 1 started recording." },
+      [row("cameras", "recording-started", "CAM 1", "CAM 1 started recording.")],
+    ],
+    [
+      "cameras.record.stop",
+      { confirm: true },
+      { camera: 1, recording: false, sentence: "CAM 1 stopped recording." },
+      [row("cameras", "recording-stopped", "CAM 1", "CAM 1 stopped recording.")],
+    ],
+    [
+      "cameras.format.set",
+      { camera: 1, frameRate: "50", confirm: true },
+      { camera: 1, sentence: "CAM 1: 25p → 50p." },
+      [row("cameras", "format-changed", "CAM 1", "CAM 1: 25p → 50p.")],
+    ],
+    [
+      "cameras.look.set",
+      { camera: 1, dynamicRange: "Video", displayLutOn: false, confirm: true },
+      { camera: 1, sentence: "CAM 1: dynamic range Film → Video; display LUT off." },
+      [row("cameras", "look-changed", "CAM 1", "CAM 1: dynamic range Film → Video; display LUT off.")],
+    ],
+    [
+      "cameras.release",
+      { camera: 2, confirm: true },
+      { camera: 2, state: "released", sentence: "CAM 2 released to LUMIX Tether." },
+      [row("cameras", "released", "CAM 2", "CAM 2 released to LUMIX Tether.")],
+    ],
+    [
+      "cameras.connect",
+      { camera: 2 },
+      { camera: 2, state: "held", sentence: "CAM 2 held again." },
+      [row("cameras", "held-again", "CAM 2", "CAM 2 held again.")],
+    ],
+    [
+      "cameras.connect",
+      { camera: 2 },
+      {
+        camera: 2,
+        state: "unreachable",
+        sentence: "CAM 2 does not answer at 10.0.0.2. Check that it is on and on the network.",
+      },
+      [],
+    ],
+    ["cameras.release", { camera: 4, confirm: true }, { camera: 4, sentence: "CAM 4 released." }, []],
   ];
 
   it.each(cases)("%s %j writes the hardware link's rows", (method, params, result, expected) => {

@@ -18,6 +18,9 @@ use crate::audio::{
     update_audio_settings, update_audio_snapshot, AudioCommandError,
 };
 use crate::bootstrap::{bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths};
+use crate::cameras::{
+    after_archive_restore as cameras_after_archive_restore, handle_cameras_request, CameraError,
+};
 use crate::commissioning::{
     evaluate_publish_gate, publish_override_timestamp, PublishGate, PUBLISH_OVERRIDE_AT_KEY,
 };
@@ -26,7 +29,7 @@ use crate::commissioning::{
     CommissioningCommandError,
 };
 use crate::diagnostics::{append_log, configured_log_level, request_log_line};
-use crate::engine_events::prompter_changed_payload;
+use crate::engine_events::{cameras_changed_payload, prompter_changed_payload};
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::lighting::{
     apply_lighting_palette_with_preview, bump_lighting_render_generation,
@@ -64,8 +67,9 @@ use crate::parity_fixtures::{
 use crate::prompter::{after_archive_restore, handle_prompter_request, PrompterError};
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
-    EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_COMMISSIONING_CHANGED, EVENT_ENGINE_READY,
-    EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
+    EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_CAMERAS_CHANGED, EVENT_COMMISSIONING_CHANGED,
+    EVENT_ENGINE_READY, EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SETTINGS_CHANGED,
+    EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{list_settings_by_prefix, set_settings, EngineResult};
@@ -606,6 +610,25 @@ impl EngineApp {
             "prompter.screen.report" => self.dispatch_prompter(request),
 
             // -------------------------------------------------------------
+            // The cameras (new pages program, Slice 8): every method runs
+            // under the cameras' own lock (`cameras::runtime`).
+            // -------------------------------------------------------------
+            "cameras.snapshot" => self.dispatch_cameras(request),
+            "cameras.select" => self.dispatch_cameras(request),
+            "cameras.set" => self.dispatch_cameras(request),
+            "cameras.step" => self.dispatch_cameras(request),
+            "cameras.auto" => self.dispatch_cameras(request),
+            "cameras.format.set" => self.dispatch_cameras(request),
+            "cameras.look.set" => self.dispatch_cameras(request),
+            "cameras.record.start" => self.dispatch_cameras(request),
+            "cameras.record.stop" => self.dispatch_cameras(request),
+            "cameras.release" => self.dispatch_cameras(request),
+            "cameras.connect" => self.dispatch_cameras(request),
+            "cameras.setup.update" => self.dispatch_cameras(request),
+            "cameras.setup.pair" => self.dispatch_cameras(request),
+            "cameras.setup.forget" => self.dispatch_cameras(request),
+
+            // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
             // error enums (support.backup.*), chained snapshot reads
             // (commissioning.update, settings.update), or unique reply
@@ -664,6 +687,7 @@ impl EngineApp {
                                         );
                                     }
                                 }
+                                self.after_restore_cameras(&mut reply);
                                 reply
                             }
                         }
@@ -901,6 +925,78 @@ impl EngineApp {
             }
             Err(PrompterError::Storage(message)) => {
                 Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    /// A `cameras.*` request: its reply, `cameras.changed { reason, camera
+    /// }` when it changed anything, and `app.changed { reason: "health" }`
+    /// when `checks.cameras` says something else after it (Slice 8), so the
+    /// header's lamp follows.
+    fn dispatch_cameras(&self, request: RequestEnvelope) -> EngineReply {
+        match handle_cameras_request(
+            &self.runtime.db_path,
+            self.runtime.cameras_simulated,
+            &request.method,
+            &request.params,
+        ) {
+            Ok(reply) => {
+                let mut events: Vec<serde_json::Value> = reply
+                    .event
+                    .map(|(reason, camera)| {
+                        vec![event_message(
+                            EVENT_CAMERAS_CHANGED,
+                            cameras_changed_payload(reason, camera),
+                        )]
+                    })
+                    .unwrap_or_default();
+                if reply.health_changed {
+                    events.push(event_message(
+                        EVENT_APP_CHANGED,
+                        json!({ "reason": crate::health::APP_CHANGED_REASON_HEALTH }),
+                    ));
+                }
+                EngineReply {
+                    response: ok_response(request.id, reply.result),
+                    events,
+                }
+            }
+            Err(CameraError::Invalid(message)) => Self::reply(invalid_params(request.id, message)),
+            Err(CameraError::Refused(code, message)) => {
+                Self::reply(error_response(request.id, code, message))
+            }
+            Err(CameraError::Storage(message)) => {
+                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
+
+    /// Slice 8: an applied archive restore wrote the cameras' addresses and
+    /// vMix inputs (format 7) and sent nothing to a camera; the hardware link
+    /// takes the new setup and says so with `cameras.changed { reason:
+    /// "restore", camera: null }`, and `app.changed { reason: "health" }`
+    /// when `checks.cameras` changed.
+    fn after_restore_cameras(&self, reply: &mut EngineReply) {
+        // Every applied restore raises the event (`v1.md`), even when the
+        // cameras could not take their setup: the page reads them again.
+        reply.events.push(event_message(
+            EVENT_CAMERAS_CHANGED,
+            cameras_changed_payload("restore", None),
+        ));
+        match cameras_after_archive_restore(&self.runtime.db_path, self.runtime.cameras_simulated) {
+            Ok(true) => {
+                reply.events.push(event_message(
+                    EVENT_APP_CHANGED,
+                    json!({ "reason": crate::health::APP_CHANGED_REASON_HEALTH }),
+                ));
+            }
+            Ok(false) => {}
+            Err(error) => {
+                let _ = append_log(
+                    &self.runtime.log_file_path,
+                    "WARN",
+                    &format!("The cameras could not take their setup after the restore: {error:?}"),
+                );
             }
         }
     }
@@ -1325,5 +1421,7 @@ impl EngineApp {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_cameras;
 #[cfg(test)]
 mod tests_prompter;

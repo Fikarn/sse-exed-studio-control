@@ -441,6 +441,8 @@ describe("createShellStore scoped refresh", () => {
       "app.changed": ["app.snapshot", "health.snapshot"],
       "audio.changed": ["audio.snapshot"],
       "audio.meters": [],
+      // New pages program, Slice 8: no cameras snapshot in the store until Slice 9.
+      "cameras.changed": [],
       "commissioning.changed": [
         "app.snapshot",
         "audio.snapshot",

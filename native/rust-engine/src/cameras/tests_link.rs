@@ -1,0 +1,425 @@
+//! The link to the cameras (new pages program, Slice 8): what reaches a
+//! camera and what comes back from one. Nothing but the operator's press
+//! sends anything (D12); a value the camera changed itself, a camera that
+//! stops answering and one that answers again come back as `cameras.changed`
+//! (with `app.changed { reason: "health" }` when the check changed); holding
+//! and releasing (D13); `checks.cameras`; the link without the simulated
+//! cameras; and the drift guard (D15 rule 1).
+
+use crate::cameras::model::Setting;
+use crate::cameras::real_link::guard_camera_address;
+use crate::cameras::simulated::{CameraCommand, CameraValue};
+use crate::cameras::snapshot::{CameraState, CameraTone};
+use crate::cameras::test_support::{
+    announced_changes, assert_operator_words, refusal, take_announced, TestCameras, CAM2_ADDRESS,
+    CAM3_ADDRESS,
+};
+use serde_json::{json, Value};
+
+fn change(reason: &str, camera: Value) -> (String, Value) {
+    (String::from(reason), camera)
+}
+
+// D12: starting, opening the page, selecting, taking a camera back, a Setup
+// change, restarting and restoring send nothing to a camera. Only a press
+// does.
+#[test]
+fn nothing_but_a_press_sends_anything_to_a_camera() {
+    let cameras = TestCameras::set_up("d12");
+    cameras.restart();
+    cameras.snapshot();
+    cameras.call("cameras.select", json!({ "camera": 2 }));
+    cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
+    cameras.call("cameras.connect", json!({ "camera": 2 }));
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 3, "vmixInput": 9 }),
+    );
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 3, "address": CAM3_ADDRESS }),
+    );
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.health();
+    crate::cameras::after_archive_restore(cameras.path(), true).expect("the restore settles");
+    cameras.restart();
+    cameras.snapshot();
+    assert!(cameras.nothing_sent(), "nothing was pressed");
+
+    cameras.call(
+        "cameras.set",
+        json!({ "camera": 2, "setting": "iso", "value": "1600" }),
+    );
+    assert_eq!(
+        cameras.sent(2),
+        vec![CameraCommand::Set(
+            Setting::Iso,
+            CameraValue::Text(String::from("1600"))
+        )]
+    );
+    assert!(cameras.sent(1).is_empty() && cameras.sent(3).is_empty());
+}
+
+// D12: the camera wins. A value it changed itself (on its body, or from the
+// iPad) is in the next snapshot and comes back as `reported`; the check does
+// not change, so no health follow-up. A released camera is not read, so
+// nothing comes back until it is connected again.
+#[test]
+fn a_value_the_camera_changed_itself_comes_back_as_reported() {
+    let cameras = TestCameras::set_up("reported");
+    cameras.body_sets(1, Setting::Iso, CameraValue::Text(String::from("1600")));
+    assert_eq!(
+        announced_changes(),
+        (vec![change("reported", json!(1))], false)
+    );
+    assert_eq!(cameras.camera(1)["values"]["iso"]["value"], "1600");
+    assert!(cameras.nothing_sent());
+
+    cameras.call("cameras.release", json!({ "camera": 3, "confirm": true }));
+    take_announced();
+    cameras.body_sets(3, Setting::WhiteBalance, CameraValue::Number(3200.0));
+    assert_eq!(announced_changes(), (Vec::new(), false));
+    assert_eq!(
+        cameras.camera(3)["values"]["whiteBalance"]["value"],
+        Value::Null
+    );
+    cameras.call("cameras.connect", json!({ "camera": 3 }));
+    assert_eq!(
+        cameras.camera(3)["values"]["whiteBalance"]["value"].as_f64(),
+        Some(3200.0)
+    );
+}
+
+// D19: a held camera that stops answering reads UNREACHABLE (error), keeps
+// the values it last reported and when, and comes back as `unreachable`
+// with the health follow-up; answering again is `reachable`.
+#[test]
+fn a_camera_that_stops_answering_is_unreachable_and_keeps_its_last_values() {
+    let cameras = TestCameras::set_up("unreachable");
+    let before = cameras.camera(2);
+    cameras.answering(2, false);
+    assert_eq!(
+        announced_changes(),
+        (vec![change("unreachable", json!(2))], true)
+    );
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["state"], "unreachable");
+    assert_eq!(cam2["word"], "UNREACHABLE");
+    assert_eq!(cam2["tone"], "error");
+    assert_eq!(
+        cam2["sentence"],
+        "CAM 2 does not answer at 172.16.16.85. Check that it is on and on the network."
+    );
+    assert_eq!(cam2["values"], before["values"], "its last values stay");
+    assert_eq!(
+        cam2["readAt"], before["readAt"],
+        "and when it last answered"
+    );
+    assert_eq!(announced_changes(), (Vec::new(), false), "said once");
+
+    let check = cameras.health();
+    assert_eq!(check.status, CameraTone::Error);
+    assert_eq!(check.word, "UNREACHABLE");
+    assert!(check.raises_whole_status());
+    assert_eq!(
+        check.whole_status_sentence(),
+        Some("CAM 2 does not answer at 172.16.16.85. Check that it is on and on the network.")
+    );
+
+    // Connect on an unreachable camera tries to read it again and answers
+    // its state.
+    assert_eq!(
+        cameras.call("cameras.connect", json!({ "camera": 2 })),
+        json!({
+            "camera": 2,
+            "state": "unreachable",
+            "sentence": "CAM 2 does not answer at 172.16.16.85. Check that it is on and on the network."
+        })
+    );
+    cameras.answering(2, true);
+    assert_eq!(
+        announced_changes(),
+        (vec![change("reachable", json!(2))], true)
+    );
+    assert_eq!(cameras.camera(2)["state"], "held");
+    assert!(!cameras.health().raises_whole_status());
+    assert!(cameras.nothing_sent());
+}
+
+// D19: a recording CAM 1 that stops answering is left as it was — the
+// snapshot keeps `recording: true` as doubt, and the take goes on.
+#[test]
+fn a_recording_cam_1_that_stops_answering_is_left_recording() {
+    let cameras = TestCameras::set_up("recording-unreachable");
+    cameras.call("cameras.record.start", json!({}));
+    let started_at = cameras.camera(1)["recording"]["startedAt"].clone();
+    assert!(started_at.is_string());
+    cameras.answering(1, false);
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "unreachable");
+    assert_eq!(cam1["recording"]["recording"], true);
+    assert_eq!(cam1["recording"]["startedAt"], started_at);
+    assert!(cameras.health().recording);
+    assert_eq!(
+        cameras.refused("cameras.record.stop", json!({ "confirm": true })),
+        refusal(
+            "CAMERA_UNREACHABLE",
+            "CAM 1 does not answer over Bluetooth. Check that it is on and within reach of this PC."
+        )
+    );
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+    // Answering again, the take reads as one that started before the hardware
+    // link looked: it was not looking, and the take may have stopped and
+    // started again in between.
+    cameras.answering(1, true);
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+    assert_eq!(cameras.camera(1)["recording"]["startedAt"], Value::Null);
+}
+
+// D13: a recording CAM 1 can be released (armed); the take goes on — only
+// the camera or the iPad stops it then — and its values are no longer shown.
+// Connected again, it reads the take as one that started before it looked.
+#[test]
+fn a_recording_cam_1_released_goes_on_recording() {
+    let cameras = TestCameras::set_up("release-recording");
+    cameras.call("cameras.record.start", json!({}));
+    cameras.call("cameras.release", json!({ "camera": 1, "confirm": true }));
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["state"], "released");
+    assert_eq!(cam1["recording"]["recording"], Value::Null);
+    assert_eq!(cam1["recording"]["timecode"], Value::Null);
+    assert_eq!(cam1["values"]["iso"]["value"], Value::Null);
+    assert_eq!(cam1["readAt"], Value::Null);
+    assert!(!cameras.health().recording);
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::RecordStart],
+        "release sends nothing: the camera keeps recording"
+    );
+    cameras.call("cameras.connect", json!({ "camera": 1 }));
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["recording"]["recording"], true);
+    assert_eq!(cam1["recording"]["startedAt"], Value::Null);
+}
+
+// D10: a take started from the iPad is seen starting (and `checks.cameras`
+// says CAM 1 records, so the health follow-up comes after it); a take
+// already running at the start started before the hardware link looked.
+#[test]
+fn a_take_started_elsewhere_is_seen_starting_or_not() {
+    let cameras = TestCameras::set_up("take-elsewhere");
+    cameras.body_records(1, true);
+    assert_eq!(
+        announced_changes(),
+        (vec![change("reported", json!(1))], true),
+        "the check says CAM 1 records now, so the lamp follows"
+    );
+    assert!(cameras.camera(1)["recording"]["startedAt"].is_string());
+    assert!(cameras.health().recording);
+    cameras.restart();
+    let cam1 = cameras.camera(1);
+    assert_eq!(cam1["recording"]["recording"], true);
+    assert_eq!(cam1["recording"]["startedAt"], Value::Null);
+    assert!(cameras.nothing_sent());
+}
+
+// D13: releasing is kept in memory; a start holds every set-up camera again.
+#[test]
+fn a_start_holds_every_set_up_camera_again() {
+    let cameras = TestCameras::set_up("start-holds");
+    cameras.call("cameras.release", json!({ "camera": 2, "confirm": true }));
+    cameras.call("cameras.release", json!({ "camera": 1, "confirm": true }));
+    cameras.restart();
+    let snapshot = cameras.snapshot();
+    for camera in snapshot["cameras"].as_array().expect("three cameras") {
+        assert_eq!(camera["state"], "held", "{camera}");
+    }
+    assert_eq!(take_announced(), Vec::new(), "a start announces nothing");
+    assert!(cameras.nothing_sent());
+}
+
+// `checks.cameras`: the worst camera's state, word and sentence (latest in
+// the states' order; among equals the lowest number), whether CAM 1 records;
+// only a set-up, unreleased camera that does not answer counts toward the
+// whole status.
+#[test]
+fn the_health_check_names_the_worst_camera() {
+    let cameras = TestCameras::new("health");
+    let check = cameras.health();
+    assert!(!check.ok);
+    assert_eq!(check.status, CameraTone::Attention);
+    assert_eq!(check.word, "NOT SET UP");
+    assert_eq!(
+        check.summary,
+        "CAM 1 is not paired. Pair it in Setup, with the camera beside you."
+    );
+    assert!(
+        !check.raises_whole_status(),
+        "not set up lights the lamp only"
+    );
+    assert_eq!(check.cameras.len(), 3);
+    assert_eq!(check.cameras[1].tag, "CAM 2");
+    assert_eq!(check.cameras[1].state, CameraState::NotSetUp);
+
+    cameras.call("cameras.setup.pair", json!({ "camera": 1 }));
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 2, "address": CAM2_ADDRESS }),
+    );
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 3, "address": CAM3_ADDRESS }),
+    );
+    let check = cameras.health();
+    assert!(check.ok);
+    assert_eq!(check.status, CameraTone::Ok);
+    assert_eq!(check.word, "HELD");
+    assert_eq!(
+        check.summary,
+        "CAM 1 is held: Studio Control reads it and sends only what you press."
+    );
+    assert!(!check.recording);
+
+    cameras.call("cameras.release", json!({ "camera": 3, "confirm": true }));
+    let check = cameras.health();
+    assert_eq!(check.word, "RELEASED");
+    assert!(check
+        .summary
+        .starts_with("CAM 3 is released to LUMIX Tether."));
+    assert!(
+        !check.raises_whole_status(),
+        "released lights the lamp only"
+    );
+
+    cameras.answering(3, false);
+    assert!(
+        !cameras.health().raises_whole_status(),
+        "a released camera is not read, so it cannot be unreachable"
+    );
+    cameras.answering(2, false);
+    cameras.answering(1, false);
+    let check = cameras.health();
+    assert_eq!(check.word, "UNREACHABLE");
+    assert!(
+        check.summary.starts_with("CAM 1 does not answer"),
+        "{}",
+        check.summary
+    );
+    assert!(check.raises_whole_status());
+    for entry in &check.cameras {
+        assert_operator_words(&entry.sentence);
+    }
+}
+
+// The live app before Slices 11 and 13: without the simulated cameras, a
+// set-up camera does not answer and says there is no link to it yet, and
+// CAM 1 cannot be paired.
+#[test]
+fn without_the_simulated_cameras_a_set_up_camera_has_no_link_yet() {
+    let cameras = TestCameras::without_simulation("no-link");
+    assert_eq!(
+        cameras.refused("cameras.setup.pair", json!({ "camera": 1 })),
+        refusal(
+            "CAMERA_NO_LINK",
+            "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version."
+        )
+    );
+    let reply = cameras
+        .reply(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": "127.0.0.1" }),
+        )
+        .expect("the address is saved");
+    assert!(
+        reply.health_changed,
+        "the camera now counts toward the whole status"
+    );
+    let no_link = "Studio Control has no link to CAM 2 yet: it comes with a later version.";
+    let cam2 = cameras.camera(2);
+    assert_eq!(cam2["state"], "unreachable");
+    assert_eq!(cam2["sentence"], no_link);
+    assert_eq!(cam2["readAt"], Value::Null);
+    assert_eq!(cam2["values"]["iso"]["value"], Value::Null);
+    assert_operator_words(no_link);
+    assert_eq!(
+        cameras.refused(
+            "cameras.set",
+            json!({ "camera": 2, "setting": "iso", "value": "800" })
+        ),
+        refusal("CAMERA_UNREACHABLE", no_link)
+    );
+    assert_eq!(cameras.health().whole_status_sentence(), Some(no_link));
+    assert_eq!(
+        cameras.call("cameras.connect", json!({ "camera": 2 }))["state"],
+        "unreachable"
+    );
+    assert!(cameras.nothing_sent());
+}
+
+// D15 rule 1: in a test build the network link refuses every address that is
+// not on this PC before it would connect — whatever the saved data says.
+#[test]
+fn the_drift_guard_refuses_every_address_but_this_pc_s_in_a_test_build() {
+    for address in ["127.0.0.1", "::1", "localhost", " 127.0.0.1 "] {
+        assert_eq!(guard_camera_address(address), Ok(()), "{address}");
+    }
+    for address in [
+        "172.16.16.85",
+        "10.0.0.1",
+        "192.168.1.20",
+        "127.0.0.2",
+        "localhost.example",
+        "0.0.0.0",
+    ] {
+        assert!(guard_camera_address(address).is_err(), "{address}");
+    }
+
+    // The link without the simulated cameras calls it before anything else:
+    // a camera at an address on the studio's network is stopped there.
+    let cameras = TestCameras::without_simulation("guard");
+    cameras.call(
+        "cameras.setup.update",
+        json!({ "camera": 3, "address": CAM3_ADDRESS }),
+    );
+    let sentence = cameras.camera(3)["sentence"]
+        .as_str()
+        .expect("a sentence")
+        .to_string();
+    assert!(
+        sentence.contains("does not reach 172.16.16.86"),
+        "{sentence}"
+    );
+}
+
+// D15 rules 1–2: the simulated cameras touch no network and no radio — their
+// module names no socket and no Bluetooth crate, and not the real links.
+#[test]
+fn the_simulated_cameras_name_no_socket_and_no_bluetooth_crate() {
+    let source = include_str!("simulated.rs");
+    let code: String = source
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    for forbidden in [
+        "std::net",
+        "TcpStream",
+        "TcpListener",
+        "UdpSocket",
+        "socket",
+        "btleplug",
+        "bluest",
+        "bluetooth",
+        "windows::",
+        "tokio",
+        "reqwest",
+        "ureq",
+        "hyper",
+        "real_link",
+    ] {
+        assert!(
+            !code.to_lowercase().contains(&forbidden.to_lowercase()),
+            "simulated.rs names {forbidden}"
+        );
+    }
+}

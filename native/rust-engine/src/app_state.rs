@@ -446,6 +446,7 @@ mod tests {
                 integrity_check: String::from("ok"),
             },
             control_surface_token: String::from("bridge-token-for-tests"),
+            cameras_simulated: true,
             control_surface_bridge: ControlSurfaceBridgeInfo {
                 available: true,
                 status: String::from("ready"),

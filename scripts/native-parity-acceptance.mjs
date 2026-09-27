@@ -104,11 +104,12 @@ export const SAVED_DATA_MARKER_CHANGED =
 
 /**
  * The backup archive's format: 5 since the new pages program's Slice 2 (D3, no
- * Planning part), 6 since Slice 4 (D20, the Teleprompter's part). It is
- * `SUPPORT_BACKUP_FORMAT_VERSION` in `native/rust-engine/src/support.rs`, which
- * `native-lanes.test.mjs` holds it to.
+ * Planning part), 6 since Slice 4 (D20, the Teleprompter's part), 7 since
+ * Slice 8 (the cameras' part). It is `SUPPORT_BACKUP_FORMAT_VERSION` in
+ * `native/rust-engine/src/support.rs`, which `native-lanes.test.mjs` holds it
+ * to.
  */
-export const SUPPORT_BACKUP_FORMAT_VERSION = 6;
+export const SUPPORT_BACKUP_FORMAT_VERSION = 7;
 
 export async function assertCoreParityContracts(harness, requestIdPrefix, runtimeLabel) {
   const controlSurfaceSnapshot = await harness.request(`${requestIdPrefix}-control-surface`, "controlSurface.snapshot");
