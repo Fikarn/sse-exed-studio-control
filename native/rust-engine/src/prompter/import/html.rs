@@ -7,14 +7,20 @@
 //! - Word: `<p class=MsoNormal>`, `<o:p>&nbsp;</o:p>` for an empty paragraph,
 //!   a list paragraph as `<p style='mso-list:l0 level1 lfo1'>` with the bullet
 //!   or number Word draws inside `<![if !supportLists]>…<![endif]>`, and each
-//!   picture twice: as VML in a conditional comment and as an `<img>`.
+//!   picture twice: as VML in a conditional comment and as an `<img>`. A
+//!   tracked change is `<del>` and `<ins>`: the deletion goes and the
+//!   insertion stays, as if accepted. A footnote's or a comment's mark is an
+//!   `<a style='mso-footnote-id:…'>` or `<a class=msocomanchor>`, counted and
+//!   left out, and the notes and comments come after the text in `div`s
+//!   styled `mso-element:footnote-list` (and the like), which are left out.
 //! - Google Docs: everything inside `<b style="font-weight:normal">`, the
 //!   emphasis in each span's `style` (`font-weight:700`), a list item's text
 //!   as `<li><p>`.
 //! - a browser: plain HTML.
 
-use std::borrow::Cow;
+mod entities;
 
+use self::entities::decode_entities;
 use super::{cue_paragraph, finished_paragraph, ImportedText, LeftOut};
 use crate::prompter::model::{PrompterParagraph, PrompterRun};
 
@@ -63,10 +69,29 @@ const BLOCKS: [&str; 30] = [
     "details",
     "summary",
 ];
-/// Where Word's HTML draws a list paragraph's bullet or number for programs
-/// without lists, up to `WORD_LIST_END`.
-const WORD_LIST_MARKER: &str = "<![if !supportLists]>";
-const WORD_LIST_END: &str = "<![endif]>";
+/// Where Word's HTML draws, for programs without a feature, what it would
+/// otherwise make itself, up to `WORD_CONDITIONAL_END`.
+const WORD_CONDITIONALS: [(&str, WordConditional); 3] = [
+    ("<![if !supportLists]>", WordConditional::Lists),
+    ("<![if !supportFootnotes]>", WordConditional::Footnotes),
+    ("<![if !supportAnnotations]>", WordConditional::Annotations),
+];
+const WORD_CONDITIONAL_END: &str = "<![endif]>";
+/// The `mso-element` values of Word's footnotes, endnotes and comments,
+/// which follow the text: left out with everything inside them.
+const WORD_NOTES: [&str; 6] = [
+    "footnote-list",
+    "endnote-list",
+    "comment-list",
+    "footnote",
+    "endnote",
+    "comment",
+];
+/// The attributes the reader uses; the others are passed over and not kept.
+const KEPT_ATTRIBUTES: [&str; 4] = ["style", "class", "start", "value"];
+/// How many attributes of one tag are read. Word and Google Docs write a
+/// handful; past these, the tag's end is looked for and nothing more read.
+const MOST_ATTRIBUTES: usize = 256;
 /// Deeper nesting than this is read as if the extra elements were not there;
 /// a page nests a few dozen deep.
 const DEEPEST: usize = 512;
@@ -84,9 +109,21 @@ pub(super) fn read_html(html: &str) -> ImportedText {
     ImportedText {
         paragraphs: reader.paragraphs,
         left_out: reader.left_out,
-        tracked_changes_accepted: false,
+        tracked_changes_accepted: reader.tracked_changes,
         encoding: None,
     }
+}
+
+/// What Word draws inside one of its conditionals (`WORD_CONDITIONALS`).
+#[derive(Debug, Clone, Copy)]
+enum WordConditional {
+    /// A list paragraph's bullet or number.
+    Lists,
+    /// A footnote's or an endnote's mark (`[1]`), and the rule above the
+    /// notes.
+    Footnotes,
+    /// A comment's anchor (`[EL1]`) and the frame around the comment.
+    Annotations,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -120,19 +157,45 @@ struct List {
     next: i64,
 }
 
+/// A start tag's name and the attributes the reader uses
+/// (`KEPT_ATTRIBUTES`), each as first written.
+#[derive(Default)]
 struct StartTag {
     name: String,
-    attributes: Vec<(String, String)>,
+    style: Option<String>,
+    class: Option<String>,
+    start: Option<String>,
+    value: Option<String>,
     self_closing: bool,
 }
 
 impl StartTag {
-    fn attribute(&self, name: &str) -> Option<&str> {
-        self.attributes
+    /// Where the attribute `key` (any case) is kept, if it is one the reader
+    /// uses.
+    fn slot(&mut self, key: &str) -> Option<&mut Option<String>> {
+        let kept = KEPT_ATTRIBUTES
             .iter()
-            .find(|(key, _)| key == name)
-            .map(|(_, value)| value.as_str())
+            .position(|kept| kept.eq_ignore_ascii_case(key))?;
+        Some(match kept {
+            0 => &mut self.style,
+            1 => &mut self.class,
+            2 => &mut self.start,
+            _ => &mut self.value,
+        })
     }
+}
+
+/// What a start tag adds to the import's counts, besides its frame.
+#[derive(Debug, Clone, Copy, Default)]
+struct Counted {
+    /// A Word list paragraph.
+    word_list: bool,
+    /// A footnote's or an endnote's mark.
+    footnote: bool,
+    /// A comment's anchor.
+    comment: bool,
+    /// A tracked change (`del`, `ins`).
+    tracked_change: bool,
 }
 
 #[derive(Default)]
@@ -150,10 +213,11 @@ struct HtmlReader {
     last_space: bool,
     /// The bullet or number waiting for the list item's first word.
     prefix: Option<String>,
-    /// No `<![endif]>` follows the Word list marker last read.
-    no_word_list_end: bool,
+    /// No `<![endif]>` follows the Word conditional last read.
+    no_conditional_end: bool,
     paragraphs: Vec<PrompterParagraph>,
     left_out: LeftOut,
+    tracked_changes: bool,
 }
 
 impl HtmlReader {
@@ -179,22 +243,23 @@ impl HtmlReader {
         let second = rest.as_bytes().get(1).copied();
         if rest.starts_with("<!--") {
             after(html, at + 4, "-->")
-        } else if starts_with_ignore_case(rest, WORD_LIST_MARKER) {
-            let content = at + WORD_LIST_MARKER.len();
-            // Once no `<![endif]>` follows, none follows a later marker either:
-            // searching again for each would make a paste of markers slow.
-            let end = if self.no_word_list_end {
+        } else if let Some((marker, conditional)) = word_conditional(rest) {
+            let content = at + marker.len();
+            // Once no `<![endif]>` follows, none follows a later conditional
+            // either: searching again for each would make a paste of them
+            // slow.
+            let end = if self.no_conditional_end {
                 None
             } else {
-                find_ignore_case(html, content, WORD_LIST_END)
+                find_ignore_case(html, content, WORD_CONDITIONAL_END)
             };
             match end {
                 Some(end) => {
-                    self.word_list_marker(slice(html, content, end));
-                    end + WORD_LIST_END.len()
+                    self.word_conditional(conditional, slice(html, content, end));
+                    end + WORD_CONDITIONAL_END.len()
                 }
                 None => {
-                    self.no_word_list_end = true;
+                    self.no_conditional_end = true;
                     content
                 }
             }
@@ -251,14 +316,20 @@ impl HtmlReader {
         if is_block(name) && !hidden {
             self.block_break(name);
         }
+        let (mut frame, counted) = self.child_frame(tag);
+        if !hidden {
+            self.left_out.footnotes += usize::from(counted.footnote);
+            self.left_out.comments += usize::from(counted.comment);
+            self.tracked_changes |= counted.tracked_change;
+        }
         if tag.self_closing || self.frames.len() >= DEEPEST {
             return;
         }
-        let (mut frame, word_list) = self.child_frame(tag);
         match name {
             "ul" | "ol" => {
                 let start = tag
-                    .attribute("start")
+                    .start
+                    .as_deref()
                     .and_then(|start| start.trim().parse().ok())
                     .filter(|_| name == "ol");
                 self.lists.push(List {
@@ -269,7 +340,8 @@ impl HtmlReader {
             }
             "li" => {
                 let value = tag
-                    .attribute("value")
+                    .value
+                    .as_deref()
                     .and_then(|value| value.trim().parse::<i64>().ok());
                 let prefix = match self.lists.last_mut() {
                     Some(list) if list.ordered => {
@@ -282,7 +354,7 @@ impl HtmlReader {
                 self.prefix = Some(prefix);
                 frame.sets_prefix = true;
             }
-            _ if word_list => {
+            _ if counted.word_list => {
                 self.prefix = Some(BULLET.to_string());
                 frame.sets_prefix = true;
             }
@@ -323,15 +395,17 @@ impl HtmlReader {
 
     /// The frame an element opens: its parent's marks, then the element's
     /// own, then its `style` attribute's, which win (Google Docs wraps a
-    /// whole paste in `<b style="font-weight:normal">`). Also whether it is a
-    /// Word list paragraph.
-    fn child_frame(&self, tag: &StartTag) -> (Frame, bool) {
+    /// whole paste in `<b style="font-weight:normal">`). Also what it adds to
+    /// the counts: whether it is a Word list paragraph, a note's or a
+    /// comment's mark (left out), or a tracked change (`<del>` left out,
+    /// `<ins>` kept as it is).
+    fn child_frame(&self, tag: &StartTag) -> (Frame, Counted) {
         let parent = self.top();
         let name = tag.name.as_str();
         let mut frame = Frame {
             name: tag.name.clone(),
             marks: parent.marks,
-            hidden: parent.hidden || HIDDEN.contains(&name),
+            hidden: parent.hidden || HIDDEN.contains(&name) || name == "del",
             ignored: parent.ignored,
             pre: parent.pre || name == "pre",
             heading: parent.heading || is_heading(name),
@@ -339,14 +413,27 @@ impl HtmlReader {
             opens_list: false,
             sets_prefix: false,
         };
+        let mut counted = Counted {
+            tracked_change: matches!(name, "del" | "ins"),
+            ..Counted::default()
+        };
         match name {
             "b" | "strong" => frame.marks.bold = true,
             "i" | "em" | "cite" => frame.marks.italic = true,
-            "u" | "ins" => frame.marks.underline = true,
+            "u" => frame.marks.underline = true,
             _ => {}
         }
-        let mut word_list = false;
-        for declaration in tag.attribute("style").unwrap_or_default().split(';') {
+        // Word's comment anchor (`[EL1]`) in the text, and its mark in the
+        // comment.
+        for class in tag.class.as_deref().unwrap_or_default().split_whitespace() {
+            if class.eq_ignore_ascii_case("msocomanchor") {
+                frame.hidden = true;
+                counted.comment = true;
+            } else if class.eq_ignore_ascii_case("msocomoff") {
+                frame.hidden = true;
+            }
+        }
+        for declaration in tag.style.as_deref().unwrap_or_default().split(';') {
             let Some((property, value)) = declaration.split_once(':') else {
                 continue;
             };
@@ -373,16 +460,42 @@ impl HtmlReader {
                     }
                 }
                 "mso-list" if value == "ignore" => frame.ignored = true,
-                "mso-list" => word_list = value != "none" && is_block(name),
+                "mso-list" => counted.word_list = value != "none" && is_block(name),
+                // The notes and comments after the text, and a note's or a
+                // comment's mark in it.
+                "mso-element" if WORD_NOTES.contains(&value) => frame.hidden = true,
+                "mso-special-character" if matches!(value, "footnote" | "comment") => {
+                    frame.hidden = true;
+                }
+                "mso-footnote-id" | "mso-endnote-id" => {
+                    frame.hidden = true;
+                    counted.footnote = true;
+                }
                 _ => {}
             }
         }
-        (frame, word_list)
+        (frame, counted)
+    }
+
+    /// What Word drew inside one of its conditionals: a list paragraph's
+    /// number is kept; a note's mark and a comment's anchor are left out, the
+    /// anchor counted.
+    fn word_conditional(&mut self, conditional: WordConditional, content: &str) {
+        match conditional {
+            WordConditional::Lists => self.word_list_marker(content),
+            WordConditional::Footnotes => {}
+            WordConditional::Annotations => {
+                if !self.top().hidden {
+                    self.left_out.comments += count_ignore_case(content, "msocomanchor");
+                }
+            }
+        }
     }
 
     /// The number Word draws for a list paragraph, from inside
-    /// `<![if !supportLists]>`: a number (`1.`, `b)`, `iv.`) is kept; a
-    /// bullet (Word draws `·`, `o` or `§` in a symbol font) stays a dash.
+    /// `<![if !supportLists]>`: a number (`1.`, `b)`, `iv.`, `1.1`, `3`) is
+    /// kept; a bullet (Word draws `·`, `o` or `§` in a symbol font) stays a
+    /// dash.
     fn word_list_marker(&mut self, content: &str) {
         if self.prefix.is_none() {
             return;
@@ -391,13 +504,14 @@ impl HtmlReader {
             .chars()
             .filter(|character| !character.is_whitespace())
             .collect();
-        let is_number = marker.strip_suffix(['.', ')']).is_some_and(|body| {
-            !body.is_empty()
-                && body.len() <= 8
-                && body
-                    .chars()
-                    .all(|character| character.is_ascii_alphanumeric() || ".(".contains(character))
-        });
+        let numeral =
+            |character: char| character.is_ascii_alphanumeric() || ".()".contains(character);
+        let is_number = marker.len() <= 9
+            && marker.chars().all(numeral)
+            && (marker.contains(|character: char| character.is_ascii_digit())
+                || marker
+                    .strip_suffix(['.', ')'])
+                    .is_some_and(|body| !body.is_empty()));
         if is_number {
             self.prefix = Some(format!("{marker} "));
         }
@@ -557,14 +671,19 @@ fn tag_name(html: &str, from: usize) -> (String, usize) {
     (slice(html, from, end).to_ascii_lowercase(), end)
 }
 
-/// A start tag's name and attributes, from just after its `<`, and where the
-/// text after it starts. Values may be quoted either way or not at all; an
-/// attribute with no value has an empty one.
+/// A start tag's name and the attributes the reader uses, from just after its
+/// `<`, and where the text after it starts. Values may be quoted either way or
+/// not at all; an attribute with no value has an empty one. Only the first
+/// `MOST_ATTRIBUTES` attributes are read, and only the `KEPT_ATTRIBUTES` kept,
+/// so a tag of millions costs one pass and no memory.
 fn start_tag(html: &str, from: usize) -> (StartTag, usize) {
     let bytes = html.as_bytes();
     let (name, mut at) = tag_name(html, from);
-    let mut attributes = Vec::new();
-    let mut self_closing = false;
+    let mut tag = StartTag {
+        name,
+        ..StartTag::default()
+    };
+    let mut attributes = 0;
     loop {
         while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
             at += 1;
@@ -578,13 +697,17 @@ fn start_tag(html: &str, from: usize) -> (StartTag, usize) {
             Some(b'/') => {
                 at += 1;
                 if bytes.get(at) == Some(&b'>') {
-                    self_closing = true;
+                    tag.self_closing = true;
                     at += 1;
                     break;
                 }
                 continue;
             }
-            _ => {}
+            _ if attributes == MOST_ATTRIBUTES => {
+                at = after(html, at, ">");
+                break;
+            }
+            _ => attributes += 1,
         }
         let key_start = at;
         while bytes
@@ -593,7 +716,7 @@ fn start_tag(html: &str, from: usize) -> (StartTag, usize) {
         {
             at += 1;
         }
-        let key = slice(html, key_start, at).to_ascii_lowercase();
+        let key = slice(html, key_start, at);
         while bytes.get(at).is_some_and(u8::is_ascii_whitespace) {
             at += 1;
         }
@@ -621,18 +744,11 @@ fn start_tag(html: &str, from: usize) -> (StartTag, usize) {
                 }
             }
         }
-        if !key.is_empty() {
-            attributes.push((key, decode_entities(value).into_owned()));
+        if let Some(slot) = tag.slot(key).filter(|slot| slot.is_none()) {
+            *slot = Some(decode_entities(value).into_owned());
         }
     }
-    (
-        StartTag {
-            name,
-            attributes,
-            self_closing,
-        },
-        at,
-    )
+    (tag, at)
 }
 
 /// The text of a piece of markup with its tags taken out and its entities
@@ -648,126 +764,6 @@ fn visible_text(markup: &str) -> String {
     }
     text.push_str(rest);
     decode_entities(&text).into_owned()
-}
-
-/// Reads the character references in a text: `&#229;`, `&#xE5;` and the
-/// names Word, browsers and Google Docs write. An unknown name stays as it
-/// was written.
-fn decode_entities(text: &str) -> Cow<'_, str> {
-    if !text.contains('&') {
-        return Cow::Borrowed(text);
-    }
-    let mut out = String::with_capacity(text.len());
-    let mut rest = text;
-    while let Some(ampersand) = rest.find('&') {
-        out.push_str(&rest[..ampersand]);
-        let after = &rest[ampersand + 1..];
-        match entity(after) {
-            Some((decoded, used)) => {
-                out.push_str(&decoded);
-                rest = slice(after, used, after.len());
-            }
-            None => {
-                out.push('&');
-                rest = after;
-            }
-        }
-    }
-    out.push_str(rest);
-    Cow::Owned(out)
-}
-
-/// The entity at the start of `after` (the text after a `&`): what it stands
-/// for and how many bytes it takes, its `;` included.
-fn entity(after: &str) -> Option<(String, usize)> {
-    if let Some(number) = after.strip_prefix('#') {
-        let (digits, radix, marker) = match number.strip_prefix(['x', 'X']) {
-            Some(hex) => (hex, 16, 2),
-            None => (number, 10, 1),
-        };
-        let length = digits
-            .bytes()
-            .take_while(|byte| byte.is_ascii_digit() || (radix == 16 && byte.is_ascii_hexdigit()))
-            .count();
-        if length == 0 {
-            return None;
-        }
-        let code = u32::from_str_radix(slice(digits, 0, length.min(8)), radix).unwrap_or(0);
-        let code = if length > 8 { 0 } else { code };
-        let semicolon = usize::from(digits.as_bytes().get(length) == Some(&b';'));
-        return Some((numeric_character(code), marker + length + semicolon));
-    }
-    let length = after.bytes().take_while(u8::is_ascii_alphanumeric).count();
-    if length == 0 || after.as_bytes().get(length) != Some(&b';') {
-        return None;
-    }
-    let decoded = named_entity(slice(after, 0, length))?;
-    Some((decoded.to_string(), length + 1))
-}
-
-/// A numeric reference's character. 128–159 are read as Windows-1252, as the
-/// HTML standard says (old Word pages write `&#150;` for an en dash); 0, a
-/// surrogate or a number past Unicode is U+FFFD.
-fn numeric_character(code: u32) -> String {
-    let character = match u8::try_from(code) {
-        Ok(byte @ 0x80..=0x9F) => super::txt::windows_1252_char(byte),
-        _ if code == 0 => Some('\u{FFFD}'),
-        _ => Some(char::from_u32(code).unwrap_or('\u{FFFD}')),
-    };
-    character.map(String::from).unwrap_or_default()
-}
-
-fn named_entity(name: &str) -> Option<&'static str> {
-    Some(match name {
-        "amp" => "&",
-        "lt" => "<",
-        "gt" => ">",
-        "quot" => "\"",
-        "apos" => "'",
-        "nbsp" => "\u{00A0}",
-        "ndash" => "–",
-        "mdash" => "—",
-        "hellip" => "…",
-        "lsquo" => "‘",
-        "rsquo" => "’",
-        "sbquo" => "‚",
-        "ldquo" => "“",
-        "rdquo" => "”",
-        "bdquo" => "„",
-        "laquo" => "«",
-        "raquo" => "»",
-        "bull" => "•",
-        "middot" => "·",
-        "copy" => "©",
-        "reg" => "®",
-        "trade" => "™",
-        "euro" => "€",
-        "pound" => "£",
-        "deg" => "°",
-        "times" => "×",
-        "divide" => "÷",
-        "aring" => "å",
-        "auml" => "ä",
-        "ouml" => "ö",
-        "Aring" => "Å",
-        "Auml" => "Ä",
-        "Ouml" => "Ö",
-        "eacute" => "é",
-        "Eacute" => "É",
-        "egrave" => "è",
-        "uuml" => "ü",
-        "Uuml" => "Ü",
-        "oslash" => "ø",
-        "Oslash" => "Ø",
-        "aelig" => "æ",
-        "AElig" => "Æ",
-        "szlig" => "ß",
-        "ensp" => "\u{2002}",
-        "emsp" => "\u{2003}",
-        "thinsp" => "\u{2009}",
-        "shy" | "zwnj" | "zwj" => "",
-        _ => return None,
-    })
 }
 
 /// `text[from..to]`, or nothing when the range is not one (the tokenizer only
@@ -789,6 +785,22 @@ fn after(html: &str, from: usize, needle: &str) -> usize {
     html.get(from..)
         .and_then(|rest| rest.find(needle))
         .map_or(html.len(), |position| from + position + needle.len())
+}
+
+/// The Word conditional `rest` starts with, and its marker.
+fn word_conditional(rest: &str) -> Option<(&'static str, WordConditional)> {
+    WORD_CONDITIONALS
+        .iter()
+        .copied()
+        .find(|(marker, _)| starts_with_ignore_case(rest, marker))
+}
+
+/// How many times `needle` (ASCII) is in `text`, case ignored.
+fn count_ignore_case(text: &str, needle: &str) -> usize {
+    text.as_bytes()
+        .windows(needle.len())
+        .filter(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
+        .count()
 }
 
 fn find_ignore_case(html: &str, from: usize, needle: &str) -> Option<usize> {

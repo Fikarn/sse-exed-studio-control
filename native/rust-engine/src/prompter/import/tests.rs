@@ -2,6 +2,8 @@
 //! reader, and the HTML paste reader. The `.docx` reader has
 //! `docx_tests.rs`.
 
+use std::time::{Duration, Instant};
+
 use super::test_support::{run, texts};
 use super::*;
 
@@ -125,8 +127,49 @@ fn a_file_or_paste_over_the_size_limit_is_refused_before_it_is_read() {
     let text = "a".repeat(MAX_IMPORT_BYTES / 2 + 1);
     assert!(matches!(
         import_paste(Some(&text), &text),
-        Err(ImportRefusal::TooLarge { .. })
+        Err(ImportRefusal::PasteTooLarge { .. })
     ));
+}
+
+#[test]
+fn a_paste_over_the_size_limit_is_refused_as_a_paste() {
+    let text = "a".repeat(MAX_IMPORT_BYTES / 2 + 1);
+    let refusal = import_paste(Some(&text), &text).expect_err("too large");
+    assert_eq!(
+        refusal,
+        ImportRefusal::PasteTooLarge {
+            bytes: MAX_IMPORT_BYTES + 2
+        }
+    );
+    assert_eq!(
+        refusal.sentence("The pasted text"),
+        "The pasted text is 21 MB; Studio Control takes pastes up to 20 MB."
+    );
+    // A file keeps its own sentence.
+    assert_eq!(
+        ImportRefusal::TooLarge {
+            bytes: MAX_IMPORT_BYTES + 1
+        }
+        .sentence("Big.txt"),
+        "Big.txt is 21 MB; Studio Control opens files up to 20 MB."
+    );
+}
+
+#[test]
+fn more_text_than_a_script_holds_is_refused_however_few_its_words() {
+    let bytes = 3 * 1024 * 1024;
+    let word = "a".repeat(bytes);
+    let refusal = import_paste(None, &word).expect_err("too much text");
+    assert_eq!(refusal, ImportRefusal::TooMuchText { bytes });
+    assert_eq!(
+        refusal.sentence("The pasted text"),
+        "The pasted text holds more text than a script can hold (2 MB). Split it into shorter scripts."
+    );
+    assert_eq!(
+        import_file("One word.txt", word.as_bytes()),
+        Err(ImportRefusal::TooMuchText { bytes })
+    );
+    assert!(import_paste(None, &"a".repeat(MAX_SCRIPT_TEXT_BYTES)).is_ok());
 }
 
 #[test]
@@ -362,7 +405,9 @@ fn line_breaks_white_space_and_entities() {
         texts(&html(markup).paragraphs),
         [
             "One line,\nthen the next & <more> åäö … – &unknown; –\u{a0}x",
-            "keep   its\nspaces",
+            // A `pre`'s lines stay, and a run of spaces inside one is one
+            // space, as everywhere on the glass.
+            "keep its\nspaces",
             "a",
             "b",
             "c"
@@ -394,8 +439,9 @@ fn a_style_attribute_overrides_the_elements_own_emphasis() {
             run("em", false, true, false),
             run(" ", false, false, false),
             run("cite", false, true, false),
-            run(" ", false, false, false),
-            run("ins", false, false, true),
+            // An insertion is a tracked change taken as accepted, not an
+            // underline.
+            run(" ins", false, false, false),
         ]
     );
 }
@@ -440,6 +486,128 @@ fn hostile_pastes_read_in_one_pass() {
         "</b></div>".repeat(50_000)
     );
     assert_eq!(texts(&html(&deep).paragraphs), ["Deep"]);
+}
+
+// ---- White space, and what Word writes into its HTML ----
+
+#[test]
+fn white_space_collapses_as_a_paragraph_is_built() {
+    // A run of white space inside a line is one space (a lone no-break space
+    // stays one); a run of line breaks is at most one blank line.
+    let paragraph = finished_paragraph(vec![PrompterRun::plain(
+        "one  \t two \u{a0} three\u{a0}four\n\n\n\n  five \n \n\n six",
+    )])
+    .expect("a paragraph");
+    assert_eq!(paragraph.text(), "one two three\u{a0}four\n\nfive\n\nsix");
+    // The space stays in the run it began in.
+    let paragraph = finished_paragraph(vec![
+        run("under  ", false, false, true),
+        run("  plain", false, false, false),
+    ])
+    .expect("a paragraph");
+    assert_eq!(
+        paragraph.runs,
+        vec![
+            run("under ", false, false, true),
+            run("plain", false, false, false)
+        ]
+    );
+
+    // Sixty million spaces between two words (a `.docx` unpacks to this
+    // many): one pass, and nothing kept for each space.
+    let started = Instant::now();
+    let paragraph = finished_paragraph(vec![PrompterRun::plain(format!(
+        "a{}b",
+        " ".repeat(60_000_000)
+    ))])
+    .expect("a paragraph");
+    assert_eq!(paragraph.text(), "a b");
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "took {:?}",
+        started.elapsed()
+    );
+}
+
+#[test]
+fn words_tracked_changes_in_a_paste_come_in_as_if_accepted() {
+    let markup = r#"<p class=MsoNormal>Kept <span class=msoDel><del cite="mailto:Edvin" datetime="2026-09-27T10:00">deleted </del></span><span class=msoIns><ins cite="mailto:Edvin" datetime="2026-09-27T10:01">inserted</ins></span> text.</p>"#;
+    let imported = html(markup);
+    assert_eq!(
+        imported.paragraphs[0].runs,
+        vec![run("Kept inserted text.", false, false, false)]
+    );
+    assert!(imported.tracked_changes_accepted);
+    assert!(!html("<p>No changes.</p>").tracked_changes_accepted);
+    let pasted = import_paste(Some(markup), "").expect("the paste reads");
+    assert_eq!(
+        import_sentence("the pasted text", &pasted),
+        "Imported the pasted text: 1 paragraph, 3 words, 0 cues. Tracked changes were taken as accepted."
+    );
+}
+
+/// Word's HTML for a paragraph with a footnote, an endnote and a comment, and
+/// the notes and comments Word writes after the text.
+const WORD_NOTES: &str = r##"<p class=MsoNormal>Claim<a style='mso-footnote-id:ftn1' href="#_ftn1" name="_ftnref1" title=""><span class=MsoFootnoteReference><span style='mso-special-character:footnote'><![if !supportFootnotes]><span class=MsoFootnoteReference>[1]</span><![endif]></span></span></a> and more<a style='mso-endnote-id:edn1' href="#_edn1" name="_ednref1" title=""><span class=MsoEndnoteReference><span style='mso-special-character:footnote'><![if !supportFootnotes]>[i]<![endif]></span></span></a><span class=MsoCommentReference><![if !supportAnnotations]><a class=msocomanchor id="_anchor_1" onmouseover="msoCommentShow('_anchor_1','_com_1')" onmouseout="msoCommentHide('_com_1')" href="#_msocom_1" language=JavaScript name="_msoanchor_1">[EL1]</a><![endif]><span style='mso-special-character:comment'>&nbsp;</span></span>.</p>
+<p class=MsoNormal>Second <a class=msocomanchor href="#_msocom_2">[EL2]</a>claim.</p>
+<div style='mso-element:footnote-list'><![if !supportFootnotes]><br clear=all><hr align=left size=1 width="33%"><![endif]>
+<div style='mso-element:footnote' id=ftn1><p class=MsoFootnoteText><a style='mso-footnote-id:ftn1' href="#_ftnref1" name="_ftn1" title=""><span class=MsoFootnoteReference><span style='mso-special-character:footnote'><![if !supportFootnotes]>[1]<![endif]></span></span></a> The footnote's text.</p></div>
+</div>
+<div style='mso-element:endnote-list'><div style='mso-element:endnote' id=edn1><p class=MsoEndnoteText>The endnote's text.</p></div></div>
+<div style='mso-element:comment-list'><![if !supportAnnotations]><hr class=msocomoff align=left size=1 width="33%"><![endif]>
+<div style='mso-element:comment'><![if !supportAnnotations]><div id="_com_1" class=msocomtxt language=JavaScript><![endif]><div><![if !supportAnnotations]><a name="_msocom_1"></a><![endif]><p class=MsoCommentText><span class=MsoCommentReference><span style='mso-special-character:comment'>&nbsp;<![if !supportAnnotations]><a href="#_msoanchor_1" class=msocomoff>[EL1]</a><![endif]></span></span>The comment's text.</p></div><![if !supportAnnotations]></div><![endif]></div>
+</div>
+<p class=MsoNormal>After the notes.</p>"##;
+
+#[test]
+fn words_footnotes_and_comments_in_a_paste_are_left_out_and_counted() {
+    let imported = html(WORD_NOTES);
+    assert_eq!(
+        texts(&imported.paragraphs),
+        ["Claim and more.", "Second claim.", "After the notes."]
+    );
+    assert_eq!(imported.left_out.footnotes, 2);
+    assert_eq!(imported.left_out.comments, 2);
+}
+
+#[test]
+fn a_word_list_number_with_no_stop_after_it_stays_a_number() {
+    let markup = r#"<p style='mso-list:l0 level2 lfo1'><![if !supportLists]><span style='mso-list:Ignore'>1.1<span style='font:7.0pt "Times New Roman"'>&nbsp;&nbsp; </span></span><![endif]>Sub item</p><p style='mso-list:l1 level1 lfo2'><![if !supportLists]><span style='mso-list:Ignore'>3<span>&nbsp;</span></span><![endif]>Bare number</p><p style='mso-list:l2 level1 lfo3'><![if !supportLists]><span style='font-family:"Courier New"'><span style='mso-list:Ignore'>o<span>&nbsp;</span></span></span><![endif]>Circle bullet</p>"#;
+    assert_eq!(
+        texts(&html(markup).paragraphs),
+        ["1.1 Sub item", "3 Bare number", "– Circle bullet"]
+    );
+}
+
+#[test]
+fn a_tag_of_millions_of_attributes_reads_in_one_pass() {
+    // Within the first 256 attributes, the ones the reader uses are read
+    // wherever they stand; past them, none is.
+    let near = format!(
+        "<p {}style='font-weight:bold'>Bold</p>",
+        "data-x=1 ".repeat(200)
+    );
+    assert_eq!(
+        html(&near).paragraphs[0].runs,
+        vec![run("Bold", true, false, false)]
+    );
+    let far = format!(
+        "<p {}style='font-weight:bold'>Plain</p>",
+        "data-x=1 ".repeat(300)
+    );
+    assert_eq!(
+        html(&far).paragraphs[0].runs,
+        vec![run("Plain", false, false, false)]
+    );
+    // Twenty megabytes of attributes: one pass, nothing kept of them.
+    let huge = format!("<p {}>Text</p>", "a ".repeat(10_000_000));
+    let started = Instant::now();
+    assert_eq!(texts(&html(&huge).paragraphs), ["Text"]);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "took {:?}",
+        started.elapsed()
+    );
 }
 
 // §3.2: in a paste, a blank line (`<br><br>`, as e-mail and web pages part

@@ -4,8 +4,12 @@
 //! a definition (`w:abstractNum`) whose level gives the number's format, its
 //! text (`%1.`, `%1.%2`) and where it starts. A list may start a level again
 //! (`w:lvlOverride`/`w:startOverride`) or define a level of its own.
+//!
+//! As in Word, the lists that share a definition count on from one another:
+//! the count is kept per definition, and a list that starts a level again
+//! does so the first time it is used.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use quick_xml::events::{BytesStart, Event};
 
@@ -40,9 +44,21 @@ pub(super) struct Numbering {
     lists: HashMap<u32, List>,
 }
 
-/// Where each list's count stands, per list (`w:numId`) and level.
+/// Where each count stands, per definition and level, and which lists have
+/// been used.
 #[derive(Default)]
-pub(super) struct ListCounters(HashMap<u32, [Option<i64>; LEVELS]>);
+pub(super) struct ListCounters {
+    counts: HashMap<Counter, [Option<i64>; LEVELS]>,
+    used: HashSet<u32>,
+}
+
+/// What a count belongs to: a definition (`w:abstractNumId`), or a list that
+/// names none and defines its levels itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Counter {
+    Definition(u32),
+    List(u32),
+}
 
 impl Numbering {
     pub(super) fn read(part: &[u8]) -> Self {
@@ -87,7 +103,8 @@ impl Numbering {
     /// its text: `– ` for a bullet, the level's text with its counts for a
     /// number (`3. `, `2.1 `, `b) `), `None` for no list (`w:numId` 0) or a
     /// level with no text. A level's count starts again whenever a shallower
-    /// level of the same list counts on.
+    /// level of the same definition counts on, and where a list's
+    /// `w:startOverride` says, the first time that list is used.
     pub(super) fn prefix(
         &self,
         counters: &mut ListCounters,
@@ -101,7 +118,18 @@ impl Numbering {
             return None;
         }
         let definition = self.level(list, level)?;
-        let counts = counters.0.entry(list).or_insert([None; LEVELS]);
+        let entry = self.lists.get(&list)?;
+        let counter = entry
+            .definition
+            .map_or(Counter::List(list), Counter::Definition);
+        let counts = counters.counts.entry(counter).or_insert([None; LEVELS]);
+        if counters.used.insert(list) {
+            for (count, restart) in counts.iter_mut().zip(&entry.start_overrides) {
+                if restart.is_some() {
+                    *count = None;
+                }
+            }
+        }
         counts[level] = Some(match counts[level] {
             Some(count) => count.saturating_add(1),
             None => self.start(list, level),

@@ -8,6 +8,8 @@
 //! The error strings finish the refusal sentence "… could not be read:
 //! {reason}.", so they are a few plain words.
 
+use std::collections::HashMap;
+
 use miniz_oxide::inflate::{decompress_to_vec_with_limit, TINFLStatus};
 
 const END_OF_CENTRAL_DIRECTORY: u32 = 0x0605_4b50;
@@ -22,16 +24,22 @@ const LOCAL_HEADER_LEN: usize = 30;
 const ENCRYPTED: u16 = 1;
 const STORED: u16 = 0;
 const DEFLATED: u16 = 8;
+/// The most entries a zip may hold. Word writes a few dozen parts, and a
+/// document of many pictures a few hundred; a zip of more is not a document
+/// (the end record allows 65,535).
+const MOST_ENTRIES: usize = 10_000;
 
 pub(super) const DAMAGED: &str = "the file is damaged";
 const PACKED_OTHERWISE: &str = "it is packed in a way Studio Control does not read";
 const LOCKED: &str = "it is locked with a password";
 const TOO_LARGE: &str = "it is too large once unpacked";
 
-/// An opened zip: the bytes and the central directory's entries.
+/// An opened zip: the bytes, the central directory's entries, and where
+/// each is by its name lower-cased, so finding one never scans them all.
 pub(super) struct Zip<'a> {
     bytes: &'a [u8],
     entries: Vec<Entry>,
+    by_name: HashMap<String, usize>,
 }
 
 struct Entry {
@@ -54,6 +62,9 @@ impl<'a> Zip<'a> {
         // record, which Word never needs.
         if count == u16::MAX || size == u32::MAX || offset == u32::MAX {
             return Err(PACKED_OTHERWISE.to_string());
+        }
+        if usize::from(count) > MOST_ENTRIES {
+            return Err(DAMAGED.to_string());
         }
         let mut entries = Vec::with_capacity(usize::from(count));
         let mut at = offset as usize;
@@ -87,7 +98,18 @@ impl<'a> Zip<'a> {
             });
             at = name_start.saturating_add(name_len + extra_len + comment_len);
         }
-        Ok(Self { bytes, entries })
+        let mut by_name = HashMap::with_capacity(entries.len());
+        for (index, entry) in entries.iter().enumerate() {
+            // Of two entries with one name, the first is the one read.
+            by_name
+                .entry(entry.name.to_ascii_lowercase())
+                .or_insert(index);
+        }
+        Ok(Self {
+            bytes,
+            entries,
+            by_name,
+        })
     }
 
     /// Every entry's name, in the central directory's order.
@@ -100,9 +122,9 @@ impl<'a> Zip<'a> {
     /// entry. `limit` caps the inflated size.
     pub(super) fn read(&self, name: &str, limit: usize) -> Result<Option<Vec<u8>>, String> {
         let Some(entry) = self
-            .entries
-            .iter()
-            .find(|entry| entry.name.eq_ignore_ascii_case(name))
+            .by_name
+            .get(&name.to_ascii_lowercase())
+            .and_then(|&index| self.entries.get(index))
         else {
             return Ok(None);
         };

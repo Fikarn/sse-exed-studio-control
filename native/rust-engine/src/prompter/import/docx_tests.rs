@@ -1,6 +1,8 @@
 //! The `.docx` reader and the zip under it, on documents written in each test
 //! (`test_support.rs`).
 
+use std::time::{Duration, Instant};
+
 use super::docx::read_docx;
 use super::test_support::{docx, p, run, texts, zip, Docx, Entry, NAMESPACES};
 use super::zip::Zip;
@@ -450,12 +452,6 @@ fn a_password_protected_document_is_refused() {
     encrypted.extend("WordDocument".encode_utf16().flat_map(u16::to_le_bytes));
     assert_eq!(read_docx(&encrypted), Err(ImportRefusal::PasswordProtected));
 
-    // A bare compound file header, too short to say more.
-    assert_eq!(
-        read_docx(&encrypted[..8]),
-        Err(ImportRefusal::PasswordProtected)
-    );
-
     // A `.doc` with a `.docx` name is the old format.
     let mut old = encrypted[..512].to_vec();
     old.extend("WordDocument".encode_utf16().flat_map(u16::to_le_bytes));
@@ -599,6 +595,196 @@ fn a_docx_through_the_public_api_names_its_parts_in_the_sentence() {
         import_sentence("Interview intro.DOCX", &imported),
         "Imported Interview intro.DOCX: 3 paragraphs, 10 words, 1 cue. Left out: 1 picture."
     );
+}
+
+#[test]
+fn a_zip_of_more_entries_than_a_document_holds_is_damaged() {
+    let names: Vec<String> = (0..=10_000)
+        .map(|index| format!("word/media/image{index}.png"))
+        .collect();
+    let entries: Vec<Entry<'_>> = names.iter().map(|name| Entry::stored(name, b"")).collect();
+    let bytes = zip(&entries);
+    assert_eq!(
+        Zip::open(&bytes).err(),
+        Some(String::from("the file is damaged"))
+    );
+    assert_eq!(
+        read_docx(&bytes),
+        Err(ImportRefusal::Unreadable(String::from(
+            "the file is damaged"
+        )))
+    );
+}
+
+#[test]
+fn header_parts_by_the_thousand_are_counted_in_one_pass() {
+    // Each part is found by its name at once, and no more than 64 are read:
+    // a file of thousands cannot keep the import busy.
+    let header = format!(r#"<w:hdr {NAMESPACES}><w:p><w:r><w:t>Header</w:t></w:r></w:p></w:hdr>"#);
+    let document = Docx::new(&p("Body.")).document_xml();
+    let names: Vec<String> = (0..9_999)
+        .map(|index| format!("word/header{index}.xml"))
+        .collect();
+    let mut entries = vec![Entry::stored("word/document.xml", document.as_bytes())];
+    entries.extend(
+        names
+            .iter()
+            .map(|name| Entry::stored(name, header.as_bytes())),
+    );
+    let bytes = zip(&entries);
+    let started = Instant::now();
+    let imported = read(&bytes);
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "took {:?}",
+        started.elapsed()
+    );
+    assert_eq!(texts(&imported.paragraphs), ["Body."]);
+    assert_eq!(imported.left_out.headers_and_footers, 64);
+}
+
+#[test]
+fn lists_of_one_definition_count_on_together_until_one_restarts() {
+    // Lists 2 and 5 share a definition, so Word counts on from one to the
+    // other; list 3 restarts it at seven the first time it is used.
+    let numbering = format!(r#"{LISTS}<w:num w:numId="5"><w:abstractNumId w:val="1"/></w:num>"#);
+    let body = [
+        item(2, 0, "One"),
+        item(5, 0, "Two, in another list of the same definition"),
+        item(2, 1, "Sub a"),
+        item(3, 0, "Seven, restarted"),
+        item(2, 0, "Eight"),
+        item(3, 0, "Nine"),
+        item(4, 0, "Another definition counts alone"),
+    ]
+    .concat();
+    let imported = read(&Docx::new(&body).numbering(&numbering).build());
+    assert_eq!(
+        texts(&imported.paragraphs),
+        [
+            "1. One",
+            "2. Two, in another list of the same definition",
+            "a) Sub a",
+            "7. Seven, restarted",
+            "8. Eight",
+            "9. Nine",
+            "IV. Another definition counts alone",
+        ]
+    );
+}
+
+#[test]
+fn a_styles_bold_italic_and_underline_are_kept() {
+    let styles = r#"
+        <w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+        <w:style w:type="paragraph" w:styleId="Talare"><w:name w:val="Speaker"/><w:basedOn w:val="Normal"/><w:rPr><w:b/></w:rPr></w:style>
+        <w:style w:type="paragraph" w:styleId="TalareKursiv"><w:name w:val="Speaker italic"/><w:basedOn w:val="Talare"/><w:rPr><w:i/></w:rPr></w:style>
+        <w:style w:type="paragraph" w:styleId="Andrad"><w:name w:val="Changed"/><w:rPr><w:i/><w:rPrChange w:id="1"><w:rPr><w:b/></w:rPr></w:rPrChange></w:rPr></w:style>
+        <w:style w:type="character" w:styleId="Understruken"><w:name w:val="Underlined"/><w:rPr><w:u w:val="single"/></w:rPr></w:style>
+        <w:style w:type="character" w:styleId="InteFet"><w:name w:val="Not bold"/><w:rPr><w:b w:val="0"/></w:rPr></w:style>
+    "#;
+    let text_run = |properties: &str, text: &str| {
+        format!(r#"<w:r><w:rPr>{properties}</w:rPr><w:t xml:space="preserve">{text}</w:t></w:r>"#)
+    };
+    let body = [
+        styled("Talare", "ANNA:"),
+        format!(
+            r#"<w:p><w:pPr><w:pStyle w:val="TalareKursiv"/></w:pPr>{}{}{}{}</w:p>"#,
+            text_run("", "Bold and italic"),
+            text_run(r#"<w:rStyle w:val="InteFet"/>"#, " not bold"),
+            text_run(r#"<w:rStyle w:val="InteFet"/><w:b/>"#, " direct wins"),
+            text_run(r#"<w:i w:val="0"/>"#, " upright"),
+        ),
+        format!(
+            "<w:p>{}</w:p>",
+            text_run(
+                r#"<w:rStyle w:val="Understruken"/>"#,
+                "Underlined by its style"
+            )
+        ),
+        styled("Andrad", "Italic, not the bold it had"),
+        // The paragraph mark's own formatting is not the text's.
+        r#"<w:p><w:pPr><w:rPr><w:b/></w:rPr></w:pPr><w:r><w:t>Plain</w:t></w:r></w:p>"#.to_string(),
+    ]
+    .concat();
+    let imported = read(&Docx::new(&body).styles(styles).build());
+    let runs: Vec<Vec<PrompterRun>> = imported
+        .paragraphs
+        .iter()
+        .map(|paragraph| paragraph.runs.clone())
+        .collect();
+    assert_eq!(
+        runs,
+        vec![
+            vec![run("ANNA:", true, false, false)],
+            vec![
+                run("Bold and italic", true, true, false),
+                run(" not bold", false, true, false),
+                run(" direct wins", true, true, false),
+                run(" upright", true, false, false),
+            ],
+            vec![run("Underlined by its style", false, false, true)],
+            vec![run("Italic, not the bold it had", false, true, false)],
+            vec![run("Plain", false, false, false)],
+        ]
+    );
+}
+
+#[test]
+fn hidden_text_is_left_out() {
+    let body = r#"<w:p>
+        <w:r><w:t xml:space="preserve">Shown </w:t></w:r>
+        <w:r><w:rPr><w:vanish/></w:rPr><w:t xml:space="preserve">hidden </w:t><w:tab/><w:br/></w:r>
+        <w:r><w:rPr><w:vanish w:val="0"/></w:rPr><w:t xml:space="preserve">unhidden </w:t></w:r>
+        <w:r><w:rPr><w:webHidden/></w:rPr><w:t>web hidden</w:t></w:r>
+    </w:p>
+    <w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t>All hidden</w:t></w:r></w:p>"#;
+    assert_eq!(
+        texts(&read_body(body).paragraphs),
+        ["Shown unhidden web hidden"]
+    );
+}
+
+#[test]
+fn a_compound_file_holding_neither_words_stream_is_not_a_docx() {
+    // A workbook or a deck in Office's old format, renamed `.docx`.
+    let mut workbook = vec![0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+    workbook.resize(512, 0);
+    workbook.extend("Workbook".encode_utf16().flat_map(u16::to_le_bytes));
+    let not_a_docx = Err(ImportRefusal::NotWhatItsNameSays { expected: ".docx" });
+    assert_eq!(read_docx(&workbook), not_a_docx);
+    // A bare compound file header, too short to say more.
+    assert_eq!(read_docx(&workbook[..8]), not_a_docx);
+}
+
+#[test]
+fn an_embedded_document_is_left_out_and_counted() {
+    let body = format!(
+        r#"{}<w:altChunk r:id="rId9"/><w:altChunk r:id="rId10"><w:altChunkPr><w:matchSrc/></w:altChunkPr></w:altChunk>{}"#,
+        p("Before."),
+        p("After.")
+    );
+    let bytes = docx(&body);
+    let imported = read(&bytes);
+    assert_eq!(texts(&imported.paragraphs), ["Before.", "After."]);
+    assert_eq!(
+        imported.left_out,
+        LeftOut {
+            embedded_documents: 2,
+            ..LeftOut::default()
+        }
+    );
+    let imported = import_file("Merged.docx", &bytes).expect("the file imports");
+    assert_eq!(
+        import_sentence("Merged.docx", &imported),
+        "Imported Merged.docx: 2 paragraphs, 2 words, 0 cues. Left out: 2 embedded documents."
+    );
+    let one = LeftOut {
+        pictures: 1,
+        embedded_documents: 1,
+        ..LeftOut::default()
+    };
+    assert_eq!(one.phrases(), ["1 picture", "1 embedded document"]);
 }
 
 #[test]

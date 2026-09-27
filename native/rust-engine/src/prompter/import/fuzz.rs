@@ -3,7 +3,9 @@
 //! damaged copies of real documents and for documents built from Word's own
 //! elements in any order, nothing panics, and what comes out keeps the model's
 //! promises: no blank paragraph, no carriage return or control character, no
-//! white space at a paragraph's ends, runs already joined.
+//! white space at a paragraph's ends, white space collapsed, runs already
+//! joined. Some inputs repeat one hostile piece hundreds of times, where a
+//! reader that rescans or keeps something per piece would show it.
 //!
 //! Each property runs 256 cases, so the suite stays fast.
 
@@ -31,8 +33,55 @@ fn assert_sound(imported: &ImportedText) -> Result<(), TestCaseError> {
             "a byte-order mark in {:?}",
             text
         );
+        // White space inside a line is one character between two that are
+        // not white space; line breaks are at most one blank line.
+        let characters: Vec<char> = text.chars().collect();
+        for (index, character) in characters.iter().enumerate() {
+            if character.is_whitespace() && *character != '\n' {
+                let neighbours = [index.checked_sub(1), Some(index + 1)]
+                    .map(|at| at.and_then(|at| characters.get(at)));
+                prop_assert!(
+                    neighbours
+                        .iter()
+                        .all(|neighbour| neighbour.is_some_and(|c| !c.is_whitespace())),
+                    "white space not between words in {:?}",
+                    text
+                );
+            }
+        }
+        prop_assert!(!text.contains("\n\n\n"), "two blank lines in {:?}", text);
     }
     Ok(())
+}
+
+/// Text made of what a reader treats as white space, around a few words.
+fn spacey_text() -> impl Strategy<Value = String> {
+    prop::collection::vec(
+        prop::sample::select(vec![
+            " ", "\t", "\n", "\r\n", "\r", "\u{a0}", "\u{3000}", "\u{2028}", "\u{85}", "a", "å",
+            "[", "]",
+        ]),
+        0..256,
+    )
+    .prop_map(|parts| parts.concat())
+}
+
+/// One piece repeated many times between a few others.
+fn repeated(piece: BoxedStrategy<String>, most: usize) -> impl Strategy<Value = String> {
+    (
+        prop::collection::vec(piece.clone(), 0..4),
+        piece.clone(),
+        1..most,
+        prop::collection::vec(piece, 0..4),
+    )
+        .prop_map(|(before, unit, times, after)| {
+            format!(
+                "{}{}{}",
+                before.concat(),
+                unit.repeat(times),
+                after.concat()
+            )
+        })
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +125,8 @@ const STYLES: &str = r#"
     <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:numPr><w:numId w:val="2"/></w:numPr></w:pPr></w:style>
     <w:style w:type="paragraph" w:styleId="x"><w:name w:val="List Bullet"/><w:pPr><w:numPr><w:ilvl w:val="8"/><w:numId w:val="1"/></w:numPr></w:pPr></w:style>
     <w:style w:type="character" w:styleId="Strong"><w:name w:val="Strong"/></w:style>
+    <w:style w:type="paragraph" w:styleId="Bold"><w:name w:val="Bold"/><w:basedOn w:val="Loop"/><w:rPr><w:b/><w:u w:val="none"/><w:rPrChange><w:rPr><w:i/></w:rPr></w:rPrChange></w:rPr></w:style>
+    <w:style w:type="character" w:styleId="9"><w:name w:val="Not bold"/><w:basedOn w:val="Strong"/><w:rPr><w:b w:val="0"/><w:i/></w:rPr></w:style>
 "#;
 
 const NUMBERING: &str = r#"
@@ -83,10 +134,12 @@ const NUMBERING: &str = r#"
     <w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:start w:val="9223372036854775807"/><w:numFmt w:val="lowerRoman"/><w:lvlText w:val="%1.%2"/><w:pStyle w:val="Heading1"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="lowerLetter"/><w:lvlText w:val="%2)"/></w:lvl></w:abstractNum>
     <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
     <w:num w:numId="2"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="1"><w:startOverride w:val="780"/><w:lvl w:ilvl="1"><w:numFmt w:val="upperRoman"/><w:lvlText w:val="%2"/></w:lvl></w:lvlOverride></w:num>
+    <w:num w:numId="8"><w:abstractNumId w:val="1"/><w:lvlOverride w:ilvl="0"><w:startOverride w:val="-9223372036854775808"/></w:lvlOverride></w:num>
+    <w:num w:numId="9"><w:lvlOverride w:ilvl="0"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:lvlOverride></w:num>
 "#;
 
 /// Word's elements, and a few that are not, to build documents from.
-const ELEMENTS: [&str; 44] = [
+const ELEMENTS: [&str; 47] = [
     "w:p",
     "w:r",
     "w:t",
@@ -101,6 +154,9 @@ const ELEMENTS: [&str; 44] = [
     "w:i",
     "w:u",
     "w:rStyle",
+    "w:vanish",
+    "w:altChunk",
+    "w:webHidden",
     "w:br",
     "w:tab",
     "w:noBreakHyphen",
@@ -133,9 +189,9 @@ const ELEMENTS: [&str; 44] = [
     "x:unknown",
 ];
 
-const VALUES: [&str; 14] = [
+const VALUES: [&str; 15] = [
     "0", "1", "2", "8", "9", "99", "-1", "begin", "separate", "end", "none", "Heading1", "x",
-    "Strong",
+    "Strong", "Bold",
 ];
 
 fn element() -> impl Strategy<Value = (&'static str, String)> {
@@ -243,7 +299,21 @@ fn html_token() -> impl Strategy<Value = &'static str> {
             "<!--",
             "-->",
             "<![if !supportLists]>",
+            "<![if !supportFootnotes]>",
+            "<![if !supportAnnotations]>",
             "<![endif]>",
+            "<del>",
+            "</del>",
+            "<ins>",
+            "</ins>",
+            "<div style='mso-element:footnote-list'>",
+            "<div style='mso-element:comment'>",
+            "<a style='mso-footnote-id:ftn1'>",
+            "<a class=msocomanchor>",
+            "</a>",
+            "<span style='mso-special-character:comment'>",
+            "<span style='mso-list:Ignore'>1.1</span>",
+            "<p a b c d e f g h style='font-weight:bold' class=x start=2 value=3>",
             "<![CDATA[",
             "]]>",
             "<span style='mso-list:Ignore'>",
@@ -336,13 +406,17 @@ proptest! {
         }
     }
 
-    /// Documents made of Word's elements in any order: every one is read
-    /// (the XML is well formed) and what comes out is sound.
+    /// Documents made of Word's elements in any order, some with one piece
+    /// repeated many times: every one is read (the XML is well formed) and
+    /// what comes out is sound.
     #[test]
     fn the_docx_reader_walks_any_arrangement_of_words_elements(
-        body in proptest::collection::vec(word_xml(), 0..8),
+        body in prop_oneof![
+            proptest::collection::vec(word_xml(), 0..8).prop_map(|pieces| pieces.concat()),
+            repeated(word_xml().boxed(), 48),
+        ],
     ) {
-        let imported = docx::read_docx(&document_of(&body.concat()));
+        let imported = docx::read_docx(&document_of(&body));
         prop_assert!(imported.is_ok(), "{:?}", imported);
         if let Ok(imported) = imported {
             assert_sound(&imported)?;
@@ -357,6 +431,8 @@ proptest! {
         bytes in prop_oneof![
             proptest::collection::vec(any::<u8>(), 0..512),
             "\\PC{0,64}".prop_map(String::into_bytes),
+            spacey_text().prop_map(String::into_bytes),
+            repeated(spacey_text().boxed(), 64).prop_map(String::into_bytes),
         ],
     ) {
         let mut file = mark.to_vec();
@@ -368,12 +444,14 @@ proptest! {
     }
 
     /// Arbitrary text and HTML made of the tags the reader treats specially,
-    /// in any order: the HTML reader never panics and what it gives is sound.
+    /// in any order and with one repeated up to 2,000 times: the HTML reader
+    /// never panics and what it gives is sound.
     #[test]
     fn the_html_reader_never_panics(
         markup in prop_oneof![
             any::<String>(),
             proptest::collection::vec(html_token(), 0..64).prop_map(|tokens| tokens.concat()),
+            repeated(html_token().prop_map(String::from).boxed(), 2_000),
         ],
     ) {
         assert_sound(&html::read_html(&markup))?;

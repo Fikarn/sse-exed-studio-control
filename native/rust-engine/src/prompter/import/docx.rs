@@ -37,6 +37,9 @@ const DOCUMENT_LIMIT: usize = 64 * 1024 * 1024;
 const PART_LIMIT: usize = 16 * 1024 * 1024;
 /// The inflated size of all the header and footer parts together.
 const HEADERS_AND_FOOTERS_LIMIT: usize = 32 * 1024 * 1024;
+/// The most header and footer parts read: Word writes up to three of each
+/// per section. A file of more counts no further.
+const MOST_HEADERS_AND_FOOTERS: usize = 64;
 const MAIN_DOCUMENT: &str = "word/document.xml";
 /// The content types `[Content_Types].xml` gives a Word document's main part:
 /// a document, a template, and the two with macros (which are never run; only
@@ -94,9 +97,10 @@ const TRACKED_REMOVALS: [&str; 11] = [
 ];
 
 /// Reads a `.docx`'s bytes. A compound file is refused as protected with a
-/// password (or as the old format, when it holds a `.doc`'s stream); anything
-/// that is not a zip, or a zip without a Word document in it (a workbook, a
-/// deck), is not what its name says.
+/// password, or as the old format when it holds a `.doc`'s stream; anything
+/// else that is not a zip (an old workbook or deck among them), or a zip
+/// without a Word document in it (a workbook, a deck), is not what its name
+/// says.
 pub(super) fn read_docx(bytes: &[u8]) -> Result<ImportedText, ImportRefusal> {
     if bytes.starts_with(COMPOUND_FILE_SIGNATURE) {
         return Err(compound_file_refusal(bytes));
@@ -125,17 +129,20 @@ fn not_a_docx() -> ImportRefusal {
 
 /// Word saves a password-protected `.docx` as a compound file holding an
 /// `EncryptedPackage` stream; an old `.doc` renamed `.docx` is a compound file
-/// holding a `WordDocument` stream. The stream names are UTF-16 in the file's
-/// directory.
+/// holding a `WordDocument` stream. A compound file with neither is another
+/// program's (an old `.xls`, `.ppt`, an Outlook `.msg`). The stream names are
+/// UTF-16 in the file's directory.
 fn compound_file_refusal(bytes: &[u8]) -> ImportRefusal {
     let holds = |name: &str| {
         let needle: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
         bytes.windows(needle.len()).any(|window| window == needle)
     };
-    if !holds("EncryptedPackage") && holds("WordDocument") {
+    if holds("EncryptedPackage") {
+        ImportRefusal::PasswordProtected
+    } else if holds("WordDocument") {
         ImportRefusal::OldWordFormat
     } else {
-        ImportRefusal::PasswordProtected
+        not_a_docx()
     }
 }
 
@@ -182,7 +189,7 @@ fn optional_part(zip: &Zip<'_>, name: &str) -> Option<Vec<u8>> {
 /// kind of header (first page, even pages, the rest) and per section. The
 /// parts share one inflating budget, so a file of many small parts that each
 /// unpack to 16 MB cannot keep the import busy for minutes; a part past it is
-/// not counted.
+/// not counted, and no more than `MOST_HEADERS_AND_FOOTERS` are read.
 fn headers_and_footers(zip: &Zip<'_>) -> usize {
     let mut names: Vec<String> = zip
         .names()
@@ -197,9 +204,13 @@ fn headers_and_footers(zip: &Zip<'_>) -> usize {
         .collect();
     names.sort();
     names.dedup();
+    names.truncate(MOST_HEADERS_AND_FOOTERS);
     let mut budget = HEADERS_AND_FOOTERS_LIMIT;
     let mut count = 0;
     for name in &names {
+        if budget == 0 {
+            break;
+        }
         let limit = budget.min(PART_LIMIT);
         match zip.read(name, limit) {
             Ok(Some(part)) => {
@@ -353,14 +364,15 @@ struct Paragraph {
     list_level: Option<u32>,
 }
 
-/// A run's own emphasis (`None`: as its character style says) and its
-/// character style.
+/// A run's own emphasis (`None`: as its styles say), its character style,
+/// and whether it is hidden text (`w:vanish`), which is left out.
 #[derive(Default)]
 struct Run {
     bold: Option<bool>,
     italic: Option<bool>,
     underline: Option<bool>,
     style: Option<String>,
+    hidden: bool,
 }
 
 /// The walk over `document.xml`.
@@ -483,7 +495,7 @@ impl<'a> Body<'a> {
                 Open::Run
             }
             "rPr" if parent == Some(Open::Run) => Open::RunProperties,
-            "b" | "i" | "u" | "rStyle" if parent == Some(Open::RunProperties) => {
+            "b" | "i" | "u" | "rStyle" | "vanish" if parent == Some(Open::RunProperties) => {
                 self.run_property(name, element);
                 Open::Other
             }
@@ -527,6 +539,12 @@ impl<'a> Body<'a> {
             }
             "drawing" | "pict" => return self.skip(empty, SkipKind::Drawing { text_box: false }),
             "object" => return self.skip(empty, SkipKind::Object),
+            // Another document kept whole inside this one (HTML, RTF, a
+            // `.docx`), which Word reads in when it opens the file.
+            "altChunk" => {
+                self.left_out.embedded_documents += 1;
+                return self.skip(empty, SkipKind::Silent);
+            }
             "AlternateContent" => Open::AlternateContent {
                 choice_taken: false,
             },
@@ -631,7 +649,8 @@ impl<'a> Body<'a> {
         match name {
             "b" => self.run.bold = Some(toggle_is_on(value.as_deref())),
             "i" => self.run.italic = Some(toggle_is_on(value.as_deref())),
-            "u" => self.run.underline = Some(value.as_deref().map(str::trim) != Some("none")),
+            "u" => self.run.underline = Some(underline_is_on(value.as_deref())),
+            "vanish" => self.run.hidden = toggle_is_on(value.as_deref()),
             _ => self.run.style = value,
         }
     }
@@ -660,18 +679,31 @@ impl<'a> Body<'a> {
         }
     }
 
+    /// Adds text to the open paragraph with the run's emphasis: the
+    /// paragraph style's, then the character style's, then the run's own,
+    /// each winning over the one before where it says anything.
     fn push_text(&mut self, text: &str) {
-        if self.field_codes > 0 || text.is_empty() {
+        if self.field_codes > 0 || self.run.hidden || text.is_empty() {
             return;
         }
-        let (bold, italic) = self
+        let paragraph_style = self
+            .paragraph
+            .as_ref()
+            .and_then(|paragraph| paragraph.style.as_deref());
+        let from_styles = self
             .run
             .style
             .as_deref()
-            .map_or((false, false), |style| self.styles.emphasis(style));
-        let bold = self.run.bold.unwrap_or(bold);
-        let italic = self.run.italic.unwrap_or(italic);
-        let underline = self.run.underline.unwrap_or(false);
+            .map(|style| self.styles.character_emphasis(style))
+            .unwrap_or_default()
+            .or(self.styles.paragraph_emphasis(paragraph_style));
+        let bold = self.run.bold.or(from_styles.bold).unwrap_or(false);
+        let italic = self.run.italic.or(from_styles.italic).unwrap_or(false);
+        let underline = self
+            .run
+            .underline
+            .or(from_styles.underline)
+            .unwrap_or(false);
         let runs = &mut self.paragraph().runs;
         match runs.last_mut() {
             Some(last)
@@ -756,7 +788,12 @@ impl<'a> Body<'a> {
     }
 }
 
-/// `w:b` and `w:i` are on unless their `w:val` turns them off.
+/// `w:b`, `w:i` and `w:vanish` are on unless their `w:val` turns them off.
 fn toggle_is_on(value: Option<&str>) -> bool {
     !matches!(value.map(str::trim), Some("0" | "false" | "off"))
+}
+
+/// `w:u` underlines unless its `w:val` is `none`.
+fn underline_is_on(value: Option<&str>) -> bool {
+    value.map(str::trim) != Some("none")
 }

@@ -13,9 +13,15 @@
 //! Kept: the text and its paragraphs, a line break inside a paragraph, bold,
 //! italic and underline, Word headings as cues, bullets and numbering as a
 //! dash or the number. Dropped: fonts, sizes, colours, highlighting, pictures,
-//! text boxes, headers and footers, footnotes and comments; a table's cells
-//! come in row by row, one paragraph each; tracked changes come in as if
-//! accepted. The import sentence counts what was left out.
+//! text boxes, embedded documents, headers and footers, footnotes and
+//! comments, hidden text; a table's cells come in row by row, one paragraph
+//! each; tracked changes come in as if accepted. The import sentence counts
+//! what was left out.
+//!
+//! White space is collapsed as each paragraph is built (`finished_paragraph`):
+//! a run of it inside a line is one space, and a run of line breaks at most
+//! one blank line. A script's text is capped (`MAX_SCRIPT_TEXT_BYTES`) as well
+//! as its words, so one enormous word cannot pass.
 
 mod docx;
 mod html;
@@ -26,6 +32,11 @@ use crate::prompter::model::{
     counted, cue_spans, cue_targets, format_count, sanitize_text, word_count, PrompterParagraph,
     PrompterRun, MAX_IMPORT_BYTES, MAX_SCRIPT_WORDS,
 };
+
+/// The most text a script may hold once imported. A 30,000-word script is
+/// about 0.2 MB.
+pub(crate) const MAX_SCRIPT_TEXT_BYTES: usize = 2 * 1024 * 1024;
+const MEGABYTE: usize = 1024 * 1024;
 
 /// What a file or a paste held, ready to become a script.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +57,9 @@ pub(crate) struct ImportedText {
 pub(crate) struct LeftOut {
     pub pictures: usize,
     pub text_boxes: usize,
+    /// Word's `w:altChunk`: another document (HTML, RTF, a `.docx`) kept
+    /// whole inside this one.
+    pub embedded_documents: usize,
     pub comments: usize,
     pub footnotes: usize,
     pub headers_and_footers: usize,
@@ -56,6 +70,11 @@ impl LeftOut {
         [
             (self.pictures, "picture", "pictures"),
             (self.text_boxes, "text box", "text boxes"),
+            (
+                self.embedded_documents,
+                "embedded document",
+                "embedded documents",
+            ),
             (self.comments, "comment", "comments"),
             (self.footnotes, "footnote", "footnotes"),
             (
@@ -104,8 +123,12 @@ pub(crate) enum ImportRefusal {
     UnsupportedKind { extension: String },
     /// Over `MAX_SCRIPT_WORDS`.
     TooLong { words: usize },
-    /// Over `MAX_IMPORT_BYTES`.
+    /// Text over `MAX_SCRIPT_TEXT_BYTES`, however few its words.
+    TooMuchText { bytes: usize },
+    /// A file over `MAX_IMPORT_BYTES`.
     TooLarge { bytes: usize },
+    /// A paste over `MAX_IMPORT_BYTES`.
+    PasteTooLarge { bytes: usize },
     /// No word in it.
     Empty,
     /// A damaged file: the reason in a few words.
@@ -137,10 +160,19 @@ impl ImportRefusal {
                 format_count(*words),
                 format_count(MAX_SCRIPT_WORDS)
             ),
+            Self::TooMuchText { .. } => format!(
+                "{source} holds more text than a script can hold ({} MB). Split it into shorter scripts.",
+                MAX_SCRIPT_TEXT_BYTES / MEGABYTE
+            ),
             Self::TooLarge { bytes } => format!(
                 "{source} is {} MB; Studio Control opens files up to {} MB.",
-                bytes.div_ceil(1024 * 1024),
-                MAX_IMPORT_BYTES / (1024 * 1024)
+                bytes.div_ceil(MEGABYTE),
+                MAX_IMPORT_BYTES / MEGABYTE
+            ),
+            Self::PasteTooLarge { bytes } => format!(
+                "{source} is {} MB; Studio Control takes pastes up to {} MB.",
+                bytes.div_ceil(MEGABYTE),
+                MAX_IMPORT_BYTES / MEGABYTE
             ),
             Self::Empty => format!("{source} has no text in it."),
             Self::Unreadable(reason) => {
@@ -183,7 +215,7 @@ pub(crate) fn import_file(file_name: &str, bytes: &[u8]) -> Result<ImportedText,
 pub(crate) fn import_paste(html: Option<&str>, text: &str) -> Result<ImportedText, ImportRefusal> {
     let size = html.map_or(0, str::len) + text.len();
     if size > MAX_IMPORT_BYTES {
-        return Err(ImportRefusal::TooLarge { bytes: size });
+        return Err(ImportRefusal::PasteTooLarge { bytes: size });
     }
     if let Some(html) = html.filter(|html| !html.trim().is_empty()) {
         let imported = html::read_html(html);
@@ -201,6 +233,15 @@ fn checked(imported: ImportedText) -> Result<ImportedText, ImportRefusal> {
     let words = word_count(&imported.paragraphs);
     if words > MAX_SCRIPT_WORDS {
         return Err(ImportRefusal::TooLong { words });
+    }
+    let bytes = imported
+        .paragraphs
+        .iter()
+        .flat_map(|paragraph| &paragraph.runs)
+        .map(|run| run.text.len())
+        .sum();
+    if bytes > MAX_SCRIPT_TEXT_BYTES {
+        return Err(ImportRefusal::TooMuchText { bytes });
     }
     Ok(imported)
 }
@@ -229,25 +270,47 @@ pub(crate) fn import_sentence(source: &str, imported: &ImportedText) -> String {
     sentence
 }
 
+/// White space waiting in `finished_paragraph` for the next character that is
+/// not white space, so none ends a line or the paragraph. It is only ever one
+/// space or two line breaks, however long the run it stands for.
+#[derive(Debug, Clone, Copy)]
+enum Waiting {
+    Nothing,
+    /// White space inside a line: the run it began in, its first character,
+    /// and whether more followed (then it is one plain space).
+    Space {
+        from: usize,
+        first: char,
+        more: bool,
+    },
+    /// Line breaks at a line's start, after the paragraph's first word: the
+    /// run each began in, at most two (one blank line).
+    Breaks {
+        from: [usize; 2],
+        count: usize,
+    },
+}
+
 /// A paragraph as every reader hands it on: each run sanitized
 /// (`sanitize_text`), the white space at both ends of each line taken off (a
-/// ragged edge on the glass, which no source means), line breaks at the
-/// paragraph's start and end taken off, neighbouring runs of the same emphasis
-/// joined. `None` when no word is left: Word and HTML use empty paragraphs for
-/// spacing, and a script keeps none.
+/// ragged edge on the glass, which no source means), a run of white space
+/// inside a line made one space (a lone no-break space stays), a run of line
+/// breaks made at most one blank line, line breaks at the paragraph's start
+/// and end taken off, neighbouring runs of the same emphasis joined. What is
+/// waiting stays the same size whatever the text (`Waiting`). `None` when no
+/// word is left: Word and HTML use empty paragraphs for spacing, and a script
+/// keeps none.
 fn finished_paragraph(runs: Vec<PrompterRun>) -> Option<PrompterParagraph> {
     let mut out: Vec<PrompterRun> = Vec::with_capacity(runs.len());
-    // White space and line breaks wait for the next character that is not
-    // white space, so none end a line or the paragraph: (run, character).
     // Line breaks wait only at a line's start and white space only after a
     // character, so `waiting` holds one kind or the other.
-    let mut waiting: Vec<(usize, char)> = Vec::new();
+    let mut waiting = Waiting::Nothing;
     let mut at_line_start = true;
     let mut has_text = false;
     for run in runs {
         let text = sanitize_text(&run.text);
         out.push(PrompterRun {
-            text: String::with_capacity(text.len()),
+            text: String::new(),
             ..run
         });
         let index = out.len() - 1;
@@ -255,19 +318,51 @@ fn finished_paragraph(runs: Vec<PrompterRun>) -> Option<PrompterParagraph> {
             if character == '\n' {
                 if !at_line_start {
                     // The white space that ended the line.
-                    waiting.clear();
+                    waiting = Waiting::Nothing;
                 }
                 if has_text {
-                    waiting.push((index, '\n'));
+                    waiting = match waiting {
+                        Waiting::Breaks { mut from, count } if count < 2 => {
+                            from[count] = index;
+                            Waiting::Breaks {
+                                from,
+                                count: count + 1,
+                            }
+                        }
+                        Waiting::Breaks { .. } => waiting,
+                        _ => Waiting::Breaks {
+                            from: [index; 2],
+                            count: 1,
+                        },
+                    };
                 }
                 at_line_start = true;
             } else if character.is_whitespace() {
                 if !at_line_start {
-                    waiting.push((index, character));
+                    waiting = match waiting {
+                        Waiting::Space { from, first, .. } => Waiting::Space {
+                            from,
+                            first,
+                            more: true,
+                        },
+                        _ => Waiting::Space {
+                            from: index,
+                            first: character,
+                            more: false,
+                        },
+                    };
                 }
             } else {
-                for (run, waiting) in waiting.drain(..) {
-                    out[run].text.push(waiting);
+                match std::mem::replace(&mut waiting, Waiting::Nothing) {
+                    Waiting::Nothing => {}
+                    Waiting::Space { from, first, more } => {
+                        out[from].text.push(if more { ' ' } else { first });
+                    }
+                    Waiting::Breaks { from, count } => {
+                        for &from in &from[..count] {
+                            out[from].text.push('\n');
+                        }
+                    }
                 }
                 out[index].text.push(character);
                 at_line_start = false;

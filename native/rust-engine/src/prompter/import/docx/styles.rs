@@ -7,11 +7,31 @@ use std::collections::HashMap;
 
 use quick_xml::events::{BytesStart, Event};
 
-use super::{attribute, local, number, walk_xml};
+use super::{attribute, local, number, toggle_is_on, underline_is_on, walk_xml};
 
 /// How far a chain of `w:basedOn` is followed. Word writes no loop, but a
 /// damaged file may hold one.
 const LONGEST_CHAIN: usize = 10;
+
+/// Bold, italic and underline as a style sets them in its `w:rPr`; `None`
+/// where it says nothing, so the next style down the chain decides.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct Emphasis {
+    pub bold: Option<bool>,
+    pub italic: Option<bool>,
+    pub underline: Option<bool>,
+}
+
+impl Emphasis {
+    /// This emphasis, with what it leaves unsaid taken from `below`.
+    pub(super) fn or(self, below: Self) -> Self {
+        Self {
+            bold: self.bold.or(below.bold),
+            italic: self.italic.or(below.italic),
+            underline: self.underline.or(below.underline),
+        }
+    }
+}
 
 #[derive(Default)]
 struct Style {
@@ -21,6 +41,21 @@ struct Style {
     outline_level: Option<u32>,
     list: Option<u32>,
     list_level: Option<u32>,
+    emphasis: Emphasis,
+}
+
+impl Style {
+    /// The style's own emphasis. Word's "Strong" is bold and its "Emphasis"
+    /// italic even when a file leaves their `w:rPr` out.
+    fn own_emphasis(&self) -> Emphasis {
+        let mut emphasis = self.emphasis;
+        match self.name.as_str() {
+            "strong" => emphasis.bold = emphasis.bold.or(Some(true)),
+            "emphasis" => emphasis.italic = emphasis.italic.or(Some(true)),
+            _ => {}
+        }
+        emphasis
+    }
 }
 
 #[derive(Default)]
@@ -62,18 +97,15 @@ impl Styles {
             .map_or((None, None), |style| (style.list, style.list_level))
     }
 
-    /// The bold and italic a character style gives: Word's "Strong" is bold,
-    /// its "Emphasis" italic.
-    pub(super) fn emphasis(&self, id: &str) -> (bool, bool) {
-        let (mut bold, mut italic) = (false, false);
-        for style in chain(&self.character, Some(id)) {
-            match style.name.as_str() {
-                "strong" => bold = true,
-                "emphasis" => italic = true,
-                _ => {}
-            }
-        }
-        (bold, italic)
+    /// The emphasis a paragraph style gives its text (a bold "Speaker"),
+    /// the nearest style in its chain that says anything deciding.
+    pub(super) fn paragraph_emphasis(&self, id: Option<&str>) -> Emphasis {
+        emphasis_of(self.paragraph_chain(id))
+    }
+
+    /// The emphasis a character style gives its run.
+    pub(super) fn character_emphasis(&self, id: &str) -> Emphasis {
+        emphasis_of(chain(&self.character, Some(id)))
     }
 
     fn paragraph_chain<'a>(&'a self, id: Option<&'a str>) -> impl Iterator<Item = &'a Style> {
@@ -93,6 +125,12 @@ fn chain<'a>(
         Some(style)
     })
     .take(LONGEST_CHAIN)
+}
+
+fn emphasis_of<'a>(chain: impl Iterator<Item = &'a Style>) -> Emphasis {
+    chain.fold(Emphasis::default(), |nearer, style| {
+        nearer.or(style.own_emphasis())
+    })
 }
 
 fn is_heading_name(name: &str) -> bool {
@@ -115,6 +153,11 @@ struct StylesReader {
     current: Option<(Kind, String, Style)>,
     in_paragraph_properties: bool,
     in_list_properties: bool,
+    /// In the style's own `w:rPr`.
+    in_run_properties: bool,
+    /// In a `w:rPrChange`: the run properties as they were before a
+    /// tracked change, which are not the style's.
+    in_change: bool,
 }
 
 impl StylesReader {
@@ -126,6 +169,8 @@ impl StylesReader {
                 "style" => self.finish_style(),
                 "pPr" => self.in_paragraph_properties = false,
                 "numPr" => self.in_list_properties = false,
+                "rPrChange" => self.in_change = false,
+                "rPr" if !self.in_change => self.in_run_properties = false,
                 _ => {}
             },
             _ => {}
@@ -168,6 +213,17 @@ impl StylesReader {
             "numPr" if self.in_paragraph_properties && !empty => self.in_list_properties = true,
             "numId" if self.in_list_properties => style.list = number(element),
             "ilvl" if self.in_list_properties => style.list_level = number(element),
+            "rPr" if !self.in_paragraph_properties && !empty => self.in_run_properties = true,
+            "rPrChange" if !empty => self.in_change = true,
+            "b" | "i" | "u" if self.in_run_properties && !self.in_change => {
+                let value = attribute(element, "val");
+                let value = value.as_deref();
+                match name {
+                    "b" => style.emphasis.bold = Some(toggle_is_on(value)),
+                    "i" => style.emphasis.italic = Some(toggle_is_on(value)),
+                    _ => style.emphasis.underline = Some(underline_is_on(value)),
+                }
+            }
             _ => {}
         }
     }
@@ -175,6 +231,8 @@ impl StylesReader {
     fn finish_style(&mut self) {
         self.in_paragraph_properties = false;
         self.in_list_properties = false;
+        self.in_run_properties = false;
+        self.in_change = false;
         let Some((kind, id, style)) = self.current.take() else {
             return;
         };
