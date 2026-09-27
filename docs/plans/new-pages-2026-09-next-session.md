@@ -30,7 +30,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
 ## Where things stand
 
-- **Landed on `main`:** S1 (#211), S2 (#213), SF (#214), S2b (#215), S3 (#216), SW (#221), C0 (#224), S4 (#225: the Teleprompter's scripts and the prompter in the hardware link), S5a (#226: the glass, and the Prompter XL's state in the hardware link; the first cloud slice) S6a (#227: the Teleprompter page without its editor) and S6b (#228: its editor, Rename, New script and Paste). Each slice's record is in the ledger, and each merge's commits are kept under a tag `archive/new-pages-<slice>-2026-09` (pushed from the workstation).
+- **Landed on `main`:** S1 (#211), S2 (#213), SF (#214), S2b (#215), S3 (#216), SW (#221), C0 (#224), S4 (#225: the Teleprompter's scripts and the prompter in the hardware link), S5a (#226: the glass, and the Prompter XL's state in the hardware link; the first cloud slice), S6a (#227: the Teleprompter page without its editor) and S6b (#228: its editor, Rename, New script and Paste). Each slice's record is in the ledger, and each merge's commits are kept under a tag `archive/new-pages-<slice>-2026-09` (pushed from the workstation).
 - **The cloud's mandate (D23, 2026-09-27):** the program's front end and visuals, end to end. That means:
   - both pages, the glass, every board, the header's tabs and lamps, Setup's steps and the deck pages' drawings;
   - the hardware-link and contract work they stand on, where it compiles on Linux.
@@ -74,9 +74,9 @@ Each cloud slice's own first steps are in its section of the ledger and are put 
   - the win32 captures: do not delete, refresh or commit any `*-win32.png`;
   - pushing a tag or deleting a branch, since a cloud session can push only its own branch. List the archive tags a merge needs in the ledger, and the next workstation session pushes them.
 
-## The contract the front end builds on (Slices 4 and 5a)
+## The contract the front end builds on (Slices 4, 5a and 8)
 
-`native/protocol/v1.md` › Teleprompter has all of it. The points a page or the glass must hold:
+`native/protocol/v1.md` › Teleprompter and › Cameras have all of it. The points a page or the glass must hold:
 
 - **The clock runs in the hardware link.** Only the front end has the fonts, so the view that draws the glass reports its layout (`prompter.layout.report`). The first report for a key wins, and a report for an older key is ignored.
 - **The anchor.** A view draws the motion from the anchor in `prompter.changed` and in the snapshots: `position(t) = min(position + pxPerReadWord · words(ageMs + t), endPosition)`, computed by `motion.ts`. A view with another layout places the text from `place.paragraph` and `wordOffset` (a share of the line's words).
@@ -91,6 +91,8 @@ Each cloud slice's own first steps are in its section of the ledger and are put 
   - its HTML paste reader keeps Word's tracked deletions, footnotes and comments.
 
   Its clock is held to the same motion cases, and its page list to `shell_settings.rs`.
+
+- **The cameras (Slice 8)** are in `cameras.snapshot` (the selection and each camera: its setup, state, what it reports and why not, the autos, recording) and in `health.snapshot`'s `checks.cameras`, which drives the Cameras lamp; `cameras.changed { reason, camera }` says what moved, and `app.changed { reason: "health" }` follows when the check changed. A camera changes only on a press: one press for the exposure, colour and focus values and starting CAM 1's recording, `confirm: true` (the page's second press) for the format, the look, Release and stopping the recording. The store does not read the cameras yet (`cameras.changed` maps to nothing): Slice 9 adds the read. The fixture double's cameras are the hardware link's, held to its sentences by `camerasWords.test.ts`; a scenario seeds them with `cameras` (`FixtureCamerasSeed`, `camerasSeed.ts`; `simulated: false` for the "no link yet" state), and with no seed every camera is NOT SET UP. Tests reach the simulated cameras through `simulatedCameras(transport)`; Playwright has no hook to them yet (Slice 9 needs one to make a camera stop answering while the page is open).
 
 ## The workstation catch-up (for the next workstation session)
 
