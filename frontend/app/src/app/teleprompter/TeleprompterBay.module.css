@@ -12,16 +12,30 @@
   overflow: hidden;
 }
 
+/* The bay's head: what it shows (the live copy or the editor, Slice 6b)
+   beside the strip. */
+.bayHead {
+  display: flex;
+  gap: 16px;
+  flex: none;
+}
+
+.views {
+  flex: none;
+  align-self: center;
+}
+
 /* What is on the glass, the place and the time left: read from a metre away. */
 .head {
   display: flex;
   align-items: center;
   gap: 32px;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 64px;
   padding: 0 20px;
   border-radius: var(--radius-screen);
   background: var(--material-well);
-  flex: none;
 }
 
 .stripItem {

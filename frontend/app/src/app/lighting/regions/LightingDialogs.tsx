@@ -2,7 +2,7 @@ import { DMXMonitorDialog } from "../components/DMXMonitorDialog";
 import { ConfirmDialog, Dialog, Button } from "@sse/design-system";
 import { CreateFixtureDialog } from "../components/CreateFixtureDialog";
 import { nextLightingFixtureName } from "../lightingHelpers";
-import { RenameDialog } from "../components/RenameDialog";
+import { RenameDialog } from "../../shared/RenameDialog";
 import type { LightingEditor } from "../useLightingEditor";
 
 /** Every dialog the workspace raises. Each opens from a flag in the session. */

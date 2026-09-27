@@ -8,6 +8,7 @@ import {
   type JsonValue,
 } from "../generated/protocol";
 import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
+import type { PrompterParagraph } from "../generated/snapshots/PrompterParagraph";
 import type { PrompterScriptSnapshot } from "../generated/snapshots/PrompterScriptSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
@@ -47,6 +48,8 @@ import type {
   PrompterJumpRequest,
   PrompterLayoutReportRequest,
   PrompterLookUpdateRequest,
+  PrompterPasteConvertResult,
+  PrompterPasteRequest,
   PrompterScriptImportRequest,
   PrompterSpeedRequest,
   PrompterTextSizeRequest,
@@ -1607,6 +1610,26 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async readPrompterScript(scriptId: string) {
       return (await transport.request("prompter.script.snapshot", { scriptId })) as unknown as PrompterScriptSnapshot;
+    },
+    createPrompterScript(name?: string) {
+      return performRequest("prompter.script.create", name === undefined ? {} : { name });
+    },
+    renamePrompterScript(scriptId: string, name: string) {
+      return performRequest("prompter.script.rename", { scriptId, name });
+    },
+    editPrompterScript(scriptId: string, paragraphs: readonly PrompterParagraph[]) {
+      return performRequest("prompter.script.edit", {
+        scriptId,
+        paragraphs: paragraphs.map((paragraph) => ({ runs: paragraph.runs.map((run) => ({ ...run })) })),
+      });
+    },
+    pastePrompterScript(request: PrompterPasteRequest) {
+      return performRequest("prompter.script.paste", { ...request });
+    },
+    async convertPrompterPaste(request: PrompterPasteRequest) {
+      return (await transport.request("prompter.paste.convert", {
+        ...request,
+      })) as unknown as PrompterPasteConvertResult;
     },
     async refreshControlSurfaceSnapshot() {
       if (state.lifecycle !== "ready") {

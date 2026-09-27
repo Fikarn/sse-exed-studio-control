@@ -19,6 +19,8 @@ export interface RenameDialogProps {
   cancelLabel?: string;
   /** Disable the submit button while a request is in flight. */
   busy?: boolean;
+  /** The longest name the field takes, in characters, when the hardware link caps it. */
+  maxLength?: number;
   /** Called with the trimmed name. Empty submissions are blocked. */
   onConfirm: (value: string) => void;
   onCancel: () => void;
@@ -32,6 +34,7 @@ export function RenameDialog({
   confirmLabel = "Save",
   cancelLabel = "Cancel",
   busy = false,
+  maxLength,
   onConfirm,
   onCancel,
 }: RenameDialogProps) {
@@ -88,6 +91,7 @@ export function RenameDialog({
           type="text"
           value={draft}
           placeholder={placeholder}
+          maxLength={maxLength}
           onChange={(event) => setDraft(event.currentTarget.value)}
           autoComplete="off"
           spellCheck={false}

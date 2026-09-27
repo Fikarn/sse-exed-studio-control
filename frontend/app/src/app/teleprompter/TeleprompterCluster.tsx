@@ -1,7 +1,13 @@
-import { useMemo, useRef, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
-import { ArmKey, ARM_TIMEOUT_MS, Key, Section, StateDisplay, type ArmedKey } from "@sse/design-system";
-import type { PrompterJumpRequest, PrompterScriptSummary, PrompterSnapshot, ShellStore } from "@sse/engine-client";
+import { ArmKey, ARM_TIMEOUT_MS, Button, Dialog, Key, Section, StateDisplay, type ArmedKey } from "@sse/design-system";
+import type {
+  JsonValue,
+  PrompterJumpRequest,
+  PrompterScriptSummary,
+  PrompterSnapshot,
+  ShellStore,
+} from "@sse/engine-client";
 
 import type { GlassParagraph } from "./glass/glassText";
 import {
@@ -13,7 +19,7 @@ import {
   stepLocks,
   type PrompterStateView,
 } from "./teleprompterModel";
-import type { PerformAction } from "./TeleprompterWorkspace";
+import { TAKE, type PerformAction } from "./perform";
 import styles from "./TeleprompterCluster.module.css";
 
 // The Teleprompter's cluster (new pages program, Slice 6a; board 1's left
@@ -38,6 +44,18 @@ export interface TeleprompterClusterProps {
   onPutOn: () => void;
   onUpdate: () => void;
   onClear: () => void;
+  /** The scripts kept, for a file opened before (§3.3). */
+  scripts: readonly PrompterScriptSummary[];
+  onNewScript: () => void;
+  onPasteScript: () => void;
+  /** What an import answered: the page selects the script. */
+  onImported: (result: JsonValue | null) => void;
+}
+
+/** A file whose name was opened before, waiting for the operator's choice (§3.3). */
+interface Reopened {
+  file: File;
+  script: PrompterScriptSummary;
 }
 
 /** The largest file the hardware link opens (`MAX_IMPORT_BYTES`): a larger one is not read at all. */
@@ -66,13 +84,18 @@ export function TeleprompterCluster({
   onPutOn,
   onUpdate,
   onClear,
+  scripts,
+  onNewScript,
+  onPasteScript,
+  onImported,
 }: TeleprompterClusterProps) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const [reopened, setReopened] = useState<Reopened | null>(null);
   const glass = snapshot.glass;
   const runLock = runLockReason(snapshot);
   const playLock = playLockReason(snapshot);
   const layoutLock = glass && !glass.laidOut ? "The text is being laid out on the glass." : null;
-  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request));
+  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request), false, TAKE);
   const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
   const speedWpm = glass?.speedWpm ?? 0;
   const rows = useMemo(() => paragraphRows(cut, speedWpm), [cut, speedWpm]);
@@ -87,11 +110,9 @@ export function TeleprompterCluster({
       : null;
   const shown = paragraphWindow(rows.length, placeParagraph, PARAGRAPH_ROOM);
 
-  const importFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    await perform(async () => {
+  /** Sends a file the page read, as a new script or as `updateScriptId`'s new text. */
+  const sendFile = async (file: File, updateScriptId?: string) => {
+    const result = await perform(async () => {
       // The hardware link's own sentence for a file over its limit, said
       // before the file is read into memory to be sent.
       if (file.size > MAX_FILE_BYTES) {
@@ -105,8 +126,23 @@ export function TeleprompterCluster({
       } catch {
         throw new Error(`${file.name} could not be read. Open it again, or save a copy and open that.`);
       }
-      return store.importPrompterScript({ fileName: file.name, contentBase64 });
+      return store.importPrompterScript({
+        fileName: file.name,
+        contentBase64,
+        ...(updateScriptId ? { updateScriptId } : {}),
+      });
     }, true);
+    onImported(result);
+  };
+
+  const importFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    // A file opened before: update that script from it, or add it (§3.3).
+    const script = scripts.find((candidate) => candidate.sourceFileName === file.name);
+    if (script) setReopened({ file, script });
+    else void sendFile(file);
   };
 
   const wayOut =
@@ -163,7 +199,9 @@ export function TeleprompterCluster({
           testId="teleprompter-play"
           className={styles.play}
           aria-pressed={glass?.playing ?? false}
-          onClick={() => void perform(() => (glass?.playing ? store.pausePrompter() : store.playPrompter()))}
+          onClick={() =>
+            void perform(() => (glass?.playing ? store.pausePrompter() : store.playPrompter()), false, TAKE)
+          }
         />
         <Key
           cap="Back"
@@ -196,7 +234,7 @@ export function TeleprompterCluster({
             take
             testId="teleprompter-speed-down"
             aria-label="Slower by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }), false, TAKE)}
           />
           <output className={styles.speedReadout} data-well="" data-testid="teleprompter-speed-readout">
             <b>{glass ? glass.speedWpm : "—"}</b> words/min
@@ -208,7 +246,7 @@ export function TeleprompterCluster({
             take
             testId="teleprompter-speed-up"
             aria-label="Faster by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }), false, TAKE)}
           />
         </div>
       </Section>
@@ -317,11 +355,19 @@ export function TeleprompterCluster({
           tabIndex={-1}
           aria-hidden="true"
           data-testid="teleprompter-file-input"
-          onChange={(event) => void importFile(event)}
+          onChange={importFile}
         />
-        <Key size="small" testId="teleprompter-open-file" onClick={() => fileInput.current?.click()}>
-          Open file…
-        </Key>
+        <div className={styles.standingRow}>
+          <Key size="small" testId="teleprompter-open-file" onClick={() => fileInput.current?.click()}>
+            Open file…
+          </Key>
+          <Key size="small" testId="teleprompter-paste-script" onClick={onPasteScript}>
+            Paste as a new script
+          </Key>
+          <Key size="small" testId="teleprompter-new-script" onClick={onNewScript}>
+            New script
+          </Key>
+        </div>
         <ArmKey
           armed={armed?.key === "clear"}
           timeoutMs={ARM_TIMEOUT_MS}
@@ -330,11 +376,50 @@ export function TeleprompterCluster({
           locked={runLock !== null}
           reason={runLock ?? undefined}
           testId="teleprompter-clear"
-          className={styles.clear}
           onClick={onClear}
         >
           Clear the prompter · press twice
         </ArmKey>
+        {reopened ? (
+          <Dialog
+            title={`${reopened.file.name} was opened before`}
+            onClose={() => setReopened(null)}
+            actions={
+              <>
+                <Button variant="ghost" size="compact" onClick={() => setReopened(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  data-testid="teleprompter-reopen-add"
+                  onClick={() => {
+                    setReopened(null);
+                    void sendFile(reopened.file);
+                  }}
+                >
+                  Add as a new script
+                </Button>
+                <Button
+                  variant="primary"
+                  size="compact"
+                  data-testid="teleprompter-reopen-update"
+                  onClick={() => {
+                    setReopened(null);
+                    void sendFile(reopened.file, reopened.script.id);
+                  }}
+                >
+                  Update {reopened.script.name}
+                </Button>
+              </>
+            }
+          >
+            <p className={styles.reopened} data-testid="teleprompter-reopen">
+              {reopened.script.name} came from this file. Update it from the file — its text now is kept as an earlier
+              version — or add the file as a new script.
+            </p>
+          </Dialog>
+        ) : null}
       </div>
     </div>
   );

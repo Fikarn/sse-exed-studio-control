@@ -309,6 +309,10 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     // What the shell found in Windows' display configuration (Slice 5a): a
     // fact about the Prompter XL, never an operator's action.
     "prompter.screen.report",
+    // The editor's Paste (Slice 6b): the clipboard read as paragraphs, which
+    // keeps nothing; the edit that follows saves them, and is not a row
+    // either.
+    "prompter.paste.convert",
     // The shell's own settings, files.
     "commissioning.update",
     "dev.parityFixture.load",

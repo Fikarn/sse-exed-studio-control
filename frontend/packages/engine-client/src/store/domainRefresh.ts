@@ -118,9 +118,11 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   ["support.", ["support"]],
   // Writes the Stream Deck profile to a file; no snapshot reads it.
   ["exports.", []],
-  // The Teleprompter (Slice 6a): a read changes nothing; every other request
-  // can change the prompter's snapshot (and, through its layout key, the text).
+  // The Teleprompter (Slice 6a): a read changes nothing, nor does reading a
+  // paste for the editor (Slice 6b); every other request can change the
+  // prompter's snapshot (and, through its layout key, the text).
   ["prompter.script.snapshot", []],
+  ["prompter.paste.convert", []],
   ["prompter.", ["prompter"]],
 ];
 

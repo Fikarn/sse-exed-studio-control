@@ -2,6 +2,7 @@
 //! Slice 4; the proposal §3.3): made, renamed, edited, removed, restored,
 //! deleted for good, and their versions.
 
+use crate::prompter::import::MAX_SCRIPT_TEXT_BYTES;
 use crate::prompter::model::{PrompterParagraph, PrompterRun, MAX_SCRIPT_WORDS};
 use crate::prompter::store::VERSIONS_KEPT;
 use crate::prompter::test_support::TestPrompter;
@@ -133,6 +134,61 @@ fn an_edit_is_saved_with_its_emphasis_and_its_counts() {
             )
             .0,
         "PROMPTER_SCRIPT_TOO_LONG"
+    );
+}
+
+// Slice 6b's review: the editor saves its whole text with every change, and
+// each paste into it is capped alone, so `edit` holds a script to an import's
+// caps, its text as well as its words: two pastes of 1.5 MB made a 3 MB
+// script before. The words are counted as the import counts them.
+#[test]
+fn an_edit_is_capped_as_an_import_is_by_its_text_as_well_as_its_words() {
+    let prompter = TestPrompter::new("edit-cap");
+    let id = prompter.call("prompter.script.create", json!({}))["scriptId"]
+        .as_str()
+        .expect("a script id")
+        .to_string();
+    let half = "a".repeat(MAX_SCRIPT_TEXT_BYTES / 2 + 1);
+    let too_much = vec![
+        PrompterParagraph::plain(half.clone()),
+        PrompterParagraph::plain(half),
+    ];
+    assert_eq!(
+        prompter.refused(
+            "prompter.script.edit",
+            json!({ "scriptId": id, "paragraphs": too_much })
+        ),
+        (
+            String::from("PROMPTER_SCRIPT_TOO_LONG"),
+            String::from(
+                "The script would hold more text than a script can hold (2 MB). Split it into shorter scripts."
+            )
+        )
+    );
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(
+        script["paragraphs"],
+        json!([{ "runs": [] }]),
+        "nothing was saved"
+    );
+
+    let at_the_cap = vec![PrompterParagraph::plain("a".repeat(MAX_SCRIPT_TEXT_BYTES))];
+    prompter.call(
+        "prompter.script.edit",
+        json!({ "scriptId": id, "paragraphs": at_the_cap }),
+    );
+
+    let too_long = vec![PrompterParagraph::plain(
+        "word ".repeat(MAX_SCRIPT_WORDS + 1),
+    )];
+    assert_eq!(
+        prompter
+            .refused(
+                "prompter.script.edit",
+                json!({ "scriptId": id, "paragraphs": too_long })
+            )
+            .1,
+        "The script would have 30,001 words; a script can have up to 30,000. Split it into shorter scripts."
     );
 }
 
@@ -375,4 +431,189 @@ fn a_paste_becomes_a_script_named_after_its_first_words() {
     );
     assert_eq!(code, "PROMPTER_IMPORT_REFUSED");
     assert_eq!(sentence, "The pasted text has no text in it.");
+}
+
+// Slice 6b (the operator's answer of 2026-09-27: keep the formatting): the
+// editor's Paste reads the clipboard with the paste's own reader — bold,
+// italic and underline kept, a heading a cue, a picture counted as left out —
+// and answers paragraphs in the shape `prompter.script.edit` takes, which the
+// editor sends back whole.
+#[test]
+fn the_editors_paste_keeps_the_emphasis_and_headings_as_cues() {
+    let prompter = TestPrompter::new("paste-convert");
+    let converted = prompter.call(
+        "prompter.paste.convert",
+        json!({
+            "html": "<h2>Guest</h2><p>Good evening and <b>welcome</b>, <i>dear</i> <u>viewers</u></p><img src='a.png'>",
+            "text": "Guest\n\nGood evening and welcome, dear viewers",
+        }),
+    );
+    let plain =
+        |text: &str| json!({ "text": text, "bold": false, "italic": false, "underline": false });
+    assert_eq!(
+        converted["paragraphs"],
+        json!([
+            { "runs": [plain("[Guest]")] },
+            { "runs": [
+                plain("Good evening and "),
+                { "text": "welcome", "bold": true, "italic": false, "underline": false },
+                plain(", "),
+                { "text": "dear", "bold": false, "italic": true, "underline": false },
+                plain(" "),
+                { "text": "viewers", "bold": false, "italic": false, "underline": true },
+            ] },
+        ])
+    );
+    assert_eq!(
+        converted["sentence"],
+        "Imported the pasted text: 2 paragraphs, 7 words, 1 cue. Left out: 1 picture."
+    );
+
+    // The editor splices them into its text and sends the whole script back.
+    let id = prompter.script("Talk", &["Before."]);
+    let mut paragraphs = vec![json!({ "runs": [plain("Before.")] })];
+    paragraphs.extend(converted["paragraphs"].as_array().unwrap().iter().cloned());
+    prompter.call(
+        "prompter.script.edit",
+        json!({ "scriptId": id, "paragraphs": paragraphs }),
+    );
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(script["paragraphs"], json!(paragraphs));
+    assert_eq!(
+        script["cues"],
+        json!([{ "paragraph": 1, "word": 0, "text": "Guest" }])
+    );
+}
+
+// As the paste: HTML that yields no word falls back to the plain text, a
+// blank line of which ends a paragraph.
+#[test]
+fn the_editors_paste_falls_back_to_the_plain_text() {
+    let prompter = TestPrompter::new("paste-convert-text");
+    let plain = |text: &str| json!({ "runs": [{ "text": text, "bold": false, "italic": false, "underline": false }] });
+    for params in [
+        json!({ "html": "<p>&nbsp;</p><img src='a.png'>", "text": "Plain  words\r\n\r\n[PAUSE]" }),
+        json!({ "text": "Plain  words\r\n\r\n[PAUSE]" }),
+        json!({ "html": null, "text": "Plain  words\r\n\r\n[PAUSE]" }),
+    ] {
+        assert_eq!(
+            prompter.call("prompter.paste.convert", params.clone()),
+            json!({
+                "paragraphs": [plain("Plain words"), plain("[PAUSE]")],
+                "sentence": "Imported the pasted text: 2 paragraphs, 3 words, 1 cue.",
+            }),
+            "{params}"
+        );
+    }
+}
+
+// The paste's refusals, code and sentence alike: nothing in it, over the
+// paste's size, too many words, too much text; a parameter of the wrong kind
+// is `INVALID_PARAMS`.
+#[test]
+fn the_editors_paste_refuses_what_the_paste_refuses() {
+    use crate::prompter::import::MAX_SCRIPT_TEXT_BYTES;
+    use crate::prompter::model::MAX_IMPORT_BYTES;
+    let prompter = TestPrompter::new("paste-convert-refused");
+    let half = "a".repeat(MAX_IMPORT_BYTES / 2 + 1);
+    let cases = [
+        (
+            json!({ "html": "<p> </p>", "text": "  \n " }),
+            "The pasted text has no text in it.",
+        ),
+        (json!({}), "The pasted text has no text in it."),
+        (
+            json!({ "html": half, "text": half }),
+            "The pasted text is 21 MB; Studio Control takes pastes up to 20 MB.",
+        ),
+        (
+            json!({ "text": "word ".repeat(MAX_SCRIPT_WORDS + 1) }),
+            "The pasted text has 30,001 words; a script can have up to 30,000. Split it into shorter scripts.",
+        ),
+        (
+            json!({ "text": "a".repeat(MAX_SCRIPT_TEXT_BYTES + 1) }),
+            "The pasted text holds more text than a script can hold (2 MB). Split it into shorter scripts.",
+        ),
+    ];
+    for (params, sentence) in cases {
+        let refused = prompter.refused("prompter.paste.convert", params.clone());
+        assert_eq!(
+            refused,
+            (
+                String::from("PROMPTER_IMPORT_REFUSED"),
+                String::from(sentence)
+            )
+        );
+        assert_eq!(
+            prompter.refused("prompter.script.paste", params),
+            refused,
+            "the paste refuses it alike"
+        );
+    }
+    assert_eq!(
+        prompter.refused("prompter.paste.convert", json!({ "html": 7, "text": "x" })),
+        (
+            String::from("INVALID_PARAMS"),
+            String::from("html must be a string.")
+        )
+    );
+    assert_eq!(names(&prompter.snapshot()["scripts"]), Vec::<String>::new());
+}
+
+// It converts and answers: no script is made, no version kept, nothing the
+// glass shows changes, and no `prompter.changed` or `app.changed` follows
+// (`app/tests_prompter.rs` holds that it leaves no Recent actions row).
+#[test]
+fn the_editors_paste_keeps_nothing_and_raises_nothing() {
+    let prompter = TestPrompter::new("paste-convert-nothing");
+    let id = prompter.script("On air", &["Words on the glass."]);
+    prompter.call("prompter.putOn", json!({ "scriptId": id }));
+    prompter.edit(&id, &["Edited, not updated."]);
+    let counts = || {
+        let connection = crate::storage::open_connection(prompter.path()).expect("a connection");
+        let count = |table: &str| -> i64 {
+            connection
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .expect("a count")
+        };
+        (count("prompter_scripts"), count("prompter_script_versions"))
+    };
+    // What the glass shows, but for how old its anchor is when it is sent.
+    let glass = || {
+        let mut glass = prompter.call("prompter.glass.snapshot", json!({}));
+        glass["anchor"]
+            .as_object_mut()
+            .expect("an anchor")
+            .remove("ageMs");
+        glass
+    };
+    let before = (
+        counts(),
+        prompter.snapshot()["scripts"].clone(),
+        prompter.call("prompter.script.snapshot", json!({ "scriptId": id })),
+        glass(),
+    );
+    assert_eq!(before.0, (1, 1), "the script and the text it went on with");
+
+    let reply = prompter
+        .reply(
+            "prompter.paste.convert",
+            json!({ "html": "<p><b>New</b> words</p>", "text": "New words" }),
+        )
+        .expect("converted");
+    assert_eq!(reply.reason, None, "no prompter.changed");
+    assert!(!reply.health_changed, "no app.changed");
+    assert_eq!(
+        reply.result["sentence"],
+        "Imported the pasted text: 1 paragraph, 2 words, 0 cues."
+    );
+    let after = (
+        counts(),
+        prompter.snapshot()["scripts"].clone(),
+        prompter.call("prompter.script.snapshot", json!({ "scriptId": id })),
+        glass(),
+    );
+    assert_eq!(after, before);
 }

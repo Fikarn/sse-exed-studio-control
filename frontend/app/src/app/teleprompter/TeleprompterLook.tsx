@@ -4,7 +4,7 @@ import { ControlRow, Key, Section, Segmented, Slider } from "@sse/design-system"
 import type { PrompterLookUpdateRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import { SIZE_RANGE } from "./teleprompterModel";
-import type { PerformAction } from "./TeleprompterWorkspace";
+import { TAKE, type PerformAction } from "./perform";
 import styles from "./TeleprompterPlate.module.css";
 
 // The look (new pages program, Slice 6a; the proposal §4.1, board 1's plate):
@@ -67,7 +67,8 @@ export interface TeleprompterLookProps {
 
 export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookProps) {
   const { look, sizePx } = snapshot;
-  const update = (request: PrompterLookUpdateRequest) => void perform(() => store.updatePrompterLook(request));
+  const update = (request: PrompterLookUpdateRequest) =>
+    void perform(() => store.updatePrompterLook(request), false, TAKE);
   const atStandard = sizePx === look.standardSizePx;
   const smallest = sizePx <= SIZE_RANGE.min ? `The text is at its smallest, ${SIZE_RANGE.min} px.` : null;
   const largest = sizePx >= SIZE_RANGE.max ? `The text is at its largest, ${SIZE_RANGE.max} px.` : null;
@@ -92,7 +93,7 @@ export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookP
           locked={smallest !== null}
           reason={smallest ?? undefined}
           aria-label="Smaller by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: -1 }))}
+          onClick={() => void perform(() => store.setPrompterTextSize({ step: -1 }), false, TAKE)}
         >
           − 4
         </Key>
@@ -102,7 +103,7 @@ export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookP
           locked={largest !== null}
           reason={largest ?? undefined}
           aria-label="Larger by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: 1 }))}
+          onClick={() => void perform(() => store.setPrompterTextSize({ step: 1 }), false, TAKE)}
         >
           + 4
         </Key>
@@ -111,7 +112,7 @@ export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookP
           testId="teleprompter-size-standard"
           locked={atStandard}
           reason="The text is at the standard size."
-          onClick={() => void perform(() => store.setPrompterTextSize({ standard: true }))}
+          onClick={() => void perform(() => store.setPrompterTextSize({ standard: true }), false, TAKE)}
         >
           Standard
         </Key>

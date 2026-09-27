@@ -16,10 +16,12 @@ import {
   cleanedParagraphs,
   cloneParagraphs,
   cueTargets,
+  formatCount,
   naturalOrder,
   paragraphsKey,
   wordCount,
 } from "./prompterModel";
+import { MAX_SCRIPT_TEXT_BYTES, scriptTextBytes } from "./prompterImport";
 import { prompterHealthCheck, screenSummary, wholeStatusPart } from "./prompterScreen";
 import { findScript, listScripts, listVersions, type FixturePrompter, type StoredScript } from "./prompterState";
 
@@ -116,7 +118,13 @@ export function editedParagraphs(params: JsonObject): PrompterParagraph[] {
   if (words > MAX_SCRIPT_WORDS) {
     throw new EngineRequestError(
       "PROMPTER_SCRIPT_TOO_LONG",
-      `The script would have ${words} words; a script can have up to ${MAX_SCRIPT_WORDS}. Split it into shorter scripts.`
+      `The script would have ${formatCount(words)} words; a script can have up to ${formatCount(MAX_SCRIPT_WORDS)}. Split it into shorter scripts.`
+    );
+  }
+  if (scriptTextBytes(cleaned) > MAX_SCRIPT_TEXT_BYTES) {
+    throw new EngineRequestError(
+      "PROMPTER_SCRIPT_TOO_LONG",
+      `The script would hold more text than a script can hold (${MAX_SCRIPT_TEXT_BYTES / (1024 * 1024)} MB). Split it into shorter scripts.`
     );
   }
   return cleaned;

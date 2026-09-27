@@ -83,12 +83,6 @@
     "radius": 5,
     "shadow": 6
   },
-  "app/src/app/lighting/components/RenameDialog.module.css": {
-    "colour": 0,
-    "fontSize": 2,
-    "radius": 0,
-    "shadow": 2
-  },
   "app/src/app/lighting/components/SelectionChipStrip.module.css": {
     "colour": 0,
     "fontSize": 0,
@@ -106,6 +100,12 @@
     "fontSize": 0,
     "radius": 1,
     "shadow": 3
+  },
+  "app/src/app/shared/RenameDialog.module.css": {
+    "colour": 0,
+    "fontSize": 2,
+    "radius": 0,
+    "shadow": 2
   },
   "packages/design-system/src/components/ChipStrip.module.css": {
     "colour": 1,

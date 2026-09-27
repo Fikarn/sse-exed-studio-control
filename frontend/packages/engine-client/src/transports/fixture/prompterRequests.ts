@@ -17,7 +17,14 @@ import {
   speedIsValid,
   wordsAtPosition,
 } from "./prompterClock";
-import { ImportRefused, importFile, importPaste, importSentence, refusalSentence } from "./prompterImport";
+import {
+  ImportRefused,
+  importFile,
+  importPaste,
+  importSentence,
+  refusalSentence,
+  type ImportedText,
+} from "./prompterImport";
 import {
   MAX_IMPORT_BYTES,
   TOP,
@@ -214,25 +221,45 @@ function importRequest(prompter: FixturePrompter, params: JsonObject, now: numbe
   return answer({ scriptId: script.id, name: script.name, sentence }, "script-imported");
 }
 
-/** `prompter.script.paste { html?, text }`: what the page read from the clipboard, named after its first words. */
-function pasteRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
+/**
+ * What the page read from the clipboard, `{ html?, text? }`, read by the paste reader: its HTML
+ * when that yields a word, else its plain text; a refusal is `PROMPTER_IMPORT_REFUSED` with the
+ * operator's sentence (`read_paste`, shared by `prompter.script.paste` and `prompter.paste.convert`).
+ */
+function readPaste(params: JsonObject): ImportedText {
   const html = optionalText(params, "html");
   const text = optionalText(params, "text") ?? "";
-  let imported;
   try {
-    imported = importPaste(html, text);
+    return importPaste(html, text);
   } catch (error) {
     if (error instanceof ImportRefused) {
       throw new EngineRequestError("PROMPTER_IMPORT_REFUSED", refusalSentence(error.refusal, "The pasted text"));
     }
     throw error;
   }
+}
+
+/** `prompter.script.paste { html?, text }`: what the page read from the clipboard, named after its first words. */
+function pasteRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
+  const imported = readPaste(params);
   const script = newScript(prompter, firstWords(imported.paragraphs), null, imported.paragraphs, now);
   keepVersion(prompter, script.id, imported.paragraphs, VERSION_REASON.pasted, now);
   return answer(
     { scriptId: script.id, name: script.name, sentence: importSentence("the pasted text", imported) },
     "script-pasted"
   );
+}
+
+/**
+ * `prompter.paste.convert { html?, text? }` (Slice 6b): what the editor's Paste read from the
+ * clipboard, read as a paste — bold, italic, underline, paragraphs and headings as cues, with the
+ * paste's limits and refusals — and answered as `{ paragraphs, sentence }`: the paragraphs in the
+ * shape `prompter.script.edit` takes, for the editor to insert at its cursor, and the paste's
+ * sentence. It keeps nothing and raises nothing (`paste_convert_request`).
+ */
+function pasteConvertRequest(params: JsonObject): Answer {
+  const imported = readPaste(params);
+  return answer({ paragraphs: imported.paragraphs, sentence: importSentence("the pasted text", imported) });
 }
 
 function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params: JsonObject, now: number): Answer {
@@ -704,6 +731,8 @@ function answerRequest(prompter: FixturePrompter, method: RequestMethod, params:
       return importRequest(prompter, params, now);
     case "prompter.script.paste":
       return pasteRequest(prompter, params, now);
+    case "prompter.paste.convert":
+      return pasteConvertRequest(params);
     case "prompter.putOn":
       return putOnRequest(prompter, params, now);
     case "prompter.update":

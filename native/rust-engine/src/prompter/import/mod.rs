@@ -226,6 +226,15 @@ pub(crate) fn import_paste(html: Option<&str>, text: &str) -> Result<ImportedTex
     checked(txt::read_plain(text))
 }
 
+/// The bytes of a script's text, the measure `MAX_SCRIPT_TEXT_BYTES` caps.
+pub(crate) fn script_text_bytes(paragraphs: &[PrompterParagraph]) -> usize {
+    paragraphs
+        .iter()
+        .flat_map(|paragraph| &paragraph.runs)
+        .map(|run| run.text.len())
+        .sum()
+}
+
 fn checked(imported: ImportedText) -> Result<ImportedText, ImportRefusal> {
     if imported.paragraphs.is_empty() {
         return Err(ImportRefusal::Empty);
@@ -234,12 +243,7 @@ fn checked(imported: ImportedText) -> Result<ImportedText, ImportRefusal> {
     if words > MAX_SCRIPT_WORDS {
         return Err(ImportRefusal::TooLong { words });
     }
-    let bytes = imported
-        .paragraphs
-        .iter()
-        .flat_map(|paragraph| &paragraph.runs)
-        .map(|run| run.text.len())
-        .sum();
+    let bytes = script_text_bytes(&imported.paragraphs);
     if bytes > MAX_SCRIPT_TEXT_BYTES {
         return Err(ImportRefusal::TooMuchText { bytes });
     }

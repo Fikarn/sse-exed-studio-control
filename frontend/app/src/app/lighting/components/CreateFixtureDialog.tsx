@@ -14,7 +14,7 @@ import {
   lightingFixtureMaxStartAddress,
 } from "../lightingPatch";
 
-import styles from "./RenameDialog.module.css";
+import styles from "../../shared/RenameDialog.module.css";
 
 export interface CreateFixtureDialogProps {
   catalog: LightingFixtureCatalogSnapshot | null;

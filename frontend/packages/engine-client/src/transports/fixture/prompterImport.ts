@@ -156,15 +156,20 @@ function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
 }
 
+/** The bytes of a script's text, the measure `MAX_SCRIPT_TEXT_BYTES` caps (`script_text_bytes`). */
+export function scriptTextBytes(paragraphs: readonly PrompterParagraph[]): number {
+  return paragraphs.reduce(
+    (sum, paragraph) => sum + paragraph.runs.reduce((runs, run) => runs + byteLength(run.text), 0),
+    0
+  );
+}
+
 /** Nothing to read, over the word limit, then over the text limit (`checked`). */
 function checked(imported: ImportedText): ImportedText {
   if (imported.paragraphs.length === 0) throw new ImportRefused({ kind: "empty" });
   const words = wordCount(imported.paragraphs);
   if (words > MAX_SCRIPT_WORDS) throw new ImportRefused({ kind: "too-long", words });
-  const bytes = imported.paragraphs.reduce(
-    (sum, paragraph) => sum + paragraph.runs.reduce((runs, run) => runs + byteLength(run.text), 0),
-    0
-  );
+  const bytes = scriptTextBytes(imported.paragraphs);
   if (bytes > MAX_SCRIPT_TEXT_BYTES) throw new ImportRefused({ kind: "too-much-text", bytes });
   return imported;
 }

@@ -103,4 +103,16 @@ describe("domainRefresh", () => {
     expect(domainsForEvent("planning.changed")).toEqual({ domains: CHANGEABLE_DOMAINS, known: false });
     expect(domainsForEvent("rig.changed")).toEqual({ domains: CHANGEABLE_DOMAINS, known: false });
   });
+
+  it("reads the prompter again after the editor's requests, and nothing after reading a paste for it (new pages S6b)", () => {
+    for (const method of [
+      "prompter.script.create",
+      "prompter.script.rename",
+      "prompter.script.edit",
+      "prompter.script.paste",
+    ]) {
+      expect(domainsForMethod(method), method).toEqual(["prompter"]);
+    }
+    expect(domainsForMethod("prompter.paste.convert")).toEqual([]);
+  });
 });

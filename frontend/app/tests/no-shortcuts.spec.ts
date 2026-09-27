@@ -218,6 +218,45 @@ test.describe("No key does anything (new pages S3, D6)", () => {
     ]);
   });
 
+  test("the Teleprompter's editor: the browser's formatting keys and the keys other programs bind change no text", async ({
+    page,
+  }) => {
+    // New pages program, Slice 6b (Slice 6's first step 2): in the focused
+    // editor the keys of a text field act (typing, Enter, the arrows, the
+    // browser's undo and redo); its formatting keys are cancelled, and no key
+    // of Studio Control's own does anything.
+    await open(page, "teleprompter-ready", "teleprompter");
+    await page.getByTestId("teleprompter-bay-edit").click();
+    const text = page.getByTestId("teleprompter-editor-text");
+    await expect(text).toHaveAttribute("contenteditable", "true");
+    await expectNoKeyGlyphs(page, "the Teleprompter's editor");
+    const line = text.locator('p[data-mark="reading line"]');
+    const box = (await line.boundingBox())!;
+    await page.mouse.click(box.x + 40, box.y + 8);
+    await page.keyboard.press("Shift+End");
+    const before = { html: await text.innerHTML(), screen: await readScreenState(page) };
+    for (const key of [
+      "Control+b",
+      "Control+i",
+      "Control+u",
+      "Control+e",
+      "Control+j",
+      "Control+l",
+      "Control+k",
+      "Control+Shift+7",
+      "Control+Shift+8",
+      "Control+Shift+x",
+      "Control+4",
+      "F1",
+      "F2",
+    ]) {
+      await page.keyboard.press(key);
+      await settle(page);
+      expect.soft(await text.innerHTML(), `${key} in the editor must not change the text`).toBe(before.html);
+    }
+    expect.soft(await readScreenState(page), "the keys in the editor must not move the screen").toEqual(before.screen);
+  });
+
   test("the startup and recovery screens show no key glyph", async ({ page }) => {
     for (const fixture of ["startup-loading", "bootstrap-failed"]) {
       await openFixture(page, fixture);

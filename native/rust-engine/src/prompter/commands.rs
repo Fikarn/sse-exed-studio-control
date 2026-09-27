@@ -20,10 +20,13 @@ use crate::prompter::clock::{
 };
 use crate::prompter::clock::{GlassClock, Layout};
 use crate::prompter::edits::map_place;
-use crate::prompter::import::{import_file, import_paste, import_sentence};
+use crate::prompter::import::{
+    import_file, import_paste, import_sentence, script_text_bytes, ImportedText,
+    MAX_SCRIPT_TEXT_BYTES,
+};
 use crate::prompter::look::{size_is_valid, SIZE_MAX_PX, SIZE_MIN_PX, SIZE_STEP_PX};
 use crate::prompter::model::{
-    cue_targets, sanitize_text, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
+    cue_targets, format_count, sanitize_text, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
     MAX_SCRIPT_NAME_CHARS, MAX_SCRIPT_WORDS,
 };
 use crate::prompter::runtime::{with_prompter, Prompter};
@@ -69,6 +72,7 @@ pub(crate) fn handle_prompter_request(
             ),
             "prompter.script.import" => import_request(prompter, connection, params, now)?,
             "prompter.script.paste" => paste_request(connection, params)?,
+            "prompter.paste.convert" => paste_convert_request(params)?,
             "prompter.script.create" => create_request(connection, params)?,
             "prompter.script.rename" => rename_request(connection, params)?,
             "prompter.script.edit" => edit_request(prompter, connection, params)?,
@@ -292,7 +296,9 @@ fn new_script_name(connection: &Connection) -> Result<String, PrompterError> {
 
 /// The text the editor sends, cleaned as an import is: sanitized runs,
 /// neighbours of one emphasis joined. Empty paragraphs stay (the editor is
-/// typing into them); an empty script is one empty paragraph.
+/// typing into them); an empty script is one empty paragraph. It is capped as
+/// an import is, by its words and by its text (`MAX_SCRIPT_TEXT_BYTES`), so
+/// pastes into the editor cannot build what no import could.
 fn edited_paragraphs(params: &Value) -> Result<Vec<PrompterParagraph>, PrompterError> {
     let raw = params.get("paragraphs").cloned().ok_or_else(|| {
         PrompterError::Invalid(String::from("paragraphs must be the script's text."))
@@ -317,7 +323,18 @@ fn edited_paragraphs(params: &Value) -> Result<Vec<PrompterParagraph>, PrompterE
         return Err(PrompterError::Refused(
             "PROMPTER_SCRIPT_TOO_LONG",
             format!(
-                "The script would have {words} words; a script can have up to {MAX_SCRIPT_WORDS}. Split it into shorter scripts."
+                "The script would have {} words; a script can have up to {}. Split it into shorter scripts.",
+                format_count(words),
+                format_count(MAX_SCRIPT_WORDS)
+            ),
+        ));
+    }
+    if script_text_bytes(&paragraphs) > MAX_SCRIPT_TEXT_BYTES {
+        return Err(PrompterError::Refused(
+            "PROMPTER_SCRIPT_TOO_LONG",
+            format!(
+                "The script would hold more text than a script can hold ({} MB). Split it into shorter scripts.",
+                MAX_SCRIPT_TEXT_BYTES / (1024 * 1024)
             ),
         ));
     }
@@ -423,15 +440,30 @@ fn import_request(
     ))
 }
 
+/// A paste in the sentences the operator reads: "The pasted text has no text
+/// in it." and "Imported the pasted text: …".
+const PASTE_REFUSAL_SOURCE: &str = "The pasted text";
+const PASTE_SENTENCE_SOURCE: &str = "the pasted text";
+
+/// What the page read from the clipboard, `{ html?, text? }`, read by the
+/// paste reader: its HTML when that yields a word, else its plain text. A
+/// paste the reader refuses is `PROMPTER_IMPORT_REFUSED` with the operator's
+/// sentence. `prompter.script.paste` and `prompter.paste.convert` share it.
+fn read_paste(params: &Value) -> Result<ImportedText, PrompterError> {
+    let html = optional_text(params, "html")?;
+    let text = optional_text(params, "text")?.unwrap_or_default();
+    import_paste(html, text).map_err(|refusal| {
+        PrompterError::Refused(
+            "PROMPTER_IMPORT_REFUSED",
+            refusal.sentence(PASTE_REFUSAL_SOURCE),
+        )
+    })
+}
+
 /// `prompter.script.paste { html?, text }`: what the page read from the
 /// clipboard, as a new script named after its first words.
 fn paste_request(connection: &mut Connection, params: &Value) -> Handled {
-    let html = optional_text(params, "html")?;
-    let text = optional_text(params, "text")?.unwrap_or_default();
-    const SOURCE: &str = "The pasted text";
-    let imported = import_paste(html, text).map_err(|refusal| {
-        PrompterError::Refused("PROMPTER_IMPORT_REFUSED", refusal.sentence(SOURCE))
-    })?;
+    let imported = read_paste(params)?;
     let id = store::new_script_id()?;
     let name = first_words(&imported.paragraphs);
     let transaction = connection.transaction()?;
@@ -455,9 +487,26 @@ fn paste_request(connection: &mut Connection, params: &Value) -> Handled {
         json!({
             "scriptId": id,
             "name": name,
-            "sentence": import_sentence("the pasted text", &imported),
+            "sentence": import_sentence(PASTE_SENTENCE_SOURCE, &imported),
         }),
         Some("script-pasted"),
+    ))
+}
+
+/// `prompter.paste.convert { html?, text? }`: what the editor's Paste read
+/// from the clipboard (Slice 6b; the operator's answer of 2026-09-27: keep
+/// the formatting), read as `prompter.script.paste` reads it — bold, italic,
+/// underline, paragraphs and headings as cues — under the same limits and
+/// refusals, and answered as `{ paragraphs, sentence }`: the paragraphs in
+/// the shape `prompter.script.edit` takes, for the editor to insert at its
+/// cursor, and the paste's sentence. It keeps nothing — no script, no version
+/// — and raises no event; the edit that follows saves the text.
+fn paste_convert_request(params: &Value) -> Handled {
+    let imported = read_paste(params)?;
+    let sentence = import_sentence(PASTE_SENTENCE_SOURCE, &imported);
+    Ok((
+        json!({ "paragraphs": imported.paragraphs, "sentence": sentence }),
+        None,
     ))
 }
 
