@@ -36,6 +36,10 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "lighting.power.all",
   "lighting.scene.recall",
   "lighting.settings.update",
+  // The Teleprompter: what the presenter reads changes (the proposal §5.5).
+  "prompter.clear",
+  "prompter.putOn",
+  "prompter.update",
   "support.backup.restore",
 ];
 
@@ -54,7 +58,7 @@ export const RECENT_ACTIONS_LIMIT = 50;
 
 /** One row before it is stored: which part of the studio, what, on what, and the sentence the operator reads. */
 export interface UiActionRow {
-  domain: "lighting" | "audio" | "setup";
+  domain: "lighting" | "audio" | "setup" | "prompter";
   action: string;
   target: string;
   detail: string;
@@ -367,6 +371,23 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
           detail: "Backup archive restored: lighting and audio state replaced",
         },
       ];
+
+    // The Teleprompter (Slice 4): putting a script on, replacing, updating and clearing
+    // what the prompter shows (the proposal §5.5); the result carries the sentence.
+    case "prompter.putOn":
+    case "prompter.update":
+    case "prompter.clear": {
+      const action = text(result, ["action"]);
+      if (action !== "put-on" && action !== "replaced" && action !== "updated" && action !== "cleared") return [];
+      return [
+        {
+          domain: "prompter",
+          action,
+          target: text(result, ["name"]) ?? "Prompter",
+          detail: (text(result, ["sentence"]) ?? "The prompter changed").replace(/\.+$/, ""),
+        },
+      ];
+    }
     default:
       return [];
   }

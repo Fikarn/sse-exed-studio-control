@@ -457,8 +457,32 @@ impl HtmlReader {
     }
 
     fn line_break(&mut self) {
+        // A blank line — a second break with no word since the first — ends
+        // the paragraph, as an empty line does in a `.txt` (§3.2): e-mail and
+        // web pastes often part their paragraphs with `<br><br>`. In a table
+        // cell or a heading it stays a line of the one paragraph.
+        if self.has_text && !self.heading && !self.top().in_cell && self.at_blank_line() {
+            self.flush();
+            return;
+        }
         self.push("\n", Marks::default());
         self.last_space = true;
+    }
+
+    /// Whether the text so far ends in a line break followed by nothing but
+    /// white space.
+    fn at_blank_line(&self) -> bool {
+        for run in self.current.iter().rev() {
+            for character in run.text.chars().rev() {
+                if character == '\n' {
+                    return true;
+                }
+                if !character.is_whitespace() {
+                    return false;
+                }
+            }
+        }
+        false
     }
 
     /// A block element starts or ends: a new paragraph, except inside a table

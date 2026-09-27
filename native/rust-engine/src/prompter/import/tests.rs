@@ -423,8 +423,9 @@ fn broken_html_still_reads() {
 fn hostile_pastes_read_in_one_pass() {
     let breaks = format!("<p>a{}b</p>", "<br>".repeat(200_000));
     let imported = html(&breaks);
-    assert_eq!(imported.paragraphs.len(), 1);
-    assert_eq!(imported.paragraphs[0].text().matches('\n').count(), 200_000);
+    // The first blank line ends the paragraph; the breaks after it hold no
+    // word, so they start nothing (and are never scanned again).
+    assert_eq!(texts(&imported.paragraphs), ["a", "b"]);
 
     let markers = format!(
         "<p style='mso-list:l0'>{}Item</p>",
@@ -439,4 +440,30 @@ fn hostile_pastes_read_in_one_pass() {
         "</b></div>".repeat(50_000)
     );
     assert_eq!(texts(&html(&deep).paragraphs), ["Deep"]);
+}
+
+// §3.2: in a paste, a blank line (`<br><br>`, as e-mail and web pages part
+// their paragraphs) ends a paragraph, as an empty line does in a `.txt`; a
+// single `<br>` stays a line break, and a table cell keeps its lines.
+#[test]
+fn a_blank_line_in_pasted_html_ends_a_paragraph() {
+    let imported = import_paste(
+        Some("<div>First line<br>second line<br><br>Next paragraph<br> <br>Third</div><table><tr><td>a<br><br>b</td></tr></table>"),
+        "",
+    )
+    .expect("the paste reads");
+    let texts: Vec<String> = imported
+        .paragraphs
+        .iter()
+        .map(PrompterParagraph::text)
+        .collect();
+    assert_eq!(
+        texts,
+        [
+            "First line\nsecond line",
+            "Next paragraph",
+            "Third",
+            "a\n\nb"
+        ]
+    );
 }

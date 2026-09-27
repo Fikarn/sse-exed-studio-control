@@ -11,6 +11,8 @@ export {
   faderDbToLin,
   faderLinToDb,
 } from "./audio/faderCurve";
+export { positionAt, speedAt, wordsAdvanced } from "./prompter/motion";
+export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
 export { createFixtureTransport } from "./transports/fixtureTransport";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {
@@ -100,3 +102,17 @@ export type { LightingSceneFixtureSnapshot } from "./generated/snapshots/Lightin
 export type { LightingSceneSnapshot } from "./generated/snapshots/LightingSceneSnapshot";
 export type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
 export type { LightingSpatialMarker } from "./generated/snapshots/LightingSpatialMarker";
+export type { PrompterAnchor } from "./generated/snapshots/PrompterAnchor";
+export type { PrompterCue } from "./generated/snapshots/PrompterCue";
+export type { PrompterGlassSnapshot } from "./generated/snapshots/PrompterGlassSnapshot";
+export type { PrompterGlassSummary } from "./generated/snapshots/PrompterGlassSummary";
+export type { PrompterLayoutLine } from "./generated/snapshots/PrompterLayoutLine";
+export type { PrompterLook } from "./generated/snapshots/PrompterLook";
+export type { PrompterParagraph } from "./generated/snapshots/PrompterParagraph";
+export type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
+export type { PrompterRun } from "./generated/snapshots/PrompterRun";
+export type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
+export type { PrompterScriptSummary } from "./generated/snapshots/PrompterScriptSummary";
+export type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
+export type { PrompterTextColour } from "./generated/snapshots/PrompterTextColour";
+export type { PrompterVersionSummary } from "./generated/snapshots/PrompterVersionSummary";

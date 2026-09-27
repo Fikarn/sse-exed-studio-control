@@ -10,12 +10,14 @@ import type { EventName, JsonObject, RequestMethod } from "../../generated/proto
 import type { FixtureScenario } from "../../types";
 import { createFixtureTransport } from "../fixtureTransport";
 import { cloneJson } from "./json";
+import { WORKSPACES, workspaceRefusal } from "./setupRequests";
 
 // New pages program, Slice 2 (D3): the fixture double's backup replies say what the
-// hardware link says (`native/rust-engine/src/support.rs`). A new archive is format 5 and
-// the export's reply counts nothing of Planning; an archive written before Planning left
-// is format 4; no reply counts projects, tasks, checklist items or activity entries, and
-// none says a Planning part was skipped, because the double never held Planning data.
+// hardware link says (`native/rust-engine/src/support.rs`). The export's reply counts
+// nothing of Planning; an archive written before Planning left is format 4; no reply
+// counts projects, tasks, checklist items or activity entries, and none says a Planning
+// part was skipped, because the double never held Planning data. Slice 4: a new archive
+// is format 6, with the Teleprompter's part, and Verify counts its scripts.
 
 const PLANNING_COUNTS = ["projectCount", "taskCount", "checklistItemCount", "activityEntryCount"];
 
@@ -27,16 +29,16 @@ function openDouble() {
 }
 
 describe("the fixture double's backup replies", () => {
-  it("exports a format-5 archive and verifies it as one", async () => {
+  it("exports a format-6 archive and verifies it as one, counting its scripts", async () => {
     const { request } = openDouble();
 
     const exported = await request("support.backup.export");
     expect(Object.keys(exported).sort()).toEqual(["fileName", "formatVersion", "path"]);
-    expect(exported.formatVersion).toBe(5);
+    expect(exported.formatVersion).toBe(6);
 
     const verified = await request("support.backup.verify", { path: exported.path as string });
-    expect(verified).toMatchObject({ formatVersion: 5, kind: "archive", ok: true });
-    expect(verified.detail).toMatch(/^Backup archive, format 5, exported .+\.$/);
+    expect(verified).toMatchObject({ formatVersion: 6, kind: "archive", ok: true });
+    expect(verified.detail).toMatch(/^Backup archive, format 6, exported .+, with 0 scripts\.$/);
     expect(String(verified.detail)).not.toMatch(/project|task|Planning/);
   });
 
@@ -49,7 +51,7 @@ describe("the fixture double's backup replies", () => {
     const verified = await request("support.backup.verify", { path: older!.path as string });
     expect(verified).toMatchObject({ formatVersion: 4, kind: "archive", ok: true });
     expect(verified.detail).toMatch(/^Backup archive, format 4, exported .+\.$/);
-    expect(String(verified.detail)).not.toMatch(/project|task|Planning/);
+    expect(String(verified.detail)).not.toMatch(/project|task|Planning|script/);
   });
 
   it("restores with no Planning counts and nothing said to be left out", async () => {
@@ -68,6 +70,130 @@ describe("the fixture double's backup replies", () => {
       expect(restored).not.toHaveProperty(key);
     }
     expect(restored).toMatchObject({ requiresRestart: false, sourceFormat: "native-support-backup" });
+  });
+
+  // Format 6 (Slice 4; the hardware link's `a_format_6_archive_adds_scripts_and_never_removes_one`):
+  // a restore adds the scripts the double lacks and never removes or overwrites one — a
+  // differing text comes back as an earlier version — brings the look back, and leaves
+  // what the prompter shows paused where it was (D12).
+  it("restores the Teleprompter's part: adds scripts, never removes one, brings the look back", async () => {
+    const { request, transport } = openDouble();
+    const create = async (name: string, text: string) => {
+      const id = (await request("prompter.script.create", { name })).scriptId as string;
+      await request("prompter.script.edit", {
+        scriptId: id,
+        paragraphs: [{ runs: [{ text }] }, { runs: [{ text: "Second." }] }],
+      });
+      return id;
+    };
+    const intro = await create("Intro", "Welcome as archived.");
+    const spare = await create("Spare", "Spare words.");
+    await request("prompter.putOn", { scriptId: spare });
+    await request("prompter.clear");
+    await request("prompter.script.remove", { scriptId: spare });
+    await request("prompter.look.update", { textColour: "yellow" });
+
+    const exported = await request("support.backup.export");
+    const path = exported.path as string;
+    expect((await request("support.backup.verify", { path })).detail).toMatch(/, with 2 scripts\.$/);
+
+    await request("prompter.script.edit", {
+      scriptId: intro,
+      paragraphs: [{ runs: [{ text: "Welcome as edited." }] }, { runs: [{ text: "Second." }] }],
+    });
+    await request("prompter.putOn", { scriptId: intro });
+    await request("prompter.jump", { to: "paragraph", paragraph: 1 });
+    await request("prompter.script.delete", { scriptId: spare });
+    await request("prompter.script.create", { name: "Newer" });
+    await request("prompter.look.update", { textColour: "white" });
+    const glassBefore = await request("prompter.glass.snapshot");
+
+    const events: JsonObject[] = [];
+    transport.subscribe((envelope) => events.push({ event: envelope.event, ...envelope.payload }));
+    const restored = await request("support.backup.restore", { path });
+    expect(restored.detail).toBe(
+      "1 script added to the Teleprompter; 1 script came back as an earlier version of a script already here."
+    );
+    expect(events.map((event) => event.event)).toEqual([
+      "support.changed",
+      "commissioning.changed",
+      "app.changed",
+      "prompter.changed",
+    ]);
+    expect(events[3]).toMatchObject({ reason: "backup-restored", anchor: { playing: false } });
+
+    const snapshot = await request("prompter.snapshot");
+    expect((snapshot.look as JsonObject).textColour).toBe("yellow");
+    expect((snapshot.scripts as JsonObject[]).map((row) => row.name)).toEqual(["Intro", "Newer"]);
+    expect((snapshot.removed as JsonObject[]).map((row) => row.id)).toEqual([spare]);
+    const introNow = await request("prompter.script.snapshot", { scriptId: intro });
+    expect((introNow.paragraphs as JsonObject[])[0]).toMatchObject({ runs: [{ text: "Welcome as edited." }] });
+    expect((introNow.versions as JsonObject[])[0]?.reason).toBe("from-backup");
+    const spareNow = await request("prompter.script.snapshot", { scriptId: spare });
+    expect((spareNow.versions as JsonObject[])[0]?.reason).toBe("put-on");
+
+    const glassAfter = await request("prompter.glass.snapshot");
+    expect(glassAfter.paragraphs).toEqual(glassBefore.paragraphs);
+    expect(glassAfter.scriptId).toBe(intro);
+    expect((snapshot.glass as JsonObject).place).toEqual({ paragraph: 1, word: 0 });
+
+    // A second restore of the same archive adds nothing more.
+    expect(await request("support.backup.restore", { path })).not.toHaveProperty("detail");
+  });
+});
+
+// Slice 4: `settings.update` opens the pages the hardware link knows and refuses any
+// other with its sentence. The list is read from `shell_settings.rs` itself, so a page
+// added or taken away on one side only fails here.
+
+const SHELL_SETTINGS_RS = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../native/rust-engine/src/shell_settings.rs"),
+  "utf-8"
+);
+
+function hardwareLinkWorkspaces(): string[] {
+  const list = SHELL_SETTINGS_RS.match(/\bpub const WORKSPACES: &\[&str\] = &\[([^\]]*)\];/)?.[1];
+  if (list === undefined) throw new Error("WORKSPACES is not in shell_settings.rs any more; update this test with it");
+  return [...list.matchAll(/"([^"\\]*)"/g)].map((entry) => entry[1]!);
+}
+
+function hardwareLinkWorkspaceRefusal(): string {
+  const format = SHELL_SETTINGS_RS.match(
+    /\bpub fn workspace_refusal\(\) -> String \{\s*format!\(\s*"([^"\\]*)",\s*WORKSPACES\.join\(", "\)\s*\)/
+  )?.[1];
+  if (format === undefined || format.split("{}").length !== 2) {
+    throw new Error('workspace_refusal is not format!("…{}", WORKSPACES.join(", ")) any more; update this test');
+  }
+  return format.replace("{}", hardwareLinkWorkspaces().join(", "));
+}
+
+describe("the fixture double's pages", () => {
+  it("knows the hardware link's pages, in its order", () => {
+    expect([...WORKSPACES]).toEqual(hardwareLinkWorkspaces());
+    expect(workspaceRefusal()).toBe(hardwareLinkWorkspaceRefusal());
+  });
+
+  it("opens the Teleprompter and refuses a page it does not know, changing nothing", async () => {
+    const { request, transport } = openDouble();
+    const events: EventName[] = [];
+    transport.subscribe((envelope) => events.push(envelope.event));
+
+    const opened = await request("settings.update", { workspace: "teleprompter" });
+    expect((opened.shell as JsonObject).workspace).toBe("teleprompter");
+    expect(events).toEqual(["settings.changed"]);
+    const before = await request("app.snapshot");
+
+    // The whole request is refused, the Setup section it also names included.
+    const otherSection =
+      ((before.shell as JsonObject).setup as JsonObject).activeSection === "support" ? "commissioning" : "support";
+    for (const unknown of ["cameras", "Teleprompter", "planning", ""]) {
+      await expect(
+        request("settings.update", { workspace: unknown, setup: { activeSection: otherSection } })
+      ).rejects.toThrow(hardwareLinkWorkspaceRefusal());
+    }
+    await expect(request("settings.update", { workspace: 3 })).rejects.toThrow("workspace must be a string");
+    expect(await request("app.snapshot")).toEqual(before);
+    expect(events).toEqual(["settings.changed"]);
   });
 });
 
