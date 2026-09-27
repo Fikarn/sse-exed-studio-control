@@ -212,11 +212,14 @@ function rustTable(fn: string, arm: RegExp): Record<string, string> {
   if (Object.keys(table).length === 0) throw new Error(`model.rs's fn ${fn} has no arms this test reads; update it`);
   return table;
 }
-const WORDS_ARM = /((?:Self::\w+\s*\|?\s*)+)=> "([^"]*)"/g;
+// One arm: `Self::A` or `Self::A | Self::B`, then what it gives. Each space is matched one
+// way only, so a long arm cannot make the pattern backtrack.
+const ARM_VARIANTS = String.raw`(Self::\w+(?:\s*\|\s*Self::\w+)*)\s*=>\s*`;
+const WORDS_ARM = new RegExp(`${ARM_VARIANTS}"([^"]*)"`, "g");
 const RUST_LABELS = rustTable("label", WORDS_ARM);
 const RUST_AUTO_WORDS = rustTable("words", WORDS_ARM);
 const RUST_STATE_WORDS = rustTable("word", WORDS_ARM);
-const RUST_STATE_TONES = rustTable("tone", /((?:Self::\w+\s*\|?\s*)+)=> CameraTone::(\w+)/g);
+const RUST_STATE_TONES = rustTable("tone", new RegExp(`${ARM_VARIANTS}CameraTone::(\\w+)`, "g"));
 
 /**
  * The literal `template`, which must be in the cameras' source word for word, its
