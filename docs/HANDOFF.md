@@ -403,7 +403,7 @@ Operator-visible frontend change (see `docs/DEVELOPMENT.md §2c`):
 
 ```bash
 npm run build --workspace @sse/frontend-app   # Playwright serves dist — always build first
-cd frontend/app && npx playwright test        # every project: 364 cases since the new pages program's Slice SW (391 after Slice 1, 441 before); 59 win32 captures at 2560x1440, compared on Windows only (82 before Slice SW)
+cd frontend/app && npx playwright test        # every project: 423 cases since the new pages program's Slice 6b (364 after Slice SW, 391 after Slice 1, 441 before); 59 win32 captures at 2560x1440, compared on Windows only (82 before Slice SW)
 node scripts/ui-census.mjs                    # the 81-board UI contract (75 before Slice 6b, 63 before Slice 6a, 66 before Slice SW, 81 before Slice 1); ~4 min
 cd ../.. && node scripts/check-operator-copy.mjs
 ```
