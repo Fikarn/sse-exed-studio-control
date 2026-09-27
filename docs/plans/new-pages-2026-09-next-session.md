@@ -30,7 +30,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
 ## Where things stand
 
-- **Landed on `main`:** S1 (#211), S2 (#213), SF (#214), S2b (#215), S3 (#216), SW (#221), C0 (#224), S4 (#225: the Teleprompter's scripts and the prompter in the hardware link) S5a (#226: the glass, and the Prompter XL's state in the hardware link; the first cloud slice) and S6a (#227: the Teleprompter page without its editor). Each slice's record is in the ledger, and each merge's commits are kept under a tag `archive/new-pages-<slice>-2026-09` (pushed from the workstation).
+- **Landed on `main`:** S1 (#211), S2 (#213), SF (#214), S2b (#215), S3 (#216), SW (#221), C0 (#224), S4 (#225: the Teleprompter's scripts and the prompter in the hardware link), S5a (#226: the glass, and the Prompter XL's state in the hardware link; the first cloud slice) and S6a (#227: the Teleprompter page without its editor). Each slice's record is in the ledger, and each merge's commits are kept under a tag `archive/new-pages-<slice>-2026-09` (pushed from the workstation).
 - **The cloud's mandate (D23, 2026-09-27):** the program's front end and visuals, end to end. That means:
   - both pages, the glass, every board, the header's tabs and lamps, Setup's steps and the deck pages' drawings;
   - the hardware-link and contract work they stand on, where it compiles on Linux.
@@ -46,7 +46,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
 The first cloud session put the re-cut to the operator with options and costs; the answer is Part C's **Rescope:** in the ledger. In short:
 
-- **The cloud, in order:** S5a (the glass and the Prompter XL's state in the hardware link) → S6a (the Teleprompter page) → S6b (its editor, New script and Paste) → S8 (the cameras' model and the simulated cameras) → S9 (the Cameras page) → S7 with S12 (the two deck pages, one slice). The slice numbers stay.
+- **The cloud, in order:** S5a (the glass and the Prompter XL's state in the hardware link) → S6a (the Teleprompter page) → S6b (its editor, Rename, New script and Paste) → S8 (the cameras' model and the simulated cameras) → S9 (the Cameras page) → S7 with S12 (the two deck pages, one slice). The slice numbers stay.
 - **The workstation, once those have landed (serial):** the catch-up, then S5b (the Prompter XL's window), S10, S11, S13 (gated on D18) and the close-out.
 - **The shell:** a cloud slice may change `native/tauri-shell`, `cfg(windows)` code included, only when it type-checks and lints for Windows in that session (below). What it does on Windows at run time goes on the catch-up list.
 - **New UI-contract boards** are seeded with `node scripts/ui-census.mjs --fixtures <its fixtures> --write-ratchets` (from `frontend/app`), so the boards seeded on Windows keep their figures.

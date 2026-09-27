@@ -315,8 +315,8 @@ page to fill the shell's plate region, and `teleprompter/glass/` is the glass
 both it and the Prompter XL's window draw. Its script editor (Slice 6b) is
 `teleprompter/editor/`: the browser makes the edits (so its own undo covers
 them) and `editorDom.ts` reads the script back from the page's markup after
-each one; `beforeinput` cancels only the browser's formatting keys, drops and
-a native paste, which goes through `prompter.paste.convert` first. The fixture double is
+each one; `beforeinput` cancels only the browser's formatting keys, lists, links and
+drops, and a native paste, which goes through `prompter.paste.convert` first. The fixture double is
 `frontend/packages/engine-client/src/transports/fixtureTransport.ts` over the
 modules in `transports/fixture/`, one request handler per domain
 (`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`,
