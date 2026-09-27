@@ -169,6 +169,28 @@ pub(crate) fn effective_entries(entries: &HealthEntries, now: u64) -> HealthEntr
         .collect()
 }
 
+/// The whole status with the Prompter XL's part (the new pages program's
+/// Slice 5a, first step 1): a Prompter XL state makes it no worse than
+/// attention — the header's `Prompter` lamp itself goes red — since the sound
+/// and the light are unaffected.
+pub(crate) fn with_prompter_status(status: &'static str, prompter: &str) -> &'static str {
+    let severity = |word: &str| match word {
+        "error" => 3,
+        "attention" => 2,
+        "warning" => 1,
+        _ => 0,
+    };
+    let prompter = match prompter {
+        "ok" => "ok",
+        _ => "attention",
+    };
+    if severity(prompter) > severity(status) {
+        "attention"
+    } else {
+        status
+    }
+}
+
 /// `error` when the saved data is not usable or an entry says so,
 /// `attention` when something could not bind, `warning` when a backup is
 /// late or failed, `ok` otherwise.
@@ -211,7 +233,21 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
     let control_surface = build_control_surface_health_check(runtime);
     let sqlite_version = read_sqlite_version(&runtime.db_path)?;
     let engine = effective_entries(&registry_entries(), unix_now_secs());
-    let status = derive_status(&engine, runtime.storage_ready);
+    let prompter = if runtime.storage_ready {
+        Some(
+            crate::prompter::prompter_health_check(&runtime.db_path)
+                .map_err(|error| format!("The prompter's check could not be read: {error:?}"))?,
+        )
+    } else {
+        None
+    };
+    let status = match &prompter {
+        Some(check) => with_prompter_status(
+            derive_status(&engine, runtime.storage_ready),
+            check.whole_status().as_str(),
+        ),
+        None => derive_status(&engine, runtime.storage_ready),
+    };
     let lighting_summary = lighting.summary.clone();
     let audio_summary = audio.summary.clone();
     let control_surface_summary = control_surface
@@ -268,6 +304,9 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
             "lighting": lighting,
             "audio": audio,
             "controlSurface": control_surface,
+            // Slice 5a: the Prompter XL and `NOT UPDATED`; `null` while the
+            // saved data is not usable.
+            "prompter": serde_json::to_value(&prompter)?,
             "engine": serde_json::to_value(&engine)?,
         }
     }))
@@ -470,6 +509,20 @@ mod tests {
         let bridge = &registry.entries()[SUBSYSTEM_BRIDGE];
         assert_eq!(bridge.detail, "ready");
         assert_eq!(bridge.at, 5);
+    }
+
+    // The new pages program's Slice 5a, first step 1: a Prompter XL state
+    // takes the whole status no further than attention, and never lowers it.
+    #[test]
+    fn the_prompter_raises_the_whole_status_no_further_than_attention() {
+        use super::with_prompter_status;
+        assert_eq!(with_prompter_status("ok", "ok"), "ok");
+        assert_eq!(with_prompter_status("ok", "attention"), "attention");
+        assert_eq!(with_prompter_status("ok", "error"), "attention");
+        assert_eq!(with_prompter_status("warning", "error"), "attention");
+        assert_eq!(with_prompter_status("attention", "ok"), "attention");
+        assert_eq!(with_prompter_status("error", "ok"), "error");
+        assert_eq!(with_prompter_status("error", "attention"), "error");
     }
 
     #[test]

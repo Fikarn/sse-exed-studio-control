@@ -13,6 +13,7 @@ pub(crate) mod import;
 pub(crate) mod look;
 pub(crate) mod model;
 pub(crate) mod runtime;
+pub(crate) mod screen;
 pub(crate) mod snapshot;
 pub(crate) mod store;
 #[cfg(test)]
@@ -20,12 +21,14 @@ pub(crate) mod test_support;
 #[cfg(test)]
 mod tests_glass;
 #[cfg(test)]
+mod tests_screen;
+#[cfg(test)]
 mod tests_scripts;
 
 use crate::prompter::clock::PrompterAnchor;
 use serde_json::Value;
 
-pub(crate) use commands::{after_archive_restore, handle_prompter_request};
+pub(crate) use commands::{after_archive_restore, handle_prompter_request, prompter_health_check};
 pub(crate) use runtime::spawn_prompter_clock;
 
 /// A refused or failed `prompter.*` request.
@@ -67,4 +70,8 @@ pub(crate) struct PrompterReply {
     pub reason: Option<&'static str>,
     /// The glass's anchor after the request; `None` when nothing is on it.
     pub anchor: Option<PrompterAnchor>,
+    /// `checks.prompter` says something else after the request (Slice 5a):
+    /// the reply also raises `app.changed { reason: "health" }`, so the
+    /// header's lamp follows.
+    pub health_changed: bool,
 }

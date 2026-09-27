@@ -9,7 +9,9 @@
 //! replacing what the prompter shows needs `replace: true` (the page's
 //! second press); an edit never reaches the glass before Update; the script
 //! on the prompter cannot be removed; only a removed script can be deleted
-//! for good.
+//! for good. Slice 5a adds the Prompter XL as the shell reports it: `PLAY` is
+//! refused while nothing is drawn on the glass, and a scroll pauses when the
+//! glass goes.
 
 use crate::diagnostics::{log_event, LogLevel};
 use crate::prompter::clock::{
@@ -25,7 +27,10 @@ use crate::prompter::model::{
     MAX_SCRIPT_NAME_CHARS, MAX_SCRIPT_WORDS,
 };
 use crate::prompter::runtime::{with_prompter, Prompter};
-use crate::prompter::snapshot::{read_glass_snapshot, read_script_snapshot, read_snapshot};
+use crate::prompter::screen::{PrompterHealthCheck, PrompterScreen};
+use crate::prompter::snapshot::{
+    glass_edited_name, read_glass_snapshot, read_script_snapshot, read_snapshot,
+};
 use crate::prompter::store::{self, reason, NewScript, StoredScript};
 use crate::prompter::{PrompterError, PrompterReply};
 use base64::Engine as _;
@@ -44,6 +49,15 @@ pub(crate) fn handle_prompter_request(
     params: &Value,
 ) -> Result<PrompterReply, PrompterError> {
     with_prompter(db_path, |prompter, connection, now| {
+        let reads = matches!(
+            method,
+            "prompter.snapshot" | "prompter.glass.snapshot" | "prompter.script.snapshot"
+        );
+        let check_before = if reads {
+            None
+        } else {
+            Some(health_check(prompter, connection)?)
+        };
         let (result, reason) = match method {
             "prompter.snapshot" => (
                 serde_json::to_value(read_snapshot(prompter, connection, now)?)?,
@@ -82,17 +96,42 @@ pub(crate) fn handle_prompter_request(
             "prompter.textSize" => text_size_request(prompter, connection, params, now)?,
             "prompter.look.update" => look_request(prompter, connection, params, now)?,
             "prompter.layout.report" => layout_request(prompter, params, now)?,
+            "prompter.screen.report" => screen_request(prompter, connection, params, now)?,
             other => {
                 return Err(PrompterError::Invalid(format!(
                     "Unsupported method: {other}"
                 )))
             }
         };
+        let health_changed = match check_before {
+            Some(before) => health_check(prompter, connection)? != before,
+            None => false,
+        };
         Ok(PrompterReply {
             result,
             reason,
             anchor: prompter.glass.as_ref().map(|glass| glass.anchor(now)),
+            health_changed,
         })
+    })
+}
+
+/// `checks.prompter`: the worse of the Prompter XL's state and `NOT UPDATED`
+/// (Slice 5a, first step 3).
+fn health_check(
+    prompter: &Prompter,
+    connection: &Connection,
+) -> Result<PrompterHealthCheck, PrompterError> {
+    Ok(PrompterHealthCheck::new(
+        &prompter.screen,
+        glass_edited_name(prompter, connection)?.as_deref(),
+    ))
+}
+
+/// `checks.prompter` for `health.snapshot`.
+pub(crate) fn prompter_health_check(db_path: &Path) -> Result<PrompterHealthCheck, PrompterError> {
+    with_prompter(db_path, |prompter, connection, _| {
+        health_check(prompter, connection)
     })
 }
 
@@ -774,6 +813,13 @@ fn glass_mut(prompter: &mut Prompter) -> Result<&mut GlassClock, PrompterError> 
 }
 
 fn play_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
+    if prompter.glass.is_none() {
+        return Err(nothing_on());
+    }
+    // Slice 5a: nothing scrolls where nobody can read it (the proposal §7).
+    if let Some(refusal) = prompter.screen.play_refusal() {
+        return Err(refusal);
+    }
     let glass = glass_mut(prompter)?;
     if glass.at_end(now) {
         let name = existing_script(connection, &glass.script_id)
@@ -1059,6 +1105,40 @@ fn layout_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Hand
         .map_err(PrompterError::Invalid)?;
     glass.accept_layout(now, layout);
     Ok((json!({ "accepted": true }), Some("laid-out")))
+}
+
+/// `prompter.screen.report { found, duplicated?, width?, height?, refreshHz?,
+/// windowError? }`: the Prompter XL as the shell found it in Windows' display
+/// configuration (Slice 5a; the shell sends it from Slice 5b, at the start,
+/// at every change and after the hardware link restarts). When the glass is
+/// no longer drawn, a scroll pauses where it is — its place kept, the next
+/// `PLAY` refused until the glass is back — and plugging back in leaves it
+/// paused (D12: nothing scrolls by itself). A report that changes nothing
+/// raises nothing.
+fn screen_request(
+    prompter: &mut Prompter,
+    connection: &mut Connection,
+    params: &Value,
+    now: Instant,
+) -> Handled {
+    let screen = PrompterScreen::from_report(params)?;
+    if screen == prompter.screen {
+        return Ok((json!({ "screen": screen.summary(), "paused": false }), None));
+    }
+    prompter.screen = screen;
+    let mut paused = false;
+    if !prompter.screen.state().draws() {
+        if let Some(glass) = prompter.glass.as_mut().filter(|glass| glass.playing) {
+            glass.pause(now);
+            let resting = glass.resting_place(now);
+            prompter.save_this_place(connection, resting);
+            paused = true;
+        }
+    }
+    Ok((
+        json!({ "screen": prompter.screen.summary(), "paused": paused }),
+        Some("screen"),
+    ))
 }
 
 /// Pauses the prompter where it is, at once, keeping the place: a restore

@@ -602,6 +602,7 @@ impl EngineApp {
             "prompter.textSize" => self.dispatch_prompter(request),
             "prompter.look.update" => self.dispatch_prompter(request),
             "prompter.layout.report" => self.dispatch_prompter(request),
+            "prompter.screen.report" => self.dispatch_prompter(request),
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
@@ -864,13 +865,14 @@ impl EngineApp {
     // branches.
     // -----------------------------------------------------------------------
 
-    /// A `prompter.*` request: its reply, and `prompter.changed` with the
-    /// glass's anchor when it changed anything.
+    /// A `prompter.*` request: its reply, `prompter.changed` with the
+    /// glass's anchor when it changed anything, and `app.changed { reason:
+    /// "health" }` when `checks.prompter` says something else after it
+    /// (Slice 5a), so the header's lamp follows.
     fn dispatch_prompter(&self, request: RequestEnvelope) -> EngineReply {
         match handle_prompter_request(&self.runtime.db_path, &request.method, &request.params) {
-            Ok(reply) => EngineReply {
-                response: ok_response(request.id, reply.result),
-                events: reply
+            Ok(reply) => {
+                let mut events: Vec<serde_json::Value> = reply
                     .reason
                     .map(|reason| {
                         vec![event_message(
@@ -878,8 +880,18 @@ impl EngineApp {
                             prompter_changed_payload(reason, reply.anchor),
                         )]
                     })
-                    .unwrap_or_default(),
-            },
+                    .unwrap_or_default();
+                if reply.health_changed {
+                    events.push(event_message(
+                        EVENT_APP_CHANGED,
+                        json!({ "reason": crate::health::APP_CHANGED_REASON_HEALTH }),
+                    ));
+                }
+                EngineReply {
+                    response: ok_response(request.id, reply.result),
+                    events,
+                }
+            }
             Err(PrompterError::Invalid(message)) => {
                 Self::reply(invalid_params(request.id, message))
             }

@@ -6,6 +6,7 @@ use crate::prompter::clock::{PrompterAnchor, PrompterPlace};
 use crate::prompter::look::PrompterLook;
 use crate::prompter::model::{cue_targets, PrompterParagraph};
 use crate::prompter::runtime::Prompter;
+use crate::prompter::screen::PrompterScreenSummary;
 use crate::prompter::store::{self, ScriptRow};
 use crate::prompter::PrompterError;
 use rusqlite::Connection;
@@ -112,6 +113,8 @@ pub struct PrompterSnapshot {
     pub scripts: Vec<PrompterScriptSummary>,
     /// Removed, the most recently removed first.
     pub removed: Vec<PrompterScriptSummary>,
+    /// The Prompter XL as Windows last reported it (Slice 5a).
+    pub screen: PrompterScreenSummary,
 }
 
 /// `prompter.glass.snapshot`: what the glass draws.
@@ -246,6 +249,7 @@ pub(crate) fn read_snapshot(
             let not_updated = script
                 .as_ref()
                 .is_some_and(|script| script.paragraphs != *glass.paragraphs);
+            // (`glass_edited_name` below reads the same fact for the check.)
             let (time_left, estimated) = glass.time_left(now);
             let (length, _) = glass.length();
             Some(PrompterGlassSummary {
@@ -293,7 +297,22 @@ pub(crate) fn read_snapshot(
         glass,
         scripts,
         removed,
+        screen: prompter.screen.summary(),
     })
+}
+
+/// The name of the script on the glass when it was edited after it went on
+/// (`NOT UPDATED`); `None` when it was not, or when nothing is on the glass.
+pub(crate) fn glass_edited_name(
+    prompter: &Prompter,
+    connection: &Connection,
+) -> Result<Option<String>, PrompterError> {
+    let Some(glass) = &prompter.glass else {
+        return Ok(None);
+    };
+    Ok(store::read_script(connection, &glass.script_id)?
+        .filter(|script| script.paragraphs != *glass.paragraphs)
+        .map(|script| script.name))
 }
 
 pub(crate) fn read_glass_snapshot(

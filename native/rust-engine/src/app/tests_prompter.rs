@@ -372,3 +372,66 @@ fn the_archive_carries_an_edited_glass_script_s_place_in_its_own_text() {
         json!({ "paragraph": 3, "word": 0 })
     );
 }
+
+// Slice 5a: the shell's report of the Prompter XL goes through the request
+// loop like any request. It raises `prompter.changed { reason: "screen" }`
+// and, when `checks.prompter` says something else after it, `app.changed {
+// reason: "health" }`, so the header's lamp follows; `health.snapshot`
+// carries the check, and a Prompter XL state takes the whole status no
+// further than attention (first step 1). It is never a Recent actions row.
+#[test]
+fn the_prompter_xl_reaches_the_health_check_and_the_lamp_follows() {
+    let test_dir = TestDir::new("prompter-screen");
+    let app = app_for(&test_dir);
+    let health = result(&app, "health.snapshot", json!({}));
+    let check = &health["checks"]["prompter"];
+    assert_eq!(check["word"], "NOT CONNECTED", "until the shell reports");
+    assert_eq!(check["status"], "error");
+    assert_eq!(check["screen"]["reported"], false);
+    assert_ne!(
+        health["status"], "error",
+        "no worse than attention: {health}"
+    );
+
+    let reply = request(
+        &app,
+        "prompter.screen.report",
+        json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }),
+    );
+    assert!(reply.response.ok);
+    let events: Vec<(String, String)> = reply
+        .events
+        .iter()
+        .map(|event| {
+            (
+                event["event"].as_str().unwrap_or_default().to_string(),
+                event["payload"]["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        events,
+        vec![
+            (String::from("prompter.changed"), String::from("screen")),
+            (String::from("app.changed"), String::from("health")),
+        ]
+    );
+    let health = result(&app, "health.snapshot", json!({}));
+    assert_eq!(health["checks"]["prompter"]["word"], "CONNECTED");
+    assert_eq!(health["checks"]["prompter"]["ok"], true);
+    assert_eq!(
+        health["checks"]["prompter"]["screen"]["sentence"],
+        "The Prompter XL is connected: 1920×1080 at 60 Hz."
+    );
+
+    let again = request(
+        &app,
+        "prompter.screen.report",
+        json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }),
+    );
+    assert!(again.events.is_empty(), "the same report raises nothing");
+    assert!(prompter_rows(&app).is_empty(), "never a Recent actions row");
+}
