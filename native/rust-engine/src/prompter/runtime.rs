@@ -181,8 +181,10 @@ pub(crate) fn with_prompter<T>(
 }
 
 /// Forgets the prompter of this saved data, so the next request loads it
-/// again from the disk, paused. A database restore that the next start
-/// applies needs nothing: the process ends first.
+/// again from the disk, paused — a start, for the tests. A database restore
+/// needs nothing of the kind: the process ends before the next start applies
+/// it.
+#[cfg(test)]
 pub(crate) fn forget(db_path: &Path) {
     let entry = entry(db_path);
     *lock(&entry) = None;
@@ -202,15 +204,11 @@ pub(crate) fn spawn_prompter_clock(db_path: PathBuf) {
                 let wait = match guard.as_mut() {
                     Some(prompter) => {
                         let now = Instant::now();
-                        match open_connection(&db_path) {
-                            Ok(connection) => {
-                                if let Ok(true) = prompter.settle(&connection, now) {
-                                    let anchor =
-                                        prompter.glass.as_ref().map(|glass| glass.anchor(now));
-                                    emit_prompter_changed("at-end", anchor);
-                                }
+                        if let Ok(connection) = open_connection(&db_path) {
+                            if let Ok(true) = prompter.settle(&connection, now) {
+                                let anchor = prompter.glass.as_ref().map(|glass| glass.anchor(now));
+                                emit_prompter_changed("at-end", anchor);
                             }
-                            Err(_) => {}
                         }
                         prompter.next_wake(Instant::now())
                     }

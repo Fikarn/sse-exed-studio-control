@@ -251,3 +251,128 @@ fn versions_are_kept_and_brought_back() {
         "the first version was let go"
     );
 }
+
+fn base64(bytes: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+// First step 2a: a file comes from the page's own picker as its name and its
+// bytes; the hardware link reads it itself, keeps it as a new script named
+// after the file, keeps the text as a version, and answers with the import
+// sentence. Opened again with `updateScriptId`, it becomes that script's
+// text, the earlier text kept.
+#[test]
+fn a_file_arrives_as_its_name_and_its_bytes() {
+    let prompter = TestPrompter::new("import-file");
+    let text = "First para\nline two\n\n[PAUSE]\n\nSecond å ä ö";
+    let imported = prompter.call(
+        "prompter.script.import",
+        json!({ "fileName": "Interview intro.txt", "contentBase64": base64(text.as_bytes()) }),
+    );
+    assert_eq!(
+        imported["sentence"],
+        "Imported Interview intro.txt: 3 paragraphs, 9 words, 1 cue. Read as UTF-8."
+    );
+    assert_eq!(imported["name"], "Interview intro");
+    let id = imported["scriptId"].as_str().unwrap().to_string();
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(script["script"]["sourceFileName"], "Interview intro.txt");
+    assert_eq!(
+        script["paragraphs"][0]["runs"][0]["text"],
+        "First para\nline two"
+    );
+    assert_eq!(script["paragraphs"][2]["runs"][0]["text"], "Second å ä ö");
+    assert_eq!(script["versions"][0]["reason"], "imported");
+
+    // Edited since, so the text the file replaces is not a kept version yet
+    // (one that is, is not kept twice).
+    prompter.edit(&id, &["Edited by hand."]);
+    let again = prompter.call(
+        "prompter.script.import",
+        json!({
+            "fileName": "Interview intro.txt",
+            "contentBase64": base64(b"Rewritten."),
+            "updateScriptId": id,
+        }),
+    );
+    assert_eq!(again["scriptId"], json!(id));
+    assert!(again["sentence"].as_str().unwrap().ends_with(
+        " It is now the text of Interview intro; the earlier text is kept among its versions."
+    ));
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(script["paragraphs"][0]["runs"][0]["text"], "Rewritten.");
+    let reasons: Vec<&str> = script["versions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|version| version["reason"].as_str().unwrap())
+        .collect();
+    assert_eq!(reasons, ["imported", "before-file-update", "imported"]);
+    assert_eq!(names(&prompter.snapshot()["scripts"]), ["Interview intro"]);
+}
+
+// §3.1: what is not read is refused with the operator's sentence, and
+// nothing is kept.
+#[test]
+fn a_file_that_is_not_read_is_refused_and_nothing_is_kept() {
+    let prompter = TestPrompter::new("import-refused");
+    let (code, sentence) = prompter.refused(
+        "prompter.script.import",
+        json!({ "fileName": "Old.doc", "contentBase64": base64(b"\xD0\xCF\x11\xE0") }),
+    );
+    assert_eq!(code, "PROMPTER_IMPORT_REFUSED");
+    assert_eq!(
+        sentence,
+        "Old.doc is in Word's old format (.doc), which Studio Control does not read. Save it as .docx in Word, then open that."
+    );
+    let (code, _) = prompter.refused(
+        "prompter.script.import",
+        json!({ "fileName": "Notes.pdf", "contentBase64": base64(b"%PDF-1.7") }),
+    );
+    assert_eq!(code, "PROMPTER_IMPORT_REFUSED");
+    let (code, _) = prompter.refused(
+        "prompter.script.import",
+        json!({ "fileName": "Script.txt", "contentBase64": "not base64!" }),
+    );
+    assert_eq!(code, "INVALID_PARAMS");
+    let (code, sentence) = prompter.refused(
+        "prompter.script.import",
+        json!({ "fileName": "Blank.txt", "contentBase64": base64(b"  \n\n ") }),
+    );
+    assert_eq!(code, "PROMPTER_IMPORT_REFUSED");
+    assert_eq!(sentence, "Blank.txt has no text in it.");
+    assert_eq!(names(&prompter.snapshot()["scripts"]), Vec::<String>::new());
+}
+
+// First step 3a: what the page read from the clipboard — its HTML when it
+// held formatting — becomes a new script named after its first words, the
+// emphasis kept and a heading a cue.
+#[test]
+fn a_paste_becomes_a_script_named_after_its_first_words() {
+    let prompter = TestPrompter::new("paste");
+    let pasted = prompter.call(
+        "prompter.script.paste",
+        json!({
+            "html": "<p>Good evening and <b>welcome</b> to the programme tonight</p><h2>Guest</h2>",
+            "text": "Good evening and welcome to the programme tonight\n\nGuest",
+        }),
+    );
+    assert_eq!(pasted["name"], "Good evening and welcome to the");
+    assert_eq!(
+        pasted["sentence"],
+        "Imported the pasted text: 2 paragraphs, 9 words, 1 cue."
+    );
+    let id = pasted["scriptId"].as_str().unwrap();
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(script["paragraphs"][0]["runs"][1]["text"], "welcome");
+    assert_eq!(script["paragraphs"][0]["runs"][1]["bold"], true);
+    assert_eq!(script["paragraphs"][1]["runs"][0]["text"], "[Guest]");
+    assert_eq!(script["script"]["sourceFileName"], Value::Null);
+    let (code, sentence) = prompter.refused(
+        "prompter.script.paste",
+        json!({ "html": "<p> </p>", "text": "" }),
+    );
+    assert_eq!(code, "PROMPTER_IMPORT_REFUSED");
+    assert_eq!(sentence, "The pasted text has no text in it.");
+}

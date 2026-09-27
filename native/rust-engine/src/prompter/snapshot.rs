@@ -332,7 +332,7 @@ pub(crate) fn read_script_snapshot(
     let row = store::list_scripts(connection)?
         .into_iter()
         .find(|row| row.id == script_id)
-        .ok_or_else(|| crate::prompter::commands::unknown_script())?;
+        .ok_or_else(crate::prompter::commands::unknown_script)?;
     let on_prompter = prompter
         .glass
         .as_ref()

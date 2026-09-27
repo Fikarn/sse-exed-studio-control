@@ -92,7 +92,8 @@ impl PrompterLook {
         if !size_is_valid(self.standard_size_px) {
             self.standard_size_px = standard.standard_size_px;
         }
-        if !(110..=200).contains(&self.line_spacing_percent) || self.line_spacing_percent % 10 != 0
+        if !(110..=200).contains(&self.line_spacing_percent)
+            || !self.line_spacing_percent.is_multiple_of(10)
         {
             self.line_spacing_percent = standard.line_spacing_percent;
         }
@@ -128,7 +129,7 @@ impl PrompterLook {
                 }
                 "lineSpacingPercent" => {
                     let spacing = whole(value, key)?;
-                    if !(110..=200).contains(&spacing) || spacing % 10 != 0 {
+                    if !(110..=200).contains(&spacing) || !spacing.is_multiple_of(10) {
                         return Err(String::from(
                             "The line spacing must be 1.1–2.0 in steps of 0.1 (lineSpacingPercent 110–200 in steps of 10).",
                         ));
@@ -169,7 +170,7 @@ impl PrompterLook {
 }
 
 pub(crate) fn size_is_valid(size: u32) -> bool {
-    (SIZE_MIN_PX..=SIZE_MAX_PX).contains(&size) && (size - SIZE_MIN_PX) % SIZE_STEP_PX == 0
+    (SIZE_MIN_PX..=SIZE_MAX_PX).contains(&size) && (size - SIZE_MIN_PX).is_multiple_of(SIZE_STEP_PX)
 }
 
 fn whole(value: &Value, key: &str) -> Result<u32, String> {

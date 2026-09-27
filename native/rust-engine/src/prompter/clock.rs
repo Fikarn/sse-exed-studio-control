@@ -768,7 +768,7 @@ pub(crate) fn advance_by_read_words(
 
 /// A pace inside 40–300 words a minute on a 5-word step.
 pub(crate) fn speed_is_valid(speed_wpm: u32) -> bool {
-    (SPEED_MIN_WPM..=SPEED_MAX_WPM).contains(&speed_wpm) && speed_wpm % SPEED_STEP_WPM == 0
+    (SPEED_MIN_WPM..=SPEED_MAX_WPM).contains(&speed_wpm) && speed_wpm.is_multiple_of(SPEED_STEP_WPM)
 }
 
 #[cfg(test)]
