@@ -114,8 +114,12 @@ export function positionOf(root: HTMLElement, container: Node, offset: number): 
 /** The page's place for a place in the model: inside a text node where there is one (at its end rather than the next one's start). */
 export function domPlaceOf(root: HTMLElement, position: Position): { node: Node; offset: number } | null {
   const element = paragraphElements(root)[position.paragraph];
-  if (!element) return null;
-  let remaining = position.offset;
+  return element ? domPlaceIn(element, position.offset) : null;
+}
+
+/** The page's place for an offset in one paragraph's element (`domPlaceOf`, once the element is known). */
+function domPlaceIn(element: HTMLElement, offset: number): { node: Node; offset: number } {
+  let remaining = offset;
   for (const leaf of leaves(element)) {
     if (leaf.nodeType === Node.TEXT_NODE) {
       const length = (leaf as Text).data.length;
@@ -213,24 +217,29 @@ export function readScript(root: HTMLElement): Paragraph[] {
   return paragraphs;
 }
 
-/** The ranges of the cues in the editor's text, for the browser's highlights. */
-export function cueHighlightRanges(root: HTMLElement): Range[] {
+/**
+ * The ranges of the cues in the editor's text, for the browser's highlights:
+ * one pass over the paragraphs, each cue placed within its own paragraph's
+ * element. `textOf` gives a paragraph's text when the editor has read it
+ * already.
+ */
+export function cueHighlightRanges(root: HTMLElement, textOf?: (element: HTMLElement) => string | undefined): Range[] {
   const ranges: Range[] = [];
-  paragraphElements(root).forEach((element, index) => {
-    const text = element.textContent ?? "";
-    if (!text.includes("[")) return;
-    const lineBreakText = readParagraph(element)
-      .runs.map((run) => run.text)
-      .join("");
+  for (const element of paragraphElements(root)) {
+    if (!(element.textContent ?? "").includes("[")) continue;
+    const lineBreakText =
+      textOf?.(element) ??
+      readParagraph(element)
+        .runs.map((run) => run.text)
+        .join("");
     for (const cue of cueRanges(lineBreakText)) {
-      const start = domPlaceOf(root, { paragraph: index, offset: cue.from });
-      const end = domPlaceOf(root, { paragraph: index, offset: cue.to });
-      if (!start || !end) continue;
+      const start = domPlaceIn(element, cue.from);
+      const end = domPlaceIn(element, cue.to);
       const range = root.ownerDocument.createRange();
       range.setStart(start.node, start.offset);
       range.setEnd(end.node, end.offset);
       ranges.push(range);
     }
-  });
+  }
   return ranges;
 }

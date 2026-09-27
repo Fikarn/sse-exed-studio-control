@@ -6,7 +6,7 @@ import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/eng
 import type { GlassParagraph } from "./glass/glassText";
 import { PrompterGlass, type PrompterGlassLayoutReport, type PrompterGlassText } from "./glass/PrompterGlass";
 import { barStart, cueKeys, paragraphAt, placeView, scriptBar, timeLeftParts } from "./teleprompterModel";
-import type { PerformAction } from "./TeleprompterWorkspace";
+import { TAKE, type PerformAction } from "./perform";
 import styles from "./TeleprompterBay.module.css";
 
 // The Teleprompter's bay (new pages program, Slice 6a; board 1's centre, the
@@ -68,7 +68,7 @@ export function TeleprompterBay({
   const glass = snapshot.glass;
   const draws = snapshot.screen.draws;
   const [goTo, setGoTo] = useState("");
-  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request));
+  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request), false, TAKE);
   const place = glass && cut.length > 0 ? placeView(glass, cut) : null;
   const segments = useMemo(() => scriptBar(cut), [cut]);
   const track = useRef<HTMLSpanElement>(null);

@@ -311,6 +311,80 @@ test.describe("the Teleprompter's editor (new pages S6b)", () => {
     await expect(page.getByTestId("teleprompter-selected")).toContainText("2 paragraphs");
   });
 
+  // Slice 6b's review: a text the hardware link will not save (here, over a
+  // script's 30,000 words after two pastes) keeps the editor open on it:
+  // another script, New script and Live copy wait, with the refusal said.
+  test("a text that cannot be saved keeps the editor open on it, and the page does not move on", async ({ page }) => {
+    await openEditor(page);
+    const text = page.getByTestId("teleprompter-editor-text");
+    await caretInReadingLine(page);
+    const words = "word ".repeat(16_000);
+    await copyToClipboard(page, `<p>${words}</p>`, words);
+    await page.keyboard.press("Control+v");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
+    await page.keyboard.press("Control+v");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "unsaved");
+    await page.keyboard.type(" MARKER");
+    const scripts = page.getByTestId("teleprompter-scripts").locator('[data-testid^="teleprompter-script-"]');
+    const count = await scripts.count();
+    await scripts.filter({ hasText: "01 Welcome" }).click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("02 Interview intro");
+    await page.getByTestId("teleprompter-new-script").click();
+    await page.getByTestId("teleprompter-bay-live").click();
+    await expect(text).toContainText("MARKER");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "unsaved");
+    await expect(scripts).toHaveCount(count);
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("02 Interview intro");
+    await expect(page.getByText("The script would have", { exact: false }).first()).toBeVisible();
+  });
+
+  // Slice 6b's review: a rename moves the script's time of change, but not its
+  // text, so the editor stays as it is, its undo with it.
+  test("Rename keeps the editor's text and its undo", async ({ page }) => {
+    await openEditor(page);
+    const line = await caretInReadingLine(page);
+    await page.keyboard.type(" Kept");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
+    await page.getByTestId("teleprompter-rename").click();
+    await page.getByRole("dialog").getByRole("textbox").fill("02 Interview opening");
+    await page.getByRole("dialog").getByRole("button", { name: "Rename" }).click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("02 Interview opening");
+    await expect(line).toContainText("Kept");
+    await expect(page.getByTestId("teleprompter-editor-undo")).not.toHaveAttribute("data-locked", "");
+    await page.getByTestId("teleprompter-editor-undo").click();
+    await expect(line).not.toContainText("Kept");
+  });
+
+  // Slice 6b's review: a paragraph removed from the script on the prompter is
+  // counted, and the reading line says its paragraph is gone.
+  test("a paragraph removed from the script on the prompter is counted, the reading line's too", async ({ page }) => {
+    await openEditor(page);
+    await caretInReadingLine(page);
+    // Select from the end of the paragraph before the reading line's to the end of that one, and delete.
+    await page.evaluate(() => {
+      const line = document.querySelector('[data-testid="teleprompter-editor-text"] p[data-mark="reading line"]')!;
+      const before = line.previousElementSibling!;
+      const range = document.createRange();
+      range.setStart(before, before.childNodes.length);
+      range.setEnd(line, line.childNodes.length);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+    await page.keyboard.press("Backspace");
+    await expect(page.getByTestId("teleprompter-edited-list")).toHaveText("1 removed");
+    await expect(page.getByTestId("teleprompter-edited-reading-line")).toHaveText("removed");
+    await expect(page.getByTestId("teleprompter-editor-text").locator('p[data-mark="reading line"]')).toHaveCount(0);
+  });
+
+  test("the bar's Paste and Add cue ask for the caret in the text first", async ({ page }) => {
+    await openEditor(page);
+    await copyToClipboard(page, "<p>Nowhere</p>", "Nowhere");
+    await page.getByTestId("teleprompter-editor-paste").click();
+    await expect(page.getByText("Click in the text where it goes first.").first()).toBeVisible();
+    await expect(page.getByTestId("teleprompter-editor-text")).not.toContainText("Nowhere");
+  });
+
   test("a file opened again asks whether to update its script from it or add it as a new one", async ({ page }) => {
     await openTeleprompter(page, "teleprompter-empty");
     const file = (text: string) => ({ name: "Morning news.txt", mimeType: "text/plain", buffer: Buffer.from(text) });

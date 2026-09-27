@@ -19,7 +19,7 @@ import {
   stepLocks,
   type PrompterStateView,
 } from "./teleprompterModel";
-import type { PerformAction } from "./TeleprompterWorkspace";
+import { TAKE, type PerformAction } from "./perform";
 import styles from "./TeleprompterCluster.module.css";
 
 // The Teleprompter's cluster (new pages program, Slice 6a; board 1's left
@@ -95,7 +95,7 @@ export function TeleprompterCluster({
   const runLock = runLockReason(snapshot);
   const playLock = playLockReason(snapshot);
   const layoutLock = glass && !glass.laidOut ? "The text is being laid out on the glass." : null;
-  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request));
+  const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request), false, TAKE);
   const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
   const speedWpm = glass?.speedWpm ?? 0;
   const rows = useMemo(() => paragraphRows(cut, speedWpm), [cut, speedWpm]);
@@ -199,7 +199,9 @@ export function TeleprompterCluster({
           testId="teleprompter-play"
           className={styles.play}
           aria-pressed={glass?.playing ?? false}
-          onClick={() => void perform(() => (glass?.playing ? store.pausePrompter() : store.playPrompter()))}
+          onClick={() =>
+            void perform(() => (glass?.playing ? store.pausePrompter() : store.playPrompter()), false, TAKE)
+          }
         />
         <Key
           cap="Back"
@@ -232,7 +234,7 @@ export function TeleprompterCluster({
             take
             testId="teleprompter-speed-down"
             aria-label="Slower by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }), false, TAKE)}
           />
           <output className={styles.speedReadout} data-well="" data-testid="teleprompter-speed-readout">
             <b>{glass ? glass.speedWpm : "—"}</b> words/min
@@ -244,7 +246,7 @@ export function TeleprompterCluster({
             take
             testId="teleprompter-speed-up"
             aria-label="Faster by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }), false, TAKE)}
           />
         </div>
       </Section>

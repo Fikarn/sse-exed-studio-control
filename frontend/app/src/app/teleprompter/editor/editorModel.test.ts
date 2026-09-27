@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  cueRanges,
-  editedParagraphs,
-  normalizeRuns,
-  readingLineIn,
-  withAParagraph,
-  type Paragraph,
-} from "./editorModel";
+import { compareWithGlass, cueRanges, normalizeRuns, sameText, withAParagraph, type Paragraph } from "./editorModel";
 
 // The script editor's model (new pages program, Slice 6b): what the script's
 // text is, and what the glass shows of it.
@@ -40,16 +33,42 @@ describe("the script editor's model", () => {
   it("marks the paragraphs the glass does not show as they are, formatting and all", () => {
     const glass = [para(run("One.")), para(run("Two.")), para(run("Three."))];
     const text = [para(run("One.")), para(run("New.")), para(run("Two.", { bold: true })), para(run("Three."))];
-    expect([...editedParagraphs(text, glass)]).toEqual([1, 2]);
+    expect(compareWithGlass(text, glass, null)).toMatchObject({ removed: 0, reordered: false, readingLine: null });
+    expect([...compareWithGlass(text, glass, null).edited]).toEqual([1, 2]);
   });
 
-  it("finds the glass's paragraph at the reading line in the edited text, nearest where it was", () => {
+  it("counts the glass's paragraphs the text no longer holds, a second copy as added, and a new order", () => {
+    const glass = [para(run("One.")), para(run("Two.")), para(run("Three.")), para(run("Four."))];
+    const removedTwo = [para(run("One.")), para(run("Four."))];
+    expect(compareWithGlass(removedTwo, glass, null)).toMatchObject({ removed: 2, reordered: false });
+    expect(compareWithGlass(removedTwo, glass, null).edited.size).toBe(0);
+    const copied = [...glass, para(run("Two."))];
+    expect([...compareWithGlass(copied, glass, null).edited]).toEqual([4]);
+    // One edited and one removed: one fewer.
+    const editedAndRemoved = [para(run("One!")), para(run("Three.")), para(run("Four."))];
+    expect(compareWithGlass(editedAndRemoved, glass, null)).toMatchObject({ removed: 1 });
+    const moved = [glass[1]!, glass[0]!, glass[2]!, glass[3]!];
+    expect(compareWithGlass(moved, glass, null)).toMatchObject({ removed: 0, reordered: true });
+    expect(compareWithGlass(glass, glass, null)).toMatchObject({ removed: 0, reordered: false });
+  });
+
+  it("finds the glass's paragraph at the reading line in the edited text: unchanged, edited or removed", () => {
     const glass = [para(run("One.")), para(run("Two.")), para(run("Three."))];
     const text = [para(run("One.")), para(run("New.")), para(run("Two.")), para(run("Three!"))];
-    expect(readingLineIn(text, glass, 1)).toBe(2);
-    // The paragraph at the reading line was edited: the place it had.
-    expect(readingLineIn(text, glass, 2)).toBe(2);
-    expect(readingLineIn(text, glass, 5)).toBeNull();
+    expect(compareWithGlass(text, glass, 1).readingLine).toEqual({ state: "unchanged", index: 2 });
+    // Edited: the paragraph between its neighbours' matches.
+    expect(compareWithGlass(text, glass, 2).readingLine).toEqual({ state: "edited", index: 3 });
+    // Removed: nothing between its neighbours, and no other paragraph is marked for it.
+    const without = [para(run("One.")), para(run("Three."))];
+    expect(compareWithGlass(without, glass, 1).readingLine).toEqual({ state: "removed" });
+    expect(compareWithGlass(text, glass, 5).readingLine).toBeNull();
+  });
+
+  it("knows the same text, paragraph for paragraph and formatting and all", () => {
+    const text = [para(run("One "), run("two", { bold: true }))];
+    expect(sameText(text, [para(run("One "), run("two", { bold: true }))])).toBe(true);
+    expect(sameText(text, [para(run("One two"))])).toBe(false);
+    expect(sameText(text, [...text, para()])).toBe(false);
   });
 
   it("gives an empty script one paragraph to type in", () => {

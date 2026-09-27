@@ -24,7 +24,14 @@ import {
   readParagraph,
   renderParagraph,
 } from "./editorDom";
-import { editedParagraphs, readingLineIn, withAParagraph, type Paragraph } from "./editorModel";
+import {
+  compareWithGlass,
+  paragraphText,
+  sameText,
+  withAParagraph,
+  type GlassComparison,
+  type Paragraph,
+} from "./editorModel";
 import styles from "./ScriptEditor.module.css";
 
 // The script editor (new pages program, Slice 6b; the proposal §6.3, board 1's
@@ -47,6 +54,15 @@ const CUE_HIGHLIGHT = "teleprompter-cue";
 /** What the browser may not do to the text: its formatting, lists, links and drops. */
 const CANCELLED_INPUT =
   /^(format|insertFromDrop|deleteByDrag|insert(Ordered|Unordered)List|insertHorizontalRule|insertLink)/;
+/** The sentence for a bar key that inserts where the caret is, when the caret was never in the text. */
+const CLICK_IN_THE_TEXT = "Click in the text where it goes first.";
+
+/**
+ * Text the hardware link would not save (over a script's limits, or no
+ * answer), kept until it is saved: the page refuses to move on from it, but a
+ * change of workspace cannot wait, and the editor opens on it again.
+ */
+const unsavedTexts = new Map<string, Paragraph[]>();
 
 type SaveState =
   | { kind: "idle" }
@@ -64,13 +80,21 @@ interface Counts {
 export interface ScriptEditorMarks {
   /** The editor's paragraphs the glass does not show as they are (from 0). */
   edited: number[];
-  /** The editor's paragraph at the reading line, while the script is on the glass. */
-  readingLine: number | null;
+  /** How many paragraphs fewer the text holds where it differs from the glass (`compareWithGlass`). */
+  removed: number;
+  /** Nothing edited or removed, but the paragraphs stand in another order. */
+  reordered: boolean;
+  /** The glass's paragraph at the reading line, in the editor's text, while the script is on the glass. */
+  readingLine: GlassComparison["readingLine"];
 }
 
-/** What the page asks of the editor: to save what was typed now, before an action reads the script's text. */
+/**
+ * What the page asks of the editor: to save what was typed now, before an
+ * action reads the script's text or the editor closes. False when the text
+ * could not be saved: the editor has said why, and the page does not move on.
+ */
 export interface ScriptEditorHandle {
-  flush(): Promise<void>;
+  flush(): Promise<boolean>;
 }
 
 export interface ScriptEditorProps {
@@ -147,7 +171,7 @@ export function ScriptEditor({
   const caret = useRef<Range | null>(null);
   const dirty = useRef(false);
   const saveTimer = useRef<number | null>(null);
-  const saving = useRef<Promise<void> | null>(null);
+  const saving = useRef<Promise<boolean> | null>(null);
   const mounted = useRef(true);
   /** The script's `changedAt` the editor opened or saved last: another value means it changed elsewhere. */
   const ownChangedAt = useRef<string | null>(null);
@@ -171,8 +195,12 @@ export function ScriptEditor({
     const paragraphs = model.current;
     if (!root || !paragraphs) return;
     const { glassText: shown, glassPlace: place, onGlass: isOn, onMarks: report } = glass.current;
-    const edited = isOn && shown ? editedParagraphs(paragraphs, shown) : new Set<number>();
-    const readingLine = isOn && shown && place !== null ? readingLineIn(paragraphs, shown, place) : null;
+    const compared: GlassComparison =
+      isOn && shown
+        ? compareWithGlass(paragraphs, shown, place)
+        : { edited: new Set(), removed: 0, reordered: false, readingLine: null };
+    const { edited } = compared;
+    const readingLine = compared.readingLine && "index" in compared.readingLine ? compared.readingLine.index : null;
     let index = 0;
     for (const child of root.childNodes) {
       if (!isParagraphElement(child)) continue;
@@ -184,9 +212,18 @@ export function ScriptEditor({
       index += 1;
     }
     if (typeof CSS !== "undefined" && "highlights" in CSS && typeof Highlight === "function") {
-      CSS.highlights.set(CUE_HIGHLIGHT, new Highlight(...cueHighlightRanges(root)));
+      const textOf = (element: HTMLElement) => {
+        const known = read.current.get(element);
+        return known ? paragraphText(known) : undefined;
+      };
+      CSS.highlights.set(CUE_HIGHLIGHT, new Highlight(...cueHighlightRanges(root, textOf)));
     }
-    report?.({ edited: [...edited], readingLine });
+    report?.({
+      edited: [...edited],
+      removed: compared.removed,
+      reordered: compared.reordered,
+      readingLine: compared.readingLine,
+    });
   }, []);
 
   /** Marks and highlights once a frame, however fast the typing. */
@@ -238,14 +275,20 @@ export function ScriptEditor({
 
   // ---- saving --------------------------------------------------------------
 
-  const saveNow = useCallback(async () => {
+  /**
+   * Saves what was typed, after any save still on its way; true once the
+   * text is saved (or nothing waits), false when the hardware link would not
+   * save it. A refusal is said whether or not the editor is still open, and
+   * the text is kept (`unsavedTexts`) until a save takes it.
+   */
+  const saveNow = useCallback(async (): Promise<boolean> => {
     if (saveTimer.current !== null) {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
-    if (saving.current) await saving.current;
+    while (saving.current) await saving.current;
     const paragraphs = model.current;
-    if (!dirty.current || !paragraphs) return;
+    if (!dirty.current || !paragraphs) return true;
     dirty.current = false;
     if (mounted.current) {
       setSave({ kind: "saving" });
@@ -259,21 +302,23 @@ export function ScriptEditor({
             ? answer.changedAt
             : new Date().toISOString();
         ownChangedAt.current = changedAt;
+        if (!dirty.current) unsavedTexts.delete(script.id);
         if (mounted.current && !dirty.current) setSave({ kind: "saved", at: changedAt });
+        return true;
       })
       .catch((error: unknown) => {
         dirty.current = true;
+        unsavedTexts.set(script.id, model.current ?? paragraphs);
         const sentence = errorSentence(error, "The script could not be saved. Your text is still here.");
-        if (mounted.current) {
-          setSave({ kind: "unsaved", sentence });
-          onNotice("attention", sentence);
-        }
+        if (mounted.current) setSave({ kind: "unsaved", sentence });
+        onNotice("attention", sentence);
+        return false;
       })
       .finally(() => {
         saving.current = null;
       });
     saving.current = pending;
-    await pending;
+    return pending;
   }, [onNotice, script.id, store]);
 
   useImperativeHandle(ref, () => ({ flush: saveNow }), [saveNow]);
@@ -301,6 +346,13 @@ export function ScriptEditor({
       page.addRange(at);
     }
   }, []);
+
+  /** Whether the caret has been in this text (the bar's Paste and Add cue insert where it is). */
+  const caretInText = () => {
+    const at = caret.current;
+    const root = text.current;
+    return Boolean(at && root && root.contains(at.startContainer));
+  };
 
   /** Inserts what was pasted, read by the hardware link, where `at` is. */
   const pasteInto = useCallback(
@@ -388,9 +440,15 @@ export function ScriptEditor({
       store.readPrompterScript(script.id).then(
         (answer) => {
           if (!isCurrent()) return;
-          model.current = withAParagraph(answer.paragraphs);
+          // Text that could not be saved when the editor last closed comes back, still to be saved.
+          const kept = unsavedTexts.get(script.id);
+          model.current = withAParagraph(kept ?? answer.paragraphs);
           ownChangedAt.current = answer.script.changedAt;
           setCounts(countsOf(model.current));
+          if (kept) {
+            dirty.current = true;
+            setSave({ kind: "unsaved", sentence: "Not saved yet." });
+          }
           setGeneration((value) => value + 1);
           setLoaded("ready");
         },
@@ -419,19 +477,35 @@ export function ScriptEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The text changed elsewhere (a version brought back, the file opened
-  // again, a backup restored): read it again, unless the operator's own
-  // typing is still to be saved — the page saves it before any such request.
+  // The script changed elsewhere (a version brought back, the file opened
+  // again, a backup restored, a rename): read it again, unless the operator's
+  // own typing is still to be saved — the page saves it before any such
+  // request. A new text is drawn in a fresh element; the same text (a rename)
+  // keeps the editor as it is, its undo and its caret.
   useEffect(() => {
     if (loaded !== "ready" || ownChangedAt.current === null) return undefined;
     if (script.changedAt === ownChangedAt.current) return undefined;
     if (dirty.current || saving.current) return undefined;
     let current = true;
-    void open(() => current && mounted.current);
+    store.readPrompterScript(script.id).then(
+      (answer) => {
+        if (!current || !mounted.current || dirty.current || saving.current) return;
+        ownChangedAt.current = answer.script.changedAt;
+        const next = withAParagraph(answer.paragraphs);
+        if (model.current && sameText(model.current, next)) return;
+        model.current = next;
+        setCounts(countsOf(next));
+        setGeneration((value) => value + 1);
+      },
+      (error: unknown) => {
+        if (!current || !mounted.current) return;
+        onNotice("attention", errorSentence(error, "The script could not be read again."));
+      }
+    );
     return () => {
       current = false;
     };
-  }, [loaded, open, script.changedAt]);
+  }, [loaded, onNotice, script.changedAt, script.id, store]);
 
   // The text drawn in a fresh element; opened at the reading line for the script on the prompter.
   useLayoutEffect(() => {
@@ -447,6 +521,7 @@ export function ScriptEditor({
       })
     );
     decorate();
+    setHistory({ undo: false, redo: false });
     const line = root.querySelector<HTMLElement>('[data-mark="reading line"]');
     const scroller = field.current;
     if (line && scroller) scroller.scrollTop = Math.max(line.offsetTop - scroller.clientHeight / 3, 0);
@@ -469,10 +544,20 @@ export function ScriptEditor({
   };
 
   const addCue = () => {
-    if (loaded !== "ready") return;
+    const root = text.current;
+    if (loaded !== "ready" || !root) return;
+    if (!caretInText()) {
+      onNotice("attention", CLICK_IN_THE_TEXT);
+      return;
+    }
     refocus();
     const page = window.getSelection();
     if (!page || page.rangeCount === 0) return;
+    const range = page.getRangeAt(0);
+    if (blockOf(root, range.startContainer) !== blockOf(root, range.endContainer)) {
+      onNotice("attention", "A cue is words of one paragraph. Select words within one paragraph.");
+      return;
+    }
     if (page.isCollapsed) {
       command("insertText", "[]");
       page.modify("move", "backward", "character");
@@ -483,6 +568,10 @@ export function ScriptEditor({
   };
 
   const pasteFromClipboard = async () => {
+    if (!caretInText()) {
+      onNotice("attention", CLICK_IN_THE_TEXT);
+      return;
+    }
     const at = caret.current?.cloneRange() ?? null;
     try {
       await pasteInto(await readClipboard(), at);

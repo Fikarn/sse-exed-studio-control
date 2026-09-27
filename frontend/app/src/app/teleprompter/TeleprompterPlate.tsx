@@ -22,8 +22,11 @@ import type {
 import { RenameDialog } from "../shared/RenameDialog";
 import { TeleprompterLook } from "./TeleprompterLook";
 import { clockTime, scriptDetail, scriptLine } from "./teleprompterModel";
-import type { PerformAction } from "./TeleprompterWorkspace";
+import type { PerformAction } from "./perform";
 import styles from "./TeleprompterPlate.module.css";
+
+/** The longest script name the hardware link keeps (`MAX_SCRIPT_NAME_CHARS`). */
+const SCRIPT_NAME_MAX_CHARS = 80;
 
 // The Teleprompter's plate (new pages program, Slice 6a; board 1's right
 // column, the proposal §2, §3.3 and §5.5): the selected script — Put on the
@@ -403,9 +406,10 @@ export function TeleprompterPlate({
 
       {renaming ? (
         <RenameDialog
-          title={`Rename ${renaming.name}`}
+          title="Rename the script"
           initialValue={renaming.name}
           fieldLabel="The script's name"
+          maxLength={SCRIPT_NAME_MAX_CHARS}
           confirmLabel="Rename"
           onCancel={() => setRenaming(null)}
           onConfirm={(name) => {

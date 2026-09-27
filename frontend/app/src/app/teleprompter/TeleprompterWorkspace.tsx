@@ -15,6 +15,7 @@ import { useLiveCallback } from "../shared/useLiveCallback";
 import { ClipboardError, readClipboard } from "./clipboard";
 import type { ScriptEditorHandle } from "./editor/ScriptEditor";
 import type { PrompterGlassLayoutReport } from "./glass/PrompterGlass";
+import { TAKE } from "./perform";
 import { usePrompterTimeLeft } from "./prompterTime";
 import { TeleprompterBay, type BayView } from "./TeleprompterBay";
 import { TeleprompterCluster } from "./TeleprompterCluster";
@@ -86,6 +87,8 @@ export function TeleprompterWorkspace({
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [bayView, setBayView] = useState<BayView>("live");
   const editor = useRef<ScriptEditorHandle>(null);
+  /** Saves what was typed in the editor, if it is open; false when the hardware link would not save it. */
+  const flushEditor = async () => (editor.current ? editor.current.flush() : true);
 
   const glass = prompterSnapshot?.glass ?? null;
   const scripts = useMemo(() => prompterSnapshot?.scripts ?? [], [prompterSnapshot]);
@@ -146,10 +149,16 @@ export function TeleprompterWorkspace({
     return () => window.clearInterval(id);
   }, [following, store]);
 
-  /** Sends one request; a refusal or a failure is the hardware link's sentence, as a notice. */
-  const perform = useLiveCallback(async (action: () => Promise<JsonValue>, announce = false) => {
+  /**
+   * Sends one request; a refusal or a failure is the hardware link's
+   * sentence, as a notice. What was typed is saved first, and an action does
+   * not go ahead from text the hardware link would not save (the editor has
+   * said why). The take's own controls (`TAKE`: play and pause, the jumps,
+   * the speed, the look, Clear) neither wait for the save nor stop for it.
+   */
+  const perform = useLiveCallback(async (action: () => Promise<JsonValue>, announce = false, kind?: typeof TAKE) => {
+    if (kind !== TAKE && !(await flushEditor())) return null;
     try {
-      await editor.current?.flush();
       const result = await action();
       const sentence = announce ? sentenceOf(result) : null;
       if (sentence) toast.push({ tone: "ok", message: sentence });
@@ -180,10 +189,21 @@ export function TeleprompterWorkspace({
       () => void perform(() => store.putOnPrompter(selected.id, true), true)
     );
   });
-  // Choosing another script drops an armed Replace: it named the script chosen before.
-  const select = useLiveCallback((scriptId: string) => {
+  // Choosing another script drops an armed Replace: it named the script chosen
+  // before. The editor closes on another script, so what was typed is saved
+  // first, and a text that could not be saved keeps the editor open on it.
+  const choose = useLiveCallback((scriptId: string) => {
     setChosenId(scriptId);
     if (arm.armed?.key.startsWith("replace:")) arm.clear();
+  });
+  const select = useLiveCallback(async (scriptId: string) => {
+    if (scriptId !== selected?.id && !(await flushEditor())) return;
+    choose(scriptId);
+  });
+  // Live copy closes the editor: the same.
+  const showView = useLiveCallback(async (view: BayView) => {
+    if (view !== bayView && view === "live" && !(await flushEditor())) return;
+    setBayView(view);
   });
   const update = useLiveCallback(() => {
     if (!glass) return;
@@ -191,7 +211,7 @@ export function TeleprompterWorkspace({
   });
   const clear = useLiveCallback(() => {
     if (!glass) return;
-    arm.armOrApply("clear", "Clear the prompter", () => void perform(() => store.clearPrompter(), true));
+    arm.armOrApply("clear", "Clear the prompter", () => void perform(() => store.clearPrompter(), true, TAKE));
   });
   const notice = useLiveCallback((tone: "ok" | "attention", message: string) => toast.push({ tone, message }));
   /** Selects the script a request answered with (a new one, a pasted one, an import). */
@@ -200,7 +220,8 @@ export function TeleprompterWorkspace({
       result && typeof result === "object" && !Array.isArray(result) && typeof result.scriptId === "string"
         ? result.scriptId
         : null;
-    if (scriptId) select(scriptId);
+    // The request's own `perform` saved what was typed first.
+    if (scriptId) choose(scriptId);
     return scriptId;
   };
   // New script opens an empty script in the editor (§3.1).
@@ -268,7 +289,7 @@ export function TeleprompterWorkspace({
         }
         glassText={glassText}
         onLayout={reportLayout}
-        onView={setBayView}
+        onView={(view) => void showView(view)}
         perform={perform}
         snapshot={prompterSnapshot}
         store={store}
@@ -295,5 +316,3 @@ export function TeleprompterWorkspace({
     </div>
   );
 }
-
-export type PerformAction = (action: () => Promise<JsonValue>, announce?: boolean) => Promise<JsonValue | null>;

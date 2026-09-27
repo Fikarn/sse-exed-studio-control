@@ -43,7 +43,12 @@ export function TeleprompterEditView({
 }: TeleprompterEditViewProps) {
   const glass = snapshot.glass;
   const onGlass = glass?.scriptId === script.id;
-  const [marks, setMarks] = useState<ScriptEditorMarks>({ edited: [], readingLine: null });
+  const [marks, setMarks] = useState<ScriptEditorMarks>({
+    edited: [],
+    removed: 0,
+    reordered: false,
+    readingLine: null,
+  });
   const glassParagraphs = onGlass && glassSnapshot ? glassSnapshot.paragraphs : null;
 
   const note = !glass
@@ -54,12 +59,19 @@ export function TeleprompterEditView({
         ? `Edits change Studio Control's copy first; the glass keeps its text until you update the prompter. ${QUARTER}`
         : `Edits to ${script.name} change nothing on the glass. Replace on the prompter puts it on, at its own place. ${QUARTER}`;
 
-  const editedList =
+  // Which paragraphs the glass does not show as they are, and how many of its
+  // own the text no longer holds (the glass's paragraphs, matched once each).
+  const editedParts = [
     marks.edited.length === 0
-      ? "nothing"
+      ? null
       : marks.edited.length <= 6
         ? marks.edited.map((index) => `¶ ${index + 1}`).join(" · ")
-        : `${marks.edited.length} paragraphs`;
+        : `${marks.edited.length} paragraphs`,
+    marks.removed > 0 ? `${marks.removed} removed` : null,
+    marks.reordered ? "the order changed" : null,
+  ].filter((part): part is string => part !== null);
+  const editedList = editedParts.length > 0 ? editedParts.join(" · ") : "nothing";
+  const changed = marks.edited.length > 0 || marks.removed > 0 || marks.reordered;
 
   return (
     <div className={styles.view} data-testid="teleprompter-edit-view">
@@ -98,13 +110,11 @@ export function TeleprompterEditView({
             {onGlass ? (
               <>
                 <dt>Edited since it went on</dt>
-                <dd data-edited={marks.edited.length > 0 ? "" : undefined} data-testid="teleprompter-edited-list">
+                <dd data-edited={changed ? "" : undefined} data-testid="teleprompter-edited-list">
                   {editedList}
                 </dd>
                 <dt>At the reading line</dt>
-                <dd>
-                  {marks.readingLine !== null && marks.edited.includes(marks.readingLine) ? "edited" : "unchanged"}
-                </dd>
+                <dd data-testid="teleprompter-edited-reading-line">{marks.readingLine?.state ?? "—"}</dd>
               </>
             ) : (
               <>
