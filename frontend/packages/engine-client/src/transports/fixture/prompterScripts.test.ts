@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JsonObject } from "../../generated/protocol";
 import { readHtml } from "./prompterHtml";
-import { importPaste, importSentence } from "./prompterImport";
+import {
+  ImportRefused,
+  MAX_SCRIPT_TEXT_BYTES,
+  importFile,
+  importPaste,
+  importSentence,
+  refusalSentence,
+} from "./prompterImport";
+import { MAX_IMPORT_BYTES, finishedParagraph, makeRun, paragraphText } from "./prompterModel";
 import { fileParams, openPrompterDouble } from "./prompterTestSupport";
 
 // The fixture double's Teleprompter scripts, end to end through the transport (new pages
@@ -252,7 +260,8 @@ describe("the fixture double's prompter import", () => {
     const script = await call("prompter.script.snapshot", { scriptId: pasted.scriptId as string });
     expect(texts(script)).toEqual([
       "[Opening & welcome]",
-      "Hello bold and italic, underlined and heavy.",
+      // A lone no-break space stays one, as the hardware link keeps it (`finished_paragraph`).
+      "Hello bold and italic, underlined\u00A0and heavy.",
       "Not bold <here> – A\"'",
       "– First",
       "– Second",
@@ -414,6 +423,97 @@ describe("the fixture double's prompter import", () => {
     expect((await refused("prompter.script.import", { ...fileParams("a.txt", "x"), updateScriptId: 4 })).sentence).toBe(
       "updateScriptId must be a string."
     );
+  });
+});
+
+// The hardware link's import review of 2026-09-27 (`prompter/import/mod.rs`, 718dcb9d): a
+// paste over 20 MB has its own sentence, a script's text is capped at 2 MB after its
+// words, and white space collapses as each paragraph is built.
+describe("the double's import holds to the hardware link's limits and white space", () => {
+  // `a_paste_over_the_size_limit_is_refused_as_a_paste`.
+  it("refuses a paste over 20 MB in its own words", async () => {
+    const { refused } = openPrompterDouble();
+    const half = "a".repeat(MAX_IMPORT_BYTES / 2 + 1);
+    expect(await refused("prompter.script.paste", { html: half, text: half })).toEqual({
+      code: "PROMPTER_IMPORT_REFUSED",
+      sentence: "The pasted text is 21 MB; Studio Control takes pastes up to 20 MB.",
+    });
+    // A file keeps its own sentence.
+    expect(refusalSentence({ kind: "too-large", bytes: MAX_IMPORT_BYTES + 1 }, "Big.txt")).toBe(
+      "Big.txt is 21 MB; Studio Control opens files up to 20 MB."
+    );
+  });
+
+  // `more_text_than_a_script_holds_is_refused_however_few_its_words`.
+  it("refuses more text than a script holds, however few its words, after the word limit", async () => {
+    const { call, refused } = openPrompterDouble();
+    const bytes = 3 * 1024 * 1024;
+    const word = "a".repeat(bytes);
+    const refusal = (run: () => unknown) => {
+      try {
+        run();
+      } catch (error) {
+        if (error instanceof ImportRefused) return error.refusal;
+        throw error;
+      }
+      throw new Error("the import should be refused");
+    };
+    expect(refusal(() => importPaste(null, word))).toEqual({ kind: "too-much-text", bytes });
+    expect(refusal(() => importFile("One word.txt", new TextEncoder().encode(word)))).toEqual({
+      kind: "too-much-text",
+      bytes,
+    });
+    expect(await refused("prompter.script.paste", { text: word })).toEqual({
+      code: "PROMPTER_IMPORT_REFUSED",
+      sentence: "The pasted text holds more text than a script can hold (2 MB). Split it into shorter scripts.",
+    });
+    expect(refusalSentence({ kind: "too-much-text", bytes }, "One word.txt")).toBe(
+      "One word.txt holds more text than a script can hold (2 MB). Split it into shorter scripts."
+    );
+    // Just at the limit is a script; over both limits, the words are what it says.
+    expect((await call("prompter.script.paste", { text: "a".repeat(MAX_SCRIPT_TEXT_BYTES) })).name).toBe(
+      "a".repeat(MAX_SCRIPT_TEXT_BYTES).slice(0, 80)
+    );
+    expect(refusal(() => importPaste(null, `${"a".repeat(70)} `.repeat(30_001)))).toEqual({
+      kind: "too-long",
+      words: 30_001,
+    });
+  });
+
+  // `white_space_collapses_as_a_paragraph_is_built`.
+  it("collapses white space as a paragraph is built", () => {
+    const paragraph = finishedParagraph([makeRun("one  \t two \u00A0 three\u00A0four\n\n\n\n  five \n \n\n six")]);
+    expect(paragraph && paragraphText(paragraph)).toBe("one two three\u00A0four\n\nfive\n\nsix");
+    // The space stays in the run it began in.
+    expect(
+      finishedParagraph([makeRun("under  ", { bold: false, italic: false, underline: true }), makeRun("  plain")])
+    ).toEqual({
+      runs: [makeRun("under ", { bold: false, italic: false, underline: true }), makeRun("plain")],
+    });
+    // A long run of spaces between two words is one space; nothing but white space is no paragraph.
+    expect(finishedParagraph([makeRun(`a${" ".repeat(1_000_000)}b`)])?.runs).toEqual([makeRun("a b")]);
+    expect(finishedParagraph([makeRun(" \n\u00A0\n ")])).toBeNull();
+  });
+
+  it("collapses white space in a .txt, a plain paste and an HTML paste", async () => {
+    const { call } = openPrompterDouble();
+    const text = async (params: JsonObject, method: "prompter.script.import" | "prompter.script.paste") => {
+      const id = (await call(method, params)).scriptId as string;
+      return texts(await call("prompter.script.snapshot", { scriptId: id }));
+    };
+    expect(
+      await text(
+        fileParams("Spaces.txt", "Hello   there,\u00A0friend.  Two \t spaces.\n  Next   line.  "),
+        "prompter.script.import"
+      )
+    ).toEqual(["Hello there,\u00A0friend. Two spaces.\nNext line."]);
+    expect(await text({ text: "One   two\u00A0\u00A0three" }, "prompter.script.paste")).toEqual(["One two three"]);
+    expect(
+      await text(
+        { html: "<p>Lone&nbsp;one, two&nbsp;&nbsp;here</p><p>&nbsp;</p><p>a<br><br>b</p>", text: "x" },
+        "prompter.script.paste"
+      )
+    ).toEqual(["Lone\u00A0one, two here", "a", "b"]);
   });
 });
 

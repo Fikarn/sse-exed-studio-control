@@ -2,7 +2,7 @@
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
 import type { PrompterRun } from "../../generated/snapshots/PrompterRun";
-import { PLAIN, makeRun, normalizedParagraph, paragraphText, sanitizeText, type RunMarks } from "./prompterModel";
+import { PLAIN, finishedParagraph, makeRun, paragraphText, sanitizeText, type RunMarks } from "./prompterModel";
 
 // A paste that held formatting: the clipboard's HTML, from Word, a browser or Google
 // Docs (the proposal §3.1 and §3.2; the hardware link's `prompter/import/html.rs`).
@@ -122,45 +122,38 @@ export function readHtmlCounted(html: string): { paragraphs: PrompterParagraph[]
   const push = (text: string, runMarks: RunMarks) => runs.push(makeRun(text, runMarks));
 
   const endParagraph = () => {
-    const paragraph = normalizedParagraph({ runs: runs.map((run) => makeRun(sanitizeText(run.text), run)) });
-    const prefix = listPrefix;
+    const taken = runs;
+    const prefix = listPrefix?.trim();
     runs = [];
     pendingSpace = null;
     lineStart = true;
     listPrefix = null;
-    // A line break at either end is not part of the text.
-    let first = paragraph.runs[0];
-    while (first && first.text.startsWith("\n")) {
-      first.text = first.text.replace(/^\n+/, "");
-      if (first.text === "") paragraph.runs.shift();
-      first = paragraph.runs[0];
-    }
-    let last = paragraph.runs[paragraph.runs.length - 1];
-    while (last && last.text.endsWith("\n")) {
-      last.text = last.text.replace(/\n+$/, "");
-      if (last.text === "") paragraph.runs.pop();
-      last = paragraph.runs[paragraph.runs.length - 1];
-    }
-    const words = paragraphText(paragraph).trim();
-    if (words === "" || words === prefix?.trim()) return;
     if (headingDepth > 0) {
       // A heading is a cue on a line of its own (§4.2), as the hardware link's `cue_paragraph`
       // makes it: one line; a heading that already is one cue stays as it is, and square
       // brackets inside any other become round ones, so the cue cannot end early.
-      const line = paragraphText(paragraph).split(/\s+/u).filter(Boolean).join(" ");
-      if (line === "") return;
+      const line = sanitizeText(taken.map((run) => run.text).join(""))
+        .split(/\s+/u)
+        .filter(Boolean)
+        .join(" ");
+      if (line === "" || line === prefix) return;
       const isOneCue = /^\[[^\]\n]*\]$/u.test(line);
       const cue = isOneCue ? line : `[${line.replace(/\[/g, "(").replace(/\]/g, ")")}]`;
       paragraphs.push({ runs: [makeRun(cue)] });
       return;
     }
+    // White space collapses as the paragraph is finished, as every reader's does
+    // (`finished_paragraph`): a run inside a line is one space, a lone no-break space
+    // stays, a run of line breaks is at most one blank line, none at either end.
+    const paragraph = finishedParagraph(taken);
+    if (paragraph === null || paragraphText(paragraph) === prefix) return;
     paragraphs.push(paragraph);
   };
 
   const text = (raw: string) => {
-    for (const part of decodeEntities(raw)
-      .replace(/\u00a0/g, " ")
-      .split(/([ \t\n\r\f]+)/)) {
+    // A no-break space is a character here, as in the hardware link's reader; it is
+    // `finishedParagraph` that keeps a lone one and makes a run with others one space.
+    for (const part of decodeEntities(raw).split(/([ \t\n\r\f]+)/)) {
       if (part === "") continue;
       if (/^[ \t\n\r\f]+$/.test(part)) {
         if (!lineStart && pendingSpace === null) pendingSpace = marks();

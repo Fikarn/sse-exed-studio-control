@@ -7,8 +7,9 @@ import {
   MAX_SCRIPT_WORDS,
   counted,
   cueTargets,
+  finishedParagraph,
   formatCount,
-  plainParagraph,
+  makeRun,
   sanitizeText,
   wordCount,
 } from "./prompterModel";
@@ -18,8 +19,14 @@ import {
 // or what the page read from the clipboard. The refusals and the import sentence are
 // the hardware link's. A `.txt` is UTF-8, UTF-16 with its byte-order mark, else
 // Windows-1252, and the sentence names which; its paragraphs are the text between empty
-// lines, and a single line break stays one. The double does not unzip a Word document:
-// a `.docx` is refused with its own sentence, below, and the hardware link reads it.
+// lines, and a single line break stays one. White space collapses as each paragraph is
+// built (`finishedParagraph`), and a script's text is capped as well as its words, so one
+// enormous word cannot pass. The double does not unzip a Word document: a `.docx` is
+// refused with its own sentence, below, and the hardware link reads it.
+
+/** The most text a script may hold once imported (`MAX_SCRIPT_TEXT_BYTES`); a 30,000-word script is about 0.2 MB. */
+export const MAX_SCRIPT_TEXT_BYTES = 2 * 1024 * 1024;
+const MEGABYTE = 1024 * 1024;
 
 export type TextEncodingName = "UTF-8" | "UTF-16" | "Windows-1252";
 
@@ -38,7 +45,12 @@ export type ImportRefusal =
   | { kind: "not-what-its-name-says"; expected: ".docx" | ".txt" }
   | { kind: "unsupported-kind"; extension: string }
   | { kind: "too-long"; words: number }
+  /** Text over `MAX_SCRIPT_TEXT_BYTES`, however few its words. */
+  | { kind: "too-much-text"; bytes: number }
+  /** A file over `MAX_IMPORT_BYTES`. */
   | { kind: "too-large"; bytes: number }
+  /** A paste over `MAX_IMPORT_BYTES`. */
+  | { kind: "paste-too-large"; bytes: number }
   | { kind: "empty" }
   | { kind: "unreadable"; reason: string };
 
@@ -62,8 +74,12 @@ export function refusalSentence(refusal: ImportRefusal, source: string): string 
         : `Studio Control does not open .${refusal.extension} files. Save the script as .docx or .txt, then open that.`;
     case "too-long":
       return `${source} has ${formatCount(refusal.words)} words; a script can have up to ${formatCount(MAX_SCRIPT_WORDS)}. Split it into shorter scripts.`;
+    case "too-much-text":
+      return `${source} holds more text than a script can hold (${MAX_SCRIPT_TEXT_BYTES / MEGABYTE} MB). Split it into shorter scripts.`;
     case "too-large":
-      return `${source} is ${Math.ceil(refusal.bytes / (1024 * 1024))} MB; Studio Control opens files up to ${MAX_IMPORT_BYTES / (1024 * 1024)} MB.`;
+      return `${source} is ${Math.ceil(refusal.bytes / MEGABYTE)} MB; Studio Control opens files up to ${MAX_IMPORT_BYTES / MEGABYTE} MB.`;
+    case "paste-too-large":
+      return `${source} is ${Math.ceil(refusal.bytes / MEGABYTE)} MB; Studio Control takes pastes up to ${MAX_IMPORT_BYTES / MEGABYTE} MB.`;
     case "empty":
       return `${source} has no text in it.`;
     case "unreadable":
@@ -114,27 +130,42 @@ export function decodeText(bytes: Uint8Array): { text: string; encoding: TextEnc
   }
 }
 
-/** Plain text as paragraphs: the text between empty lines; a single line break stays a line break. */
+/**
+ * Plain text as paragraphs (`txt::read_plain`): the text between empty lines (a line that
+ * is empty or only white space); a single line break stays a line break; each paragraph
+ * finished as every reader finishes one.
+ */
 export function readPlain(text: string): PrompterParagraph[] {
   const paragraphs: PrompterParagraph[] = [];
   let lines: string[] = [];
   const end = () => {
-    if (lines.length > 0) paragraphs.push(plainParagraph(lines.join("\n")));
+    if (lines.length === 0) return;
+    const paragraph = finishedParagraph([makeRun(lines.join("\n"))]);
     lines = [];
+    if (paragraph) paragraphs.push(paragraph);
   };
   for (const line of sanitizeText(text).split("\n")) {
-    const trimmed = line.trim();
-    if (trimmed === "") end();
-    else lines.push(trimmed);
+    if (line.trim() === "") end();
+    else lines.push(line);
   }
   end();
   return paragraphs;
 }
 
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/** Nothing to read, over the word limit, then over the text limit (`checked`). */
 function checked(imported: ImportedText): ImportedText {
   if (imported.paragraphs.length === 0) throw new ImportRefused({ kind: "empty" });
   const words = wordCount(imported.paragraphs);
   if (words > MAX_SCRIPT_WORDS) throw new ImportRefused({ kind: "too-long", words });
+  const bytes = imported.paragraphs.reduce(
+    (sum, paragraph) => sum + paragraph.runs.reduce((runs, run) => runs + byteLength(run.text), 0),
+    0
+  );
+  if (bytes > MAX_SCRIPT_TEXT_BYTES) throw new ImportRefused({ kind: "too-much-text", bytes });
   return imported;
 }
 
@@ -173,14 +204,10 @@ export function importFile(fileName: string, bytes: Uint8Array): ImportedText {
   }
 }
 
-function byteLength(text: string): number {
-  return new TextEncoder().encode(text).length;
-}
-
 /** Reads what the page took from the clipboard: its HTML when it held formatting, else its plain text (`import_paste`). */
 export function importPaste(html: string | null, text: string): ImportedText {
   const size = (html === null ? 0 : byteLength(html)) + byteLength(text);
-  if (size > MAX_IMPORT_BYTES) throw new ImportRefused({ kind: "too-large", bytes: size });
+  if (size > MAX_IMPORT_BYTES) throw new ImportRefused({ kind: "paste-too-large", bytes: size });
   if (html !== null && html.trim() !== "") {
     const { paragraphs, pictures } = readHtmlCounted(html);
     if (paragraphs.length > 0) return checked({ paragraphs, encoding: null, pictures });

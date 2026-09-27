@@ -260,17 +260,119 @@ describe("the fixture double's prompter: the take", () => {
     await call("prompter.speed", { wpm: 300 });
     await call("prompter.play");
     expect(vi.getTimerCount()).toBe(1);
-    // A page clock moved on before the timer ran: the request settles the clock itself.
+    // A page clock moved on before the timer ran: the request settles the clock itself,
+    // and says so (review of 2026-09-27: it used to keep it to itself).
     vi.setSystemTime(NOW + 5_000);
     expect(await glass()).toMatchObject({ atEnd: true, playing: false, place: { paragraph: 1, word: 0 } });
     expect(vi.getTimerCount()).toBe(0);
+    expect(reasons().filter((reason) => reason === "at-end")).toHaveLength(1);
 
     await call("prompter.jump", { to: "top" });
     await call("prompter.play");
     expect(vi.getTimerCount()).toBe(1);
     await transport.dispose?.();
     expect(vi.getTimerCount()).toBe(0);
-    expect(reasons()).not.toContain("at-end");
+    expect(reasons().filter((reason) => reason === "at-end")).toHaveLength(1);
+  });
+
+  // The hardware link's `whoever_finds_the_text_at_the_end_announces_it` (review of
+  // 2026-09-27, L1): when a request is the first to find the text at END, it says so with
+  // `at-end` as the clock would, before the request's own event.
+  it("announces the text at END whoever finds it first", async () => {
+    const { call, script, layOut, events, reasons } = openPrompterDouble();
+    await call("prompter.putOn", { scriptId: await script("Short", ["Go."]) });
+    await layOut(5, 10);
+    await call("prompter.speed", { wpm: 300 });
+    await call("prompter.play");
+    events.length = 0;
+    // The timer has not run: the read is the first to find END.
+    vi.setSystemTime(NOW + 700);
+    await call("prompter.snapshot");
+    const announced = events.filter((seen) => seen.payload.reason === "at-end");
+    expect(announced).toHaveLength(1);
+    expect(announced[0]?.payload.anchor).toMatchObject({ atEnd: true, playing: false });
+
+    await call("prompter.jump", { to: "top" });
+    await call("prompter.play");
+    events.length = 0;
+    vi.setSystemTime(NOW + 1_400);
+    await call("prompter.jump", { to: "back" });
+    expect(reasons()).toEqual(["at-end", "jumped"]);
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(reasons()).toEqual(["at-end", "jumped"]);
+  });
+
+  // Review of 2026-09-27: the clock's timer wakes at END or after a second, whichever is
+  // sooner (`next_wake`), laid out or not, and saves the place about once a second.
+  it("saves the place about once a second while the text scrolls, laid out or not", async () => {
+    const { call, script, glass, layOut, snapshot } = openPrompterDouble();
+    const words = Array.from({ length: 10 }, (_, paragraph) =>
+      Array.from({ length: 12 }, (_, word) => `p${paragraph}w${word}`).join(" ")
+    );
+    await call("prompter.putOn", { scriptId: await script("Long", words) });
+    await layOut(5, 100);
+    await call("prompter.play");
+    const saved = async () => ((await snapshot()).scripts as JsonObject[])[0]!.place;
+
+    // The timer saved the place at 1 s; half a second on, a read (which saves only once
+    // a second has passed) shows the glass further on than the saved place.
+    await vi.advanceTimersByTimeAsync(1_000);
+    vi.setSystemTime(NOW + 1_500);
+    expect(await saved()).toEqual({ paragraph: 0, word: 2 });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 4 });
+
+    // A new size: no layout until the view reports one, and the timer still wakes.
+    await call("prompter.textSize", { step: 1 });
+    expect(await glass()).toMatchObject({ laidOut: false, playing: true });
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    vi.setSystemTime(NOW + 3_000);
+    expect(await saved()).toEqual({ paragraph: 0, word: 6 });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 8 });
+  });
+
+  // Review of 2026-09-27 (L2): a pause saves where its 0.3 s ease stops the text, not
+  // where it was at the press.
+  it("saves where a pause's ease stops the text", async () => {
+    const { call, script, glass, layOut, snapshot } = openPrompterDouble();
+    const words = Array.from({ length: 10 }, (_, paragraph) =>
+      Array.from({ length: 12 }, (_, word) => `p${paragraph}w${word}`).join(" ")
+    );
+    await call("prompter.putOn", { scriptId: await script("Long", words) });
+    await layOut(5, 100);
+    await call("prompter.speed", { wpm: 300 });
+    await call("prompter.play");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await call("prompter.pause");
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 6 });
+    expect(((await snapshot()).scripts as JsonObject[])[0]!.place).toEqual({ paragraph: 0, word: 7 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 7 });
+  });
+
+  // The hardware link's `the_first_layout_for_a_key_is_the_one_the_clock_runs_on` (review
+  // of 2026-09-27, L4): another view's report for the same key moves nothing.
+  it("runs on the first layout reported for a key", async () => {
+    const { call, script, layOut, glass, reasons, events } = openPrompterDouble();
+    await call("prompter.putOn", { scriptId: await script("Talk", ["one two three four five six seven eight"]) });
+    await layOut(4, 100);
+    await call("prompter.jump", { to: "place", paragraph: 0, word: 5 });
+    const before = (await glass()).anchor as JsonObject;
+    events.length = 0;
+    const reply = await call("prompter.layout.report", {
+      layoutKey: before.layoutKey as string,
+      lines: [
+        { paragraph: 0, word: 0, top: 0, height: 90 },
+        { paragraph: 0, word: 3, top: 90, height: 90 },
+        { paragraph: 0, word: 6, top: 180, height: 90 },
+      ],
+      endTop: 400,
+    });
+    expect(reply).toEqual({ accepted: true });
+    expect(reasons()).toEqual([]);
+    const after = (await glass()).anchor as JsonObject;
+    expect(after.position).toBe(before.position);
+    expect(after.wordOffset).toBe(before.wordOffset);
   });
 
   // §5 (answered in §14): a jump keeps the scroll as it was; only TOP pauses.
@@ -334,7 +436,8 @@ describe("the fixture double's prompter: the take", () => {
       code: "PROMPTER_NO_CUE",
       sentence: "There is no cue after the reading line.",
     });
-    await call("prompter.jump", { to: "nextParagraph" });
+    // From the last paragraph there is no next one (review of 2026-09-27).
+    expect((await refused("prompter.jump", { to: "nextParagraph" })).code).toBe("PROMPTER_NO_PARAGRAPH");
     expect(await at()).toEqual({ paragraph: 4, word: 0 });
     expect((await glass()).cues).toEqual([
       { paragraph: 0, word: 0, text: "INTRO" },
@@ -348,6 +451,74 @@ describe("the fixture double's prompter: the take", () => {
       "to must be top, back, nextLine, previousLine, nextParagraph, previousParagraph, nextCue, previousCue, paragraph or place, not sideways."
     );
     expect((await refused("prompter.jump", { to: "paragraph" })).sentence).toBe("paragraph must be a whole number.");
+  });
+
+  // The hardware link's `there_is_no_paragraph_after_the_last` (review of 2026-09-27, L3):
+  // from the last paragraph, or the end, there is no next one, and the text does not move
+  // (it went back to the paragraph's start); from the end the one before is the last.
+  it("has no paragraph after the last", async () => {
+    const { call, refused, script, glass, layOut } = openPrompterDouble();
+    await call("prompter.putOn", { scriptId: await script("Talk", ["one two three", "four five six"]) });
+    await call("prompter.jump", { to: "place", paragraph: 1, word: 2 });
+    expect(await refused("prompter.jump", { to: "nextParagraph" })).toEqual({
+      code: "PROMPTER_NO_PARAGRAPH",
+      sentence: "There is no paragraph after the reading line.",
+    });
+    expect((await glass()).place).toEqual({ paragraph: 1, word: 2 });
+
+    await layOut(5, 10);
+    await call("prompter.speed", { wpm: 300 });
+    await call("prompter.play");
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect((await glass()).atEnd).toBe(true);
+    expect((await refused("prompter.jump", { to: "nextParagraph" })).code).toBe("PROMPTER_NO_PARAGRAPH");
+    await call("prompter.jump", { to: "previousParagraph" });
+    expect((await glass()).place).toEqual({ paragraph: 1, word: 0 });
+  });
+
+  // §5 (answered in §14) with a layout: BACK reads the line the reading line is on, so
+  // from the paragraph's first line it goes to the one before, and from a later line to
+  // its paragraph's start; a line step keeps the words at the reading line's share.
+  it("takes BACK from the line the reading line is on", async () => {
+    const { call, script, glass, layOut } = openPrompterDouble();
+    await call("prompter.putOn", {
+      scriptId: await script("Talk", ["one two three four", "five six seven eight nine ten eleven twelve"]),
+    });
+    await layOut(4, 100);
+    await call("prompter.jump", { to: "place", paragraph: 1, word: 2 });
+    await call("prompter.jump", { to: "back" });
+    expect((await glass()).place).toEqual({ paragraph: 0, word: 0 });
+    await call("prompter.jump", { to: "place", paragraph: 1, word: 5 });
+    await call("prompter.jump", { to: "back" });
+    expect((await glass()).place).toEqual({ paragraph: 1, word: 0 });
+    await call("prompter.jump", { to: "nextLine" });
+    expect(await glass()).toMatchObject({ place: { paragraph: 1, word: 4 }, anchor: { wordOffset: 4 } });
+  });
+
+  // The hardware link's `letting_go_of_an_edited_script_carries_its_place_into_its_text`
+  // (review of 2026-09-27, M1): the script on the glass keeps its place in the glass's
+  // text; when it was edited and never Updated, Clear and Replace carry the place into the
+  // edited text (it was saved as it stood: paragraphs cut above the reading line put the
+  // next put-on paragraphs late).
+  it("carries an edited script's place into its own text when the glass lets go of it", async () => {
+    const { call, script, edit, snapshot, glass } = openPrompterDouble();
+    const texts = Array.from({ length: 10 }, (_, index) => `Paragraph number ${index} here.`);
+    const talk = await script("Talk", texts);
+    const other = await script("Other", ["Something else."]);
+    await call("prompter.putOn", { scriptId: talk });
+    await call("prompter.jump", { to: "place", paragraph: 7, word: 2 });
+    // Paragraphs 2 to 4 cut, with no Update.
+    await edit(talk, [...texts.slice(0, 2), ...texts.slice(5)]);
+    await call("prompter.clear");
+    const row = async () => ((await snapshot()).scripts as JsonObject[]).find((entry) => entry.id === talk)!.place;
+    expect(await row()).toEqual({ paragraph: 4, word: 2 });
+    await call("prompter.putOn", { scriptId: talk });
+    expect((await glass()).place).toEqual({ paragraph: 4, word: 2 });
+
+    // Replacing it does the same: its first paragraph cut, with no Update.
+    await edit(talk, [...texts.slice(1, 2), ...texts.slice(5)]);
+    await call("prompter.putOn", { scriptId: other, replace: true });
+    expect(await row()).toEqual({ paragraph: 3, word: 2 });
   });
 
   // §5.1 and §4.1: the pace is 40–300 in steps of 5 and the script's own; the size moves in

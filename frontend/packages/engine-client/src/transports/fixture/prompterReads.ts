@@ -8,6 +8,7 @@ import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagr
 import type { PrompterScriptSnapshot } from "../../generated/snapshots/PrompterScriptSnapshot";
 import type { PrompterScriptSummary } from "../../generated/snapshots/PrompterScriptSummary";
 import type { PrompterSnapshot } from "../../generated/snapshots/PrompterSnapshot";
+import { EngineRequestError } from "../engineRequestError";
 import type { GlassClock } from "./prompterClock";
 import {
   MAX_SCRIPT_WORDS,
@@ -23,25 +24,19 @@ import { findScript, listScripts, listVersions, type FixturePrompter, type Store
 // What the double's prompter reads out (`native/rust-engine/src/prompter/snapshot.rs`):
 // only what the hardware link holds, never what a view drew; and how it answers a
 // request it refuses (`PrompterError`: `INVALID_PARAMS` for wrong parameters, a
-// `PROMPTER_*` code with the operator's sentence for a sound request refused now).
+// `PROMPTER_*` code with the operator's sentence for a sound request refused now). A
+// refusal is the `EngineRequestError` the Tauri transport throws for the same answer:
+// the sentence is its message, the code rides along as `code`.
 
-/** A refused request: the sentence is the error's message, the code rides along as `code`. */
-export class PrompterRefusal extends Error {
-  constructor(
-    readonly code: string,
-    message: string
-  ) {
-    super(message);
-    this.name = "PrompterRefusal";
-  }
+export function invalid(message: string): EngineRequestError {
+  return new EngineRequestError("INVALID_PARAMS", message);
 }
 
-export function invalid(message: string): PrompterRefusal {
-  return new PrompterRefusal("INVALID_PARAMS", message);
-}
-
-export function unknownScript(): PrompterRefusal {
-  return new PrompterRefusal("PROMPTER_SCRIPT_UNKNOWN", "There is no such script; it may have been deleted for good.");
+export function unknownScript(): EngineRequestError {
+  return new EngineRequestError(
+    "PROMPTER_SCRIPT_UNKNOWN",
+    "There is no such script; it may have been deleted for good."
+  );
 }
 
 export function existingScript(prompter: FixturePrompter, id: string): StoredScript {
@@ -117,7 +112,7 @@ export function editedParagraphs(params: JsonObject): PrompterParagraph[] {
   if (cleaned.length === 0) cleaned.push({ runs: [] });
   const words = wordCount(cleaned);
   if (words > MAX_SCRIPT_WORDS) {
-    throw new PrompterRefusal(
+    throw new EngineRequestError(
       "PROMPTER_SCRIPT_TOO_LONG",
       `The script would have ${words} words; a script can have up to ${MAX_SCRIPT_WORDS}. Split it into shorter scripts.`
     );
@@ -174,7 +169,7 @@ function glassSummary(prompter: FixturePrompter, glass: GlassClock, now: number)
     laidOut: glass.layout !== null,
     notUpdated: script !== null && paragraphsKey(script.paragraphs) !== paragraphsKey(glass.paragraphs),
     speedWpm: glass.speedWpm,
-    place: { ...glass.placeAt(now)[0] },
+    place: glass.placeAt(now),
     paragraphCount: glass.paragraphCount,
     playing: glass.playing,
     atEnd: glass.atEnd(now),

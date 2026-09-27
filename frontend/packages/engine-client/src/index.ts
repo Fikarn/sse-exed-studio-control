@@ -13,6 +13,7 @@ export {
 } from "./audio/faderCurve";
 export { positionAt, speedAt, wordsAdvanced } from "./prompter/motion";
 export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
+export { EngineRequestError } from "./transports/engineRequestError";
 export { createFixtureTransport } from "./transports/fixtureTransport";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {

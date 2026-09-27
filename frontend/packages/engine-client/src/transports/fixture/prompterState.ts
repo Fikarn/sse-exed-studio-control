@@ -12,6 +12,7 @@ import {
   clampedPlace,
   cloneParagraphs,
   counted,
+  mapPlace,
   paragraphsKey,
   readWordCount,
   samePlace,
@@ -314,18 +315,19 @@ export function readVersion(
 // The place, the stop at END and the clock's timer (`runtime.rs`)
 // ---------------------------------------------------------------------------
 
-/** Saves the glass script's place when it moved since the last save. */
+/** Saves the glass script's place at `now` when it moved since the last save. */
 export function savePlace(prompter: FixturePrompter, now: number) {
-  const glass = prompter.glass;
-  if (glass) {
-    const [place] = glass.placeAt(now);
-    if (!samePlace(prompter.savedPlace, place)) {
-      const script = findScript(prompter, glass.scriptId);
-      if (script) script.place = { ...place };
-      prompter.savedPlace = { ...place };
-    }
-  }
+  if (prompter.glass) saveThisPlace(prompter, prompter.glass.placeAt(now));
   prompter.savedAt = now;
+}
+
+/** Saves `place` as the glass script's place (`save_this_place`), when it is not the one saved last. */
+export function saveThisPlace(prompter: FixturePrompter, place: PrompterPlace) {
+  const glass = prompter.glass;
+  if (!glass || samePlace(prompter.savedPlace, place)) return;
+  const script = findScript(prompter, glass.scriptId);
+  if (script) script.place = { ...place };
+  prompter.savedPlace = { ...place };
 }
 
 /** The glass has another script, or none: its place counts as saved. */
@@ -334,23 +336,29 @@ export function placeSavedAs(prompter: FixturePrompter, place: PrompterPlace | n
   prompter.savedAt = now;
 }
 
-/** Stops the text at `END` if it got there, and saves the place when a second has passed. True when it stopped now. */
-export function settlePrompter(prompter: FixturePrompter, now: number): boolean {
-  const glass = prompter.glass;
-  if (!glass) return false;
-  const stopped = glass.settle(now);
-  if (stopped || (glass.playing && now - prompter.savedAt >= SAVE_EVERY_MS)) savePlace(prompter, now);
-  return stopped;
-}
-
 export function glassAnchor(prompter: FixturePrompter, now: number): PrompterAnchor | null {
   return prompter.glass ? prompter.glass.anchor(now) : null;
 }
 
 /**
- * The live app's clock thread, as a timer: when the text reaches `END` it stops there
- * and `prompter.changed` says so (`at-end`). Every request settles the clock first,
- * as the hardware link does, and schedules this again.
+ * Stops the text at `END` if it got there — and says so with `prompter.changed { reason:
+ * "at-end" }`, whoever noticed first, the clock's timer or a request (review of
+ * 2026-09-27: a request that noticed first kept it to itself) — and saves the place when
+ * a second has passed.
+ */
+export function settlePrompter(prompter: FixturePrompter, now: number) {
+  const glass = prompter.glass;
+  if (!glass) return;
+  const stopped = glass.settle(now);
+  if (stopped) prompter.emit?.("prompter.changed", { reason: "at-end", anchor: glass.anchor(now) });
+  if (stopped || (glass.playing && now - prompter.savedAt >= SAVE_EVERY_MS)) savePlace(prompter, now);
+}
+
+/**
+ * The live app's clock thread, as a timer: while the text scrolls it wakes at `END` or
+ * after a second, whichever is sooner (`next_wake`), so the text stops at `END` and says
+ * so, and the place is saved about once a second — laid out or not. Every request
+ * settles the clock first, as the hardware link does, and schedules this again.
  */
 export function schedulePrompterClock(prompter: FixturePrompter) {
   if (prompter.timer !== null) {
@@ -360,18 +368,12 @@ export function schedulePrompterClock(prompter: FixturePrompter) {
   const glass = prompter.glass;
   if (!glass || !glass.playing) return;
   const untilEnd = glass.timeToEndMs(Date.now());
-  if (untilEnd === null) return;
-  prompter.timer = setTimeout(
-    () => {
-      prompter.timer = null;
-      const now = Date.now();
-      if (settlePrompter(prompter, now)) {
-        prompter.emit?.("prompter.changed", { reason: "at-end", anchor: glassAnchor(prompter, now) });
-      }
-      schedulePrompterClock(prompter);
-    },
-    Math.ceil(untilEnd) + 1
-  );
+  const wait = Math.min(untilEnd === null ? SAVE_EVERY_MS : Math.ceil(untilEnd) + 1, SAVE_EVERY_MS);
+  prompter.timer = setTimeout(() => {
+    prompter.timer = null;
+    settlePrompter(prompter, Date.now());
+    schedulePrompterClock(prompter);
+  }, wait);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,8 +400,19 @@ export interface PrompterArchive {
   scripts: ArchivedScript[];
 }
 
-/** The scripts with their versions, places and speeds, the removed ones, the look and the size. */
+/**
+ * The scripts with their versions, places and speeds, the removed ones, the look and the
+ * size. The script on the glass keeps its place in the glass's text; when it was edited
+ * since it went on, the archive carries the place in its own text (review of 2026-09-27).
+ */
 export function buildPrompterArchive(prompter: FixturePrompter): PrompterArchive {
+  const glass = prompter.glass;
+  const placeOf = (script: StoredScript): PrompterPlace =>
+    glass !== null &&
+    glass.scriptId === script.id &&
+    paragraphsKey(glass.paragraphs) !== paragraphsKey(script.paragraphs)
+      ? mapPlace(glass.paragraphs, script.paragraphs, script.place)[0]
+      : { ...script.place };
   return {
     look: { ...prompter.look },
     sizePx: prompter.sizePx,
@@ -411,7 +424,7 @@ export function buildPrompterArchive(prompter: FixturePrompter): PrompterArchive
       createdAt: script.createdAt,
       changedAt: script.changedAt,
       speedWpm: script.speedWpm,
-      place: { ...script.place },
+      place: placeOf(script),
       removedAt: script.removedAt,
       versions: prompter.versions
         .filter((version) => version.scriptId === script.id)
@@ -470,11 +483,7 @@ export function restoreFromArchive(
     outcome = restoreScripts(prompter, archive, now);
   }
   const glass = prompter.glass;
-  if (glass) {
-    const [place, fraction] = glass.placeAt(now);
-    glass.jump(now, place, fraction, true);
-    glass.motion.moveFrom = null;
-  }
+  glass?.hold(now);
   savePlace(prompter, now);
   const relayout = laysOutDifferently(stored.look, prompter.look) || stored.sizePx !== prompter.sizePx;
   prompter.look = stored.look;

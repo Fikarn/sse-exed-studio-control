@@ -60,12 +60,23 @@ export function normalizedParagraph(paragraph: PrompterParagraph): PrompterParag
   return { runs };
 }
 
+/** Whether `sanitizeText` would change `text`: a control character other than a line break, U+2028, U+2029 or U+FEFF. */
+function needsSanitizing(text: string): boolean {
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    const control = (code < 0x20 && code !== 0x0a) || (code >= 0x7f && code <= 0x9f);
+    if (control || code === 0x2028 || code === 0x2029 || code === 0xfeff) return true;
+  }
+  return false;
+}
+
 /**
  * What the two word counts would read differently or the glass cannot draw
  * (`sanitize_text`): U+FEFF goes; U+0085, U+2028, U+2029, a carriage return and a
  * CR LF become a line break; a tab becomes a space; any other control character goes.
  */
 export function sanitizeText(text: string): string {
+  if (!needsSanitizing(text)) return text;
   let out = "";
   const characters = Array.from(text);
   for (let index = 0; index < characters.length; index += 1) {
@@ -87,6 +98,68 @@ export function sanitizeText(text: string): string {
     }
   }
   return out;
+}
+
+/**
+ * White space waiting in `finishedParagraph` for the next character that is not white
+ * space, so none ends a line or the paragraph: one space (the run it began in, its first
+ * character, and whether more followed, when it is one plain space) or at most two line
+ * breaks (one blank line), however long the run it stands for.
+ */
+type Waiting =
+  | { kind: "nothing" }
+  | { kind: "space"; from: number; first: string; more: boolean }
+  | { kind: "breaks"; from: number[] };
+
+const NOTHING_WAITING: Waiting = { kind: "nothing" };
+
+/**
+ * A paragraph as every import reader hands it on (`import/mod.rs`'s `finished_paragraph`):
+ * each run sanitized, the white space at both ends of each line taken off, a run of white
+ * space inside a line made one space (a lone no-break space stays), a run of line breaks
+ * made at most one blank line, line breaks at the paragraph's start and end taken off,
+ * neighbouring runs of one emphasis joined. `null` when no word is left.
+ */
+export function finishedParagraph(runs: readonly PrompterRun[]): PrompterParagraph | null {
+  const out: PrompterRun[] = [];
+  // Line breaks wait only at a line's start and white space only after a character, so
+  // `waiting` holds one kind or the other.
+  let waiting: Waiting = NOTHING_WAITING;
+  let atLineStart = true;
+  let hasText = false;
+  for (const run of runs) {
+    out.push(makeRun("", run));
+    const index = out.length - 1;
+    // A line break, a run of other white space, or a run of text: the hardware link's
+    // character-by-character rules, taken a run at a time.
+    for (const [token] of sanitizeText(run.text).matchAll(/\n|[^\S\n]+|\S+/gu)) {
+      if (token === "\n") {
+        // The white space that ended the line.
+        if (!atLineStart) waiting = NOTHING_WAITING;
+        if (hasText) {
+          if (waiting.kind !== "breaks") waiting = { kind: "breaks", from: [index] };
+          else if (waiting.from.length < 2) waiting.from.push(index);
+        }
+        atLineStart = true;
+      } else if (/^\s/u.test(token)) {
+        if (!atLineStart) {
+          waiting =
+            waiting.kind === "space"
+              ? { ...waiting, more: true }
+              : { kind: "space", from: index, first: token[0]!, more: token.length > 1 };
+        }
+      } else {
+        if (waiting.kind === "space") out[waiting.from]!.text += waiting.more ? " " : waiting.first;
+        else if (waiting.kind === "breaks") for (const from of waiting.from) out[from]!.text += "\n";
+        waiting = NOTHING_WAITING;
+        out[index]!.text += token;
+        atLineStart = false;
+        hasText = true;
+      }
+    }
+  }
+  const paragraph = normalizedParagraph({ runs: out });
+  return paragraph.runs.every((run) => run.text.trim() === "") ? null : paragraph;
 }
 
 /** The sanitized, normalized paragraphs the hardware link keeps for a text that came in. */
@@ -129,13 +202,24 @@ export function wordCount(paragraphs: readonly PrompterParagraph[]): number {
   return paragraphs.reduce((sum, paragraph) => sum + paragraphWordCount(paragraph), 0);
 }
 
-/** For each word of a paragraph, whether the presenter reads it: a word with a character outside every cue. */
+/**
+ * For each word of a paragraph, whether the presenter reads it: a word with a character
+ * outside every cue. One pass over the words and the cues together, both in order (review
+ * of 2026-09-27: checking every character against every cue was quadratic).
+ */
 export function readFlags(paragraph: PrompterParagraph): boolean[] {
   const text = paragraphText(paragraph);
   const cues = cueSpans(text);
+  let firstCue = 0;
   return wordSpans(text).map(([begin, end]) => {
-    for (let at = begin; at < end; at += 1) {
-      if (!cues.some(([cueBegin, cueEnd]) => at >= cueBegin && at < cueEnd)) return true;
+    while (firstCue < cues.length && cues[firstCue]![1] <= begin) firstCue += 1;
+    let at = begin;
+    let cue = firstCue;
+    while (at < end) {
+      const span = cues[cue];
+      if (span === undefined || span[0] > at) return true;
+      at = Math.max(at, span[1]);
+      cue += 1;
     }
     return false;
   });
@@ -151,6 +235,9 @@ export function cueTargets(paragraphs: readonly PrompterParagraph[]): PrompterCu
   const targets: PrompterCue[] = [];
   paragraphs.forEach((paragraph, paragraphIndex) => {
     const text = paragraphText(paragraph);
+    // The paragraph's words once, and each cue line's first word found by a binary search
+    // (review of 2026-09-27: counting them again for every cue line was quadratic).
+    const words = wordSpans(text);
     let lineStart = 0;
     for (const line of text.split("\n")) {
       const trimmed = line.trim();
@@ -158,8 +245,14 @@ export function cueTargets(paragraphs: readonly PrompterParagraph[]): PrompterCu
       const isCue = trimmed.length >= 2 && spans.length === 1 && spans[0]![0] === 0 && spans[0]![1] === trimmed.length;
       if (isCue) {
         const firstWordOffset = lineStart + (line.length - line.trimStart().length);
-        const word = wordSpans(text).findIndex(([begin]) => begin === firstWordOffset);
-        targets.push({ paragraph: paragraphIndex, word: Math.max(word, 0), text: trimmed.slice(1, -1).trim() });
+        let low = 0;
+        let high = words.length;
+        while (low < high) {
+          const middle = (low + high) >> 1;
+          if (words[middle]![0] < firstWordOffset) low = middle + 1;
+          else high = middle;
+        }
+        targets.push({ paragraph: paragraphIndex, word: low, text: trimmed.slice(1, -1).trim() });
       }
       lineStart += line.length + 1;
     }
@@ -245,10 +338,52 @@ export function advanceByReadWords(
   return endOf(paragraphs);
 }
 
+/** A match needs half the longer paragraph's words in common. */
+const ALIKE = 0.5;
+
+/** How alike two paragraphs are: the words they have in common (each as often as both have it) over the longer one's words. */
+function likeness(before: PrompterParagraph, after: PrompterParagraph): number {
+  const beforeWords = paragraphText(before).match(/\S+/gu) ?? [];
+  const afterWords = paragraphText(after).match(/\S+/gu) ?? [];
+  const longer = Math.max(beforeWords.length, afterWords.length);
+  if (longer === 0) return 1;
+  const counts = new Map<string, number>();
+  for (const word of beforeWords) counts.set(word, (counts.get(word) ?? 0) + 1);
+  let common = 0;
+  for (const word of afterWords) {
+    const count = counts.get(word) ?? 0;
+    if (count > 0) {
+      counts.set(word, count - 1);
+      common += 1;
+    }
+  }
+  return common / longer;
+}
+
+/** The paragraph of `next` from `from` up to `until` most like `old`, when one is alike enough; the first of equals. */
+function bestMatch(old: PrompterParagraph, next: readonly PrompterParagraph[], from: number, until: number) {
+  let best: number | null = null;
+  let bestLikeness = 0;
+  for (let index = from; index < until; index += 1) {
+    const alike = likeness(old, next[index]!);
+    if (alike >= ALIKE && (best === null || alike > bestLikeness)) {
+      best = index;
+      bestLikeness = alike;
+    }
+  }
+  return best;
+}
+
 /**
- * Where `place` in `old` stands in `next`, and whether its paragraph was taken
- * away (`map_place`): the paragraphs the two share at the start and at the end
- * are the same, what lies between is what changed.
+ * Where `place` in `old` stands in `next`, and whether its paragraph was taken away
+ * (`map_place`): the paragraphs the two share at the start and at the end are the same,
+ * what lies between is what changed. A place in an unchanged paragraph keeps its word. A
+ * place in a changed paragraph goes to the new paragraph most like it — half its words or
+ * more in common — keeping its word as far as that paragraph goes; when none is that
+ * alike and the stretch kept its number of paragraphs, to the paragraph in the same
+ * position; else the paragraph was taken away, and the place moves to the start of the
+ * next one: the match of the next old paragraph in the stretch, or the first after it
+ * (review of 2026-09-27).
  */
 export function mapPlace(
   old: readonly PrompterParagraph[],
@@ -268,9 +403,19 @@ export function mapPlace(
   const oldChangedEnd = old.length - suffix;
   const newChangedEnd = next.length - suffix;
   if (paragraph >= oldChangedEnd) return [at(paragraph - oldChangedEnd + newChangedEnd), false];
-  const offset = paragraph - prefix;
-  if (prefix + offset < newChangedEnd) return [at(prefix + offset), false];
-  return [clampedPlace({ paragraph: newChangedEnd, word: 0 }, next), true];
+  const match = bestMatch(old[paragraph]!, next, prefix, newChangedEnd);
+  if (match !== null) return [at(match), false];
+  if (oldChangedEnd - prefix === newChangedEnd - prefix) return [at(paragraph), false];
+  // Taken away: the start of the next paragraph that is still there.
+  let following = newChangedEnd;
+  for (let later = paragraph + 1; later < oldChangedEnd; later += 1) {
+    const laterMatch = bestMatch(old[later]!, next, prefix, newChangedEnd);
+    if (laterMatch !== null) {
+      following = laterMatch;
+      break;
+    }
+  }
+  return [clampedPlace({ paragraph: following, word: 0 }, next), true];
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +432,24 @@ export function cleanName(raw: string): string | null {
   return name === "" ? null : name;
 }
 
-/** Names in the order a person reads a list: letters without regard to case, a run of digits by its number. */
+/**
+ * Two texts by their characters' Unicode code points, as Rust compares `char`s (a JS
+ * string compares UTF-16 units, which puts a character past U+FFFF before U+E000–U+FFFF).
+ */
+function byCodePoint(left: string, right: string): number {
+  const a = Array.from(left);
+  const b = Array.from(right);
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) {
+    const order = a[index]!.codePointAt(0)! - b[index]!.codePointAt(0)!;
+    if (order !== 0) return order < 0 ? -1 : 1;
+  }
+  return Math.sign(a.length - b.length);
+}
+
+/**
+ * Names in the order a person reads a list (`natural_order`): letters without regard to
+ * case, each lower-cased and then by its code point, a run of digits by its number.
+ */
 export function naturalOrder(left: string, right: string): number {
   const a = Array.from(left);
   const b = Array.from(right);
@@ -309,9 +471,8 @@ export function naturalOrder(left: string, right: string): number {
         leftNumber.length - rightNumber.length || (leftNumber < rightNumber ? -1 : leftNumber > rightNumber ? 1 : 0);
       if (order !== 0) return order;
     } else {
-      const leftLower = a[i]!.toLowerCase();
-      const rightLower = b[j]!.toLowerCase();
-      if (leftLower !== rightLower) return leftLower < rightLower ? -1 : 1;
+      const order = byCodePoint(a[i]!.toLowerCase(), b[j]!.toLowerCase());
+      if (order !== 0) return order;
       i += 1;
       j += 1;
     }

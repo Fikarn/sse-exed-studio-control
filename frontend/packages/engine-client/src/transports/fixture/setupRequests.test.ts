@@ -140,6 +140,33 @@ describe("the fixture double's backup replies", () => {
     // A second restore of the same archive adds nothing more.
     expect(await request("support.backup.restore", { path })).not.toHaveProperty("detail");
   });
+
+  // The hardware link's `the_archive_carries_an_edited_glass_script_s_place_in_its_own_text`
+  // (review of 2026-09-27, M1): while the script on the glass has an edit that was never
+  // Updated, the archive carries its place in its own text.
+  it("carries an edited glass script's place in its own text", async () => {
+    const { request } = openDouble();
+    const talk = (await request("prompter.script.create", { name: "Talk" })).scriptId as string;
+    const paragraphs = Array.from({ length: 6 }, (_, index) => ({
+      runs: [{ text: `Paragraph number ${index} here.` }],
+    }));
+    await request("prompter.script.edit", { scriptId: talk, paragraphs });
+    await request("prompter.putOn", { scriptId: talk });
+    await request("prompter.jump", { to: "paragraph", paragraph: 4 });
+    await request("prompter.script.edit", {
+      scriptId: talk,
+      paragraphs: paragraphs.filter((_, index) => index !== 1),
+    });
+    const path = (await request("support.backup.export")).path as string;
+
+    // The archived place, read back: the script deleted for good comes back from it.
+    await request("prompter.clear");
+    await request("prompter.script.remove", { scriptId: talk });
+    await request("prompter.script.delete", { scriptId: talk });
+    await request("support.backup.restore", { path });
+    const restored = await request("prompter.script.snapshot", { scriptId: talk });
+    expect((restored.script as JsonObject).place).toEqual({ paragraph: 3, word: 0 });
+  });
 });
 
 // Slice 4: `settings.update` opens the pages the hardware link knows and refuses any

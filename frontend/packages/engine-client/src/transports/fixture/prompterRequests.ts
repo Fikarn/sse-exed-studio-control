@@ -3,17 +3,19 @@
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import type { PrompterLook } from "../../generated/snapshots/PrompterLook";
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
-import type { PrompterPlace } from "../../generated/snapshots/PrompterPlace";
+import { EngineRequestError } from "../engineRequestError";
 import {
   GlassClock,
   SPEED_DEFAULT_WPM,
   SPEED_MAX_WPM,
   SPEED_MIN_WPM,
   SPEED_STEP_WPM,
+  cueAfter,
+  cueBefore,
   lineStep,
   newLayout,
-  placeAtPosition,
   speedIsValid,
+  wordsAtPosition,
 } from "./prompterClock";
 import { ImportRefused, importFile, importPaste, importSentence, refusalSentence } from "./prompterImport";
 import {
@@ -30,7 +32,6 @@ import {
   paragraphsKey,
 } from "./prompterModel";
 import {
-  PrompterRefusal,
   editedParagraphs,
   existingScript,
   flagParam,
@@ -65,6 +66,7 @@ import {
   readVersion,
   restoreFromArchive,
   savePlace,
+  saveThisPlace,
   schedulePrompterClock,
   settlePrompter,
   sizeIsValid,
@@ -96,7 +98,7 @@ const answer = (result: JsonValue, reason: string | null = null): Answer => ({ r
 function keptScript(prompter: FixturePrompter, id: string): StoredScript {
   const script = existingScript(prompter, id);
   if (script.removedAt !== null) {
-    throw new PrompterRefusal("PROMPTER_SCRIPT_REMOVED", `${script.name} is in Removed. Restore it first.`);
+    throw new EngineRequestError("PROMPTER_SCRIPT_REMOVED", `${script.name} is in Removed. Restore it first.`);
   }
   return script;
 }
@@ -184,7 +186,7 @@ function importRequest(prompter: FixturePrompter, params: JsonObject, now: numbe
     imported = importFile(fileName, decodeBase64(content));
   } catch (error) {
     if (error instanceof ImportRefused) {
-      throw new PrompterRefusal("PROMPTER_IMPORT_REFUSED", refusalSentence(error.refusal, fileName));
+      throw new EngineRequestError("PROMPTER_IMPORT_REFUSED", refusalSentence(error.refusal, fileName));
     }
     throw error;
   }
@@ -213,7 +215,7 @@ function pasteRequest(prompter: FixturePrompter, params: JsonObject, now: number
     imported = importPaste(html, text);
   } catch (error) {
     if (error instanceof ImportRefused) {
-      throw new PrompterRefusal("PROMPTER_IMPORT_REFUSED", refusalSentence(error.refusal, "The pasted text"));
+      throw new EngineRequestError("PROMPTER_IMPORT_REFUSED", refusalSentence(error.refusal, "The pasted text"));
     }
     throw error;
   }
@@ -256,7 +258,7 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
       const id = textParam(params, "scriptId");
       const script = existingScript(prompter, id);
       if (remove && onGlass(prompter, id)) {
-        throw new PrompterRefusal(
+        throw new EngineRequestError(
           "PROMPTER_SCRIPT_ON_PROMPTER",
           `${script.name} is on the prompter. Clear the prompter first.`
         );
@@ -268,7 +270,7 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
       const id = textParam(params, "scriptId");
       const script = existingScript(prompter, id);
       if (script.removedAt === null) {
-        throw new PrompterRefusal(
+        throw new EngineRequestError(
           "PROMPTER_SCRIPT_NOT_REMOVED",
           `${script.name} is not in Removed. Remove it first; only a removed script can be deleted for good.`
         );
@@ -283,7 +285,7 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
       const script = keptScript(prompter, id);
       const paragraphs = readVersion(prompter, id, versionId);
       if (!paragraphs) {
-        throw new PrompterRefusal(
+        throw new EngineRequestError(
           "PROMPTER_VERSION_UNKNOWN",
           `${script.name} has no such version; it may have been let go.`
         );
@@ -305,7 +307,7 @@ function scriptRequest(prompter: FixturePrompter, method: RequestMethod, params:
 // ---------------------------------------------------------------------------
 
 const nothingOn = () =>
-  new PrompterRefusal("PROMPTER_NOTHING_ON", "Nothing is on the prompter. Put a script on first.");
+  new EngineRequestError("PROMPTER_NOTHING_ON", "Nothing is on the prompter. Put a script on first.");
 
 function glassOf(prompter: FixturePrompter): GlassClock {
   if (!prompter.glass) throw nothingOn();
@@ -315,6 +317,22 @@ function glassOf(prompter: FixturePrompter): GlassClock {
 const glassName = (prompter: FixturePrompter, glass: GlassClock) =>
   prompter.scripts.find((script) => script.id === glass.scriptId)?.name ?? "";
 
+/**
+ * The glass lets go of its script (a replace, a clear; `release_glass`): the script keeps
+ * the place it was read to — where a pause's ease will stop — carried into its own text
+ * when it was edited since it went on (review of 2026-09-27: the place, counted in the
+ * glass's text, was saved against the edited text).
+ */
+function releaseGlass(prompter: FixturePrompter, now: number) {
+  const glass = prompter.glass;
+  if (!glass) return;
+  const readTo = glass.restingPlace(now);
+  const script = prompter.scripts.find((entry) => entry.id === glass.scriptId);
+  if (!script) return;
+  const edited = paragraphsKey(script.paragraphs) !== paragraphsKey(glass.paragraphs);
+  script.place = edited ? mapPlace(glass.paragraphs, script.paragraphs, readTo)[0] : { ...readTo };
+}
+
 /** `prompter.putOn { scriptId, replace? }`: on the glass, paused at its own place — the top when left at its end. */
 function putOnRequest(prompter: FixturePrompter, params: JsonObject, now: number): Answer {
   const id = textParam(params, "scriptId");
@@ -323,16 +341,16 @@ function putOnRequest(prompter: FixturePrompter, params: JsonObject, now: number
   let replaced: string | null = null;
   if (prompter.glass) {
     if (prompter.glass.scriptId === id) {
-      throw new PrompterRefusal("PROMPTER_ALREADY_ON", `${script.name} is already on the prompter.`);
+      throw new EngineRequestError("PROMPTER_ALREADY_ON", `${script.name} is already on the prompter.`);
     }
     const shown = glassName(prompter, prompter.glass);
     if (!replace) {
-      throw new PrompterRefusal(
+      throw new EngineRequestError(
         "PROMPTER_REPLACE_NOT_CONFIRMED",
         `The prompter shows ${shown}. Replacing it with ${script.name} needs the second press.`
       );
     }
-    savePlace(prompter, now);
+    releaseGlass(prompter, now);
     replaced = shown;
   }
   const place =
@@ -359,13 +377,15 @@ function updateRequest(prompter: FixturePrompter, now: number): Answer {
   const glass = glassOf(prompter);
   const script = existingScript(prompter, glass.scriptId);
   if (paragraphsKey(script.paragraphs) === paragraphsKey(glass.paragraphs)) {
-    throw new PrompterRefusal("PROMPTER_UP_TO_DATE", `The prompter already shows the latest text of ${script.name}.`);
+    throw new EngineRequestError(
+      "PROMPTER_UP_TO_DATE",
+      `The prompter already shows the latest text of ${script.name}.`
+    );
   }
-  const [current] = glass.placeAt(now);
-  const [place, moved] = mapPlace(glass.paragraphs, script.paragraphs, current);
+  const [place, moved] = mapPlace(glass.paragraphs, script.paragraphs, glass.placeAt(now));
   keepVersion(prompter, script.id, script.paragraphs, VERSION_REASON.updated, now);
   prompter.glassRevision += 1;
-  glass.replaceText(now, cloneParagraphs(script.paragraphs), layoutKey(prompter), place);
+  glass.replaceText(now, cloneParagraphs(script.paragraphs), layoutKey(prompter), place, !moved);
   savePlace(prompter, now);
   let sentence = `Updated ${script.name} on the prompter.`;
   if (moved) {
@@ -380,7 +400,7 @@ function updateRequest(prompter: FixturePrompter, now: number): Answer {
 /** `prompter.clear`: the glass goes black; the script keeps its place. */
 function clearRequest(prompter: FixturePrompter, now: number): Answer {
   const name = glassName(prompter, glassOf(prompter));
-  savePlace(prompter, now);
+  releaseGlass(prompter, now);
   prompter.glassRevision += 1;
   prompter.glass = null;
   placeSavedAs(prompter, null, now);
@@ -392,7 +412,7 @@ function clearRequest(prompter: FixturePrompter, now: number): Answer {
 // ---------------------------------------------------------------------------
 
 const notLaidOut = () =>
-  new PrompterRefusal(
+  new EngineRequestError(
     "PROMPTER_NOT_LAID_OUT",
     "The prompter's text is not drawn yet, so it cannot scroll or step a line. Try again in a moment."
   );
@@ -400,7 +420,7 @@ const notLaidOut = () =>
 function playRequest(prompter: FixturePrompter, now: number): Answer {
   const glass = glassOf(prompter);
   if (glass.atEnd(now)) {
-    throw new PrompterRefusal(
+    throw new EngineRequestError(
       "PROMPTER_AT_END",
       `The prompter is at the end of ${glassName(prompter, glass)}. Go back with BACK, TOP or a jump first.`
     );
@@ -441,51 +461,54 @@ function jumpRequest(prompter: FixturePrompter, params: JsonObject, now: number)
   const word = wholeParam(params, "word");
   const glass = glassOf(prompter);
   const count = glass.paragraphCount;
-  const [current] = glass.placeAt(now);
-  const startOf = (index: number): PrompterPlace => ({ paragraph: Math.max(index, 0), word: 0 });
-  let fraction = 0;
-  let target: PrompterPlace;
+  const [paragraphNow, offsetNow] = glass.wordsAt(now);
+  let target: [number, number];
   switch (to) {
     case "top":
-      glass.jump(now, TOP, 0, true);
+      glass.jump(now, 0, 0, true);
       savePlace(prompter, now);
       return answer({}, "jumped");
+    // §5 (answered in §14): the start of the paragraph at the reading line; from that
+    // paragraph's first line, the start of the one before.
     case "back":
-      if (current.paragraph >= count) target = startOf(count - 1);
-      else if (current.word === 0) target = startOf(current.paragraph - 1);
-      else target = startOf(current.paragraph);
+      if (paragraphNow >= count) target = [Math.max(count - 1, 0), 0];
+      else if (glass.lineStartAt(now) === 0) target = [Math.max(paragraphNow - 1, 0), 0];
+      else target = [paragraphNow, 0];
       break;
     case "nextLine":
     case "previousLine": {
       const layout = glass.layout;
       const position = glass.positionAt(now);
       if (!layout || position === null) throw notLaidOut();
-      [target, fraction] = placeAtPosition(layout, lineStep(layout, position, to === "nextLine"), count);
+      target = wordsAtPosition(layout, lineStep(layout, position, to === "nextLine"), count);
       break;
     }
     case "nextParagraph":
-      target = startOf(Math.min(current.paragraph + 1, count - 1));
+      // From the last paragraph there is no next one: the text does not move (review of
+      // 2026-09-27: it went back to the paragraph's start).
+      if (paragraphNow + 1 >= count) {
+        throw new EngineRequestError("PROMPTER_NO_PARAGRAPH", "There is no paragraph after the reading line.");
+      }
+      target = [paragraphNow + 1, 0];
       break;
     case "previousParagraph":
-      target = startOf(current.paragraph - 1);
+      target = [Math.min(Math.max(paragraphNow - 1, 0), Math.max(count - 1, 0)), 0];
       break;
     case "nextCue":
     case "previousCue": {
       const cues = cueTargets(glass.paragraphs);
+      const here = [paragraphNow, offsetNow] as const;
       const found =
         to === "nextCue"
-          ? cues.find((cue) => comparePlaces(cue, current) > 0)
-          : [...cues].reverse().find((cue) => {
-              const order = comparePlaces(cue, current);
-              return order < 0 || (order === 0 && !glass.atLineStart(now));
-            });
+          ? cues.find((cue) => cueAfter([cue.paragraph, cue.word], here))
+          : [...cues].reverse().find((cue) => cueBefore([cue.paragraph, cue.word], here));
       if (!found) {
-        throw new PrompterRefusal(
+        throw new EngineRequestError(
           "PROMPTER_NO_CUE",
           to === "nextCue" ? "There is no cue after the reading line." : "There is no cue before the reading line."
         );
       }
-      target = { paragraph: found.paragraph, word: found.word };
+      target = [found.paragraph, found.word];
       break;
     }
     case "paragraph":
@@ -496,12 +519,12 @@ function jumpRequest(prompter: FixturePrompter, params: JsonObject, now: number)
           `The script on the prompter has ${count} paragraphs; paragraph must be 0–${Math.max(count - 1, 0)}.`
         );
       }
-      target = { paragraph, word: to === "place" ? (word ?? 0) : 0 };
+      target = [paragraph, to === "place" ? (word ?? 0) : 0];
       break;
     default:
       throw invalid(`to must be ${JUMP_TARGETS}, not ${to}.`);
   }
-  glass.jump(now, target, fraction, false);
+  glass.jump(now, target[0], target[1], false);
   savePlace(prompter, now);
   return answer({}, "jumped");
 }
@@ -626,10 +649,10 @@ function layoutRequest(prompter: FixturePrompter, params: JsonObject, now: numbe
   if (typeof endTop !== "number") throw invalid("endTop must be a number.");
   const glass = prompter.glass;
   if (!glass || glass.layoutKey !== key) return answer({ accepted: false });
-  const held = glass.layout;
-  if (held && held.endTop === endTop && JSON.stringify(held.lines) === JSON.stringify(lines)) {
-    return answer({ accepted: true });
-  }
+  // The first report for a key is the one the clock runs on; another view's for the same
+  // key changes nothing (review of 2026-09-27: the glass and the page's copy may break a
+  // line differently, and each report moved a paused place).
+  if (glass.layout) return answer({ accepted: true });
   const layout = newLayout(key, lines, endTop, glass.paragraphs);
   if (typeof layout === "string") throw invalid(layout);
   glass.acceptLayout(now, layout);
@@ -656,10 +679,14 @@ function answerRequest(prompter: FixturePrompter, method: RequestMethod, params:
       return clearRequest(prompter, now);
     case "prompter.play":
       return playRequest(prompter, now);
-    case "prompter.pause":
-      glassOf(prompter).pause(now);
-      savePlace(prompter, now);
+    case "prompter.pause": {
+      const glass = glassOf(prompter);
+      glass.pause(now);
+      // Where the 0.3 s ease will stop the text, not where it was at the press (review of
+      // 2026-09-27).
+      saveThisPlace(prompter, glass.restingPlace(now));
       return answer({}, "paused");
+    }
     case "prompter.speed":
       return speedRequest(prompter, params, now);
     case "prompter.jump":

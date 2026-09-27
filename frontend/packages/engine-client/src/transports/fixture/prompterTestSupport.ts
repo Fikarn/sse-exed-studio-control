@@ -6,6 +6,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 import type { EventName, JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import type { PrompterLayoutLine } from "../../generated/snapshots/PrompterLayoutLine";
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
+import { EngineRequestError } from "../engineRequestError";
 import { createFixtureTransport } from "../fixtureTransport";
 
 export interface SeenEvent {
@@ -45,13 +46,18 @@ export function openPrompterDouble() {
   const call = (method: RequestMethod, params: JsonObject = {}) =>
     transport.request(method, params) as Promise<JsonObject>;
 
-  /** A request that must be refused: its code and its sentence. */
+  /**
+   * A request that must be refused: its code and its sentence. The refusal is the
+   * `EngineRequestError` the Tauri transport throws for the hardware link's answer, so a
+   * page reads the code the same way on either transport.
+   */
   const refused = async (method: RequestMethod, params: JsonObject = {}) => {
     let answered: JsonValue;
     try {
       answered = await transport.request(method, params);
     } catch (error) {
-      return { code: (error as { code?: string }).code ?? "", sentence: (error as Error).message };
+      if (!(error instanceof EngineRequestError)) throw error;
+      return { code: error.code, sentence: error.message };
     }
     throw new Error(`${method} should be refused, answered ${JSON.stringify(answered)}`);
   };
