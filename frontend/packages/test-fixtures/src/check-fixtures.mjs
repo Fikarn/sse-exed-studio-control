@@ -170,6 +170,76 @@ function validateFixture(scenario, entry) {
   if (entry.commissioningSnapshot !== undefined) {
     requireObject(scenario, entry.commissioningSnapshot, "commissioningSnapshot");
   }
+
+  if (entry.prompter !== undefined) {
+    validatePrompter(scenario, entry.prompter);
+  }
+}
+
+// New pages program, Slice 6a: a scenario's `prompter` names its scripts
+// (`index.ts` makes it the double's seed from `prompterScripts.ts`). This
+// checker is plain Node and cannot read that TypeScript module, so it holds the
+// shape only; a name `prompterScripts.ts` lacks is thrown by `index.ts` as the
+// package loads, in every Vitest run and in the app. The double then throws
+// for a place outside the script's text or a look out of range.
+const PROMPTER_KEYS = new Set(["scripts", "removed", "onGlass", "place", "notUpdated", "look", "sizePx"]);
+
+function requireWhole(scenario, value, fieldPath) {
+  if (!Number.isInteger(value) || value < 0) {
+    fail(scenario, `${fieldPath} must be a whole number`);
+  }
+}
+
+function requireNames(scenario, value, fieldPath) {
+  requireArray(scenario, value, fieldPath);
+  value.forEach((name, index) => requireString(scenario, name, `${fieldPath}[${index}]`));
+  if (new Set(value).size !== value.length) {
+    fail(scenario, `${fieldPath} names a script twice`);
+  }
+}
+
+function validatePrompter(scenario, prompter) {
+  requireObject(scenario, prompter, "prompter");
+  for (const key of Object.keys(prompter)) {
+    if (!PROMPTER_KEYS.has(key)) {
+      fail(scenario, `prompter.${key} is not one of ${[...PROMPTER_KEYS].join(", ")}`);
+    }
+  }
+  const scripts = prompter.scripts ?? [];
+  const removed = prompter.removed ?? [];
+  requireNames(scenario, scripts, "prompter.scripts");
+  requireNames(scenario, removed, "prompter.removed");
+  for (const name of removed) {
+    if (scripts.includes(name)) {
+      fail(scenario, `prompter.removed names "${name}", which prompter.scripts names too`);
+    }
+  }
+  if (prompter.onGlass !== undefined) {
+    requireString(scenario, prompter.onGlass, "prompter.onGlass");
+    if (!scripts.includes(prompter.onGlass)) {
+      fail(scenario, `prompter.onGlass must be one of prompter.scripts; got "${prompter.onGlass}"`);
+    }
+  }
+  if (prompter.place !== undefined) {
+    requireObject(scenario, prompter.place, "prompter.place");
+    requireWhole(scenario, prompter.place.paragraph, "prompter.place.paragraph");
+    requireWhole(scenario, prompter.place.word, "prompter.place.word");
+    if (prompter.onGlass === undefined) {
+      fail(scenario, "prompter.place is the glass script's place, so it needs prompter.onGlass");
+    }
+  }
+  if (prompter.notUpdated !== undefined) {
+    requireBoolean(scenario, prompter.notUpdated, "prompter.notUpdated");
+    if (prompter.notUpdated && prompter.onGlass === undefined) {
+      fail(scenario, "prompter.notUpdated needs a script on the glass (prompter.onGlass)");
+    }
+  }
+  if (prompter.look !== undefined) {
+    requireObject(scenario, prompter.look, "prompter.look");
+  }
+  if (prompter.sizePx !== undefined) {
+    requireWhole(scenario, prompter.sizePx, "prompter.sizePx");
+  }
 }
 
 // First gate: every required scenario id must exist.

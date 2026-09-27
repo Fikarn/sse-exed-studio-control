@@ -3,6 +3,7 @@ import { handleFixtureLightingRequest } from "./fixture/lightingRequests";
 import { handleFixtureAudioRequest } from "./fixture/audioRequests";
 import { handleFixtureSetupRequest } from "./fixture/setupRequests";
 import { handleFixturePrompterRequest } from "./fixture/prompterRequests";
+import { seedFixturePrompter } from "./fixture/prompterSeed";
 import { disposeFixturePrompter } from "./fixture/prompterState";
 import type { FixtureScenario, EngineTransport } from "../types";
 import {
@@ -37,6 +38,12 @@ const FIXTURE_REQUEST_HANDLERS: readonly FixtureRequestHandler[] = [
 export function createFixtureTransport(scenario: FixtureScenario): EngineTransport {
   const listeners = new Set<(event: EventEnvelope<EventName>) => void>();
   const state = createMutableFixtureState(scenario);
+  // New pages program, Slice 6a: the scripts and the glass the scenario starts with, once
+  // its Prompter XL is set and before the first sync works out the prompter's check. Here
+  // rather than in `createMutableFixtureState`: the seed puts a script on through
+  // `prompterRequests.ts`, which reads `state.ts`, and the double keeps its modules free
+  // of loops.
+  seedFixturePrompter(state, scenario.prompter);
   const audioMeteringActive = scenario.audioMeteringActive === true;
   const startupDelayMs = typeof scenario.startupDelayMs === "number" ? scenario.startupDelayMs : 0;
   const startupFailure =

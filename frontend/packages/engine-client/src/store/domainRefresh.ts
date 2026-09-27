@@ -15,7 +15,9 @@ export type DomainKey =
   | "lightingDmxMonitor"
   | "audio"
   | "support"
-  | "controlSurface";
+  | "controlSurface"
+  | "prompter"
+  | "prompterGlass";
 
 export const DOMAIN_REQUESTS = {
   health: "health.snapshot",
@@ -27,6 +29,8 @@ export const DOMAIN_REQUESTS = {
   audio: "audio.snapshot",
   support: "support.snapshot",
   controlSurface: "controlSurface.snapshot",
+  prompter: "prompter.snapshot",
+  prompterGlass: "prompter.glass.snapshot",
 } as const satisfies Record<DomainKey, RequestMethod>;
 
 /** Every snapshot: the bootstrap's set and what an explicit `refresh()` fetches. */
@@ -37,10 +41,12 @@ export const ALL_DOMAINS = Object.keys(DOMAIN_REQUESTS) as DomainKey[];
  * compiled into the hardware link and cannot change while it runs, so it is
  * fetched once per session and again only by an explicit `refresh()`. The
  * deck's page model is as fixed; its one live field, the last key pressed, is
- * polled by the Setup verify step while that step is open.
+ * polled by the Setup verify step while that step is open. The glass's text
+ * (new pages program, Slice 6a) follows the prompter's snapshot: it is fetched
+ * when that snapshot's layout key has moved, never on its own.
  */
 export const CHANGEABLE_DOMAINS: readonly DomainKey[] = ALL_DOMAINS.filter(
-  (domain) => domain !== "lightingFixtureCatalog" && domain !== "controlSurface"
+  (domain) => domain !== "lightingFixtureCatalog" && domain !== "controlSurface" && domain !== "prompterGlass"
 );
 
 // The DMX monitor is the lighting snapshot rendered a second way — the
@@ -73,9 +79,11 @@ export const EVENT_DOMAIN_REFRESH = {
   "engine.ready": [],
   "engine.startupFailed": [],
   "lighting.changed": LIGHTING_DOMAINS,
-  // New pages program, Slice 4: the Teleprompter's changes carry the glass's
-  // anchor. No page reads the prompter yet; Slice 6 gives it a domain.
-  "prompter.changed": [],
+  // New pages program, Slice 6a: every change of the Teleprompter's is in its
+  // snapshot, the anchor included. The glass's text follows only when the
+  // snapshot's layout key has moved (the store's `prompterGlassIsStale`), so a
+  // play, a pause or a speed step costs one small read, never the text.
+  "prompter.changed": ["prompter"],
   "settings.changed": ["app"],
   "support.changed": ["support"],
 } as const satisfies Record<EventName, readonly DomainKey[]>;
@@ -110,8 +118,10 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   ["support.", ["support"]],
   // Writes the Stream Deck profile to a file; no snapshot reads it.
   ["exports.", []],
-  // The Teleprompter (Slice 4): no page reads it until Slice 6.
-  ["prompter.", []],
+  // The Teleprompter (Slice 6a): a read changes nothing; every other request
+  // can change the prompter's snapshot (and, through its layout key, the text).
+  ["prompter.script.snapshot", []],
+  ["prompter.", ["prompter"]],
 ];
 
 // Opening a workspace refreshes what that workspace shows. Not every change
@@ -126,6 +136,7 @@ const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
   setup: ["health", "commissioning", "support", "controlSurface"],
   lighting: LIGHTING_DOMAINS,
   audio: ["audio"],
+  teleprompter: ["prompter"],
 };
 
 /**

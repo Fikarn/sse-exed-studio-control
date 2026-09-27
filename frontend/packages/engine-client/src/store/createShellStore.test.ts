@@ -5,7 +5,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 import { createFixtureTransport } from "../transports/fixtureTransport";
 import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
 import type { EngineTransport } from "../types";
-import { createShellStore } from "./createShellStore";
+import { createShellStore, prompterGlassIsStale } from "./createShellStore";
 
 function recordingTransport(inner: EngineTransport, log: string[]): EngineTransport {
   return {
@@ -114,6 +114,9 @@ const TYPED_SNAPSHOT_REQUESTS = new Set([
   "lighting.snapshot",
   "lighting.fixtureCatalog.snapshot",
   "lighting.dmxMonitor.snapshot",
+  // New pages program, Slice 6a: the Teleprompter's, absent while nothing is on it.
+  "prompter.snapshot",
+  "prompter.glass.snapshot",
 ]);
 
 function supervisedTransport() {
@@ -450,8 +453,8 @@ describe("createShellStore scoped refresh", () => {
       "engine.ready": [],
       "engine.startupFailed": [],
       "lighting.changed": ["lighting.dmxMonitor.snapshot", "lighting.snapshot"],
-      // New pages program, Slice 4: no page reads the prompter until Slice 6.
-      "prompter.changed": [],
+      // New pages program, Slice 6a: the prompter's snapshot; its text only when the layout key moves.
+      "prompter.changed": ["prompter.snapshot"],
       "settings.changed": ["app.snapshot"],
       "support.changed": ["support.snapshot"],
     };
@@ -507,7 +510,8 @@ describe("createShellStore scoped refresh", () => {
     emit(changed("rig.changed" as EventName, "from a newer hardware link"));
     await tick();
     // Everything an event can change: not the fixture catalog, which is
-    // compiled in, nor the deck's page model, which is as fixed.
+    // compiled in, nor the deck's page model, which is as fixed, nor the
+    // glass's text, which follows the prompter's snapshot.
     expect(snapshotRequests()).toEqual([
       "app.snapshot",
       "audio.snapshot",
@@ -515,6 +519,7 @@ describe("createShellStore scoped refresh", () => {
       "health.snapshot",
       "lighting.dmxMonitor.snapshot",
       "lighting.snapshot",
+      "prompter.snapshot",
       "support.snapshot",
     ]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("rig.changed"));
@@ -548,7 +553,8 @@ describe("createShellStore scoped refresh", () => {
     calls.length = 0;
     await store.refresh();
     expect(catalogRequests()).toBe(1);
-    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(9);
+    // Eleven since the Teleprompter's two (new pages program, Slice 6a).
+    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(11);
     await store.dispose();
   });
 
@@ -604,7 +610,8 @@ describe("createShellStore scoped refresh", () => {
     // An applied archive rewrites lighting and audio settings too, and no
     // lighting or audio event says so.
     answer("support.backup.restore", { requiresRestart: false });
-    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(7);
+    // Eight since the Teleprompter's snapshot (new pages program, Slice 6a).
+    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(8);
     await store.dispose();
   });
 
@@ -985,5 +992,74 @@ describe("createShellStore identify flashes", () => {
     expect(lightingReads()).toBe(1);
 
     await store.dispose();
+  });
+});
+
+// New pages program, Slice 6a: the Teleprompter's two snapshots. Its state is
+// small and read after every change; the text on the glass can hold 30,000
+// words, so it is read only when the state's layout key says it moved.
+describe("createShellStore the Teleprompter", () => {
+  const prompter = (layoutKey: string | null) => ({
+    look: {},
+    sizePx: 88,
+    glass: layoutKey ? { layoutKey } : null,
+    scripts: [],
+    removed: [],
+    screen: {},
+  });
+  const text = (layoutKey: string | null) => ({ layoutKey, paragraphs: [] });
+
+  it("reads the glass's text only when the prompter's layout key moves", async () => {
+    const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
+    answer("prompter.snapshot", prompter("g1-l0"));
+    answer("prompter.glass.snapshot", text("g1-l0"));
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBe("g1-l0");
+
+    // A play, a pause, a speed step: the state alone.
+    calls.length = 0;
+    emit(changed("prompter.changed", "played"));
+    await tick();
+    await tick();
+    expect(snapshotRequests()).toEqual(["prompter.snapshot"]);
+
+    // An Update: a new key, so the text follows in the same run.
+    calls.length = 0;
+    answer("prompter.snapshot", prompter("g2-l0"));
+    answer("prompter.glass.snapshot", text("g2-l0"));
+    emit(changed("prompter.changed", "updated"));
+    await tick();
+    await tick();
+    expect(snapshotRequests()).toEqual(["prompter.glass.snapshot", "prompter.snapshot"]);
+    expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBe("g2-l0");
+
+    // Cleared: nothing on the glass, and the text read once more as empty.
+    calls.length = 0;
+    answer("prompter.snapshot", prompter(null));
+    answer("prompter.glass.snapshot", text(null));
+    emit(changed("prompter.changed", "cleared"));
+    await tick();
+    await tick();
+    expect(snapshotRequests()).toEqual(["prompter.glass.snapshot", "prompter.snapshot"]);
+    expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBeNull();
+    await store.dispose();
+  });
+
+  it("says the text is behind only when the keys differ", () => {
+    const state = (glassKey: string | null, textKey: string | null) =>
+      ({
+        prompterSnapshot: prompter(glassKey),
+        prompterGlassSnapshot: textKey === undefined ? null : text(textKey),
+      }) as unknown as Parameters<typeof prompterGlassIsStale>[0];
+    expect(prompterGlassIsStale(state("g1-l0", "g1-l0"))).toBe(false);
+    expect(prompterGlassIsStale(state("g1-l1", "g1-l0"))).toBe(true);
+    expect(prompterGlassIsStale(state(null, "g1-l0"))).toBe(true);
+    expect(prompterGlassIsStale(state(null, null))).toBe(false);
+    expect(
+      prompterGlassIsStale({ prompterSnapshot: null, prompterGlassSnapshot: null } as Parameters<
+        typeof prompterGlassIsStale
+      >[0])
+    ).toBe(false);
   });
 });

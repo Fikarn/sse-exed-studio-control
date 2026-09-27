@@ -81,6 +81,10 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
         listProblem(value, "mixTargets", { ids: true }),
         listProblem(value, "snapshots", { ids: true, optional: true })
       );
+    case "prompter":
+      return firstProblem(listProblem(value, "scripts", { ids: true }), listProblem(value, "removed", { ids: true }));
+    case "prompterGlass":
+      return listProblem(value, "paragraphs", { ids: false });
     default:
       return null;
   }

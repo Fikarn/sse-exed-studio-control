@@ -11,8 +11,16 @@ import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingD
 import type { LightingFixtureCatalogSnapshot } from "./generated/snapshots/LightingFixtureCatalogSnapshot";
 import type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
 import type { LightingSnapshot } from "./generated/snapshots/LightingSnapshot";
+import type { PrompterGlassSnapshot } from "./generated/snapshots/PrompterGlassSnapshot";
+import type { PrompterLayoutLine } from "./generated/snapshots/PrompterLayoutLine";
+import type { PrompterLook } from "./generated/snapshots/PrompterLook";
+import type { PrompterParagraph } from "./generated/snapshots/PrompterParagraph";
+import type { PrompterPlace } from "./generated/snapshots/PrompterPlace";
+import type { PrompterScriptSnapshot } from "./generated/snapshots/PrompterScriptSnapshot";
+import type { PrompterSnapshot } from "./generated/snapshots/PrompterSnapshot";
 
-export type WorkspaceId = "setup" | "lighting" | "audio";
+/** The pages, in the tab order (new pages program: the Teleprompter since Slice 6a, D4). */
+export type WorkspaceId = "setup" | "lighting" | "audio" | "teleprompter";
 export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";
@@ -74,6 +82,46 @@ export interface AudioChannelUpdateRequest {
   pad?: boolean;
   instrument?: boolean;
   autoSet?: boolean;
+}
+
+/** `prompter.speed`: a pace in words a minute, or a step of ±5 (new pages program, Slice 6a). */
+export type PrompterSpeedRequest = { wpm: number } | { step: number };
+
+/** `prompter.jump`: where the reading line goes; `paragraph` counts from 0. */
+export type PrompterJumpRequest =
+  | {
+      to:
+        | "top"
+        | "back"
+        | "nextLine"
+        | "previousLine"
+        | "nextParagraph"
+        | "previousParagraph"
+        | "nextCue"
+        | "previousCue";
+    }
+  | { to: "paragraph"; paragraph: number }
+  | { to: "place"; paragraph: number; word: number };
+
+/** `prompter.textSize`: a size in pixels, a step of ±4, or the look's standard. */
+export type PrompterTextSizeRequest = { sizePx: number } | { step: number } | { standard: true };
+
+/** `prompter.look.update`: any of the look's fields. */
+export type PrompterLookUpdateRequest = Partial<PrompterLook>;
+
+/** `prompter.layout.report`: what the glass measured for a layout key. */
+export interface PrompterLayoutReportRequest {
+  layoutKey: string;
+  lines: PrompterLayoutLine[];
+  endTop: number;
+}
+
+/** `prompter.script.import`: a file the page's own picker read, as its name and bytes. */
+export interface PrompterScriptImportRequest {
+  fileName: string;
+  contentBase64: string;
+  /** The script whose text the file becomes (its earlier text kept as a version). */
+  updateScriptId?: string;
 }
 
 export interface AudioSnapshotCreateRequest {
@@ -282,6 +330,43 @@ export interface ShellTalentMark {
   yMeters: number;
 }
 
+/**
+ * A script a scenario's prompter starts with (new pages program, Slice 6a): its text,
+ * cleaned as an edit is, kept with `versions` versions — the first as it came in
+ * (`imported` from `sourceFileName`, or `pasted` without one), each later one a
+ * paragraph longer, the last its text now. `place` is its own place (the top without
+ * it), inside its text or its end; `removed` puts it in Removed.
+ */
+export interface FixturePrompterScriptSeed {
+  name: string;
+  paragraphs: PrompterParagraph[];
+  /** 40–300 words a minute in steps of 5; 140 without it. */
+  speedWpm?: number;
+  place?: PrompterPlace;
+  sourceFileName?: string | null;
+  removed?: boolean;
+  /** How many versions it keeps: 1 (the one it came in as) without it, at most 20 and at most its paragraphs. */
+  versions?: number;
+}
+
+/**
+ * The prompter a scenario starts with (new pages program, Slice 6a), built by the
+ * double's own requests so it holds what the hardware link would: the scripts, then
+ * `onGlass` put on the prompter (paused at its place, as `prompter.putOn` leaves it),
+ * then, with `notUpdated`, a sentence added to that script's paragraph after the place,
+ * so the glass shows the earlier text and the prompter reads NOT UPDATED. `look` and
+ * `sizePx` are held to `prompter.look.update`'s and `prompter.textSize`'s ranges. A seed
+ * the prompter could not hold is the scenario's mistake, and says so.
+ */
+export interface FixturePrompterSeed {
+  scripts?: FixturePrompterScriptSeed[];
+  /** The name of the script on the glass; nothing is on it without one. */
+  onGlass?: string;
+  notUpdated?: boolean;
+  look?: Partial<PrompterLook>;
+  sizePx?: number;
+}
+
 export interface FixtureScenario {
   appSnapshot?: JsonObject;
   healthSnapshot?: JsonObject;
@@ -298,6 +383,10 @@ export interface FixtureScenario {
    *  `"unreported"` as every start of the hardware link begins; without it, connected at
    *  1920×1080, 60 Hz (new pages program, Slice 5a). */
   prompterScreen?: JsonObject | "unreported";
+  /** The scripts, the look and the glass the double's prompter starts with; without it, no
+   *  scripts, the standard look at 88 px and nothing on the glass (new pages program,
+   *  Slice 6a; `fixture/prompterSeed.ts`). */
+  prompter?: FixturePrompterSeed;
 }
 
 export interface EngineTransport {
@@ -367,6 +456,17 @@ export interface ShellState {
   lightingFixtureCatalogSnapshot: LightingFixtureCatalogSnapshot | null;
   lightingDmxMonitorSnapshot: LightingDmxMonitorSnapshot | null;
   audioSnapshot: AudioSnapshot | null;
+  /**
+   * The Teleprompter (new pages program, Slice 6a): the scripts, the look, the
+   * Prompter XL, and the script on the glass with its anchor.
+   */
+  prompterSnapshot: PrompterSnapshot | null;
+  /**
+   * The text on the glass, fetched again only when the glass's layout key
+   * changes (it can hold 30,000 words); read the look and the anchor from
+   * `prompterSnapshot`, which is always current.
+   */
+  prompterGlassSnapshot: PrompterGlassSnapshot | null;
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
@@ -446,6 +546,27 @@ export interface ShellStore {
    *  changing anything and answers `{ ok, kind, detail, … }`. */
   verifySupportBackup(path: string): Promise<JsonValue>;
   exportCompanionConfig(baseUrl?: string): Promise<JsonValue>;
+  // The Teleprompter (new pages program, Slice 6a). Each answers what the
+  // hardware link answered, or throws its refusal (`EngineRequestError`).
+  putOnPrompter(scriptId: string, replace?: boolean): Promise<JsonValue>;
+  updatePrompter(): Promise<JsonValue>;
+  clearPrompter(): Promise<JsonValue>;
+  playPrompter(): Promise<JsonValue>;
+  pausePrompter(): Promise<JsonValue>;
+  setPrompterSpeed(request: PrompterSpeedRequest): Promise<JsonValue>;
+  jumpPrompter(request: PrompterJumpRequest): Promise<JsonValue>;
+  setPrompterTextSize(request: PrompterTextSizeRequest): Promise<JsonValue>;
+  updatePrompterLook(request: PrompterLookUpdateRequest): Promise<JsonValue>;
+  reportPrompterLayout(request: PrompterLayoutReportRequest): Promise<JsonValue>;
+  importPrompterScript(request: PrompterScriptImportRequest): Promise<JsonValue>;
+  removePrompterScript(scriptId: string): Promise<JsonValue>;
+  restorePrompterScript(scriptId: string): Promise<JsonValue>;
+  deletePrompterScript(scriptId: string): Promise<JsonValue>;
+  bringBackPrompterVersion(scriptId: string, versionId: number): Promise<JsonValue>;
+  /** Reads the prompter's state again: the page follows the place with it while the text scrolls. */
+  refreshPrompterSnapshot(): Promise<void>;
+  /** One script with its text and its earlier versions (`prompter.script.snapshot`); changes nothing. */
+  readPrompterScript(scriptId: string): Promise<PrompterScriptSnapshot>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;

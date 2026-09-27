@@ -1686,5 +1686,193 @@
         }
       ]
     }
+  },
+  "teleprompter-ready": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "teleprompter"
+      },
+      "summary": "Teleprompter workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    },
+    "prompter": {
+      "scripts": ["01 Welcome", "02 Interview intro", "03 Panel questions", "04 Outro", "Retake lines", "Sound check"],
+      "removed": ["Draft intro", "Old outro"],
+      "onGlass": "02 Interview intro",
+      "place": {
+        "paragraph": 7,
+        "word": 8
+      },
+      "notUpdated": false
+    }
+  },
+  "teleprompter-empty": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "teleprompter"
+      },
+      "summary": "Teleprompter workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    },
+    "prompter": {
+      "scripts": []
+    }
+  },
+  "teleprompter-not-connected": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "teleprompter"
+      },
+      "summary": "Teleprompter workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    },
+    "prompterScreen": {
+      "found": false
+    },
+    "prompter": {
+      "scripts": ["01 Welcome", "02 Interview intro", "03 Panel questions", "04 Outro", "Retake lines", "Sound check"],
+      "removed": ["Draft intro", "Old outro"],
+      "onGlass": "02 Interview intro",
+      "place": {
+        "paragraph": 7,
+        "word": 8
+      },
+      "notUpdated": false
+    }
+  },
+  "teleprompter-not-updated": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "teleprompter"
+      },
+      "summary": "Teleprompter workspace active."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    },
+    "prompter": {
+      "scripts": ["01 Welcome", "02 Interview intro", "03 Panel questions", "04 Outro", "Retake lines", "Sound check"],
+      "removed": ["Draft intro", "Old outro"],
+      "onGlass": "02 Interview intro",
+      "place": {
+        "paragraph": 7,
+        "word": 8
+      },
+      "notUpdated": true
+    }
   }
 }

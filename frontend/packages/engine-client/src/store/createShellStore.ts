@@ -8,6 +8,7 @@ import {
   type JsonValue,
 } from "../generated/protocol";
 import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
+import type { PrompterScriptSnapshot } from "../generated/snapshots/PrompterScriptSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
 import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
@@ -43,6 +44,12 @@ import type {
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,
   LightingPreviewModeRequest,
+  PrompterJumpRequest,
+  PrompterLayoutReportRequest,
+  PrompterLookUpdateRequest,
+  PrompterScriptImportRequest,
+  PrompterSpeedRequest,
+  PrompterTextSizeRequest,
   LightingSceneCreateRequest,
   LightingSceneUpdateRequest,
   LightingSettingsUpdateRequest,
@@ -65,6 +72,8 @@ const initialState: ShellState = {
   audioSnapshot: null,
   supportSnapshot: null,
   controlSurfaceSnapshot: null,
+  prompterSnapshot: null,
+  prompterGlassSnapshot: null,
   startupFailure: null,
   lastEvent: null,
   errorSummary: null,
@@ -83,7 +92,23 @@ const DOMAIN_STATE_KEYS = {
   audio: "audioSnapshot",
   support: "supportSnapshot",
   controlSurface: "controlSurfaceSnapshot",
+  prompter: "prompterSnapshot",
+  prompterGlass: "prompterGlassSnapshot",
 } as const satisfies Record<DomainKey, keyof ShellState>;
+
+/**
+ * Whether the glass's text is behind the prompter's snapshot (new pages
+ * program, Slice 6a): its layout key names the text and the look it was laid
+ * out in, so a new key — Put on, Replace, Update, Clear, a size or a look that
+ * lays out differently, a restore — means the text is fetched again, and a
+ * play, a pause, a speed step or a jump never fetches it.
+ */
+export function prompterGlassIsStale(state: Pick<ShellState, "prompterSnapshot" | "prompterGlassSnapshot">): boolean {
+  if (!state.prompterSnapshot) {
+    return false;
+  }
+  return (state.prompterSnapshot.glass?.layoutKey ?? null) !== (state.prompterGlassSnapshot?.layoutKey ?? null);
+}
 
 export interface ShellStoreOptions {
   /**
@@ -164,7 +189,7 @@ function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
   const value =
     typeof workspace === "object" && workspace && "workspace" in workspace ? (workspace.workspace as string) : "setup";
 
-  if (value === "lighting" || value === "audio") {
+  if (value === "lighting" || value === "audio" || value === "teleprompter") {
     return value;
   }
 
@@ -814,6 +839,11 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
             });
             if (fetched.accepted.has("audio")) {
               publishAudioMeterFrame(state.audioSnapshot);
+            }
+            // The glass's text follows its layout key: fetched in the next
+            // batch of this same run, after this batch's waiters.
+            if (fetched.accepted.has("prompter") && prompterGlassIsStale(state)) {
+              dirtyDomains.add("prompterGlass");
             }
             if (fetched.failures.length > 0) {
               throw fetched.failures[0];
@@ -1495,6 +1525,64 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async exportCompanionConfig(baseUrl?: string) {
       return performRequest("exports.companion.export", baseUrl ? { baseUrl } : {});
+    },
+    putOnPrompter(scriptId: string, replace?: boolean) {
+      return performRequest("prompter.putOn", replace ? { scriptId, replace: true } : { scriptId });
+    },
+    updatePrompter() {
+      return performRequest("prompter.update");
+    },
+    clearPrompter() {
+      return performRequest("prompter.clear");
+    },
+    playPrompter() {
+      return performRequest("prompter.play");
+    },
+    pausePrompter() {
+      return performRequest("prompter.pause");
+    },
+    setPrompterSpeed(request: PrompterSpeedRequest) {
+      return performRequest("prompter.speed", { ...request });
+    },
+    jumpPrompter(request: PrompterJumpRequest) {
+      return performRequest("prompter.jump", { ...request });
+    },
+    setPrompterTextSize(request: PrompterTextSizeRequest) {
+      return performRequest("prompter.textSize", { ...request });
+    },
+    updatePrompterLook(request: PrompterLookUpdateRequest) {
+      return performRequest("prompter.look.update", { ...request });
+    },
+    reportPrompterLayout(request: PrompterLayoutReportRequest) {
+      return performRequest("prompter.layout.report", {
+        layoutKey: request.layoutKey,
+        lines: request.lines.map((line) => ({ ...line })),
+        endTop: request.endTop,
+      });
+    },
+    importPrompterScript(request: PrompterScriptImportRequest) {
+      return performRequest("prompter.script.import", { ...request });
+    },
+    removePrompterScript(scriptId: string) {
+      return performRequest("prompter.script.remove", { scriptId });
+    },
+    restorePrompterScript(scriptId: string) {
+      return performRequest("prompter.script.restore", { scriptId });
+    },
+    deletePrompterScript(scriptId: string) {
+      return performRequest("prompter.script.delete", { scriptId });
+    },
+    bringBackPrompterVersion(scriptId: string, versionId: number) {
+      return performRequest("prompter.script.version.bringBack", { scriptId, versionId });
+    },
+    async refreshPrompterSnapshot() {
+      if (state.lifecycle !== "ready") {
+        return;
+      }
+      await refreshDomains(["prompter"]);
+    },
+    async readPrompterScript(scriptId: string) {
+      return (await transport.request("prompter.script.snapshot", { scriptId })) as unknown as PrompterScriptSnapshot;
     },
     async refreshControlSurfaceSnapshot() {
       if (state.lifecycle !== "ready") {
