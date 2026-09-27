@@ -539,7 +539,7 @@ Review (2026-09-26, at the push of `896d43c`): a first run of seven reviewers st
 
 Done in one workstation session after the cloud's last slice, before S5b (D23; the procedure is in [`new-pages-2026-09-next-session.md`](./new-pages-2026-09-next-session.md)):
 
-- **Captures** (`--update-snapshots=changed`, every changed PNG inspected): the glass's new Storybook stories (S5a).
+- **Captures** (`--update-snapshots=changed`, every changed PNG inspected): the glass's seven new Storybook stories, `Teleprompter/Glass` (S5a).
 - **Ratchets:** every board re-seeded with Windows' contrast (`node scripts/ui-census.mjs --write-ratchets`).
 - **Tags** to push: `archive/new-pages-s5a-2026-09` (on the pull request's head, once it merges).
 - **Windows, at run time:** none yet.
@@ -767,7 +767,7 @@ The import, by one agent in a worktree of its own (`import/`, 49 tests: 42 cases
 
 ### Slice 5a — Teleprompter: the glass and the Prompter XL's state
 
-Status: in progress (next: the build). The first slice built in the cloud (D23), on branch `claude/gallant-goldberg-o8vsj2`, cut from `main` at `e6244e6` on 2026-09-27.
+Status: in progress (next: the push, the review and the operator's go-ahead). The first slice built in the cloud (D23), on branch `claude/gallant-goldberg-o8vsj2`, cut from `main` at `e6244e6` on 2026-09-27.
 
 **Rescope:** (2026-09-27, Part C's re-cut) Slice 5's front-end half and its contract, done in the cloud; the Prompter XL's window, Windows' display configuration and the shell's side of the screen's report stay in Slice 5b, on the workstation.
 
@@ -784,6 +784,64 @@ The screen's states (connected, not connected, duplicated, low resolution, not s
 Settled from board 1 and the proposal's §7–8 without a question: `PLAY` is refused for `NOT CONNECTED`, `DUPLICATED` and `NOT SHOWING`, and plays at `LOW RESOLUTION`; a report that takes the screen away while the text scrolls pauses it at its place, and plugging back in leaves it paused; jumps, speed, size, the look and edits keep working.
 
 **Boundary impact** (AGENTS.md): the screen's state is a fact only the shell has, so the shell reports it; the hardware link owns what follows from it — the check, `PLAY`'s lock, the pause — and the front end reads the check and draws. No device I/O moves. The contract gains one request, sent by the shell, and one section of the health snapshot.
+
+**Built (2026-09-27, in the cloud).** In the hardware link:
+
+- `prompter/screen.rs`: the report, the state, its words and sentences, `PLAY`'s refusal and `checks.prompter`.
+- `prompter/runtime.rs`: the screen kept in memory, `NOT CONNECTED` at every start.
+- `prompter/commands.rs`: `prompter.screen.report`; `PLAY`'s order of refusals; the check compared before and after every request but a read.
+- `prompter/snapshot.rs`: `screen` in `prompter.snapshot`.
+- `health.rs`: `checks.prompter` and the whole status's cap.
+- `app.rs`: `app.changed { reason: "health" }` after a request that changed the check.
+- `action_log.rs`: the report is not an action.
+- The contract, `v1.md` (a section, the Prompter XL, under Teleprompter; `checks.prompter` under the health snapshot) and `CHANGELOG.md`.
+
+The fixture double, by a second agent (`frontend/packages/engine-client/src/transports/fixture/`): `prompterScreen.ts` (a port of `screen.rs`), the report, `PLAY`'s order, the pause, `checks.prompter` and the status's cap in `state.ts`, and a scenario's optional `prompterScreen`.
+
+The glass, in `frontend/app/src/app/teleprompter/glass/`:
+
+- `glassText.ts`: a paragraph cut into lines, words and spaces by the hardware link's rules for words and cues;
+- `glassLayout.ts`: the look in the glass's pixels, the layout from what was measured, and `positionOf` and `lineAt` as `clock.rs` has them;
+- `glassMotion.ts`: where the text stands at a moment, and the band over the text already read;
+- `glassFont.ts`: Inter's italic for the glass alone;
+- `PrompterGlass.tsx` and its stylesheet, over the new `--prompter-glass-*` tokens;
+- seven Storybook stories (`Teleprompter/Glass`).
+
+Settled while building, each within the design:
+
+1. The shell reports facts — found, duplicated, the size, the refresh rate, a window that did not open — and the hardware link works out the state; `LOW RESOLUTION` below 1920×1080 is its rule, not the shell's.
+2. Before any report the word is `NOT CONNECTED` (first step 2), with a sentence that says what happened: "Windows has not reported the Prompter XL since Studio Control started."
+3. `PLAY` is refused in this order: nothing on the prompter, nothing drawn on the glass, at the end, not laid out.
+4. The pause when the glass goes is `PAUSE`'s own, its ease included, and the place is saved where the ease stops.
+5. The health snapshot's `summary` and `details` stay as they were: the recovery surface lists `details`, and a new row there would move a board.
+6. The fixture double starts every scenario with the Prompter XL connected (the shell has reported; the Prompter XL stays plugged in, D20), so no board gains a red lamp in Slice 6; a scenario may start it otherwise with `prompterScreen`.
+7. The glass draws the line whose top is at the anchor's position centred on the reading line, as board 1 draws a paused script, and dims the text above the top of the line at the reading line. An anchor for the glass's own layout is drawn from its pixels, exact in the gaps between paragraphs too; one for another layout is drawn from its words through the glass's layout, and a jump's move only when the key matches.
+8. The text never runs under the arrow or the paragraph numbers: when the margin leaves no room (0 % margins, or numbers on at a narrow margin), the column starts further in. At the standard 12 % the arrow stands 64 px clear of the text, as on board 1, and 24 px clear of a number. The line across sits under the baseline, where the proposal says it can meet the descenders.
+9. The glass's italics are a family of its own, `Prompter Glass Italic` (Inter's italic files, Latin and Latin Extended): loading Inter's italic for the whole app would redraw the one italic line the app has, in Lighting's DMX strip, and this slice moves no board.
+10. For Slice 6: the UI contract's census must skip `[data-picture]` (the glass's type is the presenter's, the proposal §6.1); the page wires `onLayout` to `prompter.layout.report`.
+
+Gates before the change: `prompter.play` played whatever the Prompter XL did (nothing knew it); `health.snapshot` had no `checks.prompter`; the contract had no `prompter.screen.report`; the glass did not exist.
+
+Tests added that fail without the slice:
+
+- Rust: `prompter::screen::tests` (5), `prompter::tests_screen` (5), `app::tests_prompter::the_prompter_xl_reaches_the_health_check_and_the_lamp_follows`, `health::tests::the_prompter_raises_the_whole_status_no_further_than_attention`;
+- the fixture double: `prompterScreen.test.ts` (19, among them a guard that reads `screen.rs` up to its tests and holds the double's sentences to it word for word);
+- the glass: `glassText.test.ts` (7), `glassLayout.test.ts` (6), `glassMotion.test.ts` (6), `PrompterGlass.test.tsx` (5).
+
+Tests changed (old → new → reason):
+
+1. `prompter/test_support.rs` `TestPrompter::new`: a new prompter → a new prompter to which the shell has reported a connected Prompter XL, as the shell will at its start. No assertion changed; without it every Rust test that plays would be refused (`PROMPTER_NOT_ON_GLASS`).
+2. `prompterRequests.test.ts` "starts every scenario with no scripts, the standard look and nothing on the glass": `prompter.snapshot` without `screen` → with `screen`, connected at 1920×1080, 60 Hz. The snapshot carries the screen now.
+
+Validation before the push (2026-09-27, in the cloud session):
+
+- `npm run dev:check`: all ten steps once the Tauri Linux packages were installed (engine 551 tests, shell 22, contract 7, end to end 4; clippy with warnings denied; the frontend tests with their coverage floors; the engine client 225);
+- the shell (unchanged) type-checked and linted for `x86_64-pc-windows-msvc`;
+- `node scripts/check-operator-copy.mjs`: 0;
+- `npm run frontend:storybook:build`, then Playwright's `default` project on Linux: 371 passed, the glass's seven stories among them (no capture compared, no contrast sampled, as off Windows always);
+- the glass's layout measured in Chromium for each story and checked against `Layout::new`'s rules in `clock.rs`: every one valid, `END` 540 px below the last line;
+- the stories rendered at 2560×1440 and compared with board 1 (the renders stay in the session's scratch folder, never committed). The first renders showed the arrow over the text at 0 % margins and a paragraph number under the arrow, and the line across through the words; all three were fixed before the push (settled 8).
+- `native:acceptance` and the qualification lanes left to CI.
 
 ### Slice 5b — Teleprompter: the Prompter XL's window
 

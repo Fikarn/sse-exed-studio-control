@@ -1,6 +1,6 @@
 # New pages program — the next session (the cloud: the front end and the visuals)
 
-Written on 2026-09-26, after Slice SW landed. Rewritten on 2026-09-27 on the studio workstation, as Slice 4 landed, for the cloud sessions that now carry the program's front end and visuals end to end (the operator's decision D23).
+Written on 2026-09-26, after Slice SW landed. Rewritten on 2026-09-27 on the studio workstation, as Slice 4 landed, for the cloud sessions that now carry the program's front end and visuals end to end (the operator's decision D23). Brought up to date the same day by the first cloud session, which re-cut Part C (the ledger's Part C **Rescope:**) and built Slice 5a.
 
 The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the execution record. This page covers:
 
@@ -18,7 +18,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
    - the Decisions table (D1–D23; D23 is this arrangement);
    - `Hardware safety`;
    - `Mechanical drift guards`;
-   - Part C: its common rules, Slice 4's record (the contract you build on) and Slices 5–13.
+   - Part C: its **Rescope:** (the cloud's slices and the workstation's), the workstation catch-up list, its common rules, Slice 4's record (the contract you build on) and the slices after it.
 4. Read the visual system: `docs/redesign/system-a-2026-09.md` (its §10 is measured on every board by `frontend/app/tests/ui-contract.spec.ts`) and `docs/DEVELOPMENT.md` §2c (the UI contract, the front-end map, fixtures, the traps that cost time).
 5. Read the design sources:
    - `docs/redesign/teleprompter-2026-09.md` (D20, with §14 answered);
@@ -40,26 +40,16 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 - **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each); a low Dependabot alert (#7) on `main`; and D18's two checks, which gate Slice 13.
 - **On the workstation:** the live app stays `main`'s build of `98bbb06` (schema 7) until the program's close-out. The live data then goes from schema 7 to 9, or to 10 once Slice 8 lands, in one start. The Appendix B walk happens there, on the program's last build.
 
-## The first step: re-cut Part C for the cloud
+## Part C, re-cut for the cloud (2026-09-27)
 
-Part C's Slices 5–13 were written for one workstation. Put a re-cut to the operator, with options, costs and a recommendation, and record the answer as a `**Rescope:**` under Part C before any code. A cut that fits D23 (a suggestion to weigh, not a decision):
+The first cloud session put the re-cut to the operator with options and costs; the answer is Part C's **Rescope:** in the ledger. In short:
 
-- **C1, the glass** (the front-end half of Slice 5): one component that draws the Prompter XL's 1920×1080 screen from the prompter's state.
-  - It lays the text out at a fixed 1,920 CSS px and scales, so the page's copy and the glass break every line alike.
-  - It reports its layout for the current `layoutKey`, gives every paragraph (an empty one too) a line with a height, and draws the motion with `motion.ts`.
-  - It gets its Storybook stories.
-  - The Prompter XL's states (`CONNECTED`, `NOT CONNECTED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING`) go into the contract as `checks.prompter` in the health snapshot and in the fixture double. The shell will report the screen's state to the hardware link, and the Windows side of that report comes later.
-- **C2, the Teleprompter page** (Slice 6): the page from board 1, against the fixture double, with its fixtures and UI-contract boards.
-  - The shell's clipboard permission goes to the main window only (`WebviewWindowBuilder::enable_clipboard_access`; the window is then built in code from its `tauri.conf.json` entry). A test holds that no other window gets it.
-  - The editor binds no key (D6): the browser's Ctrl+B/I/U are cancelled through `beforeinput`. Confirm that with the operator, as Slice 6 says.
-- **C3, the cameras' model** (Slice 8): schema 10, `cameras.*`, `cameras.changed`, `checks.cameras`, the simulated cameras that every test and lane uses (D15 rules 1–2), Recent actions, and archive format 7. It is hardware link and contract, and it compiles on Linux.
-- **C4, the Cameras page** (Slice 9): the page from board 2 against the simulated cameras, the header's five lamps, and Setup's camera step.
-- **C5, the deck pages** (Slices 7 and 12): the bridge's actions and feedback, the Companion export (`exports.rs` split first), and Setup's deck steps, which draw every page the deck has.
-- **On the workstation, later:**
-  - S5b: the Prompter XL's window, Windows' display configuration, the "live app" rule and the `main.rs` split;
-  - S10 (NDI), S11 (Bluetooth) and S13 (the BGH1s, gated on D18);
-  - the captures catch-up;
-  - the close-out: a new live build, the Stream Deck profile, the walk.
+- **The cloud, in order:** S5a (the glass and the Prompter XL's state in the hardware link) → S6 (the Teleprompter page) → S8 (the cameras' model and the simulated cameras) → S9 (the Cameras page) → S7 with S12 (the two deck pages, one slice). The slice numbers stay.
+- **The workstation, once those have landed (serial):** the catch-up, then S5b (the Prompter XL's window), S10, S11, S13 (gated on D18) and the close-out.
+- **The shell:** a cloud slice may change `native/tauri-shell`, `cfg(windows)` code included, only when it type-checks and lints for Windows in that session (below). What it does on Windows at run time goes on the catch-up list.
+- **New UI-contract boards** are seeded with `node scripts/ui-census.mjs --fixtures <its fixtures> --write-ratchets` (from `frontend/app`), so the boards seeded on Windows keep their figures.
+
+Each cloud slice's own first steps are in its section of the ledger and are put to the operator before its code.
 
 ## What a cloud session can and cannot do
 
@@ -67,7 +57,10 @@ Part C's Slices 5–13 were written for one workstation. Put a re-cut to the ope
   - `npm run lint`, `npm run frontend:typecheck`, `npm run frontend:test` (with its coverage floors), `npm run scripts:test`, `npm run format:check` and `npm run protocol:check`;
   - `node scripts/check-operator-copy.mjs`, which holds at 0;
   - the Playwright behaviour specs and the UI contract, after `npm run build --workspace frontend/app && npm run frontend:storybook:build` (Linux Chromium: `npx playwright install --with-deps chromium`). Off Windows, Playwright compares no screenshot (`ignoreSnapshots`) and the UI contract samples no contrast; every other §10 measure runs.
-- **Rust:** `cargo test -p studio-control-engine` and `cargo clippy -p studio-control-engine --all-targets -- -D warnings` need only the toolchain `native/rust-toolchain.toml` pins and a C compiler for the bundled SQLite. The shell crate (`native/tauri-shell`) also needs the Linux packages in `.github/actions/setup-tauri-linux/action.yml`; if they cannot be installed, leave the shell to CI, which compiles it on every push.
+- **Rust:** `cargo test -p studio-control-engine` and `cargo clippy -p studio-control-engine --all-targets -- -D warnings` need only the toolchain `native/rust-toolchain.toml` pins and a C compiler for the bundled SQLite. The shell crate (`native/tauri-shell`) also needs the Linux packages in `.github/actions/setup-tauri-linux/action.yml`; `apt-get install` of that list worked in the session of 2026-09-27, and `npm run rust:clippy` and `npm run native:test` (so `dev:check`) then run whole. Delete the `native/tauri-shell/gen/schemas/linux-schema.json` a Linux build leaves: it is not committed.
+- **The shell for Windows:** `rustup target add x86_64-pc-windows-msvc`, then from `native/`: `cargo check -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc` and `cargo clippy -p sse-exed-tauri-shell --target x86_64-pc-windows-msvc --all-targets -- -D warnings`. A type-check and lint of the `cfg(windows)` code, nothing linked or run (proven on 2026-09-27; the build script's "GNU compiler is not supported" warning is harmless). Part C's **Rescope:** makes it the condition of any cloud change to the shell.
+- **Playwright's browser:** the pinned Playwright wants a newer Chromium than the container's `/opt/pw-browsers` holds, and the container must not download one. Make a scratch folder with `chromium_headless_shell-<its build>/chrome-headless-shell-linux64/chrome-headless-shell` and `chromium-<its build>/chrome-linux64/chrome`, each a link to `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (the build number is in the first launch error), point `PLAYWRIGHT_BROWSERS_PATH` at it, and run through the npm scripts (`npm run playwright:test --workspace frontend/app -- --project=default`), never the runner script by hand: from outside npm it finds another Playwright on the path.
+- **Vitest** runs from the workspace's own folder (`npm run test --workspace …`, or `npx vitest run` in `frontend/app`): from the repository root, `--root frontend/app` refuses the glass's font asset import (`…woff2?url`).
 - **Your own visual review replaces the win32 captures until the catch-up.** Render each board you make or move at 2560×1440 in Studio, Graphite and Bone with a Playwright script of your own, in the scratch directory and never committed. Look at the renders, compare them with the boards, and say in the pull request what you checked.
   - The app runs without the hardware link at `/?fixture=<id>&transport=fixture&theme=graphite|bone`.
   - The fixtures are in `frontend/packages/test-fixtures/src/fixtures.json`. The prompter's double starts empty in every scenario, so the new pages need scenarios of their own.
@@ -97,6 +90,7 @@ Part C's Slices 5–13 were written for one workstation. Put a re-cut to the ope
 
 ## The workstation catch-up (for the next workstation session)
 
+- **The list** of what the cloud's slices left for it — boards, tags, Windows checks at run time — is kept in the ledger under Part C, "The workstation catch-up".
 - **Captures.** For every board a cloud slice moved or added:
   1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`;
   2. `cd frontend/app && npx playwright test --update-snapshots=changed`;
