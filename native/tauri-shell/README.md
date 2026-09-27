@@ -15,8 +15,11 @@ Key files:
 
 - `src/main.rs`: Tauri shell entry point and bridge command registration
 - `src/engine.rs`: engine process bridge for startup, requests, responses, and event forwarding
+- `src/shell_windows.rs`: builds the main window from its `tauri.conf.json` entry, and the rule on which windows may read the clipboard
 - `tauri.conf.json`: single-window shell config and frontend build wiring
 - `capabilities/default.json`: default window capability
+
+Clipboard (new pages program, Slice 6b): the Teleprompter page reads the clipboard itself (`navigator.clipboard.read()`), which needs WebView2's clipboard-read permission. Tauri grants it only to a webview built with `enable_clipboard_access()`, so the main window is `"create": false` in `tauri.conf.json` and built at the start of `.setup` from that entry (`build_main_window`), with the permission; `may_read_clipboard` gives it to the main window alone, and the Prompter XL's window (Slice 5b) must be built through `webview_window_from_config`, which leaves it off.
 
 Shell hardening (2026-09 production readiness, Slice 4 — findings F07, F08, F15):
 
