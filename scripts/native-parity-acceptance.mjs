@@ -102,8 +102,13 @@ export const MOVED_WORKSPACE = "audio";
 export const SAVED_DATA_MARKER_CHANGED =
   "New pages program, Slices 2 and 2b: the saved data followed is the page the app opens on, saved as Lighting through settings.update on fresh saved data (which opens on the Console); until Slice 2b it was imported from a db.json fixture, and until Slice 2 it was the imported Planning projects and tasks.";
 
-/** Backup archive format 5 (new pages program, Slice 2 — D3): no Planning part. */
-export const SUPPORT_BACKUP_FORMAT_VERSION = 5;
+/**
+ * The backup archive's format: 5 since the new pages program's Slice 2 (D3, no
+ * Planning part), 6 since Slice 4 (D20, the Teleprompter's part). It is
+ * `SUPPORT_BACKUP_FORMAT_VERSION` in `native/rust-engine/src/support.rs`, which
+ * `native-lanes.test.mjs` holds it to.
+ */
+export const SUPPORT_BACKUP_FORMAT_VERSION = 6;
 
 export async function assertCoreParityContracts(harness, requestIdPrefix, runtimeLabel) {
   const controlSurfaceSnapshot = await harness.request(`${requestIdPrefix}-control-surface`, "controlSurface.snapshot");
@@ -204,8 +209,9 @@ export async function moveSavedWorkspace(harness, requestIdPrefix, runtimeLabel)
 }
 
 /**
- * The exported backup archive is format 5, carries no Planning part (D3) and
- * holds the saved page, which is what lets a restore roll the page back.
+ * The exported backup archive is this build's format, carries no Planning part
+ * (D3), carries the Teleprompter's part (format 6, Slice 4 — D20) and holds the
+ * saved page, which is what lets a restore roll the page back.
  */
 export function assertBackupArchiveWithoutPlanning(exportSummary, expectedWorkspace, runtimeLabel) {
   assert(
@@ -225,6 +231,10 @@ export function assertBackupArchiveWithoutPlanning(exportSummary, expectedWorksp
   assert(
     !Object.hasOwn(archive, "planning") && !/"planning\./.test(text),
     `${runtimeLabel} backup archive still carries a Planning part or a planning.* setting.`
+  );
+  assert(
+    Array.isArray(archive.prompter?.scripts) && typeof archive.prompter?.look === "object",
+    `${runtimeLabel} backup archive has no Teleprompter part (its scripts and its look).`
   );
   assert(
     archive.shell?.workspace === expectedWorkspace && archive.settings?.["shell.workspace"] === expectedWorkspace,
