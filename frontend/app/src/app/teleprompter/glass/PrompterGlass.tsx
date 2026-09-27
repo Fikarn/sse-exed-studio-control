@@ -1,0 +1,296 @@
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+
+import type { PrompterAnchor, PrompterLayoutLine, PrompterLook, PrompterParagraph } from "@sse/engine-client";
+
+import { useLiveCallback } from "../../shared/useLiveCallback";
+
+import {
+  CUE_SCALE,
+  GLASS_HEIGHT,
+  GLASS_WIDTH,
+  glassMetrics,
+  layoutFromMeasure,
+  type GlassLayout,
+  type GlassMetrics,
+  type MeasuredParagraph,
+} from "./glassLayout";
+import { GLASS_ITALIC_FAMILY, registerGlassItalic } from "./glassFont";
+import { glassFrame, glassPosition, glassSettled } from "./glassMotion";
+import { glassParagraphs, type GlassParagraph, type GlassWord } from "./glassText";
+import styles from "./PrompterGlass.module.css";
+
+// The glass (new pages program, Slice 5a): what the Prompter XL shows, drawn
+// from the hardware link's state — the text on the glass, the look and the
+// take's size, and the scroll from the prompter's clock (the anchor). One
+// component for the Prompter XL's window (Slice 5b) and the Teleprompter page's
+// copy of it (Slice 6), laid out at the Prompter XL's own 1,920 px and scaled
+// to the width it is given, so both break every line alike.
+//
+// Unmirrored: the Prompter XL flips what it shows. Nothing is drawn on it that
+// the presenter does not read — no clock, no message, no logo; the operator's
+// marks sit around the page's copy, never on it (the proposal §4.2, §6.1).
+//
+// It reports its layout once for each `layoutKey`, when the fonts are ready
+// (`prompter.layout.report`; the first report for a key is the one the clock
+// runs on). It holds no prompter state: the place, the pace and playing are
+// the hardware link's, and the glass only draws the last anchor it was given
+// with the time since it came. Between frames it touches no React state: each
+// frame moves the text column with a transform.
+
+/** What is on the glass: the text as it went on, the look and the take's size. */
+export interface PrompterGlassText {
+  layoutKey: string;
+  paragraphs: readonly PrompterParagraph[];
+  look: PrompterLook;
+  sizePx: number;
+}
+
+/** What `prompter.layout.report` sends. */
+export interface PrompterGlassLayoutReport {
+  layoutKey: string;
+  lines: PrompterLayoutLine[];
+  endTop: number;
+}
+
+export interface PrompterGlassProps {
+  /** `null` while nothing is on the prompter: the glass is black. */
+  text: PrompterGlassText | null;
+  /** The prompter's clock as last reported; `null` draws the text from its top. */
+  anchor: PrompterAnchor | null;
+  /** The width it is drawn at, in the page's pixels; the height keeps 16:9. */
+  width: number;
+  /** Called once for each `layoutKey`, when the fonts are ready. */
+  onLayout?: (report: PrompterGlassLayoutReport) => void;
+  /** Draws the anchor at its own moment and never animates: a still, for Storybook and the tests. */
+  still?: boolean;
+  label?: string;
+  testId?: string;
+}
+
+function wordContent(word: GlassWord): ReactNode {
+  return word.pieces.map((piece, index) => {
+    let node: ReactNode = piece.text;
+    if (piece.underline) node = <u>{node}</u>;
+    if (piece.italic) node = <i>{node}</i>;
+    if (piece.bold) node = <b>{node}</b>;
+    return <Fragment key={index}>{node}</Fragment>;
+  });
+}
+
+function paragraphNodes(text: readonly GlassParagraph[], numbers: boolean): ReactNode {
+  return text.map((paragraph) => (
+    <p key={paragraph.index} className={styles.paragraph} data-p={paragraph.index}>
+      {numbers ? (
+        <span className={styles.number} aria-hidden="true">
+          {paragraph.index + 1}
+        </span>
+      ) : null}
+      {paragraph.lines.map((line, lineIndex) => (
+        <Fragment key={lineIndex}>
+          {lineIndex > 0 ? <br /> : null}
+          <span className={line.cueLine ? styles.cueLine : undefined}>
+            {line.tokens.map((token, tokenIndex) =>
+              token.kind === "space" ? (
+                " "
+              ) : (
+                <span
+                  key={tokenIndex}
+                  data-w={token.word.index}
+                  className={token.word.cue && !line.cueLine ? styles.cue : undefined}
+                >
+                  {wordContent(token.word)}
+                </span>
+              )
+            )}
+          </span>
+        </Fragment>
+      ))}
+    </p>
+  ));
+}
+
+/** The glass's sizes as custom properties for its stylesheet. */
+function metricVariables(metrics: GlassMetrics): CSSProperties {
+  const size = metrics.sizePx;
+  return {
+    "--glass-size": `${size}px`,
+    "--glass-cue-size": `${size * CUE_SCALE}px`,
+    "--glass-line": `${metrics.lineHeight}px`,
+    "--glass-gap": `${metrics.paragraphGap}px`,
+    "--glass-end-gap": `${metrics.endGap - metrics.paragraphGap}px`,
+    "--glass-margin": `${metrics.marginPx}px`,
+    "--glass-column-left": `${metrics.columnLeft}px`,
+    "--glass-reading": `${metrics.readingY}px`,
+    // The line across sits under the reading line's baseline, where it can meet the descenders (the proposal §4.1).
+    "--glass-across": `${metrics.readingY + size * 0.45}px`,
+    "--glass-arrow-left": `${metrics.arrowLeft}px`,
+    "--glass-number-size": `${metrics.numberSize}px`,
+    "--glass-number-gap": `${metrics.numberGap}px`,
+    "--glass-underline": `${Math.max(2, size * 0.057)}px`,
+    "--glass-underline-offset": `${size * 0.114}px`,
+  } as CSSProperties;
+}
+
+/** Measures the laid-out column: each paragraph's top and each word's centre, and `END`'s top. */
+function measureColumn(
+  column: HTMLElement,
+  key: string,
+  metrics: GlassMetrics,
+  text: readonly GlassParagraph[]
+): GlassLayout {
+  const measured: MeasuredParagraph[] = [];
+  column.querySelectorAll<HTMLElement>("[data-p]").forEach((paragraph) => {
+    const top = paragraph.offsetTop;
+    const wordCentres: number[] = [];
+    // A word's `offsetTop` is from its paragraph, which is positioned.
+    paragraph.querySelectorAll<HTMLElement>("[data-w]").forEach((word) => {
+      wordCentres.push(top + word.offsetTop + word.offsetHeight / 2);
+    });
+    measured.push({ top, wordCentres });
+  });
+  const end = column.querySelector<HTMLElement>("[data-end]");
+  const last = measured[measured.length - 1];
+  const endTop = end ? end.offsetTop : (last?.top ?? 0) + metrics.lineHeight;
+  return layoutFromMeasure(key, measured, endTop, metrics.lineHeight, text);
+}
+
+registerGlassItalic();
+
+/** Resolves when the faces the glass draws with are loaded, so its layout is final. */
+async function fontsReady(metrics: GlassMetrics): Promise<void> {
+  const fonts = typeof document === "undefined" ? undefined : document.fonts;
+  if (!fonts) return;
+  const size = `${metrics.sizePx}px`;
+  const cue = `${metrics.sizePx * CUE_SCALE}px`;
+  try {
+    await Promise.all([
+      fonts.load(`500 ${size} "Inter Variable"`),
+      fonts.load(`600 ${size} "Inter Variable"`),
+      fonts.load(`italic 500 ${size} "${GLASS_ITALIC_FAMILY}"`),
+      fonts.load(`italic 500 ${cue} "${GLASS_ITALIC_FAMILY}"`),
+    ]);
+    await fonts.ready;
+  } catch {
+    // Measure with what is there: a face that will not load stays missing.
+  }
+}
+
+export function PrompterGlass({ text, anchor, width, onLayout, still = false, label, testId }: PrompterGlassProps) {
+  const paragraphs = text?.paragraphs;
+  const look = text?.look;
+  const sizePx = text?.sizePx;
+  const layoutKey = text?.layoutKey ?? null;
+  const glassText = useMemo(() => (paragraphs ? glassParagraphs(paragraphs) : []), [paragraphs]);
+  const metrics = useMemo(() => (look && sizePx ? glassMetrics(look, sizePx) : null), [look, sizePx]);
+  const numbers = look?.paragraphNumbers ?? false;
+  const dim = look?.dimReadText ?? false;
+  const column = useMemo(() => paragraphNodes(glassText, numbers), [glassText, numbers]);
+
+  const columnRef = useRef<HTMLDivElement>(null);
+  const readRef = useRef<HTMLDivElement>(null);
+  const layoutRef = useRef<GlassLayout | null>(null);
+  const anchorRef = useRef<{ anchor: PrompterAnchor | null; receivedAt: number }>({ anchor: null, receivedAt: 0 });
+  const reportedRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
+
+  const report = useLiveCallback((layout: PrompterGlassLayoutReport) => onLayout?.(layout));
+
+  // One frame: where the anchor puts the text now, drawn by a transform. It
+  // answers whether the text has come to rest.
+  const draw = useLiveCallback((): boolean => {
+    const layout = layoutRef.current;
+    const columnElement = columnRef.current;
+    if (!layout || !metrics || !columnElement) return true;
+    const { anchor: current, receivedAt } = anchorRef.current;
+    const elapsed = current && !still ? performance.now() - receivedAt : 0;
+    const position = current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0);
+    const frame = glassFrame(layout, metrics, position);
+    columnElement.style.transform = `translate3d(0, ${frame.shift}px, 0)`;
+    if (readRef.current) readRef.current.style.height = `${frame.readHeight}px`;
+    return still || !current || glassSettled(current, elapsed);
+  });
+
+  // Draws now, and on every frame after it until the text rests; nothing runs
+  // while the text stands still (system §6: nothing animates at rest).
+  const run = useLiveCallback(() => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+    const step = () => {
+      frameRef.current = null;
+      if (!draw()) frameRef.current = requestAnimationFrame(step);
+    };
+    if (!draw()) frameRef.current = requestAnimationFrame(step);
+  });
+
+  // The layout: measured before the first paint so the text is drawn in
+  // place, and again, then reported, once the fonts are ready.
+  useLayoutEffect(() => {
+    const columnElement = columnRef.current;
+    if (!layoutKey || !metrics || !columnElement) {
+      layoutRef.current = null;
+      return;
+    }
+    layoutRef.current = measureColumn(columnElement, layoutKey, metrics, glassText);
+    run();
+    let cancelled = false;
+    void fontsReady(metrics).then(() => {
+      if (cancelled || !columnRef.current) return;
+      const layout = measureColumn(columnRef.current, layoutKey, metrics, glassText);
+      layoutRef.current = layout;
+      run();
+      if (reportedRef.current !== layoutKey) {
+        reportedRef.current = layoutKey;
+        report({ layoutKey, lines: layout.lines, endTop: layout.endTop });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [layoutKey, metrics, glassText, numbers, run, report]);
+
+  // A new anchor: drawn from the moment it came.
+  useLayoutEffect(() => {
+    anchorRef.current = { anchor, receivedAt: performance.now() };
+    run();
+  }, [anchor, still, dim, run]);
+
+  useEffect(
+    () => () => {
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    },
+    []
+  );
+
+  const scale = width / GLASS_WIDTH;
+  const yellow = look?.textColour === "yellow";
+  return (
+    <div
+      className={styles.frame}
+      style={{ width, height: (width * GLASS_HEIGHT) / GLASS_WIDTH }}
+      role="img"
+      aria-label={label ?? "The prompter's glass"}
+      data-picture="prompter-glass"
+      data-testid={testId}
+      data-layout-key={layoutKey ?? undefined}
+    >
+      <div
+        className={yellow ? `${styles.screen} ${styles.yellow}` : styles.screen}
+        style={{ transform: `scale(${scale})`, ...(metrics ? metricVariables(metrics) : {}) }}
+      >
+        {text && metrics ? (
+          <>
+            <div ref={columnRef} className={styles.column}>
+              {column}
+              <div className={styles.end} data-end="">
+                END
+              </div>
+            </div>
+            {dim ? <div ref={readRef} className={styles.read} /> : null}
+            {look?.readingLineAcross ? <i className={styles.across} /> : null}
+            <i className={styles.arrow} />
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}

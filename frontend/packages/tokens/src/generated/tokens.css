@@ -221,6 +221,14 @@
   --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** ramp stops on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 90 % (-6), orange to 95 % (-3), red above */
   --signal-ramp-h: linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%);
   --signal-cct-track: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
+  --prompter-glass-floor: #000000; /** the glass's background, black in every look */
+  --prompter-glass-text: #ffffff; /** white text, the standard */
+  --prompter-glass-text-yellow: #ffd84a; /** yellow text, the look's other colour */
+  --prompter-glass-cue: #8ec9ff; /** a cue and END, the second colour */
+  --prompter-glass-arrow: rgba(255, 255, 255, 0.6); /** the reading arrow at the left edge */
+  --prompter-glass-line: rgba(255, 255, 255, 0.35); /** the thin line across at the reading line, off by default */
+  --prompter-glass-number: rgba(255, 255, 255, 0.45); /** a paragraph number on the glass, off by default */
+  --prompter-glass-read: rgba(0, 0, 0, 0.55); /** laid over text already read: white on black reads at 45 % */
   --chrome-studio-header: 56px;
   --chrome-studio-footer: 40px;
   --chrome-studio-cluster: 424px;
