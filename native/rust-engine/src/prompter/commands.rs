@@ -20,10 +20,13 @@ use crate::prompter::clock::{
 };
 use crate::prompter::clock::{GlassClock, Layout};
 use crate::prompter::edits::map_place;
-use crate::prompter::import::{import_file, import_paste, import_sentence, ImportedText};
+use crate::prompter::import::{
+    import_file, import_paste, import_sentence, script_text_bytes, ImportedText,
+    MAX_SCRIPT_TEXT_BYTES,
+};
 use crate::prompter::look::{size_is_valid, SIZE_MAX_PX, SIZE_MIN_PX, SIZE_STEP_PX};
 use crate::prompter::model::{
-    cue_targets, sanitize_text, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
+    cue_targets, format_count, sanitize_text, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
     MAX_SCRIPT_NAME_CHARS, MAX_SCRIPT_WORDS,
 };
 use crate::prompter::runtime::{with_prompter, Prompter};
@@ -293,7 +296,9 @@ fn new_script_name(connection: &Connection) -> Result<String, PrompterError> {
 
 /// The text the editor sends, cleaned as an import is: sanitized runs,
 /// neighbours of one emphasis joined. Empty paragraphs stay (the editor is
-/// typing into them); an empty script is one empty paragraph.
+/// typing into them); an empty script is one empty paragraph. It is capped as
+/// an import is, by its words and by its text (`MAX_SCRIPT_TEXT_BYTES`), so
+/// pastes into the editor cannot build what no import could.
 fn edited_paragraphs(params: &Value) -> Result<Vec<PrompterParagraph>, PrompterError> {
     let raw = params.get("paragraphs").cloned().ok_or_else(|| {
         PrompterError::Invalid(String::from("paragraphs must be the script's text."))
@@ -318,7 +323,18 @@ fn edited_paragraphs(params: &Value) -> Result<Vec<PrompterParagraph>, PrompterE
         return Err(PrompterError::Refused(
             "PROMPTER_SCRIPT_TOO_LONG",
             format!(
-                "The script would have {words} words; a script can have up to {MAX_SCRIPT_WORDS}. Split it into shorter scripts."
+                "The script would have {} words; a script can have up to {}. Split it into shorter scripts.",
+                format_count(words),
+                format_count(MAX_SCRIPT_WORDS)
+            ),
+        ));
+    }
+    if script_text_bytes(&paragraphs) > MAX_SCRIPT_TEXT_BYTES {
+        return Err(PrompterError::Refused(
+            "PROMPTER_SCRIPT_TOO_LONG",
+            format!(
+                "The script would hold more text than a script can hold ({} MB). Split it into shorter scripts.",
+                MAX_SCRIPT_TEXT_BYTES / (1024 * 1024)
             ),
         ));
     }

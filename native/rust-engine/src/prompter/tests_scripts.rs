@@ -2,6 +2,7 @@
 //! Slice 4; the proposal §3.3): made, renamed, edited, removed, restored,
 //! deleted for good, and their versions.
 
+use crate::prompter::import::MAX_SCRIPT_TEXT_BYTES;
 use crate::prompter::model::{PrompterParagraph, PrompterRun, MAX_SCRIPT_WORDS};
 use crate::prompter::store::VERSIONS_KEPT;
 use crate::prompter::test_support::TestPrompter;
@@ -133,6 +134,61 @@ fn an_edit_is_saved_with_its_emphasis_and_its_counts() {
             )
             .0,
         "PROMPTER_SCRIPT_TOO_LONG"
+    );
+}
+
+// Slice 6b's review: the editor saves its whole text with every change, and
+// each paste into it is capped alone, so `edit` holds a script to an import's
+// caps, its text as well as its words: two pastes of 1.5 MB made a 3 MB
+// script before. The words are counted as the import counts them.
+#[test]
+fn an_edit_is_capped_as_an_import_is_by_its_text_as_well_as_its_words() {
+    let prompter = TestPrompter::new("edit-cap");
+    let id = prompter.call("prompter.script.create", json!({}))["scriptId"]
+        .as_str()
+        .expect("a script id")
+        .to_string();
+    let half = "a".repeat(MAX_SCRIPT_TEXT_BYTES / 2 + 1);
+    let too_much = vec![
+        PrompterParagraph::plain(half.clone()),
+        PrompterParagraph::plain(half),
+    ];
+    assert_eq!(
+        prompter.refused(
+            "prompter.script.edit",
+            json!({ "scriptId": id, "paragraphs": too_much })
+        ),
+        (
+            String::from("PROMPTER_SCRIPT_TOO_LONG"),
+            String::from(
+                "The script would hold more text than a script can hold (2 MB). Split it into shorter scripts."
+            )
+        )
+    );
+    let script = prompter.call("prompter.script.snapshot", json!({ "scriptId": id }));
+    assert_eq!(
+        script["paragraphs"],
+        json!([{ "runs": [] }]),
+        "nothing was saved"
+    );
+
+    let at_the_cap = vec![PrompterParagraph::plain("a".repeat(MAX_SCRIPT_TEXT_BYTES))];
+    prompter.call(
+        "prompter.script.edit",
+        json!({ "scriptId": id, "paragraphs": at_the_cap }),
+    );
+
+    let too_long = vec![PrompterParagraph::plain(
+        "word ".repeat(MAX_SCRIPT_WORDS + 1),
+    )];
+    assert_eq!(
+        prompter
+            .refused(
+                "prompter.script.edit",
+                json!({ "scriptId": id, "paragraphs": too_long })
+            )
+            .1,
+        "The script would have 30,001 words; a script can have up to 30,000. Split it into shorter scripts."
     );
 }
 

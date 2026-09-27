@@ -95,7 +95,13 @@ describe("the fixture double's prompter scripts", () => {
     const tooLong = [{ runs: [{ text: "word ".repeat(30_001) }] }];
     expect(await refused("prompter.script.edit", { scriptId: id, paragraphs: tooLong })).toEqual({
       code: "PROMPTER_SCRIPT_TOO_LONG",
-      sentence: "The script would have 30001 words; a script can have up to 30000. Split it into shorter scripts.",
+      sentence: "The script would have 30,001 words; a script can have up to 30,000. Split it into shorter scripts.",
+    });
+    // Slice 6b's review: the text is capped as an import's is, so pastes into the editor build no more.
+    const half = { runs: [{ text: "a".repeat(MAX_SCRIPT_TEXT_BYTES / 2 + 1) }] };
+    expect(await refused("prompter.script.edit", { scriptId: id, paragraphs: [half, half] })).toEqual({
+      code: "PROMPTER_SCRIPT_TOO_LONG",
+      sentence: "The script would hold more text than a script can hold (2 MB). Split it into shorter scripts.",
     });
     expect((await refused("prompter.script.edit", { scriptId: id })).sentence).toBe(
       "paragraphs must be the script's text."
