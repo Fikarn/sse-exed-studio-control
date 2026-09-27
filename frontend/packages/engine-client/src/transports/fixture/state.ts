@@ -23,11 +23,19 @@ import {
   refreshAudioCapabilities,
 } from "./audioConsole";
 import type { IdentifyBursts } from "./lightingOverlay";
+import { prompterCheck, prompterStatusPart } from "./prompterReads";
+import { scenarioScreen } from "./prompterScreen";
+import { fixturePrompter } from "./prompterState";
 
 export interface MutableFixtureState {
   appSnapshot: JsonObject;
   audioMeterState: Record<string, AudioMeterState>;
   healthSnapshot: JsonObject;
+  /** The whole status as the rest of the studio makes it (`derive_status`), worked out
+   *  on every sync; `applyPrompterHealth` folds the Prompter XL's part in. */
+  healthStatusBeforePrompter: string;
+  /** The health summary likewise; the Prompter XL's sentence is added when it counts. */
+  healthSummaryBeforePrompter: string;
   commissioningSnapshot: JsonObject;
   lightingFixtureCatalogSnapshot: JsonObject;
   lightingSnapshot: JsonObject;
@@ -212,6 +220,8 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
     appSnapshot: cloneJson((scenario.appSnapshot ?? {}) as JsonObject),
     audioMeterState: {},
     healthSnapshot: cloneJson((scenario.healthSnapshot ?? {}) as JsonObject),
+    healthStatusBeforePrompter: "ok",
+    healthSummaryBeforePrompter: "",
     commissioningSnapshot: cloneJson((scenario.commissioningSnapshot ?? {}) as JsonObject),
     lightingFixtureCatalogSnapshot: cloneJson(
       (scenario.lightingFixtureCatalogSnapshot ?? DEFAULT_LIGHTING_FIXTURE_CATALOG) as JsonObject
@@ -279,6 +289,11 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
       }
     }
   }
+
+  // New pages program, Slice 5a: the Prompter XL as the scenario starts it — connected at
+  // its own size unless the scenario's `prompterScreen`, a `prompter.screen.report`'s
+  // params, says otherwise (`prompterScreen.ts`).
+  fixturePrompter(state).screen = scenarioScreen(scenario.prompterScreen);
 
   return state;
 }
@@ -560,7 +575,9 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
   const audioCheckStatus = probeOutcome(audioCheck?.status);
   const lightingReady = lightingCheckStatus === "passed";
 
-  state.healthSnapshot.status = hasCompletedSetup && allChecksPassed ? "ok" : "attention";
+  // `applyHealthChecks` folds the Prompter XL's part into it (Slice 5a).
+  state.healthStatusBeforePrompter = hasCompletedSetup && allChecksPassed ? "ok" : "attention";
+  state.healthSnapshot.status = state.healthStatusBeforePrompter;
   state.healthSnapshot.startupPhase = hasCompletedSetup ? "ready" : "waiting-for-app-snapshot";
   // Visual overhaul A, Slice 7: a published desk whose probes have gone off is
   // not "healthy and ready" — the summary the state display prints has to say
@@ -569,11 +586,12 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     .filter((check) => asString(check.status) !== "passed" && asString(check.status) !== "ok")
     .map((check) => asString(check.label))
     .filter(Boolean);
-  state.healthSnapshot.summary = !hasCompletedSetup
+  state.healthSummaryBeforePrompter = !hasCompletedSetup
     ? "Storage healthy. Operator mode locked pending setup."
     : allChecksPassed
       ? "System healthy and ready."
       : `Operator mode is available, but ${unsettledCheckLabels.join(" and ")} need attention.`;
+  state.healthSnapshot.summary = state.healthSummaryBeforePrompter;
   state.supportSnapshot.backups = backups;
   state.supportSnapshot.backupDir = asString(
     state.supportSnapshot.backupDir,
@@ -846,7 +864,8 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
  * (`E/health.rs`, which copies the rig's and the console's own words and the
  * bridge's state from `control_surface.rs`; the deck's check never says
  * whether the deck was verified). The words are worked out from the probes and
- * the bridge address on every sync, never kept from an earlier one.
+ * the bridge address on every sync, never kept from an earlier one; so is the
+ * Prompter XL's check, and its part of the whole status.
  */
 function applyHealthChecks(
   state: MutableFixtureState,
@@ -875,6 +894,40 @@ function applyHealthChecks(
       summary: asString(controlSurface.summary, "Companion bridge ready."),
     },
   };
+  applyPrompterHealth(state);
+}
+
+/**
+ * `checks.prompter` and the Prompter XL's part of the whole status (`E/health.rs`, new
+ * pages program, Slice 5a): the worse of the Prompter XL's state and `NOT UPDATED`, as
+ * the prompter holds them now. Worked out on every sync, and again after a prompter
+ * request that changed it (`prompterRequests.ts`). The hardware link sends `null` while
+ * its saved data is not usable; the double's always is.
+ */
+export function applyPrompterHealth(state: MutableFixtureState) {
+  const prompter = fixturePrompter(state);
+  const check = prompterCheck(prompter);
+  const checks = asRecord(state.healthSnapshot.checks) ?? {};
+  checks.prompter = check;
+  state.healthSnapshot.checks = checks;
+  // Only a Prompter XL state the shell has reported counts (NOT UPDATED lights the lamp
+  // only); when one does, the summary says so, as the hardware link's does.
+  const part = prompterStatusPart(prompter);
+  state.healthSnapshot.status = withPrompterStatus(state.healthStatusBeforePrompter, part?.tone ?? "ok");
+  state.healthSnapshot.summary = part
+    ? `${state.healthSummaryBeforePrompter} Prompter: ${part.sentence}`
+    : state.healthSummaryBeforePrompter;
+}
+
+/**
+ * The whole status with the Prompter XL's part (`with_prompter_status`, first step 1): a
+ * Prompter XL state makes it no worse than attention — the header's `Prompter` lamp
+ * itself goes red — since the sound and the light are unaffected; it never lowers it.
+ */
+export function withPrompterStatus(status: string, prompter: string): string {
+  const severity = (word: string) => (word === "error" ? 3 : word === "attention" ? 2 : word === "warning" ? 1 : 0);
+  const part = prompter === "ok" ? "ok" : "attention";
+  return severity(part) > severity(status) ? "attention" : status;
 }
 
 export function updateFixtureCheck(

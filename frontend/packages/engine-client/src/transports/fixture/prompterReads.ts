@@ -3,6 +3,7 @@
 import type { JsonObject, JsonValue } from "../../generated/protocol";
 import type { PrompterGlassSnapshot } from "../../generated/snapshots/PrompterGlassSnapshot";
 import type { PrompterGlassSummary } from "../../generated/snapshots/PrompterGlassSummary";
+import type { PrompterHealthCheck } from "../../generated/snapshots/PrompterHealthCheck";
 import type { PrompterLayoutLine } from "../../generated/snapshots/PrompterLayoutLine";
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
 import type { PrompterScriptSnapshot } from "../../generated/snapshots/PrompterScriptSnapshot";
@@ -19,6 +20,7 @@ import {
   paragraphsKey,
   wordCount,
 } from "./prompterModel";
+import { prompterHealthCheck, screenSummary, wholeStatusPart } from "./prompterScreen";
 import { findScript, listScripts, listVersions, type FixturePrompter, type StoredScript } from "./prompterState";
 
 // What the double's prompter reads out (`native/rust-engine/src/prompter/snapshot.rs`):
@@ -200,7 +202,28 @@ export function readSnapshot(prompter: FixturePrompter, now: number): PrompterSn
     glass: prompter.glass ? glassSummary(prompter, prompter.glass, now) : null,
     scripts,
     removed,
+    screen: screenSummary(prompter.screen),
   };
+}
+
+/**
+ * The name of the script on the glass when it was edited after it went on (`NOT UPDATED`,
+ * `glass_edited_name`); `null` when it was not, or when nothing is on the glass.
+ */
+export function glassEditedName(prompter: FixturePrompter): string | null {
+  const glass = prompter.glass;
+  const script = glass ? findScript(prompter, glass.scriptId) : null;
+  return glass && script && paragraphsKey(script.paragraphs) !== paragraphsKey(glass.paragraphs) ? script.name : null;
+}
+
+/** `checks.prompter` (`health_check` in `commands.rs`): the worse of the Prompter XL's state and `NOT UPDATED`. */
+export function prompterCheck(prompter: FixturePrompter): PrompterHealthCheck {
+  return prompterHealthCheck(prompter.screen, glassEditedName(prompter));
+}
+
+/** What the whole status takes from the prompter, and why (`whole_status`, `whole_status_sentence`). */
+export function prompterStatusPart(prompter: FixturePrompter) {
+  return wholeStatusPart(prompter.screen);
 }
 
 /** `prompter.glass.snapshot`: what the glass draws. */

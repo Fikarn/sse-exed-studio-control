@@ -881,6 +881,41 @@
       "$value": "linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff)"
     }
   },
+  "prompterGlass": {
+    "$description": "New pages program, Slice 5a: the Prompter XL's screen, the glass the presenter reads (docs/redesign/teleprompter-2026-09.md 4.1). A picture, never themed: black gives off no light, so the glass shows only the words.",
+    "floor": {
+      "$value": "#000000",
+      "$description": "the glass's background, black in every look"
+    },
+    "text": {
+      "$value": "#ffffff",
+      "$description": "white text, the standard"
+    },
+    "textYellow": {
+      "$value": "#ffd84a",
+      "$description": "yellow text, the look's other colour"
+    },
+    "cue": {
+      "$value": "#8ec9ff",
+      "$description": "a cue and END, the second colour"
+    },
+    "arrow": {
+      "$value": "rgba(255, 255, 255, 0.6)",
+      "$description": "the reading arrow at the left edge"
+    },
+    "line": {
+      "$value": "rgba(255, 255, 255, 0.35)",
+      "$description": "the thin line across at the reading line, off by default"
+    },
+    "number": {
+      "$value": "rgba(255, 255, 255, 0.45)",
+      "$description": "a paragraph number on the glass, off by default"
+    },
+    "read": {
+      "$value": "rgba(0, 0, 0, 0.55)",
+      "$description": "laid over text already read: white on black reads at 45 %"
+    }
+  },
   "chrome": {
     "$description": "Visual overhaul A, plan D4: the chrome budget of the one surface, 2560x1440.",
     "studio": {

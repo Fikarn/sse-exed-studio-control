@@ -18,6 +18,7 @@ import {
   samePlace,
   sanitizeText,
 } from "./prompterModel";
+import { connectedScreen, type PrompterScreen } from "./prompterScreen";
 import type { MutableFixtureState } from "./state";
 
 // The prompter's saved data as the hardware link keeps it (`native/rust-engine/src/
@@ -25,7 +26,9 @@ import type { MutableFixtureState } from "./state";
 // scripts, their last 20 versions, the look, the take's size, what the glass shows, and
 // the place saved about once a second while the text scrolls. The double never
 // restarts, so what the glass shows lives only in its clock. Every scenario starts the
-// same: no scripts, the standard look at 88 px, nothing on the glass, revisions 0.
+// same: no scripts, the standard look at 88 px, nothing on the glass, revisions 0 — and,
+// from Slice 5a, the Prompter XL connected at its own size unless the scenario says
+// otherwise (`prompterScreen.ts` says why the double starts there).
 
 export const SIZE_MIN_PX = 48;
 export const SIZE_MAX_PX = 160;
@@ -141,6 +144,8 @@ export interface FixturePrompter {
   glassRevision: number;
   lookRevision: number;
   glass: GlassClock | null;
+  /** The Prompter XL as the shell last reported it (Slice 5a, `runtime.rs`): kept in memory only. */
+  screen: PrompterScreen;
   scripts: StoredScript[];
   /** Every script's kept versions, oldest first; the ids only grow. */
   versions: StoredVersion[];
@@ -166,6 +171,7 @@ export function fixturePrompter(state: MutableFixtureState): FixturePrompter {
       glassRevision: 0,
       lookRevision: 0,
       glass: null,
+      screen: connectedScreen(),
       scripts: [],
       versions: [],
       nextVersionId: 1,

@@ -14,6 +14,7 @@ use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_prompter_changed;
 use crate::prompter::clock::{GlassClock, PrompterPlace};
 use crate::prompter::look::PrompterLook;
+use crate::prompter::screen::PrompterScreen;
 use crate::prompter::store;
 use crate::prompter::PrompterError;
 use crate::storage::open_connection;
@@ -35,6 +36,10 @@ pub(crate) struct Prompter {
     pub glass_revision: i64,
     pub look_revision: i64,
     pub glass: Option<GlassClock>,
+    /// The Prompter XL as the shell last reported it (Slice 5a). Kept in
+    /// memory only: every start begins at `NOT CONNECTED` until the shell
+    /// reports again.
+    pub screen: PrompterScreen,
     /// The glass script's place as last saved, and when.
     saved_place: Option<PrompterPlace>,
     saved_at: Instant,
@@ -71,6 +76,7 @@ impl Prompter {
             glass_revision: stored.glass_revision,
             look_revision: stored.look_revision,
             glass,
+            screen: PrompterScreen::default(),
             saved_place,
             saved_at: now,
         })

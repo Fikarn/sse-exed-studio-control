@@ -1,0 +1,165 @@
+/* The glass (new pages program, Slice 5a): the Prompter XL's own 1920×1080
+   screen, laid out at that size in CSS pixels and scaled to the box it is drawn
+   in, so the glass and the page's copy break every line alike. It is a picture
+   of what the presenter reads, never themed: its colours are the
+   `--prompter-glass-*` tokens, the same in Studio, Graphite and Bone. The sizes
+   come from the look, set by the component as custom properties. */
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  background: var(--prompter-glass-floor);
+  contain: strict;
+  /* Nothing the view around it sets reaches the text, so every view breaks
+     every line alike (the first layout reported for a key is the one the
+     clock runs on). */
+  direction: ltr;
+  font-kerning: auto;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-variation-settings: normal;
+  letter-spacing: normal;
+  line-break: auto;
+  text-indent: 0;
+  text-rendering: auto;
+  text-transform: none;
+  white-space: normal;
+  word-break: normal;
+  word-spacing: normal;
+}
+
+.screen {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--prompter-glass-floor);
+  transform-origin: 0 0;
+}
+
+/* The text column: the look's margins each side, never under the arrow or the
+   paragraph numbers; moved up as the text scrolls by the component (a
+   transform, so a frame costs no layout). */
+.column {
+  position: absolute;
+  left: var(--glass-column-left);
+  right: var(--glass-margin);
+  top: 0;
+  color: var(--prompter-glass-text);
+  font-family: var(--font-family-ui);
+  font-size: var(--glass-size);
+  font-weight: 500;
+  font-feature-settings: normal;
+  line-height: var(--glass-line);
+  hyphens: none;
+  overflow-wrap: anywhere;
+  text-align: left;
+  will-change: transform;
+}
+
+.yellow .column {
+  color: var(--prompter-glass-text-yellow);
+}
+
+.paragraph {
+  position: relative;
+  margin: 0;
+  /* Half a line between paragraphs. Padding, not margin, so nothing
+     collapses and every paragraph's top is where it is measured; an empty
+     paragraph is a line and its gap (the box includes its padding). */
+  padding: 0 0 var(--glass-gap);
+  min-height: calc(var(--glass-line) + var(--glass-gap));
+}
+
+.paragraph b {
+  font-weight: 600;
+}
+
+.paragraph u {
+  text-decoration-thickness: var(--glass-underline);
+  text-underline-offset: var(--glass-underline-offset);
+}
+
+/* Italics on the glass are Inter's own italic, a family only the glass
+   loads (`glassFont.ts`), never a slanted upright. */
+.column i,
+.cue,
+.cueLine {
+  font-family: "Prompter Glass Italic", var(--font-family-ui);
+}
+
+/* A cue inside a sentence: the second colour, where it stands. */
+.cue {
+  color: var(--prompter-glass-cue);
+  font-style: italic;
+}
+
+/* A line that holds a cue and nothing else: the second colour, italic, at
+   70 % of the size, in a line of the same height as the text's (set at the
+   line's top, so the smaller face does not make the line taller). */
+.cueLine {
+  color: var(--prompter-glass-cue);
+  font-size: var(--glass-cue-size);
+  font-style: italic;
+  vertical-align: top;
+}
+
+/* A paragraph number, when the look shows them: hung in the left margin,
+   beside the paragraph's first line. */
+.number {
+  position: absolute;
+  right: 100%;
+  top: 0;
+  margin-right: var(--glass-number-gap);
+  color: var(--prompter-glass-number);
+  font-size: var(--glass-number-size);
+  font-style: normal;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* END, half a screen below the last line, in the second colour. */
+.end {
+  margin-top: var(--glass-end-gap);
+  color: var(--prompter-glass-cue);
+  font-size: var(--glass-cue-size);
+  letter-spacing: 0.1em;
+  line-height: var(--glass-line);
+}
+
+/* Over the text already read: white on black reads at 45 %. */
+.read {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: var(--prompter-glass-read);
+  pointer-events: none;
+}
+
+/* The reading line: an arrow at the left edge, and a thin line across, under
+   the line's baseline, when the look asks for it. */
+.arrow {
+  position: absolute;
+  left: var(--glass-arrow-left);
+  top: var(--glass-reading);
+  width: 0;
+  height: 0;
+  margin-top: -30px;
+  border-top: 30px solid transparent;
+  border-bottom: 30px solid transparent;
+  border-left: 46px solid var(--prompter-glass-arrow);
+}
+
+.across {
+  position: absolute;
+  left: var(--glass-column-left);
+  right: var(--glass-margin);
+  top: var(--glass-across);
+  height: 2px;
+  margin-top: -1px;
+  background: var(--prompter-glass-line);
+}

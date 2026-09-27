@@ -6,6 +6,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 import type { EventName, JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import type { PrompterLayoutLine } from "../../generated/snapshots/PrompterLayoutLine";
 import type { PrompterParagraph } from "../../generated/snapshots/PrompterParagraph";
+import type { FixtureScenario } from "../../types";
 import { EngineRequestError } from "../engineRequestError";
 import { createFixtureTransport } from "../fixtureTransport";
 
@@ -37,9 +38,9 @@ export function layoutOf(paragraphs: PrompterParagraph[], perLine: number, heigh
   return { lines, endTop: top };
 }
 
-/** A double of the `setup-ready` scenario, and the requests a Teleprompter page would send it. */
-export function openPrompterDouble() {
-  const transport = createFixtureTransport(getFixtureScenario("setup-ready"));
+/** A double of the `setup-ready` scenario (or of `scenario`), and the requests a Teleprompter page would send it. */
+export function openPrompterDouble(scenario: FixtureScenario = getFixtureScenario("setup-ready")) {
+  const transport = createFixtureTransport(scenario);
   const events: SeenEvent[] = [];
   transport.subscribe((envelope) => events.push({ event: envelope.event, payload: envelope.payload }));
 
@@ -85,7 +86,26 @@ export function openPrompterDouble() {
   const reasons = () =>
     events.filter((seen) => seen.event === "prompter.changed").map((seen) => String(seen.payload.reason));
 
-  return { transport, events, call, refused, edit, script, snapshot, glass, layOut, reasons };
+  /** A `prompter.screen.report`, as the shell sends it (Slice 5a, `report_screen`). */
+  const reportScreen = (params: JsonObject) => call("prompter.screen.report", params);
+
+  /** The report the shell sends when Windows sees the Prompter XL at its own size (`connect_screen`). */
+  const connectScreen = () => reportScreen({ found: true, width: 1920, height: 1080, refreshHz: 60 });
+
+  return {
+    transport,
+    events,
+    call,
+    refused,
+    edit,
+    script,
+    snapshot,
+    glass,
+    layOut,
+    reasons,
+    reportScreen,
+    connectScreen,
+  };
 }
 
 /** A file as the page's file picker sends it: its name and its bytes in base64. */

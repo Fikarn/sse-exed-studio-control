@@ -29,7 +29,21 @@ impl TestPrompter {
         fs::create_dir_all(&root).expect("test dir should be created");
         let db_path = root.join("studio-control.sqlite3");
         initialize_test_database(&db_path).expect("database should initialize");
-        Self { root, db_path }
+        let prompter = Self { root, db_path };
+        prompter.connect_screen();
+        prompter
+    }
+
+    /// The report the shell sends at its start when Windows sees the
+    /// Prompter XL at its own size (Slice 5a): the glass is drawn, so the
+    /// text may scroll. Every start forgets it (`runtime::forget`).
+    pub(crate) fn connect_screen(&self) -> Value {
+        self.report_screen(json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }))
+    }
+
+    /// A `prompter.screen.report`, as the shell sends it.
+    pub(crate) fn report_screen(&self, params: Value) -> Value {
+        self.call("prompter.screen.report", params)
     }
 
     pub(crate) fn path(&self) -> &Path {

@@ -306,6 +306,9 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "prompter.snapshot",
     "prompter.speed",
     "prompter.textSize",
+    // What the shell found in Windows' display configuration (Slice 5a): a
+    // fact about the Prompter XL, never an operator's action.
+    "prompter.screen.report",
     // The shell's own settings, files.
     "commissioning.update",
     "dev.parityFixture.load",
