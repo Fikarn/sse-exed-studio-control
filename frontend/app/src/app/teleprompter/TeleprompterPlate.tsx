@@ -19,6 +19,7 @@ import type {
   ShellStore,
 } from "@sse/engine-client";
 
+import { RenameDialog } from "../shared/RenameDialog";
 import { TeleprompterLook } from "./TeleprompterLook";
 import { clockTime, scriptDetail, scriptLine } from "./teleprompterModel";
 import type { PerformAction } from "./TeleprompterWorkspace";
@@ -28,7 +29,7 @@ import styles from "./TeleprompterPlate.module.css";
 // column, the proposal §2, §3.3 and §5.5): the selected script — Put on the
 // prompter, or Replace or Update · press twice (D11), its earlier versions and
 // Remove — the scripts sorted by name with Removed beside them, the look, and
-// the Prompter XL as Windows reports it. Rename and the editor are Slice 6b's.
+// the Prompter XL as Windows reports it. Rename opens a dialog (Slice 6b).
 
 /** The scripts the list has room for; more are paged, never scrolled (system §10). */
 const SCRIPT_ROOM = 8;
@@ -113,6 +114,7 @@ export function TeleprompterPlate({
     page: 0,
   });
   const [deleting, setDeleting] = useState<PrompterScriptSummary | null>(null);
+  const [renaming, setRenaming] = useState<PrompterScriptSummary | null>(null);
   const versions = useScriptVersions(store, selected);
   const onGlass = selected !== null && glass?.scriptId === selected.id;
 
@@ -164,7 +166,16 @@ export function TeleprompterPlate({
   return (
     <div className={styles.plate} data-testid="teleprompter-plate">
       {selected ? (
-        <PlateHead title={selected.name} sub={scriptDetail(selected)} testId="teleprompter-selected" />
+        <PlateHead
+          title={selected.name}
+          sub={scriptDetail(selected)}
+          action={
+            <Key size="small" testId="teleprompter-rename" onClick={() => setRenaming(selected)}>
+              Rename
+            </Key>
+          }
+          testId="teleprompter-selected"
+        />
       ) : (
         <PlateHead title="No scripts" sub="Open a script's file to add it here." testId="teleprompter-selected" />
       )}
@@ -389,6 +400,21 @@ export function TeleprompterPlate({
           </p>
         ) : null}
       </Section>
+
+      {renaming ? (
+        <RenameDialog
+          title={`Rename ${renaming.name}`}
+          initialValue={renaming.name}
+          fieldLabel="The script's name"
+          confirmLabel="Rename"
+          onCancel={() => setRenaming(null)}
+          onConfirm={(name) => {
+            const script = renaming;
+            setRenaming(null);
+            if (name !== script.name) void perform(() => store.renamePrompterScript(script.id, name));
+          }}
+        />
+      ) : null}
 
       {deleting ? (
         <ConfirmDialog

@@ -128,16 +128,29 @@
   font: 500 var(--font-size-label) / 1 var(--font-family-mono);
 }
 
-/* Open file… beside, and Clear under it across the cluster (board 1). */
+/* Open file… · Paste as a new script · New script, each as wide as its
+   words, and Clear under them across the cluster (board 1). */
 .standing {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   flex: none;
 }
 
-.clear {
-  grid-column: 1 / -1;
+.standingRow {
+  display: flex;
+  gap: 8px;
+}
+
+.standingRow > * {
+  flex: 1 1 auto;
+  white-space: nowrap;
+}
+
+.reopened {
+  margin: 0;
+  color: var(--text-text);
+  font: 500 var(--font-size-body) / 1.45 var(--font-family-ui);
 }
 
 .fileInput {

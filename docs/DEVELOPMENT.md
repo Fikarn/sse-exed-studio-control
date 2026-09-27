@@ -153,8 +153,10 @@ slices, each with a Status line saying what landed, what moved, and what was
 deliberately left. Read the slice status before changing a surface it names — it
 usually explains why something is the way it is.
 
-**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 75 boards —
-25 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
+**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 81 boards —
+27 fixtures × 3 themes at 2560×1440 (a board a page reaches by a press, such as
+the Teleprompter's editor, names its presses in `BOARD_STEPS`,
+`tests/helpers/ui-contract/boards.mjs`) — plus the Storybook primitive pages, and
 measures each one: type floor and distinct sizes, font families, pixel-sampled
 text contrast, pointer-target size, radii, shadows and blur, gradients, running
 animations at idle, chrome heights, page scroll, targets off the viewport, and a
@@ -310,7 +312,11 @@ Slice 6a) is `teleprompter/TeleprompterWorkspace.tsx` over
 `teleprompter/teleprompterModel.ts` (what the page shows, from the hardware
 link's figures) and its cluster, bay, plate, look and footer; it is the first
 page to fill the shell's plate region, and `teleprompter/glass/` is the glass
-both it and the Prompter XL's window draw. The fixture double is
+both it and the Prompter XL's window draw. Its script editor (Slice 6b) is
+`teleprompter/editor/`: the browser makes the edits (so its own undo covers
+them) and `editorDom.ts` reads the script back from the page's markup after
+each one; `beforeinput` cancels only the browser's formatting keys, drops and
+a native paste, which goes through `prompter.paste.convert` first. The fixture double is
 `frontend/packages/engine-client/src/transports/fixtureTransport.ts` over the
 modules in `transports/fixture/`, one request handler per domain
 (`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`,

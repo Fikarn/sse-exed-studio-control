@@ -187,3 +187,148 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("support-prompter-xl")).toContainText("connected · 1920×1080 · 60 Hz");
   });
 });
+
+// New pages program, Slice 6b: the editor (the bay's second view), Rename, New
+// script and Paste as a new script, and a file opened again (the proposal
+// §3.1, §3.3, §6.3). The page reads the clipboard itself, so these cases may.
+test.describe("the Teleprompter's editor (new pages S6b)", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  async function openEditor(page: Page, fixture = "teleprompter-ready") {
+    await openTeleprompter(page, fixture);
+    await page.getByTestId("teleprompter-bay-edit").click();
+    await expect(page.getByTestId("teleprompter-editor-text")).toHaveAttribute("contenteditable", "true");
+    await expect(page.getByTestId("teleprompter-quarter-copy")).toHaveAttribute("data-picture", "prompter-glass");
+  }
+
+  /** Puts the caret at the end of the paragraph at the reading line, which the editor opens on. */
+  async function caretInReadingLine(page: Page) {
+    const line = page.getByTestId("teleprompter-editor-text").locator('p[data-mark="reading line"]');
+    await expect(line).toBeVisible();
+    const box = (await line.boundingBox())!;
+    await page.mouse.click(box.x + box.width - 2, box.y + box.height - 6);
+    await page.keyboard.press("End");
+    return line;
+  }
+
+  async function copyToClipboard(page: Page, html: string, text: string) {
+    await page.evaluate(
+      async ([markup, plain]) => {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/html": new Blob([markup], { type: "text/html" }),
+            "text/plain": new Blob([plain], { type: "text/plain" }),
+          }),
+        ]);
+      },
+      [html, text] as const
+    );
+  }
+
+  test("an edit of the script on the prompter is saved as it is typed, marked, and reaches the glass only on Update", async ({
+    page,
+  }) => {
+    await openEditor(page);
+    await expect(page.getByTestId("teleprompter-edit-note")).toContainText("the glass keeps its text");
+    const line = await caretInReadingLine(page);
+    await page.keyboard.type(" Typed here.");
+    await expect(line).toContainText("Typed here.");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
+    await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT UPDATED");
+    await expect(page.getByTestId("teleprompter-edited-list")).toHaveText("¶ 8");
+    await page.getByTestId("teleprompter-state-update").click();
+    await page.waitForTimeout(400);
+    await page.getByTestId("teleprompter-state-update").click();
+    await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
+    await expect(page.getByTestId("teleprompter-edited-list")).toHaveText("nothing");
+  });
+
+  test("formatting comes from the bar, not the browser's keys; the browser's undo and redo act on the editor's text", async ({
+    page,
+  }) => {
+    await openEditor(page);
+    const line = await caretInReadingLine(page);
+    await page.keyboard.press("Shift+Home");
+    const bold = () => line.locator("b").count();
+    const before = await bold();
+    await page.keyboard.press("Control+b");
+    expect(await bold()).toBe(before);
+    await page.getByTestId("teleprompter-editor-bold").click();
+    await expect.poll(bold).toBeGreaterThan(before);
+    await page.keyboard.press("Control+z");
+    await expect.poll(bold).toBe(before);
+    await page.keyboard.press("Control+y");
+    await expect.poll(bold).toBeGreaterThan(before);
+    await page.getByTestId("teleprompter-editor-undo").click();
+    await expect.poll(bold).toBe(before);
+    await expect(page.getByTestId("teleprompter-editor-redo")).not.toHaveAttribute("data-locked", "");
+  });
+
+  test("a paste keeps its bold and its paragraphs, read by the hardware link's reader, and Add cue writes a cue", async ({
+    page,
+  }) => {
+    await openEditor(page);
+    const text = page.getByTestId("teleprompter-editor-text");
+    const paragraphs = await text.locator("p").count();
+    await caretInReadingLine(page);
+    await copyToClipboard(
+      page,
+      "<p><b>Pasted bold</b> and plain</p><p>A second paragraph</p>",
+      "Pasted bold and plain"
+    );
+    await page.keyboard.press("Control+v");
+    await expect(text.locator("b", { hasText: "Pasted bold" })).toHaveCount(1);
+    await expect(text.locator("p")).toHaveCount(paragraphs + 1);
+    await page.getByTestId("teleprompter-editor-paste").click();
+    await expect(text.locator("b", { hasText: "Pasted bold" })).toHaveCount(2);
+    await page.getByTestId("teleprompter-editor-cue").click();
+    await page.keyboard.type("look up");
+    await expect(text).toContainText("[look up]");
+  });
+
+  test("New script opens an empty script in the editor, and Rename names it", async ({ page }) => {
+    await openTeleprompter(page, "teleprompter-empty");
+    await page.getByTestId("teleprompter-new-script").click();
+    await expect(page.getByTestId("teleprompter-editor-text")).toHaveAttribute("contenteditable", "true");
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("New script");
+    await page.getByTestId("teleprompter-editor-text").click();
+    await page.keyboard.type("Good morning.");
+    await expect(page.getByTestId("teleprompter-editor-saved")).toHaveAttribute("data-save", "saved");
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("2 words");
+    await page.getByTestId("teleprompter-rename").click();
+    const field = page.getByRole("dialog").getByRole("textbox");
+    await field.fill("01 Morning");
+    await page.getByRole("dialog").getByRole("button", { name: "Rename" }).click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("01 Morning");
+    await expect(page.getByTestId("teleprompter-scripts")).toContainText("01 Morning");
+  });
+
+  test("Paste as a new script adds what the clipboard holds and selects it", async ({ page }) => {
+    await openTeleprompter(page, "teleprompter-empty");
+    await copyToClipboard(page, "<p><b>Evening news</b></p><p>Here it is.</p>", "Evening news\n\nHere it is.");
+    await page.getByTestId("teleprompter-paste-script").click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("Evening news");
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("2 paragraphs");
+  });
+
+  test("a file opened again asks whether to update its script from it or add it as a new one", async ({ page }) => {
+    await openTeleprompter(page, "teleprompter-empty");
+    const file = (text: string) => ({ name: "Morning news.txt", mimeType: "text/plain", buffer: Buffer.from(text) });
+    const input = page.getByTestId("teleprompter-file-input");
+    await input.setInputFiles(file("Good morning.\n"));
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("Morning news");
+    await input.setInputFiles(file("Good morning.\n\nHere is the news.\n"));
+    await expect(page.getByTestId("teleprompter-reopen")).toContainText("Morning news came from this file");
+    await page.getByTestId("teleprompter-reopen-update").click();
+    await expect(page.getByTestId("teleprompter-selected")).toContainText("2 paragraphs");
+    await expect(page.getByTestId("teleprompter-scripts").locator('[data-testid^="teleprompter-script-"]')).toHaveCount(
+      1
+    );
+    await input.setInputFiles(file("Another.\n"));
+    await page.getByTestId("teleprompter-reopen-add").click();
+    await expect(page.getByTestId("teleprompter-scripts")).toContainText("Morning news");
+    await expect(page.getByTestId("teleprompter-scripts").locator('[data-testid^="teleprompter-script-"]')).toHaveCount(
+      2
+    );
+  });
+});

@@ -124,6 +124,18 @@ export interface PrompterScriptImportRequest {
   updateScriptId?: string;
 }
 
+/** `prompter.script.paste` and `prompter.paste.convert`: what the page read from the clipboard (Slice 6b). */
+export interface PrompterPasteRequest {
+  html?: string;
+  text?: string;
+}
+
+/** `prompter.paste.convert`'s answer: the paragraphs a paste into the editor inserts, and what it kept and left out. */
+export interface PrompterPasteConvertResult {
+  paragraphs: PrompterParagraph[];
+  sentence: string;
+}
+
 export interface AudioSnapshotCreateRequest {
   name: string;
   oscIndex: number;
@@ -567,6 +579,14 @@ export interface ShellStore {
   refreshPrompterSnapshot(): Promise<void>;
   /** One script with its text and its earlier versions (`prompter.script.snapshot`); changes nothing. */
   readPrompterScript(scriptId: string): Promise<PrompterScriptSnapshot>;
+  // The editor and the scripts' own actions (Slice 6b).
+  createPrompterScript(name?: string): Promise<JsonValue>;
+  renamePrompterScript(scriptId: string, name: string): Promise<JsonValue>;
+  /** The editor's text, saved as the operator types; the script on the glass keeps its glass text until Update. */
+  editPrompterScript(scriptId: string, paragraphs: readonly PrompterParagraph[]): Promise<JsonValue>;
+  pastePrompterScript(request: PrompterPasteRequest): Promise<JsonValue>;
+  /** What a paste into the editor inserts, read by the hardware link's own reader; changes nothing. */
+  convertPrompterPaste(request: PrompterPasteRequest): Promise<PrompterPasteConvertResult>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;

@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { liveAudioMasks } from "./helpers/liveAudioMasks";
+import { stepToBoard } from "./helpers/ui-contract/boards.mjs";
 
 // Visual review baselines for the operator shell at 2560×1440, the one screen
 // Studio Control runs on. Replaces the screenshot-only loop that used to live
@@ -72,6 +73,9 @@ async function gotoFixture(page: Page, fixture: string, options: { theme?: "grap
   if (!preReadyFixture) {
     await page.waitForSelector("html[data-audio-hydrated]", { state: "attached", timeout: 10_000 });
   }
+  // A board the page reaches by a press (Slice 6b: the Teleprompter's editor).
+  await page.evaluate(() => document.fonts.ready);
+  await stepToBoard(page, fixture);
 }
 
 async function assertViewportFit(page: Page, size: Viewport, fixture: string) {
@@ -250,6 +254,10 @@ const STATE_FIXTURES = [
   "teleprompter-empty",
   "teleprompter-not-connected",
   "teleprompter-not-updated",
+  // Slice 6b: the editor, on the script on the prompter edited since it went
+  // on, and on a new script.
+  "teleprompter-editing",
+  "teleprompter-new-script",
 ] as const;
 
 test.describe("state coverage", () => {

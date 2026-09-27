@@ -5,7 +5,16 @@
 import { censusInPage } from "./census.mjs";
 import { sampleContrast } from "./contrast.mjs";
 import { decodePng } from "./png.mjs";
-import { CHROME_TOLERANCE_PX, D4_CHROME, FIXTURE_NOW, SURFACE, TARGETS, fixtureUrl, isPreReady } from "./boards.mjs";
+import {
+  CHROME_TOLERANCE_PX,
+  D4_CHROME,
+  FIXTURE_NOW,
+  SURFACE,
+  TARGETS,
+  fixtureUrl,
+  isPreReady,
+  stepToBoard,
+} from "./boards.mjs";
 
 // New pages program, Slice SW (D22): Studio Control runs on Windows, so the
 // contrast sampled from a screenshot is Windows' pixels alone. Off Windows (CI's
@@ -34,6 +43,7 @@ export async function openBoard(page, fixture, theme) {
     await page.waitForSelector(`html[data-theme="${theme}"]`, { state: "attached" });
   }
   await page.evaluate(() => document.fonts.ready);
+  await stepToBoard(page, fixture);
   // Let every finite animation (enter transitions, banner fades) finish before
   // measuring, so the idle count and the sampled pixels are the board at rest;
   // infinite animations (an idle pulse) are what the idle census must catch.

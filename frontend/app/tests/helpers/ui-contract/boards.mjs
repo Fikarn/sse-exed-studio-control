@@ -27,6 +27,29 @@ export function isLoading(fixture) {
   return fixture.includes("loading") || fixture.startsWith("startup");
 }
 
+// New pages program, Slice 6b: a board a page reaches by a press, not by its
+// data alone — the Teleprompter's editor is the bay's second view, chosen on
+// the page. The fixture holds the data; these are the presses that bring the
+// page to the board, and the mark that says it is there.
+export const BOARD_STEPS = {
+  "teleprompter-editing": {
+    presses: ["teleprompter-bay-edit"],
+    ready: "[data-testid=teleprompter-editor-text][contenteditable=true]",
+  },
+  "teleprompter-new-script": {
+    presses: ["teleprompter-new-script"],
+    ready: "[data-testid=teleprompter-editor-text][contenteditable=true]",
+  },
+};
+
+/** Presses a fixture's board steps, if it has any, and waits for its mark. */
+export async function stepToBoard(page, fixture) {
+  const steps = BOARD_STEPS[fixture];
+  if (!steps) return;
+  for (const testId of steps.presses) await page.getByTestId(testId).click();
+  await page.waitForSelector(steps.ready, { timeout: 10_000 });
+}
+
 export function boardName(fixture, theme) {
   return `${fixture}__${theme}`;
 }

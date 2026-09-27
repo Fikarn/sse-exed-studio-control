@@ -1,6 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
-import { Key, Lamp } from "@sse/design-system";
+import { Key, Lamp, Segmented } from "@sse/design-system";
 import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
 import type { GlassParagraph } from "./glass/glassText";
@@ -28,9 +28,18 @@ export interface TeleprompterBayProps {
   timeLeft: number | null;
   store: ShellStore;
   perform: PerformAction;
-  /** The layout the copy reported, for `BACK`'s hint. */
-  onLayoutReported: (report: PrompterGlassLayoutReport) => void;
+  /** Reports the copy's layout to the hardware link (and keeps it for `BACK`'s hint). */
+  onLayout: (report: PrompterGlassLayoutReport) => void;
+  /** What the bay shows: the live copy, or the selected script's editor (Slice 6b). */
+  view: BayView;
+  onView: (view: BayView) => void;
+  /** Why Edit script is locked (no script to edit), or `null`. */
+  editLock: string | null;
+  /** The editor's view, drawn in place of the copy while `view` is `edit`. */
+  editView: ReactNode;
 }
+
+export type BayView = "live" | "edit";
 
 /** `1 cue`, `3 cues`. */
 function counted(count: number, one: string, many: string): string {
@@ -50,7 +59,11 @@ export function TeleprompterBay({
   timeLeft,
   store,
   perform,
-  onLayoutReported,
+  onLayout,
+  view,
+  onView,
+  editLock,
+  editView,
 }: TeleprompterBayProps) {
   const glass = snapshot.glass;
   const draws = snapshot.screen.draws;
@@ -65,15 +78,6 @@ export function TeleprompterBay({
   // the part read and the part to read (the shares, the ticks and a press stay the same).
   const dense = segments.length > BAR_SEGMENT_ROOM;
   const time = glass && timeLeft !== null ? timeLeftParts(glass, timeLeft, new Date()) : null;
-
-  // A report the hardware link could not take is logged, never shown: the
-  // glass reports again when the hardware link asks (`PrompterGlass`).
-  const reportLayout = (report: PrompterGlassLayoutReport) => {
-    onLayoutReported(report);
-    store.reportPrompterLayout(report).catch((error: unknown) => {
-      store.reportBackgroundFailure(error, "the page's copy of the glass");
-    });
-  };
 
   const pressBar = (event: MouseEvent<HTMLButtonElement>) => {
     if (!glass || segments.length === 0) return;
@@ -126,160 +130,185 @@ export function TeleprompterBay({
 
   return (
     <section className={styles.bay} data-testid="teleprompter-bay" aria-label="The prompter's glass">
-      <header className={styles.head} data-well="" data-testid="teleprompter-glass-strip">
-        <span className={styles.stripItem}>
-          <span className={styles.stripLabel}>On the glass</span>
-          <b className={styles.stripValue} data-testid="teleprompter-on-glass">
-            {glass ? glass.name : "Nothing"}
-          </b>
-        </span>
-        <span className={styles.stripItem}>
-          <span className={styles.stripLabel}>Place</span>
-          <b className={styles.stripMono} data-testid="teleprompter-place">
-            {place ? place.text : "—"}
-          </b>
-        </span>
-        <span className={styles.stripItem}>
-          <span className={styles.stripLabel}>Left</span>
-          <b className={styles.stripHero} data-testid="teleprompter-time-left">
-            {time ? time.left : "—"}
-          </b>
-          {time ? (
-            <span className={styles.stripDetail}>
-              {time.of}
-              {time.ends ? ` · ${time.ends}` : ""}
-              {glass?.estimated ? " · estimated" : ""}
+      <div className={styles.bayHead}>
+        <Segmented label="The bay shows" className={styles.views} testId="teleprompter-bay-view">
+          <Key mode="segmented" engaged={view === "live"} testId="teleprompter-bay-live" onClick={() => onView("live")}>
+            Live copy
+          </Key>
+          <Key
+            mode="segmented"
+            engaged={view === "edit"}
+            locked={editLock !== null}
+            reason={editLock ?? undefined}
+            testId="teleprompter-bay-edit"
+            onClick={() => onView("edit")}
+          >
+            Edit script
+          </Key>
+        </Segmented>
+        <header className={styles.head} data-well="" data-testid="teleprompter-glass-strip">
+          <span className={styles.stripItem}>
+            <span className={styles.stripLabel}>On the glass</span>
+            <b className={styles.stripValue} data-testid="teleprompter-on-glass">
+              {glass ? glass.name : "Nothing"}
+            </b>
+          </span>
+          <span className={styles.stripItem}>
+            <span className={styles.stripLabel}>Place</span>
+            <b className={styles.stripMono} data-testid="teleprompter-place">
+              {place ? place.text : "—"}
+            </b>
+          </span>
+          <span className={styles.stripItem}>
+            <span className={styles.stripLabel}>Left</span>
+            <b className={styles.stripHero} data-testid="teleprompter-time-left">
+              {time ? time.left : "—"}
+            </b>
+            {time ? (
+              <span className={styles.stripDetail}>
+                {time.of}
+                {time.ends ? ` · ${time.ends}` : ""}
+                {glass?.estimated ? " · estimated" : ""}
+              </span>
+            ) : null}
+          </span>
+          {glass ? (
+            <span className={styles.runState} data-testid="teleprompter-run-state">
+              <Lamp tone={glass.playing ? "ok" : "off"} />
+              {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
             </span>
           ) : null}
-        </span>
-        {glass ? (
-          <span className={styles.runState} data-testid="teleprompter-run-state">
-            <Lamp tone={glass.playing ? "ok" : "off"} />
-            {glass.playing ? "Playing" : glass.atEnd ? "At the end" : "Paused"}
-          </span>
-        ) : null}
-      </header>
-
-      <div className={styles.copy} data-on-glass={draws ? "" : undefined}>
-        <PrompterGlass
-          text={glassText}
-          anchor={glass?.anchor ?? null}
-          width={COPY_WIDTH}
-          onLayout={reportLayout}
-          label={glass ? `The prompter's glass: ${glass.name}` : "The prompter's glass: nothing on it"}
-          testId="teleprompter-copy"
-        />
-        {!draws && glass ? (
-          <span className={styles.notOnGlass} data-testid="teleprompter-not-on-glass">
-            Not on the glass
-          </span>
-        ) : null}
+        </header>
       </div>
 
-      {glass ? (
-        <>
-          <div className={styles.barHead}>
-            <span>The whole script · press anywhere on it to go to the start of that paragraph</span>
-            <span>
-              {readWords}
-              {place ? ` · ${Math.round(place.share * 100)} % read` : ""}
-            </span>
-          </div>
-          <button
-            type="button"
-            className={styles.bar}
-            data-well=""
-            aria-label="The whole script: press to go to the start of a paragraph"
-            data-testid="teleprompter-script-bar"
-            onClick={pressBar}
-          >
-            <span ref={track} className={styles.track}>
-              {dense ? (
-                <>
-                  <span
-                    className={styles.segment}
-                    data-read=""
-                    style={{ left: 0, width: `${barStart(segments, readUpTo) * 100}%` }}
-                  />
-                  <span
-                    className={styles.segment}
-                    style={{
-                      left: `${barStart(segments, readUpTo) * 100}%`,
-                      width: `${(1 - barStart(segments, readUpTo)) * 100}%`,
-                    }}
-                  />
-                </>
-              ) : (
-                segments.map((segment) => (
-                  <span
-                    key={segment.index}
-                    className={styles.segment}
-                    data-read={segment.index < readUpTo ? "" : undefined}
-                    style={{ left: `${segment.start * 100}%`, width: `calc(${segment.share * 100}% - 2px)` }}
-                  >
-                    {segments.length <= 40 ? <span className={styles.segmentNumber}>{segment.index + 1}</span> : null}
-                  </span>
-                ))
-              )}
-              {glass.cues.map((cue, index) => (
-                <i
-                  key={`${cue.paragraph}:${cue.word}:${index}`}
-                  className={styles.cueTick}
-                  style={{ left: `${barStart(segments, cue.paragraph) * 100}%` }}
-                />
-              ))}
-              {place ? <i className={styles.placeMark} style={{ left: `${place.share * 100}%` }} /> : null}
-            </span>
-          </button>
-          <div className={styles.under}>
-            <div ref={cueRow} className={styles.cues} data-testid="teleprompter-cue-keys">
-              <span className={styles.cuesLabel}>Cues</span>
-              {cues.length === 0 ? <span className={styles.cuesNone}>none in this script</span> : null}
-              {shownCues.map((cue, index) => (
-                <Key
-                  key={`${cue.paragraph}:${cue.word}:${index}`}
-                  size="small"
-                  take
-                  data-cue-key=""
-                  testId={`teleprompter-cue-${index + 1}`}
-                  onClick={() => jump({ to: "place", paragraph: cue.paragraph, word: cue.word })}
-                >
-                  <span className={styles.cueParagraph}>¶ {cue.paragraph + 1}</span>{" "}
-                  <i className={styles.cueText}>{cue.text}</i>
-                </Key>
-              ))}
-            </div>
-            <div className={styles.goTo} role="group" data-testid="teleprompter-go-to">
-              <label className={styles.goToLabel} htmlFor="teleprompter-go-to-paragraph">
-                Go to paragraph
-              </label>
-              <input
-                id="teleprompter-go-to-paragraph"
-                className={styles.goToField}
-                data-well=""
-                inputMode="numeric"
-                autoComplete="off"
-                placeholder={`1–${glass.paragraphCount}`}
-                value={goTo}
-                onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
-                data-testid="teleprompter-go-to-field"
-              />
-              <Key
-                size="small"
-                locked={goToProblem !== null}
-                reason={goToProblem ?? undefined}
-                testId="teleprompter-go-to-key"
-                onClick={goToParagraph}
-              >
-                Go
-              </Key>
-            </div>
-          </div>
-        </>
+      {view === "edit" ? (
+        editView
       ) : (
-        <p className={styles.nothing} data-testid="teleprompter-nothing-on">
-          Nothing on the prompter
-        </p>
+        <>
+          <div className={styles.copy} data-on-glass={draws ? "" : undefined}>
+            <PrompterGlass
+              text={glassText}
+              anchor={glass?.anchor ?? null}
+              width={COPY_WIDTH}
+              onLayout={onLayout}
+              label={glass ? `The prompter's glass: ${glass.name}` : "The prompter's glass: nothing on it"}
+              testId="teleprompter-copy"
+            />
+            {!draws && glass ? (
+              <span className={styles.notOnGlass} data-testid="teleprompter-not-on-glass">
+                Not on the glass
+              </span>
+            ) : null}
+          </div>
+
+          {glass ? (
+            <>
+              <div className={styles.barHead}>
+                <span>The whole script · press anywhere on it to go to the start of that paragraph</span>
+                <span>
+                  {readWords}
+                  {place ? ` · ${Math.floor(place.share * 100)} % read` : ""}
+                </span>
+              </div>
+              <button
+                type="button"
+                className={styles.bar}
+                data-well=""
+                aria-label="The whole script: press to go to the start of a paragraph"
+                data-testid="teleprompter-script-bar"
+                onClick={pressBar}
+              >
+                <span ref={track} className={styles.track}>
+                  {dense ? (
+                    <>
+                      <span
+                        className={styles.segment}
+                        data-read=""
+                        style={{ left: 0, width: `${barStart(segments, readUpTo) * 100}%` }}
+                      />
+                      <span
+                        className={styles.segment}
+                        style={{
+                          left: `${barStart(segments, readUpTo) * 100}%`,
+                          width: `${(1 - barStart(segments, readUpTo)) * 100}%`,
+                        }}
+                      />
+                    </>
+                  ) : (
+                    segments.map((segment) => (
+                      <span
+                        key={segment.index}
+                        className={styles.segment}
+                        data-read={segment.index < readUpTo ? "" : undefined}
+                        style={{ left: `${segment.start * 100}%`, width: `calc(${segment.share * 100}% - 2px)` }}
+                      >
+                        {segments.length <= 40 ? (
+                          <span className={styles.segmentNumber}>{segment.index + 1}</span>
+                        ) : null}
+                      </span>
+                    ))
+                  )}
+                  {glass.cues.map((cue, index) => (
+                    <i
+                      key={`${cue.paragraph}:${cue.word}:${index}`}
+                      className={styles.cueTick}
+                      style={{ left: `${barStart(segments, cue.paragraph) * 100}%` }}
+                    />
+                  ))}
+                  {place ? <i className={styles.placeMark} style={{ left: `${place.share * 100}%` }} /> : null}
+                </span>
+              </button>
+              <div className={styles.under}>
+                <div ref={cueRow} className={styles.cues} data-testid="teleprompter-cue-keys">
+                  <span className={styles.cuesLabel}>Cues</span>
+                  {cues.length === 0 ? <span className={styles.cuesNone}>none in this script</span> : null}
+                  {shownCues.map((cue, index) => (
+                    <Key
+                      key={`${cue.paragraph}:${cue.word}:${index}`}
+                      size="small"
+                      take
+                      data-cue-key=""
+                      testId={`teleprompter-cue-${index + 1}`}
+                      onClick={() => jump({ to: "place", paragraph: cue.paragraph, word: cue.word })}
+                    >
+                      <span className={styles.cueParagraph}>¶ {cue.paragraph + 1}</span>{" "}
+                      <i className={styles.cueText}>{cue.text}</i>
+                    </Key>
+                  ))}
+                </div>
+                <div className={styles.goTo} role="group" data-testid="teleprompter-go-to">
+                  <label className={styles.goToLabel} htmlFor="teleprompter-go-to-paragraph">
+                    Go to paragraph
+                  </label>
+                  <input
+                    id="teleprompter-go-to-paragraph"
+                    className={styles.goToField}
+                    data-well=""
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder={`1–${glass.paragraphCount}`}
+                    value={goTo}
+                    onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
+                    data-testid="teleprompter-go-to-field"
+                  />
+                  <Key
+                    size="small"
+                    locked={goToProblem !== null}
+                    reason={goToProblem ?? undefined}
+                    testId="teleprompter-go-to-key"
+                    onClick={goToParagraph}
+                  >
+                    Go
+                  </Key>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className={styles.nothing} data-testid="teleprompter-nothing-on">
+              Nothing on the prompter
+            </p>
+          )}
+        </>
       )}
     </section>
   );

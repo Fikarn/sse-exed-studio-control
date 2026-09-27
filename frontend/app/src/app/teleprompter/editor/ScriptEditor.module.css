@@ -1,0 +1,138 @@
+/* The script editor (new pages program, Slice 6b; board 1's Edit script):
+   the bar, the text on a black well with paragraph numbers in a gutter and
+   cues marked as the glass will draw them, and the status under it. The
+   field is the one thing on the page that scrolls, as any text field does;
+   the page itself never scrolls. */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.field {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: var(--radius-screen);
+  background: var(--material-well);
+}
+
+.opening {
+  margin: 0;
+  padding: 20px 28px;
+  color: var(--display-text2);
+  font: 500 var(--font-size-body) / 1.3 var(--font-family-ui);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+  padding: 20px 28px 20px 0;
+  color: var(--display-text);
+  font: 400 var(--font-size-word) / 1.5 var(--font-family-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  caret-color: var(--display-text);
+  outline: none;
+  counter-reset: paragraph;
+}
+
+.text:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: var(--radius-screen);
+}
+
+/* A paragraph: its number and mark in the gutter, its text beside them; a
+   keyline beside the text when the glass does not show it as it is. */
+.paragraph {
+  position: relative;
+  margin: 0 0 0 98px;
+  padding-left: 13px;
+  border-left: 3px solid transparent;
+  counter-increment: paragraph;
+}
+
+.paragraph::before {
+  content: "¶ " counter(paragraph);
+  position: absolute;
+  top: 6px;
+  left: -101px;
+  width: 84px;
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  text-align: right;
+  user-select: none;
+}
+
+.paragraph[data-mark]::after {
+  content: attr(data-mark);
+  position: absolute;
+  top: 26px;
+  left: -101px;
+  width: 84px;
+  color: var(--display-text);
+  font: 600 var(--font-size-tick) / 1 var(--font-family-ui);
+  text-align: right;
+  user-select: none;
+}
+
+.paragraph[data-edited] {
+  border-left-color: var(--role-amber-text);
+}
+
+.paragraph[data-edited]::after {
+  color: var(--role-amber-text);
+}
+
+.paragraph[data-mark="reading line"]::before {
+  color: var(--display-text);
+  font-weight: 600;
+}
+
+/* The browser's own formatting tags, as the glass draws them. */
+.text b,
+.text strong {
+  font-weight: 600;
+}
+
+.text u {
+  text-underline-offset: 3px;
+}
+
+/* The cues, marked by the browser's highlights (never in the text's markup). */
+.text::highlight(teleprompter-cue) {
+  color: var(--role-blue-text);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: none;
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.status b {
+  color: var(--text-text);
+  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+}
+
+.note {
+  margin-left: auto;
+}

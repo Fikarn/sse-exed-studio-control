@@ -43,6 +43,8 @@ export type {
   PrompterJumpRequest,
   PrompterLayoutReportRequest,
   PrompterLookUpdateRequest,
+  PrompterPasteConvertResult,
+  PrompterPasteRequest,
   PrompterScriptImportRequest,
   PrompterSpeedRequest,
   PrompterTextSizeRequest,
