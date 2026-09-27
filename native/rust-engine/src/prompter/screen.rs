@@ -10,7 +10,10 @@
 //! shell has reported, after every start, the Prompter XL reads
 //! `NOT CONNECTED`; `checks.prompter` is the worse of the screen's state and
 //! `NOT UPDATED`; and a Prompter XL state makes the whole status no worse
-//! than attention, while the lamp itself goes red.
+//! than attention, while the lamp itself goes red. Answered again the same
+//! day, after CI's qualification lane found that the unreported state made
+//! every lane's and test's status attention: only a state the shell has
+//! reported counts toward the whole status.
 
 use crate::prompter::PrompterError;
 use serde::Serialize;
@@ -296,6 +299,11 @@ pub struct PrompterHealthCheck {
     #[serde(rename = "notUpdated")]
     pub not_updated: bool,
     pub screen: PrompterScreenSummary,
+    /// What the whole status takes from it, and the sentence that says why;
+    /// `None` when nothing counts (`whole_status`).
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts-rs", ts(skip))]
+    counted: Option<(PrompterCheckTone, String)>,
 }
 
 impl PrompterHealthCheck {
@@ -304,15 +312,31 @@ impl PrompterHealthCheck {
     /// it asks the operator for Update, on this page.
     pub(crate) fn new(screen: &PrompterScreen, edited: Option<&str>) -> Self {
         let screen = screen.summary();
-        let (status, word, summary) = match edited {
-            Some(name) if screen.tone <= PrompterCheckTone::Attention => (
+        let not_updated = edited.map(|name| {
+            format!(
+                "{name} was edited after it went on the prompter. The prompter still shows the earlier text."
+            )
+        });
+        let (status, word, summary) = match &not_updated {
+            Some(sentence) if screen.tone <= PrompterCheckTone::Attention => (
                 PrompterCheckTone::Attention,
                 String::from("NOT UPDATED"),
-                format!(
-                    "{name} was edited after it went on the prompter. The prompter still shows the earlier text."
-                ),
+                sentence.clone(),
             ),
             _ => (screen.tone, screen.word.clone(), screen.sentence.clone()),
+        };
+        // Only a state the shell has reported counts toward the whole
+        // status; `NOT UPDATED` always does. Each counts as attention.
+        let screen_counts = screen.reported && screen.tone > PrompterCheckTone::Ok;
+        let counted = match &not_updated {
+            Some(sentence) if !screen_counts || screen.tone <= PrompterCheckTone::Attention => {
+                Some((PrompterCheckTone::Attention, sentence.clone()))
+            }
+            _ if screen_counts => Some((
+                screen.tone.min(PrompterCheckTone::Attention),
+                screen.sentence.clone(),
+            )),
+            _ => None,
         };
         Self {
             ok: status == PrompterCheckTone::Ok,
@@ -321,13 +345,24 @@ impl PrompterHealthCheck {
             summary,
             not_updated: edited.is_some(),
             screen,
+            counted,
         }
     }
 
-    /// What the whole status takes from it: no worse than attention (first
-    /// step 1), since the sound and the light are unaffected.
+    /// What the whole status takes from it (first step 1): no worse than
+    /// attention, since the sound and the light are unaffected, and nothing
+    /// from a Prompter XL the shell has not reported yet (answered after CI's
+    /// qualification lane found every lane's status raised by it).
     pub(crate) fn whole_status(&self) -> PrompterCheckTone {
-        self.status.min(PrompterCheckTone::Attention)
+        self.counted
+            .as_ref()
+            .map_or(PrompterCheckTone::Ok, |(tone, _)| *tone)
+    }
+
+    /// The sentence of the state that raises the whole status, for the
+    /// health summary Setup / Support shows; `None` when nothing does.
+    pub(crate) fn whole_status_sentence(&self) -> Option<&str> {
+        self.counted.as_ref().map(|(_, sentence)| sentence.as_str())
     }
 }
 
@@ -474,6 +509,44 @@ mod tests {
             check.whole_status(),
             PrompterCheckTone::Attention,
             "the whole status goes no worse than attention"
+        );
+        assert_eq!(
+            check.whole_status_sentence(),
+            Some("Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen.")
+        );
+    }
+
+    // Answered after CI's qualification lane: a Prompter XL the shell has not
+    // reported yet reads NOT CONNECTED on its lamp and locks PLAY, and leaves
+    // the whole status alone; NOT UPDATED still counts.
+    #[test]
+    fn only_a_reported_state_counts_toward_the_whole_status() {
+        let unreported = PrompterScreen::default();
+        let check = PrompterHealthCheck::new(&unreported, None);
+        assert_eq!(check.word, "NOT CONNECTED");
+        assert_eq!(check.status, PrompterCheckTone::Error);
+        assert_eq!(check.whole_status(), PrompterCheckTone::Ok);
+        assert_eq!(check.whole_status_sentence(), None);
+
+        let edited = PrompterHealthCheck::new(&unreported, Some("Intro"));
+        assert_eq!(edited.word, "NOT CONNECTED", "the lamp shows the worse");
+        assert_eq!(edited.whole_status(), PrompterCheckTone::Attention);
+        assert!(edited
+            .whole_status_sentence()
+            .unwrap()
+            .starts_with("Intro was edited"));
+
+        let low = report(json!({ "found": true, "width": 1280, "height": 720, "refreshHz": 60 }));
+        let check = PrompterHealthCheck::new(&low, None);
+        assert_eq!(check.whole_status(), PrompterCheckTone::Attention);
+        assert!(check
+            .whole_status_sentence()
+            .unwrap()
+            .starts_with("Windows runs the Prompter XL at 1280×720."));
+        let full = report(json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }));
+        assert_eq!(
+            PrompterHealthCheck::new(&full, None).whole_status(),
+            PrompterCheckTone::Ok
         );
     }
 }

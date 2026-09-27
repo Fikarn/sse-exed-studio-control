@@ -21,6 +21,7 @@ import {
   screenSummary,
   unreportedScreen,
   wholeStatus,
+  wholeStatusPart,
 } from "./prompterScreen";
 import { openPrompterDouble } from "./prompterTestSupport";
 import { withPrompterStatus } from "./state";
@@ -370,7 +371,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
     const check = prompterHealthCheck(full, null);
     expect(check.ok).toBe(true);
     expect(check.word).toBe("CONNECTED");
-    expect(wholeStatus(check)).toBe("ok");
+    expect(wholeStatus(full, null)).toBe("ok");
 
     const edited = prompterHealthCheck(full, "Intro");
     expect(edited).toMatchObject({ ok: false, status: "attention", word: "NOT UPDATED", notUpdated: true });
@@ -384,7 +385,26 @@ describe("the fixture double's Prompter XL: the lamp", () => {
 
     const gone = prompterHealthCheck(screenFromReport(GONE), "Intro");
     expect(gone).toMatchObject({ status: "error", word: "NOT CONNECTED", notUpdated: true });
-    expect(wholeStatus(gone), "the whole status goes no worse than attention").toBe("attention");
+    expect(wholeStatus(screenFromReport(GONE), "Intro"), "the whole status goes no worse than attention").toBe(
+      "attention"
+    );
+    expect(wholeStatusPart(screenFromReport(GONE), "Intro")?.sentence).toBe(screenSentence(screenFromReport(GONE)));
+  });
+
+  // screen.rs's `only_a_reported_state_counts_toward_the_whole_status` (answered after CI's
+  // qualification lane found every lane's status raised by an unreported Prompter XL).
+  it("counts only a reported state toward the whole status, and NOT UPDATED always", () => {
+    const unreported = unreportedScreen();
+    expect(prompterHealthCheck(unreported, null)).toMatchObject({ word: "NOT CONNECTED", status: "error" });
+    expect(wholeStatusPart(unreported, null)).toBeNull();
+    expect(wholeStatus(unreported, null)).toBe("ok");
+    const edited = wholeStatusPart(unreported, "Intro");
+    expect(edited?.tone).toBe("attention");
+    expect(edited?.sentence).toMatch(/^Intro was edited/);
+    expect(wholeStatusPart(screenFromReport(LOW), null)?.sentence).toMatch(
+      /^Windows runs the Prompter XL at 1280×720\./
+    );
+    expect(wholeStatus(screenFromReport(FULL), null)).toBe("ok");
   });
 
   // `health.rs`'s `the_prompter_raises_the_whole_status_no_further_than_attention`.
@@ -468,6 +488,9 @@ describe("the fixture double's Prompter XL: the lamp", () => {
       ["app.changed", "health"],
     ]);
     expect((await healthOf(call)).check).toMatchObject({ word: "NOT CONNECTED", status: "error" });
+    // Reported gone, it counts: the summary Setup / Support shows says why.
+    const gone = await call("health.snapshot");
+    expect(gone.summary).toMatch(/ Prompter: Windows does not see the Prompter XL\. /);
 
     await reportScreen(FULL);
     expect(seen(events)).toEqual([
@@ -476,6 +499,7 @@ describe("the fixture double's Prompter XL: the lamp", () => {
     ]);
     const { check } = await healthOf(call);
     expect(check).toMatchObject({ word: "CONNECTED", ok: true });
+    expect((await call("health.snapshot")).summary).not.toMatch(/Prompter:/);
     expect((check.screen as JsonObject).sentence).toBe("The Prompter XL is connected: 1920×1080 at 60 Hz.");
 
     await reportScreen(FULL);

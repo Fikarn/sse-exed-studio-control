@@ -824,7 +824,7 @@ Gates before the change: `prompter.play` played whatever the Prompter XL did (no
 
 Tests added that fail without the slice:
 
-- Rust: `prompter::screen::tests` (5), `prompter::tests_screen` (5), `app::tests_prompter::the_prompter_xl_reaches_the_health_check_and_the_lamp_follows`, `health::tests::the_prompter_raises_the_whole_status_no_further_than_attention`;
+- Rust: `prompter::screen::tests` (5, and a sixth after CI, below), `prompter::tests_screen` (5), `app::tests_prompter::the_prompter_xl_reaches_the_health_check_and_the_lamp_follows`, `health::tests::the_prompter_raises_the_whole_status_no_further_than_attention`;
 - the fixture double: `prompterScreen.test.ts` (19, among them a guard that reads `screen.rs` up to its tests and holds the double's sentences to it word for word);
 - the glass: `glassText.test.ts` (7), `glassLayout.test.ts` (6), `glassMotion.test.ts` (6), `PrompterGlass.test.tsx` (5).
 
@@ -842,6 +842,23 @@ Validation before the push (2026-09-27, in the cloud session):
 - the glass's layout measured in Chromium for each story and checked against `Layout::new`'s rules in `clock.rs`: every one valid, `END` 540 px below the last line;
 - the stories rendered at 2560×1440 and compared with board 1 (the renders stay in the session's scratch folder, never committed). The first renders showed the arrow over the text at 0 % margins and a paragraph number under the arrow, and the line across through the words; all three were fixed before the push (settled 8).
 - `native:acceptance` and the qualification lanes left to CI.
+
+**Push and review (2026-09-27).** #226 was opened at the push of `23134dc`, with the operator's go-ahead asked there. On the push run 36313129063, nine checks were green. The tenth, `qualification`, failed in the Setup/Support lane's step 8: "A hold is not a fault: expected the store's recovery state not to be 'degraded', got 'degraded'". The lane's hardware link has no shell to report the Prompter XL, so it read `NOT CONNECTED`, and that raised its whole status to attention. The same would happen in every test and lane, and in every build until Slice 5b. Setup / Support would also have read `DEGRADED` with a summary that did not say why.
+
+The operator's answer, the same day, with options and a recommendation: **only a state the shell has reported counts toward the whole status** (not taken: every state counts, with the lane's assertion changed to exclude the prompter; the prompter never counts). The lamp and the prompter still read `NOT CONNECTED` and `PLAY` stays locked (first step 2), and `NOT UPDATED` always counts. When either counts, the health summary ends with `Prompter: ` and the sentence of that state.
+
+Fixed in `Pages S5a (CI): …`:
+
+- `PrompterHealthCheck` keeps what counts and why (`whole_status`, `whole_status_sentence`).
+- `health.rs` adds the sentence to the summary.
+- The fixture double does the same (`wholeStatusPart`, the summary before and after the prompter's part).
+- `v1.md` says so.
+
+Tests added: `prompter::screen::tests::only_a_reported_state_counts_toward_the_whole_status`, and the double's "counts only a reported state toward the whole status, and NOT UPDATED always". Tests changed (old → new → reason):
+
+1. `app::tests_prompter::the_prompter_xl_reaches_the_health_check_and_the_lamp_follows`: an unreported Prompter XL's status "not error" → the summary names no prompter, and the Prompter XL reported gone makes the status not `ok`, with the summary ending in its sentence. The unreported state no longer counts.
+2. The double's "makes the check the worse of the screen and NOT UPDATED": `wholeStatus(check)` → `wholeStatus(screen, edited)`. The part is worked out from the report and the edit, not from the check.
+3. The double's "reaches the health snapshot through the request path…": it gains the summary's `Prompter:` sentence while the Prompter XL is reported gone, and none once it is back.
 
 ### Slice 5b — Teleprompter: the Prompter XL's window
 

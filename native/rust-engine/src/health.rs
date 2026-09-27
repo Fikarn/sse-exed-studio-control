@@ -269,6 +269,15 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
         &audio_summary,
         &control_surface_summary,
     );
+    // Slice 5a: when the Prompter XL or NOT UPDATED is part of the whole
+    // status, the summary Setup / Support shows says so.
+    let health_summary = match prompter
+        .as_ref()
+        .and_then(|check| check.whole_status_sentence())
+    {
+        Some(sentence) => format!("{health_summary} Prompter: {sentence}"),
+        None => health_summary,
+    };
     Ok(json!({
         "status": status,
         "startupPhase": "storage-bootstrap",

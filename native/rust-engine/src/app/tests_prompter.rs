@@ -388,9 +388,9 @@ fn the_prompter_xl_reaches_the_health_check_and_the_lamp_follows() {
     assert_eq!(check["word"], "NOT CONNECTED", "until the shell reports");
     assert_eq!(check["status"], "error");
     assert_eq!(check["screen"]["reported"], false);
-    assert_ne!(
-        health["status"], "error",
-        "no worse than attention: {health}"
+    assert!(
+        !health["summary"].as_str().unwrap().contains("Prompter:"),
+        "an unreported Prompter XL leaves the whole status alone: {health}"
     );
 
     let reply = request(
@@ -433,5 +433,15 @@ fn the_prompter_xl_reaches_the_health_check_and_the_lamp_follows() {
         json!({ "found": true, "width": 1920, "height": 1080, "refreshHz": 60 }),
     );
     assert!(again.events.is_empty(), "the same report raises nothing");
+
+    // Reported gone, it counts: the whole status goes to attention (no
+    // further), and the summary Setup / Support shows says why.
+    result(&app, "prompter.screen.report", json!({ "found": false }));
+    let health = result(&app, "health.snapshot", json!({}));
+    assert_ne!(health["status"], "ok", "{health}");
+    assert!(health["summary"]
+        .as_str()
+        .unwrap()
+        .ends_with("Prompter: Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen."));
     assert!(prompter_rows(&app).is_empty(), "never a Recent actions row");
 }

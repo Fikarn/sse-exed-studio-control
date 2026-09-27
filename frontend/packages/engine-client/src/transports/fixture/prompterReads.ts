@@ -20,7 +20,7 @@ import {
   paragraphsKey,
   wordCount,
 } from "./prompterModel";
-import { prompterHealthCheck, screenSummary } from "./prompterScreen";
+import { prompterHealthCheck, screenSummary, wholeStatusPart } from "./prompterScreen";
 import { findScript, listScripts, listVersions, type FixturePrompter, type StoredScript } from "./prompterState";
 
 // What the double's prompter reads out (`native/rust-engine/src/prompter/snapshot.rs`):
@@ -219,6 +219,11 @@ export function glassEditedName(prompter: FixturePrompter): string | null {
 /** `checks.prompter` (`health_check` in `commands.rs`): the worse of the Prompter XL's state and `NOT UPDATED`. */
 export function prompterCheck(prompter: FixturePrompter): PrompterHealthCheck {
   return prompterHealthCheck(prompter.screen, glassEditedName(prompter));
+}
+
+/** What the whole status takes from the prompter, and why (`whole_status`, `whole_status_sentence`). */
+export function prompterStatusPart(prompter: FixturePrompter) {
+  return wholeStatusPart(prompter.screen, glassEditedName(prompter));
 }
 
 /** `prompter.glass.snapshot`: what the glass draws. */

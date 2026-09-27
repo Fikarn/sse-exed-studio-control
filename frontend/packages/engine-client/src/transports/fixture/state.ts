@@ -23,8 +23,8 @@ import {
   refreshAudioCapabilities,
 } from "./audioConsole";
 import type { IdentifyBursts } from "./lightingOverlay";
-import { prompterCheck } from "./prompterReads";
-import { scenarioScreen, wholeStatus } from "./prompterScreen";
+import { prompterCheck, prompterStatusPart } from "./prompterReads";
+import { scenarioScreen } from "./prompterScreen";
 import { fixturePrompter } from "./prompterState";
 
 export interface MutableFixtureState {
@@ -34,6 +34,8 @@ export interface MutableFixtureState {
   /** The whole status as the rest of the studio makes it (`derive_status`), worked out
    *  on every sync; `applyPrompterHealth` folds the Prompter XL's part in. */
   healthStatusBeforePrompter: string;
+  /** The health summary likewise; the Prompter XL's sentence is added when it counts. */
+  healthSummaryBeforePrompter: string;
   commissioningSnapshot: JsonObject;
   lightingFixtureCatalogSnapshot: JsonObject;
   lightingSnapshot: JsonObject;
@@ -219,6 +221,7 @@ export function createMutableFixtureState(scenario: FixtureScenario): MutableFix
     audioMeterState: {},
     healthSnapshot: cloneJson((scenario.healthSnapshot ?? {}) as JsonObject),
     healthStatusBeforePrompter: "ok",
+    healthSummaryBeforePrompter: "",
     commissioningSnapshot: cloneJson((scenario.commissioningSnapshot ?? {}) as JsonObject),
     lightingFixtureCatalogSnapshot: cloneJson(
       (scenario.lightingFixtureCatalogSnapshot ?? DEFAULT_LIGHTING_FIXTURE_CATALOG) as JsonObject
@@ -583,11 +586,12 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     .filter((check) => asString(check.status) !== "passed" && asString(check.status) !== "ok")
     .map((check) => asString(check.label))
     .filter(Boolean);
-  state.healthSnapshot.summary = !hasCompletedSetup
+  state.healthSummaryBeforePrompter = !hasCompletedSetup
     ? "Storage healthy. Operator mode locked pending setup."
     : allChecksPassed
       ? "System healthy and ready."
       : `Operator mode is available, but ${unsettledCheckLabels.join(" and ")} need attention.`;
+  state.healthSnapshot.summary = state.healthSummaryBeforePrompter;
   state.supportSnapshot.backups = backups;
   state.supportSnapshot.backupDir = asString(
     state.supportSnapshot.backupDir,
@@ -901,11 +905,18 @@ function applyHealthChecks(
  * its saved data is not usable; the double's always is.
  */
 export function applyPrompterHealth(state: MutableFixtureState) {
-  const check = prompterCheck(fixturePrompter(state));
+  const prompter = fixturePrompter(state);
+  const check = prompterCheck(prompter);
   const checks = asRecord(state.healthSnapshot.checks) ?? {};
   checks.prompter = check;
   state.healthSnapshot.checks = checks;
-  state.healthSnapshot.status = withPrompterStatus(state.healthStatusBeforePrompter, wholeStatus(check));
+  // Only a Prompter XL the shell has reported counts, and NOT UPDATED; when either
+  // does, the summary says so, as the hardware link's does.
+  const part = prompterStatusPart(prompter);
+  state.healthSnapshot.status = withPrompterStatus(state.healthStatusBeforePrompter, part?.tone ?? "ok");
+  state.healthSnapshot.summary = part
+    ? `${state.healthSummaryBeforePrompter} Prompter: ${part.sentence}`
+    : state.healthSummaryBeforePrompter;
 }
 
 /**

@@ -224,9 +224,32 @@ export function prompterHealthCheck(screen: PrompterScreen, edited: string | nul
   return { ok: status === "ok", status, word, summary: sentence, notUpdated: edited !== null, screen: summary };
 }
 
-/** What the whole status takes from the check (`whole_status`): no worse than attention (first step 1), since the sound and the light are unaffected. */
-export function wholeStatus(check: PrompterHealthCheck): PrompterCheckTone {
-  return TONE_RANK[check.status] > TONE_RANK.attention ? "attention" : check.status;
+/**
+ * What the whole status takes from the Prompter XL and `NOT UPDATED`, and the sentence
+ * that says why (`PrompterHealthCheck`'s `counted`): no worse than attention (first step
+ * 1), since the sound and the light are unaffected, and nothing from a Prompter XL the
+ * shell has not reported yet (answered after CI's qualification lane found every lane's
+ * status raised by it); `NOT UPDATED` always counts. `null` when nothing counts.
+ */
+export function wholeStatusPart(
+  screen: PrompterScreen,
+  edited: string | null
+): { tone: PrompterCheckTone; sentence: string } | null {
+  const summary = screenSummary(screen);
+  const screenCounts = summary.reported && summary.tone !== "ok";
+  if (edited !== null && (!screenCounts || TONE_RANK[summary.tone] <= TONE_RANK.attention)) {
+    return {
+      tone: "attention",
+      sentence: `${edited} was edited after it went on the prompter. The prompter still shows the earlier text.`,
+    };
+  }
+  if (screenCounts) return { tone: "attention", sentence: summary.sentence };
+  return null;
+}
+
+/** What the whole status takes (`whole_status`). */
+export function wholeStatus(screen: PrompterScreen, edited: string | null): PrompterCheckTone {
+  return wholeStatusPart(screen, edited)?.tone ?? "ok";
 }
 
 /** Whether two checks say the same (the hardware link compares them whole): every field is built in the same order. */
