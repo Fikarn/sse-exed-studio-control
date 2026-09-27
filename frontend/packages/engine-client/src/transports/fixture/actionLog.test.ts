@@ -215,6 +215,49 @@ describe("the fixture double's action log", () => {
       [row("setup", "backup-restored", "Saved data", "Backup archive restored: lighting and audio state replaced")],
     ],
     ["support.backup.restore", { path: "db-shutdown.sqlite3" }, { requiresRestart: true }, []],
+    // The Teleprompter (Slice 4): the result's sentence without its full stop, on the result's name.
+    [
+      "prompter.putOn",
+      { scriptId: "script-0000000000000001" },
+      { action: "put-on", name: "Intro", replacedName: null, sentence: "Put Intro on the prompter." },
+      [row("prompter", "put-on", "Intro", "Put Intro on the prompter")],
+    ],
+    [
+      "prompter.putOn",
+      { scriptId: "script-0000000000000002", replace: true },
+      {
+        action: "replaced",
+        name: "Outro",
+        replacedName: "Intro",
+        sentence: "Replaced Intro with Outro on the prompter.",
+      },
+      [row("prompter", "replaced", "Outro", "Replaced Intro with Outro on the prompter")],
+    ],
+    [
+      "prompter.update",
+      {},
+      {
+        action: "updated",
+        name: "Talk",
+        sentence:
+          "Updated Talk on the prompter. The paragraph at the reading line was deleted, so the prompter now starts at paragraph 4.",
+      },
+      [
+        row(
+          "prompter",
+          "updated",
+          "Talk",
+          "Updated Talk on the prompter. The paragraph at the reading line was deleted, so the prompter now starts at paragraph 4"
+        ),
+      ],
+    ],
+    [
+      "prompter.clear",
+      {},
+      { action: "cleared", name: "", sentence: "Cleared the prompter." },
+      [row("prompter", "cleared", "Prompter", "Cleared the prompter")],
+    ],
+    ["prompter.clear", {}, { action: "something else", name: "Talk" }, []],
   ];
 
   it.each(cases)("%s %j writes the hardware link's rows", (method, params, result, expected) => {

@@ -10,6 +10,7 @@ import type {
   ResponseEnvelope,
 } from "../generated/protocol";
 import type { EngineTransport } from "../types";
+import { EngineRequestError } from "./engineRequestError";
 
 interface TauriEventPayload {
   event: EventEnvelope<EventName>;
@@ -104,7 +105,9 @@ export function createTauriTransport(): EngineTransport {
 
       if (!response.ok) {
         const message = response.error?.message ?? `Request failed for ${method}`;
-        throw new Error(message);
+        // The code rides along, so a page tells one refusal from another (review of
+        // 2026-09-27: only the sentence reached it, on this transport).
+        throw new EngineRequestError(response.error?.code || "UNKNOWN_ERROR", message);
       }
 
       return response.result ?? {};

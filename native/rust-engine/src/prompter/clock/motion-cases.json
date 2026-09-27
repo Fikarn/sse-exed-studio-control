@@ -1,0 +1,104 @@
+{
+  "about": "The prompter's motion from an anchor (new pages program, Slice 4). The hardware link (native/rust-engine/src/prompter/clock/tests.rs) and the front end's copy of the formula (frontend/packages/engine-client) are both held to these cases: position(t) = min(position + pxPerReadWord * words(ageMs + t), endPosition), words in read words, t in milliseconds.",
+  "cases": [
+    {
+      "name": "steady scroll at the standard pace",
+      "anchor": {
+        "position": 1000,
+        "endPosition": 9000,
+        "pxPerReadWord": 22.4,
+        "fromWpm": 140,
+        "toWpm": 140,
+        "rampMs": 0,
+        "ageMs": 0
+      },
+      "at": [
+        { "elapsedMs": 0, "position": 1000 },
+        { "elapsedMs": 1000, "position": 1052.2666666666667 },
+        { "elapsedMs": 60000, "position": 4136 }
+      ]
+    },
+    {
+      "name": "play eases up over 0.3 s",
+      "anchor": {
+        "position": 0,
+        "endPosition": 9000,
+        "pxPerReadWord": 20,
+        "fromWpm": 0,
+        "toWpm": 120,
+        "rampMs": 300,
+        "ageMs": 0
+      },
+      "at": [
+        { "elapsedMs": 150, "position": 1.5 },
+        { "elapsedMs": 300, "position": 6 },
+        { "elapsedMs": 1300, "position": 46 }
+      ]
+    },
+    {
+      "name": "pause eases down and stands still",
+      "anchor": {
+        "position": 500,
+        "endPosition": 9000,
+        "pxPerReadWord": 20,
+        "fromWpm": 120,
+        "toWpm": 0,
+        "rampMs": 300,
+        "ageMs": 0
+      },
+      "at": [
+        { "elapsedMs": 150, "position": 504.5 },
+        { "elapsedMs": 300, "position": 506 },
+        { "elapsedMs": 5000, "position": 506 }
+      ]
+    },
+    {
+      "name": "an anchor already half a second old",
+      "anchor": {
+        "position": 200,
+        "endPosition": 9000,
+        "pxPerReadWord": 30,
+        "fromWpm": 60,
+        "toWpm": 60,
+        "rampMs": 0,
+        "ageMs": 500
+      },
+      "at": [
+        { "elapsedMs": 0, "position": 215 },
+        { "elapsedMs": 500, "position": 230 }
+      ]
+    },
+    {
+      "name": "the text stops at END",
+      "anchor": {
+        "position": 8990,
+        "endPosition": 9000,
+        "pxPerReadWord": 20,
+        "fromWpm": 300,
+        "toWpm": 300,
+        "rampMs": 0,
+        "ageMs": 0
+      },
+      "at": [
+        { "elapsedMs": 50, "position": 8995 },
+        { "elapsedMs": 1000, "position": 9000 }
+      ]
+    },
+    {
+      "name": "a pace change eases from the old pace to the new",
+      "anchor": {
+        "position": 0,
+        "endPosition": 9000,
+        "pxPerReadWord": 60,
+        "fromWpm": 100,
+        "toWpm": 200,
+        "rampMs": 300,
+        "ageMs": 0
+      },
+      "at": [
+        { "elapsedMs": 300, "position": 45 },
+        { "elapsedMs": 900, "position": 165 }
+      ]
+    }
+  ]
+}

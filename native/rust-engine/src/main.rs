@@ -19,6 +19,7 @@ mod lighting_backend;
 mod lighting_sacn_output;
 #[cfg(feature = "dev-fixtures")]
 mod parity_fixtures;
+mod prompter;
 mod protocol;
 mod rme_console_link;
 mod rme_totalmix_osc;
@@ -550,6 +551,9 @@ fn main() -> io::Result<()> {
         );
     }
     spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());
+    // The Teleprompter's clock (new pages program, Slice 4): it stops the
+    // text at END and saves the place while the text scrolls.
+    prompter::spawn_prompter_clock(db_path.clone());
 
     serve_requests(&app, &mut reader, &output_sender)?;
 

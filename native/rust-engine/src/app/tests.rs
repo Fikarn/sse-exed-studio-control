@@ -9,12 +9,12 @@ use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 use studio_control_protocol::RequestEnvelope;
 
-struct TestDir {
+pub(super) struct TestDir {
     path: PathBuf,
 }
 
 impl TestDir {
-    fn new(label: &str) -> Self {
+    pub(super) fn new(label: &str) -> Self {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
@@ -38,7 +38,7 @@ impl Drop for TestDir {
     }
 }
 
-fn app_for(test_dir: &TestDir) -> EngineApp {
+pub(super) fn app_for(test_dir: &TestDir) -> EngineApp {
     let runtime = RuntimeContext {
         protocol_version: String::from("2"),
         app_data_dir: test_dir.path().to_path_buf(),

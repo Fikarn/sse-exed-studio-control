@@ -11,6 +11,7 @@ import {
   MOVED_WORKSPACE,
   NEW_DATA_WORKSPACE,
   SEEDED_WORKSPACE,
+  SUPPORT_BACKUP_FORMAT_VERSION,
 } from "./native-parity-acceptance.mjs";
 import {
   DEFAULT_APP_DATA_DIR_NAME,
@@ -1556,6 +1557,17 @@ test("a script that does work is imported only by tests and by the entry points 
       `${shim} must be there and import ${TAURI_BEFORE_COMMAND}`
     );
   }
+});
+
+// New pages program, Slice 4: the archive went to format 6, and the lanes'
+// expectation stayed at 5 until `native:acceptance` failed on CI (push run
+// 36306473342). The lanes' format is the hardware link's.
+test("the lanes expect the archive format the hardware link writes", () => {
+  const format = /pub\(crate\) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = (\d+);/.exec(
+    read("native/rust-engine/src/support.rs")
+  )?.[1];
+  assert.ok(format, "SUPPORT_BACKUP_FORMAT_VERSION not found in support.rs");
+  assert.equal(SUPPORT_BACKUP_FORMAT_VERSION, Number(format));
 });
 
 test("the page a lane seeds can be seen: new saved data opens on another, and the restore's marker differs from it", () => {

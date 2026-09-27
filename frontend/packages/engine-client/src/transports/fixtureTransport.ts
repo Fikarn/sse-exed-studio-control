@@ -2,6 +2,8 @@ import { type FixtureRequestHandler, type FixtureRequestContext, NOT_HANDLED } f
 import { handleFixtureLightingRequest } from "./fixture/lightingRequests";
 import { handleFixtureAudioRequest } from "./fixture/audioRequests";
 import { handleFixtureSetupRequest } from "./fixture/setupRequests";
+import { handleFixturePrompterRequest } from "./fixture/prompterRequests";
+import { disposeFixturePrompter } from "./fixture/prompterState";
 import type { FixtureScenario, EngineTransport } from "../types";
 import {
   PROTOCOL_VERSION,
@@ -29,6 +31,7 @@ const FIXTURE_REQUEST_HANDLERS: readonly FixtureRequestHandler[] = [
   handleFixtureLightingRequest,
   handleFixtureAudioRequest,
   handleFixtureSetupRequest,
+  handleFixturePrompterRequest,
 ];
 
 export function createFixtureTransport(scenario: FixtureScenario): EngineTransport {
@@ -179,6 +182,8 @@ export function createFixtureTransport(scenario: FixtureScenario): EngineTranspo
         window.clearInterval(audioMeteringIntervalId);
         audioMeteringIntervalId = null;
       }
+      // The Teleprompter's clock: the timer that stops the text at END.
+      disposeFixturePrompter(state);
       listeners.clear();
     },
   };

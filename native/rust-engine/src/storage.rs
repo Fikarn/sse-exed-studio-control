@@ -17,7 +17,7 @@ pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 /// The newest schema `migrate_schema` knows. Every step there names its own
 /// version as a literal; raising this goes with a new `if schema_version < N`
 /// block, never with a change to the last one.
-pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 8;
+pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 9;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
@@ -648,6 +648,73 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
         schema_version = 8;
     }
 
+    if schema_version < 9 {
+        // v8 -> v9 (new pages program, Slice 4 — D20): the Teleprompter. The
+        // scripts, each with its paragraphs (JSON, `prompter::model`), the
+        // file it came from, its own speed and its place (a paragraph and a
+        // word; the paragraph after the last one is the end); their last
+        // versions (the counts beside the paragraphs are kept so the lists
+        // need not read every script's text); and the prompter's one row: the look, the text size of
+        // the take, and what the glass shows — the script and its text as it
+        // went on, so an edit waits for Update. The two revisions number what
+        // the glass shows and its look, for the layout the front end reports
+        // (`prompter::clock`). The look is written here as the proposal's
+        // standard (§4.1), literally: a later default must not rewrite it.
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS prompter_scripts (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              source_file_name TEXT,
+              paragraphs TEXT NOT NULL,
+              paragraph_count INTEGER NOT NULL,
+              read_words INTEGER NOT NULL,
+              created_at TEXT NOT NULL,
+              changed_at TEXT NOT NULL,
+              speed_wpm INTEGER NOT NULL,
+              place_paragraph INTEGER NOT NULL,
+              place_word INTEGER NOT NULL,
+              removed_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS prompter_script_versions (
+              id INTEGER PRIMARY KEY,
+              script_id TEXT NOT NULL
+                REFERENCES prompter_scripts(id) ON DELETE CASCADE,
+              paragraphs TEXT NOT NULL,
+              read_words INTEGER NOT NULL,
+              kept_at TEXT NOT NULL,
+              reason TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS prompter_script_versions_script_idx
+              ON prompter_script_versions(script_id, id);
+
+            CREATE TABLE IF NOT EXISTS prompter_state (
+              id INTEGER PRIMARY KEY CHECK (id = 1),
+              look TEXT NOT NULL,
+              size_px INTEGER NOT NULL,
+              glass_script_id TEXT,
+              glass_paragraphs TEXT,
+              glass_revision INTEGER NOT NULL,
+              look_revision INTEGER NOT NULL
+            );
+
+            INSERT OR IGNORE INTO prompter_state
+              (id, look, size_px, glass_script_id, glass_paragraphs,
+               glass_revision, look_revision)
+            VALUES
+              (1,
+               '{"standardSizePx":88,"lineSpacingPercent":140,"marginPercent":12,"textColour":"white","readingLinePercent":35,"readingLineAcross":false,"dimReadText":true,"paragraphNumbers":false}',
+               88, NULL, NULL, 0, 0);
+            "#,
+        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (9)", [])?;
+        transaction.commit()?;
+        schema_version = 9;
+    }
+
     Ok(schema_version)
 }
 
@@ -806,3 +873,5 @@ fn upsert_metadata(
 mod tests;
 #[cfg(test)]
 mod tests_schema_8;
+#[cfg(test)]
+mod tests_schema_9;

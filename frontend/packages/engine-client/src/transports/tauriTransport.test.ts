@@ -26,6 +26,17 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (command === "engine_request") {
       const { request } = args as { request: { id: string; method: string } };
       requestIds.push(request.id);
+      if (request.method === "prompter.jump") {
+        return {
+          type: "response",
+          id: request.id,
+          ok: false,
+          error: { code: "PROMPTER_NO_PARAGRAPH", message: "There is no paragraph after the reading line." },
+        };
+      }
+      if (request.method === "prompter.play") {
+        return { type: "response", id: request.id, ok: false };
+      }
       return { type: "response", id: request.id, ok: true, result: {} };
     }
     return undefined;
@@ -44,6 +55,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   }),
 }));
 
+import { EngineRequestError } from "./engineRequestError";
 import { createTauriTransport } from "./tauriTransport";
 
 describe("createTauriTransport", () => {
@@ -109,6 +121,26 @@ describe("createTauriTransport", () => {
       Array.from({ length: 200 }, (_, index) => index + 1)
     );
     expect(new Set(requestIds.map((id) => id.split(":")[2])).size).toBe(1);
+  });
+
+  // New pages program, Slice 4 (review of 2026-09-27): a refusal's code reaches the page
+  // on this transport as on the fixture double's, as an `EngineRequestError`.
+  it("throws the hardware link's error code with its sentence", async () => {
+    const transport = createTauriTransport();
+
+    const refusal = await transport.request("prompter.jump", { to: "nextParagraph" }).catch((error: unknown) => error);
+    expect(refusal).toBeInstanceOf(EngineRequestError);
+    expect(refusal).toBeInstanceOf(Error);
+    expect(refusal).toMatchObject({
+      name: "EngineRequestError",
+      code: "PROMPTER_NO_PARAGRAPH",
+      message: "There is no paragraph after the reading line.",
+    });
+
+    // A failure the shell answered without an error keeps the old sentence, and a code.
+    const bare = await transport.request("prompter.play").catch((error: unknown) => error);
+    expect(bare).toBeInstanceOf(EngineRequestError);
+    expect(bare).toMatchObject({ code: "UNKNOWN_ERROR", message: "Request failed for prompter.play" });
   });
 
   it("a second transport instance carries its own session nonce", async () => {

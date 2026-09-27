@@ -14,6 +14,10 @@ pub const EVENT_ENGINE_EXITED: &str = "engine.exited";
 pub const EVENT_ENGINE_READY: &str = "engine.ready";
 pub const EVENT_ENGINE_STARTUP_FAILED: &str = "engine.startupFailed";
 pub const EVENT_LIGHTING_CHANGED: &str = "lighting.changed";
+/// The Teleprompter changed (new pages program, Slice 4). Payload: `reason`
+/// and `anchor`, the glass's motion from now on (`null` when nothing is on
+/// the prompter), so a view can draw a play, a pause or a jump at once.
+pub const EVENT_PROMPTER_CHANGED: &str = "prompter.changed";
 pub const EVENT_SETTINGS_CHANGED: &str = "settings.changed";
 pub const EVENT_SUPPORT_CHANGED: &str = "support.changed";
 
@@ -26,6 +30,7 @@ pub const EVENT_NAMES: &[&str] = &[
     EVENT_ENGINE_READY,
     EVENT_ENGINE_STARTUP_FAILED,
     EVENT_LIGHTING_CHANGED,
+    EVENT_PROMPTER_CHANGED,
     EVENT_SETTINGS_CHANGED,
     EVENT_SUPPORT_CHANGED,
 ];

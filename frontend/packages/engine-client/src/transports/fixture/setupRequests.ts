@@ -18,16 +18,30 @@ import {
   type MutableFixtureState,
 } from "./state";
 import type { CommissioningStage, RunnerStage, CommissioningCheckTarget } from "../../types";
+import { counted } from "./prompterModel";
+import { exportFixturePrompterArchive, restoreFixturePrompterArchive } from "./prompterRequests";
+import type { PrompterArchive } from "./prompterState";
 
-// New pages program, Slice 2 (D3), mirroring `native/rust-engine/src/support.rs`: the
-// hardware link writes backup archives of format 5, which carry no Planning. The archives
-// this double exported are those; any other archive in its backups folder (the scenarios'
-// own, from April 2026) was written before Planning left, as format 4. The double never
-// held Planning data, so neither kind holds any, and Verify and the restore say nothing of
-// a Planning part (the hardware link adds its sentence only for a backup that holds some).
-const exportedArchivePaths = new WeakMap<MutableFixtureState, Set<string>>();
-const ARCHIVE_FORMAT_VERSION = 5;
+// Mirroring `native/rust-engine/src/support.rs`: the hardware link writes backup archives
+// of format 6 (new pages program, Slice 4), which carry the Teleprompter's part — the
+// scripts with their versions, places and speeds, the removed ones, the look and the size
+// — and, since format 5 (Slice 2, D3), no Planning. The archives this double exported are
+// those, each with its prompter part as it was at the export, kept by path; any other
+// archive in its backups folder (the scenarios' own, from April 2026) was written before
+// Planning left, as format 4, with no prompter part. The double never held Planning data,
+// so neither kind holds any, and Verify and the restore say nothing of a Planning part
+// (the hardware link adds its sentence only for a backup that holds some).
+const exportedArchives = new WeakMap<MutableFixtureState, Map<string, PrompterArchive>>();
+const ARCHIVE_FORMAT_VERSION = 6;
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
+
+/** The pages `settings.update` opens (`WORKSPACES` in `native/rust-engine/src/shell_settings.rs`). */
+export const WORKSPACES = ["lighting", "audio", "setup", "teleprompter"] as const;
+
+/** `settings.update`'s refusal of a page it does not know (`workspace_refusal`). */
+export function workspaceRefusal(): string {
+  return `workspace must be one of: ${WORKSPACES.join(", ")}`;
+}
 
 // New pages program, Slice 2b (D3, 2026-09-25): the db.json import is retired. An export
 // from the old Studio Control in the backups folder is refused at Verify (ok: false) and at
@@ -49,6 +63,12 @@ export function handleFixtureSetupRequest(
   const { state, emit } = context;
   switch (method) {
     case "settings.update": {
+      // The hardware link reads the whole request before it writes anything, so a page it
+      // does not know refuses all of it (`parse_settings_update`).
+      if (params.workspace !== undefined) {
+        if (typeof params.workspace !== "string") throw new Error("workspace must be a string");
+        if (!(WORKSPACES as readonly string[]).includes(params.workspace)) throw new Error(workspaceRefusal());
+      }
       if (typeof params.workspace === "string") {
         const shell = asRecord(state.appSnapshot.shell) ?? {};
         shell.workspace = params.workspace;
@@ -228,9 +248,9 @@ export function handleFixtureSetupRequest(
         .filter((entry): entry is JsonObject => entry !== null);
       backups.unshift(backupEntry);
       state.supportSnapshot.backups = backups;
-      const exported = exportedArchivePaths.get(state) ?? new Set<string>();
-      exported.add(backupEntry.path);
-      exportedArchivePaths.set(state, exported);
+      const exported = exportedArchives.get(state) ?? new Map<string, PrompterArchive>();
+      exported.set(backupEntry.path, exportFixturePrompterArchive(context));
+      exportedArchives.set(state, exported);
       synchronizeFixtureState(state);
       emit("support.changed", { reason: "backup-exported" });
       // The hardware link's reply: the file and its format. Since Slice 2 of the new pages
@@ -260,11 +280,12 @@ export function handleFixtureSetupRequest(
         };
       }
       const exportedAt = new Date(asNumber(match.modifiedAt, Date.now())).toISOString();
-      const formatVersion = exportedArchivePaths.get(state)?.has(path)
-        ? ARCHIVE_FORMAT_VERSION
-        : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
+      const prompterPart = exportedArchives.get(state)?.get(path) ?? null;
+      const formatVersion = prompterPart ? ARCHIVE_FORMAT_VERSION : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
+      // Format 6 counts the Teleprompter's scripts; an older archive has no such part.
+      const scripts = prompterPart ? `, with ${counted(prompterPart.scripts.length, "script", "scripts")}` : "";
       return {
-        detail: `Backup archive, format ${formatVersion}, exported ${exportedAt}.`,
+        detail: `Backup archive, format ${formatVersion}, exported ${exportedAt}${scripts}.`,
         formatVersion,
         kind,
         ok: true,
@@ -294,15 +315,21 @@ export function handleFixtureSetupRequest(
       updateFixtureCheck(state, "lighting", "passed", "Lighting bridge settings were restored from support backup.");
       updateFixtureCheck(state, "audio", "passed", "Audio transport settings were restored from support backup.");
       synchronizeFixtureState(state);
+      let detail: string | null = null;
       if (databaseRestore) {
         emit("support.changed", { reason: "backup-restore-staged" });
       } else {
         emit("support.changed", { reason: "backup-restored" });
         emit("commissioning.changed", { reason: "backup-restored" });
         emit("app.changed", { reason: "backup-restored" });
+        // Format 6 (Slice 4): the scripts come back — added, never removed or overwritten
+        // — with the look, and the prompter stays paused where it was (D12).
+        detail = restoreFixturePrompterArchive(context, exportedArchives.get(state)?.get(path) ?? null);
       }
-      // No Planning counts and no `detail` (the double's backups hold no Planning data).
+      // No Planning counts (the double's backups hold no Planning data); a `detail` only
+      // when the restore added scripts or brought one back as an earlier version.
       return {
+        ...(detail === null ? {} : { detail }),
         requiresRestart: databaseRestore,
         rollbackBackupPath: buildFixtureBackupEntry(state).path,
         settingsRestored: 12,

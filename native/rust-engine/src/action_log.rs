@@ -45,6 +45,8 @@ pub(crate) const ACTION_LOG_MAX_ROWS: i64 = 5_000;
 pub(crate) const DOMAIN_LIGHTING: &str = "lighting";
 pub(crate) const DOMAIN_AUDIO: &str = "audio";
 pub(crate) const DOMAIN_SETUP: &str = "setup";
+/// The Teleprompter (new pages program, Slice 4): what the glass shows.
+pub(crate) const DOMAIN_PROMPTER: &str = "prompter";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ActionSource {
@@ -234,6 +236,10 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "lighting.power.all",
     "lighting.scene.recall",
     "lighting.settings.update",
+    // The Teleprompter: what the presenter reads changes (the proposal §5.5).
+    "prompter.clear",
+    "prompter.putOn",
+    "prompter.update",
     "support.backup.restore",
 ];
 
@@ -277,6 +283,29 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "lighting.scene.pin",
     "lighting.scene.reorder",
     "lighting.scene.update",
+    // The Teleprompter's reads, its scripts (bookkeeping, like the Console's
+    // stored scenes), its layout, and the take's controls: a take has
+    // hundreds of plays, pauses, speeds and jumps, and they would push every
+    // other row out of the list (the proposal §5.5).
+    "prompter.glass.snapshot",
+    "prompter.jump",
+    "prompter.layout.report",
+    "prompter.look.update",
+    "prompter.pause",
+    "prompter.play",
+    "prompter.script.create",
+    "prompter.script.delete",
+    "prompter.script.edit",
+    "prompter.script.import",
+    "prompter.script.paste",
+    "prompter.script.remove",
+    "prompter.script.rename",
+    "prompter.script.restore",
+    "prompter.script.snapshot",
+    "prompter.script.version.bringBack",
+    "prompter.snapshot",
+    "prompter.speed",
+    "prompter.textSize",
     // The shell's own settings, files.
     "commissioning.update",
     "dev.parityFixture.load",
@@ -733,6 +762,27 @@ pub(crate) fn ui_actions(
                 "backup-restored",
                 "Saved data",
                 String::from("Backup archive restored: lighting and audio state replaced"),
+            )]
+        }
+
+        // The Teleprompter (Slice 4): putting a script on, replacing,
+        // updating and clearing what the prompter shows (the proposal §5.5);
+        // the result carries the sentence.
+        "prompter.putOn" | "prompter.update" | "prompter.clear" => {
+            let action = match text(result, "/action") {
+                Some("put-on") => "put-on",
+                Some("replaced") => "replaced",
+                Some("updated") => "updated",
+                Some("cleared") => "cleared",
+                _ => return Vec::new(),
+            };
+            let detail = text(result, "/sentence").unwrap_or("The prompter changed");
+            vec![ActionRecord::new(
+                ActionSource::Ui,
+                DOMAIN_PROMPTER,
+                action,
+                text(result, "/name").unwrap_or("Prompter"),
+                detail.trim_end_matches('.').to_string(),
             )]
         }
         _ => Vec::new(),

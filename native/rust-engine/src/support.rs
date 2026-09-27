@@ -9,6 +9,11 @@ use crate::commissioning::{
 };
 use crate::diagnostics::append_log;
 use crate::lighting::{LIGHTING_OUTPUT_ARMED_KEY, LIGHTING_SELECTED_FIXTURE_ID_KEY};
+use crate::prompter::archive::{
+    build_prompter_archive, restore_prompter_archive,
+    restore_sentence as prompter_restore_sentence, PrompterArchive, PrompterRestoreOutcome,
+};
+use crate::prompter::model::counted;
 use crate::shell_settings::{
     ShellSettingsSnapshot, DEFAULT_WORKSPACE, LIGHTING_CURRENT_SECTION_ID_KEY,
     LIGHTING_SCENE_THUMBS_KEY, LIGHTING_TALENT_MARKS_KEY, SETUP_ACTIVE_SECTION_KEY,
@@ -41,7 +46,14 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// of format 4 or older still restores; its Planning part is skipped, and
 /// Verify and the restore say so when it held any Planning data. A build
 /// before this one refuses a format-5 archive, by the rule above.
-pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 5;
+///
+/// Format 6 (new pages program, Slice 4 — D20): the archive carries the
+/// Teleprompter's part, `prompter` (`prompter::archive`): the scripts with
+/// their versions, places and speeds, the removed ones, the look and the
+/// take's text size. Verify counts the scripts. A restore adds scripts and
+/// never removes or overwrites one, and never changes what the prompter
+/// shows. An older archive has no such part and leaves the scripts alone.
+pub(crate) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = 6;
 const SUPPORT_BACKUP_ARCHIVE_TYPE: &str = "native-support-backup";
 /// The two JSON archive names in the backups directory: the operator's
 /// exports and the rollback copies a restore writes first.
@@ -233,6 +245,9 @@ struct SupportBackupArchive {
     /// Format 4: every setting under `RESTORE_KEY_PREFIXES`, verbatim.
     #[serde(default)]
     settings: HashMap<String, String>,
+    /// Format 6: the Teleprompter's scripts and look; absent before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    prompter: Option<PrompterArchive>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -439,6 +454,7 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                 format_version,
                 exported_at,
                 holds_planning_rows,
+                scripts,
             }) if format_version <= SUPPORT_BACKUP_FORMAT_VERSION => SupportBackupVerification {
                 ok: true,
                 kind: request.kind,
@@ -446,7 +462,15 @@ pub fn verify_support_backup(request: &SupportRestoreRequest) -> SupportBackupVe
                 format_version: Some(format_version),
                 schema_version: None,
                 detail: with_planning_note(
-                    format!("Backup archive, format {format_version}, exported {exported_at}."),
+                    match scripts {
+                        Some(scripts) => format!(
+                            "Backup archive, format {format_version}, exported {exported_at}, with {}.",
+                            counted(scripts, "script", "scripts")
+                        ),
+                        None => format!(
+                            "Backup archive, format {format_version}, exported {exported_at}."
+                        ),
+                    },
                     holds_planning_rows,
                 ),
             },
@@ -550,6 +574,8 @@ struct ArchiveFacts {
     format_version: i64,
     exported_at: String,
     holds_planning_rows: bool,
+    /// Format 6: how many scripts the Teleprompter's part holds.
+    scripts: Option<usize>,
 }
 
 fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
@@ -573,6 +599,10 @@ fn inspect_archive(path: &Path) -> Result<ArchiveFacts, String> {
             .unwrap_or("at an unknown time")
             .to_string(),
         holds_planning_rows: json_holds_planning_rows(parsed.get("planning")),
+        scripts: parsed
+            .pointer("/prompter/scripts")
+            .and_then(Value::as_array)
+            .map(Vec::len),
     })
 }
 
@@ -758,9 +788,17 @@ fn restore_archive_backup(
     let archive: SupportBackupArchive = serde_json::from_value(parsed)
         .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
     let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
-    let settings_restored = restore_native_support_archive(&runtime.db_path, &archive)
-        .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
+    let (settings_restored, prompter_outcome) =
+        restore_native_support_archive(&runtime.db_path, &archive)
+            .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
     prune_pre_restore_archives(runtime);
+    let detail = [
+        planning_not_restored(skipped_planning_rows),
+        prompter_outcome.and_then(prompter_restore_sentence),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 
     Ok(SupportBackupRestoreSummary {
         source_path: request.source_path.display().to_string(),
@@ -768,7 +806,7 @@ fn restore_archive_backup(
         rollback_backup_path: Some(rollback.path),
         settings_restored,
         requires_restart: false,
-        detail: planning_not_restored(skipped_planning_rows),
+        detail: (!detail.is_empty()).then(|| detail.join(" ")),
     })
 }
 
@@ -909,6 +947,7 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
     }
     let exported_at = current_timestamp(&runtime.db_path)?;
     let storage_format_version = read_storage_format_version(&runtime.db_path)?;
+    let prompter = build_prompter_archive(&open_connection(&runtime.db_path)?)?;
 
     Ok(SupportBackupArchive {
         archive_type: String::from(SUPPORT_BACKUP_ARCHIVE_TYPE),
@@ -948,6 +987,7 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
         },
         shell: shell_snapshot,
         settings,
+        prompter: Some(prompter),
     })
 }
 
@@ -958,7 +998,7 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
 fn restore_native_support_archive(
     db_path: &Path,
     archive: &SupportBackupArchive,
-) -> EngineResult<usize> {
+) -> EngineResult<(usize, Option<PrompterRestoreOutcome>)> {
     let mut connection = open_connection(db_path)?;
     let transaction = connection.transaction()?;
 
@@ -969,10 +1009,17 @@ fn restore_native_support_archive(
         &archive.shell,
         &archive.settings,
     )?;
+    // Format 6 (Slice 4): the scripts come back in the same transaction; an
+    // older archive leaves them alone.
+    let prompter_outcome = archive
+        .prompter
+        .as_ref()
+        .map(|prompter| restore_prompter_archive(&transaction, prompter))
+        .transpose()?;
 
     transaction.commit()?;
 
-    Ok(settings_restored)
+    Ok((settings_restored, prompter_outcome))
 }
 
 fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {
@@ -1347,4 +1394,8 @@ fn sanitize_for_file_name(value: &str) -> String {
 }
 
 #[cfg(test)]
+mod test_support;
+#[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_formats;
