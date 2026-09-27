@@ -1,6 +1,7 @@
 /* The Teleprompter's bay (new pages program, Slice 6a): board 1's centre.
    The strip over the copy, the copy across the bay (1,688 × 950), the whole
-   script under it, then the cue keys and Go to paragraph. */
+   script under it, then the cue keys and Go to paragraph. The shell's bay
+   already keeps its gutter, so the copy has the bay's whole width. */
 
 .bay {
   display: flex;
@@ -8,7 +9,6 @@
   gap: 16px;
   height: 100%;
   min-height: 0;
-  padding: 16px;
   overflow: hidden;
 }
 
@@ -118,12 +118,11 @@
 }
 
 /* The whole script at one width: a segment a paragraph, cues as ticks, the
-   place as a marker, the part already read dimmed. One press target. */
+   place as a marker, the part already read faint. One press
+   target; everything on it is placed by the same shares (`scriptBar`). */
 .bar {
   appearance: none;
-  position: relative;
-  display: flex;
-  gap: 2px;
+  display: block;
   width: 100%;
   height: 40px;
   padding: 4px;
@@ -139,41 +138,52 @@
   outline-offset: 2px;
 }
 
+.track {
+  position: relative;
+  display: block;
+  height: 100%;
+}
+
+/* The display's own ink over the black well, as board 1 draws it: bright
+   for what is still to read, faint for what was read, in every theme. */
 .segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
   display: flex;
   align-items: flex-end;
-  min-width: 2px;
-  padding: 0 4px 4px;
   border-radius: var(--radius-ctl);
-  background: var(--material-key);
-  flex-basis: 0;
+  background: color-mix(in srgb, var(--display-text) 24%, transparent);
   overflow: hidden;
 }
 
 .segment[data-read] {
-  background: var(--material-panel);
+  background: color-mix(in srgb, var(--display-text) 9%, transparent);
 }
 
 .segmentNumber {
-  color: var(--text-text2);
+  padding: 0 0 4px 4px;
+  color: var(--display-text);
   font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+}
+
+.segment[data-read] .segmentNumber {
+  color: var(--display-text2);
 }
 
 .cueTick {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
+  top: -2px;
+  bottom: -2px;
   width: 2px;
-  margin-left: 4px;
   background: var(--role-blue-text);
 }
 
 .placeMark {
   position: absolute;
-  top: -4px;
-  bottom: -4px;
+  top: -8px;
+  bottom: -8px;
   width: 2px;
-  margin-left: 4px;
   background: var(--accent);
 }
 
@@ -191,7 +201,7 @@
   gap: 8px;
   flex: 1;
   min-width: 0;
-  max-height: 64px;
+  max-height: 104px;
   overflow: hidden;
 }
 
@@ -213,7 +223,13 @@
 }
 
 .cueText {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
   color: var(--role-blue-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .goTo {

@@ -271,7 +271,9 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "teleprompter"] : [];
   const monitorItems = buildMonitorItems(
     shellState.healthSnapshot,
-    { lightingSceneDrift, audioSolo, prompterPlaying },
+    // The prompter's latch counts down, so it shows only while the hardware
+    // link answers: after it stops, the prompter comes back paused.
+    { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
     shellExperience === "ready" ? workspaceTones : undefined
   );
 

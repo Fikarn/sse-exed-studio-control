@@ -153,8 +153,8 @@ slices, each with a Status line saying what landed, what moved, and what was
 deliberately left. Read the slice status before changing a surface it names — it
 usually explains why something is the way it is.
 
-**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 63 boards —
-21 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
+**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 75 boards —
+25 fixtures × 3 themes at 2560×1440 — plus the Storybook primitive pages, and
 measures each one: type floor and distinct sizes, font families, pixel-sampled
 text contrast, pointer-target size, radii, shadows and blur, gradients, running
 animations at idle, chrome heights, page scroll, targets off the viewport, and a
@@ -177,6 +177,13 @@ counted — `outerBlurOver8UnlitEls`, `gradientsOffEls`, `backdropBlurEls`,
 `runningEls` — plus `artifacts/ui-census/census.md` and `contrast.md`. Read those
 lists when a measure is non-zero; the counts alone will not tell you which
 element is wrong.
+
+Off Windows (a cloud session) the census takes no screenshot and samples no
+contrast, so a board it seeds has `contrast: null`, which the Windows run reads
+as no failure allowed. Seed only the boards you added or moved there, with
+`--fixtures <their fixtures> --write-ratchets`: a full `--write-ratchets` off
+Windows would null every board's contrast figure. The workstation re-seeds them
+all with contrast (the new pages program's catch-up).
 
 Re-seed the ratchets only after you have looked at the diff. `git diff` on
 `ui-contract.ratchets.json` is the "numbers that moved" report, and the rule is
@@ -267,10 +274,18 @@ npm run preview --workspace @sse/frontend-app -- --host 127.0.0.1 --port 4180 --
 Use a port other than `4173`: Playwright binds that one with `--strictPort` and
 will fail to start if you are holding it.
 
+A scenario seeds the Teleprompter with its `prompter` entry (the new pages
+program's Slice 6a): scripts by name from `test-fixtures/src/prompterScripts.ts`,
+the removed ones, the script on the glass and its place, `NOT UPDATED`, the look
+and the size, applied through the double's own requests
+(`transports/fixture/prompterSeed.ts`); `prompterScreen` says how the Prompter XL
+starts (connected unless it says otherwise). The `teleprompter-*` fixtures are
+the worked examples.
+
 **Front-end map** (after production readiness S14). The shell is
-`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the three
+`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the four
 `import()` calls in `workspaceChunks.ts` (the active one is fetched after the
-shell's first draw, the other two at idle once ready; the fallback is
+shell's first draw, the others at idle once ready; the fallback is
 `startup/WorkspaceLoadingSurface.tsx`, test id `workspace-loading`). There is
 deliberately no `manualChunks` rule by folder, and `build.cssCodeSplit` is `false`
 so rule order never depends on which workspace opened first. Planning, the fourth
@@ -290,10 +305,17 @@ workspace, left the screen in the new pages program's Slice 1
   `SetupWorkstationPlate.tsx` with Recent actions and the light-outputs switch).
 
 The Console (`audio/AudioWorkspace.tsx` and `audio/components/`) was never over
-the size guard and was not split. The fixture double is
-`frontend/packages/engine-client/src/transports/fixtureTransport.ts` over twelve
+the size guard and was not split. The Teleprompter (the new pages program's
+Slice 6a) is `teleprompter/TeleprompterWorkspace.tsx` over
+`teleprompter/teleprompterModel.ts` (what the page shows, from the hardware
+link's figures) and its cluster, bay, plate, look and footer; it is the first
+page to fill the shell's plate region, and `teleprompter/glass/` is the glass
+both it and the Prompter XL's window draw. The fixture double is
+`frontend/packages/engine-client/src/transports/fixtureTransport.ts` over the
 modules in `transports/fixture/`, one request handler per domain
-(`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`); `scripts/check-operator-copy.mjs` skips that folder. The
+(`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`,
+`prompterRequests.ts` and the prompter's model, clock, reads, import and screen
+beside it); `scripts/check-operator-copy.mjs` skips that folder. The
 boundaries are `startup/ShellErrorBoundary.tsx` (root) and
 `startup/WorkspaceErrorBoundary.tsx` (per workspace).
 

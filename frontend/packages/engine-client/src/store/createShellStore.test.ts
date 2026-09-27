@@ -1002,12 +1002,12 @@ describe("createShellStore the Teleprompter", () => {
   const prompter = (layoutKey: string | null) => ({
     look: {},
     sizePx: 88,
-    glass: layoutKey ? { layoutKey } : null,
+    glass: layoutKey ? { layoutKey, cues: [] } : null,
     scripts: [],
     removed: [],
     screen: {},
   });
-  const text = (layoutKey: string | null) => ({ layoutKey, paragraphs: [] });
+  const text = (layoutKey: string | null) => ({ layoutKey, paragraphs: [], look: {} });
 
   it("reads the glass's text only when the prompter's layout key moves", async () => {
     const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
@@ -1043,6 +1043,44 @@ describe("createShellStore the Teleprompter", () => {
     await tick();
     expect(snapshotRequests()).toEqual(["prompter.glass.snapshot", "prompter.snapshot"]);
     expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBeNull();
+    await store.dispose();
+  });
+
+  it("starts when the prompter's state cannot be read, and records why", async () => {
+    const { refuse, transport } = supervisedTransport();
+    refuse("prompter.snapshot");
+    refuse("prompter.glass.snapshot");
+    const store = createShellStore(transport);
+    await store.initialize();
+    const state = store.getSnapshot();
+    expect(state.lifecycle).toBe("ready");
+    expect(state.prompterSnapshot).toBeNull();
+    expect(state.backgroundFailures.map((failure) => failure.context)).toEqual([
+      "the prompter's state",
+      "the prompter's state",
+    ]);
+    await store.dispose();
+  });
+
+  it("reads the glass's text again when the start's two reads disagree", async () => {
+    const { answer, transport: inner } = supervisedTransport();
+    answer("prompter.snapshot", prompter("g2-l0"));
+    // The text is read before the Update the state already shows.
+    let textReads = 0;
+    const transport: EngineTransport = {
+      ...inner,
+      request: (method, params) => {
+        if (method !== "prompter.glass.snapshot") return inner.request(method, params);
+        textReads += 1;
+        return Promise.resolve(text(textReads === 1 ? "g1-l0" : "g2-l0"));
+      },
+    };
+    const store = createShellStore(transport);
+    await store.initialize();
+    await tick();
+    await tick();
+    expect(textReads).toBe(2);
+    expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBe("g2-l0");
     await store.dispose();
   });
 

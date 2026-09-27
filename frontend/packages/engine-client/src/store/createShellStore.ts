@@ -96,6 +96,9 @@ const DOMAIN_STATE_KEYS = {
   prompterGlass: "prompterGlassSnapshot",
 } as const satisfies Record<DomainKey, keyof ShellState>;
 
+/** The prompter's snapshots, which the start reads without depending on them (new pages program, Slice 6a). */
+const PROMPTER_DOMAINS: readonly DomainKey[] = ["prompter", "prompterGlass"];
+
 /**
  * Whether the glass's text is behind the prompter's snapshot (new pages
  * program, Slice 6a): its layout key names the text and the look it was laid
@@ -1196,24 +1199,45 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         }),
       });
 
-      const rest = await fetchDomains(
-        ALL_DOMAINS.filter((domain) => domain !== "health" && !(domain === "lightingFixtureCatalog" && catalogLoaded)),
-        isCurrentBootstrap
-      );
-      if (!rest) return;
+      // The prompter's two reads are the exception (new pages program, Slice
+      // 6a): a fault of the prompter's alone does not stop the start, as the
+      // hardware link's own health has it. Their failure is recorded, and the
+      // Teleprompter page reads again until an answer comes.
+      const [rest, prompter] = await Promise.all([
+        fetchDomains(
+          ALL_DOMAINS.filter(
+            (domain) =>
+              domain !== "health" &&
+              !PROMPTER_DOMAINS.includes(domain) &&
+              !(domain === "lightingFixtureCatalog" && catalogLoaded)
+          ),
+          isCurrentBootstrap
+        ),
+        fetchDomains(PROMPTER_DOMAINS, isCurrentBootstrap),
+      ]);
+      if (!rest || !prompter) return;
       if (rest.failures.length > 0) {
         throw rest.failures[0];
+      }
+      for (const failure of prompter.failures) {
+        recordBackgroundFailure(failure, "the prompter's state");
       }
 
       setState({
         ...state,
         ...snapshotsToState(rest.accepted),
+        ...snapshotsToState(prompter.accepted),
         lifecycle: transitionStartupState("waiting-for-app-snapshot", { type: "app-loaded" }),
         startupFailure: null,
         lastEvent: "engine.ready",
         errorSummary: null,
       });
       publishAudioMeterFrame(state.audioSnapshot);
+      // The two reads went out side by side, so a change between them leaves
+      // the glass's text behind its key: read it again, as a refresh would.
+      if (prompterGlassIsStale(state)) {
+        void refreshDomains(["prompterGlass"]).catch(inBackground("the prompter's text"));
+      }
     } catch (error) {
       if (!isCurrentBootstrap()) return;
 

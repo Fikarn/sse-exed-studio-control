@@ -33,15 +33,21 @@ import styles from "./TeleprompterPlate.module.css";
 /** The scripts the list has room for; more are paged, never scrolled (system §10). */
 const SCRIPT_ROOM = 8;
 
+/** The scripts it has room for while the earlier versions are open above it. */
+const SCRIPT_ROOM_BESIDE_VERSIONS = 5;
+
+/** The earlier versions shown at once, newest first; the hardware link keeps 20, paged. */
+const VERSION_ROOM = 4;
+
 /** Why a version was kept, as the plate says it (`PrompterVersionSummary.reason`). */
 const VERSION_WORDS: Record<string, string> = {
   imported: "imported",
   pasted: "pasted",
-  "put-on": "put on the prompter",
-  replaced: "put on the prompter",
-  updated: "updated on the prompter",
-  "before-file-update": "before the file's new text",
-  "before-bringing-back": "before bringing one back",
+  "put-on": "put on",
+  replaced: "put on",
+  updated: "updated",
+  "before-file-update": "before a new file",
+  "before-bringing-back": "before a bring back",
   "from-backup": "from a backup",
 };
 
@@ -101,14 +107,24 @@ export function TeleprompterPlate({
   const [showRemoved, setShowRemoved] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
   const [page, setPage] = useState(0);
+  // The versions' page belongs to the script it was turned for.
+  const [versionPage, setVersionPage] = useState<{ scriptId: string | null; page: number }>({
+    scriptId: null,
+    page: 0,
+  });
   const [deleting, setDeleting] = useState<PrompterScriptSummary | null>(null);
   const versions = useScriptVersions(store, selected);
   const onGlass = selected !== null && glass?.scriptId === selected.id;
 
   const list = showRemoved ? removed : scripts;
-  const pages = Math.max(Math.ceil(list.length / SCRIPT_ROOM), 1);
+  const room = showVersions && selected ? SCRIPT_ROOM_BESIDE_VERSIONS : SCRIPT_ROOM;
+  const pages = Math.max(Math.ceil(list.length / room), 1);
   const shownPage = Math.min(page, pages - 1);
-  const rows = list.slice(shownPage * SCRIPT_ROOM, (shownPage + 1) * SCRIPT_ROOM);
+  const rows = list.slice(shownPage * room, (shownPage + 1) * room);
+  const versionPages = Math.max(Math.ceil((versions?.length ?? 0) / VERSION_ROOM), 1);
+  const shownVersionPage =
+    versionPage.scriptId === (selected?.id ?? null) ? Math.min(versionPage.page, versionPages - 1) : 0;
+  const turnVersions = (to: number) => setVersionPage({ scriptId: selected?.id ?? null, page: to });
 
   const status = !selected ? null : onGlass ? (
     glass?.notUpdated ? (
@@ -176,21 +192,52 @@ export function TeleprompterPlate({
             </Key>
           </div>
           {showVersions ? (
-            <ol className={styles.versions} data-well="" data-testid="teleprompter-version-list">
-              {versions && versions.length === 0 ? <li className={styles.none}>No earlier versions.</li> : null}
-              {(versions ?? []).slice(0, 5).map((version) => (
-                <li key={version.id} className={styles.version}>
-                  <span>{versionLine(version)}</span>
+            <>
+              <ol className={styles.versions} data-well="" data-testid="teleprompter-version-list">
+                {versions && versions.length === 0 ? <li className={styles.none}>No earlier versions.</li> : null}
+                {(versions ?? [])
+                  .slice(shownVersionPage * VERSION_ROOM, (shownVersionPage + 1) * VERSION_ROOM)
+                  .map((version) => (
+                    <li key={version.id} className={styles.version}>
+                      <span>{versionLine(version)}</span>
+                      <Key
+                        size="small"
+                        testId={`teleprompter-bring-back-${version.id}`}
+                        onClick={() =>
+                          void perform(() => store.bringBackPrompterVersion(selected.id, version.id), true)
+                        }
+                      >
+                        Bring back
+                      </Key>
+                    </li>
+                  ))}
+              </ol>
+              {versionPages > 1 ? (
+                <div className={styles.pager}>
                   <Key
                     size="small"
-                    testId={`teleprompter-bring-back-${version.id}`}
-                    onClick={() => void perform(() => store.bringBackPrompterVersion(selected.id, version.id), true)}
+                    locked={shownVersionPage === 0}
+                    reason="These are the newest versions."
+                    testId="teleprompter-versions-newer"
+                    onClick={() => turnVersions(shownVersionPage - 1)}
                   >
-                    Bring back
+                    ◂ Newer
                   </Key>
-                </li>
-              ))}
-            </ol>
+                  <span>
+                    {shownVersionPage + 1} of {versionPages}
+                  </span>
+                  <Key
+                    size="small"
+                    locked={shownVersionPage === versionPages - 1}
+                    reason="These are the oldest versions kept."
+                    testId="teleprompter-versions-older"
+                    onClick={() => turnVersions(shownVersionPage + 1)}
+                  >
+                    Older ▸
+                  </Key>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
       ) : null}
@@ -333,12 +380,14 @@ export function TeleprompterPlate({
                     ? "extended"
                     : "—",
             },
-            ...(snapshot.screen.windowError
-              ? [{ id: "window", label: "The window", value: snapshot.screen.windowError, tone: "error" as const }]
-              : []),
           ]}
           data-testid="teleprompter-screen-readouts"
         />
+        {snapshot.screen.windowError ? (
+          <p className={styles.windowError} data-testid="teleprompter-window-error">
+            The window did not open: {snapshot.screen.windowError}
+          </p>
+        ) : null}
       </Section>
 
       {deleting ? (

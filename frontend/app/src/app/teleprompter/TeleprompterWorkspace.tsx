@@ -17,7 +17,7 @@ import { TeleprompterBay } from "./TeleprompterBay";
 import { TeleprompterCluster } from "./TeleprompterCluster";
 import { TeleprompterFooter } from "./TeleprompterFooter";
 import { TeleprompterPlate } from "./TeleprompterPlate";
-import { cutGlassText, glassTextOf, prompterStateView } from "./teleprompterModel";
+import { backParagraph, cutGlassText, glassTextOf, prompterStateView, type ReportedLines } from "./teleprompterModel";
 import styles from "./TeleprompterWorkspace.module.css";
 
 // The Teleprompter page (new pages program, Slice 6a; board 1, "Live mirror",
@@ -46,6 +46,14 @@ function sentenceOf(result: JsonValue): string | null {
     : null;
 }
 
+/** A script's name in the armed row, cut so `· press again` stays in view. */
+function armName(name: string): string {
+  return name.length > ARM_NAME_ROOM ? `${name.slice(0, ARM_NAME_ROOM - 1)}…` : name;
+}
+
+/** The characters of a name the state display's armed row has room for beside its words. */
+const ARM_NAME_ROOM = 20;
+
 /** `checks.prompter` from the health snapshot; `null` while it is absent or could not be read. */
 function prompterCheckOf(healthSnapshot: JsonObject | null): PrompterHealthCheck | null {
   const checks = healthSnapshot?.checks;
@@ -67,11 +75,16 @@ export function TeleprompterWorkspace({
   const glass = prompterSnapshot?.glass ?? null;
   const scripts = useMemo(() => prompterSnapshot?.scripts ?? [], [prompterSnapshot]);
   const removed = useMemo(() => prompterSnapshot?.removed ?? [], [prompterSnapshot]);
+  // The script last on the prompter, kept after a Clear, so the selection
+  // does not move to another script under the operator's next press.
+  const onGlassId = glass?.scriptId ?? null;
+  const [lastOnGlassId, setLastOnGlassId] = useState(onGlassId);
+  if (onGlassId !== null && onGlassId !== lastOnGlassId) setLastOnGlassId(onGlassId);
   // The selected script: the operator's choice while it is in the list, else
-  // the one on the prompter, else the first.
+  // the one on the prompter or last on it, else the first.
   const selected =
     scripts.find((script) => script.id === chosenId) ??
-    scripts.find((script) => script.id === glass?.scriptId) ??
+    scripts.find((script) => script.id === (onGlassId ?? lastOnGlassId)) ??
     scripts[0] ??
     null;
 
@@ -86,21 +99,27 @@ export function TeleprompterWorkspace({
     [check, prompterSnapshot, scripts.length]
   );
   const timeLeft = usePrompterTimeLeft(glass);
+  // The layout the page's copy last reported: where its lines break, which
+  // `BACK`'s hint reads (the hardware link works from the same layout).
+  const [reported, setReported] = useState<ReportedLines | null>(null);
 
   // While the text scrolls the hardware link moves the place about once a
   // second and says nothing (it saves it; a take has no event a second), so
   // the page reads the prompter's state once a second to follow it: the place,
-  // the paragraph at the reading line, the time left.
-  const playing = glass?.playing ?? false;
+  // the paragraph at the reading line, the time left. It reads as often while
+  // it waits: for the prompter's state when the start could not read it, and
+  // while the text is not laid out, so a read of the glass's text that failed
+  // is tried again (the store reads the text whenever its key has moved).
+  const following = (glass?.playing ?? false) || !prompterSnapshot || (glass !== null && !glass.laidOut);
   useEffect(() => {
-    if (!playing) return undefined;
+    if (!following) return undefined;
     const id = window.setInterval(() => {
       store
         .refreshPrompterSnapshot()
         .catch((error: unknown) => store.reportBackgroundFailure(error, "the prompter's place"));
     }, 1000);
     return () => window.clearInterval(id);
-  }, [playing, store]);
+  }, [following, store]);
 
   /** Sends one request; a refusal or a failure is the hardware link's sentence, as a notice. */
   const perform = useLiveCallback(async (action: () => Promise<JsonValue>, announce = false) => {
@@ -110,7 +129,15 @@ export function TeleprompterWorkspace({
       if (sentence) toast.push({ tone: "ok", message: sentence });
       return result;
     } catch (error) {
-      toast.push({ tone: "attention", message: error instanceof Error ? error.message : String(error) });
+      // The hardware link's refusals are sentences; anything else (the
+      // request never answered) gets the page's own.
+      toast.push({
+        tone: "attention",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The prompter did not answer. Look at what the page shows before pressing again.",
+      });
       return null;
     }
   });
@@ -123,13 +150,18 @@ export function TeleprompterWorkspace({
     }
     arm.armOrApply(
       `replace:${selected.id}`,
-      `Replace with ${selected.name}`,
+      `Replace with ${armName(selected.name)}`,
       () => void perform(() => store.putOnPrompter(selected.id, true), true)
     );
   });
+  // Choosing another script drops an armed Replace: it named the script chosen before.
+  const select = useLiveCallback((scriptId: string) => {
+    setChosenId(scriptId);
+    if (arm.armed?.key.startsWith("replace:")) arm.clear();
+  });
   const update = useLiveCallback(() => {
     if (!glass) return;
-    arm.armOrApply("update", `Update ${glass.name}`, () => void perform(() => store.updatePrompter(), true));
+    arm.armOrApply("update", `Update ${armName(glass.name)}`, () => void perform(() => store.updatePrompter(), true));
   });
   const clear = useLiveCallback(() => {
     if (!glass) return;
@@ -137,7 +169,11 @@ export function TeleprompterWorkspace({
   });
 
   if (!prompterSnapshot || !state) {
-    return <div className={styles.waiting} data-testid="teleprompter-workspace" data-workspace="teleprompter" />;
+    return (
+      <div className={styles.waiting} data-testid="teleprompter-workspace" data-workspace="teleprompter">
+        <p className={styles.waitingText}>Reading the prompter's state…</p>
+      </div>
+    );
   }
 
   return (
@@ -151,6 +187,7 @@ export function TeleprompterWorkspace({
           onPutOn={putOn}
           perform={perform}
           selected={selected}
+          backTo={glass ? backParagraph(glass, reported) : 0}
           snapshot={prompterSnapshot}
           state={state}
           store={store}
@@ -159,6 +196,7 @@ export function TeleprompterWorkspace({
       <TeleprompterBay
         cut={cut}
         glassText={glassText}
+        onLayoutReported={setReported}
         perform={perform}
         snapshot={prompterSnapshot}
         store={store}
@@ -168,7 +206,7 @@ export function TeleprompterWorkspace({
         <TeleprompterPlate
           armed={arm.armed}
           onPutOn={putOn}
-          onSelect={setChosenId}
+          onSelect={select}
           onUpdate={update}
           perform={perform}
           removed={removed}

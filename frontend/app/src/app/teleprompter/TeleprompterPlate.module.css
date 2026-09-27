@@ -58,6 +58,14 @@
   font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
 }
 
+/* One line a version, so the list's height is known and the scripts under it keep their pager. */
+.version > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .none {
   padding: 8px;
   color: var(--text-text2);
@@ -185,4 +193,13 @@
 /* On the versions' well, the display's own muted ink. */
 .versions .none {
   color: var(--display-text2);
+}
+
+/* Why the Prompter XL's window did not open, as Windows said it (up to 300
+   characters): it wraps under the readouts rather than squeezing them. */
+.windowError {
+  margin: 8px 0 0;
+  color: var(--role-red-text);
+  font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
+  overflow-wrap: anywhere;
 }

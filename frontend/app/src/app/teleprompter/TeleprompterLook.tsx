@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ControlRow, Key, Section, Segmented, Slider } from "@sse/design-system";
 import type { PrompterLookUpdateRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
 
+import { SIZE_RANGE } from "./teleprompterModel";
 import type { PerformAction } from "./TeleprompterWorkspace";
 import styles from "./TeleprompterPlate.module.css";
 
@@ -68,6 +69,8 @@ export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookP
   const { look, sizePx } = snapshot;
   const update = (request: PrompterLookUpdateRequest) => void perform(() => store.updatePrompterLook(request));
   const atStandard = sizePx === look.standardSizePx;
+  const smallest = sizePx <= SIZE_RANGE.min ? `The text is at its smallest, ${SIZE_RANGE.min} px.` : null;
+  const largest = sizePx >= SIZE_RANGE.max ? `The text is at its largest, ${SIZE_RANGE.max} px.` : null;
   const toggle = (label: string, engaged: boolean, testId: string, request: PrompterLookUpdateRequest) => (
     <div className={styles.toggleRow}>
       <span className={styles.toggleLabel}>{label}</span>
@@ -86,16 +89,20 @@ export function TeleprompterLook({ snapshot, store, perform }: TeleprompterLookP
         <Key
           size="small"
           testId="teleprompter-size-down"
+          locked={smallest !== null}
+          reason={smallest ?? undefined}
           aria-label="Smaller by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: -4 }))}
+          onClick={() => void perform(() => store.setPrompterTextSize({ step: -1 }))}
         >
           − 4
         </Key>
         <Key
           size="small"
           testId="teleprompter-size-up"
+          locked={largest !== null}
+          reason={largest ?? undefined}
           aria-label="Larger by 4 px"
-          onClick={() => void perform(() => store.setPrompterTextSize({ step: 4 }))}
+          onClick={() => void perform(() => store.setPrompterTextSize({ step: 1 }))}
         >
           + 4
         </Key>

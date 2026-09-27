@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type MouseEvent } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { Key, Lamp } from "@sse/design-system";
 import type { PrompterJumpRequest, PrompterSnapshot, ShellStore } from "@sse/engine-client";
@@ -28,23 +28,48 @@ export interface TeleprompterBayProps {
   timeLeft: number | null;
   store: ShellStore;
   perform: PerformAction;
+  /** The layout the copy reported, for `BACK`'s hint. */
+  onLayoutReported: (report: PrompterGlassLayoutReport) => void;
 }
 
-export function TeleprompterBay({ snapshot, glassText, cut, timeLeft, store, perform }: TeleprompterBayProps) {
+/** `1 cue`, `3 cues`. */
+function counted(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** Three rows of cue keys (`.cues`' height in the CSS). */
+const CUE_ROWS_HEIGHT = 104;
+
+/** The most paragraphs the script bar draws one by one: about 14 px each across the bay. */
+const BAR_SEGMENT_ROOM = 120;
+
+export function TeleprompterBay({
+  snapshot,
+  glassText,
+  cut,
+  timeLeft,
+  store,
+  perform,
+  onLayoutReported,
+}: TeleprompterBayProps) {
   const glass = snapshot.glass;
   const draws = snapshot.screen.draws;
   const [goTo, setGoTo] = useState("");
   const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request));
   const place = glass && cut.length > 0 ? placeView(glass, cut) : null;
-  const segments = useMemo(
-    () => (glass ? scriptBar(cut, glass.atEnd ? glass.paragraphCount : glass.place.paragraph) : []),
-    [cut, glass]
-  );
+  const segments = useMemo(() => scriptBar(cut), [cut]);
+  const track = useRef<HTMLSpanElement>(null);
+  // Already read: the paragraphs before the one at the reading line.
+  const readUpTo = glass ? (glass.atEnd ? glass.paragraphCount : glass.place.paragraph) : 0;
+  // Past a paragraph for every 14 px the bar has, the segments are drawn as
+  // the part read and the part to read (the shares, the ticks and a press stay the same).
+  const dense = segments.length > BAR_SEGMENT_ROOM;
   const time = glass && timeLeft !== null ? timeLeftParts(glass, timeLeft, new Date()) : null;
 
   // A report the hardware link could not take is logged, never shown: the
   // glass reports again when the hardware link asks (`PrompterGlass`).
   const reportLayout = (report: PrompterGlassLayoutReport) => {
+    onLayoutReported(report);
     store.reportPrompterLayout(report).catch((error: unknown) => {
       store.reportBackgroundFailure(error, "the page's copy of the glass");
     });
@@ -52,26 +77,52 @@ export function TeleprompterBay({ snapshot, glassText, cut, timeLeft, store, per
 
   const pressBar = (event: MouseEvent<HTMLButtonElement>) => {
     if (!glass || segments.length === 0) return;
-    const bar = event.currentTarget.getBoundingClientRect();
+    const bar = track.current?.getBoundingClientRect();
     // A press made with a key has no position: it goes to the start of the paragraph at the reading line.
     const paragraph =
-      event.detail === 0 || bar.width <= 0
+      event.detail === 0 || !bar || bar.width <= 0
         ? Math.min(glass.place.paragraph, segments.length - 1)
-        : paragraphAt(segments, (event.clientX - bar.left) / bar.width);
+        : paragraphAt(segments, Math.min(Math.max((event.clientX - bar.left) / bar.width, 0), 0.999999));
     jump({ to: "paragraph", paragraph });
   };
 
-  const submitGoTo = (event: FormEvent) => {
-    event.preventDefault();
-    if (!glass) return;
-    const number = Number.parseInt(goTo, 10);
-    if (!Number.isInteger(number) || number < 1 || number > glass.paragraphCount) return;
+  // Only the Go key jumps: the field is not a form, so Enter in it does
+  // nothing (D6: Studio Control binds no key).
+  const goToNumber = Number.parseInt(goTo, 10);
+  const goToProblem = !glass
+    ? null
+    : !Number.isInteger(goToNumber)
+      ? "Type a paragraph number first."
+      : goToNumber < 1 || goToNumber > glass.paragraphCount
+        ? `The script has paragraphs 1–${glass.paragraphCount}.`
+        : null;
+  const goToParagraph = () => {
+    if (!glass || goToProblem !== null) return;
     setGoTo("");
-    jump({ to: "paragraph", paragraph: number - 1 });
+    jump({ to: "paragraph", paragraph: goToNumber - 1 });
   };
 
-  const cues = glass ? cueKeys(glass.cues) : [];
-  const readWords = cut.length > 0 && glass ? `${glass.paragraphCount} paragraphs · ${glass.cues.length} cues` : "";
+  const cues = useMemo(() => (glass ? cueKeys(glass.cues) : []), [glass]);
+  // The cue keys take three rows at most; the ones that would not fit are not
+  // drawn (a clipped key could still take a press or the focus). Measured
+  // once for each list of cues, drawn whole first.
+  const cueRow = useRef<HTMLDivElement>(null);
+  const cueSignature = cues.map((cue) => `${cue.paragraph}:${cue.word}:${cue.text}`).join("|");
+  const [cueFit, setCueFit] = useState<{ signature: string; count: number } | null>(null);
+  const shownCues = cueFit?.signature === cueSignature ? cues.slice(0, cueFit.count) : cues;
+  useLayoutEffect(() => {
+    if (cueFit?.signature === cueSignature) return;
+    const row = cueRow.current;
+    if (!row) return;
+    const bottom = row.getBoundingClientRect().top + CUE_ROWS_HEIGHT;
+    const keys = [...row.querySelectorAll<HTMLElement>("[data-cue-key]")];
+    const fits = keys.findIndex((key) => key.getBoundingClientRect().bottom > bottom + 0.5);
+    setCueFit({ signature: cueSignature, count: fits === -1 ? keys.length : fits });
+  }, [cueFit, cueSignature]);
+  const readWords =
+    cut.length > 0 && glass
+      ? `${counted(glass.paragraphCount, "paragraph", "paragraphs")} · ${counted(glass.cues.length, "cue", "cues")}`
+      : "";
 
   return (
     <section className={styles.bay} data-testid="teleprompter-bay" aria-label="The prompter's glass">
@@ -142,34 +193,54 @@ export function TeleprompterBay({ snapshot, glassText, cut, timeLeft, store, per
             data-testid="teleprompter-script-bar"
             onClick={pressBar}
           >
-            {segments.map((segment) => (
-              <span
-                key={segment.index}
-                className={styles.segment}
-                data-read={segment.read ? "" : undefined}
-                style={{ flexGrow: segment.share }}
-              >
-                {segments.length <= 40 ? <span className={styles.segmentNumber}>{segment.index + 1}</span> : null}
-              </span>
-            ))}
-            {glass.cues.map((cue, index) => (
-              <i
-                key={`${cue.paragraph}:${cue.word}:${index}`}
-                className={styles.cueTick}
-                style={{ left: `${barStart(segments, cue.paragraph) * 100}%` }}
-              />
-            ))}
-            {place ? <i className={styles.placeMark} style={{ left: `${place.share * 100}%` }} /> : null}
+            <span ref={track} className={styles.track}>
+              {dense ? (
+                <>
+                  <span
+                    className={styles.segment}
+                    data-read=""
+                    style={{ left: 0, width: `${barStart(segments, readUpTo) * 100}%` }}
+                  />
+                  <span
+                    className={styles.segment}
+                    style={{
+                      left: `${barStart(segments, readUpTo) * 100}%`,
+                      width: `${(1 - barStart(segments, readUpTo)) * 100}%`,
+                    }}
+                  />
+                </>
+              ) : (
+                segments.map((segment) => (
+                  <span
+                    key={segment.index}
+                    className={styles.segment}
+                    data-read={segment.index < readUpTo ? "" : undefined}
+                    style={{ left: `${segment.start * 100}%`, width: `calc(${segment.share * 100}% - 2px)` }}
+                  >
+                    {segments.length <= 40 ? <span className={styles.segmentNumber}>{segment.index + 1}</span> : null}
+                  </span>
+                ))
+              )}
+              {glass.cues.map((cue, index) => (
+                <i
+                  key={`${cue.paragraph}:${cue.word}:${index}`}
+                  className={styles.cueTick}
+                  style={{ left: `${barStart(segments, cue.paragraph) * 100}%` }}
+                />
+              ))}
+              {place ? <i className={styles.placeMark} style={{ left: `${place.share * 100}%` }} /> : null}
+            </span>
           </button>
           <div className={styles.under}>
-            <div className={styles.cues} data-testid="teleprompter-cue-keys">
+            <div ref={cueRow} className={styles.cues} data-testid="teleprompter-cue-keys">
               <span className={styles.cuesLabel}>Cues</span>
               {cues.length === 0 ? <span className={styles.cuesNone}>none in this script</span> : null}
-              {cues.map((cue, index) => (
+              {shownCues.map((cue, index) => (
                 <Key
                   key={`${cue.paragraph}:${cue.word}:${index}`}
                   size="small"
                   take
+                  data-cue-key=""
                   testId={`teleprompter-cue-${index + 1}`}
                   onClick={() => jump({ to: "place", paragraph: cue.paragraph, word: cue.word })}
                 >
@@ -178,7 +249,7 @@ export function TeleprompterBay({ snapshot, glassText, cut, timeLeft, store, per
                 </Key>
               ))}
             </div>
-            <form className={styles.goTo} onSubmit={submitGoTo} data-testid="teleprompter-go-to">
+            <div className={styles.goTo} role="group" data-testid="teleprompter-go-to">
               <label className={styles.goToLabel} htmlFor="teleprompter-go-to-paragraph">
                 Go to paragraph
               </label>
@@ -193,10 +264,16 @@ export function TeleprompterBay({ snapshot, glassText, cut, timeLeft, store, per
                 onChange={(event) => setGoTo(event.target.value.replace(/[^0-9]/g, ""))}
                 data-testid="teleprompter-go-to-field"
               />
-              <Key size="small" type="submit" testId="teleprompter-go-to-key">
+              <Key
+                size="small"
+                locked={goToProblem !== null}
+                reason={goToProblem ?? undefined}
+                testId="teleprompter-go-to-key"
+                onClick={goToParagraph}
+              >
                 Go
               </Key>
-            </form>
+            </div>
           </div>
         </>
       ) : (

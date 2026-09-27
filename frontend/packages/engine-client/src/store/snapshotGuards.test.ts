@@ -36,6 +36,20 @@ describe("snapshotProblem", () => {
     expect(snapshotProblem("lightingDmxMonitor", {})).toBe("channels is not a list");
   });
 
+  it("checks the Teleprompter's objects the page reads, not only its lists (new pages S6a)", () => {
+    const prompter = { scripts: [], removed: [], look: {}, screen: {}, glass: null };
+    expect(snapshotProblem("prompter", prompter)).toBeNull();
+    expect(snapshotProblem("prompter", { ...prompter, glass: { cues: [] } })).toBeNull();
+    expect(snapshotProblem("prompter", { ...prompter, look: null })).toBe("look is not an object");
+    expect(snapshotProblem("prompter", { scripts: [], removed: [], look: {}, glass: null })).toBe(
+      "screen is not an object"
+    );
+    expect(snapshotProblem("prompter", { ...prompter, glass: "on" })).toBe("glass is not an object");
+    expect(snapshotProblem("prompter", { ...prompter, glass: {} })).toBe("cues is not a list");
+    expect(snapshotProblem("prompterGlass", { paragraphs: [], look: {} })).toBeNull();
+    expect(snapshotProblem("prompterGlass", { paragraphs: [] })).toBe("look is not an object");
+  });
+
   it("leaves optional lists optional", () => {
     expect(snapshotProblem("lighting", { fixtures: [], groups: [], scenes: [] })).toBeNull();
     expect(snapshotProblem("audio", { channels: [], mixTargets: [] })).toBeNull();

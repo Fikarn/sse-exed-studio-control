@@ -84,7 +84,7 @@ export interface AudioChannelUpdateRequest {
   autoSet?: boolean;
 }
 
-/** `prompter.speed`: a pace in words a minute, or a step of ±5 (new pages program, Slice 6a). */
+/** `prompter.speed`: a pace in words a minute, or a number of 5-word steps (`step: 1` is 5 words a minute faster; new pages program, Slice 6a). */
 export type PrompterSpeedRequest = { wpm: number } | { step: number };
 
 /** `prompter.jump`: where the reading line goes; `paragraph` counts from 0. */
@@ -103,7 +103,7 @@ export type PrompterJumpRequest =
   | { to: "paragraph"; paragraph: number }
   | { to: "place"; paragraph: number; word: number };
 
-/** `prompter.textSize`: a size in pixels, a step of ±4, or the look's standard. */
+/** `prompter.textSize`: a size in pixels, a number of 4 px steps (`step: -1` is 4 px smaller), or the look's standard. */
 export type PrompterTextSizeRequest = { sizePx: number } | { step: number } | { standard: true };
 
 /** `prompter.look.update`: any of the look's fields. */

@@ -5,15 +5,16 @@ import type { WorkspaceId } from "@sse/engine-client";
 // 2026-09 production readiness, Slice 14 (finding F26). Each workspace is its
 // own chunk, so the startup surface draws before any workspace's code has been
 // fetched or evaluated. The shell asks for the active workspace's chunk once it
-// has drawn, and for the other two when it is ready and idle, so a chunk is
+// has drawn, and for the others when it is ready and idle, so a chunk is
 // in hand before the operator can ask for its workspace. (The Teleprompter
 // joined them in the new pages program's Slice 6a.)
 //
-// The three modules the shell itself reads from a workspace's folder
+// The four modules the shell itself reads from a workspace's folder
 // (`audio/audioFormatting`, `lighting/lightingDrift`,
-// `lighting/useUnsavedScenePrompt`) stay with the shell. That is why the chunks
+// `lighting/useUnsavedScenePrompt`, and `teleprompter/prompterTime` for the
+// playing latch since Slice 6a) stay with the shell. That is why the chunks
 // are cut by these `import()` calls and not by a `manualChunks` rule on the
-// folder: a folder rule would put those three in the workspace's chunk and the
+// folder: a folder rule would put those four in the workspace's chunk and the
 // shell would fetch the whole workspace at startup to reach them.
 
 interface LoadedSurface<Props> {

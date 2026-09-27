@@ -37,8 +37,8 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
   A slice that moves boards merges from the cloud once its ten checks are green, you have reviewed your own renders at 2560×1440, and the operator has given the go-ahead. The win32 captures of every board you moved are refreshed later, in one workstation catch-up.
 
-- **In review:** Slice 6a, the Teleprompter page without the editor (its pull request is in the ledger's `Status:`). Slice 6 was split into 6a and 6b at its first steps (2026-09-27), and its four answers are in the ledger: two slices; the editor's keys are a text field's (the browser's formatting keys cancelled); the deck lamp reads `Surface`; the editor is the app's own.
-- **Next:** Slice 6b, the editor, New script, Paste as a new script and the shell's clipboard permission.
+- **In review:** Slice 6a, the Teleprompter page without the editor, as #227 (the ledger's Slice 6a `Status:` has its head and runs). Slice 6 was split into 6a and 6b at its first steps (2026-09-27), and its four answers are in the ledger: two slices; the editor's keys are a text field's (the browser's formatting keys cancelled); the deck lamp reads `Surface`; the editor is the app's own.
+- **Next:** Slice 6b, the editor, Rename, New script, Paste as a new script and the shell's clipboard permission. Among its first steps: whether the line at the reading line moves on halfway through a line's words (Slice 5a's glass review; the page's copy shows it since 6a).
 - **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each); a low Dependabot alert (#7) on `main`; and D18's two checks, which gate Slice 13.
 - **On the workstation:** the live app stays `main`'s build of `98bbb06` (schema 7) until the program's close-out. The live data then goes from schema 7 to 9, or to 10 once Slice 8 lands, in one start. The Appendix B walk happens there, on the program's last build.
 
@@ -65,7 +65,7 @@ Each cloud slice's own first steps are in its section of the ledger and are put 
 - **Vitest** runs from the workspace's own folder (`npm run test --workspace …`, or `npx vitest run` in `frontend/app`): from the repository root, `--root frontend/app` refuses the glass's font asset import (`…woff2?url`).
 - **Your own visual review replaces the win32 captures until the catch-up.** Render each board you make or move at 2560×1440 in Studio, Graphite and Bone with a Playwright script of your own, in the scratch directory and never committed. Look at the renders, compare them with the boards, and say in the pull request what you checked.
   - The app runs without the hardware link at `/?fixture=<id>&transport=fixture&theme=graphite|bone`.
-  - The fixtures are in `frontend/packages/test-fixtures/src/fixtures.json`. The prompter's double starts with no scripts and the Prompter XL connected in every scenario, so the new pages need scenarios of their own; a scenario's `prompterScreen` (a `prompter.screen.report`'s params, or `"unreported"`) says otherwise.
+  - The fixtures are in `frontend/packages/test-fixtures/src/fixtures.json`. The prompter's double starts with the Prompter XL connected in every scenario; a scenario's `prompterScreen` (a `prompter.screen.report`'s params, or `"unreported"`) says otherwise. Since Slice 6a a scenario's `prompter` seeds the scripts (by name, from `test-fixtures/src/prompterScripts.ts`), the one on the glass and its place, `NOT UPDATED` and the look, through the double's own requests (`prompterSeed.ts`); the `teleprompter-*` fixtures are the examples.
 - **Not possible here:**
   - the live app and the studio hardware;
   - Windows-only code at run time: the cloud type-checks and lints the shell for Windows (above) but links and runs nothing, so NDI, Bluetooth, the LUMIX SDK and the Prompter XL's window (Slice 5b) stay on the workstation;

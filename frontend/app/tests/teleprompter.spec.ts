@@ -64,10 +64,33 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 2 of");
     await page.getByTestId("teleprompter-paragraph-5").click();
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 5 of");
+    // Enter in the field moves nothing (D6); the Go key does.
     await page.getByTestId("teleprompter-go-to-field").fill("3");
+    await page.getByTestId("teleprompter-go-to-field").press("Enter");
+    await page.waitForTimeout(300);
+    await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 5 of");
     await page.getByTestId("teleprompter-go-to-key").click();
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 3 of");
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("a speed press moves the pace by 5 words a minute, and a size press the text by 4 px", async ({ page }) => {
+    await openTeleprompter(page);
+    await expectLaidOut(page);
+    const speed = page.getByTestId("teleprompter-speed-readout");
+    await expect(speed).toHaveText("140 words/min");
+    await page.getByTestId("teleprompter-speed-up").click();
+    await expect(speed).toHaveText("145 words/min");
+    await page.getByTestId("teleprompter-speed-down").click();
+    await page.getByTestId("teleprompter-speed-down").click();
+    await expect(speed).toHaveText("135 words/min");
+
+    const size = page.getByTestId("teleprompter-text-size");
+    await expect(size).toHaveText("88 px standard");
+    await page.getByTestId("teleprompter-size-up").click();
+    await expect(size).toHaveText("92 px standard 88");
+    await page.getByTestId("teleprompter-size-down").click();
+    await expect(size).toHaveText("88 px standard");
   });
 
   test("the mouse wheel over the copy moves nothing", async ({ page }) => {

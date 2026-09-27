@@ -13,6 +13,8 @@ import { glassParagraphs } from "./glass/glassText";
 import { INTERVIEW_INTRO, paragraph, standardLook, storyAnchor } from "./glass/glassStoryScript";
 import { formatDuration } from "./prompterTime";
 import {
+  backParagraph,
+  barStart,
   glassTextOf,
   paragraphAt,
   paragraphRows,
@@ -24,6 +26,7 @@ import {
   scriptBar,
   scriptDetail,
   screenMode,
+  stepLocks,
 } from "./teleprompterModel";
 
 // The Teleprompter page's model (new pages program, Slice 6a): what the page
@@ -215,15 +218,91 @@ describe("the place, the paragraph list and the script bar", () => {
   });
 
   it("lays the whole script out at one width, and finds the paragraph under a press", () => {
-    const segments = scriptBar(cut, 7);
+    const segments = scriptBar(cut);
     const last = INTERVIEW_INTRO.length - 1;
     expect(segments).toHaveLength(INTERVIEW_INTRO.length);
     expect(segments.reduce((sum, segment) => sum + segment.share, 0)).toBeCloseTo(1);
-    expect(segments.filter((segment) => segment.read).map((segment) => segment.index)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(segments[0]!.start).toBe(0);
+    expect(segments[last]!.start + segments[last]!.share).toBeCloseTo(1);
+    expect(barStart(segments, 8)).toBeCloseTo(segments[7]!.start + segments[7]!.share);
+    expect(barStart(segments, INTERVIEW_INTRO.length)).toBe(1);
     expect(paragraphAt(segments, 0)).toBe(0);
     expect(paragraphAt(segments, 0.999)).toBe(last);
-    const middle = segments.slice(0, 8).reduce((sum, segment) => sum + segment.share, 0) - segments[7].share / 2;
-    expect(paragraphAt(segments, middle)).toBe(7);
+    expect(paragraphAt(segments, segments[7]!.start + segments[7]!.share / 2)).toBe(7);
+  });
+
+  it("fits a script of any length: a press lands on the paragraph drawn there", () => {
+    const long = glassParagraphs(
+      Array.from({ length: 1150 }, (_, index) =>
+        paragraph(index % 7 === 0 ? "One." : "A paragraph of eight words to read aloud.")
+      )
+    );
+    const segments = scriptBar(long);
+    expect(segments).toHaveLength(1150);
+    expect(segments.at(-1)!.start + segments.at(-1)!.share).toBeCloseTo(1);
+    for (const index of [0, 9, 575, 1149]) {
+      const segment = segments[index]!;
+      expect(paragraphAt(segments, segment.start + segment.share / 2)).toBe(index);
+    }
+  });
+});
+
+describe("the steps the hardware link would refuse", () => {
+  const cues = [
+    { paragraph: 2, word: 0, text: "Pause" },
+    { paragraph: 9, word: 0, text: "Look up" },
+  ];
+
+  it("locks the steps with nothing that way, with the hardware link's sentences, while paused", () => {
+    expect(stepLocks(glass({ cues, place: { paragraph: 5, word: 3 } }))).toEqual({
+      nextParagraph: null,
+      previousCue: null,
+      nextCue: null,
+    });
+    expect(stepLocks(glass({ cues, place: { paragraph: 1, word: 0 } })).previousCue).toBe(
+      "There is no cue before the reading line."
+    );
+    expect(stepLocks(glass({ cues, place: { paragraph: 9, word: 0 } })).nextCue).toBe(
+      "There is no cue after the reading line."
+    );
+    expect(stepLocks(glass({ cues: [], place: { paragraph: 17, word: 0 } }))).toEqual({
+      nextParagraph: "There is no paragraph after the reading line.",
+      previousCue: "There is no cue before the reading line.",
+      nextCue: "There is no cue after the reading line.",
+    });
+  });
+
+  it("leaves every step open while the text scrolls: the page's place is behind the hardware link's", () => {
+    expect(stepLocks(glass({ cues: [], playing: true, place: { paragraph: 17, word: 0 } }))).toEqual({
+      nextParagraph: null,
+      previousCue: null,
+      nextCue: null,
+    });
+  });
+});
+
+describe("where BACK goes", () => {
+  const reported = {
+    layoutKey: "g1-l0",
+    lines: [
+      { paragraph: 4, word: 0 },
+      { paragraph: 4, word: 6 },
+      { paragraph: 5, word: 0 },
+    ],
+  };
+
+  it("goes to the paragraph's start, or from its first line to the one before, as the copy laid it out", () => {
+    expect(backParagraph(glass({ place: { paragraph: 4, word: 8 } }), reported)).toBe(4);
+    expect(backParagraph(glass({ place: { paragraph: 4, word: 3 } }), reported)).toBe(3);
+    // A paragraph of one line: every word is on its first line.
+    expect(backParagraph(glass({ place: { paragraph: 5, word: 2 } }), reported)).toBe(4);
+  });
+
+  it("reads the first line from the word alone without a layout for this key, and goes to the last paragraph from END", () => {
+    expect(backParagraph(glass({ place: { paragraph: 4, word: 0 } }), null)).toBe(3);
+    expect(backParagraph(glass({ place: { paragraph: 4, word: 3 } }), { ...reported, layoutKey: "g0-l0" })).toBe(4);
+    expect(backParagraph(glass({ place: { paragraph: 0, word: 0 } }), null)).toBe(0);
+    expect(backParagraph(glass({ atEnd: true, place: { paragraph: 18, word: 0 } }), null)).toBe(17);
   });
 });
 

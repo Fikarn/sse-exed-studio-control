@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent } from "react";
+import { useMemo, useRef, type ChangeEvent } from "react";
 
 import { ArmKey, ARM_TIMEOUT_MS, Key, Section, StateDisplay, type ArmedKey } from "@sse/design-system";
 import type { PrompterJumpRequest, PrompterScriptSummary, PrompterSnapshot, ShellStore } from "@sse/engine-client";
@@ -9,6 +9,8 @@ import {
   paragraphWindow,
   playLockReason,
   runLockReason,
+  SPEED_RANGE,
+  stepLocks,
   type PrompterStateView,
 } from "./teleprompterModel";
 import type { PerformAction } from "./TeleprompterWorkspace";
@@ -28,6 +30,8 @@ export interface TeleprompterClusterProps {
   state: PrompterStateView;
   cut: readonly GlassParagraph[];
   selected: PrompterScriptSummary | null;
+  /** Where `BACK` goes from the place (`backParagraph`), from 0. */
+  backTo: number;
   armed: ArmedKey | null;
   store: ShellStore;
   perform: PerformAction;
@@ -35,6 +39,9 @@ export interface TeleprompterClusterProps {
   onUpdate: () => void;
   onClear: () => void;
 }
+
+/** The largest file the hardware link opens (`MAX_IMPORT_BYTES`): a larger one is not read at all. */
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 /** A file the page's own picker read, as the hardware link takes it: its bytes in base64. */
 async function fileAsBase64(file: File): Promise<string> {
@@ -52,6 +59,7 @@ export function TeleprompterCluster({
   state,
   cut,
   selected,
+  backTo,
   armed,
   store,
   perform,
@@ -66,15 +74,39 @@ export function TeleprompterCluster({
   const layoutLock = glass && !glass.laidOut ? "The text is being laid out on the glass." : null;
   const jump = (request: PrompterJumpRequest) => void perform(() => store.jumpPrompter(request));
   const placeParagraph = glass ? Math.min(glass.place.paragraph, Math.max(glass.paragraphCount - 1, 0)) : 0;
-  const rows = glass ? paragraphRows(cut, glass.speedWpm) : [];
+  const speedWpm = glass?.speedWpm ?? 0;
+  const rows = useMemo(() => paragraphRows(cut, speedWpm), [cut, speedWpm]);
+  const steps = stepLocks(glass);
+  const slowest =
+    glass && glass.speedWpm <= SPEED_RANGE.min
+      ? `The pace is at its slowest, ${SPEED_RANGE.min} words a minute.`
+      : null;
+  const fastest =
+    glass && glass.speedWpm >= SPEED_RANGE.max
+      ? `The pace is at its fastest, ${SPEED_RANGE.max} words a minute.`
+      : null;
   const shown = paragraphWindow(rows.length, placeParagraph, PARAGRAPH_ROOM);
 
   const importFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const contentBase64 = await fileAsBase64(file);
-    await perform(() => store.importPrompterScript({ fileName: file.name, contentBase64 }), true);
+    await perform(async () => {
+      // The hardware link's own sentence for a file over its limit, said
+      // before the file is read into memory to be sent.
+      if (file.size > MAX_FILE_BYTES) {
+        throw new Error(
+          `${file.name} is ${Math.ceil(file.size / (1024 * 1024))} MB; Studio Control opens files up to ${MAX_FILE_BYTES / (1024 * 1024)} MB.`
+        );
+      }
+      let contentBase64: string;
+      try {
+        contentBase64 = await fileAsBase64(file);
+      } catch {
+        throw new Error(`${file.name} could not be read. Open it again, or save a copy and open that.`);
+      }
+      return store.importPrompterScript({ fileName: file.name, contentBase64 });
+    }, true);
   };
 
   const wayOut =
@@ -87,7 +119,7 @@ export function TeleprompterCluster({
         testId="teleprompter-state-update"
         onClick={onUpdate}
       >
-        Update the prompter · press twice
+        {armed?.key === "update" ? "Update the prompter" : "Update the prompter · press twice"}
       </ArmKey>
     ) : state.wayOut === "put-on" && selected ? (
       <Key size="small" testId="teleprompter-state-put-on" onClick={onPutOn}>
@@ -103,7 +135,12 @@ export function TeleprompterCluster({
         sentence={state.sentence}
         meta={state.meta ?? undefined}
         actions={wayOut}
-        armed={armed ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
+        // The way out's own key says it is armed; the armed row is for the others.
+        armed={
+          armed && !(armed.key === "update" && state.wayOut === "update")
+            ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs }
+            : null
+        }
         testId="teleprompter-state-display"
       />
 
@@ -130,7 +167,7 @@ export function TeleprompterCluster({
         />
         <Key
           cap="Back"
-          hint={glass ? `to the start of ¶ ${placeParagraph + 1}` : undefined}
+          hint={glass ? `to the start of ¶ ${backTo + 1}` : undefined}
           layout="stack"
           locked={runLock !== null}
           reason={runLock ?? undefined}
@@ -154,24 +191,24 @@ export function TeleprompterCluster({
         <div className={styles.speed}>
           <Key
             cap="− 5"
-            locked={runLock !== null}
-            reason={runLock ?? undefined}
+            locked={(runLock ?? slowest) !== null}
+            reason={runLock ?? slowest ?? undefined}
             take
             testId="teleprompter-speed-down"
             aria-label="Slower by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: -5 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: -1 }))}
           />
           <output className={styles.speedReadout} data-well="" data-testid="teleprompter-speed-readout">
             <b>{glass ? glass.speedWpm : "—"}</b> words/min
           </output>
           <Key
             cap="+ 5"
-            locked={runLock !== null}
-            reason={runLock ?? undefined}
+            locked={(runLock ?? fastest) !== null}
+            reason={runLock ?? fastest ?? undefined}
             take
             testId="teleprompter-speed-up"
             aria-label="Faster by 5 words a minute"
-            onClick={() => void perform(() => store.setPrompterSpeed({ step: 5 }))}
+            onClick={() => void perform(() => store.setPrompterSpeed({ step: 1 }))}
           />
         </div>
       </Section>
@@ -205,8 +242,8 @@ export function TeleprompterCluster({
           ◂ Paragraph
         </Key>
         <Key
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
+          locked={(runLock ?? steps.nextParagraph) !== null}
+          reason={runLock ?? steps.nextParagraph ?? undefined}
           take
           testId="teleprompter-paragraph-on"
           onClick={() => jump({ to: "nextParagraph" })}
@@ -214,8 +251,8 @@ export function TeleprompterCluster({
           Paragraph ▸
         </Key>
         <Key
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
+          locked={(runLock ?? steps.previousCue) !== null}
+          reason={runLock ?? steps.previousCue ?? undefined}
           take
           testId="teleprompter-cue-back"
           onClick={() => jump({ to: "previousCue" })}
@@ -223,8 +260,8 @@ export function TeleprompterCluster({
           ◂ Cue
         </Key>
         <Key
-          locked={runLock !== null}
-          reason={runLock ?? undefined}
+          locked={(runLock ?? steps.nextCue) !== null}
+          reason={runLock ?? steps.nextCue ?? undefined}
           take
           testId="teleprompter-cue-on"
           onClick={() => jump({ to: "nextCue" })}
@@ -253,6 +290,7 @@ export function TeleprompterCluster({
                   type="button"
                   className={styles.paragraphRow}
                   data-current={row.index === placeParagraph && !glass.atEnd ? "" : undefined}
+                  aria-current={row.index === placeParagraph && !glass.atEnd ? "true" : undefined}
                   data-testid={`teleprompter-paragraph-${row.index + 1}`}
                   onClick={() => jump({ to: "paragraph", paragraph: row.index })}
                 >

@@ -119,14 +119,24 @@ export function glassTextOf(
   };
 }
 
-/** Each paragraph's read words (cues are directions, never read aloud), by the hardware link's rules. */
+const readWordsCache = new WeakMap<readonly GlassParagraph[], number[]>();
+
+/**
+ * Each paragraph's read words (cues are directions, never read aloud), by the
+ * hardware link's rules. Counted once a text: the page asks for it on every
+ * report while the text scrolls.
+ */
 export function readWordsOf(paragraphs: readonly GlassParagraph[]): number[] {
-  return paragraphs.map((paragraph) =>
+  const cached = readWordsCache.get(paragraphs);
+  if (cached) return cached;
+  const counts = paragraphs.map((paragraph) =>
     paragraph.lines.reduce(
       (sum, line) => sum + line.tokens.filter((token) => token.kind === "word" && !token.word.cue).length,
       0
     )
   );
+  readWordsCache.set(paragraphs, counts);
+  return counts;
 }
 
 /** The read words before a word of a paragraph. */
@@ -160,7 +170,8 @@ export function placeView(glass: PrompterGlassSummary, text: readonly GlassParag
     (paragraph ? readWordsBefore(paragraph, glass.place.word) : 0);
   const share = total > 0 ? Math.min(before / total, 1) : 0;
   return {
-    text: `¶ ${glass.place.paragraph + 1} of ${glass.paragraphCount} · ${Math.round(share * 100)} %`,
+    // Down, so a place short of the end never reads 100 %.
+    text: `¶ ${glass.place.paragraph + 1} of ${glass.paragraphCount} · ${Math.floor(share * 100)} %`,
     share,
   };
 }
@@ -210,30 +221,40 @@ export function paragraphWindow(count: number, place: number, room: number): { f
 
 export interface ScriptBarSegment {
   index: number;
-  /** Its share of the bar, 0..1: its read words, and never less than a sliver. */
+  /** Where it starts on the bar, 0..1. */
+  start: number;
+  /** Its share of the bar, 0..1: its read words, and never less than one word's. */
   share: number;
-  /** Already read: before the paragraph at the reading line. */
-  read: boolean;
 }
 
-/** The whole script at one width (§6.2): a segment a paragraph in proportion to its read words. */
-export function scriptBar(text: readonly GlassParagraph[], placeParagraph: number): ScriptBarSegment[] {
+/**
+ * The whole script at one width (§6.2): a segment a paragraph in proportion to
+ * its read words. The segments, the cue ticks, the place and a press all use
+ * these shares, so a script of any length fits and a press lands where it is
+ * drawn. It depends on the text alone, so it is worked out once a text.
+ */
+export function scriptBar(text: readonly GlassParagraph[]): ScriptBarSegment[] {
   const words = readWordsOf(text).map((count) => Math.max(count, 1));
   const total = words.reduce((sum, count) => sum + count, 0);
-  return words.map((count, index) => ({ index, share: count / total, read: index < placeParagraph }));
+  let start = 0;
+  return words.map((count, index) => {
+    const segment = { index, start, share: count / total };
+    start += segment.share;
+    return segment;
+  });
 }
 
-/** Where a paragraph starts on the script bar, 0..1. */
+/** Where a paragraph starts on the script bar, 0..1; past the last, the bar's end. */
 export function barStart(segments: readonly ScriptBarSegment[], paragraph: number): number {
-  return segments.slice(0, paragraph).reduce((sum, segment) => sum + segment.share, 0);
+  const segment = segments[paragraph];
+  if (segment) return segment.start;
+  return paragraph <= 0 ? 0 : 1;
 }
 
 /** The paragraph under a press on the bar, `fraction` 0..1 across it. */
 export function paragraphAt(segments: readonly ScriptBarSegment[], fraction: number): number {
-  let edge = 0;
   for (const segment of segments) {
-    edge += segment.share;
-    if (fraction < edge) return segment.index;
+    if (fraction < segment.start + segment.share) return segment.index;
   }
   return Math.max(segments.length - 1, 0);
 }
@@ -271,6 +292,60 @@ export function cutGlassText(glassSnapshot: PrompterGlassSnapshot | null): Glass
 /** Why the take's keys are locked, or `null` (§8: every run key locks while nothing is on the prompter). */
 export function runLockReason(snapshot: PrompterSnapshot | null): string | null {
   return snapshot?.glass ? null : "Nothing is on the prompter. Put a script on it first.";
+}
+
+/** The pace and the size the hardware link takes (`native/protocol/v1.md`, the take): a step stops at the ends. */
+export const SPEED_RANGE = { min: 40, max: 300 } as const;
+export const SIZE_RANGE = { min: 48, max: 160 } as const;
+
+export interface StepLocks {
+  nextParagraph: string | null;
+  previousCue: string | null;
+  nextCue: string | null;
+}
+
+/**
+ * The steps the hardware link would refuse from the place (its own sentences),
+ * so their keys are locked. Only while paused: the place the page holds is
+ * then the hardware link's, and while the text scrolls the page's is up to a
+ * second behind, so the keys stay open and the hardware link answers.
+ */
+export function stepLocks(glass: PrompterGlassSummary | null): StepLocks {
+  if (!glass || glass.playing) return { nextParagraph: null, previousCue: null, nextCue: null };
+  const here = glass.place;
+  const after = (cue: PrompterCue) =>
+    cue.paragraph > here.paragraph || (cue.paragraph === here.paragraph && cue.word > here.word);
+  const before = (cue: PrompterCue) =>
+    cue.paragraph < here.paragraph || (cue.paragraph === here.paragraph && cue.word < here.word);
+  return {
+    nextParagraph: here.paragraph + 1 >= glass.paragraphCount ? "There is no paragraph after the reading line." : null,
+    previousCue: glass.cues.some(before) ? null : "There is no cue before the reading line.",
+    nextCue: glass.cues.some(after) ? null : "There is no cue after the reading line.",
+  };
+}
+
+/** A layout the page's copy reported: each line's paragraph and first word, for its key. */
+export interface ReportedLines {
+  layoutKey: string;
+  lines: readonly { paragraph: number; word: number }[];
+}
+
+/**
+ * Where `BACK` goes, as the hardware link works it out (§5): the start of the
+ * paragraph at the reading line, or, from that paragraph's first line, the
+ * start of the one before; from `END`, the last paragraph. The first line is
+ * read from the layout the copy reported for this key, else from the place's
+ * word alone (a paragraph's first word is on its first line).
+ */
+export function backParagraph(glass: PrompterGlassSummary, reported: ReportedLines | null): number {
+  const { paragraph, word } = glass.place;
+  if (glass.atEnd || paragraph >= glass.paragraphCount) return Math.max(glass.paragraphCount - 1, 0);
+  let onFirstLine = word === 0;
+  if (reported && reported.layoutKey === glass.layoutKey) {
+    const secondLine = reported.lines.find((line) => line.paragraph === paragraph && line.word > 0);
+    onFirstLine = secondLine ? word < secondLine.word : true;
+  }
+  return onFirstLine ? Math.max(paragraph - 1, 0) : paragraph;
 }
 
 /** Why `PLAY` is locked, or `null`: nothing on, nothing drawn on the glass, the end, no layout yet. */
