@@ -13,14 +13,18 @@ __visual__/<spec-filename>-snapshots/<arg>-win32.png
 ```
 
 The `-win32` suffix is Node's `process.platform`, added by `snapshotPathTemplate`
-in [`playwright.config.ts`](../../playwright.config.ts). There are 59:
+in [`playwright.config.ts`](../../playwright.config.ts). There are 74:
 
-- `visual-review.spec.ts-snapshots/` — 19: Setup, the recovery screen
-  (`protocol-mismatch`), Lighting and the Console at 2560×1440, the same four
-  in Graphite and Bone, and seven designed states (Lighting empty and
-  unreachable, Setup degraded, the Console's four warning bands).
-- `storybook.spec.ts-snapshots/` — 40: one per story; the shell stories paint
-  full 2560×1440 frames.
+- `visual-review.spec.ts-snapshots/` — 27: Setup, the recovery screen
+  (`protocol-mismatch`), Lighting, the Console and the Teleprompter at
+  2560×1440, the same five in Graphite and Bone, and twelve designed states
+  (Lighting empty and unreachable, Setup degraded, the Console's four warning
+  bands, and the Teleprompter empty, not connected, not updated, editing and
+  on a new script — the last two reached by the spec's press on Edit script or
+  New script).
+- `storybook.spec.ts-snapshots/` — 47: one per story; the shell stories paint
+  full 2560×1440 frames, and the glass's seven (`teleprompter-glass--*`) draw
+  the Prompter XL's 1920×1080 screen.
 
 ## Where they are compared
 

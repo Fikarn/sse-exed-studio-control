@@ -224,7 +224,7 @@ Facts worth knowing before touching this surface:
 
 - **The front-end never displays a state the engine does not report.** Every state word on screen comes from a snapshot; there are no locally-invented states. This was the rule the whole overhaul was written against.
 - **The ratchets are the test.** No slice added a spec for "does it look right"; each one moved numbers in `ui-contract.ratchets.json` and the gate holds them there. If you are about to write a visual assertion by hand, check whether the census already measures it.
-- **Baselines are win32 only, at 2560×1440** (59: 19 visual-review, 40 Storybook), compared on the studio workstation before each push (the new pages program's cloud slices excepted until the workstation's catch-up, D23); CI compares none. The new pages program's Slice SW removed the `linux` and `darwin` captures and the win32 ones at other sizes; `docs/DEVELOPMENT.md §2b` has the refresh steps.
+- **Baselines are win32 only, at 2560×1440** (74: 27 visual-review, 47 Storybook), compared on the studio workstation before each push (the new pages program's cloud slices, S5a to S8, were caught up there in one catch-up); CI compares none. The new pages program's Slice SW removed the `linux` and `darwin` captures and the win32 ones at other sizes; `docs/DEVELOPMENT.md §2b` has the refresh steps.
 - Three named layout fixes are load-bearing and easy to undo by accident: the Console's tier heads are laid out at zero width and filled to the tier (S10 — otherwise a head with a lock note steals 170 px from the Outputs strips and the canvas clips the Phones levels); the Lighting palette tile puts its keys on a second row (S11 — otherwise the name column collapses to 20 px and no palette shows its name); and the sends row folds to 2 × 2 when its card is narrow (S11 — otherwise `PRE FADER` loses its R at 1920).
 - The eight Lighting components the cluster replaced were deleted in S11, but `LightingRail.module.css` **stays** — six live components still compose from it. The same trap caught the Console's `AudioRail.module.css` before it.
 - `docs/redesign/` holds the whole design pass: the brief, the review, the five Console concepts, the three-viewport study, the polish pass and the system sheet. It is the record of _why_, and it is not source material for new work — the system doc and the plan are.
@@ -403,7 +403,7 @@ Operator-visible frontend change (see `docs/DEVELOPMENT.md §2c`):
 
 ```bash
 npm run build --workspace @sse/frontend-app   # Playwright serves dist — always build first
-cd frontend/app && npx playwright test        # every project: 423 cases since the new pages program's Slice 6b (364 after Slice SW, 391 after Slice 1, 441 before); 59 win32 captures at 2560x1440, compared on Windows only (82 before Slice SW)
+cd frontend/app && npx playwright test        # every project: 428 cases since the new pages program's workstation catch-up (427 after Slice 8, 364 after Slice SW, 391 after Slice 1, 441 before); 74 win32 captures at 2560x1440, compared on Windows only (59 until the catch-up, 82 before Slice SW)
 node scripts/ui-census.mjs                    # the 81-board UI contract (75 before Slice 6b, 63 before Slice 6a, 66 before Slice SW, 81 before Slice 1); ~4 min
 cd ../.. && node scripts/check-operator-copy.mjs
 ```
