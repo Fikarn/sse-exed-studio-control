@@ -36,12 +36,10 @@ windows = "0.61"
 # The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
 # difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
 # cannot be lifted even for one item. WebView2's settings are COM calls, which
-# are `unsafe` in the `windows` bindings, so two Windows-only functions carry
-# the only `#[allow(unsafe_code)]` in this crate: `set_browser_accelerator_keys_off`
-# in main.rs (called by `switch_off_browser_keys`, decision 12) and
-# `add_clipboard_read_handler` in shell_clipboard.rs (called by
-# `allow_clipboard_reads`, the new pages program's Slice 6b); anything else
-# that uses `unsafe` still fails the build.
+# are `unsafe` in the `windows` bindings, so `set_browser_accelerator_keys_off`
+# in main.rs (Windows only, called by `switch_off_browser_keys`, decision 12)
+# carries the one `#[allow(unsafe_code)]` in this crate; anything else that
+# uses `unsafe` still fails the build.
 [lints.rust]
 unsafe_code = "deny"
 

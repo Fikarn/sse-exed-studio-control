@@ -4,12 +4,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod engine;
-mod shell_clipboard;
 mod shell_log;
+mod shell_windows;
 
 use engine::{EngineBootstrapSummary, EngineBridge};
 use serde_json::{json, Value};
-use shell_clipboard::{allow_clipboard_reads, MAIN_WINDOW_LABEL};
+use shell_windows::{build_main_window, MAIN_WINDOW_LABEL};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs::{canonicalize, create_dir_all, read_to_string, remove_file, write};
@@ -1233,49 +1233,49 @@ fn main() {
             close_confirmed: AtomicBool::new(false),
         })
         .setup(|app| {
-            if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-                // Decision 12: WebView2's own reload, find, print and zoom
-                // keys go off first — before WebView2 delivers the page's
-                // first NavigationStarting, and before the window shows.
-                #[cfg(windows)]
-                switch_off_browser_keys(app.handle(), &window);
-                // Slice 6b: the page may read the clipboard, in this window
-                // alone, and WebView2 never saves that leave
-                // (`shell_clipboard.rs`).
-                allow_clipboard_reads(app.handle(), &window);
-                let _ = window.show();
-                let app_handle = app.handle().clone();
-                restore_or_route_initial_window(&app_handle, &window);
-                let window_for_events = window.clone();
-                window.on_window_event(move |event| {
-                    // 2026-09 audit Slice 11: closing asks first. Until the
-                    // operator confirms (or automation opts out), keep the
-                    // window and let the frontend raise the dialog.
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        let confirmed = app_handle
-                            .state::<EngineState>()
-                            .close_confirmed
-                            .load(Ordering::SeqCst);
-                        let skip = env::var(SHELL_SKIP_CLOSE_CONFIRM_ENV).ok();
-                        if close_policy(confirmed, skip.as_deref()) == ClosePolicy::Prevent {
-                            api.prevent_close();
-                            let _ = window_for_events.emit(SHELL_CLOSE_REQUESTED_EVENT, ());
-                            return;
-                        }
-                    }
-                    if !matches!(
-                        event,
-                        tauri::WindowEvent::Resized(_)
-                            | tauri::WindowEvent::Moved(_)
-                            | tauri::WindowEvent::ScaleFactorChanged { .. }
-                            | tauri::WindowEvent::Focused(false)
-                            | tauri::WindowEvent::CloseRequested { .. }
-                    ) {
+            // Slice 6b: the main window is `"create": false` in tauri.conf.json,
+            // so Tauri no longer builds it just before this closure: it is
+            // built here, first, from that entry, with WebView2's
+            // clipboard-read permission (`shell_windows.rs`). A failure fails
+            // the setup, as Tauri's own build did.
+            let window = build_main_window(app.handle())?;
+            // Decision 12: WebView2's own reload, find, print and zoom
+            // keys go off first — before WebView2 delivers the page's
+            // first NavigationStarting, and before the window shows.
+            #[cfg(windows)]
+            switch_off_browser_keys(app.handle(), &window);
+            let _ = window.show();
+            let app_handle = app.handle().clone();
+            restore_or_route_initial_window(&app_handle, &window);
+            let window_for_events = window.clone();
+            window.on_window_event(move |event| {
+                // 2026-09 audit Slice 11: closing asks first. Until the
+                // operator confirms (or automation opts out), keep the
+                // window and let the frontend raise the dialog.
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    let confirmed = app_handle
+                        .state::<EngineState>()
+                        .close_confirmed
+                        .load(Ordering::SeqCst);
+                    let skip = env::var(SHELL_SKIP_CLOSE_CONFIRM_ENV).ok();
+                    if close_policy(confirmed, skip.as_deref()) == ClosePolicy::Prevent {
+                        api.prevent_close();
+                        let _ = window_for_events.emit(SHELL_CLOSE_REQUESTED_EVENT, ());
                         return;
                     }
-                    persist_current_window_preferences(&app_handle, &window_for_events);
-                });
-            }
+                }
+                if !matches!(
+                    event,
+                    tauri::WindowEvent::Resized(_)
+                        | tauri::WindowEvent::Moved(_)
+                        | tauri::WindowEvent::ScaleFactorChanged { .. }
+                        | tauri::WindowEvent::Focused(false)
+                        | tauri::WindowEvent::CloseRequested { .. }
+                ) {
+                    return;
+                }
+                persist_current_window_preferences(&app_handle, &window_for_events);
+            });
             Ok(())
         });
 
