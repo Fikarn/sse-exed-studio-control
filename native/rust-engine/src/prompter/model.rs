@@ -179,15 +179,31 @@ pub(crate) fn word_count(paragraphs: &[PrompterParagraph]) -> usize {
 pub(crate) fn read_flags(paragraph: &PrompterParagraph) -> Vec<bool> {
     let text = paragraph.text();
     let cues = cue_spans(&text);
+    // One pass over the words and the cues together, both in order (review
+    // of 2026-09-27: checking every character against every cue was
+    // quadratic, and a paragraph of thousands of cue lines stalled an import).
+    let mut first_cue = 0;
     word_spans(&text)
         .into_iter()
         .map(|(begin, end)| {
-            text[begin..end].char_indices().any(|(offset, _)| {
-                let at = begin + offset;
-                !cues
-                    .iter()
-                    .any(|(cue_begin, cue_end)| at >= *cue_begin && at < *cue_end)
-            })
+            while cues
+                .get(first_cue)
+                .is_some_and(|(_, cue_end)| *cue_end <= begin)
+            {
+                first_cue += 1;
+            }
+            let mut at = begin;
+            let mut cue = first_cue;
+            while at < end {
+                match cues.get(cue) {
+                    Some((cue_begin, cue_end)) if *cue_begin <= at => {
+                        at = at.max(*cue_end);
+                        cue += 1;
+                    }
+                    _ => return true,
+                }
+            }
+            false
         })
         .collect()
 }
@@ -222,16 +238,17 @@ pub(crate) fn cue_targets(paragraphs: &[PrompterParagraph]) -> Vec<CueTarget> {
     let mut targets = Vec::new();
     for (paragraph_index, paragraph) in paragraphs.iter().enumerate() {
         let text = paragraph.text();
+        // The paragraph's words once, and each cue line's first word found by
+        // a binary search (review of 2026-09-27: counting them again for
+        // every cue line was quadratic).
+        let words = word_spans(&text);
         let mut line_start = 0;
         for line in text.split('\n') {
             let trimmed = line.trim();
             let is_cue = trimmed.len() >= 2 && cue_spans(trimmed) == vec![(0, trimmed.len())];
             if is_cue {
                 let first_word_offset = line_start + (line.len() - line.trim_start().len());
-                let word = word_spans(&text)
-                    .iter()
-                    .position(|(begin, _)| *begin == first_word_offset)
-                    .unwrap_or(0);
+                let word = words.partition_point(|(begin, _)| *begin < first_word_offset);
                 targets.push(CueTarget {
                     paragraph: paragraph_index,
                     word,
@@ -360,6 +377,30 @@ mod tests {
                 },
             ]
         );
+    }
+
+    // Review of 2026-09-27: a paragraph of 30,000 cue lines — within the
+    // word limit — counted its words once per cue line and checked every
+    // character against every cue, which stalled an import for minutes. Both
+    // counts are one pass now.
+    #[test]
+    fn a_paragraph_of_many_cue_lines_counts_in_one_pass() {
+        let line = format!("[{}]", "a".repeat(600));
+        let paragraph = PrompterParagraph::plain(vec![line; 30_000].join("\n"));
+        let started = std::time::Instant::now();
+        assert_eq!(cue_targets(std::slice::from_ref(&paragraph)).len(), 30_000);
+        assert_eq!(
+            cue_targets(std::slice::from_ref(&paragraph))[29_999].word,
+            29_999
+        );
+        assert!(read_flags(&paragraph).iter().all(|read| !read));
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(5),
+            "{:?}",
+            started.elapsed()
+        );
+        let mixed = PrompterParagraph::plain("a[b] [c]d [e][f] g");
+        assert_eq!(read_flags(&mixed), [true, true, false, true]);
     }
 
     #[test]

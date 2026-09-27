@@ -427,3 +427,105 @@ fn speed_size_and_look_stay_in_their_ranges() {
         "dimming changes no line"
     );
 }
+
+// Review of 2026-09-27 (M1): the script on the glass keeps its place in the
+// glass's text; when it was edited and never Updated, Clear and Replace carry
+// the place into the edited text. (It was saved as it stood: five paragraphs
+// cut above the reading line put the next put-on five paragraphs late.)
+#[test]
+fn letting_go_of_an_edited_script_carries_its_place_into_its_text() {
+    let prompter = TestPrompter::new("release-edited");
+    let paragraphs: Vec<String> = (0..10)
+        .map(|index| format!("Paragraph number {index} here."))
+        .collect();
+    let texts: Vec<&str> = paragraphs.iter().map(String::as_str).collect();
+    let script = prompter.script("Talk", &texts);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.call(
+        "prompter.jump",
+        json!({ "to": "place", "paragraph": 7, "word": 2 }),
+    );
+    // Paragraphs 2 to 4 cut, with no Update.
+    let edited: Vec<&str> = texts[..2]
+        .iter()
+        .chain(texts[5..].iter())
+        .copied()
+        .collect();
+    prompter.edit(&script, &edited);
+    prompter.call("prompter.clear", json!({}));
+    assert_eq!(
+        place(&prompter.snapshot()["scripts"][0]["place"]),
+        (4, 2),
+        "the same words, in the edited text"
+    );
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    assert_eq!(place(&prompter.snapshot()["glass"]["place"]), (4, 2));
+}
+
+// Review of 2026-09-27 (L1): when a request is the first to find the text at
+// END, it says so with `at-end` as the clock's thread would.
+#[test]
+fn whoever_finds_the_text_at_the_end_announces_it() {
+    let prompter = TestPrompter::new("announce-end");
+    let script = prompter.script("Short", &["Go."]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.lay_out(5, 10.0);
+    prompter.call("prompter.speed", json!({ "wpm": 300 }));
+    crate::prompter::runtime::ANNOUNCED_ENDS.with(|ends| ends.borrow_mut().clear());
+    prompter.call("prompter.play", json!({}));
+    thread::sleep(Duration::from_millis(700));
+    prompter.snapshot();
+    let announced = crate::prompter::runtime::ANNOUNCED_ENDS.with(|ends| ends.borrow().clone());
+    assert_eq!(announced.len(), 1);
+    assert!(announced[0].at_end && !announced[0].playing);
+}
+
+// Review of 2026-09-27 (L3): from the last paragraph there is no next one,
+// and the text does not move (it went back to the paragraph's start).
+#[test]
+fn there_is_no_paragraph_after_the_last() {
+    let prompter = TestPrompter::new("no-next");
+    let script = prompter.script("Talk", &["one two three", "four five six"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.call(
+        "prompter.jump",
+        json!({ "to": "place", "paragraph": 1, "word": 2 }),
+    );
+    let (code, sentence) = prompter.refused("prompter.jump", json!({ "to": "nextParagraph" }));
+    assert_eq!(code, "PROMPTER_NO_PARAGRAPH");
+    assert_eq!(sentence, "There is no paragraph after the reading line.");
+    assert_eq!(place(&prompter.snapshot()["glass"]["place"]), (1, 2));
+}
+
+// Review of 2026-09-27 (L4): the first layout reported for a key is the one
+// the clock runs on; another view's for the same key moves nothing.
+#[test]
+fn the_first_layout_for_a_key_is_the_one_the_clock_runs_on() {
+    let prompter = TestPrompter::new("first-layout");
+    let script = prompter.script("Talk", &["one two three four five six seven eight"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.lay_out(4, 100.0);
+    prompter.call(
+        "prompter.jump",
+        json!({ "to": "place", "paragraph": 0, "word": 5 }),
+    );
+    let before = prompter.snapshot()["glass"]["anchor"].clone();
+    let reply = prompter.reply("prompter.layout.report", {
+        let glass = prompter.call("prompter.glass.snapshot", json!({}));
+        json!({
+            "layoutKey": glass["layoutKey"],
+            "lines": [
+                { "paragraph": 0, "word": 0, "top": 0, "height": 90 },
+                { "paragraph": 0, "word": 3, "top": 90, "height": 90 },
+                { "paragraph": 0, "word": 6, "top": 180, "height": 90 }
+            ],
+            "endTop": 400
+        })
+    });
+    let reply = reply.expect("a second report is answered");
+    assert_eq!(reply.result["accepted"], true);
+    assert_eq!(reply.reason, None, "nothing moved, nothing to say");
+    let after = prompter.snapshot()["glass"]["anchor"].clone();
+    assert_eq!(after["position"], before["position"]);
+    assert_eq!(after["wordOffset"], before["wordOffset"]);
+}

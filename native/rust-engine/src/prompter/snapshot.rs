@@ -255,7 +255,7 @@ pub(crate) fn read_snapshot(
                 laid_out: glass.layout.is_some(),
                 not_updated,
                 speed_wpm: glass.speed_wpm,
-                place: glass.place_at(now).0,
+                place: glass.place_at(now),
                 paragraph_count: glass.paragraph_count(),
                 playing: glass.playing,
                 at_end: glass.at_end(now),

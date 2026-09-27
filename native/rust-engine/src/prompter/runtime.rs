@@ -10,6 +10,7 @@
 //! does the same first (`with_prompter`), so nothing depends on the thread
 //! but the moment `prompter.changed` reports the stop.
 
+use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_prompter_changed;
 use crate::prompter::clock::{GlassClock, PrompterPlace};
 use crate::prompter::look::PrompterLook;
@@ -63,7 +64,7 @@ impl Prompter {
             }
             _ => None,
         };
-        let saved_place = glass.as_ref().map(|glass| glass.motion.place);
+        let saved_place = glass.as_ref().map(|glass| glass.place_at(now));
         Ok(Self {
             look: stored.look,
             size_px: stored.size_px,
@@ -80,20 +81,31 @@ impl Prompter {
     }
 
     /// Saves the glass script's place when it moved since the last save.
-    pub(crate) fn save_place(
-        &mut self,
-        connection: &Connection,
-        now: Instant,
-    ) -> Result<(), PrompterError> {
-        if let Some(glass) = &self.glass {
-            let (place, _) = glass.place_at(now);
-            if self.saved_place != Some(place) {
-                store::write_script_place(connection, &glass.script_id, place)?;
-                self.saved_place = Some(place);
-            }
+    pub(crate) fn save_place(&mut self, connection: &Connection, now: Instant) {
+        if let Some(place) = self.glass.as_ref().map(|glass| glass.place_at(now)) {
+            self.save_this_place(connection, place);
         }
         self.saved_at = now;
-        Ok(())
+    }
+
+    /// Saves `place` as the glass script's place. A save that fails is a
+    /// `WARN` line, never a failed request (review of 2026-09-27): the take's
+    /// controls — a pause above all — must act on the glass whatever the disk
+    /// does, and the next save tries again.
+    pub(crate) fn save_this_place(&mut self, connection: &Connection, place: PrompterPlace) {
+        let Some(glass) = &self.glass else {
+            return;
+        };
+        if self.saved_place == Some(place) {
+            return;
+        }
+        match store::write_script_place(connection, &glass.script_id, place) {
+            Ok(()) => self.saved_place = Some(place),
+            Err(error) => log_event(
+                LogLevel::Warn,
+                &format!("Prompter: the place could not be saved: {error}"),
+            ),
+        }
     }
 
     /// The glass has another script, or none: its place counts as saved.
@@ -102,18 +114,24 @@ impl Prompter {
         self.saved_at = now;
     }
 
-    /// Stops the text at `END` if it got there, and saves the place when a
-    /// second has passed. True when the text stopped now.
-    fn settle(&mut self, connection: &Connection, now: Instant) -> Result<bool, PrompterError> {
+    /// Stops the text at `END` if it got there — and says so with
+    /// `prompter.changed { reason: "at-end" }`, whoever noticed first, the
+    /// clock's thread or a request (review of 2026-09-27: a request that
+    /// noticed first used to keep it to itself) — and saves the place when a
+    /// second has passed.
+    fn settle(&mut self, connection: &Connection, now: Instant) {
         let Some(glass) = self.glass.as_mut() else {
-            return Ok(false);
+            return;
         };
         let stopped = glass.settle(now);
         let playing = glass.playing;
-        if stopped || (playing && now.saturating_duration_since(self.saved_at) >= SAVE_EVERY) {
-            self.save_place(connection, now)?;
+        if stopped {
+            let anchor = glass.anchor(now);
+            announce_end(anchor);
         }
-        Ok(stopped)
+        if stopped || (playing && now.saturating_duration_since(self.saved_at) >= SAVE_EVERY) {
+            self.save_place(connection, now);
+        }
     }
 
     /// How long the thread may sleep: until `END`, or the next save while the
@@ -174,7 +192,7 @@ pub(crate) fn with_prompter<T>(
         *guard = Some(Prompter::load(&connection, now)?);
     }
     let prompter = guard.as_mut().expect("loaded above");
-    prompter.settle(&connection, now)?;
+    prompter.settle(&connection, now);
     let result = action(prompter, &mut connection, now);
     entry.wake.notify_all();
     result
@@ -205,10 +223,7 @@ pub(crate) fn spawn_prompter_clock(db_path: PathBuf) {
                     Some(prompter) => {
                         let now = Instant::now();
                         if let Ok(connection) = open_connection(&db_path) {
-                            if let Ok(true) = prompter.settle(&connection, now) {
-                                let anchor = prompter.glass.as_ref().map(|glass| glass.anchor(now));
-                                emit_prompter_changed("at-end", anchor);
-                            }
+                            prompter.settle(&connection, now);
                         }
                         prompter.next_wake(Instant::now())
                     }
@@ -220,4 +235,19 @@ pub(crate) fn spawn_prompter_clock(db_path: PathBuf) {
                     .unwrap_or_else(|poisoned| poisoned.into_inner());
             }
         });
+}
+
+/// `prompter.changed { reason: "at-end" }`: the text stopped at `END`.
+fn announce_end(anchor: crate::prompter::clock::PrompterAnchor) {
+    #[cfg(test)]
+    ANNOUNCED_ENDS.with(|ends| ends.borrow_mut().push(anchor.clone()));
+    emit_prompter_changed("at-end", Some(anchor));
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The ends announced on this thread, for the tests (the event sender is
+    /// not registered there).
+    pub(crate) static ANNOUNCED_ENDS: std::cell::RefCell<Vec<crate::prompter::clock::PrompterAnchor>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }

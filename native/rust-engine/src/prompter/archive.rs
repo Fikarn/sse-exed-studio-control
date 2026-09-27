@@ -13,6 +13,7 @@
 //! stay where they are (`after_archive_restore`).
 
 use crate::prompter::clock::{speed_is_valid, PrompterPlace, SPEED_DEFAULT_WPM};
+use crate::prompter::edits::map_place;
 use crate::prompter::look::{size_is_valid, PrompterLook, STANDARD_SIZE_PX};
 use crate::prompter::model::{sanitize_text, PrompterParagraph, MAX_SCRIPT_NAME_CHARS};
 use crate::prompter::store::{self, reason, NewScript};
@@ -81,6 +82,17 @@ pub(crate) fn build_prompter_archive(connection: &Connection) -> EngineResult<Pr
                 reason: version.reason,
             })
             .collect();
+        // The script on the glass keeps its place in the glass's text; when it
+        // was edited since it went on, the archive carries the place in its
+        // own text (review of 2026-09-27).
+        let place = match (&stored.glass_script_id, &stored.glass_paragraphs) {
+            (Some(glass_id), Some(glass_text))
+                if *glass_id == script.id && *glass_text != script.paragraphs =>
+            {
+                map_place(glass_text, &script.paragraphs, script.place).0
+            }
+            _ => script.place,
+        };
         scripts.push(ArchivedScript {
             id: script.id,
             name: script.name,
@@ -89,7 +101,7 @@ pub(crate) fn build_prompter_archive(connection: &Connection) -> EngineResult<Pr
             created_at: script.created_at,
             changed_at: script.changed_at,
             speed_wpm: script.speed_wpm,
-            place: script.place,
+            place,
             removed_at: script.removed_at,
             versions,
         });

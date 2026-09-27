@@ -9,8 +9,10 @@
 //! place, the pace, playing or not, and the stop at `END`.
 //!
 //! **The anchor.** The two processes share no clock, so every change sends an
-//! anchor (`PrompterAnchor`): the place in words at that moment (a paragraph,
-//! a word and how far down its line), its position in pixels when laid out,
+//! anchor (`PrompterAnchor`): the place in words at that moment (a paragraph
+//! and the word at the reading line, with `wordOffset` how far into the
+//! paragraph, in words, the reading line stands), its position in pixels when
+//! laid out,
 //! the pace before and after with the 0.3 s ease, and how old the anchor was
 //! when sent. The glass and the page's copy both draw the motion from it:
 //!
@@ -32,6 +34,13 @@
 //! arriving while the text scrolls keeps the words at the reading line: the
 //! motion goes on in words until the new layout comes, and is then
 //! re-anchored in the new pixels.
+//!
+//! **Words, not lines, carry the place from one layout to the next** (review
+//! of 2026-09-27). Inside a line the reading line's height is taken as a share
+//! of the line's words, so a word offset turns into a height in any layout and
+//! back again; a new size moves the words at the reading line by less than a
+//! word. (It kept the line's first word and a share of the line's height until
+//! then, which moved the text by up to a line.)
 
 use crate::prompter::model::{paragraph_word_count, read_flags, PrompterParagraph};
 use serde::{Deserialize, Serialize};
@@ -47,8 +56,9 @@ pub(crate) const SPEED_MIN_WPM: u32 = 40;
 pub(crate) const SPEED_MAX_WPM: u32 = 300;
 pub(crate) const SPEED_STEP_WPM: u32 = 5;
 pub(crate) const SPEED_DEFAULT_WPM: u32 = 140;
-/// A place this close to a line's top reads as that line's start.
-const AT_LINE_START: f64 = 0.02;
+/// Two word offsets this close are the same place (a cue at the reading line
+/// is not "the next cue").
+const SAME_PLACE: f64 = 0.02;
 
 /// A place in a script: a paragraph and a word in it, both from 0. The
 /// paragraph after the last one (`paragraph == paragraph count`, word 0) is
@@ -113,6 +123,8 @@ pub(crate) struct Layout {
     pub end_top: f64,
     /// The layout's height per read word: the pace's pixels.
     pub px_per_read_word: f64,
+    /// Each paragraph's words, cues included, for the words of a line.
+    pub paragraph_words: Vec<u32>,
 }
 
 impl Layout {
@@ -199,20 +211,32 @@ impl Layout {
             .iter()
             .map(|paragraph| read_flags(paragraph).iter().filter(|read| **read).count())
             .sum();
-        let px_per_read_word = (text_bottom - first.top) / read_words.max(1) as f64;
+        // A script of cues alone has no read word: it is paced by all its
+        // words, so it does not run through in one word's time (review of
+        // 2026-09-27).
+        let pace_words = if read_words > 0 {
+            read_words
+        } else {
+            word_counts
+                .iter()
+                .map(|words| *words as usize)
+                .sum::<usize>()
+        };
+        let px_per_read_word = (text_bottom - first.top) / pace_words.max(1) as f64;
         Ok(Self {
             key,
             lines,
             end_top,
             px_per_read_word,
+            paragraph_words: word_counts,
         })
     }
 
-    /// The index of the line that holds `place`: the last line starting at
-    /// or before it.
-    fn line_of(&self, place: PrompterPlace) -> usize {
+    /// The index of the line that holds word `word` of `paragraph`: the last
+    /// line starting at or before it.
+    fn line_of(&self, paragraph: u32, word: u32) -> usize {
         self.lines
-            .partition_point(|line| (line.paragraph, line.word) <= (place.paragraph, place.word))
+            .partition_point(|line| (line.paragraph, line.word) <= (paragraph, word))
             .saturating_sub(1)
     }
 
@@ -224,42 +248,58 @@ impl Layout {
             .saturating_sub(1)
     }
 
-    /// Where the reading line stands for a place `fraction` of the way down
-    /// its line; the end is `end_top`.
-    pub(crate) fn position_of(
-        &self,
-        place: PrompterPlace,
-        fraction: f64,
-        paragraph_count: u32,
-    ) -> f64 {
-        if place.paragraph >= paragraph_count {
-            return self.end_top;
-        }
-        let line = self.lines[self.line_of(place)];
-        (line.top + fraction.clamp(0.0, 1.0) * line.height).min(self.end_top)
+    /// How many words line `index` holds: up to the next line of its
+    /// paragraph, else to the paragraph's end; at least one.
+    fn line_words(&self, index: usize) -> f64 {
+        let line = self.lines[index];
+        let until = match self.lines.get(index + 1) {
+            Some(next) if next.paragraph == line.paragraph => next.word,
+            _ => self
+                .paragraph_words
+                .get(line.paragraph as usize)
+                .copied()
+                .unwrap_or(line.word + 1),
+        };
+        f64::from(until.saturating_sub(line.word).max(1))
     }
 
-    /// The place at the reading line when it stands at `position`, and how
-    /// far down its line.
-    pub(crate) fn place_at(&self, position: f64, paragraph_count: u32) -> (PrompterPlace, f64) {
-        if position >= self.end_top {
-            return (
-                PrompterPlace {
-                    paragraph: paragraph_count,
-                    word: 0,
-                },
-                0.0,
-            );
+    /// Where the reading line stands when it is `word_offset` words into
+    /// `paragraph`; the end is `end_top`.
+    pub(crate) fn position_of(
+        &self,
+        paragraph: u32,
+        word_offset: f64,
+        paragraph_count: u32,
+    ) -> f64 {
+        if paragraph >= paragraph_count {
+            return self.end_top;
         }
-        let line = self.lines[self.line_at(position)];
-        let fraction = ((position - line.top) / line.height).clamp(0.0, 0.999);
+        let offset = word_offset.max(0.0);
+        let index = self.line_of(paragraph, offset.floor() as u32);
+        let line = self.lines[index];
+        let share = ((offset - f64::from(line.word)) / self.line_words(index)).clamp(0.0, 1.0);
+        (line.top + share * line.height).min(self.end_top)
+    }
+
+    /// The paragraph and the word offset at the reading line when it stands
+    /// at `position`; the end is the paragraph after the last.
+    pub(crate) fn words_at(&self, position: f64, paragraph_count: u32) -> (u32, f64) {
+        if position >= self.end_top {
+            return (paragraph_count, 0.0);
+        }
+        let index = self.line_at(position);
+        let line = self.lines[index];
+        let share = ((position - line.top) / line.height).clamp(0.0, 0.999);
         (
-            PrompterPlace {
-                paragraph: line.paragraph,
-                word: line.word,
-            },
-            fraction,
+            line.paragraph,
+            f64::from(line.word) + share * self.line_words(index),
         )
+    }
+
+    /// The first word of the line at the reading line when it stands at
+    /// `position`.
+    pub(crate) fn line_start_at(&self, position: f64) -> u32 {
+        self.lines[self.line_at(position)].word
     }
 
     /// One line on or back from `position`, keeping how far down the line
@@ -284,9 +324,10 @@ impl Layout {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Motion {
     pub at: Instant,
-    pub place: PrompterPlace,
-    /// How far down its line the place stands, 0 to 1.
-    pub fraction: f64,
+    pub paragraph: u32,
+    /// How far into the paragraph the reading line stands, in words: 6.5 is
+    /// halfway through its seventh word.
+    pub word_offset: f64,
     pub from_wpm: f64,
     pub to_wpm: f64,
     pub ramp_ms: f64,
@@ -295,11 +336,11 @@ pub(crate) struct Motion {
 }
 
 impl Motion {
-    pub(crate) fn resting(at: Instant, place: PrompterPlace, fraction: f64) -> Self {
+    pub(crate) fn resting(at: Instant, paragraph: u32, word_offset: f64) -> Self {
         Self {
             at,
-            place,
-            fraction,
+            paragraph,
+            word_offset,
             from_wpm: 0.0,
             to_wpm: 0.0,
             ramp_ms: 0.0,
@@ -346,13 +387,17 @@ impl Motion {
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct PrompterAnchor {
     /// The layout this anchor's pixels belong to; a view whose layout has
-    /// another key draws from `place` and `lineFraction` and reports its
-    /// layout.
+    /// another key draws from `place.paragraph` and `wordOffset` and reports
+    /// its layout.
     #[serde(rename = "layoutKey")]
     pub layout_key: String,
+    /// The paragraph and the word at the reading line.
     pub place: PrompterPlace,
-    #[serde(rename = "lineFraction")]
-    pub line_fraction: f64,
+    /// How far into `place.paragraph` the reading line stands, in words
+    /// (`place.word` is its whole part). Inside a line, a view takes the
+    /// height as a share of the line's words.
+    #[serde(rename = "wordOffset")]
+    pub word_offset: f64,
     /// The reading line's position at the anchor, in the glass's pixels;
     /// `null` until the layout is reported.
     pub position: Option<f64>,
@@ -410,7 +455,7 @@ impl GlassClock {
             paragraphs,
             layout_key,
             layout: None,
-            motion: Motion::resting(now, place, 0.0),
+            motion: Motion::resting(now, place.paragraph, f64::from(place.word)),
             playing: false,
             speed_wpm,
         }
@@ -420,56 +465,94 @@ impl GlassClock {
         self.paragraphs.len() as u32
     }
 
+    /// The anchor's position in the layout, when laid out.
+    fn anchor_position(&self) -> Option<f64> {
+        self.layout.as_ref().map(|layout| {
+            layout.position_of(
+                self.motion.paragraph,
+                self.motion.word_offset,
+                self.paragraph_count(),
+            )
+        })
+    }
+
     /// The reading line's position at `now`, when laid out.
     pub(crate) fn position_at(&self, now: Instant) -> Option<f64> {
         let layout = self.layout.as_ref()?;
-        let base = layout.position_of(
-            self.motion.place,
-            self.motion.fraction,
-            self.paragraph_count(),
-        );
+        let base = self.anchor_position()?;
         let advanced = self.motion.words_advanced(self.motion.elapsed_ms(now));
         Some((base + advanced * layout.px_per_read_word).min(layout.end_top))
     }
 
-    /// The place at `now` and how far down its line: from the layout when
-    /// there is one, else by counting the read words the text has moved.
-    pub(crate) fn place_at(&self, now: Instant) -> (PrompterPlace, f64) {
-        match (self.position_at(now), self.layout.as_ref()) {
-            (Some(position), Some(layout)) => layout.place_at(position, self.paragraph_count()),
-            _ => {
-                let advanced = self.motion.words_advanced(self.motion.elapsed_ms(now));
-                if advanced < 1.0 {
-                    (self.motion.place, self.motion.fraction)
-                } else {
-                    (
-                        advance_by_read_words(
-                            &self.paragraphs,
-                            self.motion.place,
-                            advanced.floor() as usize,
-                        ),
-                        0.0,
-                    )
-                }
-            }
+    /// The paragraph and the word offset at the reading line at `now`: from
+    /// the layout when there is one, else by counting the read words the text
+    /// has moved.
+    pub(crate) fn words_at(&self, now: Instant) -> (u32, f64) {
+        if let (Some(position), Some(layout)) = (self.position_at(now), self.layout.as_ref()) {
+            return layout.words_at(position, self.paragraph_count());
+        }
+        let advanced = self.motion.words_advanced(self.motion.elapsed_ms(now));
+        let offset = self.motion.word_offset.max(0.0);
+        let travelled = offset.fract() + advanced;
+        if travelled < 1.0 {
+            return (self.motion.paragraph, offset + advanced);
+        }
+        let start = PrompterPlace {
+            paragraph: self.motion.paragraph,
+            word: offset.floor() as u32,
+        };
+        let reached = advance_by_read_words(&self.paragraphs, start, travelled.floor() as usize);
+        if reached.paragraph >= self.paragraph_count() {
+            return (self.paragraph_count(), 0.0);
+        }
+        (
+            reached.paragraph,
+            f64::from(reached.word) + travelled.fract(),
+        )
+    }
+
+    /// The place at `now`: the paragraph and the word at the reading line.
+    pub(crate) fn place_at(&self, now: Instant) -> PrompterPlace {
+        let (paragraph, offset) = self.words_at(now);
+        PrompterPlace {
+            paragraph,
+            word: offset.floor() as u32,
         }
     }
 
+    /// The place where the text will stand when the ease under way is over:
+    /// what a pause saves (review of 2026-09-27: saving at the moment of the
+    /// press left the place up to a line early).
+    pub(crate) fn resting_place(&self, now: Instant) -> PrompterPlace {
+        let left = (self.motion.ramp_ms - self.motion.elapsed_ms(now)).max(0.0);
+        self.place_at(now + std::time::Duration::from_secs_f64(left / 1000.0))
+    }
+
     pub(crate) fn at_end(&self, now: Instant) -> bool {
-        self.place_at(now).0.paragraph >= self.paragraph_count()
+        self.words_at(now).0 >= self.paragraph_count()
+    }
+
+    /// The first word of the line at the reading line: `BACK`'s "first line
+    /// of the paragraph" is the line starting at word 0. Without a layout,
+    /// the word at the reading line.
+    pub(crate) fn line_start_at(&self, now: Instant) -> u32 {
+        match (self.position_at(now), self.layout.as_ref()) {
+            (Some(position), Some(layout)) => layout.line_start_at(position),
+            _ => self.place_at(now).word,
+        }
     }
 
     /// Folds the motion so far into a new anchor at `now`, keeping the pace
     /// and what is left of an ease.
     fn rebase(&mut self, now: Instant) {
         let elapsed = self.motion.elapsed_ms(now);
-        let (place, fraction) = self.place_at(now);
+        let (paragraph, word_offset) = self.words_at(now);
         let speed = self.motion.speed_at(elapsed);
         let ramp_left = (self.motion.ramp_ms - elapsed).max(0.0);
         self.motion = Motion {
             at: now,
-            place,
-            fraction,
+            paragraph,
+            word_offset,
             from_wpm: speed,
             to_wpm: self.motion.to_wpm,
             ramp_ms: ramp_left,
@@ -508,10 +591,10 @@ impl GlassClock {
         }
     }
 
-    /// A jump to `place` (`fraction` of its line down): the place is the
+    /// A jump to `word_offset` words into `paragraph`: the place is the
     /// target at once, the glass draws a 0.2 s move, and the scroll goes on
     /// as it was — or stops when `pause` (`TOP`).
-    pub(crate) fn jump(&mut self, now: Instant, place: PrompterPlace, fraction: f64, pause: bool) {
+    pub(crate) fn jump(&mut self, now: Instant, paragraph: u32, word_offset: f64, pause: bool) {
         let from = self.position_at(now);
         if pause {
             self.playing = false;
@@ -521,15 +604,33 @@ impl GlassClock {
         } else {
             0.0
         };
+        let (paragraph, word_offset) = self.clamped(paragraph, word_offset);
         self.motion = Motion {
             at: now,
-            place: place.clamped(&self.paragraphs),
-            fraction,
+            paragraph,
+            word_offset,
             from_wpm: speed,
             to_wpm: speed,
             ramp_ms: 0.0,
             move_from: from,
         };
+    }
+
+    /// A word offset the text on the glass has: inside its paragraph, or the
+    /// end.
+    fn clamped(&self, paragraph: u32, word_offset: f64) -> (u32, f64) {
+        if paragraph >= self.paragraph_count() {
+            return (self.paragraph_count(), 0.0);
+        }
+        let words = paragraph_word_count(&self.paragraphs[paragraph as usize]) as f64;
+        (paragraph, word_offset.clamp(0.0, (words - 0.001).max(0.0)))
+    }
+
+    /// Stops the text where it is, at once: after a restore (D12).
+    pub(crate) fn hold(&mut self, now: Instant) {
+        let (paragraph, word_offset) = self.words_at(now);
+        self.playing = false;
+        self.motion = Motion::resting(now, paragraph, word_offset);
     }
 
     /// The glass is to be laid out again (a new look or size): the words at
@@ -541,24 +642,28 @@ impl GlassClock {
         self.layout_key = layout_key;
     }
 
-    /// New text on the glass (an Update): the place is `place` in the new
-    /// text, the scroll goes on as it was, and the layout waits for the view.
+    /// New text on the glass (an Update): the reading line stands at `place`
+    /// in the new text — `keep_share` when that is the same word it was
+    /// reading, so the share of the word it had stays — the scroll goes on as
+    /// it was, and the layout waits for the view.
     pub(crate) fn replace_text(
         &mut self,
         now: Instant,
         paragraphs: Arc<Vec<PrompterParagraph>>,
         layout_key: String,
         place: PrompterPlace,
+        keep_share: bool,
     ) {
-        let (_, fraction) = self.place_at(now);
         self.rebase(now);
-        self.paragraphs = paragraphs;
-        self.motion.place = place.clamped(&self.paragraphs);
-        self.motion.fraction = if place == self.motion.place {
-            fraction
+        let share = if keep_share {
+            self.motion.word_offset.fract()
         } else {
             0.0
         };
+        self.paragraphs = paragraphs;
+        let (paragraph, word_offset) = self.clamped(place.paragraph, f64::from(place.word) + share);
+        self.motion.paragraph = paragraph;
+        self.motion.word_offset = word_offset;
         self.layout = None;
         self.layout_key = layout_key;
     }
@@ -568,17 +673,17 @@ impl GlassClock {
     pub(crate) fn accept_layout(&mut self, now: Instant, layout: Layout) {
         let elapsed = self.motion.elapsed_ms(now);
         let base = layout.position_of(
-            self.motion.place,
-            self.motion.fraction,
+            self.motion.paragraph,
+            self.motion.word_offset,
             self.paragraph_count(),
         );
         let position = (base + self.motion.words_advanced(elapsed) * layout.px_per_read_word)
             .min(layout.end_top);
-        let (place, fraction) = layout.place_at(position, self.paragraph_count());
+        let (paragraph, word_offset) = layout.words_at(position, self.paragraph_count());
         self.motion = Motion {
             at: now,
-            place,
-            fraction,
+            paragraph,
+            word_offset,
             from_wpm: self.motion.speed_at(elapsed),
             to_wpm: self.motion.to_wpm,
             ramp_ms: (self.motion.ramp_ms - elapsed).max(0.0),
@@ -595,7 +700,7 @@ impl GlassClock {
             return false;
         }
         self.playing = false;
-        self.motion = Motion::resting(now, PrompterPlace::end_of(&self.paragraphs), 0.0);
+        self.motion = Motion::resting(now, self.paragraph_count(), 0.0);
         true
     }
 
@@ -606,11 +711,7 @@ impl GlassClock {
         if !self.motion.moving(self.motion.elapsed_ms(now)) || self.motion.to_wpm <= 0.0 {
             return None;
         }
-        let base = layout.position_of(
-            self.motion.place,
-            self.motion.fraction,
-            self.paragraph_count(),
-        );
+        let base = self.anchor_position()?;
         let reached = |elapsed: f64| {
             base + self.motion.words_advanced(elapsed) * layout.px_per_read_word >= layout.end_top
         };
@@ -650,13 +751,10 @@ impl GlassClock {
                     false,
                 )
             }
-            _ => {
-                let (place, _) = self.place_at(now);
-                (
-                    read_words_from(&self.paragraphs, place) as f64 * 60.0 / pace,
-                    true,
-                )
-            }
+            _ => (
+                read_words_from(&self.paragraphs, self.place_at(now)) as f64 * 60.0 / pace,
+                true,
+            ),
         }
     }
 
@@ -681,18 +779,14 @@ impl GlassClock {
     /// The anchor as a view reads it at `now`.
     pub(crate) fn anchor(&self, now: Instant) -> PrompterAnchor {
         let layout = self.layout.as_ref();
-        let age_ms = self.motion.elapsed_ms(now);
         PrompterAnchor {
             layout_key: self.layout_key.clone(),
-            place: self.motion.place,
-            line_fraction: self.motion.fraction,
-            position: layout.map(|layout| {
-                layout.position_of(
-                    self.motion.place,
-                    self.motion.fraction,
-                    self.paragraph_count(),
-                )
-            }),
+            place: PrompterPlace {
+                paragraph: self.motion.paragraph,
+                word: self.motion.word_offset.max(0.0).floor() as u32,
+            },
+            word_offset: self.motion.word_offset,
+            position: self.anchor_position(),
             end_position: layout.map(|layout| layout.end_top),
             px_per_read_word: layout.map(|layout| layout.px_per_read_word),
             playing: self.playing,
@@ -706,14 +800,19 @@ impl GlassClock {
             } else {
                 0.0
             },
-            age_ms,
+            age_ms: self.motion.elapsed_ms(now),
         }
     }
+}
 
-    /// Whether the reading line stands at the start of its line.
-    pub(crate) fn at_line_start(&self, now: Instant) -> bool {
-        self.place_at(now).1 < AT_LINE_START
-    }
+/// Whether the cue at `cue` stands after `here` (by more than `SAME_PLACE`).
+pub(crate) fn cue_after(cue: (u32, u32), here: (u32, f64)) -> bool {
+    cue.0 > here.0 || (cue.0 == here.0 && f64::from(cue.1) > here.1 + SAME_PLACE)
+}
+
+/// Whether the cue at `cue` stands before `here` (by more than `SAME_PLACE`).
+pub(crate) fn cue_before(cue: (u32, u32), here: (u32, f64)) -> bool {
+    cue.0 < here.0 || (cue.0 == here.0 && f64::from(cue.1) < here.1 - SAME_PLACE)
 }
 
 /// The read words from `place` to the end.

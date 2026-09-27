@@ -8,12 +8,20 @@ import type { PrompterPlace } from "./PrompterPlace";
 export type PrompterAnchor = {
   /**
    * The layout this anchor's pixels belong to; a view whose layout has
-   * another key draws from `place` and `lineFraction` and reports its
-   * layout.
+   * another key draws from `place.paragraph` and `wordOffset` and reports
+   * its layout.
    */
   layoutKey: string;
+  /**
+   * The paragraph and the word at the reading line.
+   */
   place: PrompterPlace;
-  lineFraction: number;
+  /**
+   * How far into `place.paragraph` the reading line stands, in words
+   * (`place.word` is its whole part). Inside a line, a view takes the
+   * height as a share of the line's words.
+   */
+  wordOffset: number;
   /**
    * The reading line's position at the anchor, in the glass's pixels;
    * `null` until the layout is reported.

@@ -328,3 +328,47 @@ fn an_older_archive_leaves_the_scripts_alone() {
     let snapshot = result(&app, "prompter.snapshot", json!({}));
     assert_eq!(snapshot["scripts"][0]["name"], "Kept");
 }
+
+// Review of 2026-09-27 (M1): while the script on the glass has an edit that
+// was never Updated, the archive carries its place in its own text.
+#[test]
+fn the_archive_carries_an_edited_glass_script_s_place_in_its_own_text() {
+    let test_dir = TestDir::new("prompter-archive-edited");
+    let app = app_for(&test_dir);
+    let script =
+        result(&app, "prompter.script.create", json!({ "name": "Talk" }))["scriptId"].clone();
+    let paragraphs: Vec<Value> = (0..6)
+        .map(|index| json!({ "runs": [{ "text": format!("Paragraph number {index} here.") }] }))
+        .collect();
+    result(
+        &app,
+        "prompter.script.edit",
+        json!({ "scriptId": script, "paragraphs": paragraphs }),
+    );
+    result(&app, "prompter.putOn", json!({ "scriptId": script }));
+    result(
+        &app,
+        "prompter.jump",
+        json!({ "to": "paragraph", "paragraph": 4 }),
+    );
+    let edited: Vec<Value> = paragraphs
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != 1)
+        .map(|(_, paragraph)| paragraph.clone())
+        .collect();
+    result(
+        &app,
+        "prompter.script.edit",
+        json!({ "scriptId": script, "paragraphs": edited }),
+    );
+    let path = result(&app, "support.backup.export", json!({}))["path"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let raw: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(
+        raw["prompter"]["scripts"][0]["place"],
+        json!({ "paragraph": 3, "word": 0 })
+    );
+}

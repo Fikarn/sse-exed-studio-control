@@ -11,9 +11,10 @@
 //! on the prompter cannot be removed; only a removed script can be deleted
 //! for good.
 
+use crate::diagnostics::{log_event, LogLevel};
 use crate::prompter::clock::{
-    speed_is_valid, PrompterLayoutLine, PrompterPlace, SPEED_DEFAULT_WPM, SPEED_MAX_WPM,
-    SPEED_MIN_WPM, SPEED_STEP_WPM,
+    cue_after, cue_before, speed_is_valid, PrompterLayoutLine, PrompterPlace, SPEED_DEFAULT_WPM,
+    SPEED_MAX_WPM, SPEED_MIN_WPM, SPEED_STEP_WPM,
 };
 use crate::prompter::clock::{GlassClock, Layout};
 use crate::prompter::edits::map_place;
@@ -588,24 +589,25 @@ fn put_on_request(
                 format!("{} is already on the prompter.", script.name),
             ))
         }
-        Some(glass) => {
-            let shown = existing_script(connection, &glass.script_id)
+        Some(glass) => Some(
+            existing_script(connection, &glass.script_id)
                 .map(|shown| shown.name)
-                .unwrap_or_default();
-            if !replace {
-                return Err(PrompterError::Refused(
-                    "PROMPTER_REPLACE_NOT_CONFIRMED",
-                    format!(
-                        "The prompter shows {shown}. Replacing it with {} needs the second press.",
-                        script.name
-                    ),
-                ));
-            }
-            prompter.save_place(connection, now)?;
-            Some(shown)
-        }
+                .unwrap_or_default(),
+        ),
         None => None,
     };
+    if let Some(shown) = &replaced {
+        if !replace {
+            return Err(PrompterError::Refused(
+                "PROMPTER_REPLACE_NOT_CONFIRMED",
+                format!(
+                    "The prompter shows {shown}. Replacing it with {} needs the second press.",
+                    script.name
+                ),
+            ));
+        }
+        release_glass(prompter, connection, now);
+    }
     let place = if script.place >= PrompterPlace::end_of(&script.paragraphs) {
         PrompterPlace::TOP
     } else {
@@ -675,7 +677,7 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
             ),
         ));
     }
-    let (current, _) = glass.place_at(now);
+    let current = glass.place_at(now);
     let (place, moved) = map_place(&glass.paragraphs, &script.paragraphs, current);
     let transaction = connection.transaction()?;
     store::keep_version(
@@ -689,8 +691,8 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
     prompter.glass_revision = revision;
     let key = prompter.layout_key();
     let glass = prompter.glass.as_mut().expect("checked above");
-    glass.replace_text(now, Arc::new(script.paragraphs.clone()), key, place);
-    prompter.save_place(connection, now)?;
+    glass.replace_text(now, Arc::new(script.paragraphs.clone()), key, place, !moved);
+    prompter.save_place(connection, now);
     let mut sentence = format!("Updated {} on the prompter.", script.name);
     if moved {
         if place.paragraph >= script.paragraphs.len() as u32 {
@@ -708,6 +710,31 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
     ))
 }
 
+/// The glass lets go of its script (a replace, a clear): the script keeps
+/// the place it was read to — where a pause's ease will stop — carried into
+/// its own text when it was edited since it went on (review of 2026-09-27:
+/// the place, counted in the glass's text, was saved against the edited text,
+/// so the next put-on started paragraphs off, or at the top). A save that
+/// fails is a `WARN` line, as every take save is.
+fn release_glass(prompter: &mut Prompter, connection: &Connection, now: Instant) {
+    let Some(glass) = prompter.glass.as_ref() else {
+        return;
+    };
+    let read_to = glass.resting_place(now);
+    let place = match store::read_script(connection, &glass.script_id) {
+        Ok(Some(script)) if script.paragraphs != *glass.paragraphs => {
+            map_place(&glass.paragraphs, &script.paragraphs, read_to).0
+        }
+        _ => read_to,
+    };
+    if let Err(error) = store::write_script_place(connection, &glass.script_id, place) {
+        log_event(
+            LogLevel::Warn,
+            &format!("Prompter: the place could not be saved: {error}"),
+        );
+    }
+}
+
 /// `prompter.clear`: the glass goes black; the script keeps its place.
 fn clear_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
     let Some(glass) = prompter.glass.as_ref() else {
@@ -716,7 +743,7 @@ fn clear_request(prompter: &mut Prompter, connection: &mut Connection, now: Inst
     let name = existing_script(connection, &glass.script_id)
         .map(|script| script.name)
         .unwrap_or_default();
-    prompter.save_place(connection, now)?;
+    release_glass(prompter, connection, now);
     let transaction = connection.transaction()?;
     let revision = store::write_glass(&transaction, None, None)?;
     transaction.commit()?;
@@ -769,8 +796,12 @@ fn play_request(prompter: &mut Prompter, connection: &mut Connection, now: Insta
 }
 
 fn pause_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
-    glass_mut(prompter)?.pause(now);
-    prompter.save_place(connection, now)?;
+    let glass = glass_mut(prompter)?;
+    glass.pause(now);
+    // Where the 0.3 s ease will stop the text, not where it was at the press
+    // (review of 2026-09-27).
+    let resting = glass.resting_place(now);
+    prompter.save_this_place(connection, resting);
     Ok((json!({}), Some("paused")))
 }
 
@@ -803,7 +834,12 @@ fn speed_request(
     };
     glass.set_speed(now, speed);
     let id = glass.script_id.clone();
-    store::write_script_speed(connection, &id, speed)?;
+    if let Err(error) = store::write_script_speed(connection, &id, speed) {
+        log_event(
+            LogLevel::Warn,
+            &format!("Prompter: the pace could not be saved: {error}"),
+        );
+    }
     Ok((json!({ "speedWpm": speed }), Some("speed")))
 }
 
@@ -823,53 +859,53 @@ fn jump_request(
     let word = whole_param(params, "word")?;
     let glass = glass_mut(prompter)?;
     let count = glass.paragraph_count();
-    let (current, _) = glass.place_at(now);
-    let start_of = |paragraph: u32| PrompterPlace { paragraph, word: 0 };
-    let mut target_fraction = 0.0;
-    let target = match to {
+    let (paragraph_now, offset_now) = glass.words_at(now);
+    let (target_paragraph, target_offset) = match to {
         "top" => {
-            glass.jump(now, PrompterPlace::TOP, 0.0, true);
-            prompter.save_place(connection, now)?;
+            glass.jump(now, 0, 0.0, true);
+            prompter.save_place(connection, now);
             return Ok((json!({}), Some("jumped")));
         }
         // §5 (answered in §14): the start of the paragraph at the reading
         // line; from that paragraph's first line, the start of the one before.
         "back" => {
-            if current.paragraph >= count {
-                start_of(count.saturating_sub(1))
-            } else if current.word == 0 {
-                start_of(current.paragraph.saturating_sub(1))
+            if paragraph_now >= count {
+                (count.saturating_sub(1), 0.0)
+            } else if glass.line_start_at(now) == 0 {
+                (paragraph_now.saturating_sub(1), 0.0)
             } else {
-                start_of(current.paragraph)
+                (paragraph_now, 0.0)
             }
         }
         "nextLine" | "previousLine" => {
             let layout = glass.layout.as_ref().ok_or_else(not_laid_out)?;
             let position = glass.position_at(now).ok_or_else(not_laid_out)?;
             let moved = layout.line_step(position, to == "nextLine");
-            let (place, fraction) = layout.place_at(moved, count);
-            target_fraction = fraction;
-            place
+            layout.words_at(moved, count)
         }
-        "nextParagraph" => start_of((current.paragraph + 1).min(count.saturating_sub(1))),
-        "previousParagraph" => start_of(current.paragraph.saturating_sub(1)),
+        // From the last paragraph there is no next one: the text does not
+        // move (review of 2026-09-27: it went back to the paragraph's start).
+        "nextParagraph" if paragraph_now + 1 >= count => {
+            return Err(PrompterError::Refused(
+                "PROMPTER_NO_PARAGRAPH",
+                String::from("There is no paragraph after the reading line."),
+            ))
+        }
+        "nextParagraph" => (paragraph_now + 1, 0.0),
+        "previousParagraph" => (paragraph_now.saturating_sub(1).min(count.saturating_sub(1)), 0.0),
         "nextCue" | "previousCue" => {
             let cues = cue_targets(&glass.paragraphs);
-            let here = (current.paragraph, current.word);
+            let here = (paragraph_now, offset_now);
             let found = if to == "nextCue" {
                 cues.iter()
-                    .find(|cue| (cue.paragraph as u32, cue.word as u32) > here)
+                    .find(|cue| cue_after((cue.paragraph as u32, cue.word as u32), here))
             } else {
-                cues.iter().rev().find(|cue| {
-                    let at = (cue.paragraph as u32, cue.word as u32);
-                    at < here || (at == here && !glass.at_line_start(now))
-                })
+                cues.iter()
+                    .rev()
+                    .find(|cue| cue_before((cue.paragraph as u32, cue.word as u32), here))
             };
             match found {
-                Some(cue) => PrompterPlace {
-                    paragraph: cue.paragraph as u32,
-                    word: cue.word as u32,
-                },
+                Some(cue) => (cue.paragraph as u32, cue.word as f64),
                 None => {
                     return Err(PrompterError::Refused(
                         "PROMPTER_NO_CUE",
@@ -892,10 +928,8 @@ fn jump_request(
                     count.saturating_sub(1)
                 )));
             }
-            PrompterPlace {
-                paragraph,
-                word: if to == "place" { word.unwrap_or(0) } else { 0 },
-            }
+            let word = if to == "place" { word.unwrap_or(0) } else { 0 };
+            (paragraph, f64::from(word))
         }
         other => {
             return Err(PrompterError::Invalid(format!(
@@ -903,8 +937,8 @@ fn jump_request(
             )))
         }
     };
-    glass.jump(now, target, target_fraction, false);
-    prompter.save_place(connection, now)?;
+    glass.jump(now, target_paragraph, target_offset, false);
+    prompter.save_place(connection, now);
     Ok((json!({}), Some("jumped")))
 }
 
@@ -978,7 +1012,7 @@ fn set_look(
     relayout: bool,
     now: Instant,
 ) -> Result<(), PrompterError> {
-    prompter.save_place(connection, now)?;
+    prompter.save_place(connection, now);
     let revision = store::write_look(connection, &look, size_px, relayout)?;
     prompter.look = look;
     prompter.size_px = size_px;
@@ -1014,11 +1048,11 @@ fn layout_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Hand
     if glass.layout_key != key {
         return Ok((json!({ "accepted": false }), None));
     }
-    if glass
-        .layout
-        .as_ref()
-        .is_some_and(|layout| layout.lines == lines && layout.end_top == end_top)
-    {
+    // The first report for a key is the one the clock runs on; another view's
+    // for the same key changes nothing (review of 2026-09-27: the glass and
+    // the page's copy may break a line differently, and each report moved a
+    // paused place).
+    if glass.layout.is_some() {
         return Ok((json!({ "accepted": true }), None));
     }
     let layout = Layout::new(key.to_string(), lines, end_top, &glass.paragraphs)
@@ -1035,11 +1069,9 @@ pub(crate) fn after_archive_restore(
 ) -> Result<Option<crate::prompter::clock::PrompterAnchor>, PrompterError> {
     with_prompter(db_path, |prompter, connection, now| {
         if let Some(glass) = prompter.glass.as_mut() {
-            let (place, fraction) = glass.place_at(now);
-            glass.jump(now, place, fraction, true);
-            glass.motion.move_from = None;
+            glass.hold(now);
         }
-        prompter.save_place(connection, now)?;
+        prompter.save_place(connection, now);
         let stored = store::read_prompter(connection)?;
         let relayout =
             stored.look.lays_out_differently(&prompter.look) || stored.size_px != prompter.size_px;

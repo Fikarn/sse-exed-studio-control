@@ -78,8 +78,8 @@ fn the_motion_follows_the_shared_cases() {
         let number = |key: &str| anchor[key].as_f64().expect(key);
         let motion = Motion {
             at: now,
-            place: PrompterPlace::TOP,
-            fraction: 0.0,
+            paragraph: 0,
+            word_offset: 0.0,
             from_wpm: number("fromWpm"),
             to_wpm: number("toWpm"),
             ramp_ms: number("rampMs"),
@@ -114,8 +114,8 @@ fn the_pace_is_words_a_minute_in_any_look() {
     // One minute at 140 words a minute moves 140 read words in either look.
     for layout in [small, large] {
         let moved = 60.0 * 140.0 / 60.0 * layout.px_per_read_word;
-        let (place, _) = layout.place_at(moved, 10);
-        assert_eq!(place.paragraph, 2, "140 words on is the third paragraph");
+        let (paragraph, _) = layout.words_at(moved, 10);
+        assert_eq!(paragraph, 2, "140 words on is the third paragraph");
     }
 }
 
@@ -215,7 +215,11 @@ fn the_text_stops_at_end() {
     assert!(clock.settle(after(now, to_end as u64 + 5)));
     assert!(!clock.playing);
     assert!(clock.at_end(after(now, to_end as u64 + 5)));
-    assert_eq!(clock.motion.place, PrompterPlace::end_of(&paragraphs));
+    assert_eq!(clock.motion.paragraph, paragraphs.len() as u32);
+    assert_eq!(
+        clock.place_at(after(now, to_end as u64 + 5)),
+        PrompterPlace::end_of(&paragraphs)
+    );
     assert_eq!(clock.time_to_end_ms(after(now, 60_000)), None);
 }
 
@@ -230,56 +234,64 @@ fn a_jump_keeps_the_scroll_and_top_pauses() {
         word: 0,
     };
     let before = clock.position_at(after(now, 2_000)).unwrap();
-    clock.jump(after(now, 2_000), target, 0.0, false);
+    clock.jump(after(now, 2_000), target.paragraph, 0.0, false);
     assert!(clock.playing);
-    assert_eq!(clock.place_at(after(now, 2_000)).0, target);
+    assert_eq!(clock.place_at(after(now, 2_000)), target);
     let anchor = clock.anchor(after(now, 2_000));
     assert_eq!(anchor.move_from_position, Some(before));
     assert_eq!(anchor.move_ms, JUMP_MOVE_MS);
     assert!(clock.position_at(after(now, 3_000)).unwrap() > anchor.position.unwrap());
 
-    clock.jump(after(now, 3_000), PrompterPlace::TOP, 0.0, true);
+    clock.jump(after(now, 3_000), 0, 0.0, true);
     assert!(!clock.playing);
     assert_eq!(clock.position_at(after(now, 9_000)), Some(0.0));
 }
 
 // §4.1 and §5.2: a new look keeps the words at the reading line. The motion
-// goes on in words until the new layout is reported, then in its pixels.
+// goes on in words until the new layout is reported, then in its pixels, and
+// the word at the reading line is the same word in both (review of
+// 2026-09-27: the place was the line's first word and a share of the line's
+// height, so a new size moved the reading line by up to a line — from word
+// 19 of lines of ten words to word 14 of lines of five).
 #[test]
 fn a_new_look_keeps_the_words_at_the_reading_line() {
     let now = Instant::now();
     let paragraphs = script(12, 30);
-    let mut clock = laid_out_clock(now, paragraphs.clone(), 150);
-    clock.jump(
-        now,
-        PrompterPlace {
-            paragraph: 6,
-            word: 10,
-        },
-        0.5,
-        false,
-    );
-    clock.relayout(after(now, 10), String::from("g1-l1"));
-    assert_eq!(clock.anchor(after(now, 10)).position, None);
-    assert_eq!(
-        clock.place_at(after(now, 10)).0,
-        PrompterPlace {
-            paragraph: 6,
-            word: 10
-        }
-    );
-    clock.accept_layout(after(now, 20), layout_of("g1-l1", &paragraphs, 7, 140.0));
-    let (place, fraction) = clock.place_at(after(now, 20));
-    assert_eq!(place.paragraph, 6);
-    assert!(
-        place.word <= 10 && place.word + 7 > 10,
-        "the line holding word 10"
-    );
-    assert!(fraction < 1.0);
+    for (per_line_after, height_after) in [(5, 140.0), (20, 70.0), (7, 120.0)] {
+        let mut clock = GlassClock::paused(
+            now,
+            String::from("script-a"),
+            paragraphs.clone(),
+            String::from("g1-l0"),
+            PrompterPlace::TOP,
+            150,
+        );
+        clock.accept_layout(now, layout_of("g1-l0", &paragraphs, 10, 100.0));
+        clock.jump(now, 6, 19.4, false);
+        let before = clock.words_at(after(now, 10));
+        assert!((before.1 - 19.4).abs() < 0.01, "{before:?}");
+        clock.relayout(after(now, 10), String::from("g1-l1"));
+        assert_eq!(clock.anchor(after(now, 10)).position, None);
+        assert!((clock.words_at(after(now, 10)).1 - 19.4).abs() < 0.01);
+        clock.accept_layout(
+            after(now, 20),
+            layout_of("g1-l1", &paragraphs, per_line_after, height_after),
+        );
+        let (paragraph, offset) = clock.words_at(after(now, 20));
+        assert_eq!(paragraph, 6);
+        assert!(
+            (offset - 19.4).abs() < 0.01,
+            "{per_line_after} words a line: the reading line is at word {offset}, not 19.4"
+        );
+        assert_eq!(clock.place_at(after(now, 20)).word, 19);
+    }
 }
 
 // A layout that arrives while the text scrolls takes the motion over from
-// the words, so nothing jumps.
+// the words, so nothing jumps: the view reports its layout within moments of
+// a new look, and in that time the words the text moved and the pixels it
+// moved agree to a small part of a word. (Over a long wait they drift apart
+// by the gaps between paragraphs, which the pixels spread over every word.)
 #[test]
 fn a_layout_arriving_mid_scroll_carries_the_motion_on() {
     let now = Instant::now();
@@ -294,18 +306,50 @@ fn a_layout_arriving_mid_scroll_carries_the_motion_on() {
     );
     clock.accept_layout(now, layout_of("g1-l0", &paragraphs, 6, 100.0));
     clock.play(now);
-    let before = clock.place_at(after(now, 10_000)).0;
+    let before = clock.place_at(after(now, 10_000));
     clock.relayout(after(now, 10_000), String::from("g1-l1"));
-    // 20 s later in words: 40 read words on (with the pace settled).
-    let in_words = clock.place_at(after(now, 30_000)).0;
-    assert!(in_words > before);
+    let in_words = clock.words_at(after(now, 10_200));
+    assert!(clock.place_at(after(now, 10_200)) >= before);
     clock.accept_layout(
-        after(now, 30_000),
+        after(now, 10_200),
         layout_of("g1-l1", &paragraphs, 6, 100.0),
     );
-    let in_pixels = clock.place_at(after(now, 30_000)).0;
-    assert_eq!(in_pixels.paragraph, in_words.paragraph);
+    let in_pixels = clock.words_at(after(now, 10_200));
+    assert_eq!(in_pixels.0, in_words.0);
+    assert!(
+        (in_pixels.1 - in_words.1).abs() < 0.1,
+        "{in_pixels:?} {in_words:?}"
+    );
     assert!(clock.playing);
+}
+
+// Review of 2026-09-27: a pause saves where the 0.3 s ease stops the text,
+// not where it was at the press.
+#[test]
+fn a_pause_rests_where_its_ease_stops() {
+    let now = Instant::now();
+    let paragraphs = script(4, 40);
+    let mut clock = laid_out_clock(now, paragraphs, 300);
+    clock.jump(now, 0, 4.9, false);
+    clock.play(now);
+    clock.pause(after(now, 300));
+    let at_press = clock.place_at(after(now, 300));
+    let resting = clock.resting_place(after(now, 300));
+    assert!(resting > at_press, "{resting:?} after {at_press:?}");
+    assert_eq!(resting, clock.place_at(after(now, 5_000)));
+}
+
+// Review of 2026-09-27: a script of cues alone has no read word; it is paced
+// by all its words instead of running through in one word's time.
+#[test]
+fn a_script_of_cues_alone_is_paced_by_its_words() {
+    let paragraphs: Vec<PrompterParagraph> = (0..20)
+        .map(|index| PrompterParagraph::plain(format!("[CUE {index}]")))
+        .collect();
+    let layout = layout_of("k", &paragraphs, 5, 100.0);
+    // Forty words (two to a cue) share the height.
+    let text_height = layout.lines.last().unwrap().top + 100.0;
+    assert!(close(layout.px_per_read_word, text_height / 40.0));
 }
 
 // §5.3: the time left is exact from the layout, estimated from the words
