@@ -241,7 +241,7 @@ export function readCamera(cameras: FixtureCameras, camera: CameraNumber, now: n
   const answeredBefore = last !== null && !wasUnreachable;
   const was = last?.report.recording ?? null;
   held.startedAt =
-    read.recording === true && was === true
+    read.recording === true && answeredBefore && was === true
       ? held.startedAt
       : read.recording === true && answeredBefore && was === false
         ? now

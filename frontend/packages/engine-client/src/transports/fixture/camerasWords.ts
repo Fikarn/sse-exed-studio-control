@@ -5,11 +5,11 @@ import type { CameraTone } from "../../generated/snapshots/CameraTone";
 import { EngineRequestError } from "../engineRequestError";
 import { SETTING_LABELS, type AutoWhat, type CameraModel, type ChoiceSetting, type LevelSetting } from "./camerasModel";
 
-// The operator's words for the cameras (new pages program, Slice 8; the slice's build
-// brief): each state's word, tone and sentence, the refusals with their codes, and the
-// Recent actions' sentences, word for word as the hardware link says them
-// (`native/rust-engine/src/cameras/`). `camerasWords.test.ts` holds them to the brief and
-// reads them out of the Rust source, so a sentence reworded on one side only fails.
+// The operator's words for the cameras (new pages program, Slice 8): each state's word,
+// tone and sentence, the refusals with their codes, and the Recent actions' sentences, word
+// for word as the hardware link says them (`native/rust-engine/src/cameras/`).
+// `camerasWords.test.ts` holds each one to a string literal of the Rust source, filled from
+// the source's own tables, so a sentence reworded on one side only fails.
 
 /** Each state's word (`HELD`, `RELEASED`, `NOT SET UP`, `UNREACHABLE`). */
 export const STATE_WORDS: Record<CameraState, string> = {

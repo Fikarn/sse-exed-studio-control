@@ -107,6 +107,11 @@ describe("the fixture double's cameras seed", () => {
     mistake({ cameras: [null] }, "cameras: cameras[0] must be an object.");
     mistake({ cameras: [{ camera: 4 }] }, "cameras: cameras[0].camera must be 1, 2 or 3.");
     mistake({ cameras: [{ camera: 2 }, { camera: 2 }] }, "cameras: CAM 2 is seeded twice.");
+    mistake({ selectd: 2 }, "cameras: the seed has selectd, which a seed does not have.");
+    mistake(
+      { cameras: [{ camera: 2, adress: "10.0.0.2" }] },
+      "cameras: CAM 2's seed has adress, which a seed does not have."
+    );
     mistake(
       { cameras: [{ camera: 1, address: "10.0.0.1" }] },
       "cameras: CAM 1 has no address: it is paired (paired: true)."

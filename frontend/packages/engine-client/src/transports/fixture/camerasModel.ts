@@ -5,9 +5,9 @@ import type { CameraLink } from "../../generated/snapshots/CameraLink";
 import type { CameraUnavailable } from "../../generated/snapshots/CameraUnavailable";
 
 // The three cameras as the hardware link knows them (`native/rust-engine/src/cameras/`, new
-// pages program, Slice 8; `v1.md`'s "Cameras" and the slice's build brief): which camera is
-// which, and what each simulated camera reports — board 2's assumptions (the slice's first
-// step 4): CAM 1, the Pocket 6K Pro, every value D10 lists; CAM 2 and CAM 3, the BGH1s, no
+// pages program, Slice 8; `v1.md`'s "Cameras"): which camera is which, and what each
+// simulated camera reports — board 2's assumptions (the slice's first step 4, in the
+// ledger): CAM 1, the Pocket 6K Pro, every value D10 lists; CAM 2 and CAM 3, the BGH1s, no
 // tint, focus position, ND, dynamic range or display LUT, and no recording. Each camera's
 // model says what it reports, so Slices 11 and 13 can narrow or widen it; the options are
 // the camera's model and stay when it is not read, the values are what it reports.

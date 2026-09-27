@@ -168,9 +168,12 @@ fn a_recording_cam_1_that_stops_answering_is_left_recording() {
         )
     );
     assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+    // Answering again, the take reads as one that started before the hardware
+    // link looked: it was not looking, and the take may have stopped and
+    // started again in between.
     cameras.answering(1, true);
     assert_eq!(cameras.camera(1)["recording"]["recording"], true);
-    assert_eq!(cameras.camera(1)["recording"]["startedAt"], started_at);
+    assert_eq!(cameras.camera(1)["recording"]["startedAt"], Value::Null);
 }
 
 // D13: a recording CAM 1 can be released (armed); the take goes on — only

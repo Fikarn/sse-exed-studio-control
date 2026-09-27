@@ -1,5 +1,5 @@
 //! The real links, which later slices build: CAM 1's over Bluetooth in Slice
-//! 12 (Blackmagic's Bluetooth protocol), CAM 2's and CAM 3's over the network
+//! 11 (Blackmagic's Bluetooth protocol, with its own test-build guard), CAM 2's and CAM 3's over the network
 //! in Slice 13 (Panasonic's LUMIX SDK). Until then a set-up camera without
 //! the simulated link does not answer, and the sentence says Studio Control
 //! has no link to it yet.

@@ -977,19 +977,20 @@ impl EngineApp {
     /// "restore", camera: null }`, and `app.changed { reason: "health" }`
     /// when `checks.cameras` changed.
     fn after_restore_cameras(&self, reply: &mut EngineReply) {
+        // Every applied restore raises the event (`v1.md`), even when the
+        // cameras could not take their setup: the page reads them again.
+        reply.events.push(event_message(
+            EVENT_CAMERAS_CHANGED,
+            cameras_changed_payload("restore", None),
+        ));
         match cameras_after_archive_restore(&self.runtime.db_path, self.runtime.cameras_simulated) {
-            Ok(health_changed) => {
+            Ok(true) => {
                 reply.events.push(event_message(
-                    EVENT_CAMERAS_CHANGED,
-                    cameras_changed_payload("restore", None),
+                    EVENT_APP_CHANGED,
+                    json!({ "reason": crate::health::APP_CHANGED_REASON_HEALTH }),
                 ));
-                if health_changed {
-                    reply.events.push(event_message(
-                        EVENT_APP_CHANGED,
-                        json!({ "reason": crate::health::APP_CHANGED_REASON_HEALTH }),
-                    ));
-                }
             }
+            Ok(false) => {}
             Err(error) => {
                 let _ = append_log(
                     &self.runtime.log_file_path,

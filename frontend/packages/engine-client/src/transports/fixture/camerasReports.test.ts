@@ -6,8 +6,8 @@ import { CAMERA_MODELS } from "./camerasModel";
 import { ALL_SET_UP, CAM2_ADDRESS, openCamerasDouble } from "./camerasTestSupport";
 
 // What the fixture double's cameras report (new pages program, Slice 8), held to board 2's
-// assumptions as the slice's build brief writes them and as the hardware link's simulated
-// cameras hold them (`native/rust-engine/src/cameras/model.rs`, `simulated.rs`,
+// assumptions as the ledger records them (the slice's first step 4) and as the hardware
+// link's simulated cameras hold them (`native/rust-engine/src/cameras/model.rs`, `simulated.rs`,
 // `report.rs`): CAM 1 every value D10 lists, CAM 2 and CAM 3 no tint, focus position, ND,
 // dynamic range or display LUT and no recording; a camera never read, or released, shows
 // no value; an unreachable one keeps what it last reported, and when.
@@ -271,6 +271,18 @@ describe("the fixture double's cameras: what a camera not read shows", () => {
     cameras.changeOnBody(1, { recording: false });
     cameras.stopAnswering(1);
     cameras.changeOnBody(1, { recording: true });
+    cameras.answerAgain(1);
+    expect((await camera(1)).recording).toMatchObject({ recording: true, startedAt: null });
+
+    // So does one running before the spell and after it: the hardware link was not looking,
+    // and the take may have stopped and started again in between.
+    vi.setSystemTime(NOW + 30_000);
+    cameras.changeOnBody(1, { recording: false });
+    await camera(1);
+    cameras.changeOnBody(1, { recording: true });
+    expect((await camera(1)).recording.startedAt).toBe(AT(NOW + 30_000));
+    cameras.stopAnswering(1);
+    await camera(1);
     cameras.answerAgain(1);
     expect((await camera(1)).recording).toMatchObject({ recording: true, startedAt: null });
   });

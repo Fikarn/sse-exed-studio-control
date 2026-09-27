@@ -83,6 +83,24 @@ export function applyBodyValues(
   Object.assign(report, next);
 }
 
+/** A key the seed does not know is a mistake, not ignored: a misspelling would drop what it meant. */
+function onlyKeys(object: object, known: readonly string[], where: string) {
+  const unknown = Object.keys(object).filter((key) => !known.includes(key));
+  if (unknown.length > 0) throw mistake(`${where} has ${unknown.join(", ")}, which a seed does not have.`);
+}
+
+const SEED_KEYS = ["cameras", "selected", "simulated"] as const;
+const CAMERA_SEED_KEYS = [
+  "camera",
+  "address",
+  "paired",
+  "vmixInput",
+  "released",
+  "unreachable",
+  "recording",
+  "values",
+] as const;
+
 function flag(value: unknown, what: string): boolean {
   if (value === undefined) return false;
   if (typeof value !== "boolean") throw mistake(`${what} must be true or false.`);
@@ -109,6 +127,7 @@ function checkedCamera(seed: FixtureCameraSeed, index: number, seen: Set<number>
   if (seen.has(camera)) throw mistake(`CAM ${camera} is seeded twice.`);
   seen.add(camera);
   const tag = `CAM ${camera}`;
+  onlyKeys(seed, CAMERA_SEED_KEYS, `${tag}'s seed`);
   let address: string | null = null;
   if (seed.address !== undefined) {
     if (camera === 1) throw mistake("CAM 1 has no address: it is paired (paired: true).");
@@ -139,6 +158,7 @@ function checkedCamera(seed: FixtureCameraSeed, index: number, seen: Set<number>
 export function seedFixtureCameras(state: MutableFixtureState, seed: FixtureCamerasSeed | undefined) {
   if (seed === undefined) return;
   if (seed === null || typeof seed !== "object" || Array.isArray(seed)) throw mistake("the seed must be an object.");
+  onlyKeys(seed, SEED_KEYS, "the seed");
   const cameras = fixtureCameras(state);
   if (seed.simulated !== undefined) cameras.simulated = flag(seed.simulated, "simulated");
   if (seed.selected !== undefined) {

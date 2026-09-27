@@ -318,6 +318,14 @@ fn a_press_sets_what_the_camera_allows() {
             "CAM 1 does not allow white balance 5625."
         )
     );
+    // A whole number sent as `5625.0` reads as the page writes it.
+    assert_eq!(
+        refused(json!({ "camera": 1, "setting": "whiteBalance", "value": 5625.0 })),
+        refusal(
+            "CAMERA_VALUE_NOT_ALLOWED",
+            "CAM 1 does not allow white balance 5625."
+        )
+    );
     assert_eq!(
         refused(json!({ "camera": 1, "setting": "tint", "value": 51 })),
         refusal("CAMERA_VALUE_NOT_ALLOWED", "CAM 1 does not allow tint 51.")
@@ -442,6 +450,9 @@ fn a_step_moves_in_the_camera_s_own_steps_and_stops_at_the_ends() {
     for params in [
         json!({ "camera": 1, "setting": "iso", "step": 0 }),
         json!({ "camera": 1, "setting": "iso", "step": 1.5 }),
+        json!({ "camera": 1, "setting": "iso", "step": 1001 }),
+        json!({ "camera": 1, "setting": "iso", "step": -1001 }),
+        json!({ "camera": 1, "setting": "iso", "step": i64::MIN }),
         json!({ "camera": 1, "setting": "iso" }),
         json!({ "camera": 1, "setting": "frameRate", "step": 1 }),
     ] {

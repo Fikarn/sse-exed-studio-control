@@ -68,10 +68,9 @@ import { NOT_HANDLED, type FixtureRequestContext, type FixtureRequestResult } fr
 import { applyCamerasHealth } from "./state";
 
 // The cameras' `cameras.*` methods as the hardware link answers them (`native/rust-engine/
-// src/cameras/`, new pages program, Slice 8; `v1.md`'s "Cameras" and the slice's build
-// brief): the same parameters, answers, refusal codes and sentences, and a
-// `cameras.changed { reason, camera }` for every request that changed something; a refused
-// one changes nothing and raises nothing. The checks run in the brief's order: the
+// src/cameras/`, new pages program, Slice 8; `v1.md`'s "Cameras"): the same parameters,
+// answers, refusal codes and sentences, and a `cameras.changed { reason, camera }` for
+// every request that changed something; a refused one changes nothing and raises nothing. The checks run in the hardware link's order: the
 // parameters' shape (`INVALID_PARAMS`), then not set up, released, unreachable, a setting
 // the camera does not report or offer, a value it does not allow, and last a change that
 // needs a second press. Only a press sends anything to a camera (D12): starting, reading,

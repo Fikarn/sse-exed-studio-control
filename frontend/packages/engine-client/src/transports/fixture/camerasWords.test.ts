@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 
 import type { CameraState } from "../../generated/snapshots/CameraState";
 import { CAMERA_ACTIONS } from "./actionLog";
-import { CAMERA_MODELS, CHOICE_SETTINGS, isReported, type CameraNumber, type ChoiceSetting } from "./camerasModel";
+import {
+  CAMERA_MODELS,
+  CHOICE_SETTINGS,
+  SETTING_LABELS,
+  isReported,
+  type CameraNumber,
+  type ChoiceSetting,
+} from "./camerasModel";
 import { SIMULATED_AUTO } from "./camerasRequests";
 import { startingReport } from "./camerasState";
 import {
@@ -38,16 +45,19 @@ import {
 import { openCamerasDouble } from "./camerasTestSupport";
 
 // The fixture double's words for the cameras (new pages program, Slice 8) are the hardware
-// link's. They are held here twice: to the slice's build brief, sentence by sentence, and
-// to the hardware link's own source (`native/rust-engine/src/cameras/`, above its tests),
-// as `prompterScreen.test.ts` holds the Prompter XL's to `screen.rs` — so a sentence
-// reworded on one side only fails. The Rust source is also read for what the simulated
-// cameras hold: each choice's options, where each camera starts, where a one-shot auto
-// settles, and the Recent actions' action names (`action_log.rs`).
+// link's. They are held here twice: once as the operator reads them, sentence by sentence,
+// and once to the hardware link's own source (`native/rust-engine/src/cameras/`, above its
+// tests), as `prompterScreen.test.ts` holds the Prompter XL's to `screen.rs`. There each
+// sentence must be one of the source's string literals, word for word, with its
+// placeholders filled exactly from the source's own tables (the settings' labels, the
+// autos' words, the states' words and tones, each camera's tag and app) — so a sentence,
+// or a word filled into one, changed on one side only fails. The Rust source is also read
+// for what the simulated cameras hold: each choice's options, where each camera starts,
+// where a one-shot auto settles, and the Recent actions' action names (`action_log.rs`).
 
 const [CAM1, CAM2, CAM3] = [CAMERA_MODELS[1], CAMERA_MODELS[2], CAMERA_MODELS[3]];
 
-describe("the fixture double's camera words: the brief's", () => {
+describe("the fixture double's camera words, as the operator reads them", () => {
   it("names each state with its word, tone and sentence", () => {
     expect(STATE_WORDS).toEqual({
       held: "HELD",
@@ -74,7 +84,7 @@ describe("the fixture double's camera words: the brief's", () => {
     expect(noLinkSentence(CAM2)).toBe("Studio Control has no link to CAM 2 yet: it comes with a later version.");
   });
 
-  it("refuses in the brief's words, with its codes", () => {
+  it("refuses in its own words, with the hardware link's codes", () => {
     const pair = (error: { code: string; message: string }) => [error.code, error.message];
     expect(pair(releasedRefusal(CAM2))).toEqual([
       "CAMERA_RELEASED",
@@ -107,7 +117,7 @@ describe("the fixture double's camera words: the brief's", () => {
     ]);
   });
 
-  it("says what changed in the brief's words", () => {
+  it("says what changed, word for word", () => {
     expect(startedRecordingSentence(CAM1)).toBe("CAM 1 started recording.");
     expect(stoppedRecordingSentence(CAM1)).toBe("CAM 1 stopped recording.");
     expect(formatSentence(CAM1, { from: "6K", to: "UHD" }, null)).toBe("CAM 1: 6K → UHD.");
@@ -168,61 +178,90 @@ const CAMERAS_RS = (() => {
 /** Every string literal the cameras' source holds, unescaped. */
 const LITERALS = [...CAMERAS_RS.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((match) => match[1]!.replace(/\\(["\\])/g, "$1"));
 
-interface Pattern {
-  source: string;
-  /** How many characters of it are written out, not filled in. */
-  fixed: number;
+/** The model's fields for each camera (`MODELS` in `model.rs`): its tag, make, link, app and whether it is a BGH1. */
+const RUST_MODELS = (() => {
+  const model = rustSource("cameras/model.rs");
+  const models = [
+    ...model.matchAll(
+      /camera: (\d),\s*tag: "([^"]+)",\s*model: "([^"]+)",\s*link: CameraLink::(\w+),\s*app: "([^"]+)",\s*bgh1: (true|false),/g
+    ),
+  ].map(([, camera, tag, make, link, app, bgh1]) => ({
+    camera: Number(camera),
+    tag: tag!,
+    model: make!,
+    link: link!.toLowerCase(),
+    app: app!,
+    bgh1: bgh1 === "true",
+  }));
+  if (models.length !== 3) throw new Error("model.rs's MODELS do not read as three cameras any more; update this test");
+  return models;
+})();
+
+const variantKey = (variant: string) => variant[0]!.toLowerCase() + variant.slice(1);
+const kebab = (variant: string) => variant.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+
+/** A `fn name(self) -> …` table in `model.rs`: each `Self::Variant` (or `A | B`) and what its arm gives. */
+function rustTable(fn: string, arm: RegExp): Record<string, string> {
+  const model = rustSource("cameras/model.rs");
+  const body = model.match(new RegExp(`fn ${fn}\\(self\\) -> [^{]+\\{\\s*match self \\{([^}]*)\\}`))?.[1];
+  if (body === undefined) throw new Error(`model.rs has no fn ${fn} table any more; update this test`);
+  const table: Record<string, string> = {};
+  for (const [, variants, value] of body.matchAll(arm)) {
+    for (const [, variant] of variants!.matchAll(/Self::(\w+)/g)) table[variant!] = value!;
+  }
+  if (Object.keys(table).length === 0) throw new Error(`model.rs's fn ${fn} has no arms this test reads; update it`);
+  return table;
+}
+const WORDS_ARM = /((?:Self::\w+\s*\|?\s*)+)=> "([^"]*)"/g;
+const RUST_LABELS = rustTable("label", WORDS_ARM);
+const RUST_AUTO_WORDS = rustTable("words", WORDS_ARM);
+const RUST_STATE_WORDS = rustTable("word", WORDS_ARM);
+const RUST_STATE_TONES = rustTable("tone", /((?:Self::\w+\s*\|?\s*)+)=> CameraTone::(\w+)/g);
+
+/**
+ * The literal `template`, which must be in the cameras' source word for word, its
+ * placeholders filled exactly: `{name}` from `named`, `{}` from `positional` in order —
+ * as `prompterScreen.test.ts` fills `screen.rs`'s. Loud when the template is not there:
+ * a sentence reworded on either side fails, the words filled into it included, for they
+ * come from the hardware link's own tables (`RUST_LABELS`, `RUST_AUTO_WORDS`, the models).
+ */
+function rust(template: string, positional: Array<string | number> = [], named: Record<string, string | number> = {}) {
+  if (!LITERALS.includes(template)) {
+    throw new Error(`"${template}" is not a literal in the cameras' source any more: one side changed its words`);
+  }
+  let next = 0;
+  return template.replace(/\{\{|\}\}|\{(\w*)(?::[^}]*)?\}/g, (whole: string, name: string) => {
+    if (whole === "{{") return "{";
+    if (whole === "}}") return "}";
+    if (name === "") {
+      if (next >= positional.length) throw new Error(`"${template}" has more {} than this test fills`);
+      return String(positional[next++]);
+    }
+    if (!(name in named)) throw new Error(`"${template}" has {${name}}, which this test does not fill`);
+    return String(named[name]);
+  });
+}
+
+/** Whether a source text holds `snippet` as written, white space aside. */
+const holds = (source: string, snippet: string) => source.replace(/\s+/g, " ").includes(snippet.replace(/\s+/g, " "));
+
+/**
+ * For a request of the wrong shape only (`INVALID_PARAMS`, never shown on the page): whether
+ * the sentence is one of the source's literals with its placeholders filled by anything.
+ */
+function inRustLoosely(sentence: string): boolean {
+  return LITERALS.some((literal) => {
+    const parts = literal.split(/(\{\{|\}\}|\{[^{}]*\})/);
+    const source = parts
+      .map((part) =>
+        part === "{{" || part === "}}" ? escapeRegex(part[0]!) : /^\{[^{}]*\}$/.test(part) ? "(.+?)" : escapeRegex(part)
+      )
+      .join("");
+    return literal.replace(/\{[^{}]*\}/g, "").trim().length >= 8 && new RegExp(`^${source}$`, "su").test(sentence);
+  });
 }
 
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/** A literal as a pattern: each `format!` placeholder is anything, `{{` and `}}` are braces. */
-function patternOf(literal: string, fill?: { index: number; with: Pattern }): Pattern {
-  let source = "";
-  let fixed = 0;
-  let hole = 0;
-  for (const part of literal.split(/(\{\{|\}\}|\{[^{}]*\})/)) {
-    if (part === "{{" || part === "}}") {
-      source += escapeRegex(part[0]!);
-      fixed += 1;
-    } else if (/^\{[^{}]*\}$/.test(part)) {
-      if (fill && hole === fill.index) {
-        source += fill.with.source;
-        fixed += fill.with.fixed;
-      } else {
-        source += "(.+?)";
-      }
-      hole += 1;
-    } else {
-      source += escapeRegex(part);
-      fixed += part.replace(/\s/g, "").length;
-    }
-  }
-  return { source, fixed };
-}
-
-const PATTERNS = LITERALS.map((literal) => ({ literal, ...patternOf(literal) }));
-const matches = (pattern: Pattern, sentence: string) => new RegExp(`^${pattern.source}$`, "su").test(sentence);
-
-/**
- * Whether `sentence` is one of the hardware link's literals with its placeholders filled —
- * or, for a sentence it builds from two (`"{}: {change}."` around `"{old} → {new}"`), a short
- * literal with one placeholder filled by another literal.
- */
-function inRust(sentence: string): boolean {
-  if (PATTERNS.some((pattern) => pattern.fixed >= 8 && matches(pattern, sentence))) return true;
-  const outers = PATTERNS.filter((pattern) => pattern.fixed < 8 && pattern.literal.includes("{"));
-  const inners = PATTERNS.filter((pattern) => pattern.fixed >= 1 && pattern.literal.includes("{"));
-  return outers.some((outer) => {
-    const holes = outer.literal.match(/\{[^{}]*\}/g)?.length ?? 0;
-    return Array.from({ length: holes }).some((_, index) =>
-      inners.some((inner) => {
-        const composed = patternOf(outer.literal, { index, with: inner });
-        return composed.fixed >= 3 && matches(composed, sentence);
-      })
-    );
-  });
-}
 
 /** Every sentence the double's cameras say, one of each kind, filled as the double fills them. */
 function everyDoubleSentence(): string[] {
@@ -298,9 +337,217 @@ function rustStart(camera: CameraNumber): Record<string, string | number | boole
 }
 
 describe("the fixture double's camera words: the hardware link's", () => {
+  it("names the states, the settings and the autos in the hardware link's words", () => {
+    expect(STATE_WORDS).toEqual(
+      Object.fromEntries(Object.entries(RUST_STATE_WORDS).map(([variant, word]) => [kebab(variant), word]))
+    );
+    expect(STATE_TONES).toEqual(
+      Object.fromEntries(
+        Object.entries(RUST_STATE_TONES).map(([variant, tone]) => [kebab(variant), tone.toLowerCase()])
+      )
+    );
+    const labels = Object.fromEntries(
+      Object.entries(RUST_LABELS)
+        .map(([variant, label]) => [variantKey(variant), label] as const)
+        .filter(([key]) => key in SETTING_LABELS)
+    );
+    expect(SETTING_LABELS).toEqual(labels);
+    for (const model of [CAM1, CAM2, CAM3]) {
+      for (const what of ["focus", "whiteBalance", "iris"] as const) {
+        const words = RUST_AUTO_WORDS[what[0]!.toUpperCase() + what.slice(1)]!;
+        expect(autoNotOfferedRefusal(model, what).message).toBe(rust("{} does not offer {} once.", [model.tag, words]));
+      }
+    }
+  });
+
   it("speaks the cameras' sentences word for word", () => {
-    for (const sentence of everyDoubleSentence()) {
-      expect(inRust(sentence), sentence).toBe(true);
+    for (const model of [CAM1, CAM2, CAM3]) {
+      const rustModel = RUST_MODELS[model.camera - 1]!;
+      const tag = { tag: model.tag };
+      expect(model.tag).toBe(rustModel.tag);
+      expect(model.app).toBe(rustModel.app);
+      expect(heldSentence(model)).toBe(
+        rust("{tag} is held: Studio Control reads it and sends only what you press.", [], tag)
+      );
+      expect(releasedSentence(model)).toBe(
+        rust(
+          "{tag} is released to {}. Studio Control does not read it or send it anything until you connect it again.",
+          [rustModel.app],
+          tag
+        )
+      );
+      expect(notSetUpSentence(model)).toBe(
+        rustModel.bgh1
+          ? rust("{tag} has no address. Enter it in Setup.", [], tag)
+          : rust("{tag} is not paired. Pair it in Setup, with the camera beside you.", [], tag)
+      );
+      expect(unreachableSentence(model, "172.16.16.85")).toBe(
+        rustModel.bgh1
+          ? rust("{tag} does not answer at {}. Check that it is on and on the network.", ["172.16.16.85"], tag)
+          : rust("{tag} does not answer over Bluetooth. Check that it is on and within reach of this PC.", [], tag)
+      );
+      expect(noLinkSentence(model)).toBe(
+        rust("Studio Control has no link to {} yet: it comes with a later version.", [model.tag])
+      );
+      expect(releasedRefusal(model).message).toBe(rust("{} is released. Connect it to set it from here.", [model.tag]));
+      expect(alreadyHeldRefusal(model).message).toBe(rust("{} is already held.", [model.tag]));
+      expect(releasedToSentence(model)).toBe(rust("{} released to {}.", [model.tag, rustModel.app]));
+      expect(heldAgainSentence(model)).toBe(rust("{} held again.", [model.tag]));
+      expect(formatNotAllowedRefusal(model, "60", "6K").message).toBe(
+        rust("{} does not allow {frame_rate}p at {resolution}.", [model.tag], { frame_rate: "60", resolution: "6K" })
+      );
+      for (const setting of [...CHOICE_SETTINGS, "whiteBalance", "tint", "focus"] as const) {
+        const label = RUST_LABELS[setting[0]!.toUpperCase() + setting.slice(1)]!;
+        expect(notAllowedRefusal(model, setting, "7").message, setting).toBe(
+          rust("{} does not allow {} {value}.", [model.tag, label], { value: "7" })
+        );
+      }
+      const notReported: Record<string, string> = {
+        nd: "The BGH1 has no ND filter.",
+        tint: rust("{tag} does not report tint.", [], tag),
+        focus: rust("{tag} does not report a focus position.", [], tag),
+        dynamicRange: rust("{tag} does not report its dynamic range.", [], tag),
+        displayLut: rust("{tag} does not report a display LUT.", [], tag),
+      };
+      for (const [key, entry] of Object.entries({
+        ...model.choices,
+        ...model.levels,
+        displayLutOn: model.displayLutOn,
+      })) {
+        if (!isReported(entry)) {
+          const expected = key === "displayLutOn" ? notReported.displayLut : notReported[key];
+          expect(entry.notReported, `CAM ${model.camera} ${key}`).toBe(expected);
+          if (key === "nd") expect(LITERALS).toContain(expected);
+        }
+      }
+      expect(model.cardTimeNotReported).toBe(
+        rustModel.bgh1 ? null : rust("{} does not report its card time over Bluetooth.", [model.tag])
+      );
+    }
+    expect(NO_LINK_SENTENCE).toBe(rust(NO_LINK_SENTENCE));
+    expect(NOT_CONFIRMED_SENTENCE).toBe(rust(NOT_CONFIRMED_SENTENCE));
+    expect(alreadyRecordingRefusal().message).toBe(rust("CAM 1 is already recording."));
+    expect(notRecordingRefusal().message).toBe(rust("CAM 1 is not recording."));
+    expect(addressInvalidRefusal("10.0.0").message).toBe(
+      rust(
+        "{value} is not the address of one machine. Enter the camera's IPv4 address: four numbers from 0 to 255, such as 172.16.16.85.",
+        [],
+        { value: "10.0.0" }
+      )
+    );
+  });
+
+  it("says what changed in the hardware link's words", () => {
+    const commands = rustSource("cameras/commands.rs");
+    const tag = CAM1.tag;
+    expect(startedRecordingSentence(CAM1)).toBe(rust("CAM 1 started recording."));
+    expect(stoppedRecordingSentence(CAM1)).toBe(rust("CAM 1 stopped recording."));
+    const change = (text: string) => rust("{}: {change}.", [tag], { change: text });
+    expect(formatSentence(CAM1, { from: "6K", to: "UHD" }, null)).toBe(
+      change(rust("{old_resolution} → {now_resolution}", [], { old_resolution: "6K", now_resolution: "UHD" }))
+    );
+    expect(formatSentence(CAM1, null, { from: "25", to: "50" })).toBe(
+      change(rust("{old_frame_rate}p → {now_frame_rate}p", [], { old_frame_rate: "25", now_frame_rate: "50" }))
+    );
+    expect(formatSentence(CAM1, { from: "6K", to: "UHD" }, { from: "25", to: "50" })).toBe(
+      change(
+        rust("{old_resolution} {old_frame_rate}p → {now_resolution} {now_frame_rate}p", [], {
+          old_resolution: "6K",
+          old_frame_rate: "25",
+          now_resolution: "UHD",
+          now_frame_rate: "50",
+        })
+      )
+    );
+    // The look: its parts, joined as the hardware link joins them, inside its sentence.
+    expect(holds(commands, 'parts.join("; ")')).toBe(true);
+    expect(holds(commands, 'if after.display_lut_on == Some(true) { "on" } else { "off" }')).toBe(true);
+    const look = (...parts: string[]) => rust("{}: {}.", [tag, parts.join("; ")]);
+    const range = rust("dynamic range {} → {}", ["Film", "Video"]);
+    const lut = rust("display LUT {} → {}", ["Film → Ext. video", "Custom"]);
+    const off = rust("display LUT {}", ["off"]);
+    const on = rust("display LUT {}", ["on"]);
+    expect(lookSentence(CAM1, [lookPart({ setting: "dynamicRange", from: "Film", to: "Video" })])).toBe(look(range));
+    expect(lookSentence(CAM1, [lookPart({ setting: "displayLut", from: "Film → Ext. video", to: "Custom" })])).toBe(
+      look(lut)
+    );
+    expect(lookSentence(CAM1, [lookPart({ setting: "displayLutOn", on: false })])).toBe(look(off));
+    expect(lookSentence(CAM1, [lookPart({ setting: "displayLutOn", on: true })])).toBe(look(on));
+    expect(
+      lookSentence(CAM1, [
+        lookPart({ setting: "dynamicRange", from: "Film", to: "Video" }),
+        lookPart({ setting: "displayLutOn", on: false }),
+      ])
+    ).toBe(look(range, off));
+  });
+
+  it("holds what each camera is, offers and reports as the hardware link's model does", () => {
+    const model = rustSource("cameras/model.rs");
+    // A flag that is `self.bgh1`, `!self.bgh1` or a constant, for each camera.
+    const flag = (expression: string, bgh1: boolean) =>
+      expression === "true" ? true : expression === "false" ? false : expression === "self.bgh1" ? bgh1 : !bgh1;
+    const fnBody = (name: string) => {
+      const body = model.match(new RegExp(`fn ${name}\\(&self\\) -> \\w+ \\{([^}]*)\\}`))?.[1];
+      if (body === undefined) throw new Error(`model.rs has no fn ${name} any more; update this test`);
+      return body.trim();
+    };
+    const autos = model.match(/CameraAutos \{\s*focus: ([!\w.]+),\s*white_balance: ([!\w.]+),\s*iris: ([!\w.]+),\s*\}/);
+    if (!autos) throw new Error("model.rs's autos do not read as this test expects any more; update it");
+    const scale = (arm: string) => {
+      const found = model.match(
+        new RegExp(
+          `\\(Setting::${arm}\\) => Ok\\(LevelScale \\{\\s*min: ([-\\d.]+),\\s*max: ([-\\d.]+),\\s*step: ([^,]+),\\s*unit: "([^"]*)",`
+        )
+      );
+      if (!found) throw new Error(`model.rs's scale for ${arm} does not read as this test expects any more; update it`);
+      return found;
+    };
+    for (const camera of [CAM1, CAM2, CAM3]) {
+      const rustModel = RUST_MODELS[camera.camera - 1]!;
+      const bgh1 = rustModel.bgh1;
+      expect(camera.model).toBe(rustModel.model);
+      expect(camera.link).toBe(rustModel.link);
+      expect(camera.auto).toEqual({
+        focus: flag(autos[1]!, bgh1),
+        whiteBalance: flag(autos[2]!, bgh1),
+        iris: flag(autos[3]!, bgh1),
+      });
+      expect(camera.focusSteps).toBe(flag(fnBody("focus_steps"), bgh1));
+      expect(camera.records).toBe(flag(fnBody("records"), bgh1));
+      expect(camera.timecodeReported).toBe(flag(fnBody("timecode_reported"), bgh1));
+      const whiteBalance = scale("WhiteBalance, bgh1");
+      const step = whiteBalance[3]!.match(/if bgh1 \{ ([\d.]+) \} else \{ ([\d.]+) \}/);
+      expect(camera.levels.whiteBalance).toMatchObject({
+        min: Number(whiteBalance[1]),
+        max: Number(whiteBalance[2]),
+        step: Number(bgh1 ? step![1] : step![2]),
+        unit: whiteBalance[4],
+      });
+      for (const [key, arm] of [
+        ["tint", "Tint, false"],
+        ["focus", "Focus, false"],
+      ] as const) {
+        const level = camera.levels[key];
+        if (bgh1) {
+          expect(isReported(level), `CAM ${camera.camera} ${key}`).toBe(false);
+        } else {
+          const found = scale(arm);
+          expect(level).toMatchObject({
+            min: Number(found[1]),
+            max: Number(found[2]),
+            step: Number(found[3]),
+            unit: found[4],
+          });
+        }
+      }
+      // Frame rates the camera does not allow at a resolution: the Pocket's 60p at 6K.
+      const unavailable = model.match(
+        /if !self\.bgh1 && resolution == "([^"]+)" \{\s*vec!\[\("([^"]+)", String::from\("([^"]+)"\)\)\]/
+      );
+      if (!unavailable) throw new Error("model.rs's unavailable frame rates do not read as this test expects any more");
+      expect(camera.unavailableFrameRates).toEqual(
+        bgh1 ? {} : { [unavailable[1]!]: [{ value: unavailable[2], reason: unavailable[3] }] }
+      );
     }
   });
 
@@ -349,7 +596,7 @@ describe("the fixture double's camera words: the hardware link's", () => {
     for (const [method, params] of asked) {
       const { code, sentence } = await refused(method, params as never);
       expect(code, sentence).toBe("INVALID_PARAMS");
-      expect(inRust(sentence), sentence).toBe(true);
+      expect(inRustLoosely(sentence), sentence).toBe(true);
     }
   });
 
@@ -415,14 +662,17 @@ describe("the fixture double's camera words: the hardware link's", () => {
     expect(actionLog).toMatch(new RegExp(`_ if text\\(result, "/state"\\) == Some\\("held"\\) => "${connect}"`));
   });
 
-  it("finds a changed sentence", () => {
-    // The guard itself: a word changed on one side only is not found.
-    expect(inRust("CAM 2 is held: Studio Control reads it and sends only what you press.")).toBe(true);
-    expect(inRust("CAM 2 is held: Studio Control reads it and sends what you press.")).toBe(false);
-    expect(inRust("CAM 1: 6K → UHD.")).toBe(true);
-    expect(inRust("CAM 1: 6K to UHD.")).toBe(false);
-    expect(inRust("CAM 1: display LUT on.")).toBe(true);
-    expect(inRust("CAM 1: the display LUT on.")).toBe(false);
-    expect(inRust("CAM 1: 25p to 50p.")).toBe(false);
+  it("fails on a template or a filled-in word changed on one side", () => {
+    // The guard itself: a template that is not in the source word for word is loud, and a
+    // sentence filled with other words is not the hardware link's.
+    expect(() => rust("{} is already held.", ["CAM 2"])).not.toThrow();
+    expect(() => rust("{} is held already.", ["CAM 2"])).toThrow(/not a literal/);
+    expect(() => rust("{}: {change}.", ["CAM 1"])).toThrow(/does not fill/);
+    expect(notAllowedRefusal(CAM1, "frameRate", "48").message).not.toBe(
+      rust("{} does not allow {} {value}.", ["CAM 1", "frame-rate"], { value: "48" })
+    );
+    expect(lookSentence(CAM1, [lookPart({ setting: "displayLutOn", on: true })])).not.toBe(
+      rust("{}: {}.", ["CAM 1", rust("display LUT {}", ["shown"])])
+    );
   });
 });

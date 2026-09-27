@@ -138,12 +138,13 @@ fn setting_param(params: &Value) -> Result<Setting, CameraError> {
         })
 }
 
-/// `step`: a whole number of the camera's own steps, not 0.
+/// `step`: a whole number of the camera's own steps, from −1000 to 1000, not
+/// 0 (a range check, as `abs` would overflow on the smallest `i64`).
 fn step_param(params: &Value) -> Result<i64, CameraError> {
     params
         .get("step")
         .and_then(Value::as_i64)
-        .filter(|step| *step != 0 && step.abs() <= 1000)
+        .filter(|step| *step != 0 && (-1000..=1000).contains(step))
         .ok_or_else(|| {
             CameraError::Invalid(String::from("step must be a whole number of steps, not 0."))
         })
@@ -276,7 +277,10 @@ fn set_request(
         CameraValue::Number(number) => {
             let scale = model.scale(setting).map_err(unsupported)?;
             if !scale.allows(number) {
-                return Err(not_allowed(model.value_refusal(setting, &raw.to_string())));
+                // The number as the page writes it: `5625`, not JSON's `5625.0`.
+                return Err(not_allowed(
+                    model.value_refusal(setting, &number.to_string()),
+                ));
             }
             CameraValue::Number(scale.at(scale.steps_of(number)))
         }

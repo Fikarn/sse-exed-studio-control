@@ -139,7 +139,7 @@ impl CameraRuntime {
         let answered_before = self.reading.is_some() && self.failure.is_none();
         let was = self.reading.as_ref().and_then(|last| last.recording);
         self.started_at = match reading.recording {
-            Some(true) if was == Some(true) => self.started_at.clone(),
+            Some(true) if answered_before && was == Some(true) => self.started_at.clone(),
             Some(true) if answered_before && was == Some(false) => Some(utc_text(now)),
             _ => None,
         };

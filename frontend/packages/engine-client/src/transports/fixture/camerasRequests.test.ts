@@ -4,11 +4,11 @@ import type { RequestMethod } from "../../generated/protocol";
 import { ALL_SET_UP, CAM2_ADDRESS, openCamerasDouble } from "./camerasTestSupport";
 
 // The fixture double's `cameras.*` requests (new pages program, Slice 8), held to what the
-// hardware link answers (`native/rust-engine/src/cameras/commands.rs`; `v1.md`'s "Cameras"
-// and the slice's build brief): each request's answer and its `cameras.changed`, every
-// refusal's code and sentence in the brief's order of checks, a refused request that
-// changes, raises and sends nothing, D12's rule that only a press sends anything to a
-// camera, and the Recent actions rows.
+// hardware link answers (`native/rust-engine/src/cameras/commands.rs`; `v1.md`'s
+// "Cameras"): each request's answer and its `cameras.changed`, every refusal's code and
+// sentence in the hardware link's order of checks, a refused request that changes, raises
+// and sends nothing, D12's rule that only a press sends anything to a camera, and the
+// Recent actions rows.
 
 const NOW = Date.parse("2026-09-27T12:00:00.000Z");
 
