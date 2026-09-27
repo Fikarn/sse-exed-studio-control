@@ -21,18 +21,25 @@ import type { CommissioningStage, RunnerStage, CommissioningCheckTarget } from "
 import { counted } from "./prompterModel";
 import { exportFixturePrompterArchive, restoreFixturePrompterArchive } from "./prompterRequests";
 import type { PrompterArchive } from "./prompterState";
+import { exportFixtureCamerasArchive, restoreFixtureCamerasArchive } from "./camerasRequests";
+import type { ArchivedCamera } from "./camerasState";
 
 // Mirroring `native/rust-engine/src/support.rs`: the hardware link writes backup archives
-// of format 6 (new pages program, Slice 4), which carry the Teleprompter's part — the
-// scripts with their versions, places and speeds, the removed ones, the look and the size
-// — and, since format 5 (Slice 2, D3), no Planning. The archives this double exported are
-// those, each with its prompter part as it was at the export, kept by path; any other
-// archive in its backups folder (the scenarios' own, from April 2026) was written before
-// Planning left, as format 4, with no prompter part. The double never held Planning data,
-// so neither kind holds any, and Verify and the restore say nothing of a Planning part
-// (the hardware link adds its sentence only for a backup that holds some).
-const exportedArchives = new WeakMap<MutableFixtureState, Map<string, PrompterArchive>>();
-const ARCHIVE_FORMAT_VERSION = 6;
+// of format 7 (new pages program, Slice 8), which carry the cameras' part — each camera's
+// address and vMix input; the pairing stays with this PC — beside the Teleprompter's
+// (format 6, Slice 4: the scripts with their versions, places and speeds, the removed ones,
+// the look and the size) and, since format 5 (Slice 2, D3), no Planning. The archives this
+// double exported are those, each with its parts as they were at the export, kept by path;
+// any other archive in its backups folder (the scenarios' own, from April 2026) was written
+// before Planning left, as format 4, with neither part. The double never held Planning
+// data, so neither kind holds any, and Verify and the restore say nothing of a Planning
+// part (the hardware link adds its sentence only for a backup that holds some).
+interface ExportedArchive {
+  prompter: PrompterArchive;
+  cameras: ArchivedCamera[];
+}
+const exportedArchives = new WeakMap<MutableFixtureState, Map<string, ExportedArchive>>();
+const ARCHIVE_FORMAT_VERSION = 7;
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
 /** The pages `settings.update` opens (`WORKSPACES` in `native/rust-engine/src/shell_settings.rs`). */
@@ -248,8 +255,11 @@ export function handleFixtureSetupRequest(
         .filter((entry): entry is JsonObject => entry !== null);
       backups.unshift(backupEntry);
       state.supportSnapshot.backups = backups;
-      const exported = exportedArchives.get(state) ?? new Map<string, PrompterArchive>();
-      exported.set(backupEntry.path, exportFixturePrompterArchive(context));
+      const exported = exportedArchives.get(state) ?? new Map<string, ExportedArchive>();
+      exported.set(backupEntry.path, {
+        prompter: exportFixturePrompterArchive(context),
+        cameras: exportFixtureCamerasArchive(context),
+      });
       exportedArchives.set(state, exported);
       synchronizeFixtureState(state);
       emit("support.changed", { reason: "backup-exported" });
@@ -280,12 +290,17 @@ export function handleFixtureSetupRequest(
         };
       }
       const exportedAt = new Date(asNumber(match.modifiedAt, Date.now())).toISOString();
-      const prompterPart = exportedArchives.get(state)?.get(path) ?? null;
-      const formatVersion = prompterPart ? ARCHIVE_FORMAT_VERSION : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
-      // Format 6 counts the Teleprompter's scripts; an older archive has no such part.
-      const scripts = prompterPart ? `, with ${counted(prompterPart.scripts.length, "script", "scripts")}` : "";
+      const archive = exportedArchives.get(state)?.get(path) ?? null;
+      const formatVersion = archive ? ARCHIVE_FORMAT_VERSION : ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT;
+      // Verify names the parts the archive holds (`archive_sentence`): the Teleprompter's
+      // scripts, counted (format 6), and the cameras' setup (format 7); an older archive has
+      // neither.
+      const parts = archive
+        ? [counted(archive.prompter.scripts.length, "script", "scripts"), "the cameras' setup"]
+        : [];
+      const holding = parts.length > 0 ? `, with ${parts.join(" and ")}` : "";
       return {
-        detail: `Backup archive, format ${formatVersion}, exported ${exportedAt}${scripts}.`,
+        detail: `Backup archive, format ${formatVersion}, exported ${exportedAt}${holding}.`,
         formatVersion,
         kind,
         ok: true,
@@ -324,7 +339,11 @@ export function handleFixtureSetupRequest(
         emit("app.changed", { reason: "backup-restored" });
         // Format 6 (Slice 4): the scripts come back — added, never removed or overwritten
         // — with the look, and the prompter stays paused where it was (D12).
-        detail = restoreFixturePrompterArchive(context, exportedArchives.get(state)?.get(path) ?? null);
+        const archive = exportedArchives.get(state)?.get(path) ?? null;
+        detail = restoreFixturePrompterArchive(context, archive?.prompter ?? null);
+        // Format 7 (Slice 8): the cameras' addresses and vMix inputs, and nothing sent to a
+        // camera; an older archive leaves their setup as it is.
+        restoreFixtureCamerasArchive(context, archive?.cameras ?? null);
       }
       // No Planning counts (the double's backups hold no Planning data); a `detail` only
       // when the restore added scripts or brought one back as an earlier version.

@@ -174,6 +174,10 @@ function validateFixture(scenario, entry) {
   if (entry.prompter !== undefined) {
     validatePrompter(scenario, entry.prompter);
   }
+
+  if (entry.cameras !== undefined) {
+    validateCameras(scenario, entry.cameras);
+  }
 }
 
 // New pages program, Slice 6a: a scenario's `prompter` names its scripts
@@ -240,6 +244,93 @@ function validatePrompter(scenario, prompter) {
   if (prompter.sizePx !== undefined) {
     requireWhole(scenario, prompter.sizePx, "prompter.sizePx");
   }
+}
+
+// New pages program, Slice 8: a scenario's `cameras` is the double's seed
+// (`engine-client`'s `FixtureCamerasSeed`, `fixture/camerasSeed.ts`). This
+// checker holds its shape; the double throws, as the scenario loads, for what
+// only the cameras' model knows — an address that is not one machine's, a
+// value a camera does not report or allow.
+const CAMERAS_KEYS = new Set(["cameras", "selected", "simulated"]);
+const CAMERA_KEYS = new Set([
+  "camera",
+  "address",
+  "paired",
+  "vmixInput",
+  "released",
+  "unreachable",
+  "recording",
+  "values",
+]);
+const CAMERA_TEXT_VALUES = new Set([
+  "iso",
+  "shutter",
+  "iris",
+  "nd",
+  "resolution",
+  "frameRate",
+  "dynamicRange",
+  "displayLut",
+]);
+const CAMERA_NUMBER_VALUES = new Set(["whiteBalance", "tint", "focus"]);
+
+function requireCameraNumber(scenario, value, fieldPath) {
+  if (value !== 1 && value !== 2 && value !== 3) {
+    fail(scenario, `${fieldPath} must be 1, 2 or 3`);
+  }
+}
+
+function validateCameras(scenario, cameras) {
+  requireObject(scenario, cameras, "cameras");
+  for (const key of Object.keys(cameras)) {
+    if (!CAMERAS_KEYS.has(key)) {
+      fail(scenario, `cameras.${key} is not one of ${[...CAMERAS_KEYS].join(", ")}`);
+    }
+  }
+  if (cameras.selected !== undefined) requireCameraNumber(scenario, cameras.selected, "cameras.selected");
+  if (cameras.simulated !== undefined) requireBoolean(scenario, cameras.simulated, "cameras.simulated");
+  const list = cameras.cameras ?? [];
+  requireArray(scenario, list, "cameras.cameras");
+  const seen = new Set();
+  list.forEach((camera, index) => {
+    const at = `cameras.cameras[${index}]`;
+    requireObject(scenario, camera, at);
+    for (const key of Object.keys(camera)) {
+      if (!CAMERA_KEYS.has(key)) fail(scenario, `${at}.${key} is not one of ${[...CAMERA_KEYS].join(", ")}`);
+    }
+    requireCameraNumber(scenario, camera.camera, `${at}.camera`);
+    if (seen.has(camera.camera)) fail(scenario, `${at} names CAM ${camera.camera} twice`);
+    seen.add(camera.camera);
+    if (camera.address !== undefined) {
+      requireString(scenario, camera.address, `${at}.address`);
+      if (camera.camera === 1) fail(scenario, `${at}.address: CAM 1 is paired, not addressed`);
+    }
+    for (const key of ["paired", "released", "unreachable", "recording"]) {
+      if (camera[key] !== undefined) requireBoolean(scenario, camera[key], `${at}.${key}`);
+    }
+    if (camera.paired === true && camera.camera !== 1) fail(scenario, `${at}.paired: only CAM 1 is paired`);
+    if (camera.recording !== undefined && camera.camera !== 1) fail(scenario, `${at}.recording: only CAM 1 records`);
+    if (
+      camera.vmixInput !== undefined &&
+      (!Number.isInteger(camera.vmixInput) || camera.vmixInput < 1 || camera.vmixInput > 1000)
+    ) {
+      fail(scenario, `${at}.vmixInput must be a whole number from 1 to 1000`);
+    }
+    const setUp = camera.camera === 1 ? camera.paired === true : camera.address !== undefined;
+    if ((camera.released === true || camera.unreachable === true) && !setUp) {
+      fail(scenario, `${at} is released or does not answer, so it must be set up`);
+    }
+    if (camera.values !== undefined) {
+      requireObject(scenario, camera.values, `${at}.values`);
+      for (const [key, value] of Object.entries(camera.values)) {
+        if (CAMERA_TEXT_VALUES.has(key)) requireString(scenario, value, `${at}.values.${key}`);
+        else if (CAMERA_NUMBER_VALUES.has(key)) {
+          if (typeof value !== "number") fail(scenario, `${at}.values.${key} must be a number`);
+        } else if (key === "displayLutOn") requireBoolean(scenario, value, `${at}.values.${key}`);
+        else fail(scenario, `${at}.values.${key} is not a camera setting`);
+      }
+    }
+  });
 }
 
 // First gate: every required scenario id must exist.

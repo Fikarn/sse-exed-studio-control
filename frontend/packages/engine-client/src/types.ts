@@ -379,6 +379,56 @@ export interface FixturePrompterSeed {
   sizePx?: number;
 }
 
+/**
+ * Values a simulated camera reports that differ from board 2's (new pages program, Slice 8):
+ * a choice in the camera's own words from its options, a level in its range on its step.
+ * A setting the camera does not report cannot be given one.
+ */
+export interface FixtureCameraValuesSeed {
+  iso?: string;
+  shutter?: string;
+  iris?: string;
+  nd?: string;
+  resolution?: string;
+  frameRate?: string;
+  dynamicRange?: string;
+  displayLut?: string;
+  whiteBalance?: number;
+  tint?: number;
+  focus?: number;
+  displayLutOn?: boolean;
+}
+
+/**
+ * One camera a scenario starts with (new pages program, Slice 8): set up by `paired`
+ * (CAM 1) or `address` (CAM 2, CAM 3), its vMix input (its number without it), `released`
+ * to the iPad or LUMIX Tether, `unreachable` (it answered at the start, then stopped:
+ * it keeps what it reported), CAM 1 `recording` (a take started before the hardware link
+ * looked), and `values` that differ from board 2's.
+ */
+export interface FixtureCameraSeed {
+  camera: 1 | 2 | 3;
+  address?: string;
+  paired?: boolean;
+  vmixInput?: number;
+  released?: boolean;
+  unreachable?: boolean;
+  recording?: boolean;
+  values?: FixtureCameraValuesSeed;
+}
+
+/**
+ * The cameras a scenario starts with (new pages program, Slice 8; `fixture/camerasSeed.ts`):
+ * the cameras it names, the selection (CAM 1 without it), and `simulated: false` for a
+ * hardware link with no link to a camera yet, as the live app is until Slices 12 and 13.
+ * Without it every camera is NOT SET UP (D15 rule 1).
+ */
+export interface FixtureCamerasSeed {
+  cameras?: FixtureCameraSeed[];
+  selected?: 1 | 2 | 3;
+  simulated?: boolean;
+}
+
 export interface FixtureScenario {
   appSnapshot?: JsonObject;
   healthSnapshot?: JsonObject;
@@ -399,6 +449,9 @@ export interface FixtureScenario {
    *  scripts, the standard look at 88 px and nothing on the glass (new pages program,
    *  Slice 6a; `fixture/prompterSeed.ts`). */
   prompter?: FixturePrompterSeed;
+  /** The cameras the double starts with; without it, none set up and CAM 1 selected (new
+   *  pages program, Slice 8; `fixture/camerasSeed.ts`). */
+  cameras?: FixtureCamerasSeed;
 }
 
 export interface EngineTransport {

@@ -23,6 +23,7 @@ import {
   refreshAudioCapabilities,
 } from "./audioConsole";
 import type { IdentifyBursts } from "./lightingOverlay";
+import { camerasHealthCheck, camerasStatusPart, fixtureCameras } from "./camerasState";
 import { prompterCheck, prompterStatusPart } from "./prompterReads";
 import { scenarioScreen } from "./prompterScreen";
 import { fixturePrompter } from "./prompterState";
@@ -32,9 +33,10 @@ export interface MutableFixtureState {
   audioMeterState: Record<string, AudioMeterState>;
   healthSnapshot: JsonObject;
   /** The whole status as the rest of the studio makes it (`derive_status`), worked out
-   *  on every sync; `applyPrompterHealth` folds the Prompter XL's part in. */
+   *  on every sync; `applyPrompterHealth` and `applyCamerasHealth` fold the Prompter XL's
+   *  part and the cameras' in (Slices 5a and 8). */
   healthStatusBeforePrompter: string;
-  /** The health summary likewise; the Prompter XL's sentence is added when it counts. */
+  /** The health summary likewise; the Prompter XL's sentence and the cameras' are added when they count. */
   healthSummaryBeforePrompter: string;
   commissioningSnapshot: JsonObject;
   lightingFixtureCatalogSnapshot: JsonObject;
@@ -895,6 +897,7 @@ function applyHealthChecks(
     },
   };
   applyPrompterHealth(state);
+  applyCamerasHealth(state);
 }
 
 /**
@@ -905,18 +908,41 @@ function applyHealthChecks(
  * its saved data is not usable; the double's always is.
  */
 export function applyPrompterHealth(state: MutableFixtureState) {
-  const prompter = fixturePrompter(state);
-  const check = prompterCheck(prompter);
   const checks = asRecord(state.healthSnapshot.checks) ?? {};
-  checks.prompter = check;
+  checks.prompter = prompterCheck(fixturePrompter(state));
   state.healthSnapshot.checks = checks;
-  // Only a Prompter XL state the shell has reported counts (NOT UPDATED lights the lamp
-  // only); when one does, the summary says so, as the hardware link's does.
-  const part = prompterStatusPart(prompter);
-  state.healthSnapshot.status = withPrompterStatus(state.healthStatusBeforePrompter, part?.tone ?? "ok");
-  state.healthSnapshot.summary = part
-    ? `${state.healthSummaryBeforePrompter} Prompter: ${part.sentence}`
-    : state.healthSummaryBeforePrompter;
+  applyWholeStatus(state);
+}
+
+/**
+ * `checks.cameras` and the cameras' part of the whole status (new pages program, Slice 8):
+ * the worst camera's state and sentence, and whether CAM 1 records, as the cameras are held
+ * now. Worked out on every sync, and again after a cameras request or a change on the link
+ * that changed it (`camerasRequests.ts`).
+ */
+export function applyCamerasHealth(state: MutableFixtureState) {
+  const checks = asRecord(state.healthSnapshot.checks) ?? {};
+  checks.cameras = camerasHealthCheck(fixtureCameras(state));
+  state.healthSnapshot.checks = checks;
+  applyWholeStatus(state);
+}
+
+/**
+ * The whole status and its summary with the Prompter XL's part and the cameras'. Only a
+ * Prompter XL state the shell has reported counts (NOT UPDATED lights the lamp only), and
+ * only a set-up, unreleased camera that does not answer (not set up and released light the
+ * Cameras lamp only); each raises the status to attention at most, and when one counts the
+ * summary ends with its sentence, ` Prompter: ` and then ` Cameras: `, as the hardware
+ * link's does.
+ */
+function applyWholeStatus(state: MutableFixtureState) {
+  const prompter = prompterStatusPart(fixturePrompter(state));
+  const cameras = camerasStatusPart(fixtureCameras(state));
+  const status = withPrompterStatus(state.healthStatusBeforePrompter, prompter?.tone ?? "ok");
+  state.healthSnapshot.status = withCamerasStatus(status, cameras?.tone ?? "ok");
+  state.healthSnapshot.summary = `${state.healthSummaryBeforePrompter}${prompter ? ` Prompter: ${prompter.sentence}` : ""}${
+    cameras ? ` Cameras: ${cameras.sentence}` : ""
+  }`;
 }
 
 /**
@@ -928,6 +954,15 @@ export function withPrompterStatus(status: string, prompter: string): string {
   const severity = (word: string) => (word === "error" ? 3 : word === "attention" ? 2 : word === "warning" ? 1 : 0);
   const part = prompter === "ok" ? "ok" : "attention";
   return severity(part) > severity(status) ? "attention" : status;
+}
+
+/**
+ * The whole status with the cameras' part (Slice 8, first step 3): a held camera that does
+ * not answer makes it no worse than attention — the header's `Cameras` lamp itself goes
+ * red — and it never lowers it.
+ */
+export function withCamerasStatus(status: string, cameras: string): string {
+  return withPrompterStatus(status, cameras);
 }
 
 export function updateFixtureCheck(

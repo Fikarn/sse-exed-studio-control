@@ -17,7 +17,8 @@ import { WORKSPACES, workspaceRefusal } from "./setupRequests";
 // nothing of Planning; an archive written before Planning left is format 4; no reply
 // counts projects, tasks, checklist items or activity entries, and none says a Planning
 // part was skipped, because the double never held Planning data. Slice 4: a new archive
-// is format 6, with the Teleprompter's part, and Verify counts its scripts.
+// is format 6, with the Teleprompter's part, and Verify counts its scripts. Slice 8: format
+// 7, with the cameras' part too, which Verify names.
 
 const PLANNING_COUNTS = ["projectCount", "taskCount", "checklistItemCount", "activityEntryCount"];
 
@@ -29,16 +30,16 @@ function openDouble() {
 }
 
 describe("the fixture double's backup replies", () => {
-  it("exports a format-6 archive and verifies it as one, counting its scripts", async () => {
+  it("exports a format-7 archive and verifies it as one, counting its scripts and naming the cameras' setup", async () => {
     const { request } = openDouble();
 
     const exported = await request("support.backup.export");
     expect(Object.keys(exported).sort()).toEqual(["fileName", "formatVersion", "path"]);
-    expect(exported.formatVersion).toBe(6);
+    expect(exported.formatVersion).toBe(7);
 
     const verified = await request("support.backup.verify", { path: exported.path as string });
-    expect(verified).toMatchObject({ formatVersion: 6, kind: "archive", ok: true });
-    expect(verified.detail).toMatch(/^Backup archive, format 6, exported .+, with 0 scripts\.$/);
+    expect(verified).toMatchObject({ formatVersion: 7, kind: "archive", ok: true });
+    expect(verified.detail).toMatch(/^Backup archive, format 7, exported .+, with 0 scripts and the cameras' setup\.$/);
     expect(String(verified.detail)).not.toMatch(/project|task|Planning/);
   });
 
@@ -95,7 +96,9 @@ describe("the fixture double's backup replies", () => {
 
     const exported = await request("support.backup.export");
     const path = exported.path as string;
-    expect((await request("support.backup.verify", { path })).detail).toMatch(/, with 2 scripts\.$/);
+    expect((await request("support.backup.verify", { path })).detail).toMatch(
+      /, with 2 scripts and the cameras' setup\.$/
+    );
 
     await request("prompter.script.edit", {
       scriptId: intro,
@@ -119,8 +122,11 @@ describe("the fixture double's backup replies", () => {
       "commissioning.changed",
       "app.changed",
       "prompter.changed",
+      // Slice 8: the cameras take their setup again (`after_restore_cameras`).
+      "cameras.changed",
     ]);
     expect(events[3]).toMatchObject({ reason: "backup-restored", anchor: { playing: false } });
+    expect(events[4]).toEqual({ event: "cameras.changed", reason: "restore", camera: null });
 
     const snapshot = await request("prompter.snapshot");
     expect((snapshot.look as JsonObject).textColour).toBe("yellow");

@@ -74,6 +74,10 @@ export const EVENT_DOMAIN_REFRESH = {
   "app.changed": ["app", "health"],
   "audio.changed": ["audio"],
   "audio.meters": [],
+  // New pages program, Slice 8: the store keeps no cameras snapshot yet (the page's reads
+  // come with it in Slice 9), so the event refreshes nothing; a change that moves the
+  // Cameras lamp is followed by `app.changed { reason: "health" }`, which refreshes health.
+  "cameras.changed": [],
   "commissioning.changed": COMMISSIONING_DOMAINS,
   "engine.exited": [],
   "engine.ready": [],
