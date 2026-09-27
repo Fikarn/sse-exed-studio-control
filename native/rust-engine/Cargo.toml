@@ -26,6 +26,15 @@ serde.workspace = true
 serde_json.workspace = true
 studio-control-protocol.workspace = true
 ts-rs = { workspace = true, optional = true }
+# The Teleprompter's import (new pages program, Slice 4): a Word document is a
+# zip of XML parts. The hardware link reads it itself with these three, each
+# already in the lock file through Tauri (flate2, plist, the shell's crates),
+# so no new crate is fetched: miniz_oxide inflates the zip's entries,
+# quick-xml reads word/document.xml, and base64 decodes the bytes the page's
+# file picker sends.
+miniz_oxide = { version = "0.8.9", default-features = false, features = ["with-alloc"] }
+quick-xml = "0.42"
+base64 = "0.22.1"
 
 [dev-dependencies]
 # Property tests for the two parsers that read bytes from outside the process:

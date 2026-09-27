@@ -19,6 +19,9 @@ mod lighting_backend;
 mod lighting_sacn_output;
 #[cfg(feature = "dev-fixtures")]
 mod parity_fixtures;
+// TEMPORARY while Slice 4 is built: removed before its commit.
+#[allow(dead_code)]
+mod prompter;
 mod protocol;
 mod rme_console_link;
 mod rme_totalmix_osc;
