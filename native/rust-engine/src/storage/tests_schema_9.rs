@@ -89,7 +89,8 @@ fn assert_empty_prompter(db_path: &Path) {
 // arrive empty with the standard look and nothing on the prompter, nothing
 // else is touched, and the one pre-migration copy is the schema-7 database.
 // On the build before this slice the start ended at schema 8 with no
-// prompter table.
+// prompter table. Since Slice 8 the same start goes on to schema 10 (the
+// cameras' Setup, `tests_schema_10.rs`); it asserted 9 until then.
 #[test]
 fn the_live_data_s_schema_7_goes_to_schema_9_in_one_start() {
     let test_dir = TestDir::new("storage-v7-to-v9");
@@ -103,9 +104,12 @@ fn the_live_data_s_schema_7_goes_to_schema_9_in_one_start() {
 
     let bootstrap =
         initialize_database(&db_path, &backups_dir).expect("the v9 migration should succeed");
-    assert_eq!(bootstrap.schema_version, 9);
-    assert_eq!(STORAGE_SCHEMA_VERSION, 9);
-    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert_eq!(bootstrap.schema_version, 10);
+    assert_eq!(STORAGE_SCHEMA_VERSION, 10);
+    assert_eq!(
+        schema_versions(&db_path),
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
 
     assert_eq!(planning_objects(&db_path), Vec::<String>::new());
     assert_empty_prompter(&db_path);
@@ -165,13 +169,17 @@ fn the_live_data_s_schema_7_goes_to_schema_9_in_one_start() {
 
     // A second start changes nothing and writes no copy.
     initialize_database(&db_path, &backups_dir).expect("second start should succeed");
-    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert_eq!(
+        schema_versions(&db_path),
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
     assert_empty_prompter(&db_path);
     assert_eq!(settings_rows(&db_path), rows_after);
 }
 
 // D20: a database at schema 8 (a build of Slices 2 to 3) takes the one step,
-// behind a copy of itself at schema 8.
+// behind a copy of itself at schema 8. Since Slice 8 it takes step 10 after
+// it (the test stepped back from 9 and asserted 9 until then).
 #[test]
 fn a_schema_8_database_takes_the_one_step_to_9() {
     let test_dir = TestDir::new("storage-v8-to-v9");
@@ -179,15 +187,16 @@ fn a_schema_8_database_takes_the_one_step_to_9() {
     let backups_dir = test_dir.path().join("backups");
     initialize_database(&db_path, &test_dir.path().join("first-backups"))
         .expect("a new database should initialize");
-    // Schema 9 less its step is schema 8 as the build before this slice
-    // left it.
+    // Schema 10 less its last two steps is schema 8 as the build before
+    // Slice 4 left it.
     open_connection(&db_path)
         .expect("connection should open")
         .execute_batch(
-            "DROP TABLE prompter_script_versions;
+            "DROP TABLE camera_setup;
+             DROP TABLE prompter_script_versions;
              DROP TABLE prompter_scripts;
              DROP TABLE prompter_state;
-             DELETE FROM schema_migrations WHERE version = 9;",
+             DELETE FROM schema_migrations WHERE version IN (9, 10);",
         )
         .expect("the database should step back to schema 8");
     assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
@@ -195,7 +204,7 @@ fn a_schema_8_database_takes_the_one_step_to_9() {
 
     let bootstrap =
         initialize_database(&db_path, &backups_dir).expect("the v9 migration should succeed");
-    assert_eq!(bootstrap.schema_version, 9);
+    assert_eq!(bootstrap.schema_version, 10);
     assert_empty_prompter(&db_path);
     assert_eq!(settings_rows(&db_path), rows_before);
     let backup = newest_snapshot(&backups_dir).expect("a pre-migration backup should exist");

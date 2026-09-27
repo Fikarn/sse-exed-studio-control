@@ -13,8 +13,8 @@ use serde_json::{json, Value};
 
 use crate::prompter::clock::PrompterAnchor;
 use crate::protocol::{
-    event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_LIGHTING_CHANGED,
-    EVENT_PROMPTER_CHANGED,
+    event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_CAMERAS_CHANGED,
+    EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED,
 };
 
 static ENGINE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
@@ -71,6 +71,24 @@ pub(crate) fn emit_prompter_changed(reason: &str, anchor: Option<PrompterAnchor>
         let _ = sender.send(event_message(
             EVENT_PROMPTER_CHANGED,
             prompter_changed_payload(reason, anchor),
+        ));
+    }
+}
+
+/// `cameras.changed { reason, camera }`, the payload the IPC replies carry
+/// too (new pages program, Slice 8); `camera` is `null` when it is about all
+/// three.
+pub(crate) fn cameras_changed_payload(reason: &str, camera: Option<u8>) -> Value {
+    json!({ "reason": reason, "camera": camera })
+}
+
+/// Emits `cameras.changed` from outside the request loop: a value a camera
+/// changed itself, a camera that stops answering or answers again.
+pub(crate) fn emit_cameras_changed(reason: &str, camera: Option<u8>) {
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(
+            EVENT_CAMERAS_CHANGED,
+            cameras_changed_payload(reason, camera),
         ));
     }
 }

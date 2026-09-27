@@ -17,7 +17,7 @@ pub type EngineResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 /// The newest schema `migrate_schema` knows. Every step there names its own
 /// version as a literal; raising this goes with a new `if schema_version < N`
 /// block, never with a change to the last one.
-pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 9;
+pub(crate) const STORAGE_SCHEMA_VERSION: i64 = 10;
 const STORAGE_FORMAT_VERSION_KEY: &str = "storage.format_version";
 const STORAGE_FORMAT_VERSION_INITIAL: &str = "1";
 const LIGHTING_EDITOR_STATE_KEY: &str = "app.lighting.editor.state";
@@ -715,6 +715,32 @@ fn migrate_schema(connection: &mut Connection, backups_dir: &Path) -> EngineResu
         schema_version = 9;
     }
 
+    if schema_version < 10 {
+        // v9 -> v10 (new pages program, Slice 8 — D15): the cameras' Setup.
+        // One row a camera: CAM 2's and CAM 3's address, whether CAM 1 is
+        // paired, and the vMix input that carries its picture — 1, 2 and 3
+        // in new and migrated data alike, nothing entered, so a start after
+        // the upgrade contacts no camera. Who holds a camera and the
+        // selection are kept in memory (`cameras::runtime`).
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS camera_setup (
+              camera INTEGER PRIMARY KEY CHECK (camera BETWEEN 1 AND 3),
+              address TEXT,
+              paired INTEGER NOT NULL DEFAULT 0 CHECK (paired IN (0, 1)),
+              vmix_input INTEGER NOT NULL CHECK (vmix_input BETWEEN 1 AND 1000)
+            );
+
+            INSERT OR IGNORE INTO camera_setup (camera, address, paired, vmix_input)
+            VALUES (1, NULL, 0, 1), (2, NULL, 0, 2), (3, NULL, 0, 3);
+            "#,
+        )?;
+        transaction.execute("INSERT INTO schema_migrations(version) VALUES (10)", [])?;
+        transaction.commit()?;
+        schema_version = 10;
+    }
+
     Ok(schema_version)
 }
 
@@ -871,6 +897,8 @@ fn upsert_metadata(
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_schema_10;
 #[cfg(test)]
 mod tests_schema_8;
 #[cfg(test)]

@@ -271,7 +271,99 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
                 "sentence": "Cleared the prompter."
             }),
         ),
+        // New pages program, Slice 8: a take, a format, a look, who holds a
+        // camera.
+        (
+            "cameras.record.start",
+            json!({}),
+            json!({ "camera": 1, "recording": true, "sentence": "CAM 1 started recording." }),
+        ),
+        (
+            "cameras.record.stop",
+            json!({ "confirm": true }),
+            json!({ "camera": 1, "recording": false, "sentence": "CAM 1 stopped recording." }),
+        ),
+        (
+            "cameras.format.set",
+            json!({ "camera": 1, "frameRate": "50", "confirm": true }),
+            json!({ "camera": 1, "sentence": "CAM 1: 25p → 50p." }),
+        ),
+        (
+            "cameras.look.set",
+            json!({ "camera": 1, "displayLutOn": false, "confirm": true }),
+            json!({ "camera": 1, "sentence": "CAM 1: display LUT off." }),
+        ),
+        (
+            "cameras.release",
+            json!({ "camera": 2, "confirm": true }),
+            json!({ "camera": 2, "state": "released", "sentence": "CAM 2 released to LUMIX Tether." }),
+        ),
+        (
+            "cameras.connect",
+            json!({ "camera": 2 }),
+            json!({ "camera": 2, "state": "held", "sentence": "CAM 2 held again." }),
+        ),
     ]
+}
+
+// New pages program, Slice 8: the cameras' rows are under the cameras, the
+// camera's tag as the target and the answer's sentence as the operator read
+// it; Connect is a row only when the camera is held again, and the selection,
+// a press on a setting and Setup are not actions.
+#[test]
+fn the_camera_rows_are_what_the_answer_says() {
+    let row = |method: &str, result: Value| {
+        ui_actions(method, &json!({}), &result, false)
+            .into_iter()
+            .map(|entry| (entry.domain, entry.action, entry.target, entry.detail))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        row(
+            "cameras.release",
+            json!({ "camera": 1, "state": "released", "sentence": "CAM 1 released to the iPad." })
+        ),
+        vec![(
+            DOMAIN_CAMERAS,
+            "released",
+            String::from("CAM 1"),
+            String::from("CAM 1 released to the iPad.")
+        )]
+    );
+    assert_eq!(
+        row(
+            "cameras.look.set",
+            json!({ "camera": 1, "sentence": "CAM 1: display LUT Film → Ext. video → Custom." })
+        )[0]
+        .3,
+        "CAM 1: display LUT Film → Ext. video → Custom."
+    );
+    assert!(row(
+        "cameras.connect",
+        json!({
+            "camera": 3,
+            "state": "unreachable",
+            "sentence": "CAM 3 does not answer at 172.16.16.86. Check that it is on and on the network."
+        })
+    )
+    .is_empty());
+    assert!(row("cameras.record.start", json!({ "recording": true })).is_empty());
+    for method in [
+        "cameras.snapshot",
+        "cameras.select",
+        "cameras.set",
+        "cameras.step",
+        "cameras.auto",
+        "cameras.setup.update",
+        "cameras.setup.pair",
+        "cameras.setup.forget",
+    ] {
+        assert_eq!(
+            ui_method_class(method),
+            Some(UiMethodClass::NotAnAction),
+            "{method}"
+        );
+    }
 }
 
 // New pages program, Slice 4 (the proposal §5.5): putting a script on,

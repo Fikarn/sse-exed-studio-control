@@ -151,21 +151,24 @@ export async function reserveLocalPort(host = "127.0.0.1") {
 
 /**
  * The variables that harden a process a lane starts: a reserved bridge port,
- * a safe start and, unless `simulatedAudio` is false (the live console lane
- * only), the simulated console.
+ * a safe start, the simulated cameras (every lane, the live console lane too:
+ * new pages program, Slice 8 — D15 rules 1–2) and, unless `simulatedAudio` is
+ * false (the live console lane only), the simulated console.
  */
 export async function hardenedLaneEnv({ simulatedAudio = true } = {}) {
   return {
     SSE_CONTROL_SURFACE_PORT: String(await reserveLocalPort()),
     SSE_SAFE_START: "1",
+    SSE_CAMERAS_SIMULATED: "1",
     ...(simulatedAudio ? { SSE_AUDIO_SIMULATED_INPUT_MODE: "1" } : {}),
   };
 }
 
-// The engine's own readings of the three variables (control_surface.rs
+// The engine's own readings of the four variables (control_surface.rs
 // `resolve_control_surface_port`, bootstrap.rs `safe_start_requested`,
-// audio/helpers.rs `resolve_audio_config`): a port the engine cannot parse
-// falls back to the live app's.
+// audio/helpers.rs `resolve_audio_config`, cameras.rs
+// `simulated_cameras_requested`): a port the engine cannot parse falls back
+// to the live app's.
 function bridgePortOf(value) {
   const text = String(value ?? "").trim();
   if (!/^\d{1,5}$/.test(text)) {
@@ -185,6 +188,11 @@ function safeStartRequested(value) {
 
 function simulatedConsoleRequested(value) {
   return ["1", "true", "TRUE", "yes", "YES"].includes(value);
+}
+
+// Only `1` asks for the simulated cameras; the engine trims the value first.
+function simulatedCamerasRequested(value) {
+  return String(value ?? "").trim() === "1";
 }
 
 /**
@@ -213,6 +221,11 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
   }
   if (!liveConsole && !simulatedConsoleRequested(env.SSE_AUDIO_SIMULATED_INPUT_MODE)) {
     return "SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane.";
+  }
+  // Every lane, the live console lane too, uses the simulated cameras: no lane
+  // may reach a camera (new pages program, Slice 8 — D15 rules 1–2).
+  if (!simulatedCamerasRequested(env.SSE_CAMERAS_SIMULATED)) {
+    return "SSE_CAMERAS_SIMULATED must be 1: a lane uses the simulated cameras.";
   }
   return null;
 }

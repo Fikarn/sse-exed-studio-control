@@ -216,7 +216,9 @@ fn script_named<'a>(snapshot: &'a Value, list: &str, name: &str) -> &'a Value {
 // Verify counts the scripts. A restore adds the scripts the saved data lacks,
 // never removes or overwrites one — a differing text comes back as an
 // earlier version — brings the look back, and never changes what the
-// prompter shows, which stays paused where it was (D12).
+// prompter shows, which stays paused where it was (D12). Since Slice 8 the
+// archive is format 7 and Verify names the cameras' setup after the scripts
+// (the test asserted format 6 and "…, with 2 scripts.").
 #[test]
 fn a_format_6_archive_adds_scripts_and_never_removes_one() {
     let test_dir = TestDir::new("prompter-archive");
@@ -244,7 +246,7 @@ fn a_format_6_archive_adds_scripts_and_never_removes_one() {
     );
 
     let exported = result(&app, "support.backup.export", json!({}));
-    assert_eq!(exported["formatVersion"], 6);
+    assert_eq!(exported["formatVersion"], 7);
     let path = exported["path"].as_str().expect("a path").to_string();
     let raw: Value =
         serde_json::from_slice(&std::fs::read(&path).expect("the archive reads")).expect("JSON");
@@ -265,7 +267,7 @@ fn a_format_6_archive_adds_scripts_and_never_removes_one() {
     assert!(
         verified["detail"]
             .as_str()
-            .is_some_and(|detail| detail.ends_with(", with 2 scripts.")),
+            .is_some_and(|detail| detail.ends_with(", with 2 scripts and the cameras' setup.")),
         "{}",
         verified["detail"]
     );
@@ -349,7 +351,8 @@ fn a_format_6_archive_adds_scripts_and_never_removes_one() {
 }
 
 // An archive from before format 6 has no Teleprompter part: a restore
-// leaves every script as it is.
+// leaves every script as it is. Since Slice 8 the stand-in for it also
+// leaves out the cameras' part, which no format-5 archive had.
 #[test]
 fn an_older_archive_leaves_the_scripts_alone() {
     let test_dir = TestDir::new("prompter-archive-5");
@@ -361,6 +364,7 @@ fn an_older_archive_leaves_the_scripts_alone() {
     let mut raw: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
     raw["formatVersion"] = json!(5);
     raw.as_object_mut().unwrap().remove("prompter");
+    raw.as_object_mut().unwrap().remove("cameras");
     std::fs::write(&path, serde_json::to_vec_pretty(&raw).unwrap()).unwrap();
     result(&app, "prompter.script.create", json!({ "name": "Kept" }));
 

@@ -802,24 +802,37 @@ function scratchFolders(name = "sse-native-lanes-scratch") {
   return { SSE_APP_DATA_DIR: path.join(root, "app-data"), SSE_LOG_DIR: path.join(root, "logs") };
 }
 
-test("the lanes' hardening: a bridge port of their own, the light outputs held, the simulated console", async () => {
+// New pages program, Slice 8 (D15 rules 1–2): every lane also uses the
+// simulated cameras — the live console lane too — and an environment without
+// them is refused (the hand-built `hardened` below gained
+// `SSE_CAMERAS_SIMULATED: "1"`, and the refusals the cases without it or with
+// a value the engine does not read).
+test("the lanes' hardening: a bridge port of their own, the light outputs held, the simulated console and cameras", async () => {
   const folders = scratchFolders();
   const env = await hardenedLaneEnv();
   assert.match(env.SSE_CONTROL_SURFACE_PORT, /^\d{1,5}$/);
   assert.notEqual(Number(env.SSE_CONTROL_SURFACE_PORT), LIVE_APP_CONTROL_SURFACE_PORT);
   assert.equal(env.SSE_SAFE_START, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
+  assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...env, ...folders }, { liveConsole: false }), null);
 
-  // The live console lane keeps the real console and nothing else.
+  // The live console lane keeps the real console and nothing else: its
+  // cameras are the simulated ones too.
   const live = { ...(await hardenedLaneEnv({ simulatedAudio: false })), ...folders };
   assert.equal(Object.hasOwn(live, "SSE_AUDIO_SIMULATED_INPUT_MODE"), false);
+  assert.equal(live.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal(live, { liveConsole: true }), null);
   assert.match(laneEnvRefusal(live, { liveConsole: false }), /SSE_AUDIO_SIMULATED_INPUT_MODE/);
+  assert.match(
+    laneEnvRefusal({ ...live, SSE_CAMERAS_SIMULATED: undefined }, { liveConsole: true }),
+    /SSE_CAMERAS_SIMULATED must be 1/
+  );
   const acceptance = await acceptanceEngineEnv({ SSE_LANE_MARKER: "kept" });
   assert.equal(acceptance.SSE_LANE_MARKER, "kept");
   assert.equal(acceptance.SSE_SAFE_START, "1");
   assert.equal(acceptance.SSE_AUDIO_SIMULATED_INPUT_MODE, LIVE_CONSOLE ? undefined : "1");
+  assert.equal(acceptance.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...acceptance, ...folders }), null);
 
   const hardened = {
@@ -827,6 +840,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     SSE_CONTROL_SURFACE_PORT: "45123",
     SSE_SAFE_START: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
+    SSE_CAMERAS_SIMULATED: "1",
   };
   assert.equal(laneEnvRefusal(hardened, { liveConsole: false }), null);
   const refused = {
@@ -841,6 +855,9 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     "a safe start switched off": { ...hardened, SSE_SAFE_START: "off" },
     "the real console": { ...hardened, SSE_AUDIO_SIMULATED_INPUT_MODE: undefined },
     "a simulated console the engine does not read": { ...hardened, SSE_AUDIO_SIMULATED_INPUT_MODE: "on" },
+    "the real cameras": { ...hardened, SSE_CAMERAS_SIMULATED: undefined },
+    "the real cameras, asked for by name": { ...hardened, SSE_CAMERAS_SIMULATED: "0" },
+    "simulated cameras the engine does not read": { ...hardened, SSE_CAMERAS_SIMULATED: "true" },
   };
   for (const [label, candidate] of Object.entries(refused)) {
     assert.notEqual(laneEnvRefusal(candidate, { liveConsole: false }), null, label);
@@ -1112,6 +1129,32 @@ test("only acceptanceEngineEnv may leave the simulated console, and no lane can 
       /A planted lane was not started: a lane cannot choose the real console/
     );
   }
+});
+
+// New pages program, Slice 8 (D15 rules 1–2): the simulated cameras have no
+// waiver. Only the harness names SSE_CAMERAS_SIMULATED — hardenedLaneEnv sets
+// it and laneEnvRefusal requires it — so no lane can leave them, and any
+// environment laneProcessEnv builds without them is refused before anything
+// is spawned.
+test("every lane uses the simulated cameras, and only the harness names them", async () => {
+  const namers = ALL_LANES.filter((lane) => /\bSSE_CAMERAS_SIMULATED\b/.test(withoutComments(read(lane))));
+  assert.deepEqual(namers, [HARNESS], "a lane that names the simulated cameras itself");
+  assert.equal(
+    withoutComments(classText(read(HARNESS), "EngineHarness")).includes("SSE_CAMERAS_SIMULATED"),
+    false,
+    "the harness's engine start takes the lanes' hardening as it is"
+  );
+
+  const env = { ...(await hardenedLaneEnv()), ...scratchFolders() };
+  assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
+  for (const value of [undefined, "", "0", "on", "yes", "TRUE"]) {
+    assert.throws(
+      () => laneProcessEnv(env, { SSE_CAMERAS_SIMULATED: value }, { label: "A planted lane" }),
+      /A planted lane was not started: SSE_CAMERAS_SIMULATED must be 1/,
+      String(value)
+    );
+  }
+  assert.doesNotThrow(() => laneProcessEnv(env, { SSE_CAMERAS_SIMULATED: " 1 " }, { label: "A lane" }));
 });
 
 test("the scripts that do work do nothing when imported, and packaging refuses to replace the folder a running app uses", () => {
@@ -1561,7 +1604,8 @@ test("a script that does work is imported only by tests and by the entry points 
 
 // New pages program, Slice 4: the archive went to format 6, and the lanes'
 // expectation stayed at 5 until `native:acceptance` failed on CI (push run
-// 36306473342). The lanes' format is the hardware link's.
+// 36306473342). The lanes' format is the hardware link's: 7 since Slice 8
+// (the cameras' part).
 test("the lanes expect the archive format the hardware link writes", () => {
   const format = /pub\(crate\) const SUPPORT_BACKUP_FORMAT_VERSION: i64 = (\d+);/.exec(
     read("native/rust-engine/src/support.rs")

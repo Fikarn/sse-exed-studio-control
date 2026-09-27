@@ -43,11 +43,11 @@ fn format_4_archive(runtime: &RuntimeContext, with_rows: bool) -> Value {
         serde_json::to_value(build_support_backup_archive(runtime).expect("archive should build"))
             .expect("archive should serialize to value");
     archive["formatVersion"] = json!(4);
-    // Format 4 had no Teleprompter part (format 6, Slice 4).
-    archive
-        .as_object_mut()
-        .expect("the archive is an object")
-        .remove("prompter");
+    // Format 4 had no Teleprompter part (format 6, Slice 4) and no cameras'
+    // part (format 7, Slice 8).
+    let parts = archive.as_object_mut().expect("the archive is an object");
+    parts.remove("prompter");
+    parts.remove("cameras");
     // The Control Surface Probe's line as that build wrote it with nothing
     // loaded; the operator's archive of 2026-09-24 carries one like it.
     let checks = archive["commissioning"]["checks"]
@@ -154,7 +154,8 @@ fn make_schema_7_backup(path: &Path, with_rows: bool) {
     connection
         .execute_batch(
             r#"
-            DELETE FROM schema_migrations WHERE version IN (8, 9);
+            DELETE FROM schema_migrations WHERE version IN (8, 9, 10);
+            DROP TABLE camera_setup;
             DROP TABLE prompter_script_versions;
             DROP TABLE prompter_scripts;
             DROP TABLE prompter_state;
@@ -193,15 +194,17 @@ fn make_schema_7_backup(path: &Path, with_rows: bool) {
 // reply no longer counts them. Verify reads it back with nothing left out.
 // Slice 2 wrote it as format 5; since Slice 4 it is format 6 and Verify
 // counts its scripts (the test asserted format 5 and the sentence "Backup
-// archive, format 5, exported T.").
+// archive, format 5, exported T."); since Slice 8 it is format 7 and Verify
+// names the cameras' setup too (it asserted format 6 and "…, with 0
+// scripts.").
 #[test]
 fn a_new_archive_carries_no_planning() {
-    let test_dir = TestDir::new("format-6-no-planning");
+    let test_dir = TestDir::new("format-7-no-planning");
     let runtime = seeded_runtime(&test_dir);
 
     let export = export_support_backup(&runtime).expect("export should succeed");
-    assert_eq!(SUPPORT_BACKUP_FORMAT_VERSION, 6);
-    assert_eq!(export.format_version, 6);
+    assert_eq!(SUPPORT_BACKUP_FORMAT_VERSION, 7);
+    assert_eq!(export.format_version, 7);
     let reply = serde_json::to_value(&export).expect("reply should serialize");
     let mut reply_keys = reply
         .as_object()
@@ -214,7 +217,7 @@ fn a_new_archive_carries_no_planning() {
 
     let raw: Value = serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
         .expect("archive should parse");
-    assert_eq!(raw["formatVersion"], json!(6));
+    assert_eq!(raw["formatVersion"], json!(7));
     let keys = every_key(&raw);
     for key in &keys {
         assert!(
@@ -230,11 +233,11 @@ fn a_new_archive_carries_no_planning() {
 
     let verification = verify_support_backup(&request_for(&runtime, Path::new(&export.path)));
     assert!(verification.ok, "{}", verification.detail);
-    assert_eq!(verification.format_version, Some(6));
+    assert_eq!(verification.format_version, Some(7));
     assert_eq!(
         verification.detail,
         format!(
-            "Backup archive, format 6, exported {}, with 0 scripts.",
+            "Backup archive, format 7, exported {}, with 0 scripts and the cameras' setup.",
             raw["exportedAt"]
                 .as_str()
                 .expect("the archive has its time")
@@ -427,12 +430,15 @@ fn verify_says_a_format_4_archive_s_planning_part_is_skipped() {
 // tables. Before the backups left Planning, every schema-8 backup was
 // refused ("no such table: projects"). Since Slice 4 this build writes
 // schema 9 and the newer backup is at 10 (the test wrote a schema 8 and
-// refused a 9; its schema-7 copies now also lose step 9's tables).
+// refused a 9; its schema-7 copies now also lose step 9's tables). Since
+// Slice 8 this build writes schema 10 and the newer backup is at 11 (the
+// test was `database_backups_of_schema_7_and_9_restore_…`, wrote a schema 9
+// and refused a 10; its schema-7 copies now also lose step 10's table).
 #[test]
-fn database_backups_of_schema_7_and_9_restore_and_a_newer_one_is_refused() {
-    let test_dir = TestDir::new("schema-7-and-9");
+fn database_backups_of_schema_7_and_10_restore_and_a_newer_one_is_refused() {
+    let test_dir = TestDir::new("schema-7-and-10");
     let runtime = seeded_runtime(&test_dir);
-    let schema_9 = snapshot_database(
+    let schema_10 = snapshot_database(
         &runtime.db_path,
         &runtime.backups_dir,
         SnapshotReason::Daily,
@@ -442,28 +448,28 @@ fn database_backups_of_schema_7_and_9_restore_and_a_newer_one_is_refused() {
     let schema_7_settings_only = runtime
         .backups_dir
         .join("db-schema-7-settings-only.sqlite3");
-    let schema_10 = runtime.backups_dir.join("db-schema-10.sqlite3");
-    for copy in [&schema_7_rows, &schema_7_settings_only, &schema_10] {
-        fs::copy(&schema_9, copy).expect("backup should copy");
+    let schema_11 = runtime.backups_dir.join("db-schema-11.sqlite3");
+    for copy in [&schema_7_rows, &schema_7_settings_only, &schema_11] {
+        fs::copy(&schema_10, copy).expect("backup should copy");
     }
     make_schema_7_backup(&schema_7_rows, true);
     make_schema_7_backup(&schema_7_settings_only, false);
-    Connection::open(&schema_10)
+    Connection::open(&schema_11)
         .expect("backup should open")
-        .execute("INSERT INTO schema_migrations(version) VALUES (10)", [])
+        .execute("INSERT INTO schema_migrations(version) VALUES (11)", [])
         .expect("the newer schema should seed");
 
-    let checked_9 = verify_support_backup(&request_for(&runtime, &schema_9));
-    assert!(checked_9.ok, "{}", checked_9.detail);
-    assert_eq!(checked_9.schema_version, Some(9));
-    let settings_8 = inspect_database_backup(&schema_9)
-        .expect("a schema-9 backup is a good database")
+    let checked_10 = verify_support_backup(&request_for(&runtime, &schema_10));
+    assert!(checked_10.ok, "{}", checked_10.detail);
+    assert_eq!(checked_10.schema_version, Some(10));
+    let settings_8 = inspect_database_backup(&schema_10)
+        .expect("a schema-10 backup is a good database")
         .settings_count;
     assert_eq!(
-        checked_9.detail,
-        format!("Database backup, schema 9, integrity ok: {settings_8} settings.")
+        checked_10.detail,
+        format!("Database backup, schema 10, integrity ok: {settings_8} settings.")
     );
-    assert_operator_words(&checked_9.detail);
+    assert_operator_words(&checked_10.detail);
 
     let checked_7 = verify_support_backup(&request_for(&runtime, &schema_7_rows));
     assert!(checked_7.ok, "{}", checked_7.detail);
@@ -483,27 +489,27 @@ fn database_backups_of_schema_7_and_9_restore_and_a_newer_one_is_refused() {
         format!("Database backup, schema 7, integrity ok: {settings_8} settings.")
     );
 
-    let checked_10 = verify_support_backup(&request_for(&runtime, &schema_10));
-    assert!(!checked_10.ok);
-    assert_eq!(checked_10.schema_version, Some(10));
+    let checked_11 = verify_support_backup(&request_for(&runtime, &schema_11));
+    assert!(!checked_11.ok);
+    assert_eq!(checked_11.schema_version, Some(11));
     assert!(
-        checked_10.detail.contains("newer Studio Control"),
+        checked_11.detail.contains("newer Studio Control"),
         "{}",
-        checked_10.detail
+        checked_11.detail
     );
     let pending = runtime.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
-    match restore_support_backup(&runtime, &request_for(&runtime, &schema_10)) {
+    match restore_support_backup(&runtime, &request_for(&runtime, &schema_11)) {
         Err(SupportCommandError::UnsupportedVersion(message)) => {
-            assert!(message.contains("schema 10"), "{message}");
+            assert!(message.contains("schema 11"), "{message}");
         }
         other => panic!("expected UnsupportedVersion, got {other:?}"),
     }
     assert!(!pending.exists(), "nothing is staged");
 
-    let staged_9 = restore_support_backup(&runtime, &request_for(&runtime, &schema_9))
-        .expect("a schema-9 backup restores");
-    assert!(staged_9.requires_restart);
-    assert_eq!(staged_9.detail, None);
+    let staged_10 = restore_support_backup(&runtime, &request_for(&runtime, &schema_10))
+        .expect("a schema-10 backup restores");
+    assert!(staged_10.requires_restart);
+    assert_eq!(staged_10.detail, None);
 
     let staged_7 = restore_support_backup(&runtime, &request_for(&runtime, &schema_7_rows))
         .expect("a schema-7 backup restores");
@@ -512,19 +518,167 @@ fn database_backups_of_schema_7_and_9_restore_and_a_newer_one_is_refused() {
     assert_eq!(staged_7.detail.as_deref(), Some(PLANNING_WAS_NOT_RESTORED));
 
     // The next start: the bootstrap moves the pending file into place and
-    // opens it, and the upgrade to schema 9 runs on it like any older data.
+    // opens it, and the upgrade to schema 10 runs on it like any older data.
     let next_start = test_dir.path().join("next-start");
     fs::create_dir_all(&next_start).expect("next start dir should create");
     let restored = next_start.join("studio-control.sqlite3");
     fs::copy(&pending, &restored).expect("pending should copy");
     let bootstrap = initialize_database(&restored, &next_start.join("backups"))
         .expect("the restored backup opens");
-    assert_eq!(bootstrap.schema_version, 9);
+    assert_eq!(bootstrap.schema_version, 10);
     assert!(planning_tables_in(&restored).is_empty());
     let settings = list_settings_by_prefix(&restored, "").expect("settings should load");
     assert!(!settings.keys().any(|key| key.starts_with("planning.")));
     assert_eq!(
         settings.get(WORKSPACE_KEY).map(String::as_str),
         Some("audio")
+    );
+}
+
+// ---------------------------------------------------------------------------
+// New pages program, Slice 8: the cameras' part (format 7).
+// ---------------------------------------------------------------------------
+
+fn camera_rows(db_path: &Path) -> [crate::cameras::store::StoredSetup; 3] {
+    crate::cameras::store::read_setup(&open_connection(db_path).expect("connection should open"))
+        .expect("the cameras' rows should read")
+}
+
+fn write_camera(db_path: &Path, camera: u8, address: Option<&str>, paired: bool, input: u32) {
+    crate::cameras::store::write_setup(
+        &open_connection(db_path).expect("connection should open"),
+        &crate::cameras::store::StoredSetup {
+            camera,
+            address: address.map(String::from),
+            paired,
+            vmix_input: input,
+        },
+    )
+    .expect("the camera's row should write");
+}
+
+// Slice 8: an archive carries each camera's address and vMix input, never
+// CAM 1's pairing (Windows' own, it stays with this PC). A restore writes
+// the addresses and vMix inputs back and keeps this PC's pairing flag, and
+// Verify names the part.
+#[test]
+fn a_format_7_archive_carries_the_cameras_and_restores_them_without_the_pairing() {
+    let test_dir = TestDir::new("format-7-cameras");
+    let runtime = seeded_runtime(&test_dir);
+    write_camera(&runtime.db_path, 1, None, true, 1);
+    write_camera(&runtime.db_path, 2, Some("172.16.16.85"), false, 12);
+    write_camera(&runtime.db_path, 3, None, false, 7);
+
+    let export = export_support_backup(&runtime).expect("export should succeed");
+    let raw: Value = serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
+        .expect("archive should parse");
+    assert_eq!(
+        raw["cameras"],
+        json!([
+            { "camera": 1, "address": null, "vmixInput": 1 },
+            { "camera": 2, "address": "172.16.16.85", "vmixInput": 12 },
+            { "camera": 3, "address": null, "vmixInput": 7 }
+        ])
+    );
+    assert!(
+        !every_key(&raw["cameras"]).contains(&String::from("paired")),
+        "the pairing stays with this PC"
+    );
+    let verification = verify_support_backup(&request_for(&runtime, Path::new(&export.path)));
+    assert!(verification.ok, "{}", verification.detail);
+    assert!(
+        verification
+            .detail
+            .ends_with(", with 0 scripts and the cameras' setup."),
+        "{}",
+        verification.detail
+    );
+    assert_operator_words(&verification.detail);
+
+    // This PC now: CAM 1 unpaired, CAM 2's address taken away, CAM 3 on
+    // another input.
+    write_camera(&runtime.db_path, 1, None, false, 4);
+    write_camera(&runtime.db_path, 2, None, false, 2);
+    write_camera(&runtime.db_path, 3, Some("10.0.0.9"), false, 3);
+    let restored =
+        restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+            .expect("the archive restores");
+    assert!(!restored.requires_restart);
+
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!(
+        (rows[0].paired, rows[0].vmix_input),
+        (false, 1),
+        "CAM 1 keeps this PC's pairing and takes the archive's input"
+    );
+    assert_eq!(
+        (rows[1].address.as_deref(), rows[1].vmix_input),
+        (Some("172.16.16.85"), 12)
+    );
+    assert_eq!((rows[2].address.as_deref(), rows[2].vmix_input), (None, 7));
+}
+
+// Slice 8: an archive of format 6 or older has no cameras' part, and a
+// restore of it leaves the cameras' setup as it is; Verify names only its
+// scripts.
+#[test]
+fn an_archive_of_format_6_leaves_the_cameras_setup_as_it_is() {
+    let test_dir = TestDir::new("format-6-cameras");
+    let runtime = seeded_runtime(&test_dir);
+    let mut archive =
+        serde_json::to_value(build_support_backup_archive(&runtime).expect("archive should build"))
+            .expect("archive should serialize to value");
+    archive["formatVersion"] = json!(6);
+    archive
+        .as_object_mut()
+        .expect("the archive is an object")
+        .remove("cameras");
+    let path = write_archive(&runtime, "native-backup-format-6.json", &archive);
+    let verification = verify_support_backup(&request_for(&runtime, &path));
+    assert!(verification.ok, "{}", verification.detail);
+    assert!(
+        verification.detail.ends_with(", with 0 scripts."),
+        "{}",
+        verification.detail
+    );
+
+    write_camera(&runtime.db_path, 1, None, true, 5);
+    write_camera(&runtime.db_path, 2, Some("172.16.16.85"), false, 6);
+    let before = camera_rows(&runtime.db_path);
+    restore_support_backup(&runtime, &request_for(&runtime, &path)).expect("the archive restores");
+    assert_eq!(camera_rows(&runtime.db_path), before);
+}
+
+// Slice 8: a restore never writes what Setup would refuse — an address that
+// is not one machine's, a vMix input out of range, a camera that does not
+// exist, CAM 1 with an address; those values stay as this PC has them.
+#[test]
+fn a_restore_writes_no_camera_value_setup_would_refuse() {
+    let test_dir = TestDir::new("format-7-refused-values");
+    let runtime = seeded_runtime(&test_dir);
+    write_camera(&runtime.db_path, 2, Some("172.16.16.85"), false, 2);
+    write_camera(&runtime.db_path, 3, Some("172.16.16.86"), false, 3);
+    let mut archive =
+        serde_json::to_value(build_support_backup_archive(&runtime).expect("archive should build"))
+            .expect("archive should serialize to value");
+    archive["cameras"] = json!([
+        { "camera": 1, "address": "10.0.0.1", "vmixInput": 1001 },
+        { "camera": 2, "address": "224.0.0.1", "vmixInput": 0 },
+        { "camera": 3, "address": " 010.000.000.020 ", "vmixInput": 9 },
+        { "camera": 4, "address": "10.0.0.4", "vmixInput": 4 }
+    ]);
+    let path = write_archive(&runtime, "native-backup-refused-values.json", &archive);
+    restore_support_backup(&runtime, &request_for(&runtime, &path)).expect("the archive restores");
+
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!((rows[0].address.as_deref(), rows[0].vmix_input), (None, 1));
+    assert_eq!(
+        (rows[1].address.as_deref(), rows[1].vmix_input),
+        (Some("172.16.16.85"), 2)
+    );
+    assert_eq!(
+        (rows[2].address.as_deref(), rows[2].vmix_input),
+        (Some("10.0.0.20"), 9),
+        "an address Setup takes is written as Setup writes it"
     );
 }

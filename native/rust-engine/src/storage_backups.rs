@@ -148,7 +148,8 @@ fn file_timestamp(time: SystemTime) -> String {
 }
 
 /// Howard Hinnant's `civil_from_days`: days since 1970-01-01 to (y, m, d).
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+/// The cameras' times (`cameras::runtime::utc_text`) use it too.
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let day_of_era = (z - era * 146_097) as u64;

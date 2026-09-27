@@ -56,6 +56,10 @@ pub struct RuntimePaths {
     /// `SSE_SAFE_START` asked for a safe start (Slice 11 — F31): the light
     /// outputs are held before anything could stream.
     pub safe_start: bool,
+    /// `SSE_CAMERAS_SIMULATED=1` asked for the simulated cameras (new pages
+    /// program, Slice 8 — D15 rules 1–2): every test, lane and scratch run
+    /// sets it, and nothing then reaches a camera.
+    pub cameras_simulated: bool,
 }
 
 pub struct RuntimeContext {
@@ -73,6 +77,9 @@ pub struct RuntimeContext {
     /// profile carries (2026-09 production readiness, Slice 2 — F01). Never
     /// part of a snapshot.
     pub control_surface_token: String,
+    /// The cameras are the simulated ones (`SSE_CAMERAS_SIMULATED=1`, read at
+    /// the start; new pages program, Slice 8).
+    pub cameras_simulated: bool,
 }
 
 pub const STARTUP_CODE_BOOTSTRAP_FAILED: &str = "BOOTSTRAP_FAILED";
@@ -214,6 +221,8 @@ where
         env_string("SSE_UPDATE_REPOSITORY_PATH", &mut get_env).map(PathBuf::from);
     let safe_start = env_string("SSE_SAFE_START", &mut get_env)
         .is_some_and(|value| safe_start_requested(&value));
+    let cameras_simulated = env_string("SSE_CAMERAS_SIMULATED", &mut get_env)
+        .is_some_and(|value| crate::cameras::simulated_cameras_requested(&value));
 
     Ok(RuntimePaths {
         protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
@@ -225,6 +234,7 @@ where
         db_path,
         update_repository_path,
         safe_start,
+        cameras_simulated,
     })
 }
 
@@ -406,6 +416,7 @@ pub(crate) fn bootstrap_runtime_from_paths(
         storage_bootstrap,
         control_surface_bridge,
         control_surface_token,
+        cameras_simulated: runtime_paths.cameras_simulated,
     })
 }
 
@@ -457,6 +468,7 @@ pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeC
             error: None,
         },
         control_surface_token: String::new(),
+        cameras_simulated: runtime_paths.cameras_simulated,
     }
 }
 
@@ -1132,6 +1144,7 @@ mod tests {
             db_path: app_data_dir.join("studio-control.sqlite3"),
             update_repository_path: None,
             safe_start: false,
+            cameras_simulated: true,
             app_data_dir,
         }
     }
@@ -1554,6 +1567,51 @@ mod tests {
             .into_iter()
             .map(|entry| (entry.source, entry.action, entry.detail))
             .collect()
+    }
+
+    // New pages program, Slice 8 (D15 rules 1–2): `SSE_CAMERAS_SIMULATED=1`
+    // — read through the injected reader at the start, like the safe start
+    // — gives the hardware link the simulated cameras; anything else, or
+    // nothing, is the live app, which has no link to a camera yet. The
+    // lanes read it the same way (`laneEnvRefusal`).
+    #[test]
+    fn the_simulated_cameras_are_read_at_the_start() {
+        let (base_name, base_value) = host_platform_base();
+        let resolved = |entries: &[(&str, &str)]| {
+            resolve_runtime_paths_from(current_runtime_platform(), env_fixture(entries))
+                .expect("paths should resolve")
+                .cameras_simulated
+        };
+        assert!(
+            !resolved(&[(base_name, base_value)]),
+            "unset is the live app"
+        );
+        for (value, simulated) in [
+            ("1", true),
+            (" 1 ", true),
+            ("0", false),
+            ("", false),
+            ("true", false),
+            ("yes", false),
+            ("on", false),
+            ("11", false),
+        ] {
+            assert_eq!(
+                resolved(&[(base_name, base_value), ("SSE_CAMERAS_SIMULATED", value)]),
+                simulated,
+                "{value:?}"
+            );
+        }
+
+        let test_dir = TestDir::new("cameras-simulated");
+        let mut paths = runtime_paths_for(&test_dir);
+        paths.cameras_simulated = false;
+        let runtime = bootstrap_runtime_from_paths(paths).expect("the live app boots");
+        assert!(!runtime.cameras_simulated);
+        drop(runtime);
+        let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
+            .expect("a simulated start boots");
+        assert!(runtime.cameras_simulated);
     }
 
     // `SSE_SAFE_START=1` — read through the injected reader, like every

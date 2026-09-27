@@ -60,7 +60,9 @@ impl EngineProcess {
     /// bridge port the system picks (never the live app's 38201), the light
     /// outputs held (`SSE_SAFE_START`) and the simulated console
     /// (`SSE_AUDIO_SIMULATED_INPUT_MODE`). `SSE_DISABLE_AUTO_IMPORT`, which
-    /// every spawn set until then, went with the db.json import.
+    /// every spawn set until then, went with the db.json import. Slice 8:
+    /// the simulated cameras too (`SSE_CAMERAS_SIMULATED`), so no spawn can
+    /// reach a camera.
     fn spawn_with<F: FnOnce(&mut Command, &PathBuf)>(label: &str, configure: F) -> Self {
         let runtime_dir = unique_runtime_dir(label);
         let mut command = Command::new(engine_binary_path());
@@ -70,6 +72,7 @@ impl EngineProcess {
             .env("SSE_CONTROL_SURFACE_PORT", "0")
             .env("SSE_SAFE_START", "1")
             .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
+            .env("SSE_CAMERAS_SIMULATED", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -429,6 +432,76 @@ fn engine_boots_dispatches_a_request_and_exits_cleanly() {
     );
 
     // 4. Clean shutdown.
+    engine.shutdown();
+}
+
+// New pages program, Slice 8: over the pipe, a spawn with the simulated
+// cameras (`SSE_CAMERAS_SIMULATED=1`) starts with no camera set up and CAM 1
+// selected; pairing CAM 1 answers its setup and raises `cameras.changed {
+// reason: "setup", camera: 1 }`; the camera then reads HELD with board 2's
+// values, and `checks.cameras` is in `health.snapshot`.
+#[test]
+fn the_simulated_cameras_answer_over_the_pipe() {
+    let mut engine = EngineProcess::spawn("cameras");
+    wait_for_ready(&mut engine);
+
+    engine.send(&json!({
+        "type": "request", "id": "cameras-1", "method": "cameras.snapshot", "params": {}
+    }));
+    let snapshot = engine.wait_for("cameras.snapshot", response_with_id("cameras-1"));
+    assert_eq!(
+        snapshot.pointer("/result/selected"),
+        Some(&json!(1)),
+        "{snapshot}"
+    );
+    assert_eq!(
+        snapshot.pointer("/result/cameras/0/word"),
+        Some(&json!("NOT SET UP")),
+        "{snapshot}"
+    );
+
+    engine.send(&json!({
+        "type": "request", "id": "cameras-2", "method": "cameras.setup.pair", "params": { "camera": 1 }
+    }));
+    // The response comes first, then the events it raised.
+    let paired = engine.wait_for("cameras.setup.pair", response_with_id("cameras-2"));
+    assert_eq!(
+        paired.pointer("/result/setup/paired"),
+        Some(&json!(true)),
+        "{paired}"
+    );
+    let changed = engine.wait_for("cameras.changed", |value| {
+        value.get("event").and_then(Value::as_str) == Some("cameras.changed")
+    });
+    assert_eq!(
+        changed.get("payload"),
+        Some(&json!({ "reason": "setup", "camera": 1 })),
+        "{changed}"
+    );
+
+    engine.send(&json!({
+        "type": "request", "id": "cameras-3", "method": "cameras.snapshot", "params": {}
+    }));
+    let snapshot = engine.wait_for("cameras.snapshot", response_with_id("cameras-3"));
+    assert_eq!(
+        snapshot.pointer("/result/cameras/0/word"),
+        Some(&json!("HELD"))
+    );
+    assert_eq!(
+        snapshot.pointer("/result/cameras/0/values/iso/value"),
+        Some(&json!("400"))
+    );
+
+    engine.send(&json!({
+        "type": "request", "id": "cameras-4", "method": "health.snapshot", "params": {}
+    }));
+    let health = engine.wait_for("health.snapshot", response_with_id("cameras-4"));
+    assert_eq!(
+        health.pointer("/result/checks/cameras/cameras/0/word"),
+        Some(&json!("HELD")),
+        "{health}"
+    );
+
     engine.shutdown();
 }
 
