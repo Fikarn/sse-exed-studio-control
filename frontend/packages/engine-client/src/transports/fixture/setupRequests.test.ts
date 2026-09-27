@@ -213,7 +213,7 @@ describe("the fixture double's pages", () => {
     // The whole request is refused, the Setup section it also names included.
     const otherSection =
       ((before.shell as JsonObject).setup as JsonObject).activeSection === "support" ? "commissioning" : "support";
-    for (const unknown of ["cameras", "Teleprompter", "planning", ""]) {
+    for (const unknown of ["Cameras", "Teleprompter", "planning", ""]) {
       await expect(
         request("settings.update", { workspace: unknown, setup: { activeSection: otherSection } })
       ).rejects.toThrow(hardwareLinkWorkspaceRefusal());

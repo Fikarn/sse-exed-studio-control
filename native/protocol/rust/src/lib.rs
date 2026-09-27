@@ -6,6 +6,9 @@ pub const PROTOCOL_VERSION: &str = "2";
 pub const EVENT_APP_CHANGED: &str = "app.changed";
 pub const EVENT_AUDIO_CHANGED: &str = "audio.changed";
 pub const EVENT_AUDIO_METERS: &str = "audio.meters";
+/// The cameras changed (new pages program, Slice 8). Payload: `reason` and
+/// `camera` (1, 2 or 3; `null` when it is about all three).
+pub const EVENT_CAMERAS_CHANGED: &str = "cameras.changed";
 pub const EVENT_COMMISSIONING_CHANGED: &str = "commissioning.changed";
 /// The shell reports that the engine process is gone (2026-09 production
 /// readiness, Slice 5 - finding F09). Payload: `status` (exit code or
@@ -25,6 +28,7 @@ pub const EVENT_NAMES: &[&str] = &[
     EVENT_APP_CHANGED,
     EVENT_AUDIO_CHANGED,
     EVENT_AUDIO_METERS,
+    EVENT_CAMERAS_CHANGED,
     EVENT_COMMISSIONING_CHANGED,
     EVENT_ENGINE_EXITED,
     EVENT_ENGINE_READY,

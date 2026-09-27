@@ -190,14 +190,14 @@ fn the_teleprompter_page_is_kept() {
     assert!(reply.response.ok, "{:?}", reply.response.error);
     let settings = result(&app, "settings.get", json!({}));
     assert_eq!(settings["shell"]["workspace"], "teleprompter");
-    let refused = request(&app, "settings.update", json!({ "workspace": "cameras" }));
+    let refused = request(&app, "settings.update", json!({ "workspace": "Cameras" }));
     assert_eq!(
         refused
             .response
             .error
             .and_then(|error| error["message"].as_str().map(str::to_string)),
         Some(String::from(
-            "workspace must be one of: lighting, audio, setup, teleprompter"
+            "workspace must be one of: lighting, audio, setup, teleprompter, cameras"
         ))
     );
 }

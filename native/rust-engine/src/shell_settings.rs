@@ -22,7 +22,9 @@ pub const DEFAULT_WORKSPACE: &str = "audio";
 /// (it refused every page but the first three until then, so the tab could
 /// not have opened in the real app). The fixture double reads this list out
 /// of this file (`setupRequests.test.ts`), so the two cannot drift apart.
-pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter"];
+/// Slice 8: `cameras` joins them, before the Cameras page (Slice 9), as the
+/// Teleprompter's did before its page.
+pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter", "cameras"];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
@@ -502,14 +504,14 @@ mod tests {
         // was "workspace must be one of: lighting, audio, setup").
         assert_eq!(
             error,
-            "workspace must be one of: lighting, audio, setup, teleprompter"
+            "workspace must be one of: lighting, audio, setup, teleprompter, cameras"
         );
     }
 
     // New pages program, Slice 4: the Teleprompter's page is one the hardware
     // link accepts and keeps; before the slice `settings.update` refused
     // `teleprompter` and a saved `teleprompter` opened the Console. A page
-    // it does not know (the Cameras come in Slice 8) is still refused.
+    // it does not know is still refused.
     #[test]
     fn the_teleprompter_is_a_page_to_open() {
         assert!(is_valid_workspace("teleprompter"));
@@ -522,13 +524,29 @@ mod tests {
             ShellSettingsSnapshot::from_settings(&saved).workspace,
             "teleprompter"
         );
-        for unknown in ["cameras", "Teleprompter", "planning", ""] {
+        for unknown in ["Cameras", "Teleprompter", "planning", ""] {
             assert_eq!(
                 parse_settings_update(&json!({ "workspace": unknown })),
                 Err(workspace_refusal()),
                 "{unknown:?}"
             );
         }
+    }
+
+    // New pages program, Slice 8: the Cameras' page is one the hardware link
+    // accepts and keeps, before the page itself (Slice 9).
+    #[test]
+    fn the_cameras_are_a_page_to_open() {
+        assert!(is_valid_workspace("cameras"));
+        assert_eq!(
+            parse_settings_update(&json!({ "workspace": "cameras" })),
+            Ok(vec![(WORKSPACE_KEY, String::from("cameras"))])
+        );
+        let saved = HashMap::from([(String::from(WORKSPACE_KEY), String::from("cameras"))]);
+        assert_eq!(
+            ShellSettingsSnapshot::from_settings(&saved).workspace,
+            "cameras"
+        );
     }
 
     #[test]

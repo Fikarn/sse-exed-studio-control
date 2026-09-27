@@ -5,6 +5,7 @@ mod audio;
 mod audio_backend;
 mod audio_meter_fixture;
 mod bootstrap;
+mod cameras;
 mod commissioning;
 mod control_surface;
 mod control_surface_audio;

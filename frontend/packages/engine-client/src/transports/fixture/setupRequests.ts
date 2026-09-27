@@ -36,7 +36,7 @@ const ARCHIVE_FORMAT_VERSION = 6;
 const ARCHIVE_FORMAT_BEFORE_PLANNING_LEFT = 4;
 
 /** The pages `settings.update` opens (`WORKSPACES` in `native/rust-engine/src/shell_settings.rs`). */
-export const WORKSPACES = ["lighting", "audio", "setup", "teleprompter"] as const;
+export const WORKSPACES = ["lighting", "audio", "setup", "teleprompter", "cameras"] as const;
 
 /** `settings.update`'s refusal of a page it does not know (`workspace_refusal`). */
 export function workspaceRefusal(): string {
