@@ -173,22 +173,35 @@ pub(crate) fn word_count(paragraphs: &[PrompterParagraph]) -> usize {
     paragraphs.iter().map(paragraph_word_count).sum()
 }
 
+/// For each word of a paragraph, whether the presenter reads it: a word
+/// with a character outside every cue. A word that is all cue (`[PAUSE]`,
+/// `[look`, `CAM 2]`) is a direction, never read aloud.
+pub(crate) fn read_flags(paragraph: &PrompterParagraph) -> Vec<bool> {
+    let text = paragraph.text();
+    let cues = cue_spans(&text);
+    word_spans(&text)
+        .into_iter()
+        .map(|(begin, end)| {
+            text[begin..end].char_indices().any(|(offset, _)| {
+                let at = begin + offset;
+                !cues
+                    .iter()
+                    .any(|(cue_begin, cue_end)| at >= *cue_begin && at < *cue_end)
+            })
+        })
+        .collect()
+}
+
 /// The words the presenter reads: every word outside a cue. The pace, the
 /// length at a pace and the time left count these.
 pub(crate) fn read_word_count(paragraphs: &[PrompterParagraph]) -> usize {
     paragraphs
         .iter()
         .map(|paragraph| {
-            let text = paragraph.text();
-            let mut spoken = String::with_capacity(text.len());
-            let mut last = 0;
-            for (begin, end) in cue_spans(&text) {
-                spoken.push_str(&text[last..begin]);
-                spoken.push(' ');
-                last = end;
-            }
-            spoken.push_str(&text[last..]);
-            word_spans(&spoken).len()
+            read_flags(paragraph)
+                .into_iter()
+                .filter(|read| *read)
+                .count()
         })
         .sum()
 }

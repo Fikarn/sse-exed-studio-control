@@ -450,6 +450,8 @@ describe("createShellStore scoped refresh", () => {
       "engine.ready": [],
       "engine.startupFailed": [],
       "lighting.changed": ["lighting.dmxMonitor.snapshot", "lighting.snapshot"],
+      // New pages program, Slice 4: no page reads the prompter until Slice 6.
+      "prompter.changed": [],
       "settings.changed": ["app.snapshot"],
       "support.changed": ["support.snapshot"],
     };

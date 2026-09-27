@@ -13,7 +13,7 @@ use std::fs;
 
 /// Every schema object as (type, name, table, SQL with its whitespace
 /// collapsed), so a seeded layout compares with one the migrations built.
-fn schema_objects(db_path: &Path) -> Vec<(String, String, String, String)> {
+pub(super) fn schema_objects(db_path: &Path) -> Vec<(String, String, String, String)> {
     let connection = open_connection(db_path).expect("connection should open");
     let mut statement = connection
         .prepare(
@@ -37,7 +37,7 @@ fn schema_objects(db_path: &Path) -> Vec<(String, String, String, String)> {
 }
 
 /// Every settings row with its `updated_at`, to prove a row was not touched.
-fn settings_rows(db_path: &Path) -> HashMap<String, (String, String)> {
+pub(super) fn settings_rows(db_path: &Path) -> HashMap<String, (String, String)> {
     let connection = open_connection(db_path).expect("connection should open");
     let mut statement = connection
         .prepare("SELECT key, value, updated_at FROM app_settings")
@@ -50,7 +50,7 @@ fn settings_rows(db_path: &Path) -> HashMap<String, (String, String)> {
     rows
 }
 
-fn metadata(db_path: &Path) -> HashMap<String, String> {
+pub(super) fn metadata(db_path: &Path) -> HashMap<String, String> {
     let connection = open_connection(db_path).expect("connection should open");
     let mut statement = connection
         .prepare("SELECT key, value FROM app_metadata")
@@ -63,7 +63,7 @@ fn metadata(db_path: &Path) -> HashMap<String, String> {
     rows
 }
 
-fn schema_versions(db_path: &Path) -> Vec<i64> {
+pub(super) fn schema_versions(db_path: &Path) -> Vec<i64> {
     let connection = open_connection(db_path).expect("connection should open");
     let mut statement = connection
         .prepare("SELECT version FROM schema_migrations ORDER BY version")
@@ -82,7 +82,7 @@ fn schema_versions(db_path: &Path) -> Vec<i64> {
 /// `planning.*` defaults with `shell.workspace` at its default then,
 /// `planning`. The operator's own copy, read on 2026-09-24, held no Planning
 /// rows, those seven settings and `shell.workspace = audio`.
-fn seed_v7_database(db_path: &Path) {
+pub(super) fn seed_v7_database(db_path: &Path) {
     let connection = open_connection(db_path).expect("connection should open");
     connection
         .execute_batch(
@@ -206,7 +206,7 @@ fn seed_v7_database(db_path: &Path) {
 /// `planning.*` key no build wrote (the step removes the whole prefix), the
 /// Control Surface Probe's line about that selection, and what an earlier
 /// db.json import recorded.
-fn seed_v7_planning_data(db_path: &Path) {
+pub(super) fn seed_v7_planning_data(db_path: &Path) {
     let connection = open_connection(db_path).expect("connection should open");
     connection
         .execute_batch(
@@ -245,7 +245,7 @@ fn seed_v7_planning_data(db_path: &Path) {
 
 /// The Lighting, Console and Setup saved data around Planning, with an
 /// action-log row. None of it may change.
-fn seed_v7_other_data(db_path: &Path) {
+pub(super) fn seed_v7_other_data(db_path: &Path) {
     let connection = open_connection(db_path).expect("connection should open");
     connection
         .execute_batch(
@@ -299,10 +299,12 @@ fn migrate_v7_to_v8_drops_planning_after_snapshot() {
         10
     );
 
+    // Since Slice 4 the same start goes on to schema 9 (the Teleprompter's
+    // tables, `tests_schema_9.rs`); until then it ended here, at 8.
     let bootstrap =
         initialize_database(&db_path, &backups_dir).expect("the v8 migration should succeed");
-    assert_eq!(bootstrap.schema_version, 8);
-    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(bootstrap.schema_version, 9);
+    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     assert_eq!(planning_objects(&db_path), Vec::<String>::new());
     let rows_after = settings_rows(&db_path);
@@ -428,7 +430,7 @@ fn migrate_v7_to_v8_drops_planning_after_snapshot() {
     // A second start changes nothing and writes no copy.
     let rows_settled = settings_rows(&db_path);
     initialize_database(&db_path, &backups_dir).expect("second start should succeed");
-    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     assert_eq!(settings_rows(&db_path), rows_settled);
     let copies = fs::read_dir(&backups_dir)
         .expect("backups dir should list")
@@ -459,7 +461,7 @@ fn migrate_v7_to_v8_keeps_every_other_saved_page() {
 
         let bootstrap =
             initialize_test_database(&db_path).expect("the v8 migration should succeed");
-        assert_eq!(bootstrap.schema_version, 8);
+        assert_eq!(bootstrap.schema_version, 9);
         assert_eq!(planning_objects(&db_path), Vec::<String>::new());
         assert_eq!(
             all_settings(&db_path)
@@ -472,10 +474,12 @@ fn migrate_v7_to_v8_keeps_every_other_saved_page() {
 
 // D2: older builds refuse schema 8, and this one still refuses a database a
 // newer build wrote — by its schema number and this build's — before any
-// step or copy touches it.
+// step or copy touches it. Since Slice 4 this build runs schema 9, so the
+// newer database is at 10 (until then it was at 9, refused by a build that
+// supported up to 8).
 #[test]
 fn a_database_from_a_newer_build_is_refused_by_name() {
-    let test_dir = TestDir::new("storage-v9-refused");
+    let test_dir = TestDir::new("storage-v10-refused");
     let db_path = test_dir.path().join("native.sqlite3");
     let backups_dir = test_dir.path().join("backups");
     seed_v7_database(&db_path);
@@ -483,22 +487,26 @@ fn a_database_from_a_newer_build_is_refused_by_name() {
         .expect("connection should open")
         .execute_batch(
             "INSERT INTO schema_migrations(version) VALUES (8);
-             INSERT INTO schema_migrations(version) VALUES (9);",
+             INSERT INTO schema_migrations(version) VALUES (9);
+             INSERT INTO schema_migrations(version) VALUES (10);",
         )
         .expect("the newer rows should insert");
     let rows_before = settings_rows(&db_path);
 
     let error = initialize_database(&db_path, &backups_dir)
-        .expect_err("a schema-9 database must be refused");
+        .expect_err("a schema-10 database must be refused");
     let message = error.to_string();
-    assert!(message.contains("schema version 9"), "{message}");
-    assert!(message.contains("(supports up to 8)"), "{message}");
+    assert!(message.contains("schema version 10"), "{message}");
+    assert!(message.contains("(supports up to 9)"), "{message}");
     assert!(
-        message.contains("restore a v8-or-earlier backup"),
+        message.contains("restore a v9-or-earlier backup"),
         "{message}"
     );
 
-    assert_eq!(schema_versions(&db_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert_eq!(
+        schema_versions(&db_path),
+        vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
     assert_eq!(settings_rows(&db_path), rows_before);
     assert_eq!(planning_objects(&db_path).len(), 13, "no step ran");
     assert!(

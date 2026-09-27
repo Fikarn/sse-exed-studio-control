@@ -26,6 +26,7 @@ use crate::commissioning::{
     CommissioningCommandError,
 };
 use crate::diagnostics::{append_log, configured_log_level, request_log_line};
+use crate::engine_events::prompter_changed_payload;
 use crate::exports::{build_control_surface_snapshot, export_companion_config, ExportCommandError};
 use crate::lighting::{
     apply_lighting_palette_with_preview, bump_lighting_render_generation,
@@ -60,10 +61,11 @@ use crate::lighting::{
 use crate::parity_fixtures::{
     load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
 };
+use crate::prompter::{after_archive_restore, handle_prompter_request, PrompterError};
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
     EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_COMMISSIONING_CHANGED, EVENT_ENGINE_READY,
-    EVENT_LIGHTING_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
+    EVENT_LIGHTING_CHANGED, EVENT_PROMPTER_CHANGED, EVENT_SETTINGS_CHANGED, EVENT_SUPPORT_CHANGED,
 };
 use crate::shell_settings::{parse_settings_update, ShellSettingsSnapshot, SHELL_SETTINGS_PREFIX};
 use crate::storage::{list_settings_by_prefix, set_settings, EngineResult};
@@ -575,6 +577,33 @@ impl EngineApp {
             )),
 
             // -------------------------------------------------------------
+            // The Teleprompter (new pages program, Slice 4): every method
+            // runs under the prompter's own lock (`prompter::runtime`).
+            // -------------------------------------------------------------
+            "prompter.snapshot" => self.dispatch_prompter(request),
+            "prompter.glass.snapshot" => self.dispatch_prompter(request),
+            "prompter.script.snapshot" => self.dispatch_prompter(request),
+            "prompter.script.import" => self.dispatch_prompter(request),
+            "prompter.script.paste" => self.dispatch_prompter(request),
+            "prompter.script.create" => self.dispatch_prompter(request),
+            "prompter.script.rename" => self.dispatch_prompter(request),
+            "prompter.script.edit" => self.dispatch_prompter(request),
+            "prompter.script.remove" => self.dispatch_prompter(request),
+            "prompter.script.restore" => self.dispatch_prompter(request),
+            "prompter.script.delete" => self.dispatch_prompter(request),
+            "prompter.script.version.bringBack" => self.dispatch_prompter(request),
+            "prompter.putOn" => self.dispatch_prompter(request),
+            "prompter.update" => self.dispatch_prompter(request),
+            "prompter.clear" => self.dispatch_prompter(request),
+            "prompter.play" => self.dispatch_prompter(request),
+            "prompter.pause" => self.dispatch_prompter(request),
+            "prompter.speed" => self.dispatch_prompter(request),
+            "prompter.jump" => self.dispatch_prompter(request),
+            "prompter.textSize" => self.dispatch_prompter(request),
+            "prompter.look.update" => self.dispatch_prompter(request),
+            "prompter.layout.report" => self.dispatch_prompter(request),
+
+            // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform
             // error enums (support.backup.*), chained snapshot reads
             // (commissioning.update, settings.update), or unique reply
@@ -616,7 +645,24 @@ impl EngineApp {
                                 // applied at the next start (Slice 7 — F20).
                                 Self::reply_with_support_change(response, "backup-restore-staged")
                             } else {
-                                Self::reply_with_support_restore_change(response, "backup-restored")
+                                let mut reply =
+                                    Self::reply_with_support_restore_change(response, "backup-restored");
+                                // Slice 4: a restore leaves the prompter paused
+                                // where it was (D12) and may bring the look back.
+                                match after_archive_restore(&self.runtime.db_path) {
+                                    Ok(anchor) => reply.events.push(event_message(
+                                        EVENT_PROMPTER_CHANGED,
+                                        prompter_changed_payload("backup-restored", anchor),
+                                    )),
+                                    Err(error) => {
+                                        let _ = append_log(
+                                            &self.runtime.log_file_path,
+                                            "WARN",
+                                            &format!("The prompter could not settle after the restore: {error:?}"),
+                                        );
+                                    }
+                                }
+                                reply
                             }
                         }
                         Err(error) => Self::reply(support_error_response(request.id, error)),
@@ -817,6 +863,34 @@ impl EngineApp {
     // `support.backup.*`, `exports.companion.export`) stay as hand-written
     // branches.
     // -----------------------------------------------------------------------
+
+    /// A `prompter.*` request: its reply, and `prompter.changed` with the
+    /// glass's anchor when it changed anything.
+    fn dispatch_prompter(&self, request: RequestEnvelope) -> EngineReply {
+        match handle_prompter_request(&self.runtime.db_path, &request.method, &request.params) {
+            Ok(reply) => EngineReply {
+                response: ok_response(request.id, reply.result),
+                events: reply
+                    .reason
+                    .map(|reason| {
+                        vec![event_message(
+                            EVENT_PROMPTER_CHANGED,
+                            prompter_changed_payload(reason, reply.anchor),
+                        )]
+                    })
+                    .unwrap_or_default(),
+            },
+            Err(PrompterError::Invalid(message)) => {
+                Self::reply(invalid_params(request.id, message))
+            }
+            Err(PrompterError::Refused(code, message)) => {
+                Self::reply(error_response(request.id, code, message))
+            }
+            Err(PrompterError::Storage(message)) => {
+                Self::reply(error_response(request.id, "STORAGE_ERROR", message))
+            }
+        }
+    }
 
     fn dispatch_read<T, F>(&self, request_id: serde_json::Value, read: F) -> EngineReply
     where
@@ -1238,3 +1312,5 @@ impl EngineApp {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_prompter;

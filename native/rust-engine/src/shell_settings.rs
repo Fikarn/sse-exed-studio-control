@@ -17,6 +17,12 @@ pub const WINDOW_MODE_KEY: &str = "shell.window.mode";
 /// longer has reads as: the Console (new pages program, D1 — Planning, the
 /// default until Slice 2, left the app).
 pub const DEFAULT_WORKSPACE: &str = "audio";
+/// The pages the hardware link accepts as the page to open, in the order the
+/// refusal names them. New pages program, Slice 4: `teleprompter` joins them
+/// (it refused every page but the first three until then, so the tab could
+/// not have opened in the real app). The fixture double reads this list out
+/// of this file (`setupRequests.test.ts`), so the two cannot drift apart.
+pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter"];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
@@ -183,9 +189,7 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
             .ok_or_else(|| String::from("workspace must be a string"))?;
 
         if !is_valid_workspace(workspace) {
-            return Err(String::from(
-                "workspace must be one of: lighting, audio, setup",
-            ));
+            return Err(workspace_refusal());
         }
 
         updates.push((WORKSPACE_KEY, workspace.to_string()));
@@ -312,7 +316,12 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
 }
 
 pub fn is_valid_workspace(workspace: &str) -> bool {
-    matches!(workspace, "lighting" | "audio" | "setup")
+    WORKSPACES.contains(&workspace)
+}
+
+/// `settings.update`'s refusal of a page it does not know.
+pub fn workspace_refusal() -> String {
+    format!("workspace must be one of: {}", WORKSPACES.join(", "))
 }
 
 pub fn is_valid_setup_active_section(active_section: &str) -> bool {
@@ -489,7 +498,37 @@ mod tests {
         assert!(!is_valid_workspace("planning"));
         let error = parse_settings_update(&json!({ "workspace": "planning" }))
             .expect_err("Planning is no longer a page");
-        assert_eq!(error, "workspace must be one of: lighting, audio, setup");
+        // Since Slice 4 the sentence names the Teleprompter's page too (it
+        // was "workspace must be one of: lighting, audio, setup").
+        assert_eq!(
+            error,
+            "workspace must be one of: lighting, audio, setup, teleprompter"
+        );
+    }
+
+    // New pages program, Slice 4: the Teleprompter's page is one the hardware
+    // link accepts and keeps; before the slice `settings.update` refused
+    // `teleprompter` and a saved `teleprompter` opened the Console. A page
+    // it does not know (the Cameras come in Slice 8) is still refused.
+    #[test]
+    fn the_teleprompter_is_a_page_to_open() {
+        assert!(is_valid_workspace("teleprompter"));
+        assert_eq!(
+            parse_settings_update(&json!({ "workspace": "teleprompter" })),
+            Ok(vec![(WORKSPACE_KEY, String::from("teleprompter"))])
+        );
+        let saved = HashMap::from([(String::from(WORKSPACE_KEY), String::from("teleprompter"))]);
+        assert_eq!(
+            ShellSettingsSnapshot::from_settings(&saved).workspace,
+            "teleprompter"
+        );
+        for unknown in ["cameras", "Teleprompter", "planning", ""] {
+            assert_eq!(
+                parse_settings_update(&json!({ "workspace": unknown })),
+                Err(workspace_refusal()),
+                "{unknown:?}"
+            );
+        }
     }
 
     #[test]

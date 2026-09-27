@@ -73,6 +73,9 @@ export const EVENT_DOMAIN_REFRESH = {
   "engine.ready": [],
   "engine.startupFailed": [],
   "lighting.changed": LIGHTING_DOMAINS,
+  // New pages program, Slice 4: the Teleprompter's changes carry the glass's
+  // anchor. No page reads the prompter yet; Slice 6 gives it a domain.
+  "prompter.changed": [],
   "settings.changed": ["app"],
   "support.changed": ["support"],
 } as const satisfies Record<EventName, readonly DomainKey[]>;
@@ -107,6 +110,8 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   ["support.", ["support"]],
   // Writes the Stream Deck profile to a file; no snapshot reads it.
   ["exports.", []],
+  // The Teleprompter (Slice 4): no page reads it until Slice 6.
+  ["prompter.", []],
 ];
 
 // Opening a workspace refreshes what that workspace shows. Not every change

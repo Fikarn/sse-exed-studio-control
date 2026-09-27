@@ -11,8 +11,10 @@ use std::sync::OnceLock;
 
 use serde_json::{json, Value};
 
+use crate::prompter::clock::PrompterAnchor;
 use crate::protocol::{
     event_message, EVENT_APP_CHANGED, EVENT_AUDIO_CHANGED, EVENT_LIGHTING_CHANGED,
+    EVENT_PROMPTER_CHANGED,
 };
 
 static ENGINE_EVENT_SENDER: OnceLock<Sender<Value>> = OnceLock::new();
@@ -52,6 +54,23 @@ pub(crate) fn emit_lighting_changed(reason: &str) {
         let _ = sender.send(event_message(
             EVENT_LIGHTING_CHANGED,
             json!({ "reason": reason }),
+        ));
+    }
+}
+
+/// `prompter.changed { reason, anchor }`, the payload the IPC replies carry
+/// too: the Teleprompter's clock stopping the text at `END` arrives this way
+/// (new pages program, Slice 4).
+pub(crate) fn prompter_changed_payload(reason: &str, anchor: Option<PrompterAnchor>) -> Value {
+    json!({ "reason": reason, "anchor": anchor })
+}
+
+/// Emits `prompter.changed` from outside the request loop.
+pub(crate) fn emit_prompter_changed(reason: &str, anchor: Option<PrompterAnchor>) {
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(
+            EVENT_PROMPTER_CHANGED,
+            prompter_changed_payload(reason, anchor),
         ));
     }
 }

@@ -43,6 +43,11 @@ fn format_4_archive(runtime: &RuntimeContext, with_rows: bool) -> Value {
         serde_json::to_value(build_support_backup_archive(runtime).expect("archive should build"))
             .expect("archive should serialize to value");
     archive["formatVersion"] = json!(4);
+    // Format 4 had no Teleprompter part (format 6, Slice 4).
+    archive
+        .as_object_mut()
+        .expect("the archive is an object")
+        .remove("prompter");
     // The Control Surface Probe's line as that build wrote it with nothing
     // loaded; the operator's archive of 2026-09-24 carries one like it.
     let checks = archive["commissioning"]["checks"]
@@ -149,7 +154,10 @@ fn make_schema_7_backup(path: &Path, with_rows: bool) {
     connection
         .execute_batch(
             r#"
-            DELETE FROM schema_migrations WHERE version = 8;
+            DELETE FROM schema_migrations WHERE version IN (8, 9);
+            DROP TABLE prompter_script_versions;
+            DROP TABLE prompter_scripts;
+            DROP TABLE prompter_state;
             CREATE TABLE projects (id TEXT PRIMARY KEY, title TEXT NOT NULL);
             CREATE TABLE tasks (id TEXT PRIMARY KEY, project_id TEXT NOT NULL);
             CREATE TABLE task_checklist_items (id TEXT PRIMARY KEY, task_id TEXT NOT NULL);
@@ -180,18 +188,20 @@ fn make_schema_7_backup(path: &Path, with_rows: bool) {
     }
 }
 
-// D3: a new archive is format 5 and carries nothing of Planning — no
-// `planning` part, no Planning setting, no project, task or activity entry —
-// and the export's reply no longer counts them. Verify reads it back as
-// format 5 with nothing left out.
+// D3: a new archive carries nothing of Planning — no `planning` part, no
+// Planning setting, no project, task or activity entry — and the export's
+// reply no longer counts them. Verify reads it back with nothing left out.
+// Slice 2 wrote it as format 5; since Slice 4 it is format 6 and Verify
+// counts its scripts (the test asserted format 5 and the sentence "Backup
+// archive, format 5, exported T.").
 #[test]
-fn a_new_archive_is_format_5_and_carries_no_planning() {
-    let test_dir = TestDir::new("format-5");
+fn a_new_archive_carries_no_planning() {
+    let test_dir = TestDir::new("format-6-no-planning");
     let runtime = seeded_runtime(&test_dir);
 
     let export = export_support_backup(&runtime).expect("export should succeed");
-    assert_eq!(SUPPORT_BACKUP_FORMAT_VERSION, 5);
-    assert_eq!(export.format_version, 5);
+    assert_eq!(SUPPORT_BACKUP_FORMAT_VERSION, 6);
+    assert_eq!(export.format_version, 6);
     let reply = serde_json::to_value(&export).expect("reply should serialize");
     let mut reply_keys = reply
         .as_object()
@@ -204,7 +214,7 @@ fn a_new_archive_is_format_5_and_carries_no_planning() {
 
     let raw: Value = serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
         .expect("archive should parse");
-    assert_eq!(raw["formatVersion"], json!(5));
+    assert_eq!(raw["formatVersion"], json!(6));
     let keys = every_key(&raw);
     for key in &keys {
         assert!(
@@ -220,11 +230,11 @@ fn a_new_archive_is_format_5_and_carries_no_planning() {
 
     let verification = verify_support_backup(&request_for(&runtime, Path::new(&export.path)));
     assert!(verification.ok, "{}", verification.detail);
-    assert_eq!(verification.format_version, Some(5));
+    assert_eq!(verification.format_version, Some(6));
     assert_eq!(
         verification.detail,
         format!(
-            "Backup archive, format 5, exported {}.",
+            "Backup archive, format 6, exported {}, with 0 scripts.",
             raw["exportedAt"]
                 .as_str()
                 .expect("the archive has its time")
@@ -409,17 +419,20 @@ fn verify_says_a_format_4_archive_s_planning_part_is_skipped() {
     assert_operator_words(&checked.detail);
 }
 
-// D2, D3: a database backup of schema 8 and one of schema 7 (from before
-// Planning left) both verify and restore; a newer one is refused before
-// anything is staged. The schema-7 backup's Planning settings are not
+// D2, D3: a database backup this build writes and one of schema 7 (from
+// before Planning left) both verify and restore; a newer one is refused
+// before anything is staged. The schema-7 backup's Planning settings are not
 // counted, its Planning rows are named as not restored, and it is upgraded
-// again at the next start, which removes them. Before the backups left
-// Planning, every schema-8 backup was refused ("no such table: projects").
+// again at the next start, which removes them and adds the Teleprompter's
+// tables. Before the backups left Planning, every schema-8 backup was
+// refused ("no such table: projects"). Since Slice 4 this build writes
+// schema 9 and the newer backup is at 10 (the test wrote a schema 8 and
+// refused a 9; its schema-7 copies now also lose step 9's tables).
 #[test]
-fn database_backups_of_schema_7_and_8_restore_and_a_newer_one_is_refused() {
-    let test_dir = TestDir::new("schema-7-and-8");
+fn database_backups_of_schema_7_and_9_restore_and_a_newer_one_is_refused() {
+    let test_dir = TestDir::new("schema-7-and-9");
     let runtime = seeded_runtime(&test_dir);
-    let schema_8 = snapshot_database(
+    let schema_9 = snapshot_database(
         &runtime.db_path,
         &runtime.backups_dir,
         SnapshotReason::Daily,
@@ -429,28 +442,28 @@ fn database_backups_of_schema_7_and_8_restore_and_a_newer_one_is_refused() {
     let schema_7_settings_only = runtime
         .backups_dir
         .join("db-schema-7-settings-only.sqlite3");
-    let schema_9 = runtime.backups_dir.join("db-schema-9.sqlite3");
-    for copy in [&schema_7_rows, &schema_7_settings_only, &schema_9] {
-        fs::copy(&schema_8, copy).expect("backup should copy");
+    let schema_10 = runtime.backups_dir.join("db-schema-10.sqlite3");
+    for copy in [&schema_7_rows, &schema_7_settings_only, &schema_10] {
+        fs::copy(&schema_9, copy).expect("backup should copy");
     }
     make_schema_7_backup(&schema_7_rows, true);
     make_schema_7_backup(&schema_7_settings_only, false);
-    Connection::open(&schema_9)
+    Connection::open(&schema_10)
         .expect("backup should open")
-        .execute("INSERT INTO schema_migrations(version) VALUES (9)", [])
+        .execute("INSERT INTO schema_migrations(version) VALUES (10)", [])
         .expect("the newer schema should seed");
 
-    let checked_8 = verify_support_backup(&request_for(&runtime, &schema_8));
-    assert!(checked_8.ok, "{}", checked_8.detail);
-    assert_eq!(checked_8.schema_version, Some(8));
-    let settings_8 = inspect_database_backup(&schema_8)
-        .expect("a schema-8 backup is a good database")
+    let checked_9 = verify_support_backup(&request_for(&runtime, &schema_9));
+    assert!(checked_9.ok, "{}", checked_9.detail);
+    assert_eq!(checked_9.schema_version, Some(9));
+    let settings_8 = inspect_database_backup(&schema_9)
+        .expect("a schema-9 backup is a good database")
         .settings_count;
     assert_eq!(
-        checked_8.detail,
-        format!("Database backup, schema 8, integrity ok: {settings_8} settings.")
+        checked_9.detail,
+        format!("Database backup, schema 9, integrity ok: {settings_8} settings.")
     );
-    assert_operator_words(&checked_8.detail);
+    assert_operator_words(&checked_9.detail);
 
     let checked_7 = verify_support_backup(&request_for(&runtime, &schema_7_rows));
     assert!(checked_7.ok, "{}", checked_7.detail);
@@ -470,27 +483,27 @@ fn database_backups_of_schema_7_and_8_restore_and_a_newer_one_is_refused() {
         format!("Database backup, schema 7, integrity ok: {settings_8} settings.")
     );
 
-    let checked_9 = verify_support_backup(&request_for(&runtime, &schema_9));
-    assert!(!checked_9.ok);
-    assert_eq!(checked_9.schema_version, Some(9));
+    let checked_10 = verify_support_backup(&request_for(&runtime, &schema_10));
+    assert!(!checked_10.ok);
+    assert_eq!(checked_10.schema_version, Some(10));
     assert!(
-        checked_9.detail.contains("newer Studio Control"),
+        checked_10.detail.contains("newer Studio Control"),
         "{}",
-        checked_9.detail
+        checked_10.detail
     );
     let pending = runtime.app_data_dir.join(RESTORE_PENDING_FILE_NAME);
-    match restore_support_backup(&runtime, &request_for(&runtime, &schema_9)) {
+    match restore_support_backup(&runtime, &request_for(&runtime, &schema_10)) {
         Err(SupportCommandError::UnsupportedVersion(message)) => {
-            assert!(message.contains("schema 9"), "{message}");
+            assert!(message.contains("schema 10"), "{message}");
         }
         other => panic!("expected UnsupportedVersion, got {other:?}"),
     }
     assert!(!pending.exists(), "nothing is staged");
 
-    let staged_8 = restore_support_backup(&runtime, &request_for(&runtime, &schema_8))
-        .expect("a schema-8 backup restores");
-    assert!(staged_8.requires_restart);
-    assert_eq!(staged_8.detail, None);
+    let staged_9 = restore_support_backup(&runtime, &request_for(&runtime, &schema_9))
+        .expect("a schema-9 backup restores");
+    assert!(staged_9.requires_restart);
+    assert_eq!(staged_9.detail, None);
 
     let staged_7 = restore_support_backup(&runtime, &request_for(&runtime, &schema_7_rows))
         .expect("a schema-7 backup restores");
@@ -499,14 +512,14 @@ fn database_backups_of_schema_7_and_8_restore_and_a_newer_one_is_refused() {
     assert_eq!(staged_7.detail.as_deref(), Some(PLANNING_WAS_NOT_RESTORED));
 
     // The next start: the bootstrap moves the pending file into place and
-    // opens it, and the schema-8 upgrade runs on it like any older data.
+    // opens it, and the upgrade to schema 9 runs on it like any older data.
     let next_start = test_dir.path().join("next-start");
     fs::create_dir_all(&next_start).expect("next start dir should create");
     let restored = next_start.join("studio-control.sqlite3");
     fs::copy(&pending, &restored).expect("pending should copy");
     let bootstrap = initialize_database(&restored, &next_start.join("backups"))
         .expect("the restored backup opens");
-    assert_eq!(bootstrap.schema_version, 8);
+    assert_eq!(bootstrap.schema_version, 9);
     assert!(planning_tables_in(&restored).is_empty());
     let settings = list_settings_by_prefix(&restored, "").expect("settings should load");
     assert!(!settings.keys().any(|key| key.starts_with("planning.")));

@@ -242,7 +242,85 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({ "path": "backups/archive.json" }),
             json!({ "requiresRestart": false }),
         ),
+        // New pages program, Slice 4: what the prompter shows (§5.5).
+        (
+            "prompter.putOn",
+            json!({ "scriptId": "script-a", "replace": true }),
+            json!({
+                "action": "replaced",
+                "name": "Outro",
+                "replacedName": "Intro",
+                "sentence": "Replaced Intro with Outro on the prompter."
+            }),
+        ),
+        (
+            "prompter.update",
+            json!({}),
+            json!({
+                "action": "updated",
+                "name": "Intro",
+                "sentence": "Updated Intro on the prompter."
+            }),
+        ),
+        (
+            "prompter.clear",
+            json!({}),
+            json!({
+                "action": "cleared",
+                "name": "Intro",
+                "sentence": "Cleared the prompter."
+            }),
+        ),
     ]
+}
+
+// New pages program, Slice 4 (the proposal §5.5): putting a script on,
+// replacing, updating and clearing it are rows under the prompter, in the
+// words the page shows; a take's play, pause, speed and jumps are not.
+#[test]
+fn the_prompter_rows_are_what_the_glass_shows() {
+    let row = |method: &str, result: Value| {
+        ui_actions(method, &json!({}), &result, false)
+            .into_iter()
+            .map(|entry| (entry.domain, entry.action, entry.target, entry.detail))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        row(
+            "prompter.putOn",
+            json!({ "action": "put-on", "name": "Outro", "sentence": "Put Outro on the prompter." })
+        ),
+        vec![(
+            DOMAIN_PROMPTER,
+            "put-on",
+            String::from("Outro"),
+            String::from("Put Outro on the prompter")
+        )]
+    );
+    assert_eq!(
+        row(
+            "prompter.clear",
+            json!({ "action": "cleared", "name": "Intro", "sentence": "Cleared the prompter." })
+        )[0]
+        .3,
+        "Cleared the prompter"
+    );
+    for method in [
+        "prompter.play",
+        "prompter.pause",
+        "prompter.speed",
+        "prompter.jump",
+        "prompter.textSize",
+        "prompter.look.update",
+        "prompter.script.edit",
+    ] {
+        assert_eq!(
+            ui_method_class(method),
+            Some(UiMethodClass::NotAnAction),
+            "{method}"
+        );
+        assert!(row(method, json!({})).is_empty(), "{method}");
+    }
 }
 
 fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {

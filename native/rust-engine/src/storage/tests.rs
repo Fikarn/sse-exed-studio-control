@@ -47,7 +47,8 @@ impl Drop for TestDir {
 // without the Planning tables (steps 2 and 3 create them, step 8 drops them)
 // and without a `planning.*` default, and opens on the Console. Before the
 // slice it asserted the `planning.*` defaults (`planning.view_filter` = all,
-// `planning.dashboard_view` = kanban).
+// `planning.dashboard_view` = kanban). Since Slice 4 it ends at schema 9 (the
+// Teleprompter's tables, `tests_schema_9.rs`).
 #[test]
 fn initialize_database_applies_the_schema_and_defaults_without_planning() {
     let test_dir = TestDir::new("storage-init");
@@ -55,7 +56,7 @@ fn initialize_database_applies_the_schema_and_defaults_without_planning() {
 
     let bootstrap = initialize_test_database(&db_path).expect("database should initialize");
     assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
-    assert_eq!(bootstrap.schema_version, 8);
+    assert_eq!(bootstrap.schema_version, 9);
     assert_eq!(bootstrap.integrity_check, "ok");
     assert!(
         newest_snapshot(&test_dir.path().join("backups")).is_none(),
@@ -955,12 +956,13 @@ fn migrate_v6_to_v7_after_snapshot() {
     .expect("the editor state should write");
 
     // New pages program, Slice 2: every road now ends at schema 8, one step
-    // further (the test asserted 7 and the versions 1 to 7).
+    // further (the test asserted 7 and the versions 1 to 7); Slice 4: at
+    // schema 9, one step further again.
     let bootstrap =
         initialize_database(&v6_path, &v6_backups).expect("the v7 migration should succeed");
-    assert_eq!(bootstrap.schema_version, 8);
+    assert_eq!(bootstrap.schema_version, 9);
     assert_eq!(bootstrap.schema_version, STORAGE_SCHEMA_VERSION);
-    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     the_log_is_there(&v6_path);
     let stored: String = open_connection(&v6_path)
         .expect("connection should open")
@@ -1001,7 +1003,7 @@ fn migrate_v6_to_v7_after_snapshot() {
 
     // A second start changes nothing and writes no copy.
     initialize_database(&v6_path, &v6_backups).expect("second start should succeed");
-    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(versions(&v6_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     let copies = fs::read_dir(&v6_backups)
         .expect("backups dir should list")
         .filter_map(Result::ok)
@@ -1023,8 +1025,8 @@ fn migrate_v6_to_v7_after_snapshot() {
     .expect("the editor state should write");
     let bootstrap = initialize_database(&v5_path, &v5_dir.path().join("backups"))
         .expect("the v5 database should upgrade");
-    assert_eq!(bootstrap.schema_version, 8);
-    assert_eq!(versions(&v5_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(bootstrap.schema_version, 9);
+    assert_eq!(versions(&v5_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     the_log_is_there(&v5_path);
     let seeded: String = open_connection(&v5_path)
         .expect("connection should open")
@@ -1042,8 +1044,8 @@ fn migrate_v6_to_v7_after_snapshot() {
     let fresh_path = fresh_dir.path().join("native.sqlite3");
     let bootstrap = initialize_database(&fresh_path, &fresh_dir.path().join("backups"))
         .expect("a new database should initialize");
-    assert_eq!(bootstrap.schema_version, 8);
-    assert_eq!(versions(&fresh_path), vec![1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(bootstrap.schema_version, 9);
+    assert_eq!(versions(&fresh_path), vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     the_log_is_there(&fresh_path);
     assert!(
         newest_snapshot(&fresh_dir.path().join("backups")).is_none(),
