@@ -1141,7 +1141,13 @@ Tests added by the review, each failing without its fix (the four Playwright cas
 
 Tests changed by the review (old → new → reason): `editorModel.test.ts`'s two comparison cases, `editedParagraphs` and `readingLineIn` → `compareWithGlass`, which replaces both (the reading line's edited paragraph is now found between its neighbours' matches, and a removed one is said); `prompterScripts.test.ts`'s edit refusal, "30001 … 30000" → "30,001 … 30,000", counted as the import's; `model.rs`'s one-pass test, 600 → 60 characters a line, above.
 
-Validation of the review's fixes (2026-09-27, in the cloud session): VALIDATION_LINES
+Validation of the review's fixes (2026-09-27, in the cloud session):
+
+- `npm run dev:check`: all ten steps pass (the app 255 tests, the engine client 251, with their coverage floors; `native:test`: the engine 560, the shell 26, the contract 7, end to end 4); `npm run scripts:test` 190 of 190;
+- Playwright's `default` project on Linux: 425 of 427; the two others passed on their own (the Console's no-shortcuts case timing out, and a whole-shell Storybook story read before it painted, the local kinds of Slices 5a and 6a); `teleprompter.spec.ts`'s 22 and the UI contract's 125 passed, no ratchet re-seeded;
+- CI green on all ten checks at `096b1e1` (the shell as reviewed, the edit's cap, the one-pass test's shorter lines), CodeQL with no new alert;
+- in Chromium: no frame over 50 ms while typing on 1,000 paragraphs with a cue each (424–480 ms a keystroke before);
+- renders at 2560×1440 in Studio, Graphite and Bone: the editor with a paragraph removed before the reading line ("¶ 8 · 1 removed", the reading line "unchanged"), and "Rename the script".
 
 ### Slice 7 — The PROMPTER deck page
 
