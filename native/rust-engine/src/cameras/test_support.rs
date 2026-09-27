@@ -32,7 +32,7 @@ impl TestCameras {
     }
 
     /// New saved data without the simulated cameras (the live app before
-    /// Slices 12 and 13).
+    /// Slices 11 and 13).
     pub(crate) fn without_simulation(label: &str) -> Self {
         Self::with_link(label, false)
     }

@@ -7,7 +7,7 @@
 //!
 //! The hardware link is the only thing that talks to the cameras; the page
 //! (Slice 9) and the deck (Slices 7 and 12) draw and send what it answers.
-//! Until Slices 12 and 13 bring the real links, a set-up camera is read only
+//! Until Slices 11 and 13 bring the real links, a set-up camera is read only
 //! through the simulated link (`SSE_CAMERAS_SIMULATED=1`).
 
 pub(crate) mod archive;

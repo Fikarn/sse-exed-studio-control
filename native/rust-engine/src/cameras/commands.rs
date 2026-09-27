@@ -763,7 +763,7 @@ fn setup_update_request(
 }
 
 /// `cameras.setup.pair { camera: 1 }`: with the simulated link at once; the
-/// real one comes in Slice 12 (`CAMERA_NO_LINK` until then).
+/// real one comes in Slice 11 (`CAMERA_NO_LINK` until then).
 fn setup_pair_request(
     db_path: &Path,
     cameras: &mut Cameras,

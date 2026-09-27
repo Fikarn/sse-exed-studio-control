@@ -51,7 +51,7 @@ export function unreachableSentence(model: CameraModel, address: string | null):
     : `${model.tag} does not answer at ${address ?? "its address"}. Check that it is on and on the network.`;
 }
 
-/** A set-up camera without the simulated link, before Slices 12 and 13 bring the real one. */
+/** A set-up camera without the simulated link, before Slices 11 and 13 bring the real one. */
 export function noLinkSentence(model: CameraModel): string {
   return `Studio Control has no link to ${model.tag} yet: it comes with a later version.`;
 }

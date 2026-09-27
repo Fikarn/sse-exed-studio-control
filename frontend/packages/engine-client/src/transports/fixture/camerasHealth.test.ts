@@ -115,7 +115,7 @@ describe("the fixture double's Cameras lamp: the whole status", () => {
     expect(summary).not.toMatch(/Cameras:/);
   });
 
-  it("counts a set-up camera with no link yet, as the live app has until Slices 12 and 13", async () => {
+  it("counts a set-up camera with no link yet, as the live app has until Slices 11 and 13", async () => {
     const { health } = openCamerasDouble({ simulated: false, cameras: [{ camera: 1, paired: true }] });
     const { status, summary } = await health();
     expect(status).toBe("attention");

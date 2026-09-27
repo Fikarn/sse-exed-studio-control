@@ -16,7 +16,7 @@ use crate::cameras::model::model;
 pub(crate) enum LinkFailure {
     /// The link reached for it and it did not answer.
     NoAnswer,
-    /// Studio Control has no link of this kind yet (before Slices 12 and 13).
+    /// Studio Control has no link of this kind yet (before Slices 11 and 13).
     NoLinkYet,
     /// A test build refused to reach for it (the drift guard); the reason.
     Refused(String),
@@ -51,7 +51,7 @@ pub(crate) fn guard_camera_address(address: &str) -> Result<(), String> {
 }
 
 /// Reads a camera over its real link. CAM 2 and CAM 3 pass the drift guard
-/// first; then, until Slices 12 and 13, there is no link to read them with.
+/// first; then, until Slices 11 and 13, there is no link to read them with.
 pub(crate) fn read(camera: u8, address: Option<&str>) -> LinkFailure {
     if let Some(address) = address.filter(|_| camera != 1) {
         if let Err(reason) = guard_camera_address(address) {

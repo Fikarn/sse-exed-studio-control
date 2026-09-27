@@ -38,7 +38,7 @@ import type { MutableFixtureState } from "./state";
 //
 // Each camera's link is the simulated one — the double stands for every test, lane and
 // scratch run (`SSE_CAMERAS_SIMULATED=1`) — unless a scenario says `simulated: false`, as
-// the live app is until Slices 12 and 13: a set-up camera then reads UNREACHABLE, with no
+// the live app is until Slices 11 and 13: a set-up camera then reads UNREACHABLE, with no
 // link to it yet. The simulated camera ("the body") holds its own values, answers or not,
 // and counts what it is sent (D12: nothing is sent by itself); the hardware link reads it
 // and keeps what it read. A held camera that answers is read before every request; one

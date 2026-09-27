@@ -1,7 +1,7 @@
 //! The three cameras as the hardware link knows them (D10, D11; the slice's
 //! first step 4): who each is, what each reports and allows, and the words
 //! the operator reads about them. Each camera's model says what it reports,
-//! so Slices 12 and 13 can narrow or widen it once the real links read the
+//! so Slices 11 and 13 can narrow or widen it once the real links read the
 //! cameras themselves. The values are board 2's
 //! (`docs/redesign/assets/concepts/A-cameras-2.html`).
 
@@ -428,7 +428,7 @@ impl CameraModel {
         }
     }
 
-    /// A set-up camera without the simulated link, before Slices 12 and 13.
+    /// A set-up camera without the simulated link, before Slices 11 and 13.
     pub(crate) fn no_link_sentence(&self) -> String {
         format!(
             "Studio Control has no link to {} yet: it comes with a later version.",

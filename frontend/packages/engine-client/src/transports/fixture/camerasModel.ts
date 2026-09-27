@@ -9,7 +9,7 @@ import type { CameraUnavailable } from "../../generated/snapshots/CameraUnavaila
 // which, and what each simulated camera reports — board 2's assumptions (the slice's first
 // step 4): CAM 1, the Pocket 6K Pro, every value D10 lists; CAM 2 and CAM 3, the BGH1s, no
 // tint, focus position, ND, dynamic range or display LUT, and no recording. Each camera's
-// model says what it reports, so Slices 12 and 13 can narrow or widen it; the options are
+// model says what it reports, so Slices 11 and 13 can narrow or widen it; the options are
 // the camera's model and stay when it is not read, the values are what it reports.
 
 export type CameraNumber = 1 | 2 | 3;

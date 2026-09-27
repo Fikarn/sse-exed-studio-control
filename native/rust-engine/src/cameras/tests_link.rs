@@ -308,7 +308,7 @@ fn the_health_check_names_the_worst_camera() {
     }
 }
 
-// The live app before Slices 12 and 13: without the simulated cameras, a
+// The live app before Slices 11 and 13: without the simulated cameras, a
 // set-up camera does not answer and says there is no link to it yet, and
 // CAM 1 cannot be paired.
 #[test]

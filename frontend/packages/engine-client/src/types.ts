@@ -420,7 +420,7 @@ export interface FixtureCameraSeed {
 /**
  * The cameras a scenario starts with (new pages program, Slice 8; `fixture/camerasSeed.ts`):
  * the cameras it names, the selection (CAM 1 without it), and `simulated: false` for a
- * hardware link with no link to a camera yet, as the live app is until Slices 12 and 13.
+ * hardware link with no link to a camera yet, as the live app is until Slices 11 and 13.
  * Without it every camera is NOT SET UP (D15 rule 1).
  */
 export interface FixtureCamerasSeed {
