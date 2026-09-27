@@ -63,36 +63,76 @@ export function censusInPage() {
     const cs = getComputedStyle(el);
     return cs.visibility !== "hidden" && cs.display !== "none";
   };
-  // New pages program, the workstation catch-up: the part of a text's box its
-  // clipping ancestors leave on screen — a scrolled field (the Teleprompter's
-  // editor opens at the reading line) or any box with `overflow` other than
-  // visible — so contrast is sampled where the text is seen, not on whatever
-  // is drawn where a scrolled-out line would be. Null when nothing of it is
-  // left. An absolutely positioned box escapes the static ancestors between it
-  // and its containing block, and a fixed one every ancestor.
+  // New pages program, the workstation catch-up (and its review): the part of
+  // a text's box its clipping ancestors leave on screen — a scrolled field (the
+  // Teleprompter's editor opens at the reading line) or any box that clips —
+  // so contrast is sampled where the text is seen, not on whatever is drawn
+  // where a scrolled-out line would be. Null when nothing of it is left.
+  //
+  // A box clips an axis whose `overflow` is other than visible, or both with
+  // paint containment, and only a box `overflow` applies to: not an inline
+  // box or `display: contents`, and of SVG only the outermost <svg>. An
+  // absolutely positioned box escapes the ancestors before its containing
+  // block (a positioned box, or one with a transform, a filter or
+  // containment); a fixed one escapes every ancestor but such a containing
+  // block; the top layer (a shown popover, a modal dialog) escapes them all.
+  // A clipping box drawn scaled or turned (its box on screen is not its
+  // layout size) is not used: the census would rather sample a text it need
+  // not than drop one it must.
+  const makesContainingBlock = (cs) =>
+    cs.transform !== "none" ||
+    cs.perspective !== "none" ||
+    cs.filter !== "none" ||
+    cs.backdropFilter !== "none" ||
+    /\b(layout|paint|strict|content)\b/.test(cs.contain) ||
+    /\b(transform|perspective|filter)\b/.test(cs.willChange);
+  const overflowApplies = (a, cs) =>
+    a instanceof SVGElement ? a.ownerSVGElement === null : cs.display !== "inline" && cs.display !== "contents";
+  const inTopLayer = (el) => {
+    try {
+      return el.closest(":popover-open, :modal") !== null;
+    } catch {
+      return false;
+    }
+  };
   const visibleBox = (el, r) => {
     let x0 = r.left;
     let y0 = r.top;
     let x1 = r.right;
     let y1 = r.bottom;
-    let position = getComputedStyle(el).position;
-    for (let a = el.parentElement; a && a !== document.documentElement && position !== "fixed"; a = a.parentElement) {
+    let position = inTopLayer(el) ? "top-layer" : getComputedStyle(el).position;
+    for (
+      let a = el.parentElement;
+      a && a !== document.documentElement && position !== "top-layer";
+      a = a.parentElement
+    ) {
       const acs = getComputedStyle(a);
-      const escapes = position === "absolute" && acs.position === "static";
-      if (!escapes) {
+      const block = makesContainingBlock(acs);
+      const escapes =
+        (position === "absolute" && acs.position === "static" && !block) || (position === "fixed" && !block);
+      if (escapes) continue;
+      const paint = /\b(paint|strict|content)\b/.test(acs.contain);
+      const clipX = acs.overflowX !== "visible" || paint;
+      const clipY = acs.overflowY !== "visible" || paint;
+      if ((clipX || clipY) && overflowApplies(a, acs)) {
         const ar = a.getBoundingClientRect();
-        const left = ar.left + a.clientLeft;
-        const top = ar.top + a.clientTop;
-        if (acs.overflowX !== "visible") {
-          x0 = Math.max(x0, left);
-          x1 = Math.min(x1, left + a.clientWidth);
+        const laidOutW = a instanceof HTMLElement ? a.offsetWidth : ar.width;
+        const laidOutH = a instanceof HTMLElement ? a.offsetHeight : ar.height;
+        if (Math.abs(ar.width - laidOutW) < 0.5 && Math.abs(ar.height - laidOutH) < 0.5) {
+          const left = ar.left + a.clientLeft;
+          const top = ar.top + a.clientTop;
+          if (clipX) {
+            x0 = Math.max(x0, left);
+            x1 = Math.min(x1, left + a.clientWidth);
+          }
+          if (clipY) {
+            y0 = Math.max(y0, top);
+            y1 = Math.min(y1, top + a.clientHeight);
+          }
         }
-        if (acs.overflowY !== "visible") {
-          y0 = Math.max(y0, top);
-          y1 = Math.min(y1, top + a.clientHeight);
-        }
-        if (acs.position !== "static") position = acs.position;
       }
+      // Past its containing block a box is in the flow of that block's own.
+      position = acs.position;
     }
     if (x1 - x0 < 1 || y1 - y0 < 1) return null;
     return { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
@@ -313,6 +353,9 @@ export function censusInPage() {
     weights: sortMap(weights),
     uppercase: upper,
     textCount: texts.length,
+    // The texts the contrast sampler skips as out of sight (`visibleBox`), so
+    // a board's report shows what the gate did not read.
+    clippedOutTexts: texts.filter((t) => t.clippedOut).length,
     textColorCount: textColors.size,
     bgColorCount: bgColors.size,
     radii: sortMap(radii),

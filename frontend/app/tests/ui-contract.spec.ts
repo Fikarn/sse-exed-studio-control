@@ -253,15 +253,34 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
 // it is on screen. The Teleprompter's editor opens scrolled to the reading line,
 // and in Bone the lines scrolled out of its dark field lay over the light header
 // and footer, where the sampler read them as white on white — four failures no
-// operator could see. A field scrolled over a light page holds the rule.
+// operator could see. A field scrolled over a light page holds the rule, and the
+// cases around it hold what may clip a text and what may not (the catch-up's
+// review): a positioned text escaping a clipping box, a containing block made
+// by a transform, one axis clipped, and boxes `overflow` does not apply to.
 test.describe("UI contract — the census", () => {
   test("measures a scrolled field's text only where the field shows it", async ({ page }) => {
     await page.setViewportSize({ width: 800, height: 600 });
+    const dark = "color:rgb(20,20,20)";
     const lines = Array.from({ length: 10 }, (_, i) => `<p style="margin:0;height:60px">Line ${i + 1}</p>`).join("");
     await page.setContent(
       `<!doctype html><html><body style="margin:0;background:rgb(242,242,238);font:20px/1.5 sans-serif">` +
         `<div style="height:100px"></div>` +
-        `<div id="field" style="height:200px;overflow:auto;background:rgb(16,16,18);color:rgb(244,244,245)">${lines}</div>` +
+        `<div id="field" style="height:200px;overflow:auto;background:rgb(16,16,18);color:rgb(244,244,245)">${lines}` +
+        // Fixed, with no containing block but the viewport: the field does not clip it.
+        `<span style="position:fixed;left:500px;top:20px;${dark}">Fixed note</span></div>` +
+        // Absolute: it escapes the static box that clips, to the positioned box around it.
+        `<div style="position:relative;height:60px"><div style="overflow:hidden;width:100px;height:20px">` +
+        `<span style="position:absolute;left:400px;top:20px;${dark}">Absolute note</span></div></div>` +
+        // One axis: a box that clips across only, with the text below it.
+        `<div style="overflow-x:clip;overflow-y:visible;width:300px;height:10px">` +
+        `<p style="margin:0;display:inline-block;position:relative;top:10px;white-space:nowrap;${dark}">` +
+        `Below the clip box, and cut at its right edge</p></div>` +
+        `<div style="height:40px;margin-top:50px;${dark}"><span style="overflow:hidden"><b>Inline bold</b> tail</span></div>` +
+        `<svg width="300" height="40" style="display:block"><svg width="300" height="40">` +
+        `<text x="0" y="28" font-size="20" fill="rgb(20,20,20)">Inner svg text</text></svg></svg>` +
+        // A transform makes the containing block of a fixed text, and clips it.
+        `<div style="transform:translateZ(0);overflow:hidden;width:200px;height:30px">` +
+        `<p style="position:fixed;left:0;top:60px;margin:0;${dark}">Fixed in a transform</p></div>` +
         `</body></html>`
     );
     // The field shows its content from 150 to 350: lines 3 and 6 in part, 4 and 5 whole.
@@ -269,16 +288,31 @@ test.describe("UI contract — the census", () => {
       document.getElementById("field")!.scrollTop = 150;
     });
     const { census, contrast } = await measureBoard(page);
-    const texts = census.texts as Array<{ text: string; clippedOut: boolean; y: number; h: number }>;
-    const line = (n: number) => texts.find((t) => t.text === `Line ${n}`);
+    const texts = census.texts as Array<{
+      text: string;
+      clippedOut: boolean;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }>;
+    const find = (text: string) => texts.find((t) => t.text === text);
+    const line = (n: number) => find(`Line ${n}`);
     for (const n of [1, 2, 7, 8, 9, 10]) expect(line(n)?.clippedOut, `Line ${n}`).toBe(true);
     for (const n of [3, 4, 5, 6]) expect(line(n)?.clippedOut, `Line ${n}`).toBe(false);
     expect([line(3)?.y, line(3)?.h]).toEqual([100, 30]);
     expect([line(4)?.y, line(4)?.h]).toEqual([130, 60]);
     expect([line(6)?.y, line(6)?.h]).toEqual([250, 50]);
-    // On Windows the sampler reads the four lines on screen against the dark field.
+    for (const shown of ["Fixed note", "Absolute note", "Inline bold", "Inner svg text"])
+      expect(find(shown)?.clippedOut, shown).toBe(false);
+    const below = find("Below the clip box, and cut at its right edge");
+    expect([below?.clippedOut, below?.x, below?.w]).toEqual([false, 0, 300]);
+    expect(find("Fixed in a transform")?.clippedOut, "Fixed in a transform").toBe(true);
+    expect(census.clippedOutTexts).toBe(7);
+    // On Windows the sampler reads every text on screen, the four lines against
+    // the dark field and the rest against the page, and none of those out of sight.
     if (SAMPLES_CONTRAST) {
-      expect(contrast?.measured).toBe(4);
+      expect(contrast?.measured).toBe(texts.length - 7);
       expect(worstContrast(contrast, 6, " · ")).toBe("");
     }
   });

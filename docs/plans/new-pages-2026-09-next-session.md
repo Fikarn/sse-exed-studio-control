@@ -27,7 +27,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 - **The order that is left** (approved by the operator on 2026-09-28, serial): **the workstation catch-up → S9 → S7+S12 → S5b → S10 → S11 → S13** (gated on D18) **→ the close-out**.
   - The catch-up (in progress on 2026-09-28): the cloud slices' win32 captures and new captures, every UI-contract board re-seeded with Windows' contrast, the doc counts, and the operator's Windows checks at run time on a check copy (below).
   - S9, the Cameras page: its first steps were answered on 2026-09-28 (the ledger's Slice 9): one slice; the `REC` chip amber, "not read while released", whenever CAM 1 is released; a camera-only read of Recent actions; `cameras.setup.update` refusing an address with `CAMERA_NO_LINK` without a network link (answered during Slice 8's review); and the settled items listed there.
-- **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each); a low Dependabot alert (#7) on `main`; and D18's two checks, which gate Slice 13.
+- **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each), and #223 (qs 6.15.2 → 6.16.0, opened 2026-09-26, not on the handoff's list of 2026-09-27); the Dependabot alerts on `main`, #7 (esbuild, low) and #1 (glib, medium, `native/Cargo.lock`, open since 2026-05-16, not on that list either); and D18's two checks, which gate Slice 13.
 - **The live app** stays `main`'s build of `98bbb06` (schema 7) until the program's close-out. The live data then goes from schema 7 to 10 in one start. The Appendix B walk happens on the program's last build.
 
 ## The workstation's rules for the slices that are left

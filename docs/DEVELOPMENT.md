@@ -180,12 +180,13 @@ counted — `outerBlurOver8UnlitEls`, `gradientsOffEls`, `backdropBlurEls`,
 lists when a measure is non-zero; the counts alone will not tell you which
 element is wrong.
 
-Off Windows (a cloud session) the census takes no screenshot and samples no
-contrast, so a board it seeds has `contrast: null`, which the Windows run reads
-as no failure allowed. Seed only the boards you added or moved there, with
-`--fixtures <their fixtures> --write-ratchets`: a full `--write-ratchets` off
-Windows would null every board's contrast figure. The workstation re-seeds them
-all with contrast (the new pages program's catch-up).
+Off Windows the census takes no screenshot and samples no contrast, so a board
+seeded there has `contrastFails: null`, which the Windows run reads as no
+failure allowed, and a full `--write-ratchets` off Windows would null every
+board's contrast figure. Seed the ratchets on the studio workstation. (The new
+pages program's cloud slices, S5a to S8, seeded their boards off Windows with
+`--fixtures <their fixtures> --write-ratchets`; the workstation catch-up
+re-seeded all of them with contrast.)
 
 Re-seed the ratchets only after you have looked at the diff. `git diff` on
 `ui-contract.ratchets.json` is the "numbers that moved" report, and the rule is
