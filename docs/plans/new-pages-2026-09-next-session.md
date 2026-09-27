@@ -37,7 +37,7 @@ The ledger, [`new-pages-2026-09.md`](./new-pages-2026-09.md), stays the executio
 
   A slice that moves boards merges from the cloud once its ten checks are green, you have reviewed your own renders at 2560×1440, and the operator has given the go-ahead. The win32 captures of every board you moved are refreshed later, in one workstation catch-up.
 
-- **In progress:** Slice 8, the cameras' model and the simulated cameras (the ledger's Slice 8 has its first steps, answered on 2026-09-27: one slice; each camera's vMix input set in Setup, 1–3 by default; a camera raises the whole status to attention at most; the simulated cameras report what board 2 assumes).
+- **In review:** Slice 8, the cameras' model and the simulated cameras, built and pushed on 2026-09-27; its pull request waits on the review, its ten checks and the operator's go-ahead (the ledger's Slice 8 has its first steps, answered on 2026-09-27: one slice; each camera's vMix input set in Setup, 1–3 by default; a camera raises the whole status to attention at most; the simulated cameras report what board 2 assumes).
 - **Next:** Slice 9, the Cameras page.
 - **Waiting on the operator's word:** the Dependabot pull requests #193, #217, #218, #219 and #220 (one go-ahead each); a low Dependabot alert (#7) on `main`; and D18's two checks, which gate Slice 13.
 - **On the workstation:** the live app stays `main`'s build of `98bbb06` (schema 7) until the program's close-out. The live data then goes from schema 7 to 9, or to 10 once Slice 8 lands, in one start. The Appendix B walk happens there, on the program's last build.
