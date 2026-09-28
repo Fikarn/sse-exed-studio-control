@@ -244,7 +244,7 @@ export function handleFixtureSetupRequest(
           state,
           "control-surface",
           "passed",
-          `Control surface bridge exposes ${countControls(state)} mapped controls across ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
+          `The deck's bridge serves ${countControls(state)} controls on ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
         );
       } else {
         throw new Error("target must be one of: control-surface, lighting, audio");

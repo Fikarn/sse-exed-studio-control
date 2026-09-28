@@ -49,6 +49,8 @@ export function useLightingRig({ props }: { props: LightingWorkspaceSurfaceProps
   const fixturesPatched = liveFixtureEntries.filter((fixture) => fixture.dmxStartAddress > 0).length;
 
   const bridgeReachable = lightingSnapshot?.reachable === true;
+  // Only an explicit false is a hold, as on the hardware link and the header's lamp.
+  const outputsHeld = lightingSnapshot?.outputArmed === false;
   const bridgeUniverse = lightingSnapshot?.universe ?? 1;
   const bridgeIp = String(lightingSnapshot?.bridgeIp ?? "");
 
@@ -90,6 +92,7 @@ export function useLightingRig({ props }: { props: LightingWorkspaceSurfaceProps
     bridgeReachable,
     bridgeUniverse,
     bridgeIp,
+    outputsHeld,
     overlayFixtureIds,
     highlightActive,
     soloActive,

@@ -53,6 +53,31 @@ test("output lane exposes inline Mute; the cluster owns Dim and Mono", async ({ 
   await expect(monitorBar.locator('[data-control="talk"]')).toHaveCount(0);
 });
 
+// Found, to check (2026-09-28): DIM and MONO lit on screen for Phones 1 and
+// Phones 2, and nothing was sent to the desk: TotalMix has neither for the
+// phones. They are Main Out's alone (the owner's decision): the phones' strips
+// show neither, and the cluster's Dim and Mono act on Main Out whichever
+// output is the mix target, as the deck's DIM does.
+test("Dim and Mono are Main Out's alone, whichever output is the mix target", async ({ page }) => {
+  await openFixture(page, "audio-populated");
+
+  await expect(page.getByTestId("audio-lane-lamps-audio-mix-main")).toBeVisible();
+  for (const phones of ["audio-mix-phones-a", "audio-mix-phones-b"]) {
+    await expect(page.getByTestId(`audio-output-${phones}`)).toBeVisible();
+    await expect(page.getByTestId(`audio-lane-lamps-${phones}`)).toHaveCount(0);
+  }
+
+  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
+  const dim = page.getByTestId("audio-monitor-dim");
+  const before = await dim.getAttribute("aria-pressed");
+  await dim.click();
+  await expect(dim).not.toHaveAttribute("aria-pressed", before ?? "");
+  const mainLamps = page.getByTestId("audio-lane-lamps-audio-mix-main");
+  await expect(mainLamps).toContainText("dim");
+  await expect(page.getByTestId("audio-lane-lamps-audio-mix-phones-a")).toHaveCount(0);
+});
+
 // New pages program, Slice SW (D22): the case "1920 fallback keeps the output
 // lane Mute control tappable" went with the 1920 fallback. At 2560×1440 the case
 // above finds Mute on the lane and Dim and Mono off it, and the UI

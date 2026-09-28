@@ -67,7 +67,7 @@ export function useSetupPilotChrome({
 
   const engineLogPath = String(runtimePaths?.logFilePath ?? "");
   const openEngineLog = () => {
-    void performAction("open-engine-log", () => openReferencePath("Engine log", engineLogPath));
+    void performAction("open-engine-log", () => openReferencePath("The log", engineLogPath));
   };
 
   const primaryKey = (

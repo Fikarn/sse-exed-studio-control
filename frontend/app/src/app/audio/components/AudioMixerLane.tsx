@@ -314,6 +314,7 @@ export function AudioOutputLane({
   setDraftValue: (key: string, value: number) => void;
   selected: boolean;
 }) {
+  const isMainOut = mixTarget.role === "main-out";
   const volumeDraftKey = `mixTarget:${mixTarget.id}:volume`;
   const volume = useAudioControlDraftValue(draftStore, volumeDraftKey, getDraftValue(volumeDraftKey, mixTarget.volume));
   const throttledVolumeCommit = useMemo(
@@ -348,14 +349,19 @@ export function AudioOutputLane({
         <span className={styles.stripTag} data-active={selected} data-testid={`audio-lane-tag-${mixTarget.id}`}>
           {selected ? "mix target" : outputTag(mixTarget)}
         </span>
-        <span className={styles.stripLamps}>
-          <LampWord cap={false} tone={mixTarget.dim ? "attention" : "off"}>
-            dim
-          </LampWord>
-          <LampWord cap={false} tone={mixTarget.mono ? "attention" : "off"}>
-            mono
-          </LampWord>
-        </span>
+        {/* Dim and mono are the control room's, Main Out's alone: TotalMix has
+            none for the phones, and nothing is sent for them (the owner's
+            decision, 2026-09-28). The phones' strips show no lamp for them. */}
+        {isMainOut ? (
+          <span className={styles.stripLamps} data-testid={`audio-lane-lamps-${mixTarget.id}`}>
+            <LampWord cap={false} tone={mixTarget.dim ? "attention" : "off"}>
+              dim
+            </LampWord>
+            <LampWord cap={false} tone={mixTarget.mono ? "attention" : "off"}>
+              mono
+            </LampWord>
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.stripKeys}>
@@ -383,7 +389,7 @@ export function AudioOutputLane({
         empty={meterEmpty}
         label={`${mixTarget.name} output level`}
         level={mixTarget.meterLeft}
-        levelRight={mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight}
+        levelRight={isMainOut && mixTarget.mono ? mixTarget.meterLeft : mixTarget.meterRight}
         meterId={mixTarget.id}
         meterKind="mixTarget"
         meterLabel={`${mixTarget.name} meter`}

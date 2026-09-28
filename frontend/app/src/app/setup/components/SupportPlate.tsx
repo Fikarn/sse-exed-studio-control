@@ -205,7 +205,7 @@ export function SupportPlate({
             Export diagnostics
           </Key>
           <Key size="small" disabled={busy || !canOpenEngineLog} testId="support-engine-log" onClick={onOpenEngineLog}>
-            Engine log
+            Open the log
           </Key>
         </div>
       </Section>

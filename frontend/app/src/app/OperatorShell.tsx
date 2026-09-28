@@ -271,7 +271,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
     // The prompter's latch counts down, so it shows only while the hardware
     // link answers: after it stops, the prompter comes back paused.
     { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
-    shellExperience === "ready" ? workspaceTones : undefined
+    shellExperience === "ready" ? workspaceTones : undefined,
+    now.getTime()
   );
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and

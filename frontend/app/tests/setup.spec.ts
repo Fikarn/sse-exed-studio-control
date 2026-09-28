@@ -423,6 +423,12 @@ test.describe("Light outputs: Armed / Held", () => {
       .click();
     await expect(page.getByTestId("lighting-workspace")).toBeVisible();
     await expect(lamp).toContainText("held");
+    // Found, to check (2026-09-28): the page's own display said REACHABLE,
+    // "the rig is following it", while held. It says HELD, as the lamp does.
+    const lightingState = page.getByTestId("lighting-state-display");
+    await expect(lightingState).toContainText("HELD");
+    await expect(lightingState).not.toContainText("following it");
+    await expect(lightingState).toHaveAttribute("data-tone", "attention");
 
     await page
       .getByRole("navigation", { name: "Workspace navigation" })

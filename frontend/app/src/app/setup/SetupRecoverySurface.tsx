@@ -155,7 +155,7 @@ export function SetupRecoverySurface({
     };
     const path = await exportShellDiagnostics(report);
     return {
-      message: `Shell diagnostics exported to ${path}.`,
+      message: `Diagnostics exported to ${path}.`,
       tone: "ok" as const,
     };
   };
@@ -433,12 +433,12 @@ export function SetupRecoverySurface({
               disabled={!String(runtimePaths.logFilePath ?? "").trim() || busyAction !== null}
               onClick={() => {
                 void performAction("open-engine-log-card", () =>
-                  openReferencePath("Engine log", String(runtimePaths.logFilePath ?? ""))
+                  openReferencePath("The log", String(runtimePaths.logFilePath ?? ""))
                 );
               }}
               variant="ghost"
             >
-              Engine log
+              Open the log
             </Button>
           </div>
 
