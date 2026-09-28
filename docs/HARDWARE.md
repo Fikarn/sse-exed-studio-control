@@ -87,7 +87,7 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - `All Off` and `Del Scene` ask as `REC`'s stop does: `OFF?` or `DEL?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, a mute and `Toggle` drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the two keys without showing it, so the build and the profile go together.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
-- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A key a page refuses (`REC` while CAM 1 is released) is one `WARN` line of its own in `engine.log`, with the key and the reason.
+- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:

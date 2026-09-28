@@ -1145,3 +1145,49 @@ fn toggle_dim_and_a_mute_drop_a_second_press_within_the_dwell() {
         2
     );
 }
+
+// The review of #254: an armed or kept press of `All Off` raises no
+// `lighting.changed`, another key of the page ends its arm, and the press
+// that acts is heard.
+#[test]
+fn an_arm_raises_nothing_and_another_key_ends_it() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("asking-keys-events");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment() + Duration::from_secs(10);
+    let press = |action: &str, at: Instant| {
+        deck_key_stamped(
+            db_path,
+            true,
+            "/api/deck/light-action",
+            &json!({ "action": action }),
+            at,
+        )
+    };
+
+    let (armed, events) = press("allOff", start);
+    assert_eq!(armed.expect("an answer")["did"], "armed");
+    assert!(events.is_empty(), "an arm raises nothing: {events:?}");
+    let (kept, events) = press("allOff", start + Duration::from_millis(100));
+    assert_eq!(kept.expect("an answer")["did"], "kept");
+    assert!(
+        events.is_empty(),
+        "the same press raises nothing: {events:?}"
+    );
+
+    // Another key of the page ends the arm: the next press asks again.
+    let (moved, _) = press("selectNextScene", start + Duration::from_millis(500));
+    moved.expect("the dial moves the selection");
+    let (again, events) = press("allOff", start + Duration::from_secs(1));
+    assert_eq!(again.expect("an answer")["did"], "armed");
+    assert!(events.is_empty());
+
+    let (switched, events) = press("allOff", start + Duration::from_secs(2));
+    assert_eq!(switched.expect("an answer")["did"], "switched");
+    assert_eq!(
+        events,
+        vec![KeyEvent::Lighting],
+        "the press that acted is heard"
+    );
+}

@@ -7,7 +7,7 @@
 //! method, target, headers and body.
 
 use crate::control_surface::{
-    handle_deck_http_action, read_control_surface_context, read_deck_lcd_text,
+    handle_deck_http_action_at, read_control_surface_context, read_deck_lcd_text,
     ControlSurfaceBridgeInfo, ControlSurfaceError, DEFAULT_CONTROL_SURFACE_HOST,
 };
 use crate::diagnostics::append_log;
@@ -48,11 +48,15 @@ const WORKER_COUNT: usize = 4;
 /// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
 /// of 16 turned the poll's last five requests away every second on the studio
 /// workstation. The thread count stays fixed whatever the queue holds. With
-/// the CAMERAS and PROMPTER pages the instant is 62 requests (it was 44), and
-/// the queue went from 64 to 96: a refused key press is lost, since Companion
-/// never sends one again.
+/// the CAMERAS and PROMPTER pages the instant was 62 requests (it was 44),
+/// and 64 since the LIGHTS page's `OFF?` and `DEL?` (2026-09-28); the queue
+/// went from 64 to 96: a refused key press is lost, since Companion never
+/// sends one again.
 const QUEUE_CAPACITY: usize = 96;
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
+/// A key a page refuses is a line of its own, one a second at most for each
+/// key: a dial's turn is many refused detents (the review of #254).
+const REFUSED_KEY_LOG_INTERVAL: Duration = Duration::from_secs(1);
 
 /// The bearer token the bridge demands on every request (finding F01):
 /// `<app-data>/control-surface.token`, 64 hex characters from OS randomness,
@@ -180,6 +184,9 @@ struct BridgeContext {
     token: String,
     port: u16,
     rejection_log: Mutex<HashMap<u16, RejectionTally>>,
+    /// The refused keys' lines, for each route and action: when the last was
+    /// written, and how many were refused since without one.
+    refused_keys: Mutex<HashMap<String, (Instant, u32)>>,
     /// Whether the workers keep one read connection each (Slice 10 — F18).
     /// The engine's bridge does; a test's bridge does not, because its
     /// workers outlive the test and would hold its temporary database open.
@@ -199,6 +206,7 @@ impl BridgeContext {
             token,
             port,
             rejection_log: Mutex::new(HashMap::new()),
+            refused_keys: Mutex::new(HashMap::new()),
             keep_read_connections: false,
             cameras_simulated: false,
         }
@@ -292,7 +300,10 @@ fn run_control_surface_bridge(
     queue_capacity: usize,
 ) {
     let _ = listener.set_nonblocking(false);
-    let (sender, receiver) = sync_channel::<TcpStream>(queue_capacity.max(1));
+    // A connection is queued with the moment it arrived: a key's moment is
+    // its arrival, not when a worker is free (the review of #254), so a press
+    // that waited behind a burst is never taken for a later one.
+    let (sender, receiver) = sync_channel::<(TcpStream, Instant)>(queue_capacity.max(1));
     let receiver = Arc::new(Mutex::new(receiver));
 
     for index in 0..worker_count.max(1) {
@@ -312,9 +323,10 @@ fn run_control_surface_bridge(
 
     for incoming in listener.incoming() {
         match incoming {
-            Ok(stream) => match sender.try_send(stream) {
+            Ok(stream) => match sender.try_send((stream, Instant::now())) {
                 Ok(()) => {}
-                Err(TrySendError::Full(stream)) | Err(TrySendError::Disconnected(stream)) => {
+                Err(TrySendError::Full((stream, _)))
+                | Err(TrySendError::Disconnected((stream, _))) => {
                     refuse_busy(stream, &context);
                 }
             },
@@ -333,7 +345,10 @@ fn run_control_surface_bridge(
 /// One worker: serves queued connections until the acceptor goes away. The
 /// engine's workers keep one read connection each for their settings reads
 /// (2026-09 production readiness, Slice 10 — F18).
-fn serve_queued_connections(receiver: &Mutex<Receiver<TcpStream>>, context: &BridgeContext) {
+fn serve_queued_connections(
+    receiver: &Mutex<Receiver<(TcpStream, Instant)>>,
+    context: &BridgeContext,
+) {
     if context.keep_read_connections {
         crate::storage::enable_thread_read_connection();
     }
@@ -342,11 +357,11 @@ fn serve_queued_connections(receiver: &Mutex<Receiver<TcpStream>>, context: &Bri
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .recv();
-        let Ok(stream) = next else {
+        let Ok((stream, arrived)) = next else {
             break;
         };
         let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            handle_control_surface_connection(stream, context)
+            handle_control_surface_connection(stream, context, arrived)
         }));
         match outcome {
             Ok(Ok(())) => {}
@@ -381,11 +396,12 @@ fn refuse_busy(mut stream: TcpStream, context: &BridgeContext) {
 fn handle_control_surface_connection(
     mut stream: TcpStream,
     context: &BridgeContext,
+    arrived: Instant,
 ) -> Result<(), ControlSurfaceError> {
     let deadline = Instant::now() + REQUEST_DEADLINE;
     let _ = stream.set_write_timeout(Some(RESPONSE_WRITE_TIMEOUT));
     let request = read_http_request(&mut stream, deadline);
-    let response = respond(context, request);
+    let response = respond_at(context, request, arrived);
     let written = write_http_response(&mut stream, response.status_code, &response.body);
     finish_connection(stream);
     written.map_err(|error| ControlSurfaceError::Storage(error.to_string()))
@@ -393,9 +409,19 @@ fn handle_control_surface_connection(
 
 /// Authorization runs before anything in the request is interpreted: an
 /// unauthenticated body is never parsed, whatever it says.
+#[cfg(test)]
 fn respond(
     context: &BridgeContext,
     request: Result<HttpRequest, ControlSurfaceError>,
+) -> HttpResponse {
+    respond_at(context, request, Instant::now())
+}
+
+/// `respond` for a request that arrived at `arrived`: a key's moment.
+fn respond_at(
+    context: &BridgeContext,
+    request: Result<HttpRequest, ControlSurfaceError>,
+    arrived: Instant,
 ) -> HttpResponse {
     let authorized = request
         .and_then(|request| authorize(&request, &context.token, context.port).map(|()| request));
@@ -405,8 +431,9 @@ fn respond(
                 &context.db_path,
                 context.cameras_simulated,
                 &request,
+                arrived,
             );
-            note_refused_key(context, &request, &response);
+            note_refused_key(context, &request, &response, arrived);
             response
         }
         Err(error) => {
@@ -431,18 +458,25 @@ const KEY_ROUTES: [&str; 4] = [
 /// a refused press: a press comes from a person, and needs the token. The
 /// displays' reads are left out, since the poll asks for 43 of them a second,
 /// and so are the bridge's own refusals, which `note_rejection` counts.
-fn note_refused_key(context: &BridgeContext, request: &HttpRequest, response: &HttpResponse) {
+fn note_refused_key(
+    context: &BridgeContext,
+    request: &HttpRequest,
+    response: &HttpResponse,
+    at: Instant,
+) {
     let (path, _) = split_target(&request.target);
     if request.method != "POST" || !KEY_ROUTES.contains(&path) || response.status_code == 200 {
         return;
     }
     let body = serde_json::from_slice::<Value>(&request.body).unwrap_or(Value::Null);
-    let key = [body.get("action"), body.get("value")]
+    let text = |field: &str| body.get(field).and_then(Value::as_str).unwrap_or_default();
+    // What the profile sent, on one line whatever it holds.
+    let key = [text("action"), text("value")]
         .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
+        .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
-        .join(" ");
+        .join(" ")
+        .replace(['\r', '\n'], " ");
     let sentence = serde_json::from_slice::<Value>(&response.body)
         .ok()
         .and_then(|answer| {
@@ -453,13 +487,36 @@ fn note_refused_key(context: &BridgeContext, request: &HttpRequest, response: &H
         })
         .unwrap_or_default();
     let route = path.trim_start_matches("/api/deck/");
+    // One line a second at most for each key: a dial's turn is many refused
+    // detents. The line counts the refusals it stands for.
+    let since = {
+        let mut tally = context
+            .refused_keys
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let entry = tally
+            .entry(format!("{route} {}", text("action")))
+            .or_insert((at - REFUSED_KEY_LOG_INTERVAL, 0));
+        if at.saturating_duration_since(entry.0) < REFUSED_KEY_LOG_INTERVAL {
+            entry.1 += 1;
+            return;
+        }
+        let since = entry.1;
+        *entry = (at, 0);
+        since
+    };
     let _ = append_log(
         &context.log_file_path,
         "WARN",
         &format!(
-            "Stream Deck key {route} {} was refused ({}): {sentence}",
+            "Stream Deck key {route} {} was refused ({}): {sentence}{}",
             if key.is_empty() { "(no action)" } else { &key },
-            response.status_code
+            response.status_code,
+            if since > 0 {
+                format!(" ({since} more of this key refused since the last line)")
+            } else {
+                String::new()
+            }
         ),
     );
 }
@@ -742,6 +799,7 @@ fn route_control_surface_request(
     db_path: &Path,
     cameras_simulated: bool,
     request: &HttpRequest,
+    arrived: Instant,
 ) -> HttpResponse {
     let (path, query) = split_target(&request.target);
 
@@ -760,8 +818,11 @@ fn route_control_surface_request(
         ("POST", "/api/deck/light-action")
         | ("POST", "/api/deck/audio-action")
         | ("POST", "/api/deck/camera-action")
-        | ("POST", "/api/deck/prompter-action") => parse_json_body(&request.body)
-            .and_then(|body| handle_deck_http_action(db_path, cameras_simulated, path, &body)),
+        | ("POST", "/api/deck/prompter-action") => {
+            parse_json_body(&request.body).and_then(|body| {
+                handle_deck_http_action_at(db_path, cameras_simulated, path, &body, arrived)
+            })
+        }
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported bridge endpoint: {} {}",
             request.method, path
@@ -1653,6 +1714,80 @@ mod tests {
         assert!(
             refused[2].contains("Stream Deck key prompter-action rec was refused (400): "),
             "{log}"
+        );
+    }
+
+    // The review of #254: a dial turned on a page that refuses it is many
+    // refused detents. A key's line is written once a second at most, and
+    // counts the refusals it stands for; another key has its own.
+    #[test]
+    fn a_refused_key_is_one_line_a_second_counting_the_rest() {
+        let test_dir = TestDir::new("bridge-refused-key-rate");
+        let log_path = test_dir.path().join("engine.log");
+        let context = BridgeContext::new(
+            test_dir.db_path(),
+            log_path.clone(),
+            TEST_TOKEN.to_string(),
+            38201,
+        );
+        let refused = HttpResponse {
+            status_code: 409,
+            body: br#"{"error":"CAM 1 is released."}"#.to_vec(),
+        };
+        let press =
+            |body: &str| request_with("POST", "/api/deck/camera-action", &[], body.as_bytes());
+        let start = Instant::now();
+        for tenth in 0..5 {
+            note_refused_key(
+                &context,
+                &press(r#"{"action":"dial","value":"1:up"}"#),
+                &refused,
+                start + Duration::from_millis(100 * tenth),
+            );
+        }
+        note_refused_key(&context, &press(r#"{"action":"rec"}"#), &refused, start);
+        note_refused_key(
+            &context,
+            &press(r#"{"action":"dial","value":"1:down"}"#),
+            &refused,
+            start + Duration::from_millis(1_200),
+        );
+        let log = fs::read_to_string(&log_path).expect("the log");
+        let lines = log
+            .lines()
+            .filter(|line| line.contains("Stream Deck key"))
+            .collect::<Vec<_>>();
+        assert_eq!(lines.len(), 3, "{log}");
+        assert!(lines[0].contains("camera-action dial 1:up was refused (409): CAM 1 is released."));
+        assert!(lines[1].contains("camera-action rec was refused (409)"));
+        assert!(
+            lines[2].contains("camera-action dial 1:down was refused (409): CAM 1 is released. (4 more of this key refused since the last line)"),
+            "{log}"
+        );
+        // A display's read and a key that acted leave nothing.
+        note_refused_key(
+            &context,
+            &request_with("GET", "/api/deck/lcd?key=camera_key_rec", &[], b""),
+            &refused,
+            start + Duration::from_secs(5),
+        );
+        let answered = HttpResponse {
+            status_code: 200,
+            body: b"{}".to_vec(),
+        };
+        note_refused_key(
+            &context,
+            &press(r#"{"action":"rec"}"#),
+            &answered,
+            start + Duration::from_secs(5),
+        );
+        let after = fs::read_to_string(&log_path).expect("the log");
+        assert_eq!(
+            after
+                .lines()
+                .filter(|line| line.contains("Stream Deck key"))
+                .count(),
+            3
         );
     }
 

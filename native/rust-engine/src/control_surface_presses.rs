@@ -207,14 +207,26 @@ pub(crate) fn take_dwelling_press(
     })
 }
 
-/// A dwelling press that failed did not act: what stood before it stands.
-pub(crate) fn release_dwelling_press(db_path: &Path, press: &str, before: Option<Instant>) {
-    with_presses(db_path, |presses| match before {
-        Some(before) => {
-            presses.acted.insert(String::from(press), before);
+/// A dwelling press made at `at` that failed did not act: what stood before
+/// it stands again, unless a later press has taken the key since (the review
+/// of #254), whose moment stays.
+pub(crate) fn release_dwelling_press(
+    db_path: &Path,
+    press: &str,
+    before: Option<Instant>,
+    at: Instant,
+) {
+    with_presses(db_path, |presses| {
+        if presses.acted.get(press) != Some(&at) {
+            return;
         }
-        None => {
-            presses.acted.remove(press);
+        match before {
+            Some(before) => {
+                presses.acted.insert(String::from(press), before);
+            }
+            None => {
+                presses.acted.remove(press);
+            }
         }
     });
 }
@@ -381,8 +393,48 @@ mod tests {
         // A press that failed gives its moment back.
         let at = start + Duration::from_millis(900);
         let before = take_dwelling_press(&db, &press, at).expect("a press of its own");
-        release_dwelling_press(&db, &press, before);
+        release_dwelling_press(&db, &press, before, at);
         assert!(take_dwelling_press(&db, &press, at + Duration::from_millis(10)).is_some());
+    }
+
+    // The review of #254: a press that fails after a later press took the key
+    // gives nothing back, so the later press's moment and its dwell stand.
+    #[test]
+    fn a_failed_press_leaves_a_later_press_s_moment_alone() {
+        let db = db("release-race");
+        let press =
+            dwelling_press("/api/deck/light-action", "toggleLight", None).expect("Toggle dwells");
+        let first = Instant::now();
+        let before_first = take_dwelling_press(&db, &press, first).expect("the first press");
+        let second = first + Duration::from_millis(400);
+        take_dwelling_press(&db, &press, second).expect("the second press");
+        // The first, still running, fails now.
+        release_dwelling_press(&db, &press, before_first, first);
+        assert!(
+            take_dwelling_press(&db, &press, second + Duration::from_millis(50)).is_none(),
+            "a bounce of the second press is still the same press"
+        );
+    }
+
+    // A moment earlier than the stored one (a worker that took its press
+    // later) counts as no time at all: the same press again, never an act.
+    #[test]
+    fn a_press_whose_moment_is_earlier_is_the_same_press() {
+        let db = db("earlier");
+        let start = Instant::now() + Duration::from_secs(10);
+        assert_eq!(
+            ask(&db, AskingKey::DeleteScene, scene("a"), start),
+            Ask::Armed
+        );
+        assert_eq!(
+            ask(
+                &db,
+                AskingKey::DeleteScene,
+                scene("a"),
+                start - Duration::from_millis(30)
+            ),
+            Ask::Kept
+        );
     }
 
     #[test]

@@ -411,7 +411,10 @@ pub fn handle_control_surface_http_action_at(
 }
 
 /// A key or a dial of the deck, whatever its page. `cameras_simulated` is
-/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`).
+/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`). The
+/// bridge calls `handle_deck_http_action_at` with the moment the request
+/// arrived; this form, at the moment of the call, is the tests'.
+#[cfg(test)]
 pub fn handle_deck_http_action(
     db_path: &Path,
     cameras_simulated: bool,
@@ -422,8 +425,9 @@ pub fn handle_deck_http_action(
 }
 
 /// `handle_deck_http_action` at a moment of the caller's: the CAMERAS page's
-/// `REC` counts from it, and the two new pages keep their texts from it.
-fn handle_deck_http_action_at(
+/// `REC` counts from it, and the two new pages keep their texts from it. The
+/// bridge gives the moment the request arrived.
+pub(crate) fn handle_deck_http_action_at(
     db_path: &Path,
     cameras_simulated: bool,
     path: &str,
@@ -518,7 +522,7 @@ pub(crate) fn deck_key_stamped(
     };
     let Ok(reply) = &response else {
         if let Some(press) = &dwelling {
-            release_dwelling_press(db_path, press, before);
+            release_dwelling_press(db_path, press, before, at);
         }
         return (response, Vec::new());
     };
@@ -633,20 +637,29 @@ fn asked_light_action(
         return locked_light_action(db_path, action, preview);
     };
     let target = match key {
-        AskingKey::AllOff => AskTarget::Previewing(preview.enabled),
-        AskingKey::DeleteScene => {
-            let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-                .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-            let lighting_state = load_lighting_editor_state(&app_settings);
-            let scene = resolve_selected_inventory_id(
-                &app_settings,
-                SELECTED_SCENE_ID_KEY,
-                lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
-            )
-            .ok_or_else(|| {
-                ControlSurfaceError::Rejected(String::from("No lighting scene is selected."))
-            })?;
-            AskTarget::Scene(scene)
+        AskingKey::AllOff => Ok(AskTarget::Previewing(preview.enabled)),
+        AskingKey::DeleteScene => list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
+            .and_then(|app_settings| {
+                let lighting_state = load_lighting_editor_state(&app_settings);
+                resolve_selected_inventory_id(
+                    &app_settings,
+                    SELECTED_SCENE_ID_KEY,
+                    lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
+                )
+                .map(AskTarget::Scene)
+                .ok_or_else(|| {
+                    ControlSurfaceError::Rejected(String::from("No lighting scene is selected."))
+                })
+            }),
+    };
+    // A refused press is a press of the page too: it ends another key's arm
+    // (the review of #254).
+    let target = match target {
+        Ok(target) => target,
+        Err(error) => {
+            end_arm(db_path);
+            return Err(error);
         }
     };
     match ask(db_path, key, target, at) {
