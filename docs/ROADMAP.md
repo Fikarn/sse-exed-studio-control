@@ -17,7 +17,7 @@ One pull request each, in this order. Then the Cameras page.
 - [ ] Step 6: product code.
   - [x] Graphite and Bone out (D25).
   - [x] Talkback out (D26).
-  - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, seven unused components of the design system and four of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
+  - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, eight unused components of the design system and three of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
   - [ ] Three changes of behaviour: one recovery screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine leaves the studio build's bundle.
 - [ ] Step 7: local cleanup.
 

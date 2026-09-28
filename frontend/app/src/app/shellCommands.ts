@@ -25,8 +25,8 @@ function toError(error: unknown, fallback: string) {
 
 /**
  * Opens a folder or file with the platform's opener. The shell only opens
- * paths inside its own folders — app data (with backups and exports), logs
- * and the update folder — and refuses everything else (2026-09 production
+ * paths inside its own folders — app data (with backups and exports) and
+ * logs — and refuses everything else (2026-09 production
  * readiness, Slice 4 — finding F15).
  */
 export async function openShellPath(path: string) {

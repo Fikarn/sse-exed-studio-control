@@ -114,12 +114,16 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
     timeout: 10000,
   });
 
-  // The last block on the screen is the list of file paths, and its last row.
+  // Both cards, whole: the grid that holds them ends on the screen, and so
+  // does the last row of the list of file paths, the lowest text there is.
+  const cards = await page.getByTestId("setup-recovery-cards").boundingBox();
+  expect(cards, "the cards should have a box").not.toBeNull();
+  expect(cards!.y).toBeGreaterThanOrEqual(0);
+  expect(cards!.y + cards!.height).toBeLessThanOrEqual(1440);
   const lastPath = page.getByText("File paths").locator("xpath=following-sibling::ul/li[last()]");
   const box = await lastPath.boundingBox();
-  expect(box, "the last reference block should have a box").not.toBeNull();
-  expect(box!.y).toBeGreaterThanOrEqual(0);
-  expect(box!.y + box!.height).toBeLessThanOrEqual(1440);
+  expect(box, "the last file path should have a box").not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(cards!.y + cards!.height);
   await expectNoDocumentScroll(page);
 });
 

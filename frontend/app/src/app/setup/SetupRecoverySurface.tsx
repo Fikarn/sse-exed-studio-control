@@ -220,7 +220,7 @@ export function SetupRecoverySurface({
         </div>
       ) : null}
 
-      <div className={styles.setupIncidentGrid}>
+      <div className={styles.setupIncidentGrid} data-testid="setup-recovery-cards">
         <div className={`${styles.setupIncidentHero} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentPrompt}>What went wrong?</div>
 

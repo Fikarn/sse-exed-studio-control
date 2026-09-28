@@ -521,8 +521,8 @@
     color: var(--color-text-subtle);
   }
 
-  /* Slice 5 (CHROME-02): the runner footer is now the shared DS HealthBar
-     (full variant). This only handles bottom placement within the runner
+  /* The runner's footer is the design system's Footer.
+     This only handles bottom placement within the runner
      grid; the bar supplies its own chrome (border-top, gradient, height). */
   .setupFooter {
     margin-top: auto;

@@ -701,9 +701,8 @@ const PATH_OUTSIDE_APP_DATA_CODE: &str = "PATH_OUTSIDE_APP_DATA";
 const PATH_NOT_FOUND_CODE: &str = "PATH_NOT_FOUND";
 
 /// The folders the shell opens for the operator: the app-data directory
-/// (which holds `backups` and `exports`), the logs directory (which may live
-/// elsewhere through `SSE_LOG_DIR`) and the update repository when the
-/// launcher configured one. Everything else is refused (2026-09 production
+/// (which holds `backups` and `exports`) and the logs directory (which may
+/// live elsewhere through `SSE_LOG_DIR`). Everything else is refused (2026-09 production
 /// readiness, Slice 4 — finding F15): the command took any path the webview
 /// named and handed it to Explorer.
 fn allowed_open_roots() -> Result<Vec<PathBuf>, String> {
@@ -730,7 +729,7 @@ fn resolve_open_path(target: &Path, roots: &[PathBuf]) -> Result<PathBuf, String
         Ok(canonical)
     } else {
         Err(format!(
-            "{PATH_OUTSIDE_APP_DATA_CODE}: {} is outside the app data, logs and update folders, so it was not opened.",
+            "{PATH_OUTSIDE_APP_DATA_CODE}: {} is outside the app data and logs folders, so it was not opened.",
             target.display()
         ))
     }
