@@ -94,4 +94,25 @@ describe("deriveSetupState with the hardware link's health", () => {
     expect(state.word).toBe("SETUP REQUIRED");
     expect(state.wayOut).toBe("start-runner");
   });
+
+  it("an unpublished runtime says what is left to verify, and the count once nothing is", () => {
+    const unpublished = {
+      ...base,
+      healthSummary: null,
+      healthTone: "ok" as const,
+      published: false,
+      stepLabel: "Map bindings",
+      stepNumber: 3,
+      stepTotal: 5,
+    };
+    expect(deriveSetupState({ ...unpublished, checks: [] }).meta).toBe(
+      "Step 3 of 5 · Map bindings · no probes run yet"
+    );
+    expect(deriveSetupState({ ...unpublished, checks: deckNotGreen }).meta).toBe(
+      "Step 3 of 5 · Map bindings · control surface not yet verified"
+    );
+    expect(deriveSetupState({ ...unpublished, checks: green }).meta).toBe(
+      "Step 3 of 5 · Map bindings · 3 of 3 probes passed"
+    );
+  });
 });

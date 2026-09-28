@@ -87,6 +87,60 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-footer")).toContainText("Big picture CAM 3 · 87.5 %");
   });
 
+  test("the bank's keys say what the Stream Deck's dials set, and set it", async ({ page }) => {
+    await openCameras(page);
+    const bank = (name: string) => page.getByTestId(`cameras-bank-${name}`);
+    const hint = page.getByTestId("cameras-dials-hint");
+    const footer = page.getByTestId("cameras-footer");
+    await expect(page.getByTestId("cameras-bank").getByRole("button")).toHaveText(["Exposure", "Colour", "Focus"]);
+    await expect(bank("exposure")).toHaveAttribute("aria-pressed", "true");
+    await expect(hint).toHaveText("The dials drive CAM 1: ISO · shutter · iris · ND.");
+    await expect(footer).toContainText("Dials CAM 1 · Exposure");
+    const recent = await page.getByTestId("cameras-recent-row").allTextContents();
+
+    await bank("colour").click();
+    await expect(bank("colour")).toHaveAttribute("aria-pressed", "true");
+    await expect(bank("exposure")).toHaveAttribute("aria-pressed", "false");
+    await expect(hint).toHaveText("The dials drive CAM 1: white balance · tint.");
+    await expect(footer).toContainText("Dials CAM 1 · Colour");
+
+    // The bank is the deck's, not a camera's: it stays when the selection
+    // changes, and the dials follow the selection.
+    await page.getByTestId("cameras-key-3").click();
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "3");
+    await expect(bank("colour")).toHaveAttribute("aria-pressed", "true");
+    await expect(hint).toHaveText("The dials drive CAM 3: white balance · tint.");
+    await expect(footer).toContainText("Dials CAM 3 · Colour");
+
+    await bank("focus").click();
+    await expect(hint).toHaveText("The dials drive CAM 3: focus · a push is autofocus once.");
+    await expect(footer).toContainText("Dials CAM 3 · Focus");
+
+    // Setting the bank sends nothing to a camera and is no Recent action.
+    await expect(page.getByTestId("cameras-recent-row")).toHaveText(recent);
+  });
+
+  test("the dials set nothing on a camera that is not held, and the hint says what brings them back", async ({
+    page,
+  }) => {
+    const hint = page.getByTestId("cameras-dials-hint");
+    await openCameras(page, "cameras-released");
+    await expect(hint).toHaveText("CAM 2 is released: the dials set nothing until you press Connect.");
+    await expect(hint).not.toHaveAttribute("data-live", "");
+    // The bank can be set meanwhile: it is the deck's.
+    await page.getByTestId("cameras-bank-focus").click();
+    await expect(page.getByTestId("cameras-bank-focus")).toHaveAttribute("aria-pressed", "true");
+    await expect(hint).toHaveText("CAM 2 is released: the dials set nothing until you press Connect.");
+    await page.getByTestId("cameras-state-connect").click();
+    await expect(hint).toHaveText("The dials drive CAM 2: focus · a push is autofocus once.");
+    await expect(hint).toHaveAttribute("data-live", "");
+
+    await openCameras(page, "cameras-unreachable");
+    await expect(hint).toHaveText("CAM 3 does not answer: the dials set nothing until it does.");
+    await openCameras(page, "cameras-no-link");
+    await expect(hint).toHaveText("CAM 1 is not set up: the dials set nothing until it is.");
+  });
+
   test("REC starts with one press and stops with two, and its chip stands on every page", async ({ page }) => {
     await page.clock.install();
     await openCameras(page);
@@ -516,6 +570,34 @@ test.describe("the Cameras page", () => {
     }
   });
 
+  test("the Recent list has room for its five rows at two lines each", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page);
+    // A look's sentence is the longest a row carries, and takes two lines.
+    for (const lut of ["Film → Video", "Film → Ext. video", "Film → Video", "Film → Ext. video", "Film → Video"]) {
+      await pressTwice(page, `cameras-displayLut-${lut}`);
+      await expect(page.getByTestId("cameras-recent-row").first()).toContainText(`→ ${lut}.`);
+    }
+    const room = await page.evaluate(() => {
+      const section = document.querySelector<HTMLElement>("[data-testid=cameras-recent]")!;
+      const rows = [...section.querySelectorAll<HTMLElement>("[data-testid=cameras-recent-row]")];
+      return {
+        lines: rows.map((row) => {
+          const text = row.children[1] as HTMLElement;
+          return Math.round(text.getBoundingClientRect().height / parseFloat(getComputedStyle(text).lineHeight));
+        }),
+        cut: section.scrollHeight > section.clientHeight + 1,
+        lastRowBottom: rows.at(-1)!.getBoundingClientRect().bottom,
+        sectionBottom: section.getBoundingClientRect().bottom,
+        standingTop: document.querySelector("[data-testid=cameras-read-all]")!.getBoundingClientRect().top,
+      };
+    });
+    expect(room.lines).toEqual([2, 2, 2, 2, 2]);
+    expect(room.cut, "the list is not cut").toBe(false);
+    expect(room.lastRowBottom).toBeLessThanOrEqual(room.sectionBottom + 0.5);
+    expect(room.sectionBottom, "the list ends above the standing keys").toBeLessThan(room.standingTop);
+  });
+
   // Controls used during a take never move (docs/DESIGN.md, section 1): REC,
   // the cameras' keys and what stands under them are where they were, whatever
   // the take's rows and the cameras' keys say.
@@ -528,6 +610,9 @@ test.describe("the Cameras page", () => {
           "cameras-key-1",
           "cameras-key-2",
           "cameras-key-3",
+          "cameras-dials",
+          "cameras-bank-exposure",
+          "cameras-dials-hint",
           "cameras-pictures",
           "cameras-recent",
           "cameras-read-all",
@@ -549,6 +634,12 @@ test.describe("the Cameras page", () => {
     ]) {
       await openCameras(page, fixture);
       expect(await places(), fixture).toEqual(held);
+      // Whatever the dials' hint says, it says it on one line.
+      for (const bank of ["colour", "focus", "exposure"]) {
+        await page.getByTestId(`cameras-bank-${bank}`).click();
+        await expect(page.getByTestId(`cameras-bank-${bank}`)).toHaveAttribute("aria-pressed", "true");
+        expect(await places(), `${fixture}, ${bank}`).toEqual(held);
+      }
     }
 
     // And through a take on one board: started, armed to stop, stopped.

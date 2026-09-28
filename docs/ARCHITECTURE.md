@@ -63,7 +63,7 @@ Engine (`native/rust-engine/src/`):
 - `prompter/`: scripts, the prompter's clock, the Prompter XL's state, imports.
 - `cameras/`: the three cameras, the simulated cameras, the link guard.
 - `control_surface.rs`, `control_surface_http.rs`, `control_surface_pages.rs`: the Stream Deck bridge. What a key of the PROMPTER or the CAMERAS page does, and what their displays say, is in `prompter/deck.rs` and `cameras/deck.rs`, under the prompter's and the cameras' own locks.
-- `exports/`: the Companion profile and the page model Setup draws. The deck's pages come from one list, `DECK_PAGES` in `pages.rs`; each page has a file of its own.
+- `exports/`: the Companion profile and the page model Setup draws. The deck's pages come from one list, `DECK_PAGES` in `pages.rs`; each page has a file of its own. The pages' test double draws the same page model, from `deckPages.json`, which a test here holds equal to it.
 - `commissioning.rs`: Setup's steps and probes.
 - `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.
 - `health.rs`, `action_log.rs`, `engine_events.rs`: the health the header shows, Recent actions, events.

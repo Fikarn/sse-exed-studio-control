@@ -60,6 +60,8 @@ The committed captures are under `frontend/app/tests/__visual__/`. CI compares n
 
 A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (nine headers, five footers). A change to the header moves the strips and no page.
 
+A board that a page reaches by a press (the Teleprompter's editor, Setup's Map step on a page of the deck) has its presses in `BOARD_STEPS`, in `frontend/app/tests/helpers/ui-contract/boards.mjs`. The captures and the layout measures both make them.
+
 When a change moves a page:
 
 1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`
@@ -86,6 +88,8 @@ Pages and their tests:
 - **A page is on screen later than its shell.** Each page is a chunk fetched after the shell has drawn. A test whose first step is a key or a one-off read calls `expectWorkspaceMounted(page, workspace)` first.
 - **Time is driven, never waited out.** Use `page.clock` and `helpers/pageClock.ts`. A second press inside an arm's dwell, a meter tick, a countdown: none of them is tested with a real wait.
 - **A page test reaches the simulated cameras through `window.__SSE_TEST_CAMERAS__`:** a value changed on a camera, a camera that stops answering and answers again, how many commands a camera was sent. The page drives everything else.
+- **The double's deck is the hardware link's.** `deckPages.json`, beside the double, is the page model Setup draws (`build_control_surface_snapshot`), and the engine's test `the_doubles_deck_pages_are_the_page_model` fails when the two differ. Write it again from `native`, then format it: `SSE_WRITE_DECK_PAGES=1 cargo test -p studio-control-engine --bins the_doubles_deck_pages_are_the_page_model`, and `npx prettier --write` on the file.
+- **A JSON file the double imports carries its attribute:** `import pages from "./deckPages.json" with { type: "json" }`. Some page tests load the double's source in Node, which refuses a JSON module without it; the pages' build and the unit tests do not notice.
 - **No line is cut.** The layout measures do not see a text cut with an ellipsis. Where a line may be cut, a page test fills it with the longest value and compares `scrollWidth` with `clientWidth` (`cameras.spec.ts`, "no line is cut").
 - **The app's unit tests run from the app's folder:** `npm run test --workspace frontend/app -- <file>`. Started from the repository's root with `--root`, Vitest refuses the glass's font files and `PrompterGlass.test.tsx` fails.
 - **A test that fails now and then has a cause.** Every one so far was the test: a click sent before the page had drawn the state it needed. Find it; do not retry it away.
@@ -104,6 +108,8 @@ The engine:
 - **Checkpoint before moving the database.** The long-lived threads keep a read connection open, so anything that moves, copies or replaces the database file calls `storage::checkpoint_database` first.
 - **A commit waits for the disk,** about 35 ms here. A test that loops over writes stays in the tens.
 - **Tests that share the console link wait on its state** (`settle_console_link`), never on a sleep.
+- **The deck's tests give the moment themselves.** The cameras' keys and displays take the moment of a press from their caller (`handle_deck_action_at`, the bridge's `*_at` forms), so the dwell, the 3 s of `STOP?` and the 250 ms a page's texts are kept are tested without a wait. The prompter reads its own clock.
+- **A take's start or stop changes the Cameras lamp,** so its key raises `app.changed` after `cameras.changed`.
 - **Tests never bind the real ports.** TotalMix's `7001` to `7010` and sACN's `5568` are never bound or sent to by a test; test builds drop datagrams aimed at TotalMix.
 - **One log writer.** `diagnostics::log_event` writes `<logs>/engine.log`, which rotates at 5 MiB. `SSE_ENGINE_LOG_LEVEL=DEBUG` adds one line per request. The shell keeps the engine's stderr in `<logs>/shell.log`.
 - **Health reports changes of state, not attempts:** `health::report(subsystem, state, detail)`.

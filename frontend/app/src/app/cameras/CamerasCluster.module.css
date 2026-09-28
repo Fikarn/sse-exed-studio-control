@@ -210,6 +210,15 @@
   font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
 }
 
+/* What the deck's dials set: three keys across the cluster. The hint under
+   them is one line, whatever it says: a page test holds that what stands
+   under it stays where it stood. */
+.banks > * {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 6px;
+}
+
 .pictures {
   display: flex;
   flex-direction: column;

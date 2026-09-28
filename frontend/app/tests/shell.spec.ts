@@ -67,21 +67,21 @@ test("Setup's modes, steps and the Map's pages and deck keys answer clicks", asy
   await page.getByTestId("setup-run-all-probes").click();
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
 
-  // New pages program, Slice 2: the deck's pages are LIGHTS and AUDIO (PROJECTS and
-  // TASKS left with Planning), so page 1 opens on "Light 1" and page 2 is AUDIO.
+  // D5: the deck's pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, so page 1 opens on
+  // LIGHTS' first key, `Toggle`, and page 2 is AUDIO.
   const deckKey = (label: string) =>
     page
       .getByTestId("setup-deck-keys")
       .locator("button")
       .filter({ has: page.getByText(label, { exact: true }) });
-  await expect(deckKey("Light 1")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("Toggle")).toHaveAttribute("data-selected", "true");
 
-  await page.getByRole("button", { name: /^AUDIO/ }).click();
-  await expect(deckKey("Channel 1")).toHaveAttribute("data-selected", "true");
+  await page.getByRole("button", { name: "AUDIO", exact: true }).click();
+  await expect(deckKey("MAIN")).toHaveAttribute("data-selected", "true");
 
-  await deckKey("Channel 2").click();
-  await expect(deckKey("Channel 2")).toHaveAttribute("data-selected", "true");
-  await expect(deckKey("Channel 1")).toHaveAttribute("data-selected", "false");
+  await deckKey("PH 1").click();
+  await expect(deckKey("PH 1")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("MAIN")).toHaveAttribute("data-selected", "false");
 
   await page.getByRole("button", { name: /^Back to Probe hardware/ }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();

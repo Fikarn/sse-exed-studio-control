@@ -22,6 +22,8 @@ import {
   buildAudioSnapshotPreview,
   refreshAudioCapabilities,
 } from "./audioConsole";
+// The attribute is for Node, which loads this file as it is for the page tests.
+import deckPages from "./deckPages.json" with { type: "json" };
 import type { IdentifyBursts } from "./lightingOverlay";
 import { camerasHealthCheck, camerasStatusPart, fixtureCameras } from "./camerasState";
 import { prompterCheck, prompterStatusPart } from "./prompterReads";
@@ -159,70 +161,16 @@ export function countControls(state: MutableFixtureState) {
 }
 
 /**
- * The deck's pages as the hardware link's `build_control_surface_snapshot`
- * models them (D5): LIGHTS, AUDIO, CAMERAS and PROMPTER. The shape and the
- * counts are the hardware link's: LIGHTS has seven keys, at places 2–8 (place
- * 1 held `<< PROJ`); AUDIO has eight keys and four touch-strip cells, at
- * places 1–12 (place 7, which held `TALK`, is the page key of the ring);
- * CAMERAS has six keys, at places 1–5 and 8, and four strip cells; PROMPTER
- * six keys, at places 1–3, 5, 6 and 8, and four strip cells; each page has
- * four dials that are pressed and turned either way, three controls apiece —
- * 87 controls in all. The labels stay the double's own.
+ * The deck's pages (D5): LIGHTS, AUDIO, CAMERAS and PROMPTER. `deckPages.json`
+ * is the hardware link's page model itself (`build_control_surface_snapshot`),
+ * every key with its place, its words, what it sends and what it shows, and a
+ * test of the hardware link holds it so
+ * (`the_doubles_deck_pages_are_the_page_model`): Setup draws in development
+ * what it draws in the studio. Until 2026-09-28 the double had the model's
+ * shape and counts with labels of its own.
  */
 export function buildDefaultControlSurfaceSnapshot(): JsonObject {
-  const makeButtons = (pageId: string, prefix: string, positions: number[]) =>
-    positions.map((position, index) => ({
-      id: `${pageId}-btn-${position}`,
-      type: "button",
-      position,
-      label: `${prefix} ${index + 1}`,
-      description: `${prefix} action ${index + 1} is mapped through the native control-surface bridge.`,
-    }));
-
-  const dialMotions = [
-    { motion: "press", type: "dial-press", label: "" },
-    { motion: "left", type: "dial-turn-left", label: " left" },
-    { motion: "right", type: "dial-turn-right", label: " right" },
-  ];
-  const makeDials = (pageId: string, prefix: string) =>
-    [1, 2, 3, 4].flatMap((position) =>
-      dialMotions.map(({ motion, type, label }) => ({
-        id: `${pageId}-dial-${position}-${motion}`,
-        type,
-        position,
-        label: `${prefix} ${position}${label}`,
-        description: `${prefix} dial ${position} is available for live verification.`,
-      }))
-    );
-
-  return {
-    pages: [
-      {
-        id: "lights",
-        label: "LIGHTS",
-        buttons: makeButtons("lights", "Light", [2, 3, 4, 5, 6, 7, 8]),
-        dials: makeDials("lights", "Intensity"),
-      },
-      {
-        id: "audio",
-        label: "AUDIO",
-        buttons: makeButtons("audio", "Channel", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
-        dials: makeDials("audio", "Gain"),
-      },
-      {
-        id: "cameras",
-        label: "CAMERAS",
-        buttons: makeButtons("cameras", "Camera", [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]),
-        dials: makeDials("cameras", "Setting"),
-      },
-      {
-        id: "prompter",
-        label: "PROMPTER",
-        buttons: makeButtons("prompter", "Take", [1, 2, 3, 5, 6, 8, 9, 10, 11, 12]),
-        dials: makeDials("prompter", "Prompter"),
-      },
-    ],
-  };
+  return cloneJson(deckPages as unknown as JsonObject);
 }
 
 export function createMutableFixtureState(scenario: FixtureScenario): MutableFixtureState {

@@ -72,8 +72,10 @@ export function deriveSetupState({
   const probes = total > 0 ? `${passed} of ${total} probes passed` : "no probes run yet";
 
   if (!published) {
+    // What is left to verify, by name; the count once every probe has passed.
+    // (Until 2026-09-28 three probes out of three read "nothing verified yet".)
     const unverified = setupUnverifiedProbeNames(checks);
-    const tail = unverified.length > 0 ? `${unverified.join(" and ")} not yet verified` : "nothing verified yet";
+    const tail = unverified.length > 0 ? `${unverified.join(" and ")} not yet verified` : probes;
     return {
       meta: `${step} · ${tail}`,
       passedProbeCount: passed,

@@ -94,7 +94,8 @@ The Prompter XL's own window is not built yet, so the page reads `NOT CONNECTED`
 
 The links to the real cameras and their pictures are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, every control and `REC` are locked, and the pictures are test pictures. This is how the page works with a camera that is held.
 
-- **Select** a camera with its key on the left or its small picture. The big picture and the plate follow. `REC` does not: it is always CAM 1's.
+- **Select** a camera with its key on the left or its small picture. The big picture, the plate and the Stream Deck's dials follow. `REC` does not: it is always CAM 1's.
+- **The Stream Deck's dials** set the selected camera. `Exposure`, `Colour` and `Focus` choose what they set, as the deck's `BANK` does. The line under them says what the dials set, or why they set nothing now.
 - **Pictures.** The selected camera is big, the other two small. `Whole frame` shows all of it, at 87.5 %; `1:1` shows a part pixel for pixel. The loupe shows a part at `2:1` or `4:1`. Press the big picture to move the part.
 - **Aids.** `Guides`, `Peaking` and `Zebras 95 %` are drawn on this screen only and never reach a camera, vMix or a recording. They are off at every start.
 - **Values.** An arrow steps a value at one press. A press on the value opens the list the camera allows, or typed entry for white balance and tint. `Auto iris once`, `Auto white balance once` and `Autofocus once` run once. A value a camera does not report says so.
@@ -121,13 +122,19 @@ While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last know
 
 A control on the deck does what the same control does on screen, and the screen follows. Putting the profile on the deck is in [HARDWARE.md](HARDWARE.md).
 
-The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`. The other pages have no deck page yet. `AUDIO >>` turns the deck alone.
+The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `Cameras` to `CAMERAS` and `Teleprompter` to `PROMPTER`. Setup / Support has no page on the deck, which stays where it is. One key on each page turns the deck alone, to the next page and round again: `AUDIO >>`, `CAMS >>`, `PROMPTER >>`, `LIGHTS >>`.
 
 **`LIGHTS`.** `Toggle` switches the chosen light, `All On` and `All Off` all of them. `Recall` recalls the chosen scene, `Save` saves the rig as a new scene, `Del Scene` deletes the chosen scene. Every key acts at one press and asks nothing. The dials `LIGHT` and `SCENE` choose by a turn; a push switches the light or recalls the scene. `INTENSITY` moves 5 % a step and `CCT` 200 K; a push sets 100 % or 4500 K. While Preview is on they change the preview, and the strip reads `PREVIEW`.
 
 **`AUDIO`.** `MAIN`, `PH 1` and `PH 2` choose the mix target. `BANK` puts the dials on inputs, playback or outputs. `DIM` dims `Main Out`. `GAIN` turns the input dials from send level to preamp gain. `SOLO` clears every solo. A dial's turn sets the level and its push mutes. The strip shows name, level and the fader's position; it is not a meter.
 
-**Colours.** Amber: chosen or switched on. Yellow `SOLO`: a solo is on. Grey, with `AUDIO` and a reason on the strip: locked, as the Console is. Green means running now; no key on the deck uses it yet.
+**`CAMERAS`.** `CAM 1`, `CAM 2` and `CAM 3` select the camera, as on the page. `BANK` puts the dials on exposure (ISO, shutter, iris, ND), colour (white balance, tint) or focus, in turn, and the strip shows what each dial sets and the camera's value. A turn is one of the camera's own steps. On focus, a push of the first dial is autofocus once. Until the cameras' links are built every key but `BANK` and the three cameras' is refused, as the page's controls are locked.
+
+`REC` is CAM 1's whichever camera is selected. One press starts. While CAM 1 records the key has a red lamp; a press makes it read `STOP?`, and a second press within 3 s stops. A press that arrives twice within a third of a second is one press. The key can read `STOP?` for up to a second after the 3 s: a press then arms the stop again, and the next stops. If the take ended meanwhile, on the camera or from the screen, the press does nothing, and the next starts a take.
+
+**`PROMPTER`.** `PLAY` plays or pauses. `BACK`, `TOP`, `CUE <` and `CUE >` jump as on the page. The dials are speed (a push plays or pauses), position by line, text size (a push returns to the standard size) and paragraph. The strip shows the speed, the place, the time left and the script's name. While nothing is on the prompter every control is grey and does nothing. Until the Prompter XL's window is built `PLAY` is grey and the strip reads `XL NOT CONNECTED`; the jumps, the speed and the size work. A script is put on, replaced, updated and cleared on the screen only.
+
+**Colours.** Amber: chosen or switched on, and `STOP?`. Yellow `SOLO`: a solo is on. Green: running now, which is `PLAY` while the text scrolls. A red lamp: CAM 1 records. Amber words on the `CAMERAS` strip, and an amber lamp on `REC`: the last a camera reported before it stopped answering. Grey: locked, as on screen; the `AUDIO` strip gives the reason.
 
 ## Setup / Support
 
@@ -137,8 +144,8 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`. T
 
 1. `Import profile` exports the Stream Deck's profile for Companion.
 2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe does not reach the deck.
-3. `Map bindings` shows the deck's pages, keys and dials as the app holds them.
-4. `Verify live echo`: a control pressed on the deck pulses on screen.
+3. `Map bindings` shows the deck's four pages as the app holds them: the keys and the strip where the deck has them, each dial under its cell of the strip.
+4. `Verify live echo`: a control pressed on the deck pulses on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
 
 A press on a step or on `Run all probes` unpublishes the setup at once: `Lighting`, `Audio`, `Cameras` and `Teleprompter` lock until `Publish setup` is pressed again. The devices and the deck keep working. Leave the runner alone during a session; the Console has its own `Run audio probe`.

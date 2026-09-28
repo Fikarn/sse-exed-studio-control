@@ -1,5 +1,6 @@
 import type {
   CameraChoice,
+  CameraDialBank,
   CameraLevel,
   CameraNumber,
   CameraPressSetting,
@@ -435,6 +436,74 @@ export function levelStepLock(level: CameraLevel, tag: string, label: string, st
 /** Why a frame rate cannot be chosen now (`not at 6K`); `null` when it can. */
 export function unavailableReason(choice: CameraChoice, value: string): string | null {
   return choice.unavailable.find((entry) => entry.value === value)?.reason ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// What the Stream Deck's dials set (the deck's CAMERAS page; D14)
+// ---------------------------------------------------------------------------
+
+/** The banks in the order the deck's `BANK` key goes through them, with their keys' words. */
+export const DIAL_BANKS: readonly { bank: CameraDialBank; label: string }[] = [
+  { bank: "exposure", label: "Exposure" },
+  { bank: "colour", label: "Colour" },
+  { bank: "focus", label: "Focus" },
+];
+
+/** A setting's word in a sentence, by its name in the requests; any other name is printed as it came. */
+const DIAL_WORDS: Record<string, string> = {
+  focus: "focus",
+  iris: "iris",
+  iso: "ISO",
+  nd: "ND",
+  shutter: "shutter",
+  tint: "tint",
+  whiteBalance: "white balance",
+};
+
+export interface DialsView {
+  bank: CameraDialBank;
+  /** The bank's word, as its key says it: `Exposure`. */
+  bankWord: string;
+  /** What the dials do now, or why they do nothing. */
+  hint: string;
+  /** The dials set the selected camera: it is held. */
+  live: boolean;
+  /** The footer's words: `CAM 1 · Exposure`. */
+  footer: string;
+}
+
+/**
+ * What the deck's dials set: the selected camera, and of it what the hardware
+ * link says the bank's dials set (`dials.sets`). A camera that is not held is
+ * set by nothing, and the hint says what brings the dials back.
+ */
+export function dialsView(snapshot: CamerasSnapshot): DialsView | null {
+  const selected = selectedCamera(snapshot);
+  if (!selected) return null;
+  const bank = snapshot.dials.bank;
+  const bankWord = DIAL_BANKS.find((entry) => entry.bank === bank)?.label ?? bank;
+  const sets = snapshot.dials.sets
+    .filter((setting): setting is string => setting !== null)
+    .map((setting) => DIAL_WORDS[setting] ?? setting);
+  // Of the dials only focus's does something when it is pushed.
+  if (snapshot.dials.sets.includes("focus")) sets.push("a push is autofocus once");
+  const tag = selected.tag;
+  let hint: string;
+  switch (selected.state) {
+    case "held":
+      hint = sets.length > 0 ? `The dials drive ${tag}: ${sets.join(" · ")}.` : `The dials set nothing on ${tag}.`;
+      break;
+    case "released":
+      hint = `${tag} is released: the dials set nothing until you press Connect.`;
+      break;
+    case "unreachable":
+      hint = `${tag} does not answer: the dials set nothing until it does.`;
+      break;
+    case "not-set-up":
+      hint = `${tag} is not set up: the dials set nothing until it is.`;
+      break;
+  }
+  return { bank, bankWord, hint, live: selected.state === "held", footer: `${tag} · ${bankWord}` };
 }
 
 // ---------------------------------------------------------------------------

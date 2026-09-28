@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ShellRegion, useArm } from "@sse/design-system";
 import {
   EngineRequestError,
+  type CameraDialBank,
   type CameraNumber,
   type CameraPressSetting,
   type CamerasSnapshot,
@@ -153,6 +154,11 @@ export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspacePro
     if (camera === selectedNumber) return;
     void perform(() => store.selectCamera(camera));
   });
+  // What the deck's dials set: the hardware link keeps it, as it keeps the selection.
+  const bank = useLiveCallback((next: CameraDialBank) => {
+    if (next === camerasSnapshot?.dials.bank) return;
+    void perform(() => store.setCameraDialBank(next));
+  });
   const step = useLiveCallback((setting: CameraPressSetting, steps: number) => {
     void perform(() => store.stepCameraValue({ camera: selectedNumber, setting, step: steps }));
   });
@@ -247,6 +253,7 @@ export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspacePro
           now={now}
           snapshot={camerasSnapshot}
           state={state}
+          onBank={bank}
           onConnect={connect}
           onOpenActions={openActions}
           onOpenSetup={openSetup}

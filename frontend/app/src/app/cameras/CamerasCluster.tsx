@@ -1,15 +1,24 @@
-import { ArmKey, Key, LampWord, Section, StateDisplay, type ArmedKey } from "@sse/design-system";
-import type { CameraNumber, CamerasSnapshot } from "@sse/engine-client";
+import { ArmKey, Key, LampWord, Section, Segmented, StateDisplay, type ArmedKey } from "@sse/design-system";
+import type { CameraDialBank, CameraNumber, CamerasSnapshot } from "@sse/engine-client";
 
-import { cameraKeyView, cameraOf, recentRows, recKeyView, takeReadouts, type CamerasStateView } from "./camerasModel";
+import {
+  cameraKeyView,
+  cameraOf,
+  DIAL_BANKS,
+  dialsView,
+  recentRows,
+  recKeyView,
+  takeReadouts,
+  type CamerasStateView,
+} from "./camerasModel";
 import { STOP_WINDOW_MS } from "./perform";
 import styles from "./CamerasCluster.module.css";
 
 // The Cameras page's cluster (board 2's left column): the state display with
 // its armed row, the take — REC, which is CAM 1's whichever camera is
 // selected (D14), and what is known about the take —, the three cameras,
-// where the pictures come from, who changed what, and the standing actions.
-// What the dials set waits for the deck's CAMERAS page.
+// what the Stream Deck's dials set, where the pictures come from, who changed
+// what, and the standing actions.
 
 /** The rows the Recent list has room for: what the hardware link sends. */
 const RECENT_ROOM = 5;
@@ -22,6 +31,8 @@ export interface CamerasClusterProps {
   now: number;
   onRecord: () => void;
   onSelect: (camera: CameraNumber) => void;
+  /** What the Stream Deck's dials set on the selected camera. */
+  onBank: (bank: CameraDialBank) => void;
   onConnect: (camera: CameraNumber) => void;
   /** One read of the cameras; `camera` is the one the key names, `null` for all three. */
   onReadAgain: (camera: CameraNumber | null) => void;
@@ -36,6 +47,7 @@ export function CamerasCluster({
   now,
   onRecord,
   onSelect,
+  onBank,
   onConnect,
   onReadAgain,
   onOpenSetup,
@@ -46,6 +58,7 @@ export function CamerasCluster({
   const stopArmed = armed?.key === "stop";
   const recent = snapshot.recent === null ? null : recentRows(snapshot.recent).slice(0, RECENT_ROOM);
   const wayOut = state.wayOut;
+  const dials = dialsView(snapshot);
 
   return (
     <div className={styles.cluster} data-testid="cameras-cluster">
@@ -192,6 +205,28 @@ export function CamerasCluster({
         </div>
         <p className={styles.fine}>The big picture and the plate follow the camera selected here.</p>
       </Section>
+
+      {dials ? (
+        <Section title="Stream Deck" detail="CAMERAS page · what the dials set" testId="cameras-dials">
+          <Segmented label="What the Stream Deck's dials set" className={styles.banks} testId="cameras-bank">
+            {DIAL_BANKS.map((entry) => (
+              <Key
+                key={entry.bank}
+                mode="segmented"
+                engaged={dials.bank === entry.bank}
+                aria-pressed={dials.bank === entry.bank}
+                testId={`cameras-bank-${entry.bank}`}
+                onClick={() => onBank(entry.bank)}
+              >
+                {entry.label}
+              </Key>
+            ))}
+          </Segmented>
+          <p className={styles.fine} data-live={dials.live ? "" : undefined} data-testid="cameras-dials-hint">
+            {dials.hint}
+          </p>
+        </Section>
+      ) : null}
 
       <Section title="Pictures" detail="test pictures" testId="cameras-pictures">
         <ul className={styles.pictures}>

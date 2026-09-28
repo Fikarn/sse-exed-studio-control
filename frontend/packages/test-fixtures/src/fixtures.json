@@ -2593,5 +2593,179 @@
         }
       ]
     }
+  },
+  "setup-map-cameras": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "2",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "ready",
+          "summary": "Companion bridge available but setup incomplete."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Commissioning required before operator mode."
+      },
+      "commissioning": {
+        "hasCompletedSetup": false,
+        "runnerStage": "map",
+        "stage": "setup-required",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Setup required to unlock lighting and audio."
+      },
+      "startup": {
+        "targetSurface": "setup",
+        "operatorUiAllowed": false
+      },
+      "summary": "Setup required: the deck's map is next."
+    },
+    "healthSnapshot": {
+      "status": "attention",
+      "startupPhase": "waiting-for-app-snapshot",
+      "summary": "Storage healthy. Operator mode locked pending setup.",
+      "checks": {
+        "lighting": {
+          "status": "ready",
+          "summary": "Lighting bridge verified."
+        },
+        "audio": {
+          "status": "ready",
+          "summary": "OSC connection synchronized."
+        },
+        "controlSurface": {
+          "status": "ready",
+          "summary": "Bridge reachable."
+        }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": false,
+      "runnerStage": "map",
+      "stage": "setup-required",
+      "summary": "Complete commissioning to unlock operator mode.",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
+      "backupCount": 0,
+      "latestBackupPath": null,
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
+      "backups": [],
+      "summary": "No backup exported yet.",
+      "recentBackups": [],
+      "recentEvents": []
+    }
+  },
+  "setup-map-prompter": {
+    "appSnapshot": {
+      "runtime": {
+        "protocol": "2",
+        "engineVersion": "0.1.0",
+        "controlSurface": {
+          "available": true,
+          "status": "ready",
+          "summary": "Companion bridge available but setup incomplete."
+        }
+      },
+      "shell": {
+        "workspace": "setup",
+        "window": {
+          "mode": "fullscreen"
+        },
+        "summary": "Commissioning required before operator mode."
+      },
+      "commissioning": {
+        "hasCompletedSetup": false,
+        "runnerStage": "map",
+        "stage": "setup-required",
+        "hardwareProfile": "Studio workstation",
+        "summary": "Setup required to unlock lighting and audio."
+      },
+      "startup": {
+        "targetSurface": "setup",
+        "operatorUiAllowed": false
+      },
+      "summary": "Setup required: the deck's map is next."
+    },
+    "healthSnapshot": {
+      "status": "attention",
+      "startupPhase": "waiting-for-app-snapshot",
+      "summary": "Storage healthy. Operator mode locked pending setup.",
+      "checks": {
+        "lighting": {
+          "status": "ready",
+          "summary": "Lighting bridge verified."
+        },
+        "audio": {
+          "status": "ready",
+          "summary": "OSC connection synchronized."
+        },
+        "controlSurface": {
+          "status": "ready",
+          "summary": "Bridge reachable."
+        }
+      }
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": false,
+      "runnerStage": "map",
+      "stage": "setup-required",
+      "summary": "Complete commissioning to unlock operator mode.",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "supportSnapshot": {
+      "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
+      "backupCount": 0,
+      "latestBackupPath": null,
+      "restoreSummary": "Restore a backup archive or a database backup from the backups folder. A rollback backup is written first; a database backup takes effect once Studio Control has restarted its hardware link.",
+      "backups": [],
+      "summary": "No backup exported yet.",
+      "recentBackups": [],
+      "recentEvents": []
+    }
   }
 }

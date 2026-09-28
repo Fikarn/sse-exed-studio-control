@@ -5,10 +5,10 @@ The ledgers this file replaces are in git history at the tag `archive/records-20
 
 ## Now: the Cameras and Teleprompter pages
 
-Built so far: the Teleprompter page and its editor, the prompter and the cameras' model in the engine, the simulated cameras, and the Cameras page with Setup's camera section. What is left, in the agreed order:
+Built so far: the Teleprompter page and its editor, the prompter and the cameras' model in the engine, the simulated cameras, the Cameras page with Setup's camera section, and the deck's PROMPTER and CAMERAS pages. What is left, in the agreed order:
 
 - [x] The Cameras page (#243, #244)
-- [ ] The two Stream Deck pages, PROMPTER and CAMERAS
+- [x] The two Stream Deck pages, PROMPTER and CAMERAS (#246, #247, #248)
 - [ ] The Prompter XL's window
 - [ ] The camera pictures
 - [ ] The Pocket 6K Pro over Bluetooth
@@ -48,20 +48,28 @@ Decided while it was built, and kept by the work that follows:
 
 ### The two Stream Deck pages, PROMPTER and CAMERAS (were Slices 7 and 12)
 
-Built together: they share the split of `native/rust-engine/src/exports.rs` into `exports/` (done, #246), the page chain (D5) and Setup's deck steps, which draw every page's keys and dials. They bring the bridge's actions and feedback and the Companion export. The page's word on the deck is the engine's: `teleprompter`, `cameras`.
+Built, in three pull requests, against the simulated cameras. The profile reaches the studio's deck when the owner imports it, at the close-out.
 
-PROMPTER is `docs/design/teleprompter.md` §9: dials for speed, position, text size and paragraph; `PLAY`, `BACK`, `TOP`, `◂ CUE` and `CUE ▸`; the strip. `PLAY` and the speed dial's push go the deck's locked grey while nothing is drawn on the glass (`checks.prompter.screen.draws` is false), and at a script's end until a jump moves the place back. Every control is grey while nothing is on the prompter.
+- [x] The split of `native/rust-engine/src/exports.rs` into `exports/`, with the profile unchanged (#246).
+- [x] The hardware link's part (#247): the two pages' keys, dials and displays (`prompter/deck.rs`, `cameras/deck.rs`), the bridge's two routes, the page chain (D5), the dials' bank, the export and the contract. It had its one independent review, and a second look at what the review changed.
+- [x] The pages' part (#248): the Cameras page's section on what the dials set, Setup's deck steps with four pages, the manual and the checklist.
 
-CAMERAS:
+PROMPTER is `docs/design/teleprompter.md` §9, CAMERAS is D14. In the studio's build the CAMERAS page selects and turns the bank, and refuses `REC` and the dials until the cameras' links are built; the PROMPTER page refuses `PLAY` until the Prompter XL's window is built.
 
-- `CAM 1`–`CAM 3` choose the camera the dials drive. Amber is selected, and it is the page's selection.
-- `BANK` switches the dials between exposure (ISO · shutter · iris · ND), colour (white balance · tint) and focus (a push is one-shot autofocus where the lens allows).
-- `REC` always acts on CAM 1. One press starts; a second within 3 s, while the key reads `STOP?`, stops. While CAM 1 records the key shows `REC` with a red lamp, on a dark key.
-- The strip shows the selected camera's values. There is no `PLAY` key.
-- The dials' bank gets a home in the engine, which has none for the cameras yet, for the page and the deck to read. The Cameras page gains its "what the dials set" section: the bank keys, the dials' hints, the footer's dials.
-- Recent actions gains the deck's camera rows, with `Stream Deck` as their source.
+Decided while they were built, and kept by the work that follows:
 
-Ask the owner first: nothing is open.
+- The page keys make a ring of one key a page, at the second row's last place: LIGHTS > AUDIO > CAMERAS > PROMPTER > LIGHTS. AUDIO's stands in `TALK`'s old place, the second row's third, which D26 called empty: its last place holds `SOLO CLR`. The owner can overrule it before the import.
+- The cue keys read `CUE <` and `CUE >`, in plain characters: nothing in development shows that Companion draws `◂` and `▸`. The strips use `¶`, `·` and `°`, which the walk checks.
+- A key of either page runs under the prompter's or the cameras' lock, through the functions the screen's requests run, and the screen hears of it once the key is stamped and its row written.
+- The dials' bank and the deck's armed stop are kept in the hardware link's memory, as the selection is: exposure, and no arm, after a start.
+- `REC` on the deck starts a take with one press and stops it with two, and with nothing else. A press sooner than 350 ms after it armed the stop, started a take or stopped one is the same press again. An armed stop stops the take it was made for and no other: when that take is over, or may be (the screen stopped it, it ended on the camera itself, another began there, CAM 1 did not answer for a while), a press within the 3 s ends the arm and sends nothing. The cost is one swallowed press, when a take ends under an armed stop and the next is wanted at once.
+- The key's display follows the deck's poll, so it can read `STOP?` for up to a second after the 3 s. For those 4.25 s a press starts no take. The stop's own window stays 3 s: after it, a press on a take that still runs arms again.
+- The hardware link tells a take from the next by what CAM 1 reports when it is read, once a second. A take that ends and another that begins on the camera itself between two reads are one to it.
+- A display never reads a camera by itself. One poll of the deck reads the cameras once, a key once, and the key's own read answers its displays. A page's texts are kept for 250 ms.
+- The poll stays one request a display, 41 of them a second, the way proven on the real deck. The bridge's queue is 96 for a worst instant of 62.
+- A take started or stopped at the deck is a row in Recent actions with `Stream Deck`. The armed stop, a selection, the bank, a detent and every key of the PROMPTER page are none.
+- While nothing is on the prompter the deck's size dial is refused with the rest (§9); the screen's look sets the size at any time.
+- Setup draws the deck from the hardware link's page model, and the pages' test double draws the same model from `deckPages.json`, which a test of the hardware link holds equal. A cell of the strip that only shows is a `display` there. Setup's echo goes by the route a key was sent on, and its Verify step turns to the page of the key that was pressed.
 
 ### The Prompter XL's window (was Slice 5b)
 
@@ -172,6 +180,11 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **Tests with a deadline failed in two slow runs of the gate** (2026-09-28): the shell's `exit_watcher_fails_pending_and_emits_event`, then the engine's `recall_pushes_the_snapshot_and_the_console_confirms_it` and `a_glass_that_goes_pauses_the_scroll_and_its_return_leaves_it_paused`, in a run where the engine's tests took 120 s (11 s alone). Each passed on the next run. The gate runs below normal priority, so whatever is busy beside it takes its time; what was busy was not found.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
+- [ ] **The deck's poll opens 41 connections a second,** one a display, which leaves about 5,000 closed sockets waiting in Windows at any time. One request for all the displays of a page would make it four. It needs a way to fill many Companion variables from one answer, tried on the real deck.
+- [ ] **A slow read of a camera would hold the bridge.** A display waits for its page's texts while they are read, so with a real link that answers slowly the poll's displays can hold all four workers. Measure it when the first real link is built.
+- [ ] **A key the deck was refused leaves no line in the log.** The bridge logs what it refuses itself (a token, a full queue), not what a page refuses (`REC` while CAM 1 is released).
+- [ ] **`PLAY`, `DIM`, a mute and `Toggle` on the deck have no dwell.** A press that arrives twice switches twice. `REC` has one.
+- [ ] **Setup's runner offers `Start with Import profile` on every step,** also when the first steps are done.
 
 ## Waiting on the owner
 

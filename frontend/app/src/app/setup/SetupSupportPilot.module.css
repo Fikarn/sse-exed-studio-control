@@ -175,7 +175,6 @@
     gap: var(--space-3);
   }
 
-  .pageTab,
   .backupRow,
   .deckButton,
   .dialChip,
@@ -343,33 +342,17 @@
     flex-wrap: wrap;
   }
 
+  /* The deck's pages: a well of segmented keys, as wide as its keys. */
   .pageTabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+    justify-self: start;
   }
 
-  .pageTab,
+  .pageTabs > * {
+    padding: 0 14px;
+  }
+
   .dialChip {
     padding: 10px 14px;
-  }
-
-  .pageTab {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .pageTab[data-active="true"],
-  .dialChip[data-selected="true"] {
-    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--color-primary-500) 18%, transparent),
-        color-mix(in srgb, var(--color-primary-500) 5%, transparent)
-      ),
-      var(--color-surface-raised);
   }
 
   .deckPreview {
@@ -399,7 +382,8 @@
     border-radius: var(--radius-screen);
   }
 
-  .deckButton[data-selected="true"] {
+  .deckButton[data-selected="true"],
+  .dialChip[data-selected="true"] {
     border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
     /* Slice 9 (system §5): a selected key is marked by its edge. */
     box-shadow:
@@ -407,17 +391,13 @@
       0 0 0 1px color-mix(in srgb, var(--color-primary-500) 34%, transparent);
   }
 
+  /* A control the deck just pressed: a flat tint for the pulse's 300 ms (no
+     gradient: system §5 keeps them to plates, keys, caps and meters). */
   .deckButton[data-echo="true"],
   .dialChip[data-echo="true"] {
     animation: echoPulse 300ms ease;
     border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in srgb, var(--color-primary-500) 20%, transparent),
-        color-mix(in srgb, var(--color-primary-500) 8%, transparent)
-      ),
-      var(--color-surface-raised);
+    background: color-mix(in srgb, var(--color-primary-500) 14%, var(--color-surface-raised));
   }
 
   .deckButton small,
@@ -426,9 +406,13 @@
     font: var(--font-weight-medium) var(--font-size-tick) / 1.4 var(--font-family-mono);
   }
 
+  /* A dial a column, under its cell of the strip, as on the deck: its push,
+     its turn to the left, its turn to the right. */
   .dialRow {
     display: grid;
+    grid-auto-flow: column;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(3, auto);
     gap: var(--space-3);
   }
 
