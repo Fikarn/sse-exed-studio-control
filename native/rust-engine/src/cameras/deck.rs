@@ -83,7 +83,18 @@ pub(crate) fn handle_deck_action(
     action: &str,
     value: Option<&str>,
 ) -> Result<CamerasReply, CameraError> {
-    let at = Instant::now();
+    handle_deck_action_at(db_path, simulated, action, value, Instant::now())
+}
+
+/// `handle_deck_action` at a moment of the caller's: the armed stop counts
+/// its dwell and its 3 s from `at`.
+pub(crate) fn handle_deck_action_at(
+    db_path: &Path,
+    simulated: bool,
+    action: &str,
+    value: Option<&str>,
+    at: Instant,
+) -> Result<CamerasReply, CameraError> {
     with_cameras(db_path, simulated, |cameras, bodies, now| {
         let before = cameras.health_check();
         let (result, event) = match action {
@@ -222,7 +233,16 @@ pub(crate) fn deck_texts(
     simulated: bool,
     read: bool,
 ) -> Result<Vec<(&'static str, String)>, CameraError> {
-    let at = Instant::now();
+    deck_texts_at(db_path, simulated, read, Instant::now())
+}
+
+/// `deck_texts` at a moment of the caller's.
+pub(crate) fn deck_texts_at(
+    db_path: &Path,
+    simulated: bool,
+    read: bool,
+    at: Instant,
+) -> Result<Vec<(&'static str, String)>, CameraError> {
     if read {
         with_cameras(db_path, simulated, |cameras, _, _| Ok(texts(cameras, at)))
     } else {

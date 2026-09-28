@@ -1,11 +1,14 @@
 use super::audio::AUDIO_LCD_KEYS;
 use super::controls::{DECK_AMBER_BG, DECK_MUTED_INK};
+use super::controls::{DECK_GREY_INK, DECK_HAZARD_INK, DECK_LIVE_BG};
 use super::lights::LIGHT_LCD_KEYS;
 use super::profile::{
-    generate_companion_config, streamdeck_surface_id_from, COMPANION_EXPORT_FORMAT_VERSION,
-    INSTANCE_ID, INSTANCE_LABEL,
+    generate_companion_config, polled_lcd_keys, streamdeck_surface_id_from,
+    COMPANION_EXPORT_FORMAT_VERSION, INSTANCE_ID, INSTANCE_LABEL,
 };
 use super::snapshot::build_control_surface_snapshot;
+use crate::cameras::deck::CAMERA_LCD_KEYS;
+use crate::prompter::deck::PROMPTER_LCD_KEYS;
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
@@ -127,13 +130,19 @@ fn companion_export_is_a_native_v9_full_config() {
     let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
     assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
     assert_eq!(config["type"], "full");
-    // New pages program, Slice 2 (D5): LIGHTS and AUDIO; PROJECTS and
-    // TASKS left with Planning.
+    // D5: LIGHTS, AUDIO, CAMERAS and PROMPTER.
     assert_eq!(
         config["pages"].as_object().map(|pages| pages.len()),
-        Some(2)
+        Some(4)
     );
-    assert!(config["pages"]["2"]["id"].is_string());
+    for (number, id) in [
+        ("1", "sse-page-lights"),
+        ("2", "sse-page-audio"),
+        ("3", "sse-page-cameras"),
+        ("4", "sse-page-prompter"),
+    ] {
+        assert_eq!(config["pages"][number]["id"], id);
+    }
     assert!(config.get("surfaces").is_none());
 
     let custom_variables = config["custom_variables"]
@@ -141,8 +150,14 @@ fn companion_export_is_a_native_v9_full_config() {
         .expect("custom variables should exist");
     assert_eq!(
         custom_variables.len(),
-        AUDIO_LCD_KEYS.len() + LIGHT_LCD_KEYS.len()
+        AUDIO_LCD_KEYS.len()
+            + LIGHT_LCD_KEYS.len()
+            + CAMERA_LCD_KEYS.len()
+            + PROMPTER_LCD_KEYS.len()
     );
+    assert_eq!(custom_variables.len(), 45);
+    assert!(custom_variables.contains_key("lcd_camera_key_rec"));
+    assert!(custom_variables.contains_key("lcd_prompter_state_play"));
     assert!(custom_variables.contains_key("lcd_light_nav"));
     assert!(custom_variables.contains_key("lcd_audio_strip_1_level"));
     assert!(
@@ -164,8 +179,9 @@ fn companion_export_audio_page_maps_the_deck_hardware() {
         .as_object()
         .expect("audio controls should exist");
 
-    // Row 1, column 2 held TALK until 2026-09-28 (D26) and is empty.
-    for (row, columns) in [("0", 4), ("1", 3), ("2", 4), ("3", 4)] {
+    // Row 1, column 2 held TALK until 2026-09-28 (D26); the page key of
+    // the ring stands there now.
+    for (row, columns) in [("0", 4), ("1", 4), ("2", 4), ("3", 4)] {
         assert_eq!(
             controls[row].as_object().map(|columns| columns.len()),
             Some(columns),
@@ -191,8 +207,31 @@ fn companion_export_audio_page_maps_the_deck_hardware() {
         .expect("press body should exist");
     assert!(press_body.contains("dialPress"));
 
-    // Row 1, column 2 held TALK until 2026-09-28 (D26); nothing is there.
-    assert!(controls["1"].get("2").is_none(), "{}", controls["1"]["2"]);
+    // Row 1, column 2 held TALK until 2026-09-28 (D26). The ring's page
+    // key is there, and every other key is where it was.
+    let page_key = &controls["1"]["2"];
+    assert_eq!(page_key["style"]["text"], "CAMS\\n>>");
+    let jump = &page_key["steps"]["0"]["action_sets"]["down"][0];
+    assert_eq!(jump["definitionId"], "set_page");
+    assert_eq!(jump["options"]["page"], 3);
+    assert_eq!(
+        page_key["steps"]["0"]["action_sets"]["down"]
+            .as_array()
+            .map(Vec::len),
+        Some(1),
+        "a page key posts nothing"
+    );
+    for (row, col, text) in [
+        ("0", "0", "MAIN"),
+        ("0", "1", "PH\\n1"),
+        ("0", "2", "PH\\n2"),
+        ("0", "3", "$(custom:lcd_audio_key_4)"),
+        ("1", "0", "$(custom:lcd_audio_key_5)"),
+        ("1", "1", "$(custom:lcd_audio_key_6)"),
+        ("1", "3", "$(custom:lcd_audio_key_8)"),
+    ] {
+        assert_eq!(controls[row][col]["style"]["text"], text, "{row}/{col}");
+    }
 }
 
 #[test]
@@ -249,9 +288,8 @@ fn companion_export_triggers_poll_and_follow_the_app() {
     let triggers = config["triggers"]
         .as_object()
         .expect("triggers should exist");
-    // New pages program, Slice 2: the poll and a follow trigger per deck
-    // page (the Planning one left with PROJECTS).
-    assert_eq!(triggers.len(), 3);
+    // The poll, and a follow trigger for each of the deck's four pages.
+    assert_eq!(triggers.len(), 5);
 
     let poll = &triggers["sse-trigger-lcd-poll"];
     assert_eq!(poll["options"]["enabled"], true);
@@ -259,8 +297,9 @@ fn companion_export_triggers_poll_and_follow_the_app() {
     assert_eq!(poll["events"][0]["options"]["seconds"], 1);
     assert_eq!(
         poll["actions"].as_array().map(Vec::len),
-        Some(AUDIO_LCD_KEYS.len())
+        Some(polled_lcd_keys().len())
     );
+    assert_eq!(polled_lcd_keys().len(), 41);
 
     let follow = &triggers["sse-trigger-follow-audio"];
     assert_eq!(follow["events"][0]["type"], "condition_true");
@@ -286,11 +325,20 @@ fn companion_export_triggers_poll_and_follow_the_app() {
 #[test]
 fn control_surface_snapshot_matches_the_deck_page_model() {
     let snapshot = build_control_surface_snapshot();
-    // New pages program, Slice 2 (D5): LIGHTS is page 1, AUDIO page 2.
-    // The PROJECTS page's model (its first key, its `TASKS >>` and
-    // `LIGHTS >>` keys, its project dial) left with it; LIGHTS carries
-    // the same checks.
-    assert_eq!(snapshot.pages.len(), 2);
+    // D5: LIGHTS is page 1, AUDIO page 2, CAMERAS page 3, PROMPTER page 4.
+    assert_eq!(
+        snapshot
+            .pages
+            .iter()
+            .map(|page| (page.id.as_str(), page.label.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("lights", "LIGHTS"),
+            ("audio", "AUDIO"),
+            ("cameras", "CAMERAS"),
+            ("prompter", "PROMPTER"),
+        ]
+    );
     let lights = &snapshot.pages[0];
     assert_eq!(lights.id, "lights");
     assert_eq!(lights.label, "LIGHTS");
@@ -324,9 +372,17 @@ fn control_surface_snapshot_matches_the_deck_page_model() {
     assert_eq!(audio.label, "AUDIO");
     assert_eq!(
         audio.buttons.len(),
-        11,
-        "audio page should model 7 keys plus 4 touch-strip cells"
+        12,
+        "audio page should model 7 keys, the page key and 4 touch-strip cells"
     );
+    let cameras_key = audio
+        .buttons
+        .iter()
+        .find(|control| control.position == 7)
+        .expect("the page key stands at position 7");
+    assert_eq!(cameras_key.label, "CAMS >>");
+    assert_eq!(cameras_key.page_nav_target.as_deref(), Some("CAMERAS"));
+    assert_eq!(cameras_key.method, None, "a page key posts nothing");
     assert_eq!(audio.dials.len(), 12);
     assert!(audio.buttons.iter().any(|control| control
         .body
@@ -518,13 +574,12 @@ fn every_lcd_the_deck_shows_is_shipped_refreshed_and_answered() {
     }
 }
 
-// D5: LIGHTS (page 1) and AUDIO (page 2), chained by the page keys and by
-// the deck following the app. LIGHTS' `AUDIO >>` is the one page key: the
-// AUDIO page has none, so the deck goes
-// back to LIGHTS by following the app. Setup has no deck page, so nothing
-// follows it and the deck stays where it is.
+// D5: LIGHTS, AUDIO, CAMERAS and PROMPTER, chained by the page keys and by
+// the deck following the app. The page keys make a ring: each page has one,
+// to the page after it, and PROMPTER's goes round to LIGHTS. Setup has no
+// deck page, so nothing follows it and the deck stays where it is.
 #[test]
-fn the_page_keys_and_follow_triggers_chain_lights_and_audio() {
+fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
     let profile = test_profile();
     let pages = profile["pages"].as_object().expect("pages");
     let page_names = pages
@@ -538,22 +593,42 @@ fn the_page_keys_and_follow_triggers_chain_lights_and_audio() {
         .collect::<Vec<_>>();
     assert_eq!(
         page_names,
-        vec![(1, String::from("LIGHTS")), (2, String::from("AUDIO"))]
+        vec![
+            (1, String::from("LIGHTS")),
+            (2, String::from("AUDIO")),
+            (3, String::from("CAMERAS")),
+            (4, String::from("PROMPTER")),
+        ]
     );
 
     let mut all_jumps = Vec::new();
     page_jumps(&profile, &mut all_jumps);
     assert!(
-        all_jumps.iter().all(|page| (1..=2).contains(page)),
+        all_jumps.iter().all(|page| (1..=4).contains(page)),
         "every jump lands on a page the profile has: {all_jumps:?}"
     );
 
-    let mut lights_jumps = Vec::new();
-    page_jumps(&pages["1"], &mut lights_jumps);
-    assert_eq!(lights_jumps, vec![2], "LIGHTS' page key goes to AUDIO");
-    let mut audio_jumps = Vec::new();
-    page_jumps(&pages["2"], &mut audio_jumps);
-    assert!(audio_jumps.is_empty(), "{audio_jumps:?}");
+    // One page key a page, to the page after it; the last to the first.
+    for (page, next, place) in [
+        ("1", 2, ("1", "3")),
+        ("2", 3, ("1", "2")),
+        ("3", 4, ("1", "3")),
+        ("4", 1, ("1", "3")),
+    ] {
+        let mut jumps = Vec::new();
+        page_jumps(&pages[page], &mut jumps);
+        assert_eq!(jumps, vec![next], "page {page}'s one page key");
+        let mut at_its_place = Vec::new();
+        page_jumps(
+            &pages[page]["controls"][place.0][place.1],
+            &mut at_its_place,
+        );
+        assert_eq!(
+            at_its_place,
+            vec![next],
+            "page {page}'s page key stands at {place:?}"
+        );
+    }
     assert!(
         pages["1"]["controls"]["0"].get("0").is_none(),
         "`<< PROJ` left LIGHTS' first place empty"
@@ -580,9 +655,19 @@ fn the_page_keys_and_follow_triggers_chain_lights_and_audio() {
         follows,
         vec![
             (String::from("audio"), vec![2]),
+            (String::from("cameras"), vec![3]),
             (String::from("lighting"), vec![1]),
+            // The page's word in the app is the one the hardware link
+            // accepts (`shell_settings::WORKSPACES`).
+            (String::from("teleprompter"), vec![4]),
         ]
     );
+    for follow in follows.iter().map(|(workspace, _)| workspace.as_str()) {
+        assert!(
+            crate::shell_settings::WORKSPACES.contains(&follow),
+            "{follow} is a page the app can be on"
+        );
+    }
 
     let mut lighting_keys = LcdKeys::default();
     collect_lcd_keys(
@@ -596,5 +681,300 @@ fn the_page_keys_and_follow_triggers_chain_lights_and_audio() {
             .map(|key| key.to_string())
             .collect::<BTreeSet<_>>(),
         "arriving on LIGHTS refreshes its LCDs, as the PROJECTS page's `LIGHTS >>` did"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The CAMERAS and PROMPTER pages (D14; `docs/design/teleprompter.md` §9)
+// ---------------------------------------------------------------------------
+
+/// The body a control's first action posts, with its route.
+fn posted(control: &Value, set: &str) -> Option<(String, Value)> {
+    let action = control["steps"]["0"]["action_sets"][set].get(0)?;
+    if action["definitionId"] != "post" {
+        return None;
+    }
+    let body = serde_json::from_str(action["options"]["body"].as_str()?).ok()?;
+    Some((action["options"]["url"].as_str()?.to_string(), body))
+}
+
+#[test]
+fn the_cameras_page_is_three_cameras_the_bank_and_rec() {
+    let profile = test_profile();
+    let controls = &profile["pages"]["3"]["controls"];
+    assert_eq!(profile["pages"]["3"]["name"], "CAMERAS");
+
+    for (col, camera) in [("0", "1"), ("1", "2"), ("2", "3")] {
+        let key = &controls["0"][col];
+        assert_eq!(
+            key["style"]["text"],
+            format!("$(custom:lcd_camera_key_{camera})")
+        );
+        assert_eq!(
+            posted(key, "down"),
+            Some((
+                String::from("/api/deck/camera-action"),
+                json!({ "action": "select", "value": camera })
+            ))
+        );
+        // Amber is selected, and it is the page's selection.
+        let selected = &key["feedbacks"][0];
+        assert_eq!(
+            selected["options"]["variable"],
+            "custom:lcd_camera_state_selected"
+        );
+        assert_eq!(selected["options"]["value"], camera);
+        assert_eq!(selected["style"]["bgcolor"], DECK_AMBER_BG);
+    }
+    assert_eq!(
+        posted(&controls["0"]["3"], "down").map(|(_, body)| body),
+        Some(json!({ "action": "bank" }))
+    );
+
+    // `REC`: a red lamp and the word on a dark key, never a red fill (D19).
+    let rec = &controls["1"]["0"];
+    assert_eq!(rec["style"]["text"], "$(custom:lcd_camera_key_rec)");
+    assert_eq!(rec["style"]["bgcolor"], 0);
+    assert_eq!(
+        posted(rec, "down").map(|(_, body)| body),
+        Some(json!({ "action": "rec" }))
+    );
+    let recording = rec["feedbacks"]
+        .as_array()
+        .expect("feedbacks")
+        .iter()
+        .find(|feedback| feedback["options"]["value"] == "recording")
+        .expect("the recording feedback");
+    assert_eq!(recording["style"]["color"], DECK_HAZARD_INK);
+    assert!(recording["style"].get("bgcolor").is_none(), "{recording}");
+    assert!(recording["style"]["png64"]
+        .as_str()
+        .is_some_and(|png| png.starts_with("iVBOR")));
+    for (value, ink) in [("locked", DECK_GREY_INK), ("last-known", DECK_AMBER_BG)] {
+        assert!(
+            rec["feedbacks"]
+                .as_array()
+                .expect("feedbacks")
+                .iter()
+                .any(|feedback| feedback["options"]["value"] == value
+                    && feedback["style"]["color"] == ink),
+            "{value}"
+        );
+    }
+
+    // Rows 1's other places stay dark, but the page key.
+    assert!(controls["1"].get("1").is_none());
+    assert!(controls["1"].get("2").is_none());
+    assert_eq!(controls["1"]["3"]["style"]["text"], "PROMPTER\\n>>");
+
+    for (col, dial) in [("0", "1"), ("1", "2"), ("2", "3"), ("3", "4")] {
+        let cell = &controls["2"][col];
+        assert_eq!(
+            cell["style"]["text"],
+            format!("$(custom:lcd_camera_strip_{dial})")
+        );
+        assert_eq!(
+            cell["steps"]["0"]["action_sets"]["down"],
+            json!([]),
+            "a strip cell only shows"
+        );
+        let encoder = &controls["3"][col];
+        assert_eq!(encoder["options"]["rotaryActions"], true);
+        assert_eq!(
+            posted(encoder, "rotate_left").map(|(_, body)| body),
+            Some(json!({ "action": "dial", "value": format!("{dial}:down") }))
+        );
+        assert_eq!(
+            posted(encoder, "rotate_right").map(|(_, body)| body),
+            Some(json!({ "action": "dial", "value": format!("{dial}:up") }))
+        );
+        assert_eq!(
+            posted(encoder, "down").map(|(_, body)| body),
+            Some(json!({ "action": "dialPush", "value": dial }))
+        );
+    }
+}
+
+#[test]
+fn the_prompter_page_is_the_takes_keys_and_four_dials() {
+    let profile = test_profile();
+    let controls = &profile["pages"]["4"]["controls"];
+    assert_eq!(profile["pages"]["4"]["name"], "PROMPTER");
+
+    let keys: [(&str, &str, &str, Value); 5] = [
+        ("0", "0", "PLAY", json!({ "action": "playPause" })),
+        ("0", "1", "BACK", json!({ "action": "back" })),
+        ("0", "2", "TOP", json!({ "action": "top" })),
+        (
+            "1",
+            "0",
+            "CUE\\n<",
+            json!({ "action": "cue", "value": "previous" }),
+        ),
+        (
+            "1",
+            "1",
+            "CUE\\n>",
+            json!({ "action": "cue", "value": "next" }),
+        ),
+    ];
+    for (row, col, text, body) in keys {
+        let key = &controls[row][col];
+        assert_eq!(key["style"]["text"], text, "{row}/{col}");
+        assert_eq!(
+            posted(key, "down"),
+            Some((String::from("/api/deck/prompter-action"), body)),
+            "{text}"
+        );
+    }
+    // The other keys stay dark (§9), but the page key, which goes round.
+    assert!(controls["0"].get("3").is_none());
+    assert!(controls["1"].get("2").is_none());
+    assert_eq!(controls["1"]["3"]["style"]["text"], "LIGHTS\\n>>");
+
+    // `PLAY` is lit green while the text scrolls, and grey while it cannot
+    // be pressed.
+    let play = controls["0"]["0"]["feedbacks"]
+        .as_array()
+        .expect("feedbacks");
+    assert!(play.iter().any(|feedback| {
+        feedback["options"]["variable"] == "custom:lcd_prompter_state_play"
+            && feedback["options"]["value"] == "playing"
+            && feedback["style"]["bgcolor"] == DECK_LIVE_BG
+    }));
+    assert!(play.iter().any(|feedback| {
+        feedback["options"]["value"] == "locked" && feedback["style"]["color"] == DECK_GREY_INK
+    }));
+
+    let dials: [(&str, Option<Value>, Value, Value); 4] = [
+        (
+            "0",
+            Some(json!({ "action": "playPause" })),
+            json!({ "action": "speed", "value": "down" }),
+            json!({ "action": "speed", "value": "up" }),
+        ),
+        (
+            "1",
+            None,
+            json!({ "action": "line", "value": "previous" }),
+            json!({ "action": "line", "value": "next" }),
+        ),
+        (
+            "2",
+            Some(json!({ "action": "size", "value": "standard" })),
+            json!({ "action": "size", "value": "down" }),
+            json!({ "action": "size", "value": "up" }),
+        ),
+        (
+            "3",
+            None,
+            json!({ "action": "paragraph", "value": "previous" }),
+            json!({ "action": "paragraph", "value": "next" }),
+        ),
+    ];
+    for (col, push, left, right) in dials {
+        let encoder = &controls["3"][col];
+        assert_eq!(posted(encoder, "down").map(|(_, body)| body), push, "{col}");
+        assert_eq!(
+            posted(encoder, "rotate_left").map(|(_, body)| body),
+            Some(left)
+        );
+        assert_eq!(
+            posted(encoder, "rotate_right").map(|(_, body)| body),
+            Some(right)
+        );
+    }
+    for (col, key) in [
+        ("0", "prompter_speed"),
+        ("1", "prompter_place"),
+        ("2", "prompter_left"),
+        ("3", "prompter_name"),
+    ] {
+        assert_eq!(
+            controls["2"][col]["style"]["text"],
+            format!("$(custom:lcd_{key})")
+        );
+    }
+}
+
+// Setup draws every page from the page model: each control of the two new
+// pages says what it does in the operator's words, and none falls back to
+// the words of a control nobody described.
+#[test]
+fn the_page_model_says_what_the_new_pages_controls_do() {
+    let snapshot = build_control_surface_snapshot();
+    let cameras = &snapshot.pages[2];
+    let prompter = &snapshot.pages[3];
+    for page in [cameras, prompter] {
+        assert_eq!(
+            page.buttons.len(),
+            10,
+            "{}: 6 keys and 4 strip cells",
+            page.label
+        );
+        assert_eq!(page.dials.len(), 12, "{}", page.label);
+        for control in page.buttons.iter().chain(&page.dials) {
+            assert!(
+                control.description.ends_with('.')
+                    && control
+                        .description
+                        .chars()
+                        .next()
+                        .is_some_and(char::is_uppercase),
+                "{}: {:?}",
+                control.id,
+                control.description
+            );
+            for fallback in ["button ", "press ", "left ", "right "] {
+                assert!(
+                    !control.description.starts_with(fallback),
+                    "{}: {:?}",
+                    control.id,
+                    control.description
+                );
+            }
+        }
+    }
+    let by_id = |page: &super::snapshot::ControlSurfacePage, id: &str| {
+        page.buttons
+            .iter()
+            .chain(&page.dials)
+            .find(|control| control.id == id)
+            .unwrap_or_else(|| panic!("{id}"))
+            .clone()
+    };
+    assert_eq!(
+        by_id(cameras, "cameras-btn-5").description,
+        "Start recording on CAM 1. While it records: arm the stop, then stop."
+    );
+    assert_eq!(
+        by_id(cameras, "cameras-btn-5").lcd_key.as_deref(),
+        Some("camera_key_rec")
+    );
+    assert_eq!(
+        by_id(cameras, "cameras-dial-2-left").description,
+        "Step shutter or tint down on the selected camera, as the bank says."
+    );
+    assert_eq!(by_id(cameras, "cameras-dial-2-left").label, "Dial 2 Down");
+    assert_eq!(
+        by_id(cameras, "cameras-dial-3-press").description,
+        "A push of dial 3 does nothing."
+    );
+    assert_eq!(
+        by_id(cameras, "cameras-btn-9").description,
+        "Shows what dial 1 sets."
+    );
+    assert_eq!(
+        by_id(prompter, "prompter-btn-1").description,
+        "Play or pause the prompter."
+    );
+    assert_eq!(
+        by_id(prompter, "prompter-dial-2-press").description,
+        "A push of Position does nothing."
+    );
+    assert_eq!(by_id(prompter, "prompter-dial-1-right").label, "Speed Up");
+    assert_eq!(
+        by_id(prompter, "prompter-btn-8").page_nav_target.as_deref(),
+        Some("LIGHTS")
     );
 }

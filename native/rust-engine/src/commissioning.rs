@@ -1016,12 +1016,13 @@ mod tests {
     // The test double says this sentence word for word
     // (`controlSurface.test.ts`), and the pages' captures print its number:
     // when the deck's model changes, both change. 7 keys and 12 dial
-    // controls on LIGHTS, 7 keys, 4 strips and 12 dial controls on AUDIO.
+    // controls on LIGHTS; 8 keys, 4 strips and 12 dial controls on AUDIO;
+    // 6 keys, 4 strips and 12 dial controls on CAMERAS and on PROMPTER.
     #[test]
     fn the_control_surface_probe_counts_the_decks_controls() {
         assert_eq!(
             summarize_control_surface_probe(),
-            "Control surface bridge exposes 42 mapped controls across 2 pages."
+            "Control surface bridge exposes 87 mapped controls across 4 pages."
         );
     }
 

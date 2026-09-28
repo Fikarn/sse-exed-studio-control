@@ -583,6 +583,7 @@ impl EngineApp {
             // -------------------------------------------------------------
             "cameras.snapshot" => self.dispatch_cameras(request),
             "cameras.select" => self.dispatch_cameras(request),
+            "cameras.bank.set" => self.dispatch_cameras(request),
             "cameras.set" => self.dispatch_cameras(request),
             "cameras.step" => self.dispatch_cameras(request),
             "cameras.auto" => self.dispatch_cameras(request),

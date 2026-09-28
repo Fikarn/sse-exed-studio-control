@@ -2,8 +2,10 @@
 //! and the page-follow triggers are made from.
 
 use super::audio::audio_controls;
+use super::cameras::camera_controls;
 use super::controls::ControlDef;
 use super::lights::{light_controls, LIGHT_LCD_KEYS};
+use super::prompter::prompter_controls;
 
 /// One page of the exported Stream Deck profile.
 pub(super) struct DeckPage {
@@ -17,18 +19,18 @@ pub(super) struct DeckPage {
     /// deck here.
     pub(super) workspace: &'static str,
     /// The LCDs the page-follow trigger refreshes as the deck arrives: the
-    /// LIGHTS texts are not polled, so they are refreshed here; the AUDIO ones
-    /// by the 1 s poll.
+    /// LIGHTS texts are not polled, so they are refreshed here; the other
+    /// pages' by the 1 s poll.
     pub(super) arrival_refreshes: &'static [&'static str],
     pub(super) controls: fn() -> Vec<ControlDef>,
 }
 
-/// The deck's pages in their Companion order (new pages program, D5: the
-/// pages follow the app's tabs). PROJECTS and TASKS left with Planning in
-/// Slice 2, so LIGHTS is page 1 and AUDIO page 2; CAMERAS and PROMPTER join
-/// with Part C. The page numbers, the page keys' jumps, the page-follow
-/// triggers and the snapshot's page-nav targets all come from this list.
-pub(super) const DECK_PAGES: [DeckPage; 2] = [
+/// The deck's pages in their Companion order (D5: the pages follow the
+/// app's tabs): LIGHTS, AUDIO, CAMERAS, PROMPTER. The page keys chain them in
+/// a ring, one key a page, each to the page after it and the last to the
+/// first. The page numbers, the page keys' jumps, the page-follow triggers
+/// and the snapshot's page-nav targets all come from this list.
+pub(super) const DECK_PAGES: [DeckPage; 4] = [
     DeckPage {
         companion_id: "sse-page-lights",
         id: "lights",
@@ -44,6 +46,23 @@ pub(super) const DECK_PAGES: [DeckPage; 2] = [
         workspace: "audio",
         arrival_refreshes: &[],
         controls: audio_controls,
+    },
+    DeckPage {
+        companion_id: "sse-page-cameras",
+        id: "cameras",
+        label: "CAMERAS",
+        workspace: "cameras",
+        arrival_refreshes: &[],
+        controls: camera_controls,
+    },
+    DeckPage {
+        companion_id: "sse-page-prompter",
+        id: "prompter",
+        label: "PROMPTER",
+        // The page's word in the app, which the hardware link accepts.
+        workspace: "teleprompter",
+        arrival_refreshes: &[],
+        controls: prompter_controls,
     },
 ];
 

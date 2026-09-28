@@ -40,15 +40,18 @@ const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
 /// Sized for the deck's worst instant: the exported profile's once-a-second
-/// LCD poll sends one request per audio LCD key, all at once, the lighting
+/// LCD poll sends one request per polled LCD key, all at once, the lighting
 /// page-follow trigger the poll can set off adds the four LIGHTS LCDs, and the
 /// control with the most LCD refreshes sends its own burst on one press
 /// (`exports::deck_worst_instant_requests` counts them). All
 /// of them must fit the workers and the queue together, with
 /// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
 /// of 16 turned the poll's last five requests away every second on the studio
-/// workstation. The thread count stays fixed whatever the queue holds.
-const QUEUE_CAPACITY: usize = 64;
+/// workstation. The thread count stays fixed whatever the queue holds. With
+/// the CAMERAS and PROMPTER pages the instant is 62 requests (it was 44), and
+/// the queue went from 64 to 96: a refused key press is lost, since Companion
+/// never sends one again.
+const QUEUE_CAPACITY: usize = 96;
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The bearer token the bridge demands on every request (finding F01):
@@ -1437,9 +1440,13 @@ mod tests {
     #[test]
     fn the_pool_holds_the_decks_worst_instant() {
         let burst = crate::exports::deck_worst_instant_requests();
+        let largest_press = burst - crate::exports::polled_lcd_keys().len();
+        assert!(largest_press > 0, "the poll and a press: {burst}");
+        // The instant and the largest press again must fit: a key pressed
+        // while the instant waits is not turned away.
         assert!(
-            burst > crate::exports::AUDIO_LCD_KEYS.len(),
-            "the poll and a press: {burst}"
+            WORKER_COUNT + QUEUE_CAPACITY >= burst + largest_press,
+            "{burst} requests at the worst instant and a press of {largest_press} more do not fit {WORKER_COUNT} workers and a queue of {QUEUE_CAPACITY}"
         );
         let test_dir = ready_audio_test_db("bridge-deck-burst");
         let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);

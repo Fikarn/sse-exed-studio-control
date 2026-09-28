@@ -8,10 +8,11 @@
 use crate::cameras::deck::CAMERA_LCD_KEYS;
 use crate::cameras::CameraError;
 use crate::control_surface::ControlSurfaceError;
-use crate::engine_events::{emit_app_changed, emit_cameras_changed, emit_prompter_changed};
+use crate::engine_events::{cameras_changed_payload, emit_event, prompter_changed_payload};
 use crate::health::APP_CHANGED_REASON_HEALTH;
 use crate::prompter::deck::PROMPTER_LCD_KEYS;
 use crate::prompter::PrompterError;
+use crate::protocol::{EVENT_APP_CHANGED, EVENT_CAMERAS_CHANGED, EVENT_PROMPTER_CHANGED};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -158,10 +159,13 @@ pub(crate) fn handle_page_action(
                 .map(|reply| {
                     forget_texts(db_path, Page::Prompter);
                     if let Some(reason) = reply.reason {
-                        emit_prompter_changed(reason, reply.anchor.clone());
+                        emit_event(
+                            EVENT_PROMPTER_CHANGED,
+                            prompter_changed_payload(reason, reply.anchor.clone()),
+                        );
                     }
                     if reply.health_changed {
-                        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+                        announce_health();
                     }
                     answer(reply.result, reply.reason)
                 })
@@ -172,10 +176,13 @@ pub(crate) fn handle_page_action(
                 .map(|reply| {
                     forget_texts(db_path, Page::Cameras);
                     if let Some((reason, camera)) = reply.event {
-                        emit_cameras_changed(reason, camera);
+                        emit_event(
+                            EVENT_CAMERAS_CHANGED,
+                            cameras_changed_payload(reason, camera),
+                        );
                     }
                     if reply.health_changed {
-                        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+                        announce_health();
                     }
                     answer(reply.result, reply.event.map(|(reason, _)| reason))
                 })
@@ -183,6 +190,15 @@ pub(crate) fn handle_page_action(
         ),
         _ => None,
     }
+}
+
+/// `app.changed { reason: "health" }`: a lamp says something else after the
+/// key.
+fn announce_health() {
+    emit_event(
+        EVENT_APP_CHANGED,
+        json!({ "reason": APP_CHANGED_REASON_HEALTH }),
+    );
 }
 
 /// The bridge's answer to a key: the request's own answer, `ok`, and what
@@ -198,3 +214,6 @@ fn answer(result: Value, reason: Option<&'static str>) -> Value {
     }
     Value::Object(answer)
 }
+
+#[cfg(test)]
+mod tests;

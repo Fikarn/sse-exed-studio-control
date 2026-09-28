@@ -8,6 +8,8 @@ use super::controls::{deck_asset, lcd_refreshes, ControlDef};
 use super::lights::LIGHT_LCD_KEYS;
 use super::pages::{deck_page_number, DECK_PAGES};
 use crate::bootstrap::RuntimeContext;
+use crate::cameras::deck::CAMERA_LCD_KEYS;
+use crate::prompter::deck::PROMPTER_LCD_KEYS;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::fs;
@@ -288,6 +290,18 @@ fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Optio
     })
 }
 
+/// Every display the 1 s poll refreshes: the AUDIO page's (with `workspace`,
+/// which every page's follow reads), the CAMERAS page's and the PROMPTER
+/// page's. The LIGHTS page's are refreshed as the deck arrives.
+pub(crate) fn polled_lcd_keys() -> Vec<&'static str> {
+    AUDIO_LCD_KEYS
+        .iter()
+        .chain(CAMERA_LCD_KEYS.iter())
+        .chain(PROMPTER_LCD_KEYS.iter())
+        .copied()
+        .collect()
+}
+
 fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
     let controller = deck_surface_id.unwrap_or("self");
     let mut triggers = Map::new();
@@ -297,11 +311,11 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
         json!({
             "type": "trigger",
             "options": {
-                "name": "SSE audio LCD poll",
+                "name": "SSE LCD poll",
                 "enabled": true,
                 "sortOrder": 0
             },
-            "actions": trigger_lcd_refreshes(AUDIO_LCD_KEYS),
+            "actions": trigger_lcd_refreshes(&polled_lcd_keys()),
             "condition": [],
             "events": [
                 {
@@ -400,7 +414,7 @@ fn trigger_lcd_refreshes(keys: &[&str]) -> Vec<Value> {
 // silent no-op, so the profile must ship every LCD variable it polls into.
 fn generate_companion_custom_variables() -> Value {
     let mut variables = Map::new();
-    for (sort_order, key) in AUDIO_LCD_KEYS
+    for (sort_order, key) in polled_lcd_keys()
         .iter()
         .chain(LIGHT_LCD_KEYS.iter())
         .enumerate()
@@ -512,7 +526,8 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
 /// hold them all (`control_surface_http`,
 /// `the_pool_holds_the_decks_worst_instant`). New pages program, Slice 2: the
 /// follow triggers sent nothing to the bridge until the lighting one took over
-/// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4).
+/// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4). With
+/// the CAMERAS and PROMPTER pages the poll is 41 requests, and the instant 62.
 #[cfg(test)]
 pub(crate) fn deck_worst_instant_requests() -> usize {
     fn bridge_requests(value: &Value) -> usize {

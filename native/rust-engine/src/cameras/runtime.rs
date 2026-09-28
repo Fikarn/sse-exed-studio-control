@@ -529,6 +529,16 @@ pub(crate) fn with_bodies<T>(db_path: &Path, action: impl FnOnce(&mut SimulatedC
     result
 }
 
+/// Does something to the simulated cameras and lets nobody notice: what the
+/// hardware link finds out only when it next reads them.
+#[cfg(test)]
+pub(crate) fn with_bodies_unnoticed<T>(
+    db_path: &Path,
+    action: impl FnOnce(&mut SimulatedCameras) -> T,
+) -> T {
+    action(&mut lock(&entry(db_path)).bodies)
+}
+
 /// Everything the simulated camera `camera` of this saved data was sent,
 /// oldest first (the D12 tests).
 #[cfg(test)]

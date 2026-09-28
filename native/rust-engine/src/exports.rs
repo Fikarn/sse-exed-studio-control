@@ -5,17 +5,17 @@
 //! bridge (`control_surface`, `control_surface_http`).
 
 mod audio;
+mod cameras;
 mod controls;
 mod lights;
 mod pages;
 mod profile;
+mod prompter;
 mod snapshot;
 #[cfg(test)]
 mod tests;
 
 #[cfg(test)]
-pub(crate) use audio::AUDIO_LCD_KEYS;
-#[cfg(test)]
-pub(crate) use profile::deck_worst_instant_requests;
+pub(crate) use profile::{deck_worst_instant_requests, polled_lcd_keys};
 pub use profile::{export_companion_config, ExportCommandError};
 pub use snapshot::build_control_surface_snapshot;

@@ -1,8 +1,10 @@
-# Renders the Stream Deck+ audio-surface PNG assets embedded by the Companion
-# profile export (native/rust-engine/assets/deck/). Standalone authoring tool,
-# not part of any npm lane: `python scripts/deck-assets.py` with Pillow
-# installed regenerates every .png and its .b64 sibling (the engine embeds the
-# .b64 files via include_str!).
+# Renders the Stream Deck+ PNG assets embedded by the Companion profile export
+# (native/rust-engine/assets/deck/). Standalone authoring tool, not part of
+# any npm lane: `python scripts/deck-assets.py` with Pillow installed
+# regenerates every .png and its .b64 sibling (the engine embeds the .b64
+# files via include_str!). With names, it renders those only:
+# `python scripts/deck-assets.py lamp_red lamp_amber`. Another Pillow packs
+# the same picture into other bytes, so render what is new and leave the rest.
 #
 # Design: 144x144 canvas (2x the Companion 72px button canvas, scaled by
 # Companion per surface). Bars sit in the bottom band with the unity notch at
@@ -12,6 +14,7 @@
 # through beneath them.
 
 import base64
+import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -113,25 +116,48 @@ def ico_gain():
     return img
 
 
-def main():
+LAMP_RED = (255, 97, 97)  # the screen's red: a hazard that is on
+LAMP_AMBER = (232, 177, 61)  # the deck's amber: doubt
+
+
+def lamp(colour):
+    # A lamp over the key's word: a bloom, and the lamp itself. REC is a red
+    # lamp and the word on a dark key, never a red fill (docs/DESIGN.md).
+    img, draw = glyph_canvas()
+    cx, cy = 72, 30
+    for radius, alpha in ((22, 40), (18, 70), (15, 110)):
+        draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], fill=colour + (alpha,))
+    draw.ellipse([cx - 11, cy - 11, cx + 11, cy + 11], fill=colour + (255,))
+    return img
+
+
+def images():
     for bucket in range(13):
-        save(bar_image(bucket, FILL_NORMAL), f"bar_f{bucket}")
-        save(bar_image(bucket, FILL_MUTED), f"bar_m{bucket}")
-    save(bar_image(0, FILL_NORMAL, with_notch=False), "strip_off")
-    save(
-        bar_image(0, FILL_NORMAL, with_notch=False, with_track=False),
-        "strip_empty",
-    )
-    for name, fn in (
-        ("ico_main", ico_main),
-        ("ico_phones", ico_phones),
-        ("ico_bank", ico_bank),
-        ("ico_dim", ico_dim),
-        ("ico_solo", ico_solo),
-        ("ico_gain", ico_gain),
-    ):
-        save(fn(), name)
-    print(f"wrote assets to {OUT}")
+        yield f"bar_f{bucket}", lambda bucket=bucket: bar_image(bucket, FILL_NORMAL)
+        yield f"bar_m{bucket}", lambda bucket=bucket: bar_image(bucket, FILL_MUTED)
+    yield "strip_off", lambda: bar_image(0, FILL_NORMAL, with_notch=False)
+    yield "strip_empty", lambda: bar_image(0, FILL_NORMAL, with_notch=False, with_track=False)
+    yield "ico_main", ico_main
+    yield "ico_phones", ico_phones
+    yield "ico_bank", ico_bank
+    yield "ico_dim", ico_dim
+    yield "ico_solo", ico_solo
+    yield "ico_gain", ico_gain
+    yield "lamp_red", lambda: lamp(LAMP_RED)
+    yield "lamp_amber", lambda: lamp(LAMP_AMBER)
+
+
+def main():
+    wanted = sys.argv[1:]
+    known = dict(images())
+    unknown = [name for name in wanted if name not in known]
+    if unknown:
+        raise SystemExit(f"no such asset: {', '.join(unknown)}")
+    for name, render in known.items():
+        if not wanted or name in wanted:
+            save(render(), name)
+            print(f"wrote {name}")
+    print(f"assets are in {OUT}")
 
 
 if __name__ == "__main__":
