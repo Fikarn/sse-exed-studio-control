@@ -4,6 +4,13 @@
 //! on. The rule is written over snapshots of the monitors, so it is tested
 //! without a window. The two window commands are here too, with the
 //! sentences the operator reads when one does not finish.
+//!
+//! The window is held on its display while screens come and go (`Held`):
+//! Windows moves windows about when a screen is plugged in or out, and the
+//! Prompter XL is plugged in and out. The display is saved by the window
+//! commands and by the watch over the screens (`shell_display_watch.rs`),
+//! while the screens stand still; until the Prompter XL's window it was
+//! saved at every move of the window, Windows' own among them.
 
 use crate::shell_windows::MAIN_WINDOW_LABEL;
 use crate::EngineState;
@@ -340,6 +347,116 @@ fn route_window_fullscreen(
     let monitor = fullscreen_monitor(window, saved)
         .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
     route_window_to_monitor(window, &monitor)
+}
+
+/// What the window needs once the screens have changed and stand still.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AfterTheScreensChanged {
+    /// It stands fullscreen on the display it belongs on.
+    Nothing,
+    /// Windows moved it, or its display is gone: it goes where the shell's
+    /// one rule sends it.
+    Route(FullscreenDisplay),
+}
+
+/// The rule of `Held::put_back`, over snapshots: `on` is the monitor the
+/// window stands on, `belongs_on` the display it stood on while the screens
+/// last stood still.
+fn after_the_screens_changed(
+    monitors: &[AvailableMonitorSnapshot],
+    on: Option<&AvailableMonitorSnapshot>,
+    fullscreen: bool,
+    belongs_on: Option<&MonitorSnapshot>,
+) -> AfterTheScreensChanged {
+    let in_place = fullscreen
+        && on
+            .zip(belongs_on)
+            .is_some_and(|(on, belongs_on)| same_place(on, belongs_on));
+    if in_place {
+        AfterTheScreensChanged::Nothing
+    } else {
+        AfterTheScreensChanged::Route(fullscreen_display(monitors, belongs_on))
+    }
+}
+
+/// The display the window belongs on, as the watch over the screens keeps
+/// it: the one it stood on while the screens last stood still.
+pub(crate) struct Held {
+    display: Option<MonitorSnapshot>,
+}
+
+impl Held {
+    /// The display saved at the start, when the window was shown on it.
+    pub(crate) fn from_saved(app: &AppHandle) -> Self {
+        Self {
+            display: read_window_preferences(app).and_then(|preferences| preferences.monitor),
+        }
+    }
+
+    /// While the screens stand still, the display the window stands on is
+    /// the one it belongs on. When it is another than before, a window
+    /// command put it there, or the operator did with Windows' own keys: it
+    /// is saved for the next start.
+    pub(crate) fn follow(&mut self, app: &AppHandle) {
+        let Ok(window) = main_window(app) else {
+            return;
+        };
+        let Some(monitor) = window.current_monitor().ok().flatten() else {
+            return;
+        };
+        let stands_on = available_monitor_snapshot(&monitor);
+        let as_before = self
+            .display
+            .as_ref()
+            .is_some_and(|display| same_place(&stands_on, display));
+        if !as_before {
+            self.display = Some(monitor_snapshot(&monitor));
+            persist_current_window_preferences(app, &window);
+        }
+    }
+
+    /// The screens changed and stand still again: the window is put back on
+    /// the display it belongs on when Windows moved it, and fullscreen. A
+    /// window that stands where it stood is left alone.
+    pub(crate) fn put_back(&mut self, app: &AppHandle) {
+        let Ok(window) = main_window(app) else {
+            return;
+        };
+        let monitors = window.available_monitors().unwrap_or_default();
+        let snapshots = monitors
+            .iter()
+            .map(available_monitor_snapshot)
+            .collect::<Vec<_>>();
+        let on = window
+            .current_monitor()
+            .ok()
+            .flatten()
+            .map(|monitor| available_monitor_snapshot(&monitor));
+        let fullscreen = window.is_fullscreen().unwrap_or(false);
+        let needed =
+            after_the_screens_changed(&snapshots, on.as_ref(), fullscreen, self.display.as_ref());
+        if needed == AfterTheScreensChanged::Nothing {
+            return;
+        }
+        match route_window_fullscreen(&window, self.display.as_ref()) {
+            Ok(()) => {
+                log_shell_line(
+                    app,
+                    "The screens changed: the window was put back on its display.",
+                );
+                persist_current_window_preferences(app, &window);
+                self.display = window
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .map(|monitor| monitor_snapshot(&monitor));
+            }
+            Err(detail) => log_shell_line(
+                app,
+                &format!("The screens changed, and the window was not put back: {detail}"),
+            ),
+        }
+    }
 }
 
 /// New pages program, Slice SW (D22): the shell always shows the screen
@@ -715,6 +832,63 @@ mod shell_window_preferences_tests {
         assert_eq!(
             fullscreen_display(&[], preferences.monitor.as_ref()),
             FullscreenDisplay::Current
+        );
+    }
+
+    // §7: Studio Control's own window stays on the studio display while the
+    // Prompter XL is plugged in and out. Windows moves windows about when the
+    // screens change; once they stand still the window is put back, and a
+    // window that stands where it stood is left alone.
+    #[test]
+    fn after_the_screens_changed_the_window_goes_back_to_its_display() {
+        let belongs_on = saved_monitor(Some(r"\\.\DISPLAY2"), (2560.0, 0.0), (2560.0, 1440.0), 1.0);
+        let primary = available_monitor(Some(r"\\.\DISPLAY3"), (0.0, 0.0), (2560.0, 1440.0), 1.25);
+        let studio = available_monitor(Some(r"\\.\DISPLAY2"), (2560.0, 0.0), (2560.0, 1440.0), 1.0);
+        let prompter =
+            available_monitor(Some(r"\\.\DISPLAY4"), (5120.0, 0.0), (1920.0, 1080.0), 1.0);
+        let with_prompter = [primary.clone(), studio.clone(), prompter.clone()];
+
+        // It stands where it stood: nothing is done, and nothing flickers.
+        assert_eq!(
+            after_the_screens_changed(&with_prompter, Some(&studio), true, Some(&belongs_on)),
+            AfterTheScreensChanged::Nothing
+        );
+        // Windows moved it to the primary, or onto the Prompter XL.
+        for moved_to in [&primary, &prompter] {
+            assert_eq!(
+                after_the_screens_changed(&with_prompter, Some(moved_to), true, Some(&belongs_on)),
+                AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+            );
+        }
+        // It stands on its display and is no longer fullscreen.
+        assert_eq!(
+            after_the_screens_changed(&with_prompter, Some(&studio), false, Some(&belongs_on)),
+            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+        );
+        // Windows numbered the screens anew: the place decides.
+        let renumbered = [
+            available_monitor(Some(r"\\.\DISPLAY2"), (0.0, 0.0), (2560.0, 1440.0), 1.25),
+            available_monitor(Some(r"\\.\DISPLAY5"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
+        assert_eq!(
+            after_the_screens_changed(&renumbered, Some(&renumbered[0]), true, Some(&belongs_on)),
+            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+        );
+        // Its display is gone: the shell's one rule sends it on, to the
+        // 2560×1440 display, else to where it stands.
+        let without_it = [primary.clone(), prompter.clone()];
+        assert_eq!(
+            after_the_screens_changed(&without_it, Some(&primary), true, Some(&belongs_on)),
+            AfterTheScreensChanged::Route(FullscreenDisplay::Current)
+        );
+        // No display was ever saved, or the window stands on none.
+        assert_eq!(
+            after_the_screens_changed(&with_prompter, Some(&studio), true, None),
+            AfterTheScreensChanged::Route(FullscreenDisplay::Studio(1))
+        );
+        assert_eq!(
+            after_the_screens_changed(&with_prompter, None, true, Some(&belongs_on)),
+            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
         );
     }
 

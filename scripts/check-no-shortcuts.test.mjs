@@ -226,7 +226,31 @@ test("the words the program keeps are not hits", () => {
   );
 });
 
-test("the native shell switches the web view's own keys off, with one exception to the unsafe rule (decision 12)", () => {
+// Where the shell may use `unsafe`: a function each, with its reason, and the blocks it holds.
+// Anything else fails the build (`unsafe_code = "deny"`), and a block more fails this test.
+const SHELL_UNSAFE = [
+  {
+    file: "shell_browser_keys.rs",
+    item: "fn set_browser_accelerator_keys_off(",
+    blocks: 1,
+    reason: "WebView2's settings are COM calls, which the windows bindings mark unsafe (decision 12).",
+    // The whole module is compiled on Windows alone.
+    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod shell_browser_keys;/.test(main),
+  },
+  {
+    file: "shell_displays.rs",
+    item: "pub(crate) fn read_display_paths(",
+    blocks: 6,
+    reason:
+      "Windows' display configuration is read through calls of user32 that fill lists and unions (the Prompter XL's window).",
+    // The function is; another system has one of its own, which reads nothing.
+    onWindowsAlone: (source) =>
+      source.includes("#[cfg(windows)]\n#[allow(unsafe_code)]\npub(crate) fn read_display_paths(") &&
+      source.includes("#[cfg(not(windows))]\npub(crate) fn read_display_paths("),
+  },
+];
+
+test("the native shell switches the web view's own keys off, and uses unsafe where its list says (decision 12)", () => {
   const shellFile = (name) => readFileSync(path.join(repoRoot, "native/tauri-shell/src", name), "utf8");
   const main = shellFile("main.rs");
   const keys = shellFile("shell_browser_keys.rs");
@@ -246,9 +270,9 @@ test("the native shell switches the web view's own keys off, with one exception 
     /#\[cfg\(windows\)\]\s*\n\s*switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
     "setup switches the browser keys off before it routes the window"
   );
-  // `unsafe` is lifted for the one function that makes the COM calls, and nowhere else in the shell:
-  // every Rust file of the crate (its sources, their folders, build.rs) names the lint once, in any
-  // form (allow, expect, warn, a crate-wide #![…], a list, cfg_attr), and holds one unsafe block.
+  // `unsafe` is lifted for the functions of `SHELL_UNSAFE`, and nowhere else in the shell: the Rust
+  // files of the crate (its sources, their folders, build.rs) name the lint once for each, in any
+  // form (allow, expect, warn, a crate-wide #![…], a list, cfg_attr), and hold the blocks the list says.
   const rustFiles = (dir) =>
     readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
       entry.isDirectory()
@@ -262,16 +286,49 @@ test("the native shell switches the web view's own keys off, with one exception 
     path.join(repoRoot, "native/tauri-shell/build.rs"),
   ]
     .filter((file) => existsSync(file))
-    .map((file) => readFileSync(file, "utf8"));
-  const everySource = shellSources.join("\n");
+    .map((file) => [path.basename(file), readFileSync(file, "utf8")]);
+  const everySource = shellSources.map(([, source]) => source).join("\n");
   assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
-  const lintNames = everySource.match(/\bunsafe_code\b/g) ?? [];
-  assert.equal(lintNames.length, 1, "the shell names unsafe_code once");
-  const unsafeItems = everySource.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? [];
-  assert.equal(unsafeItems.length, 1, "the shell holds one unsafe block");
+  const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
+  const unsafeItems = (source) => (source.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? []).length;
+  for (const [name, source] of shellSources) {
+    const listed = SHELL_UNSAFE.filter((allowance) => allowance.file === name);
+    assert.equal(lintNames(source), listed.length, `${name} names unsafe_code once for each of its allowances`);
+    assert.equal(
+      unsafeItems(source),
+      listed.reduce((sum, allowance) => sum + allowance.blocks, 0),
+      `${name} holds the unsafe blocks its allowances say`
+    );
+    for (const allowance of listed) {
+      assert.ok(allowance.reason.length > 40, `${allowance.item} says why`);
+      assert.ok(
+        source.includes(`#[allow(unsafe_code)]\n${allowance.item}`),
+        `the #[allow(unsafe_code)] of ${name} sits on ${allowance.item}`
+      );
+      assert.ok(allowance.onWindowsAlone(source, main), `${allowance.item} is compiled on Windows alone`);
+    }
+  }
+  for (const allowance of SHELL_UNSAFE) {
+    assert.ok(
+      shellSources.some(([name]) => name === allowance.file),
+      `${allowance.file} is a file of the shell`
+    );
+  }
+  // An unsafe block says why it is sound, in the lines above it.
+  for (const [name, source] of shellSources) {
+    const lines = source.split("\n");
+    lines.forEach((line, index) => {
+      if (!/\bunsafe\s*\{/.test(line)) return;
+      const above = lines.slice(Math.max(0, index - 12), index).join("\n");
+      assert.ok(/\/\/ SAFETY: /.test(above), `${name}:${index + 1} says why its unsafe block is sound`);
+    });
+  }
+  // The shell's crate takes the display calls from the one windows crate, by its feature.
   assert.ok(
-    /#\[allow\(unsafe_code\)\]\s*\nfn set_browser_accelerator_keys_off\(/.test(keys),
-    "the one #[allow(unsafe_code)] sits on set_browser_accelerator_keys_off"
+    /windows = \{ version = "0\.61", features = \["Win32_Devices_Display", "Win32_Foundation"\] \}/.test(
+      readFileSync(path.join(repoRoot, "native/tauri-shell/Cargo.toml"), "utf8")
+    ),
+    "the shell's windows crate has the display configuration's feature"
   );
   // The shell's lints are the workspace's, with unsafe_code at deny (a forbid cannot be lifted for one item).
   const workspace = readFileSync(path.join(repoRoot, "native/Cargo.toml"), "utf8");
