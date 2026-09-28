@@ -13,8 +13,11 @@ One pull request each, in this order. Then the Cameras page.
 - [x] Step 4: builds, in two pull requests.
   - [x] Development runs. `npm run app` starts the app on its own saved data with simulated devices; a development build refuses the studio's data and is an app of its own; the shell starts the engine beside it and no other; a release build keeps the overflow checks.
   - [x] Studio builds. `npm run release` makes one from `main`, keeps it in `builds\` beside the repository and tries it on scratch data; only that command makes a build the studio's kind; `npm run release:verified` names the build the studio starts. The installer, update, signing, evidence and release scripts are removed.
-- [ ] Step 5: screenshots and the layout gate. Header and footer captured once; absolute thresholds instead of per-page ratchets.
-- [ ] Step 6: product code. Talkback out (D26), Graphite and Bone out (D25), update-folder leftovers, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
+- [x] Step 5: screenshots and the layout gate. Header and footer captured once; one set of limits in place of each page's ratchets. Done with the themes' removal, which was two thirds of the gate's boards.
+- [ ] Step 6: product code.
+  - [x] Graphite and Bone out (D25).
+  - [ ] Talkback out (D26).
+  - [ ] The leftovers: the update folder, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
 - [ ] Step 7: local cleanup.
 
 ## Next: the Cameras and Teleprompter pages
@@ -180,6 +183,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **Lighting's `Undo` forgets its steps** when the page is left.
 - [ ] **The deck's `LIGHTS` strip refreshes only on arriving at the page** and on a push of the `LIGHT` dial.
 - [ ] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine".
+- [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
 
 ## Waiting on the owner
@@ -209,11 +213,10 @@ Four larger changes, each decided on its own:
 - **Collapse migrations 1–10 into one baseline.** It removes the upgrade chain and the code that only explains retired features. It needs the studio data at schema 10, and a decision on whether older database backups must still restore.
 - **Move CI to a Windows runner.** CI would then compile and test the Windows-only code, and the Linux-only leftovers could go. It needs the four-job CI (step 3) and a measure of a Windows runner's time and cost.
 
-Three follow-ups from the visual overhaul were never decided. Decide or drop:
+Two follow-ups from the visual overhaul were never decided. Decide or drop:
 
 - **F1** The Stream Deck marks the selected strip amber; on screen amber means engaged and a selection is neutral. Changing it means new deck drawings, new Companion colours and a profile import.
 - **F2** Per-channel `ASSUMED` marks on the Console. The engine reports one confidence for the whole desk; single marks need a field for each channel and mix target.
-- **F4** The engine's own status sentences in the operator's words. The plan's example ("Console did not answer OSC ping") is no longer in the engine, so this may be done: check, then drop.
 
 ## Decisions
 

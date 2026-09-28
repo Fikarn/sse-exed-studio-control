@@ -1,10 +1,8 @@
-// The boards the UI contract measures: every fixture in `fixtures.json` at
-// the one surface that matters (2560×1440, operator ruling 2026-09-07, plan
-// D4) in the three themes.
+// The boards the layout gate measures: every fixture in `fixtures.json` at the
+// one surface that matters (2560×1440, D22), in the one theme (Studio, D25).
 import { readFileSync } from "node:fs";
 
 export const SURFACE = { width: 2560, height: 1440, label: "2560x1440" };
-export const THEMES = ["studio", "graphite", "bone"];
 export const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
 const fixtureMap = JSON.parse(
@@ -50,19 +48,12 @@ export async function stepToBoard(page, fixture) {
   await page.waitForSelector(steps.ready, { timeout: 10_000 });
 }
 
-export function boardName(fixture, theme) {
-  return `${fixture}__${theme}`;
-}
-
-export function fixtureUrl(fixture, theme) {
-  const params = new URLSearchParams({ fixture, transport: "fixture" });
-  if (theme !== "studio") params.set("theme", theme);
-  return `/?${params.toString()}`;
+export function fixtureUrl(fixture) {
+  return `/?${new URLSearchParams({ fixture, transport: "fixture" }).toString()}`;
 }
 
 // The chrome budget of plan D4 at 2560×1440; a declared `[data-region]` must
-// sit within ±2 px of its number. Regions are declared by Slice 2; until then
-// the census reports how many of the five are present.
+// sit within ±2 px of its number.
 export const D4_CHROME = {
   header: { h: 56 },
   footer: { h: 40 },
@@ -74,7 +65,7 @@ export const CHROME_TOLERANCE_PX = 2;
 // The state display must sit at the same x-band on every workspace (±8 px).
 export const STATE_DISPLAY_X_TOLERANCE_PX = 8;
 
-// The system's thresholds (system §10) — what every ratchet tightens towards.
+// The system's thresholds (docs/DESIGN.md, section 10).
 export const TARGETS = {
   minFontSize: 12,
   maxFontSizes: 8,
@@ -82,3 +73,67 @@ export const TARGETS = {
   minTarget: 24,
   minTake: 28,
 };
+
+// What every board holds. Until 2026-09-28 each board had numbers of its own
+// in `ui-contract.ratchets.json`, seeded from what it measured and tightened
+// by hand; across its boards thirteen of the sixteen numbers were these.
+export const LIMITS = {
+  /** No text under the type floor. */
+  minFontSize: TARGETS.minFontSize,
+  /** At most this many type sizes on one board. */
+  sizeCount: TARGETS.maxFontSizes,
+  /** Texts set in a family other than the two. */
+  offFamilyText: 0,
+  radiiOff: 0,
+  smallTargets: 0,
+  smallTake: 0,
+  contrastFails: 0,
+  shadowNegative: 0,
+  blurOver8Unlit: 0,
+  gradientsOff: 0,
+  backdropBlur: 0,
+  runningAnimations: 0,
+  offViewport: 0,
+  /** Words the operator never reads ("engine", "OSC ping"…), on the screen as drawn. */
+  copyHits: 0,
+  /** Header, cluster, state display, plate and footer. */
+  regionsPresent: 5,
+};
+
+// The boards that differ, each with its reason. A number here is a limit like
+// the others: the board may do better and may not do worse.
+const FRAUNCES = "Fraunces, the display face of the design before A, still prints";
+export const EXCEPTIONS = {
+  // No workspace is on these screens: a header and a state display.
+  "startup-loading": { regionsPresent: 2 },
+  "bootstrap-failed": {
+    regionsPresent: 2,
+    offFamilyText: [3, `${FRAUNCES} the three check titles of the recovery screen`],
+  },
+  "protocol-mismatch": {
+    regionsPresent: 2,
+    offFamilyText: [3, `${FRAUNCES} the three check titles of the recovery screen`],
+  },
+  // The Console's loading surface stands in for its cluster, plate and display.
+  "audio-loading": { regionsPresent: 2 },
+  // Setup has no cluster: its runner takes the bay's whole width.
+  "setup-required": { regionsPresent: 4 },
+  "setup-ready": { regionsPresent: 4 },
+  "setup-degraded": { regionsPresent: 4 },
+  "lighting-empty": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
+  "lighting-loading": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
+  "lighting-populated": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
+  "lighting-patch-overlap": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
+  "lighting-dmx-unreachable": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
+  "lighting-populated-noselect": {
+    offFamilyText: [8, `${FRAUNCES} the scenes' names, the plot's pill and the scene's four figures`],
+  },
+};
+
+/** The limits of one board: the common ones, with the board's own in their place. */
+export function limitsOf(fixture) {
+  const own = Object.fromEntries(
+    Object.entries(EXCEPTIONS[fixture] ?? {}).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
+  );
+  return { ...LIMITS, ...own };
+}

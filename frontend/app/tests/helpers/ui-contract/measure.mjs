@@ -1,7 +1,5 @@
 // One board, measured: the in-page census plus the pixel-sampled contrast of
-// the same render. Shared by `tests/ui-contract.spec.ts` (the gate) and
-// `scripts/ui-census.mjs` (the human-readable census and the ratchet seeds),
-// so the numbers the gate asserts are the numbers the census prints.
+// the same render, and the limits it is held to (`tests/ui-contract.spec.ts`).
 import { censusInPage } from "./census.mjs";
 import { sampleContrast } from "./contrast.mjs";
 import { decodePng } from "./png.mjs";
@@ -19,28 +17,24 @@ import {
 // New pages program, Slice SW (D22): Studio Control runs on Windows, so the
 // contrast sampled from a screenshot is Windows' pixels alone. Off Windows (CI's
 // Linux runner) no screenshot is taken, the contrast measures are null and the
-// ratchet does not judge them; every other measure is the DOM's and is checked
+// gate does not judge them; every other measure is the DOM's and is checked
 // everywhere.
 export const SAMPLES_CONTRAST = process.platform === "win32";
 
 /**
- * Navigate a page to a fixture board and let it settle: hydration, the theme
- * attribute, fonts, then one second for transitions to end so the idle
- * animation count is honest.
+ * Navigate a page to a fixture board and let it settle: hydration, fonts, then
+ * one second for transitions to end so the idle animation count is honest.
  * @param {import("@playwright/test").Page} page
  */
-export async function openBoard(page, fixture, theme) {
+export async function openBoard(page, fixture) {
   await page.clock.setFixedTime(FIXTURE_NOW);
-  const response = await page.goto(fixtureUrl(fixture, theme), { waitUntil: "networkidle" });
+  const response = await page.goto(fixtureUrl(fixture), { waitUntil: "networkidle" });
   if (!response || response.status() >= 400) throw new Error(`fixture ${fixture} did not load`);
   if (!isPreReady(fixture)) {
     // A loading fixture (audio-loading) never hydrates; measure it as it is.
     await page
       .waitForSelector("html[data-audio-hydrated]", { state: "attached", timeout: 10_000 })
       .catch(() => undefined);
-  }
-  if (theme !== "studio") {
-    await page.waitForSelector(`html[data-theme="${theme}"]`, { state: "attached" });
   }
   await page.evaluate(() => document.fonts.ready);
   await stepToBoard(page, fixture);
@@ -78,8 +72,8 @@ export async function measureBoard(page) {
 }
 
 /**
- * The numbers the gate ratchets and the census prints, from one census.
- * `contrast` is null where it is not sampled (off Windows).
+ * The numbers of one board, from one census. `contrast` is null where it is
+ * not sampled (off Windows).
  */
 export function summarize(c, contrast) {
   const enabled = c.targets.filter((t) => !t.disabled);
@@ -116,7 +110,7 @@ export function summarize(c, contrast) {
     radiiOff: c.radiiOff,
     contrastMeasured: contrast === null ? null : contrast.measured,
     contrastFails: contrast === null ? null : contrast.fails.length,
-    // Reported, not ratcheted: the texts out of sight that the sampler skips.
+    // Reported, not judged: the texts out of sight that the sampler skips.
     contrastClippedOut: c.clippedOutTexts,
     shadows: c.light.shadows,
     shadowNegative: c.light.outerNegativeOffset,
@@ -140,22 +134,19 @@ export function summarize(c, contrast) {
   };
 }
 
-// The ratchet a board must satisfy: counts may only fall, floors only rise.
-// Returns the list of violations (empty when the board holds its ratchet). A
-// count that was not measured (null) is a violation, never a pass: the one
-// measure left unmeasured on purpose, the contrast off Windows, is skipped by
-// name below.
-export function checkRatchet(measures, ratchet) {
+// What a board must hold: its limits (`limitsOf` in boards.mjs). Returns the
+// list of violations, empty when the board holds them. A count that was not
+// measured (null) is a violation, never a pass: the one measure left
+// unmeasured on purpose, the contrast off Windows, is skipped by name below.
+export function checkLimits(measures, limits) {
   const problems = [];
   const atMost = (key) => {
-    if (ratchet[key] === undefined) return;
-    if (measures[key] === null || measures[key] > ratchet[key])
-      problems.push(`${key}: ${measures[key]} > ratchet ${ratchet[key]}`);
+    if (measures[key] === null || measures[key] > limits[key])
+      problems.push(`${key}: ${measures[key]}, and the limit is ${limits[key]}`);
   };
   const atLeast = (key) => {
-    if (ratchet[key] === undefined || ratchet[key] === null) return;
-    if (measures[key] === null || measures[key] < ratchet[key])
-      problems.push(`${key}: ${measures[key]} < ratchet ${ratchet[key]}`);
+    if (measures[key] === null || measures[key] < limits[key])
+      problems.push(`${key}: ${measures[key]}, and the floor is ${limits[key]}`);
   };
   atLeast("minFontSize");
   atMost("sizeCount");
@@ -173,34 +164,7 @@ export function checkRatchet(measures, ratchet) {
   atMost("offViewport");
   atMost("copyHits");
   atLeast("regionsPresent");
-  if (ratchet.scrolls === false && measures.scrolls) problems.push(`page scrolls (${measures.scroll})`);
+  if (measures.scrolls) problems.push(`the page scrolls (${measures.scroll})`);
   if (measures.regionsOff.length) problems.push(`chrome off D4: ${measures.regionsOff.join(", ")}`);
   return problems;
-}
-
-// What the ratchet file stores per board: the ratcheted keys only, so a
-// re-seed diff reads as "the numbers that moved".
-export const RATCHET_KEYS = [
-  "minFontSize",
-  "sizeCount",
-  "offFamilyText",
-  "radiiOff",
-  "smallTargets",
-  "smallTake",
-  "contrastFails",
-  "shadowNegative",
-  "blurOver8Unlit",
-  "gradientsOff",
-  "backdropBlur",
-  "runningAnimations",
-  "offViewport",
-  "copyHits",
-  "regionsPresent",
-  "scrolls",
-];
-
-export function ratchetFrom(measures) {
-  const out = {};
-  for (const key of RATCHET_KEYS) out[key] = measures[key];
-  return out;
 }

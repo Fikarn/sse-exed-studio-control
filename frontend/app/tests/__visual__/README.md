@@ -2,6 +2,8 @@
 
 Committed Playwright screenshots of the app's pages (`visual-review.spec.ts`) and of the Storybook stories (`storybook.spec.ts`), at 2560×1440 on Windows, the one system Studio Control runs on.
 
+A page's capture is its workspace: the header and the footer are masked there, and captured once, as strips (`header-*`, `footer-*`).
+
 ## Layout
 
 ```
