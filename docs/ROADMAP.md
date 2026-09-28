@@ -44,6 +44,7 @@ Decided while it was built, and kept by the work that follows:
 - The test pictures are test cards without words, one to three squares naming the camera. The aids are worked out from the picture's pixels, as they will be from a camera's.
 - Also gone from the board, since nothing backs them: the cameras' names (Main, Wide, Operator), the time a camera was released, and the BGH1's warning of a settings reset (D18's check is not made).
 - Setup's address field shows `no address` when Setup holds none, never an example.
+- The cluster's keys stand in one place whatever the cameras' state (`docs/DESIGN.md`, section 1): the take's rows keep their height and say what they say on one line, the card's on two. A page test holds the keys' places on every board and through a take.
 
 ### The two Stream Deck pages, PROMPTER and CAMERAS (were Slices 7 and 12)
 

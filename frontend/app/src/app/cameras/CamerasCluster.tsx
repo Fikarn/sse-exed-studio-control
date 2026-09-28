@@ -135,7 +135,12 @@ export function CamerasCluster({
         )}
         <dl className={styles.take} data-testid="cameras-take">
           {takeReadouts(main, now).map((row) => (
-            <div key={row.id} className={styles.takeRow} data-testid={`cameras-take-${row.id}`}>
+            <div
+              key={row.id}
+              className={styles.takeRow}
+              data-lines={row.id === "card" ? "2" : undefined}
+              data-testid={`cameras-take-${row.id}`}
+            >
               <dt>{row.label}</dt>
               <dd>
                 {row.value !== null ? <b data-doubt={row.doubt ? "" : undefined}>{row.value}</b> : null}
