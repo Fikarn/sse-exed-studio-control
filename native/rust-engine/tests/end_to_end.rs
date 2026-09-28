@@ -688,8 +688,18 @@ fn a_development_build_sets_its_own_switches() {
         "the lights start held: {health_text}"
     );
 
-    let log = fs::read_to_string(runtime_dir.join("logs").join("engine.log"))
-        .expect("the engine log should exist");
+    // The lighting output's thread writes its line once it runs, which can be
+    // after the engine has said it is ready: the log is read until it is
+    // there.
+    let log_path = runtime_dir.join("logs").join("engine.log");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let log = loop {
+        let log = fs::read_to_string(&log_path).expect("the engine log should exist");
+        if log.contains("Lights simulated (SSE_LIGHTS_SIMULATED)") || Instant::now() >= deadline {
+            break log;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
     let line = log
         .lines()
         .find(|line| line.contains("Development build: set by itself"))

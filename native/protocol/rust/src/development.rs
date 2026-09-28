@@ -12,9 +12,9 @@
 //! `npm run app` gives a development run folders of its own. To work on the
 //! studio's data, copy the folder and name the copy.
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 /// The studio's folder in the platform's app-data folder.
 pub const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
@@ -147,25 +147,37 @@ fn parts(path: &Path) -> Vec<String> {
 
 /// The path as the file system resolves it. A path that does not exist yet
 /// is resolved as far as it does: its nearest folder that exists, then the
-/// rest as written. So a folder the run would create is recognised by the
-/// place it would be created in.
+/// rest as written, a `..` in it taking the step back it names. So a folder
+/// the run would create is recognised by the place it would be created in.
 fn resolved(path: &Path) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
-    let mut missing: Vec<&OsStr> = Vec::new();
-    let mut existing = absolute.as_path();
-    loop {
-        if let Ok(mut resolved) = fs::canonicalize(existing) {
-            resolved.extend(missing.iter().rev());
-            return resolved;
+    let mut existing = absolute.clone();
+    // What follows the nearest folder that exists, last part first.
+    let mut rest: Vec<Option<OsString>> = Vec::new();
+    let mut resolved = loop {
+        if let Ok(resolved) = fs::canonicalize(&existing) {
+            break resolved;
         }
-        match (existing.parent(), existing.file_name()) {
-            (Some(parent), Some(name)) => {
-                missing.push(name);
-                existing = parent;
+        match existing.components().next_back() {
+            Some(Component::Normal(name)) => rest.push(Some(name.to_os_string())),
+            Some(Component::ParentDir) => rest.push(None),
+            Some(Component::CurDir) => {}
+            // A root or a drive that is not there: nothing resolves.
+            _ => return absolute,
+        }
+        if !existing.pop() {
+            return absolute;
+        }
+    };
+    for part in rest.into_iter().rev() {
+        match part {
+            Some(name) => resolved.push(name),
+            None => {
+                resolved.pop();
             }
-            _ => return absolute.clone(),
         }
     }
+    resolved
 }
 
 #[cfg(test)]
@@ -392,6 +404,20 @@ mod tests {
         assert!(same_or_inside(&folder.join("logs").join(".."), &folder));
         assert!(same_or_inside(
             &folder.join("not").join("there").join("yet"),
+            &folder
+        ));
+        // A detour through folders that are not there leads where it says.
+        let detour = test_dir
+            .path()
+            .join("not")
+            .join("there")
+            .join("..")
+            .join("..")
+            .join("Studio Data")
+            .join("new");
+        assert!(same_or_inside(&detour, &folder));
+        assert!(!same_or_inside(
+            &folder.join("not-there").join("..").join(".."),
             &folder
         ));
         assert!(!same_or_inside(&folder, &folder.join("logs")));
