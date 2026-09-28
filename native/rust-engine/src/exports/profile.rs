@@ -529,7 +529,7 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
 /// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4). With
 /// the CAMERAS and PROMPTER pages the poll is 41 requests, and the instant 62.
 #[cfg(test)]
-pub(crate) fn deck_worst_instant_requests() -> usize {
+pub(crate) fn deck_worst_instant_requests() -> DeckWorstInstant {
     fn bridge_requests(value: &Value) -> usize {
         match value {
             Value::Object(map) => {
@@ -563,5 +563,28 @@ pub(crate) fn deck_worst_instant_requests() -> usize {
         .map(bridge_requests)
         .max()
         .unwrap_or(0);
-    poll + largest_follow + largest_press
+    DeckWorstInstant {
+        poll,
+        follow: largest_follow,
+        press: largest_press,
+    }
+}
+
+/// The requests of the deck's worst instant, by what sends them.
+#[cfg(test)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DeckWorstInstant {
+    /// The 1 s poll: a request a display.
+    pub poll: usize,
+    /// The follow trigger that sends the most.
+    pub follow: usize,
+    /// The key that sends the most: its action and its displays.
+    pub press: usize,
+}
+
+#[cfg(test)]
+impl DeckWorstInstant {
+    pub(crate) fn total(self) -> usize {
+        self.poll + self.follow + self.press
+    }
 }

@@ -659,7 +659,7 @@ pub(super) fn record_request(
     let after = press(cameras, bodies, camera, &[command], now)?;
     // A take that starts or stops, from the screen or the deck, ends the
     // deck's armed stop: `STOP?` is about the take that was running.
-    cameras.stop_armed_at = None;
+    cameras.stop_arm = None;
     let sentence = if start {
         STARTED_RECORDING
     } else {

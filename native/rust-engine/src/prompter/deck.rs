@@ -13,11 +13,13 @@
 //!
 //! Putting a script on, replacing, updating and clearing it stay on the
 //! screen (D14). Nothing here starts a scroll but `PLAY` and the speed
-//! dial's push (D12).
+//! dial's push (D12). While nothing is on the prompter every control is
+//! grey and refused (§9), the size dial too, which the screen's look sets
+//! at any time.
 
 use crate::prompter::clock::{read_words_from, PrompterPlace};
 use crate::prompter::commands::{
-    jump_request, pause_request, play_request, speed_request, text_size_request,
+    jump_request, nothing_on, pause_request, play_request, speed_request, text_size_request,
 };
 use crate::prompter::runtime::{with_prompter, Prompter};
 use crate::prompter::screen::PrompterScreenState;
@@ -46,15 +48,19 @@ pub(crate) const PROMPTER_LCD_KEYS: [&str; 6] = [
 /// A line of a strip cell holds about this many characters.
 const STRIP_LINE_CHARS: usize = 12;
 
-/// One key or dial of the PROMPTER page. `action` and `value` are the
-/// profile's: `playPause`, `back`, `top`, `cue` with `previous` or `next`,
-/// `speed` with `up` or `down`, `line` and `paragraph` with `previous` or
-/// `next`, and `size` with `up`, `down` or `standard`.
+/// What the page's displays say, by their LCD keys.
+pub(crate) type DeckTexts = Vec<(&'static str, String)>;
+
+/// One key or dial of the PROMPTER page, and what the page's displays say
+/// after it. `action` and `value` are the profile's: `playPause`, `back`,
+/// `top`, `cue` with `previous` or `next`, `speed` with `up` or `down`,
+/// `line` and `paragraph` with `previous` or `next`, and `size` with `up`,
+/// `down` or `standard`.
 pub(crate) fn handle_deck_action(
     db_path: &Path,
     action: &str,
     value: Option<&str>,
-) -> Result<PrompterReply, PrompterError> {
+) -> Result<(PrompterReply, DeckTexts), PrompterError> {
     with_prompter(db_path, |prompter, connection, now| {
         let jump = |to: &str| json!({ "to": to });
         let (result, reason) = match (action, value) {
@@ -88,6 +94,9 @@ pub(crate) fn handle_deck_action(
                 speed_request(prompter, connection, &json!({ "step": -1 }), now)?
             }
             ("size", Some(way @ ("up" | "down" | "standard"))) => {
+                if prompter.glass.is_none() {
+                    return Err(nothing_on());
+                }
                 let params = match way {
                     "up" => json!({ "step": 1 }),
                     "down" => json!({ "step": -1 }),
@@ -118,19 +127,20 @@ pub(crate) fn handle_deck_action(
                 )))
             }
         };
-        Ok(PrompterReply {
+        let reply = PrompterReply {
             result,
             reason,
             anchor: prompter.glass.as_ref().map(|glass| glass.anchor(now)),
             // A take's controls cannot change `checks.prompter`
             // (`commands::changes_the_check`).
             health_changed: false,
-        })
+        };
+        Ok((reply, texts(prompter, connection, now)))
     })
 }
 
 /// Every display of the PROMPTER page, as the prompter is now.
-pub(crate) fn deck_texts(db_path: &Path) -> Result<Vec<(&'static str, String)>, PrompterError> {
+pub(crate) fn deck_texts(db_path: &Path) -> Result<DeckTexts, PrompterError> {
     with_prompter(db_path, |prompter, connection, now| {
         Ok(texts(prompter, connection, now))
     })
@@ -230,11 +240,7 @@ fn screen_words(state: PrompterScreenState) -> &'static str {
     }
 }
 
-fn texts(
-    prompter: &Prompter,
-    connection: &Connection,
-    now: Instant,
-) -> Vec<(&'static str, String)> {
+fn texts(prompter: &Prompter, connection: &Connection, now: Instant) -> DeckTexts {
     let Some(glass) = &prompter.glass else {
         return vec![
             ("prompter_speed", String::from("SPEED\\n--")),

@@ -1439,48 +1439,141 @@ mod tests {
     // the press that sends the most.
     #[test]
     fn the_pool_holds_the_decks_worst_instant() {
-        let burst = crate::exports::deck_worst_instant_requests();
-        let largest_press = burst - crate::exports::polled_lcd_keys().len();
-        assert!(largest_press > 0, "the poll and a press: {burst}");
+        let worst = crate::exports::deck_worst_instant_requests();
+        // The numbers the queue was sized for. A profile that sends more
+        // changes them here, and the queue with them.
+        assert_eq!(
+            (worst.poll, worst.follow, worst.press, worst.total()),
+            (41, 4, 17, 62)
+        );
         // The instant and the largest press again must fit: a key pressed
         // while the instant waits is not turned away.
         assert!(
-            WORKER_COUNT + QUEUE_CAPACITY >= burst + largest_press,
-            "{burst} requests at the worst instant and a press of {largest_press} more do not fit {WORKER_COUNT} workers and a queue of {QUEUE_CAPACITY}"
+            WORKER_COUNT + QUEUE_CAPACITY >= worst.total() + worst.press,
+            "{} requests at the worst instant and a press of {} more do not fit {WORKER_COUNT} workers and a queue of {QUEUE_CAPACITY}",
+            worst.total(),
+            worst.press
         );
         let test_dir = ready_audio_test_db("bridge-deck-burst");
         let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);
         let host = format!("127.0.0.1:{port}");
 
+        // What the instant asks for: every display of the poll, the LIGHTS
+        // displays of the follow, and a press's worth of displays more.
+        let polled = crate::exports::polled_lcd_keys();
+        let keys: Vec<&str> = polled
+            .iter()
+            .copied()
+            .chain(["light_nav", "light_intensity", "light_cct", "scene_nav"])
+            .chain(polled.iter().copied().take(worst.press))
+            .collect();
+        assert_eq!(keys.len(), worst.total());
+
         // Every connection is open before any request is sent, so no worker can
         // finish one and make room: the whole burst waits at once.
-        let mut streams: Vec<TcpStream> = (0..burst)
+        let mut streams: Vec<TcpStream> = keys
+            .iter()
             .map(|_| TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect"))
             .collect();
         thread::sleep(Duration::from_millis(200));
-        for stream in &mut streams {
+        for (stream, key) in streams.iter_mut().zip(&keys) {
             let request = format!(
-                "GET /api/deck/lcd?key=audio_strip_1 HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+                "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
             );
             let _ = stream.write_all(request.as_bytes());
             let _ = stream.shutdown(Shutdown::Write);
         }
-        let statuses: Vec<u16> = streams
+        let statuses: Vec<(&str, u16)> = streams
             .into_iter()
-            .map(|mut stream| {
+            .zip(&keys)
+            .map(|(mut stream, key)| {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(5)))
                     .expect("read timeout");
                 let mut response = Vec::new();
                 let _ = stream.read_to_end(&mut response);
-                status_of(&String::from_utf8_lossy(&response))
+                (*key, status_of(&String::from_utf8_lossy(&response)))
             })
             .collect();
-        let unserved = statuses.iter().filter(|status| **status != 200).count();
-        assert_eq!(
-            unserved, 0,
-            "{unserved} of {burst} requests at the deck's worst instant were not served: {statuses:?}"
+        let unserved: Vec<&(&str, u16)> = statuses
+            .iter()
+            .filter(|(_, status)| *status != 200)
+            .collect();
+        assert!(
+            unserved.is_empty(),
+            "{} of {} requests at the deck's worst instant were not served: {unserved:?}",
+            unserved.len(),
+            keys.len()
         );
+    }
+
+    // The CAMERAS and PROMPTER pages over the wire: a key of each is pressed
+    // as Companion presses it, and answered as the page's own entry point
+    // answers. The cameras are the simulated ones (D15).
+    #[test]
+    fn the_cameras_and_the_prompter_keys_are_pressed_over_the_wire() {
+        let test_dir = ready_audio_test_db("bridge-page-keys");
+        let port = start_test_bridge(&test_dir, 2, 4);
+        let host = format!("127.0.0.1:{port}");
+        let post = |route: &str, body: &str| {
+            raw_request(
+                port,
+                &format!(
+                    "POST {route} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                    body.len()
+                ),
+            )
+        };
+        let get = |key: &str| {
+            raw_request(
+                port,
+                &format!(
+                    "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+                ),
+            )
+        };
+
+        let selected = post(
+            "/api/deck/camera-action",
+            r#"{"action":"select","value":"2"}"#,
+        );
+        assert_eq!(status_of(&selected), 200, "{selected}");
+        assert!(selected.contains(r#""did":"select""#), "{selected}");
+        assert!(selected.contains(r#""selected":2"#), "{selected}");
+        let display = get("camera_state_selected");
+        assert_eq!(status_of(&display), 200, "{display}");
+        assert!(display.ends_with("\"2\""), "{display}");
+
+        let bank = post("/api/deck/camera-action", r#"{"action":"bank"}"#);
+        assert_eq!(status_of(&bank), 200, "{bank}");
+        assert!(bank.contains(r#""bank":"colour""#), "{bank}");
+
+        // New saved data holds no camera: a dial is refused in the cameras'
+        // own words, and nothing is on the prompter.
+        let dial = post(
+            "/api/deck/camera-action",
+            r#"{"action":"dial","value":"1:up"}"#,
+        );
+        assert_eq!(status_of(&dial), 409, "{dial}");
+        let play = post("/api/deck/prompter-action", r#"{"action":"playPause"}"#);
+        assert_eq!(status_of(&play), 409, "{play}");
+        assert!(
+            play.contains("Nothing is on the prompter. Put a script on first."),
+            "{play}"
+        );
+        let unknown = post("/api/deck/prompter-action", r#"{"action":"rec"}"#);
+        assert_eq!(status_of(&unknown), 400, "{unknown}");
+        let display = get("prompter_name");
+        assert_eq!(status_of(&display), 200, "{display}");
+
+        // Without the token a key of the new pages is refused as any other.
+        let anonymous = raw_request(
+            port,
+            &format!(
+                "POST /api/deck/camera-action HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: 16\r\n\r\n{{\"action\":\"rec\"}}"
+            ),
+        );
+        assert_eq!(status_of(&anonymous), 401, "{anonymous}");
     }
 
     #[test]

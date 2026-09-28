@@ -352,7 +352,7 @@ async function main() {
       status: "passed",
       message: `The engine exposed a live bridge and the control-surface page model ${DECK_PAGE_LABELS.join(", ")}.`,
       scopeChanged:
-        "New pages program, Slice 2: the page model is LIGHTS and AUDIO in that order; until then it was four pages, PROJECTS and TASKS included.",
+        "The page model is LIGHTS, AUDIO, CAMERAS and PROMPTER in that order; until 2026-09-28 it was LIGHTS and AUDIO, and until the new pages program's Slice 2 four pages, PROJECTS and TASKS included.",
     });
 
     console.log("Step 2: verify live HTTP bind, LCD, and action endpoints against the bridge.");

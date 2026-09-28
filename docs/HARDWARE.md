@@ -82,7 +82,8 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
 - `401` in Companion's log means the profile's token is missing or wrong: export and import again.
 - The profile asks for every display once a second, a connection each: 41 of them. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
-- A display never reads a camera. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second.
+- A display never reads a camera by itself. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second, and once for a key, whose own read answers its displays.
+- `REC` on the deck starts a take with one press and stops it with two, and with nothing else: a press that arrives twice is one press, and a press that finds the armed take over starts no other.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
 - The bridge writes one refusal line a minute at most for each status, and counts the rest in it.

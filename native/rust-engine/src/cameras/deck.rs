@@ -12,18 +12,21 @@
 //!   allows. A dial with nothing to set in the bank is refused, and says so.
 //! - `REC` acts on CAM 1 whichever camera is selected. One press starts.
 //!   While CAM 1 records, a press arms the stop and the key reads `STOP?`;
-//!   a second press within 3 s stops. A second press sooner than the dwell
-//!   is a bounce and changes nothing.
+//!   a second press within 3 s stops. Nothing but these two starts or stops
+//!   a take (`rec`): a press sooner than the dwell after the one before is
+//!   the same press again, and a press that finds the armed take over
+//!   starts no other.
 //!
-//! A display never reads a camera: it says what the hardware link last read
-//! (`with_cameras_as_read`). The bridge reads the cameras once a second for
-//! all of them, as the open page does (`control_surface_pages`).
+//! A display never reads a camera by itself. The cameras are read once for
+//! all the displays of a poll, as the open page reads them once a second,
+//! and once for a key, whose own read answers its displays
+//! (`control_surface_pages`).
 
 use crate::cameras::commands::{
     auto_request, held, reading, record_request, select_request, set_bank, step_request, Handled,
 };
 use crate::cameras::model::{model, Setting, RECORDING_CAMERA};
-use crate::cameras::runtime::{with_cameras, with_cameras_as_read, Cameras};
+use crate::cameras::runtime::{with_cameras, Cameras, StopArm};
 use crate::cameras::simulated::{CameraReading, SimulatedCameras};
 use crate::cameras::snapshot::CameraState;
 use crate::cameras::{CameraError, CamerasReply};
@@ -33,9 +36,13 @@ use std::time::{Duration, Instant, SystemTime};
 
 /// The deck's armed stop (D14): `STOP?` for 3 s.
 pub(crate) const STOP_ARM_WINDOW: Duration = Duration::from_secs(3);
-/// A second press sooner than this is a double press, and changes nothing:
-/// the dwell of every armed key on the screen.
+/// A press sooner than this after the one that armed the stop, started a
+/// take or stopped one is the same press again, and changes nothing: the
+/// dwell of every armed key on the screen.
 pub(crate) const STOP_ARM_DWELL: Duration = Duration::from_millis(350);
+
+/// What the page's displays say, by their LCD keys.
+pub(crate) type DeckTexts = Vec<(&'static str, String)>;
 
 /// The displays of the CAMERAS page, by their LCD keys: the three camera
 /// keys, `BANK` and `REC`, the four touch-strip cells, and the three words
@@ -74,27 +81,29 @@ fn dial_number(text: &str) -> Result<usize, CameraError> {
     }
 }
 
-/// One key or dial of the CAMERAS page. `action` and `value` are the
-/// profile's: `select` with `1`–`3`, `bank`, `dial` with `2:up` or `2:down`,
-/// `dialPush` with `1`–`4`, and `rec`.
+/// One key or dial of the CAMERAS page, now (the tests' short form).
+#[cfg(test)]
 pub(crate) fn handle_deck_action(
     db_path: &Path,
     simulated: bool,
     action: &str,
     value: Option<&str>,
-) -> Result<CamerasReply, CameraError> {
+) -> Result<(CamerasReply, DeckTexts), CameraError> {
     handle_deck_action_at(db_path, simulated, action, value, Instant::now())
 }
 
-/// `handle_deck_action` at a moment of the caller's: the armed stop counts
-/// its dwell and its 3 s from `at`.
+/// One key or dial of the CAMERAS page, pressed at `at`, and what the page's
+/// displays say after it: the key's own read of the cameras answers them.
+/// `action` and `value` are the profile's: `select` with `1`–`3`, `bank`,
+/// `dial` with `2:up` or `2:down`, `dialPush` with `1`–`4`, and `rec`, which
+/// counts its dwell and its 3 s from `at`.
 pub(crate) fn handle_deck_action_at(
     db_path: &Path,
     simulated: bool,
     action: &str,
     value: Option<&str>,
     at: Instant,
-) -> Result<CamerasReply, CameraError> {
+) -> Result<(CamerasReply, DeckTexts), CameraError> {
     with_cameras(db_path, simulated, |cameras, bodies, now| {
         let before = cameras.health_check();
         let (result, event) = match action {
@@ -149,11 +158,12 @@ pub(crate) fn handle_deck_action_at(
                 )))
             }
         };
-        Ok(CamerasReply {
+        let reply = CamerasReply {
             result,
             event,
             health_changed: cameras.health_check() != before,
-        })
+        };
+        Ok((reply, texts(cameras, at)))
     })
 }
 
@@ -170,16 +180,33 @@ fn dial_setting(cameras: &Cameras, dial: usize) -> Result<Setting, CameraError> 
     })
 }
 
-/// Whether the deck's stop is armed at `at`: armed, and the 3 s not over.
-fn stop_armed(cameras: &Cameras, at: Instant) -> bool {
+/// The arm while its 3 s last, whatever became of the take it was about.
+fn arm_in_window(cameras: &Cameras, at: Instant) -> Option<StopArm> {
     cameras
-        .stop_armed_at
-        .is_some_and(|armed| at.saturating_duration_since(armed) <= STOP_ARM_WINDOW)
+        .stop_arm
+        .filter(|arm| at.saturating_duration_since(arm.at) <= STOP_ARM_WINDOW)
+}
+
+/// Whether the deck's stop is armed at `at`: armed for the take that runs,
+/// and the 3 s not over.
+fn stop_armed(cameras: &Cameras, at: Instant) -> bool {
+    arm_in_window(cameras, at).is_some_and(|arm| arm.take == cameras.take_changes)
 }
 
 /// The deck's `REC` (D14). The answer's `did` says what the press did:
-/// `started`, `armed`, `kept` (a press inside the dwell: the arm stays) or
-/// `stopped`.
+/// `started`, `armed`, `stopped`, or `kept` for a press that changed nothing
+/// and sent nothing.
+///
+/// A take is started by one press and stopped by two, and by nothing else:
+///
+/// - A press sooner than the dwell after the deck's `REC` started or stopped
+///   a take is the same press again. Without this the second of a double
+///   press would arm the stop of the take the first began, or begin a take
+///   after the one the first ended.
+/// - A press within the 3 s of an armed stop is the stop's second press, and
+///   starts nothing. When the take the arm was about is over (it ended on
+///   the camera itself, or another began there), there is nothing for it to
+///   stop: it ends the arm and sends nothing.
 fn rec(
     cameras: &mut Cameras,
     bodies: &mut SimulatedCameras,
@@ -188,32 +215,47 @@ fn rec(
 ) -> Handled {
     let camera = RECORDING_CAMERA;
     held(cameras, camera)?;
+    let recording = reading(cameras, camera).recording == Some(true);
+    let kept = |recording: bool| -> Handled {
+        Ok((
+            json!({ "camera": camera, "recording": recording, "did": "kept" }),
+            None,
+        ))
+    };
     let did = |did: &str, (mut result, event): (Value, Option<(&'static str, Option<u8>)>)| {
         if let Some(result) = result.as_object_mut() {
             result.insert(String::from("did"), json!(did));
         }
         (result, event)
     };
-    if reading(cameras, camera).recording != Some(true) {
-        return Ok(did(
-            "started",
-            record_request(cameras, bodies, &json!({}), now, true)?,
-        ));
+
+    if cameras
+        .deck_rec_at
+        .is_some_and(|acted| at.saturating_duration_since(acted) < STOP_ARM_DWELL)
+    {
+        return kept(recording);
     }
-    if stop_armed(cameras, at) {
-        let armed = cameras.stop_armed_at.unwrap_or(at);
-        if at.saturating_duration_since(armed) < STOP_ARM_DWELL {
-            return Ok((
-                json!({ "camera": camera, "recording": true, "did": "kept" }),
-                None,
-            ));
+    if let Some(arm) = arm_in_window(cameras, at) {
+        if arm.take != cameras.take_changes || !recording {
+            cameras.stop_arm = None;
+            return kept(recording);
         }
-        return Ok(did(
-            "stopped",
-            record_request(cameras, bodies, &json!({ "confirm": true }), now, false)?,
-        ));
+        if at.saturating_duration_since(arm.at) < STOP_ARM_DWELL {
+            return kept(true);
+        }
+        let stopped = record_request(cameras, bodies, &json!({ "confirm": true }), now, false)?;
+        cameras.deck_rec_at = Some(at);
+        return Ok(did("stopped", stopped));
     }
-    cameras.stop_armed_at = Some(at);
+    if !recording {
+        let started = record_request(cameras, bodies, &json!({}), now, true)?;
+        cameras.deck_rec_at = Some(at);
+        return Ok(did("started", started));
+    }
+    cameras.stop_arm = Some(StopArm {
+        at,
+        take: cameras.take_changes,
+    });
     Ok((
         json!({ "camera": camera, "recording": true, "did": "armed" }),
         None,
@@ -224,33 +266,24 @@ fn rec(
 // The displays
 // ---------------------------------------------------------------------------
 
-/// Every display of the CAMERAS page, as the cameras were last read. With
-/// `read` the cameras are read first, once for all the displays (a read
-/// sends nothing): what a camera changed itself is announced as any request
-/// would announce it.
-pub(crate) fn deck_texts(
-    db_path: &Path,
-    simulated: bool,
-    read: bool,
-) -> Result<Vec<(&'static str, String)>, CameraError> {
-    deck_texts_at(db_path, simulated, read, Instant::now())
+/// Every display of the CAMERAS page, now (the tests' short form).
+#[cfg(test)]
+pub(crate) fn deck_texts(db_path: &Path, simulated: bool) -> Result<DeckTexts, CameraError> {
+    deck_texts_at(db_path, simulated, Instant::now())
 }
 
-/// `deck_texts` at a moment of the caller's.
+/// Every display of the CAMERAS page at `at`. The cameras are read first,
+/// once for all the displays (a read sends nothing): what a camera changed
+/// itself is announced as any request would announce it.
 pub(crate) fn deck_texts_at(
     db_path: &Path,
     simulated: bool,
-    read: bool,
     at: Instant,
-) -> Result<Vec<(&'static str, String)>, CameraError> {
-    if read {
-        with_cameras(db_path, simulated, |cameras, _, _| Ok(texts(cameras, at)))
-    } else {
-        with_cameras_as_read(db_path, simulated, |cameras| texts(cameras, at))
-    }
+) -> Result<DeckTexts, CameraError> {
+    with_cameras(db_path, simulated, |cameras, _, _| Ok(texts(cameras, at)))
 }
 
-fn texts(cameras: &Cameras, at: Instant) -> Vec<(&'static str, String)> {
+fn texts(cameras: &Cameras, at: Instant) -> DeckTexts {
     let mut texts = Vec::with_capacity(CAMERA_LCD_KEYS.len());
     for (key, camera) in [
         ("camera_key_1", 1),

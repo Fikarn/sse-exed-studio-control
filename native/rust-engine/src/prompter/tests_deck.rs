@@ -15,13 +15,14 @@ use std::time::Duration;
 fn press(prompter: &TestPrompter, action: &str, value: Option<&str>) -> Option<&'static str> {
     handle_deck_action(prompter.path(), action, value)
         .unwrap_or_else(|error| panic!("{action} {value:?} should succeed: {error:?}"))
+        .0
         .reason
 }
 
 /// A key or a dial that must be refused; its code and sentence.
 fn refused(prompter: &TestPrompter, action: &str, value: Option<&str>) -> (String, String) {
     match handle_deck_action(prompter.path(), action, value) {
-        Ok(reply) => panic!(
+        Ok((reply, _)) => panic!(
             "{action} {value:?} should be refused, answered {}",
             reply.result
         ),
@@ -62,10 +63,14 @@ fn on_the_prompter(label: &str) -> TestPrompter {
     prompter
 }
 
-// §9: every prompter control is grey while nothing is on the prompter.
+// §9: every prompter control is grey while nothing is on the prompter, the
+// size dial too: the screen's look sets the size at any time, the deck's dial
+// sets the take's.
 #[test]
 fn with_nothing_on_the_prompter_the_displays_say_so_and_every_key_is_refused() {
     let prompter = TestPrompter::new("deck-nothing-on");
+    let size = prompter.snapshot()["sizePx"].clone();
+    assert!(size.is_number(), "{size}");
     let displays = displays(&prompter);
     assert_eq!(displays.len(), PROMPTER_LCD_KEYS.len());
     for key in PROMPTER_LCD_KEYS {
@@ -86,6 +91,9 @@ fn with_nothing_on_the_prompter_the_displays_say_so_and_every_key_is_refused() {
         ("speed", Some("up")),
         ("line", Some("next")),
         ("paragraph", Some("previous")),
+        ("size", Some("up")),
+        ("size", Some("down")),
+        ("size", Some("standard")),
     ] {
         assert_eq!(
             refused(&prompter, action, value),
@@ -93,9 +101,12 @@ fn with_nothing_on_the_prompter_the_displays_say_so_and_every_key_is_refused() {
                 String::from("PROMPTER_NOTHING_ON"),
                 String::from("Nothing is on the prompter. Put a script on first.")
             ),
-            "{action}"
+            "{action} {value:?}"
         );
     }
+    // The size is as it was, and the strip shows no size.
+    assert_eq!(prompter.snapshot()["sizePx"], size);
+    assert_eq!(self::displays(&prompter)["prompter_left"], "LEFT\\n--");
 }
 
 #[test]
@@ -142,10 +153,14 @@ fn the_strip_says_the_speed_the_place_the_time_left_and_the_name() {
 #[test]
 fn play_plays_or_pauses_by_what_the_glass_does() {
     let prompter = on_the_prompter("deck-play");
-    let reply = handle_deck_action(prompter.path(), "playPause", None).expect("play");
+    let (reply, texts) = handle_deck_action(prompter.path(), "playPause", None).expect("play");
     assert_eq!(reply.reason, Some("played"));
     assert!(reply.anchor.is_some(), "the views hear where the text is");
     assert!(!reply.health_changed);
+    // The key says what the displays read after it.
+    let texts: HashMap<&'static str, String> = texts.into_iter().collect();
+    assert_eq!(texts.len(), PROMPTER_LCD_KEYS.len());
+    assert_eq!(texts["prompter_state_play"], "playing");
     assert_eq!(prompter.snapshot()["glass"]["playing"], true);
     assert_eq!(displays(&prompter)["prompter_state_play"], "playing");
 

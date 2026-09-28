@@ -26,6 +26,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
 pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
@@ -173,9 +174,19 @@ pub fn read_deck_lcd_text(
     cameras_simulated: bool,
     key: &str,
 ) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text_at(db_path, cameras_simulated, key, Instant::now())
+}
+
+/// `read_deck_lcd_text` at a moment of the caller's.
+fn read_deck_lcd_text_at(
+    db_path: &Path,
+    cameras_simulated: bool,
+    key: &str,
+    at: Instant,
+) -> Result<String, ControlSurfaceError> {
     // The PROMPTER and CAMERAS displays first: they need nothing of the
     // Console or the rig, and are read once for a whole poll.
-    match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key) {
+    match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key, at) {
         Some(text) => text,
         None => lights_and_audio_lcd_text(db_path, key),
     }
@@ -188,6 +199,16 @@ pub fn read_control_surface_lcd_text(
     key: &str,
 ) -> Result<String, ControlSurfaceError> {
     read_deck_lcd_text(db_path, true, key)
+}
+
+/// The tests' short form at a moment of the test's.
+#[cfg(test)]
+pub fn read_control_surface_lcd_text_at(
+    db_path: &Path,
+    key: &str,
+    at: Instant,
+) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text_at(db_path, true, key, at)
 }
 
 fn lights_and_audio_lcd_text(db_path: &Path, key: &str) -> Result<String, ControlSurfaceError> {
@@ -363,6 +384,17 @@ pub fn handle_control_surface_http_action(
     handle_deck_http_action(db_path, true, path, body)
 }
 
+/// The tests' short form at a moment of the test's.
+#[cfg(test)]
+pub fn handle_control_surface_http_action_at(
+    db_path: &Path,
+    path: &str,
+    body: &Value,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
+    handle_deck_http_action_at(db_path, true, path, body, at)
+}
+
 /// A key or a dial of the deck, whatever its page. `cameras_simulated` is
 /// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`).
 pub fn handle_deck_http_action(
@@ -370,6 +402,18 @@ pub fn handle_deck_http_action(
     cameras_simulated: bool,
     path: &str,
     body: &Value,
+) -> Result<Value, ControlSurfaceError> {
+    handle_deck_http_action_at(db_path, cameras_simulated, path, body, Instant::now())
+}
+
+/// `handle_deck_http_action` at a moment of the caller's: the CAMERAS page's
+/// `REC` counts from it, and the two new pages keep their texts from it.
+fn handle_deck_http_action_at(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    body: &Value,
+    at: Instant,
 ) -> Result<Value, ControlSurfaceError> {
     let action = body
         .get("action")
@@ -379,22 +423,30 @@ pub fn handle_deck_http_action(
         .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("action is required")))?;
     let value = body.get("value").and_then(Value::as_str);
 
+    // What the screen is to hear of a key of the PROMPTER or the CAMERAS
+    // page. It hears it below, once the key is stamped and its row written:
+    // a page that reads on the event finds the row.
+    let mut page_events = Vec::new();
     let response = match path {
         "/api/deck/light-action" => handle_light_action(db_path, action),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
-        // The PROMPTER and CAMERAS pages raise their own events.
-        _ => crate::control_surface_pages::handle_page_action(
+        _ => match crate::control_surface_pages::handle_page_action(
             db_path,
             cameras_simulated,
             path,
             action,
             value,
-        )
-        .unwrap_or_else(|| {
-            Err(ControlSurfaceError::InvalidParams(format!(
+            at,
+        ) {
+            Some(Ok(page)) => {
+                page_events = page.events;
+                Ok(page.answer)
+            }
+            Some(Err(error)) => Err(error),
+            None => Err(ControlSurfaceError::InvalidParams(format!(
                 "Unsupported action route: {path}"
-            )))
-        }),
+            ))),
+        },
     };
     if let Ok(reply) = &response {
         // The action log (Slice 11 — F30): every key through the bridge is
@@ -416,6 +468,9 @@ pub fn handle_deck_http_action(
         }
         if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
             crate::engine_events::emit_lighting_changed("control-surface")
+        }
+        for (event, payload) in page_events {
+            crate::engine_events::emit_event(event, payload);
         }
     }
     response

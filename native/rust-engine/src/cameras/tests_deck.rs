@@ -19,13 +19,14 @@ use std::time::{Duration, Instant};
 fn press(cameras: &TestCameras, action: &str, value: Option<&str>) -> Value {
     handle_deck_action(cameras.path(), cameras.simulated, action, value)
         .unwrap_or_else(|error| panic!("{action} {value:?} should succeed: {error:?}"))
+        .0
         .result
 }
 
 /// A key or a dial that must be refused; its code and sentence.
 fn refused(cameras: &TestCameras, action: &str, value: Option<&str>) -> (String, String) {
     match handle_deck_action(cameras.path(), cameras.simulated, action, value) {
-        Ok(reply) => panic!(
+        Ok((reply, _)) => panic!(
             "{action} {value:?} should be refused, answered {}",
             reply.result
         ),
@@ -35,12 +36,34 @@ fn refused(cameras: &TestCameras, action: &str, value: Option<&str>) -> (String,
     }
 }
 
-/// The displays as they are, without a read of the cameras.
+/// The displays, as a poll of the deck reads them.
 fn displays(cameras: &TestCameras) -> HashMap<&'static str, String> {
-    deck_texts(cameras.path(), cameras.simulated, false)
+    deck_texts(cameras.path(), cameras.simulated)
         .expect("the displays read")
         .into_iter()
         .collect()
+}
+
+/// `REC` at a moment of the test's: what the press did.
+fn rec_at(cameras: &TestCameras, at: Instant) -> Value {
+    handle_deck_action_at(cameras.path(), cameras.simulated, "rec", None, at)
+        .expect("REC should be taken")
+        .0
+        .result["did"]
+        .clone()
+}
+
+/// What the `REC` key reads at a moment of the test's, and the word its
+/// colour follows.
+fn rec_key_at(cameras: &TestCameras, at: Instant) -> (String, String) {
+    let texts: HashMap<&'static str, String> = deck_texts_at(cameras.path(), cameras.simulated, at)
+        .expect("the displays read")
+        .into_iter()
+        .collect();
+    (
+        texts["camera_key_rec"].clone(),
+        texts["camera_state_rec"].clone(),
+    )
 }
 
 fn strip(cameras: &TestCameras) -> [String; 4] {
@@ -105,11 +128,16 @@ fn with_no_camera_set_up_the_displays_say_so_and_every_control_is_refused() {
 #[test]
 fn a_camera_key_selects_the_pages_camera() {
     let cameras = TestCameras::set_up("deck-select");
-    let reply =
+    let (reply, texts) =
         handle_deck_action(cameras.path(), cameras.simulated, "select", Some("3")).expect("select");
     assert_eq!(reply.result, json!({ "selected": 3 }));
     assert_eq!(reply.event, Some(("select", Some(3))));
     assert_eq!(cameras.snapshot()["selected"], 3);
+    // The key says what the displays read after it, from its own read.
+    let texts: HashMap<&'static str, String> = texts.into_iter().collect();
+    assert_eq!(texts.len(), CAMERA_LCD_KEYS.len());
+    assert_eq!(texts["camera_state_selected"], "3");
+    assert_eq!(texts["camera_strip_1"], "ISO\\n1600");
     assert_eq!(displays(&cameras)["camera_state_selected"], "3");
     assert_eq!(
         strip(&cameras),
@@ -141,7 +169,8 @@ fn the_bank_goes_round_and_the_page_reads_and_sets_it() {
         json!({ "bank": "exposure", "sets": ["iso", "shutter", "iris", "nd"] })
     );
 
-    let reply = handle_deck_action(cameras.path(), cameras.simulated, "bank", None).expect("bank");
+    let (reply, _) =
+        handle_deck_action(cameras.path(), cameras.simulated, "bank", None).expect("bank");
     assert_eq!(reply.event, Some(("bank", None)));
     assert_eq!(reply.result["bank"], "colour");
     assert_eq!(
@@ -190,7 +219,7 @@ fn the_bank_goes_round_and_the_page_reads_and_sets_it() {
 #[test]
 fn a_dial_steps_what_the_bank_gives_it_on_the_selected_camera() {
     let cameras = TestCameras::set_up("deck-dials");
-    let reply = handle_deck_action(cameras.path(), cameras.simulated, "dial", Some("1:up"))
+    let (reply, _) = handle_deck_action(cameras.path(), cameras.simulated, "dial", Some("1:up"))
         .expect("a detent");
     assert_eq!(
         reply.result,
@@ -301,18 +330,9 @@ fn rec_starts_at_one_press_and_stops_at_two_within_three_seconds() {
     let act = |at: Instant| {
         handle_deck_action_at(cameras.path(), cameras.simulated, "rec", None, at)
             .expect("REC should be taken")
+            .0
     };
-    let rec = |at: Instant| {
-        let texts: HashMap<&'static str, String> =
-            deck_texts_at(cameras.path(), cameras.simulated, false, at)
-                .expect("the displays read")
-                .into_iter()
-                .collect();
-        (
-            texts["camera_key_rec"].clone(),
-            texts["camera_state_rec"].clone(),
-        )
-    };
+    let rec = |at: Instant| rec_key_at(&cameras, at);
     // Whichever camera is selected.
     press(&cameras, "select", Some("3"));
     let start = Instant::now();
@@ -341,6 +361,8 @@ fn rec_starts_at_one_press_and_stops_at_two_within_three_seconds() {
     // Inside the dwell: a bounce.
     let bounce = act(armed_at + STOP_ARM_DWELL - Duration::from_millis(1));
     assert_eq!(bounce.result["did"], "kept");
+    assert_eq!(bounce.result["recording"], true);
+    assert_eq!(bounce.event, None);
     assert_eq!(cameras.sent(1).len(), 1);
     assert_eq!(cameras.camera(1)["recording"]["recording"], true);
 
@@ -366,25 +388,67 @@ fn rec_starts_at_one_press_and_stops_at_two_within_three_seconds() {
     );
 }
 
-// The arm is about the take that was running: a stop from the screen, or a
-// take that ended on the camera, ends it.
+// A press that arrives twice is one press. Without the dwell the second of a
+// double press would arm the stop of the take the first began, and the
+// second of a stop's double press would begin a take after the one it ended.
 #[test]
-fn an_armed_stop_ends_with_the_take() {
+fn a_double_press_neither_arms_nor_starts_after_the_press_before_it() {
+    let cameras = TestCameras::set_up("deck-rec-double");
+    let start = Instant::now();
+    let almost = STOP_ARM_DWELL - Duration::from_millis(1);
+
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, start + Duration::from_millis(100)), "kept");
+    assert_eq!(rec_at(&cameras, start + almost), "kept");
+    assert_eq!(
+        rec_key_at(&cameras, start + almost),
+        (String::from("REC"), String::from("recording")),
+        "the double press armed nothing"
+    );
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+
+    // After the dwell the key is the operator's again.
+    let armed_at = start + STOP_ARM_DWELL;
+    assert_eq!(rec_at(&cameras, armed_at), "armed");
+    let stopped_at = armed_at + STOP_ARM_DWELL;
+    assert_eq!(rec_at(&cameras, stopped_at), "stopped");
+
+    // The stop's own double press starts no take.
+    assert_eq!(
+        rec_at(&cameras, stopped_at + Duration::from_millis(100)),
+        "kept"
+    );
+    assert_eq!(rec_at(&cameras, stopped_at + almost), "kept");
+    assert_eq!(cameras.camera(1)["recording"]["recording"], false);
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::RecordStart, CameraCommand::RecordStop]
+    );
+    // And after the dwell one press starts the next take, as any first press.
+    assert_eq!(rec_at(&cameras, stopped_at + STOP_ARM_DWELL), "started");
+
+    // The dwell counts from the deck's own presses: a take the screen
+    // started is armed by the deck's next press.
+    let restarted_at = stopped_at + STOP_ARM_DWELL;
+    cameras.call("cameras.record.stop", json!({ "confirm": true }));
+    cameras.call("cameras.record.start", json!({}));
+    assert_eq!(rec_at(&cameras, restarted_at + STOP_ARM_DWELL), "armed");
+}
+
+// The arm is about the take that was running. A take that the screen stops
+// or starts ends it; so does a take that starts or stops on the camera.
+#[test]
+fn an_armed_stop_ends_with_the_take_it_was_about() {
     let cameras = TestCameras::set_up("deck-rec-arm-ends");
     let start = Instant::now();
-    let act = |at: Instant| {
-        handle_deck_action_at(cameras.path(), cameras.simulated, "rec", None, at)
-            .expect("REC should be taken")
-            .result["did"]
-            .clone()
-    };
-    assert_eq!(act(start), "started");
-    assert_eq!(act(start + Duration::from_secs(1)), "armed");
+    let seconds = |seconds: u64| start + Duration::from_secs(seconds);
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, seconds(1)), "armed");
     // The screen stops the take (its own two presses).
     cameras.call("cameras.record.stop", json!({ "confirm": true }));
     // A new take, from the screen: the deck's next press arms, it does not stop.
     cameras.call("cameras.record.start", json!({}));
-    assert_eq!(act(start + Duration::from_secs(2)), "armed");
+    assert_eq!(rec_at(&cameras, seconds(2)), "armed");
     assert_eq!(
         cameras.sent(1),
         vec![
@@ -393,11 +457,79 @@ fn an_armed_stop_ends_with_the_take() {
             CameraCommand::RecordStart
         ]
     );
+}
 
-    // The take ends on the camera itself while the stop is armed: the next
-    // press starts a take, it stops nothing.
+// The take ends on the camera itself while the stop is armed (its own
+// button, a full card). The press that comes within the 3 s was the stop's
+// second press: it finds nothing to stop, and starts nothing.
+#[test]
+fn the_second_press_of_a_stop_starts_no_take_when_the_take_ended_by_itself() {
+    let cameras = TestCameras::set_up("deck-rec-ended-itself");
+    let start = Instant::now();
+    let seconds = |seconds: u64| start + Duration::from_secs(seconds);
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, seconds(10)), "armed");
+
+    // Nobody has read the cameras since: the press's own read finds it.
+    crate::cameras::runtime::with_bodies_unnoticed(cameras.path(), |bodies| {
+        bodies.body_records(1, false);
+    });
+    let (reply, texts) =
+        handle_deck_action_at(cameras.path(), cameras.simulated, "rec", None, seconds(11))
+            .expect("REC should be taken");
+    assert_eq!(
+        reply.result,
+        json!({ "camera": 1, "recording": false, "did": "kept" })
+    );
+    assert_eq!(reply.event, None);
+    let texts: HashMap<&'static str, String> = texts.into_iter().collect();
+    assert_eq!(texts["camera_key_rec"], "REC");
+    assert_eq!(texts["camera_state_rec"], "ready");
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+
+    // The arm ended with that press: the next one starts a take, inside
+    // what were the arm's 3 s.
+    assert_eq!(rec_at(&cameras, seconds(12)), "started");
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::RecordStart, CameraCommand::RecordStart]
+    );
+}
+
+// An arm never stops another take than the one it was made for. Take A is
+// armed; A is stopped and B started on the camera itself; the deck's press
+// within A's 3 s finds a take running and the dwell long over, and would
+// have stopped B with one press.
+#[test]
+fn an_arm_stops_no_other_take_than_its_own() {
+    let cameras = TestCameras::set_up("deck-rec-stale-arm");
+    let start = Instant::now();
+    let at = |millis: u64| start + Duration::from_millis(millis);
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, at(10_000)), "armed");
+    assert_eq!(
+        rec_key_at(&cameras, at(10_100)),
+        (String::from("STOP?"), String::from("armed"))
+    );
+
     cameras.body_records(1, false);
-    assert_eq!(act(start + Duration::from_secs(3)), "started");
+    cameras.body_records(1, true);
+    // The key says so as soon as the cameras were read.
+    assert_eq!(
+        rec_key_at(&cameras, at(11_000)),
+        (String::from("REC"), String::from("recording"))
+    );
+    assert_eq!(rec_at(&cameras, at(12_000)), "kept");
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+
+    // B is stopped as any take: a press arms, a second stops.
+    assert_eq!(rec_at(&cameras, at(12_500)), "armed");
+    assert_eq!(rec_at(&cameras, at(13_000)), "stopped");
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::RecordStart, CameraCommand::RecordStop]
+    );
 }
 
 // D13, D19: a camera that is released or does not answer takes nothing from
@@ -446,11 +578,12 @@ fn a_camera_that_is_not_held_takes_nothing_from_the_deck() {
     assert_eq!(cameras.sent(2), Vec::new());
 }
 
-// D12: a display never reads a camera. The bridge reads them once for all
-// the displays of a poll (`read`), and what a camera changed itself is then
-// announced as any request announces it.
+// D12: a read sends nothing. The displays are read with the cameras, once
+// for all of them, and what a camera changed itself is then announced as
+// any request announces it. (The bridge keeps the texts for the rest of the
+// poll: `control_surface_pages`.)
 #[test]
-fn a_display_reads_no_camera_and_a_poll_reads_them_once() {
+fn the_displays_are_read_with_the_cameras_once_for_all_of_them() {
     let cameras = TestCameras::set_up("deck-poll");
     cameras.snapshot();
     take_announced();
@@ -460,20 +593,9 @@ fn a_display_reads_no_camera_and_a_poll_reads_them_once() {
         bodies.body_sets(1, Setting::Iso, CameraValue::Text(String::from("3200")));
         bodies.set_answering(3, false);
     });
-    for _ in 0..3 {
-        let displays = displays(&cameras);
-        assert_eq!(displays["camera_strip_1"], "ISO\\n400");
-        assert_eq!(displays["camera_key_3"], "CAM 3\\nHELD");
-    }
-    assert!(
-        announced_changes().0.is_empty(),
-        "a display reads no camera"
-    );
+    assert!(announced_changes().0.is_empty());
 
-    let texts: HashMap<&'static str, String> = deck_texts(cameras.path(), cameras.simulated, true)
-        .expect("the poll's read")
-        .into_iter()
-        .collect();
+    let texts = displays(&cameras);
     assert_eq!(texts["camera_strip_1"], "ISO\\n3200");
     assert_eq!(texts["camera_key_3"], "CAM 3\\nUNREACHABLE");
     let (changes, health) = announced_changes();

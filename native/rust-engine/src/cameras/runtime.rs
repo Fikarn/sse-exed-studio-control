@@ -165,6 +165,17 @@ impl CameraRuntime {
     }
 }
 
+/// The deck's armed stop (D14: `STOP?`). The window and the dwell are
+/// `deck.rs`'s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct StopArm {
+    /// When the press armed it.
+    pub at: Instant,
+    /// What `take_changes` read then: the arm is about the take that ran,
+    /// and about no other.
+    pub take: u64,
+}
+
 /// The three cameras, the selection and the deck's dials.
 #[derive(Debug, Clone)]
 pub(crate) struct Cameras {
@@ -175,9 +186,15 @@ pub(crate) struct Cameras {
     /// What the deck's dials set on it (D14); exposure after a start. Kept
     /// in memory only, as the selection is.
     pub bank: CameraDialBank,
-    /// When the deck's `REC` armed the stop (D14: `STOP?`); `None` while it
-    /// is not armed. The window and the dwell are `deck.rs`'s.
-    pub stop_armed_at: Option<Instant>,
+    /// The deck's armed stop; `None` while it is not armed.
+    pub stop_arm: Option<StopArm>,
+    /// When the deck's `REC` last started or stopped a take: a press sooner
+    /// than the dwell after it is the same press again (`deck.rs`).
+    pub deck_rec_at: Option<Instant>,
+    /// Counts the reads in which CAM 1 reported another state of its take
+    /// than in the read before: a take that began or ended, whoever did it.
+    /// An armed stop whose count is another's is about a take that is over.
+    pub take_changes: u64,
     /// The last read of the cameras' Recent actions failed: the log says so
     /// once for as long as it lasts.
     pub recent_unread: bool,
@@ -198,7 +215,9 @@ impl Cameras {
             simulated,
             selected: RECORDING_CAMERA,
             bank: CameraDialBank::default(),
-            stop_armed_at: None,
+            stop_arm: None,
+            deck_rec_at: None,
+            take_changes: 0,
             recent_unread: false,
             cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
         };
@@ -253,6 +272,11 @@ impl Cameras {
                 let changed = last
                     .as_ref()
                     .is_some_and(|last| !last.same_values(&reading));
+                if camera == RECORDING_CAMERA
+                    && last.as_ref().and_then(|last| last.recording) != reading.recording
+                {
+                    self.take_changes = self.take_changes.wrapping_add(1);
+                }
                 self.camera_mut(camera).take_reading(reading, now);
                 if was_unreachable {
                     Some(Transition::Reachable)
@@ -447,30 +471,6 @@ pub(crate) fn with_cameras<T>(
         None => cameras.insert(Cameras::load(db_path, simulated, bodies, now)?),
     };
     action(cameras, bodies, now)
-}
-
-/// Runs `action` on the cameras of this saved data as they were last read:
-/// no camera is read, so the Stream Deck's displays can ask as often as they
-/// like (`deck.rs`). The first call after a start loads them, which reads
-/// every set-up camera once, as any first request does.
-pub(crate) fn with_cameras_as_read<T>(
-    db_path: &Path,
-    simulated: bool,
-    action: impl FnOnce(&Cameras) -> T,
-) -> Result<T, CameraError> {
-    let entry = entry(db_path);
-    let mut guard = lock(&entry);
-    let EntryState { cameras, bodies } = &mut *guard;
-    let cameras = match cameras {
-        Some(cameras) => cameras,
-        None => cameras.insert(Cameras::load(
-            db_path,
-            simulated,
-            bodies,
-            SystemTime::now(),
-        )?),
-    };
-    Ok(action(cameras))
 }
 
 /// `cameras.changed { reason, camera }` from outside a request's own reply.

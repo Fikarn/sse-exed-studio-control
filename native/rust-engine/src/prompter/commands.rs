@@ -673,7 +673,7 @@ fn bring_back_request(
 // What the glass shows (D11: replacing, updating and clearing are armed)
 // ---------------------------------------------------------------------------
 
-fn nothing_on() -> PrompterError {
+pub(super) fn nothing_on() -> PrompterError {
     PrompterError::Refused(
         "PROMPTER_NOTHING_ON",
         String::from("Nothing is on the prompter. Put a script on first."),
