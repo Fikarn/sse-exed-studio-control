@@ -93,8 +93,6 @@ export const KEY_HANDLERS = {
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/audio/components/AudioSliderControl.tsx":
     "a focused send or level slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
-  "frontend/app/src/app/audio/hooks/useMomentaryTalkback.ts":
-    "Space or Enter held on the focused Talkback key holds talkback, as the pointer does (D6, D7)",
   "frontend/app/src/app/lighting/components/FixtureMarker.tsx":
     "Enter or Space presses the focused fixture marker (D6)",
   "frontend/app/src/app/lighting/components/GroupChip.tsx":

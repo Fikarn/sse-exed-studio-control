@@ -38,7 +38,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 
 ## Stream Deck
 
-- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER (the last two once built), with no PROJECTS or TASKS, and the deck follows the app's page.
+- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER (the last two once built), with no PROJECTS or TASKS, and the deck follows the app's page. The AUDIO page has no `TALK` key: its place, second row, third key, is empty.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, its displays read `PREVIEW` and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.

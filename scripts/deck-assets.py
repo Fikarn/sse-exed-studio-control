@@ -99,14 +99,6 @@ def ico_dim():
     return img
 
 
-def ico_talk():
-    img, draw = glyph_canvas()
-    draw.rounded_rectangle([62, 14, 82, 46], radius=10, fill=GLYPH)
-    draw.arc([52, 26, 92, 58], 0, 180, fill=GLYPH, width=6)
-    draw.line([(72, 58), (72, 68)], fill=GLYPH, width=6)
-    return img
-
-
 def ico_solo():
     img, draw = glyph_canvas()
     draw.ellipse([48, 18, 96, 66], outline=GLYPH, width=7)
@@ -135,7 +127,6 @@ def main():
         ("ico_phones", ico_phones),
         ("ico_bank", ico_bank),
         ("ico_dim", ico_dim),
-        ("ico_talk", ico_talk),
         ("ico_solo", ico_solo),
         ("ico_gain", ico_gain),
     ):
