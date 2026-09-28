@@ -186,7 +186,7 @@ struct BridgeContext {
     rejection_log: Mutex<HashMap<u16, RejectionTally>>,
     /// The refused keys' lines, for each route and action: when the last was
     /// written, and how many were refused since without one.
-    refused_keys: Mutex<HashMap<String, (Instant, u32)>>,
+    refused_keys: Mutex<HashMap<String, (Option<Instant>, u32)>>,
     /// Whether the workers keep one read connection each (Slice 10 — F18).
     /// The engine's bridge does; a test's bridge does not, because its
     /// workers outlive the test and would hold its temporary database open.
@@ -455,7 +455,8 @@ const KEY_ROUTES: [&str; 4] = [
 /// route, the key and its value as the profile sent them, the status and the
 /// sentence. Companion never sends a refused press again, so without it the
 /// press was lost without a trace (`REC` while CAM 1 is released). One line
-/// a refused press: a press comes from a person, and needs the token. The
+/// a second at most for each route and action, since a dial's turn is many
+/// refused detents; the next line of that key counts the ones between. The
 /// displays' reads are left out, since the poll asks for 43 of them a second,
 /// and so are the bridge's own refusals, which `note_rejection` counts.
 fn note_refused_key(
@@ -485,7 +486,9 @@ fn note_refused_key(
                 .and_then(Value::as_str)
                 .map(String::from)
         })
-        .unwrap_or_default();
+        .unwrap_or_default()
+        // The sentence can repeat what the profile sent: one line too.
+        .replace(['\r', '\n'], " ");
     let route = path.trim_start_matches("/api/deck/");
     // One line a second at most for each key: a dial's turn is many refused
     // detents. The line counts the refusals it stands for.
@@ -494,15 +497,23 @@ fn note_refused_key(
             .refused_keys
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Only a token holder can name actions the profile does not have;
+        // the tally stays small whatever they send.
+        if tally.len() >= 256 {
+            tally.clear();
+        }
         let entry = tally
             .entry(format!("{route} {}", text("action")))
-            .or_insert((at - REFUSED_KEY_LOG_INTERVAL, 0));
-        if at.saturating_duration_since(entry.0) < REFUSED_KEY_LOG_INTERVAL {
+            .or_insert((None, 0));
+        if entry
+            .0
+            .is_some_and(|last| at.saturating_duration_since(last) < REFUSED_KEY_LOG_INTERVAL)
+        {
             entry.1 += 1;
             return;
         }
         let since = entry.1;
-        *entry = (at, 0);
+        *entry = (Some(at), 0);
         since
     };
     let _ = append_log(
