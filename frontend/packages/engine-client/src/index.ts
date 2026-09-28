@@ -38,6 +38,14 @@ export type {
   AudioSnapshotDeleteRequest,
   AudioSnapshotUpdateRequest,
   BackgroundFailure,
+  CameraAutoRequest,
+  CameraFormatRequest,
+  CameraLookRequest,
+  CameraNumber,
+  CameraPressSetting,
+  CameraSetRequest,
+  CameraSetupUpdateRequest,
+  CameraStepRequest,
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,
   LightingPaletteUpdateRequest,
@@ -85,6 +93,22 @@ export type { AudioScenePreviewSnapshot } from "./generated/snapshots/AudioScene
 export type { AudioSceneSnapshot } from "./generated/snapshots/AudioSceneSnapshot";
 export type { AudioSendModeSnapshot } from "./generated/snapshots/AudioSendModeSnapshot";
 export type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
+export type { CameraAutos } from "./generated/snapshots/CameraAutos";
+export type { CameraChoice } from "./generated/snapshots/CameraChoice";
+export type { CameraHealthEntry } from "./generated/snapshots/CameraHealthEntry";
+export type { CameraLevel } from "./generated/snapshots/CameraLevel";
+export type { CameraLink } from "./generated/snapshots/CameraLink";
+export type { CameraRecentAction } from "./generated/snapshots/CameraRecentAction";
+export type { CameraRecording } from "./generated/snapshots/CameraRecording";
+export type { CameraSetupSummary } from "./generated/snapshots/CameraSetupSummary";
+export type { CameraSnapshot } from "./generated/snapshots/CameraSnapshot";
+export type { CameraState } from "./generated/snapshots/CameraState";
+export type { CameraSwitch } from "./generated/snapshots/CameraSwitch";
+export type { CameraTone } from "./generated/snapshots/CameraTone";
+export type { CameraUnavailable } from "./generated/snapshots/CameraUnavailable";
+export type { CameraValues } from "./generated/snapshots/CameraValues";
+export type { CamerasHealthCheck } from "./generated/snapshots/CamerasHealthCheck";
+export type { CamerasSnapshot } from "./generated/snapshots/CamerasSnapshot";
 export type { LightingDmxChannelSnapshot } from "./generated/snapshots/LightingDmxChannelSnapshot";
 export type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
 export type { LightingEffect } from "./generated/snapshots/LightingEffect";

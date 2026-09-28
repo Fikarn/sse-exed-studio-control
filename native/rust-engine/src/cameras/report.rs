@@ -6,8 +6,9 @@ use crate::cameras::model::{model, CameraModel, Setting, CAMERA_NUMBERS, RECORDI
 use crate::cameras::runtime::{CameraRuntime, Cameras};
 use crate::cameras::simulated::CameraReading;
 use crate::cameras::snapshot::{
-    CameraChoice, CameraHealthEntry, CameraLevel, CameraRecording, CameraSnapshot, CameraState,
-    CameraSwitch, CameraTone, CameraUnavailable, CameraValues, CamerasHealthCheck, CamerasSnapshot,
+    CameraChoice, CameraHealthEntry, CameraLevel, CameraRecentAction, CameraRecording,
+    CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable, CameraValues,
+    CamerasHealthCheck, CamerasSnapshot,
 };
 
 fn choice(model: &CameraModel, reading: &CameraReading, setting: Setting) -> CameraChoice {
@@ -108,7 +109,7 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime) -> CameraSnapshot {
         tag: String::from(model.tag),
         model: String::from(model.model),
         link: model.link,
-        setup: runtime.setup.summary(),
+        setup: runtime.setup_summary(),
         state,
         word: String::from(state.word()),
         tone: state.tone(),
@@ -136,11 +137,13 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime) -> CameraSnapshot {
 }
 
 impl Cameras {
-    /// `cameras.snapshot`.
-    pub(crate) fn snapshot(&self) -> CamerasSnapshot {
+    /// `cameras.snapshot`, with the cameras' Recent actions as the action
+    /// log holds them (`None` when it could not be read).
+    pub(crate) fn snapshot(&self, recent: Option<Vec<CameraRecentAction>>) -> CamerasSnapshot {
         CamerasSnapshot {
             selected: self.selected,
             cameras: self.all().iter().map(camera_snapshot).collect(),
+            recent,
         }
     }
 

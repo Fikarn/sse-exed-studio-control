@@ -50,6 +50,14 @@ export function workspaceRefusal(): string {
   return `workspace must be one of: ${WORKSPACES.join(", ")}`;
 }
 
+/** Setup / Support's sections (`SETUP_SECTIONS` in `native/rust-engine/src/shell_settings.rs`). */
+export const SETUP_SECTIONS = ["commissioning", "support", "cameras"] as const;
+
+/** `settings.update`'s refusal of a section Setup / Support does not have (`setup_section_refusal`). */
+export function setupSectionRefusal(): string {
+  return `setup.activeSection must be one of: ${SETUP_SECTIONS.join(", ")}`;
+}
+
 // New pages program, Slice 2b (D3, 2026-09-25): the db.json import is retired. An export
 // from the old Studio Control in the backups folder is refused at Verify (ok: false) and at
 // Restore, before anything is written, a rollback archive included, in the hardware link's
@@ -75,6 +83,15 @@ export function handleFixtureSetupRequest(
       if (params.workspace !== undefined) {
         if (typeof params.workspace !== "string") throw new Error("workspace must be a string");
         if (!(WORKSPACES as readonly string[]).includes(params.workspace)) throw new Error(workspaceRefusal());
+      }
+      // The page and the section are checked before either is saved, as the hardware link
+      // does. (It checks the rest of the request as well, the window and the lighting
+      // marks, before it saves anything; the double takes those as they come.)
+      if (params.setup !== undefined && asRecord(params.setup) === null) throw new Error("setup must be an object");
+      const section = asRecord(params.setup)?.activeSection;
+      if (section !== undefined) {
+        if (typeof section !== "string") throw new Error("setup.activeSection must be a string");
+        if (!(SETUP_SECTIONS as readonly string[]).includes(section)) throw new Error(setupSectionRefusal());
       }
       if (typeof params.workspace === "string") {
         const shell = asRecord(state.appSnapshot.shell) ?? {};
@@ -340,13 +357,16 @@ export function handleFixtureSetupRequest(
         // Format 6 (Slice 4): the scripts come back — added, never removed or overwritten
         // — with the look, and the prompter stays paused where it was (D12).
         const archive = exportedArchives.get(state)?.get(path) ?? null;
-        detail = restoreFixturePrompterArchive(context, archive?.prompter ?? null);
+        const scripts = restoreFixturePrompterArchive(context, archive?.prompter ?? null);
         // Format 7 (Slice 8): the cameras' addresses and vMix inputs, and nothing sent to a
         // camera; an older archive leaves their setup as it is.
-        restoreFixtureCamerasArchive(context, archive?.cameras ?? null);
+        const addresses = restoreFixtureCamerasArchive(context, archive?.cameras ?? null);
+        const said = [scripts, addresses].filter((sentence): sentence is string => sentence !== null);
+        detail = said.length > 0 ? said.join(" ") : null;
       }
       // No Planning counts (the double's backups hold no Planning data); a `detail` only
-      // when the restore added scripts or brought one back as an earlier version.
+      // when the restore added scripts or brought one back as an earlier version, or left
+      // a camera's address out.
       return {
         ...(detail === null ? {} : { detail }),
         requiresRestart: databaseRestore,

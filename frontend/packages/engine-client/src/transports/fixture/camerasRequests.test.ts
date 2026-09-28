@@ -1,6 +1,11 @@
+/// <reference types="node" />
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RequestMethod } from "../../generated/protocol";
+import type { JsonObject, RequestMethod } from "../../generated/protocol";
+import { CAMERAS_RECENT_LIMIT } from "./camerasState";
 import { ALL_SET_UP, CAM2_ADDRESS, openCamerasDouble } from "./camerasTestSupport";
 
 // The fixture double's `cameras.*` requests (new pages program, Slice 8), held to what the
@@ -467,7 +472,7 @@ describe("the fixture double's cameras: Setup", () => {
     const before = (await rows()).length;
     expect(await call("cameras.setup.update", { camera: 2, address: " 010.000.000.002 " })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 2 },
+      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 2, noLink: null },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 2],
@@ -477,14 +482,14 @@ describe("the fixture double's cameras: Setup", () => {
     expect((await camera(2)).values.iso.value).toBe("800");
     expect(await call("cameras.setup.update", { camera: 2, vmixInput: 7 })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 7 },
+      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 7, noLink: null },
     });
     expect(await call("cameras.setup.update", { camera: 1, vmixInput: 1000 })).toMatchObject({
       setup: { setUp: false, vmixInput: 1000 },
     });
     expect(await call("cameras.setup.update", { camera: 2, address: null })).toEqual({
       camera: 2,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 7 },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 7, noLink: null },
     });
     expect((await camera(2)).state).toBe("not-set-up");
     expect(cameras.sent(2)).toBe(0);
@@ -546,7 +551,7 @@ describe("the fixture double's cameras: Setup", () => {
     const { call, refused, seen, camera, cameras } = openCamerasDouble();
     expect(await call("cameras.setup.pair", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: true, address: null, paired: true, vmixInput: 1 },
+      setup: { setUp: true, address: null, paired: true, vmixInput: 1, noLink: null },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 1],
@@ -560,20 +565,87 @@ describe("the fixture double's cameras: Setup", () => {
     await call("cameras.setup.update", { camera: 1, vmixInput: 4 });
     expect(await call("cameras.setup.forget", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 4 },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 4, noLink: null },
     });
     expect((await camera(1)).state).toBe("not-set-up");
     expect(cameras.sent(1)).toBe(0);
   });
 
-  it("answers CAMERA_NO_LINK for a pairing without the simulated link, and reads a set-up camera as having no link yet", async () => {
-    const { refused, camera } = openCamerasDouble({
-      simulated: false,
-      cameras: [{ camera: 2, address: CAM2_ADDRESS }],
-    });
+  it("takes no pairing and no address without a link: every camera NOT SET UP, and why", async () => {
+    const { call, refused, seen, snapshot, health, cameras } = openCamerasDouble({ simulated: false });
+    const cannotPair = "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
+    const cannotTake = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
     expect(await refused("cameras.setup.pair", { camera: 1 })).toEqual({
       code: "CAMERA_NO_LINK",
-      sentence: "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.",
+      sentence: cannotPair,
+    });
+    expect(await refused("cameras.setup.update", { camera: 2, address: "127.0.0.1" })).toEqual({
+      code: "CAMERA_NO_LINK",
+      sentence: cannotTake,
+    });
+    // Nothing of a refused request is saved, the vMix input beside the address included.
+    expect(await refused("cameras.setup.update", { camera: 2, address: "127.0.0.1", vmixInput: 9 })).toEqual({
+      code: "CAMERA_NO_LINK",
+      sentence: cannotTake,
+    });
+    // The request's shape and the address's form are checked first.
+    expect((await refused("cameras.setup.update", { camera: 2, address: "" })).code).toBe("INVALID_PARAMS");
+    expect((await refused("cameras.setup.update", { camera: 2, address: "1.2.3" })).code).toBe(
+      "CAMERA_ADDRESS_INVALID"
+    );
+    expect(seen()).toEqual([]);
+
+    const shown = await snapshot();
+    expect(shown.cameras.map((camera) => [camera.state, camera.sentence, camera.setup])).toEqual([
+      [
+        "not-set-up",
+        "Studio Control has no link to CAM 1 yet: it comes with a later version.",
+        { setUp: false, address: null, paired: false, vmixInput: 1, noLink: cannotPair },
+      ],
+      [
+        "not-set-up",
+        "Studio Control has no link to CAM 2 yet: it comes with a later version.",
+        { setUp: false, address: null, paired: false, vmixInput: 2, noLink: cannotTake },
+      ],
+      [
+        "not-set-up",
+        "Studio Control has no link to CAM 3 yet: it comes with a later version.",
+        {
+          setUp: false,
+          address: null,
+          paired: false,
+          vmixInput: 3,
+          noLink: "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
+        },
+      ],
+    ]);
+    const { summary, check } = await health();
+    expect(check).toMatchObject({
+      word: "NOT SET UP",
+      summary: "Studio Control has no link to CAM 1 yet: it comes with a later version.",
+    });
+    expect(summary, "the Cameras lamp only").not.toContain("Cameras:");
+    expect(await refused("cameras.set", { camera: 2, setting: "iso", value: "800" })).toEqual({
+      code: "CAMERA_NOT_SET_UP",
+      sentence: "Studio Control has no link to CAM 2 yet: it comes with a later version.",
+    });
+
+    // The vMix input, taking an address away and Forget stay.
+    expect(await call("cameras.setup.update", { camera: 2, vmixInput: 9 })).toMatchObject({
+      setup: { vmixInput: 9 },
+    });
+    expect(await call("cameras.setup.update", { camera: 2, address: null })).toMatchObject({
+      setup: { setUp: false },
+    });
+    expect(await call("cameras.setup.forget", { camera: 1 })).toMatchObject({ setup: { noLink: cannotPair } });
+    expect([cameras.sent(1), cameras.sent(2), cameras.sent(3)]).toEqual([0, 0, 0]);
+  });
+
+  it("reads a camera the saved data holds without a link as having no link yet, until its address is taken away", async () => {
+    // Saved data that holds an address all the same: a database backup restored whole.
+    const { call, refused, camera, health } = openCamerasDouble({
+      simulated: false,
+      cameras: [{ camera: 2, address: CAM2_ADDRESS }],
     });
     expect(await camera(2)).toMatchObject({
       state: "unreachable",
@@ -584,6 +656,70 @@ describe("the fixture double's cameras: Setup", () => {
       code: "CAMERA_UNREACHABLE",
       sentence: "Studio Control has no link to CAM 2 yet: it comes with a later version.",
     });
+    expect((await health()).summary).toContain("Cameras:");
+    await call("cameras.setup.update", { camera: 2, address: null });
+    expect((await camera(2)).state).toBe("not-set-up");
+    expect((await health()).summary).not.toContain("Cameras:");
+  });
+});
+
+describe("the fixture double's cameras: their Recent actions in the read", () => {
+  it("carries the newest five rows about the cameras, newest first, and no row of another page", async () => {
+    const { call, snapshot, seen, rows } = held();
+    expect((await snapshot()).recent).toEqual([]);
+    await call("cameras.record.start");
+    await call("cameras.format.set", { camera: 1, frameRate: "50", confirm: true });
+    await call("prompter.script.create", { name: "Opening" });
+    const script = (((await call("prompter.snapshot")).scripts as JsonObject[])[0] as JsonObject).id as string;
+    await call("prompter.putOn", { scriptId: script });
+    await call("cameras.record.stop", { confirm: true });
+    await call("cameras.release", { camera: 2, confirm: true });
+    await call("cameras.connect", { camera: 2 });
+    await call("cameras.release", { camera: 3, confirm: true });
+    // A press on a setting, the selection and Setup leave no row.
+    await call("cameras.set", { camera: 1, setting: "iso", value: "800" });
+    await call("cameras.select", { camera: 2 });
+    await call("cameras.setup.update", { camera: 3, vmixInput: 4 });
+    seen();
+
+    const recent = (await snapshot()).recent!;
+    expect(seen(), "a read raises nothing").toEqual([]);
+    expect(recent.map((row) => [row.source, row.action, row.target, row.detail])).toEqual([
+      ["ui", "released", "CAM 3", "CAM 3 released to LUMIX Tether."],
+      ["ui", "held-again", "CAM 2", "CAM 2 held again."],
+      ["ui", "released", "CAM 2", "CAM 2 released to LUMIX Tether."],
+      ["ui", "recording-stopped", "CAM 1", "CAM 1 stopped recording."],
+      ["ui", "format-changed", "CAM 1", "CAM 1: 25p → 50p."],
+    ]);
+    expect(Object.keys(recent[0]!).sort()).toEqual(["action", "at", "detail", "id", "source", "target"]);
+    expect(recent[0]!.id).toBeGreaterThan(recent[1]!.id);
+    expect(recent[0]!.at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    // They are the action log's own rows, as Setup / Support lists them.
+    const logged = (await rows()).filter((row) => row.domain === "cameras");
+    expect(logged.slice(0, 5).map((row) => row.id)).toEqual(recent.map((row) => row.id));
+    expect(logged).toHaveLength(6);
+  });
+
+  it("answers no list, and everything else, while the action log cannot be read", async () => {
+    const { call, snapshot, seen, cameras } = held();
+    await call("cameras.record.start");
+    seen();
+    cameras.actionLogUnreadable(true);
+    const unread = await snapshot();
+    expect(unread.recent).toBeNull();
+    expect(unread.cameras[0]).toMatchObject({ state: "held", recording: { recording: true } });
+    expect(seen(), "a read raises nothing").toEqual([]);
+    cameras.actionLogUnreadable(false);
+    expect((await snapshot()).recent).toHaveLength(1);
+  });
+
+  it("holds as many rows as the hardware link's read", () => {
+    const commands = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../native/rust-engine/src/cameras/commands.rs"),
+      "utf-8"
+    );
+    const limit = commands.match(/const CAMERAS_RECENT_LIMIT: usize = (\d+);/)?.[1];
+    expect(Number(limit)).toBe(CAMERAS_RECENT_LIMIT);
   });
 });
 

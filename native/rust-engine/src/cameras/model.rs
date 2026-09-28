@@ -394,10 +394,18 @@ impl CameraModel {
 
     /// The state's sentence. `unreachable` is the sentence of a held camera
     /// that does not answer, which depends on the link
-    /// (`unreachable_sentence`, `no_link_sentence`).
-    pub(crate) fn state_sentence(&self, state: CameraState, unreachable: &str) -> String {
+    /// (`unreachable_sentence`, `no_link_sentence`). A camera that is not
+    /// set up in a build with no link to it says that, not what to enter in
+    /// Setup.
+    pub(crate) fn state_sentence(
+        &self,
+        state: CameraState,
+        has_link: bool,
+        unreachable: &str,
+    ) -> String {
         let tag = self.tag;
         match state {
+            CameraState::NotSetUp if !has_link => self.no_link_sentence(),
             CameraState::Held => {
                 format!("{tag} is held: Studio Control reads it and sends only what you press.")
             }
@@ -428,12 +436,25 @@ impl CameraModel {
         }
     }
 
-    /// A set-up camera without the simulated link, before Slices 11 and 13.
+    /// A camera in a build with no link to it, before Slices 11 and 13.
     pub(crate) fn no_link_sentence(&self) -> String {
         format!(
             "Studio Control has no link to {} yet: it comes with a later version.",
             self.tag
         )
+    }
+
+    /// `CAMERA_NO_LINK`: why Setup cannot pair the camera or take its
+    /// address in a build with no link to it.
+    pub(crate) fn no_link_refusal(&self) -> String {
+        if self.bgh1 {
+            format!(
+                "Studio Control cannot take {}'s address yet: its network link comes with a later version.",
+                self.tag
+            )
+        } else {
+            String::from(NO_LINK_TO_PAIR)
+        }
     }
 
     /// `CAMERA_RELEASED`.
@@ -508,12 +529,33 @@ pub(crate) const NOT_CONFIRMED: &str = "This change needs a second press to conf
 pub(crate) const ALREADY_RECORDING: &str = "CAM 1 is already recording.";
 /// `CAMERA_NOT_RECORDING`.
 pub(crate) const NOT_RECORDING: &str = "CAM 1 is not recording.";
-/// `CAMERA_NO_LINK`.
+/// `CAMERA_NO_LINK` for CAM 1 (`CameraModel::no_link_refusal`).
 pub(crate) const NO_LINK_TO_PAIR: &str =
     "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
 /// The record's sentences (its answers and its Recent actions rows).
 pub(crate) const STARTED_RECORDING: &str = "CAM 1 started recording.";
 pub(crate) const STOPPED_RECORDING: &str = "CAM 1 stopped recording.";
+
+/// What an archive restore says of the addresses it left out, in a build
+/// with no link to those cameras; `None` when it left none out.
+pub(crate) fn addresses_not_restored(cameras: &[u8]) -> Option<String> {
+    if cameras.is_empty() {
+        return None;
+    }
+    let whose: Vec<String> = cameras
+        .iter()
+        .map(|camera| format!("{}'s", model(*camera).tag))
+        .collect();
+    let (what, which) = if whose.len() == 1 {
+        ("address was", "it")
+    } else {
+        ("addresses were", "them")
+    };
+    Some(format!(
+        "{} {what} not restored: Studio Control has no link to {which} yet.",
+        whose.join(" and ")
+    ))
+}
 
 /// `CAMERA_ADDRESS_INVALID`.
 pub(crate) fn address_refusal(value: &str) -> String {

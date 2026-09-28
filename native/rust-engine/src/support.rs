@@ -4,6 +4,7 @@ use crate::app_state::{
 };
 use crate::bootstrap::RuntimeContext;
 use crate::cameras::archive::{build_cameras_archive, restore_cameras_archive, ArchivedCamera};
+use crate::cameras::model::addresses_not_restored;
 use crate::commissioning::{
     read_commissioning_snapshot, retire_planning_probe_message, AUDIO_RECEIVE_PORT_KEY,
     AUDIO_SEND_HOST_KEY, AUDIO_SEND_PORT_KEY, LIGHTING_BRIDGE_IP_KEY, LIGHTING_UNIVERSE_KEY,
@@ -821,13 +822,14 @@ fn restore_archive_backup(
     let archive: SupportBackupArchive = serde_json::from_value(parsed)
         .map_err(|error| SupportCommandError::InvalidParams(error.to_string()))?;
     let rollback = write_support_backup_archive(runtime, PRE_RESTORE_ARCHIVE_PREFIX)?;
-    let (settings_restored, prompter_outcome) =
-        restore_native_support_archive(&runtime.db_path, &archive)
+    let (settings_restored, prompter_outcome, addresses_left_out) =
+        restore_native_support_archive(&runtime.db_path, &archive, runtime.cameras_simulated)
             .map_err(|error| SupportCommandError::Storage(error.to_string()))?;
     prune_pre_restore_archives(runtime);
     let detail = [
         planning_not_restored(skipped_planning_rows),
         prompter_outcome.and_then(prompter_restore_sentence),
+        addresses_not_restored(&addresses_left_out),
     ]
     .into_iter()
     .flatten()
@@ -1034,7 +1036,8 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
 fn restore_native_support_archive(
     db_path: &Path,
     archive: &SupportBackupArchive,
-) -> EngineResult<(usize, Option<PrompterRestoreOutcome>)> {
+    cameras_simulated: bool,
+) -> EngineResult<(usize, Option<PrompterRestoreOutcome>, Vec<u8>)> {
     let mut connection = open_connection(db_path)?;
     let transaction = connection.transaction()?;
 
@@ -1054,14 +1057,16 @@ fn restore_native_support_archive(
         .transpose()?;
     // Format 7 (Slice 8): the cameras' addresses and vMix inputs, in the same
     // transaction; nothing is sent to a camera. An older archive leaves the
-    // cameras' setup as it is.
-    if let Some(cameras) = &archive.cameras {
-        restore_cameras_archive(&transaction, cameras)?;
-    }
+    // cameras' setup as it is. An address for a camera this build has no
+    // link to is left out, and the reply's `detail` names the camera.
+    let addresses_left_out = match &archive.cameras {
+        Some(cameras) => restore_cameras_archive(&transaction, cameras, cameras_simulated)?,
+        None => Vec::new(),
+    };
 
     transaction.commit()?;
 
-    Ok((settings_restored, prompter_outcome))
+    Ok((settings_restored, prompter_outcome, addresses_left_out))
 }
 
 fn clear_support_settings(transaction: &Transaction<'_>) -> Result<(), rusqlite::Error> {

@@ -311,29 +311,132 @@ fn the_health_check_names_the_worst_camera() {
     }
 }
 
-// The live app before Slices 11 and 13: without the simulated cameras, a
-// set-up camera does not answer and says there is no link to it yet, and
-// CAM 1 cannot be paired.
+// The studio's build before Slices 11 and 13: without a link Setup takes
+// no pairing and no address, so every camera reads NOT SET UP and says why,
+// and the whole status stays as it is. The vMix input, taking an address
+// away and Forget stay.
 #[test]
-fn without_the_simulated_cameras_a_set_up_camera_has_no_link_yet() {
-    let cameras = TestCameras::without_simulation("no-link");
+fn without_a_link_setup_takes_no_pairing_and_no_address() {
+    let cameras = TestCameras::without_simulation("no-link-setup");
+    let cannot_pair =
+        "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
+    let cannot_take = "Studio Control cannot take CAM 2's address yet: its network link comes with a later version.";
     assert_eq!(
         cameras.refused("cameras.setup.pair", json!({ "camera": 1 })),
-        refusal(
-            "CAMERA_NO_LINK",
-            "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version."
-        )
+        refusal("CAMERA_NO_LINK", cannot_pair)
     );
-    let reply = cameras
-        .reply(
+    assert_eq!(
+        cameras.refused(
             "cameras.setup.update",
-            json!({ "camera": 2, "address": "127.0.0.1" }),
-        )
-        .expect("the address is saved");
-    assert!(
-        reply.health_changed,
-        "the camera now counts toward the whole status"
+            json!({ "camera": 2, "address": "127.0.0.1" })
+        ),
+        refusal("CAMERA_NO_LINK", cannot_take)
     );
+    assert_eq!(
+        cameras.refused(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": "127.0.0.1", "vmixInput": 9 })
+        ),
+        refusal("CAMERA_NO_LINK", cannot_take),
+        "and the vMix input beside it is not saved"
+    );
+    // The request's shape and the address's form are checked first.
+    assert_eq!(
+        cameras.code(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": "" })
+        ),
+        "INVALID_PARAMS"
+    );
+    assert_eq!(
+        cameras.code(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": "1.2.3" })
+        ),
+        "CAMERA_ADDRESS_INVALID"
+    );
+    assert_eq!(announced_changes(), (Vec::new(), false));
+    // Nothing of a refused request is in the saved data: a start reads it again.
+    cameras.restart();
+
+    let snapshot = cameras.snapshot();
+    for (index, no_link, cannot) in [
+        (
+            0,
+            "Studio Control has no link to CAM 1 yet: it comes with a later version.",
+            cannot_pair,
+        ),
+        (
+            1,
+            "Studio Control has no link to CAM 2 yet: it comes with a later version.",
+            cannot_take,
+        ),
+        (
+            2,
+            "Studio Control has no link to CAM 3 yet: it comes with a later version.",
+            "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
+        ),
+    ] {
+        let camera = &snapshot["cameras"][index];
+        assert_eq!(camera["state"], "not-set-up");
+        assert_eq!(camera["word"], "NOT SET UP");
+        assert_eq!(camera["sentence"], no_link);
+        assert_eq!(
+            camera["setup"],
+            json!({
+                "setUp": false, "address": null, "paired": false, "vmixInput": index + 1,
+                "noLink": cannot
+            })
+        );
+        assert_operator_words(no_link);
+        assert_operator_words(cannot);
+    }
+    let check = cameras.health();
+    assert_eq!(check.word, "NOT SET UP");
+    assert_eq!(
+        check.summary,
+        "Studio Control has no link to CAM 1 yet: it comes with a later version."
+    );
+    assert!(!check.raises_whole_status());
+    assert_eq!(
+        cameras.refused(
+            "cameras.set",
+            json!({ "camera": 2, "setting": "iso", "value": "800" })
+        ),
+        refusal(
+            "CAMERA_NOT_SET_UP",
+            "Studio Control has no link to CAM 2 yet: it comes with a later version."
+        )
+    );
+
+    assert_eq!(
+        cameras.call(
+            "cameras.setup.update",
+            json!({ "camera": 2, "vmixInput": 9 })
+        )["setup"]["vmixInput"],
+        9
+    );
+    assert_eq!(
+        cameras.call(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": null })
+        )["setup"]["setUp"],
+        false
+    );
+    assert_eq!(
+        cameras.call("cameras.setup.forget", json!({ "camera": 1 }))["setup"]["noLink"],
+        cannot_pair
+    );
+    assert!(cameras.nothing_sent());
+}
+
+// Saved data that holds an address all the same (a database backup restored
+// whole brings what it holds): the camera is set up and does not answer,
+// says there is no link to it yet, and its address can be taken away.
+#[test]
+fn without_a_link_a_camera_the_saved_data_holds_does_not_answer() {
+    let cameras = TestCameras::without_simulation("no-link");
+    cameras.starts_with_address(2, "127.0.0.1");
     let no_link = "Studio Control has no link to CAM 2 yet: it comes with a later version.";
     let cam2 = cameras.camera(2);
     assert_eq!(cam2["state"], "unreachable");
@@ -353,6 +456,19 @@ fn without_the_simulated_cameras_a_set_up_camera_has_no_link_yet() {
         cameras.call("cameras.connect", json!({ "camera": 2 }))["state"],
         "unreachable"
     );
+    take_announced();
+    let reply = cameras
+        .reply(
+            "cameras.setup.update",
+            json!({ "camera": 2, "address": null }),
+        )
+        .expect("the address is taken away");
+    assert!(
+        reply.health_changed,
+        "the camera no longer counts toward the whole status"
+    );
+    assert_eq!(cameras.camera(2)["state"], "not-set-up");
+    assert_eq!(cameras.health().whole_status_sentence(), None);
     assert!(cameras.nothing_sent());
 }
 
@@ -377,10 +493,7 @@ fn the_drift_guard_refuses_every_address_but_this_pc_s_in_a_test_build() {
     // The link without the simulated cameras calls it before anything else:
     // a camera at an address on the studio's network is stopped there.
     let cameras = TestCameras::without_simulation("guard");
-    cameras.call(
-        "cameras.setup.update",
-        json!({ "camera": 3, "address": CAM3_ADDRESS }),
-    );
+    cameras.starts_with_address(3, CAM3_ADDRESS);
     let sentence = cameras.camera(3)["sentence"]
         .as_str()
         .expect("a sentence")

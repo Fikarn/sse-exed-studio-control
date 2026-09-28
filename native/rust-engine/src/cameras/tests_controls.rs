@@ -64,7 +64,10 @@ fn a_fresh_start_holds_nothing_and_selects_cam_1() {
         assert_operator_words(sentence);
         assert_eq!(
             camera["setup"],
-            json!({ "setUp": false, "address": null, "paired": false, "vmixInput": number })
+            json!({
+                "setUp": false, "address": null, "paired": false, "vmixInput": number,
+                "noLink": null
+            })
         );
         assert_eq!(camera["readAt"], Value::Null);
         assert_eq!(values(camera, "iso")["value"], Value::Null);

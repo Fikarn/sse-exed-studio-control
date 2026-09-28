@@ -16,7 +16,7 @@
 use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::real_link::{self, LinkFailure};
 use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
-use crate::cameras::snapshot::CameraState;
+use crate::cameras::snapshot::{CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
@@ -48,6 +48,8 @@ pub(crate) fn utc_text(time: SystemTime) -> String {
 #[derive(Debug, Clone)]
 pub(crate) struct CameraRuntime {
     pub setup: StoredSetup,
+    /// This build has a link to it (`real_link::has_link`).
+    pub has_link: bool,
     /// Handed back to the iPad or LUMIX Tether (D13); kept in memory only.
     pub released: bool,
     /// What it last reported; `None` when it was never read since the start
@@ -85,8 +87,9 @@ impl Transition {
 }
 
 impl CameraRuntime {
-    fn new(setup: StoredSetup) -> Self {
+    fn new(setup: StoredSetup, simulated: bool) -> Self {
         Self {
+            has_link: real_link::has_link(setup.camera, simulated),
             setup,
             released: false,
             reading: None,
@@ -121,7 +124,20 @@ impl CameraRuntime {
 
     /// The state's sentence.
     pub(crate) fn sentence(&self) -> String {
-        model(self.camera()).state_sentence(self.state(), &self.unreachable_sentence())
+        model(self.camera()).state_sentence(
+            self.state(),
+            self.has_link,
+            &self.unreachable_sentence(),
+        )
+    }
+
+    /// What Setup holds for it, and why Setup can take no more in a build
+    /// with no link to it.
+    pub(crate) fn setup_summary(&self) -> CameraSetupSummary {
+        CameraSetupSummary {
+            no_link: (!self.has_link).then(|| model(self.camera()).no_link_refusal()),
+            ..self.setup.summary()
+        }
     }
 
     /// Stops reading it: what it reported is no longer shown.
@@ -156,6 +172,9 @@ pub(crate) struct Cameras {
     pub simulated: bool,
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
+    /// The last read of the cameras' Recent actions failed: the log says so
+    /// once for as long as it lasts.
+    pub recent_unread: bool,
     cameras: [CameraRuntime; 3],
 }
 
@@ -172,7 +191,8 @@ impl Cameras {
         let mut cameras = Self {
             simulated,
             selected: RECORDING_CAMERA,
-            cameras: setup.map(CameraRuntime::new),
+            recent_unread: false,
+            cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
         };
         for camera in CAMERA_NUMBERS {
             cameras.read(camera, bodies, now);

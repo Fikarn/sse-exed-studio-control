@@ -5,8 +5,9 @@
 use crate::cameras::model::Setting;
 use crate::cameras::runtime::{self, ANNOUNCED};
 use crate::cameras::simulated::{CameraCommand, CameraValue};
+use crate::cameras::store::{write_setup, StoredSetup};
 use crate::cameras::{handle_cameras_request, CameraError, CamerasReply};
-use crate::storage::initialize_test_database;
+use crate::storage::{initialize_test_database, open_connection};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -133,6 +134,22 @@ impl TestCameras {
     /// A start: the hardware link forgets what it held; the cameras stay.
     pub(crate) fn restart(&self) {
         runtime::forget(&self.db_path);
+    }
+
+    /// Saved data that holds an address Setup did not take here, as a
+    /// database backup restored whole brings it: the row is written, and
+    /// the hardware link starts.
+    pub(crate) fn starts_with_address(&self, camera: u8, address: &str) {
+        let connection = open_connection(&self.db_path).expect("connection should open");
+        write_setup(
+            &connection,
+            &StoredSetup {
+                address: Some(String::from(address)),
+                ..StoredSetup::new(camera)
+            },
+        )
+        .expect("the row writes");
+        self.restart();
     }
 
     /// The body: a value changed on the camera itself, or from the iPad.

@@ -26,6 +26,10 @@ pub const DEFAULT_WORKSPACE: &str = "audio";
 /// Teleprompter's did before its page.
 pub const WORKSPACES: &[&str] = &["lighting", "audio", "setup", "teleprompter", "cameras"];
 pub const DEFAULT_SETUP_ACTIVE_SECTION: &str = "commissioning";
+/// Setup / Support's sections: the runner, Support, and the cameras' setup
+/// (the Cameras page's "Camera setup" opens it). The fixture double's guard
+/// reads this list.
+pub const SETUP_SECTIONS: &[&str] = &["commissioning", "support", "cameras"];
 pub const DEFAULT_WINDOW_WIDTH: i64 = 1280;
 pub const DEFAULT_WINDOW_HEIGHT: i64 = 800;
 pub const DEFAULT_WINDOW_MAXIMIZED: bool = false;
@@ -208,9 +212,7 @@ pub fn parse_settings_update(params: &Value) -> Result<Vec<(&'static str, String
                 .ok_or_else(|| String::from("setup.activeSection must be a string"))?;
 
             if !is_valid_setup_active_section(active_section) {
-                return Err(String::from(
-                    "setup.activeSection must be one of: commissioning, support",
-                ));
+                return Err(setup_section_refusal());
             }
 
             updates.push((SETUP_ACTIVE_SECTION_KEY, active_section.to_string()));
@@ -327,7 +329,15 @@ pub fn workspace_refusal() -> String {
 }
 
 pub fn is_valid_setup_active_section(active_section: &str) -> bool {
-    matches!(active_section, "commissioning" | "support")
+    SETUP_SECTIONS.contains(&active_section)
+}
+
+/// `settings.update`'s refusal of a section Setup / Support does not have.
+pub fn setup_section_refusal() -> String {
+    format!(
+        "setup.activeSection must be one of: {}",
+        SETUP_SECTIONS.join(", ")
+    )
 }
 
 pub fn is_valid_window_mode(window_mode: &str) -> bool {
@@ -822,7 +832,32 @@ mod tests {
         let error = parse_settings_update(&params).expect_err("section should be rejected");
         assert_eq!(
             error,
-            "setup.activeSection must be one of: commissioning, support"
+            "setup.activeSection must be one of: commissioning, support, cameras"
+        );
+    }
+
+    // The Cameras page's "Camera setup" opens Setup / Support on the cameras'
+    // section, in one request; the section is saved as the others are.
+    #[test]
+    fn the_cameras_setup_is_a_section_to_open() {
+        assert!(is_valid_setup_active_section("cameras"));
+        assert_eq!(
+            parse_settings_update(&json!({
+                "workspace": "setup",
+                "setup": { "activeSection": "cameras" }
+            })),
+            Ok(vec![
+                (WORKSPACE_KEY, String::from("setup")),
+                (SETUP_ACTIVE_SECTION_KEY, String::from("cameras")),
+            ])
+        );
+        let saved = HashMap::from([(
+            String::from(SETUP_ACTIVE_SECTION_KEY),
+            String::from("cameras"),
+        )]);
+        assert_eq!(
+            ShellSettingsSnapshot::from_settings(&saved).setup_active_section,
+            "cameras"
         );
     }
 

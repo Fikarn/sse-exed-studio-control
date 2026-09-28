@@ -17,7 +17,8 @@ export type DomainKey =
   | "support"
   | "controlSurface"
   | "prompter"
-  | "prompterGlass";
+  | "prompterGlass"
+  | "cameras";
 
 export const DOMAIN_REQUESTS = {
   health: "health.snapshot",
@@ -31,6 +32,7 @@ export const DOMAIN_REQUESTS = {
   controlSurface: "controlSurface.snapshot",
   prompter: "prompter.snapshot",
   prompterGlass: "prompter.glass.snapshot",
+  cameras: "cameras.snapshot",
 } as const satisfies Record<DomainKey, RequestMethod>;
 
 /** Every snapshot: the bootstrap's set and what an explicit `refresh()` fetches. */
@@ -74,10 +76,9 @@ export const EVENT_DOMAIN_REFRESH = {
   "app.changed": ["app", "health"],
   "audio.changed": ["audio"],
   "audio.meters": [],
-  // New pages program, Slice 8: the store keeps no cameras snapshot yet (the page's reads
-  // come with it in Slice 9), so the event refreshes nothing; a change that moves the
-  // Cameras lamp is followed by `app.changed { reason: "health" }`, which refreshes health.
-  "cameras.changed": [],
+  // Every change of the cameras' is in their snapshot. One that moves the Cameras lamp or
+  // the `REC` chip is followed by `app.changed { reason: "health" }`, which reads health.
+  "cameras.changed": ["cameras"],
   "commissioning.changed": COMMISSIONING_DOMAINS,
   "engine.exited": [],
   "engine.ready": [],
@@ -128,6 +129,10 @@ const METHOD_DOMAIN_REFRESH: ReadonlyArray<readonly [prefix: string, domains: re
   ["prompter.script.snapshot", []],
   ["prompter.paste.convert", []],
   ["prompter.", ["prompter"]],
+  // The cameras: every request can change their snapshot, and the ones that are Recent
+  // actions move its `recent`. Their rows reach Setup / Support's list when Setup is opened,
+  // as every other row does.
+  ["cameras.", ["cameras"]],
 ];
 
 // Opening a workspace refreshes what that workspace shows. Not every change
@@ -143,6 +148,7 @@ const WORKSPACE_DOMAINS: Readonly<Record<string, readonly DomainKey[]>> = {
   lighting: LIGHTING_DOMAINS,
   audio: ["audio"],
   teleprompter: ["prompter"],
+  cameras: ["cameras"],
 };
 
 /**

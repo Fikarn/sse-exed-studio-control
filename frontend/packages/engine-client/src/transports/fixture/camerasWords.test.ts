@@ -22,6 +22,7 @@ import {
   STATE_TONES,
   STATE_WORDS,
   addressInvalidRefusal,
+  addressesNotRestoredSentence,
   alreadyHeldRefusal,
   alreadyRecordingRefusal,
   autoNotOfferedRefusal,
@@ -31,6 +32,8 @@ import {
   heldSentence,
   lookPart,
   lookSentence,
+  noLinkRefusal,
+  noLinkRefusalSentence,
   noLinkSentence,
   notAllowedRefusal,
   notRecordingRefusal,
@@ -82,6 +85,11 @@ describe("the fixture double's camera words, as the operator reads them", () => 
       "CAM 3 does not answer at 172.16.16.85. Check that it is on and on the network."
     );
     expect(noLinkSentence(CAM2)).toBe("Studio Control has no link to CAM 2 yet: it comes with a later version.");
+    // Not set up in a build with no link to it: that there is none, not what to enter in Setup.
+    expect(notSetUpSentence(CAM1, false)).toBe(
+      "Studio Control has no link to CAM 1 yet: it comes with a later version."
+    );
+    expect(notSetUpSentence(CAM2, true)).toBe("CAM 2 has no address. Enter it in Setup.");
   });
 
   it("refuses in its own words, with the hardware link's codes", () => {
@@ -94,6 +102,11 @@ describe("the fixture double's camera words, as the operator reads them", () => 
     expect(NO_LINK_SENTENCE).toBe(
       "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version."
     );
+    expect(pair(noLinkRefusal(CAM1))).toEqual(["CAMERA_NO_LINK", NO_LINK_SENTENCE]);
+    expect(pair(noLinkRefusal(CAM3))).toEqual([
+      "CAMERA_NO_LINK",
+      "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
+    ]);
     expect(pair(autoNotOfferedRefusal(CAM2, "whiteBalance"))).toEqual([
       "CAMERA_SETTING_UNSUPPORTED",
       "CAM 2 does not offer auto white balance once.",
@@ -135,6 +148,13 @@ describe("the fixture double's camera words, as the operator reads them", () => 
     expect(releasedToSentence(CAM1)).toBe("CAM 1 released to the iPad.");
     expect(releasedToSentence(CAM2)).toBe("CAM 2 released to LUMIX Tether.");
     expect(heldAgainSentence(CAM2)).toBe("CAM 2 held again.");
+    expect(addressesNotRestoredSentence([])).toBeNull();
+    expect(addressesNotRestoredSentence([CAM2])).toBe(
+      "CAM 2's address was not restored: Studio Control has no link to it yet."
+    );
+    expect(addressesNotRestoredSentence([CAM2, CAM3])).toBe(
+      "CAM 2's and CAM 3's addresses were not restored: Studio Control has no link to them yet."
+    );
   });
 
   it("never says engine, backend, transport, IPC or snapshot to the operator", () => {
@@ -274,8 +294,10 @@ function everyDoubleSentence(): string[] {
       heldSentence(model),
       releasedSentence(model),
       notSetUpSentence(model),
+      notSetUpSentence(model, false),
       unreachableSentence(model, "172.16.16.85"),
       noLinkSentence(model),
+      noLinkRefusalSentence(model),
       releasedRefusal(model).message,
       alreadyHeldRefusal(model).message,
       releasedToSentence(model),
@@ -296,6 +318,8 @@ function everyDoubleSentence(): string[] {
   sentences.push(
     unreachableSentence(CAM2, null),
     NO_LINK_SENTENCE,
+    addressesNotRestoredSentence([CAM2])!,
+    addressesNotRestoredSentence([CAM2, CAM3])!,
     NOT_CONFIRMED_SENTENCE,
     alreadyRecordingRefusal().message,
     notRecordingRefusal().message,
@@ -392,6 +416,14 @@ describe("the fixture double's camera words: the hardware link's", () => {
       expect(noLinkSentence(model)).toBe(
         rust("Studio Control has no link to {} yet: it comes with a later version.", [model.tag])
       );
+      expect(notSetUpSentence(model, false)).toBe(noLinkSentence(model));
+      expect(noLinkRefusalSentence(model)).toBe(
+        rustModel.bgh1
+          ? rust("Studio Control cannot take {}'s address yet: its network link comes with a later version.", [
+              model.tag,
+            ])
+          : rust(NO_LINK_SENTENCE)
+      );
       expect(releasedRefusal(model).message).toBe(rust("{} is released. Connect it to set it from here.", [model.tag]));
       expect(alreadyHeldRefusal(model).message).toBe(rust("{} is already held.", [model.tag]));
       expect(releasedToSentence(model)).toBe(rust("{} released to {}.", [model.tag, rustModel.app]));
@@ -428,6 +460,19 @@ describe("the fixture double's camera words: the hardware link's", () => {
       );
     }
     expect(NO_LINK_SENTENCE).toBe(rust(NO_LINK_SENTENCE));
+    // The restore's sentence, its parts the hardware link's own: whose, how many, which.
+    const model = rustSource("cameras/model.rs");
+    expect(holds(model, 'format!("{}\'s", model(*camera).tag)')).toBe(true);
+    expect(holds(model, 'whose.join(" and ")')).toBe(true);
+    expect(holds(model, '("address was", "it")')).toBe(true);
+    expect(holds(model, '("addresses were", "them")')).toBe(true);
+    const notRestored = "{} {what} not restored: Studio Control has no link to {which} yet.";
+    expect(addressesNotRestoredSentence([CAM2])).toBe(
+      rust(notRestored, ["CAM 2's"], { what: "address was", which: "it" })
+    );
+    expect(addressesNotRestoredSentence([CAM2, CAM3])).toBe(
+      rust(notRestored, ["CAM 2's and CAM 3's"], { what: "addresses were", which: "them" })
+    );
     expect(NOT_CONFIRMED_SENTENCE).toBe(rust(NOT_CONFIRMED_SENTENCE));
     expect(alreadyRecordingRefusal().message).toBe(rust("CAM 1 is already recording."));
     expect(notRecordingRefusal().message).toBe(rust("CAM 1 is not recording."));

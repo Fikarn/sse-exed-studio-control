@@ -19,7 +19,10 @@ A schema change brings a migration test that starts from schema 7, the studio da
 
 ### The Cameras page (was Slice 9)
 
-One pull request. Built against the simulated cameras from board 2 (`docs/design/boards/A-cameras-2.html`), as D10, D11 and D19 amend it.
+Two pull requests, built against the simulated cameras from board 2 (`docs/design/boards/A-cameras-2.html`), as D10, D11 and D19 amend it.
+
+- [x] What the page needs from the hardware link (#243): the Recent list in `cameras.snapshot`, Setup and a restore that take no address without a link, and the store's read of the cameras with the requests the page sends.
+- [ ] The page, with Setup's camera section, its test data and its page tests.
 
 Build:
 
@@ -35,12 +38,12 @@ Build:
 Decided:
 
 - Whenever CAM 1 is released, the `REC` chip is amber and reads "not read while released". It reads CAM 1's state in `checks.cameras`; the contract does not change.
-- The page's Recent list is a camera-only read of the action log, new in the engine, `v1.md` and the fixture double. It shows the log's camera rows in the log's sentences, with `Screen` as their source until the deck pages exist.
-- `cameras.setup.update` refuses a non-empty address with `CAMERA_NO_LINK` while the build has no network link, and Setup says why. The simulated cameras take one. Removing an address, the vMix input and `Forget` stay allowed. An archive restore then skips the addresses and says so; a database restore brings back what it holds.
+- The page's Recent list is a camera-only read of the action log, new in the engine, `v1.md` and the fixture double: `cameras.snapshot` carries the five newest rows as `recent`. It shows the log's camera rows in the log's sentences, with `Screen` as their source until the deck pages exist. A log that cannot be read is `null` there and never fails the read.
+- `cameras.setup.update` refuses a non-empty address with `CAMERA_NO_LINK` while the build has no network link, and Setup says why. The simulated cameras take one. Removing an address, the vMix input and `Forget` stay allowed. An archive restore then skips the addresses and says so; a database restore brings back what it holds. Each camera's `setup.noLink` carries the refusal's sentence, so Setup can lock the field and say why before anything is pressed.
 - "Try CAM n again", "Try again" and "Read all cameras again" are one `cameras.snapshot`, which leaves no event and no row: the page says it tried when nothing changes. The page reads again once a second while open, only through `cameras.*`.
 - `CAMERA_ALREADY_HELD` from `Connect` is worded as already held, not as a fault, and the page reads again.
 - An `UNREACHABLE` CAM 1 that last reported recording reads amber, "last known". Its timecode is shown as last read, never advanced by the page.
-- `NOT SET UP` comes with the model's sentence and a way to Setup's camera section. `REC` is locked while CAM 1 is not paired. An unreachable camera has no `Release`.
+- `NOT SET UP` comes with the model's sentence and a way to Setup's camera section. In a build with no link to the camera the sentence says that, not what to enter in Setup. `REC` is locked while CAM 1 is not paired. An unreachable camera has no `Release`.
 - Other pages' test data stays unseeded, so their Cameras lamp reads amber, "not set up", as the studio build's will until the real links exist.
 - What the board draws and nothing backs goes: the look-only state, false colour, the waveform, the "Proposal" marks, rows and times that nothing records. Its bank section waits for the deck pages.
 - The header's worst case (Scene drift, Solo, Prompter playing and `REC` together) fits at 2560.
@@ -111,6 +114,7 @@ Ask the owner first: route (c), if it is wanted. It is an architecture decision.
 - The engine speaks Blackmagic's published Bluetooth protocol for CAM 1. Battery and card time are not in it, and read "not reported".
 - Pairing (`cameras.setup.pair`) happens once, in Setup, with the owner present, through Windows' own pairing on the `windows` crate.
 - A watch reads the camera between requests, off the request loop. A change on the camera shows within about a second, and a silent camera never holds up a request.
+- A value that keeps moving by itself (an auto setting) must not keep the pages reading: every `cameras.*` request reads the cameras and says `reported`, and the pages' store answers `cameras.changed` with a read. With the simulated cameras that ends after one read.
 
 Guards:
 

@@ -33,6 +33,13 @@ import type {
   AudioMixTargetUpdateRequest,
   AudioSettingsUpdateRequest,
   BackgroundFailure,
+  CameraAutoRequest,
+  CameraFormatRequest,
+  CameraLookRequest,
+  CameraNumber,
+  CameraSetRequest,
+  CameraSetupUpdateRequest,
+  CameraStepRequest,
   CommissioningCheckRequest,
   CommissioningUpdateRequest,
   EngineLaunchInfo,
@@ -76,6 +83,7 @@ const initialState: ShellState = {
   controlSurfaceSnapshot: null,
   prompterSnapshot: null,
   prompterGlassSnapshot: null,
+  camerasSnapshot: null,
   startupFailure: null,
   lastEvent: null,
   errorSummary: null,
@@ -96,10 +104,13 @@ const DOMAIN_STATE_KEYS = {
   controlSurface: "controlSurfaceSnapshot",
   prompter: "prompterSnapshot",
   prompterGlass: "prompterGlassSnapshot",
+  cameras: "camerasSnapshot",
 } as const satisfies Record<DomainKey, keyof ShellState>;
 
 /** The prompter's snapshots, which the start reads without depending on them (new pages program, Slice 6a). */
 const PROMPTER_DOMAINS: readonly DomainKey[] = ["prompter", "prompterGlass"];
+/** The cameras' snapshot, which the start reads the same way: a fault of the cameras' alone does not stop it. */
+const CAMERAS_DOMAINS: readonly DomainKey[] = ["cameras"];
 
 /**
  * Whether the glass's text is behind the prompter's snapshot (new pages
@@ -1181,31 +1192,38 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       // The prompter's two reads are the exception (new pages program, Slice
       // 6a): a fault of the prompter's alone does not stop the start, as the
       // hardware link's own health has it. Their failure is recorded, and the
-      // Teleprompter page reads again until an answer comes.
-      const [rest, prompter] = await Promise.all([
+      // Teleprompter page reads again until an answer comes. The cameras'
+      // read is the same exception, and the Cameras page reads again.
+      const [rest, prompter, cameras] = await Promise.all([
         fetchDomains(
           ALL_DOMAINS.filter(
             (domain) =>
               domain !== "health" &&
               !PROMPTER_DOMAINS.includes(domain) &&
+              !CAMERAS_DOMAINS.includes(domain) &&
               !(domain === "lightingFixtureCatalog" && catalogLoaded)
           ),
           isCurrentBootstrap
         ),
         fetchDomains(PROMPTER_DOMAINS, isCurrentBootstrap),
+        fetchDomains(CAMERAS_DOMAINS, isCurrentBootstrap),
       ]);
-      if (!rest || !prompter) return;
+      if (!rest || !prompter || !cameras) return;
       if (rest.failures.length > 0) {
         throw rest.failures[0];
       }
       for (const failure of prompter.failures) {
         recordBackgroundFailure(failure, "the prompter's state");
       }
+      for (const failure of cameras.failures) {
+        recordBackgroundFailure(failure, "the cameras' state");
+      }
 
       setState({
         ...state,
         ...snapshotsToState(rest.accepted),
         ...snapshotsToState(prompter.accepted),
+        ...snapshotsToState(cameras.accepted),
         lifecycle: transitionStartupState("waiting-for-app-snapshot", { type: "app-loaded" }),
         startupFailure: null,
         lastEvent: "engine.ready",
@@ -1330,6 +1348,14 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async setSetupSection(section) {
       return performRequest("settings.update", {
+        setup: {
+          activeSection: section,
+        },
+      });
+    },
+    async openSetupSection(section) {
+      return performRequest("settings.update", {
+        workspace: "setup",
         setup: {
           activeSection: section,
         },
@@ -1603,6 +1629,51 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return (await transport.request("prompter.paste.convert", {
         ...request,
       })) as unknown as PrompterPasteConvertResult;
+    },
+    selectCamera(camera: CameraNumber) {
+      return performRequest("cameras.select", { camera });
+    },
+    setCameraValue(request: CameraSetRequest) {
+      return performRequest("cameras.set", { ...request });
+    },
+    stepCameraValue(request: CameraStepRequest) {
+      return performRequest("cameras.step", { ...request });
+    },
+    runCameraAuto(request: CameraAutoRequest) {
+      return performRequest("cameras.auto", { ...request });
+    },
+    setCameraFormat(request: CameraFormatRequest) {
+      return performRequest("cameras.format.set", { ...request });
+    },
+    setCameraLook(request: CameraLookRequest) {
+      return performRequest("cameras.look.set", { ...request });
+    },
+    startCameraRecording() {
+      return performRequest("cameras.record.start");
+    },
+    stopCameraRecording(confirm: boolean) {
+      return performRequest("cameras.record.stop", { confirm });
+    },
+    releaseCamera(camera: CameraNumber, confirm: boolean) {
+      return performRequest("cameras.release", { camera, confirm });
+    },
+    connectCamera(camera: CameraNumber) {
+      return performRequest("cameras.connect", { camera });
+    },
+    updateCameraSetup(request: CameraSetupUpdateRequest) {
+      return performRequest("cameras.setup.update", { ...request });
+    },
+    pairCamera(camera: CameraNumber) {
+      return performRequest("cameras.setup.pair", { camera });
+    },
+    forgetCamera(camera: CameraNumber) {
+      return performRequest("cameras.setup.forget", { camera });
+    },
+    async refreshCamerasSnapshot() {
+      if (state.lifecycle !== "ready") {
+        return;
+      }
+      await refreshDomains(["cameras"]);
     },
     async refreshControlSurfaceSnapshot() {
       if (state.lifecycle !== "ready") {

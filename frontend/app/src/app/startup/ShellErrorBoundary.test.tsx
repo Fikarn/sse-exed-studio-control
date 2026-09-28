@@ -105,6 +105,8 @@ describe("ShellErrorBoundary", () => {
           // The Teleprompter's (new pages program, Slice 6a): absent, as a console with none.
           "prompter.snapshot": null,
           "prompter.glass.snapshot": null,
+          // The cameras', absent as well.
+          "cameras.snapshot": null,
         };
         return method in typed ? (typed[method] ?? null) : { protocol: "2" };
       },

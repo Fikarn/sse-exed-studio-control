@@ -79,7 +79,13 @@ describe("the fixture double's cameras: where they start", () => {
       "CAM 3 has no address. Enter it in Setup.",
     ]);
     for (const camera of shown.cameras) {
-      expect(camera.setup).toEqual({ setUp: false, address: null, paired: false, vmixInput: camera.camera });
+      expect(camera.setup).toEqual({
+        setUp: false,
+        address: null,
+        paired: false,
+        vmixInput: camera.camera,
+        noLink: null,
+      });
       expect(camera.readAt).toBeNull();
       // Never read: no value, but the camera's model — its options — stays.
       expect(Object.values(camera.values).every((value) => value.value === null)).toBe(true);
@@ -111,7 +117,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tag: "CAM 1",
       model: "Blackmagic Pocket Cinema Camera 6K Pro",
       link: "bluetooth",
-      setup: { setUp: true, address: null, paired: true, vmixInput: 1 },
+      setup: { setUp: true, address: null, paired: true, vmixInput: 1, noLink: null },
       state: "held",
       word: "HELD",
       tone: "ok",
@@ -160,7 +166,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tag: "CAM 2",
       model: "Panasonic LUMIX BGH1",
       link: "network",
-      setup: { setUp: true, address: CAM2_ADDRESS, paired: false, vmixInput: 2 },
+      setup: { setUp: true, address: CAM2_ADDRESS, paired: false, vmixInput: 2, noLink: null },
       state: "held",
       word: "HELD",
       tone: "ok",

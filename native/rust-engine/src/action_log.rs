@@ -171,6 +171,18 @@ pub(crate) fn record_actions_or_log(db_path: &Path, actions: &[ActionRecord]) {
     }
 }
 
+fn recorded_action(row: &rusqlite::Row<'_>) -> Result<RecordedAction, rusqlite::Error> {
+    Ok(RecordedAction {
+        id: row.get(0)?,
+        at: row.get(1)?,
+        source: row.get(2)?,
+        domain: row.get(3)?,
+        action: row.get(4)?,
+        target: row.get(5)?,
+        detail: row.get(6)?,
+    })
+}
+
 /// The newest rows first, in the order they were written.
 pub(crate) fn list_recent_actions(
     db_path: &Path,
@@ -182,17 +194,27 @@ pub(crate) fn list_recent_actions(
          FROM event_log ORDER BY id DESC LIMIT ?1",
     )?;
     let rows = statement
-        .query_map([limit as i64], |row| {
-            Ok(RecordedAction {
-                id: row.get(0)?,
-                at: row.get(1)?,
-                source: row.get(2)?,
-                domain: row.get(3)?,
-                action: row.get(4)?,
-                target: row.get(5)?,
-                detail: row.get(6)?,
-            })
-        })?
+        .query_map([limit as i64], recorded_action)?
+        .collect::<Result<Vec<_>, rusqlite::Error>>()?;
+    Ok(rows)
+}
+
+/// The newest rows of one domain first: a page's own Recent list (the
+/// Cameras page's, in `cameras.snapshot`). The table keeps
+/// `ACTION_LOG_MAX_ROWS` rows at most, so the read stays a short one without
+/// an index of its own.
+pub(crate) fn list_recent_domain_actions(
+    db_path: &Path,
+    domain: &str,
+    limit: usize,
+) -> EngineResult<Vec<RecordedAction>> {
+    let connection = open_connection(db_path)?;
+    let mut statement = connection.prepare(
+        "SELECT id, at, source, domain, action, target, detail
+         FROM event_log WHERE domain = ?1 ORDER BY id DESC LIMIT ?2",
+    )?;
+    let rows = statement
+        .query_map(params![domain, limit as i64], recorded_action)?
         .collect::<Result<Vec<_>, rusqlite::Error>>()?;
     Ok(rows)
 }

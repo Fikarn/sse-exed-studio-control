@@ -36,6 +36,15 @@ describe("snapshotProblem", () => {
     expect(snapshotProblem("lightingDmxMonitor", {})).toBe("channels is not a list");
   });
 
+  it("checks the cameras' lists, and takes a Recent list that could not be read", () => {
+    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: [] })).toBeNull();
+    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: null })).toBeNull();
+    expect(snapshotProblem("cameras", { selected: 1, recent: [] })).toBe("cameras is not a list");
+    expect(snapshotProblem("cameras", { selected: 1, cameras: [] })).toBe("recent is not a list");
+    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: "none" })).toBe("recent is not a list");
+    expect(snapshotProblem("cameras", null)).toBeNull();
+  });
+
   it("checks the Teleprompter's objects the page reads, not only its lists (new pages S6a)", () => {
     const prompter = { scripts: [], removed: [], look: {}, screen: {}, glass: null };
     expect(snapshotProblem("prompter", prompter)).toBeNull();

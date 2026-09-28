@@ -31,7 +31,10 @@ fn an_address_sets_a_camera_up_and_holds_it() {
         reply.result,
         json!({
             "camera": 2,
-            "setup": { "setUp": true, "address": "172.16.16.85", "paired": false, "vmixInput": 2 }
+            "setup": {
+                "setUp": true, "address": "172.16.16.85", "paired": false, "vmixInput": 2,
+                "noLink": null
+            }
         })
     );
     assert_eq!(reply.event, Some(("setup", Some(2))));
@@ -157,7 +160,9 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
             "cameras.setup.update",
             json!({ "camera": 3, "address": null })
         )["setup"],
-        json!({ "setUp": false, "address": null, "paired": false, "vmixInput": 12 })
+        json!({
+            "setUp": false, "address": null, "paired": false, "vmixInput": 12, "noLink": null
+        })
     );
     let cam3 = cameras.camera(3);
     assert_eq!(cam3["state"], "not-set-up");
@@ -174,7 +179,10 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
         reply.result,
         json!({
             "camera": 1,
-            "setup": { "setUp": false, "address": null, "paired": false, "vmixInput": 5 }
+            "setup": {
+                "setUp": false, "address": null, "paired": false, "vmixInput": 5,
+                "noLink": null
+            }
         })
     );
     assert_eq!(reply.event, Some(("setup", Some(1))));
@@ -217,7 +225,9 @@ fn cam_1_is_paired_and_held() {
         reply.result,
         json!({
             "camera": 1,
-            "setup": { "setUp": true, "address": null, "paired": true, "vmixInput": 1 }
+            "setup": {
+                "setUp": true, "address": null, "paired": true, "vmixInput": 1, "noLink": null
+            }
         })
     );
     assert_eq!(
