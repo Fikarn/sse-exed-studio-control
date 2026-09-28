@@ -4,10 +4,10 @@ The studio's devices, how Studio Control reaches each one, and the rules that ke
 
 ## The room
 
-- **Workstation.** One PC, Windows 11, for development and for the studio.
-- **Display.** The app runs fullscreen on the studio display: 2560×1440 at 100 % Windows scaling. It opens on the display it was last on, else on that one. `Reset the window layout` in Setup / Support › Workstation puts it back.
-- **Keep that display at 100 %.** The primary display is the same size at 125 %, and the scaling tells them apart. Windows' display numbers can change.
-- **Networks.** `Ethernet 2` is the office network (`172.16.16.0/21`), with the BGH1s. `Ethernet 3` is the lighting network (`10.1.0.0/16`), with the Apollo Bridge.
+- **Workstation.** One PC, Windows 11, for development and for the studio. Smart App Control is off and must stay off: the app is not signed.
+- **Display.** The app runs fullscreen on the studio display: 2560×1440 at 100 % Windows scaling. It opens on the display it was last on, found by its place on the desktop, else on that one. `Reset the window layout` in Setup / Support › Workstation puts it back.
+- **Keep that display at 100 %.** The primary display is the same size at 125 %, and the scaling tells them apart. Windows' display numbers can change, so the app goes by a display's place, size and scaling before its number. The studio display stands at x 2560: the window is right when it covers x 2560 to 5120, y 0 to 1440.
+- **Networks.** `Ethernet 2` is the office network (`172.16.16.0/21`), with the BGH1s. `Ethernet 3` is the lighting network (`10.1.0.0/16`), with the Apollo Bridge. Both have a default route, the office's first: with the office network down, a packet to an unknown address leaves towards the bridge. That is why nothing here may send to an address nobody typed, and why the two shell lanes run in CI only.
 - **Beside the app** run TotalMix FX, Bitfocus Companion and vMix.
 
 ## Devices
@@ -49,6 +49,16 @@ What the app never does:
 
 Talkback is not used, and the app has none: it sends TotalMix no talkback and reads past the desk's report of it.
 
+Measured on the studio's desk (2026-09), for whoever probes by hand or reads a log:
+
+- Channels count from 0, and the right side of a stereo pair is the left plus 1. The outputs are 0/1 Main, 8/9 Phones 1 and 10/11 Phones 2.
+- TotalMix never echoes a write to the remote that sent it. It must be asked (`/sendchan/<input|playback|output>/<ch>`, `/sendsubmix/<out> 2` then `/sendstate`, `/sendsettings`), and answers in one burst about 30 ms later.
+- A dump gives a fader in dB, never as a position. `/sendsubmix 2` sends nothing for a mix with no send above −65 dB. `/sendall 2` is 3,100 to 3,500 messages.
+- `/output/0/volume` in a dump is the level after dim (−20 dB), so the fader is set before dim is switched off.
+- TotalMix sends to a remote only while it hears from it. A command marked `(f)` in RME's table ignores a value under 0.5.
+- Playback 1/2 is Windows' sound and 3/4 is vMix's. Input 9, `Host`, has 48 V on: compare with the state read before, never with "off".
+- The desk's reference state is TotalMix's own snapshot `mix 1`: Main Out at 0 dB, dim off. The owner loads it; the app and the assistant never do.
+
 ## Lights
 
 The engine streams to the Litepanels Apollo Bridge as unicast sACN (E1.31) on UDP port `5568`. The bridge drives the fixtures: Litepanels Astra Bi-Color Soft, Aputure Infinimat 2x4 and Aputure Infinibar PB12.
@@ -71,6 +81,11 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - The bridge listens on `127.0.0.1` only and has no fallback port. `SSE_CONTROL_SURFACE_PORT` names another port.
 - Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
 - `401` in Companion's log means the profile's token is missing or wrong: export and import again.
+- The profile asks for every display once a second, a connection each. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
+- Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
+- It stores a reply only in a custom variable that exists already, so the profile brings its own.
+- The bridge writes one refusal line a minute at most for each status, and counts the rest in it.
+- Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:
 

@@ -4,7 +4,8 @@ import { useSyncExternalStore } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShellFrame } from "@sse/design-system";
-import { createFixtureTransport, createShellStore, type ShellStore } from "@sse/engine-client";
+import { createShellStore, type ShellStore } from "@sse/engine-client";
+import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { OperatorLayoutProvider } from "../OperatorLayoutProvider";

@@ -92,7 +92,7 @@ function main() {
       `  Saved data   ${env.SSE_APP_DATA_DIR}`,
       `  Bridge port  ${env.SSE_CONTROL_SURFACE_PORT} (the studio's is ${STUDIO_BRIDGE_PORT})`,
       "  Lights held and simulated, console and cameras simulated.",
-      "  Setup's probes and the Companion export still ask the address they are given.",
+      "  Setup's probes still ask the address they are given.",
       "",
     ].join("\n")
   );

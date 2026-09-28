@@ -190,8 +190,25 @@ pub fn export_companion_config(
 // no meaning in a trigger context). Companion being closed is not an error —
 // the export then targets "self" and the operator re-exports with Companion
 // running to get surface-bound follow.
+//
+// A development build asks nobody (2026-09-28): Companion is the studio's,
+// and the bridge lane exports a profile at every run of the gate. Its export
+// targets "self", as one made with Companion closed does.
 fn discover_streamdeck_surface_id() -> Option<String> {
-    let body = fetch_companion_export_json(DEFAULT_COMPANION_URL)?;
+    streamdeck_surface_id_from(
+        studio_control_protocol::development::development_build(),
+        || fetch_companion_export_json(DEFAULT_COMPANION_URL),
+    )
+}
+
+fn streamdeck_surface_id_from<F>(development_build: bool, fetch: F) -> Option<String>
+where
+    F: FnOnce() -> Option<String>,
+{
+    if development_build {
+        return None;
+    }
+    let body = fetch()?;
     let parsed = serde_json::from_str::<Value>(&body).ok()?;
     parsed
         .get("surfaces")
@@ -1143,6 +1160,28 @@ pub(crate) fn deck_worst_instant_requests() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 2026-09-28: a development build does not ask Companion for its deck;
+    // the studio's build does, and reads the deck's id from the answer.
+    #[test]
+    fn only_the_studio_build_asks_companion_for_its_deck() {
+        let answer = r#"{"surfaces":{"emulator:1":{},"streamdeck:A00TEST":{}}}"#;
+        let mut asked = false;
+        assert_eq!(
+            streamdeck_surface_id_from(true, || {
+                asked = true;
+                Some(String::from(answer))
+            }),
+            None
+        );
+        assert!(!asked, "a development build asks nobody");
+
+        assert_eq!(
+            streamdeck_surface_id_from(false, || Some(String::from(answer))),
+            Some(String::from("streamdeck:A00TEST"))
+        );
+        assert_eq!(streamdeck_surface_id_from(false, || None), None);
+    }
     use crate::exports_audio::{DECK_AMBER_BG, DECK_MUTED_INK};
     use std::collections::BTreeSet;
 

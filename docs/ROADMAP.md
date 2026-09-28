@@ -18,7 +18,7 @@ One pull request each, in this order. Then the Cameras page.
   - [x] Graphite and Bone out (D25).
   - [x] Talkback out (D26).
   - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, eight unused components of the design system and three of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
-  - [ ] Three changes of behaviour: one recovery screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine leaves the studio build's bundle.
+  - [x] Three changes of behaviour: one recovery screen and one startup screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine is a chunk of its own, which the app's window never loads. And a fourth: a development build's Companion export asks Companion nothing, so the gate's bridge lane leaves the studio's Companion alone.
 - [ ] Step 7: local cleanup.
 
 ## Next: the Cameras and Teleprompter pages
@@ -179,14 +179,14 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **`Save · press twice` saves at the first press.** No key on the Lighting page arms.
 - [ ] **In Preview, `Save to the rig` does not change the rig.** It saves into the scene.
 - [ ] **`DIM` and `MONO` light on screen for `Phones 1` and `Phones 2`** but nothing is sent to the desk.
-- [ ] **A stop during a session shows the smaller recovery screen,** with no `Export diagnostics` and no restore keys. The streamlining's step 6 makes the two recovery screens one.
 - [ ] **A failed or overdue automatic backup lights no lamp,** and neither does a light-output port that could not open.
 - [ ] **Lighting's `Undo` forgets its steps** when the page is left.
 - [ ] **The deck's `LIGHTS` strip refreshes only on arriving at the page** and on a push of the `LIGHT` dial.
 - [ ] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine".
 - [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
 - [ ] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`.
-- [ ] **A shell test timed out once under load** (2026-09-28): `exit_watcher_fails_pending_and_emits_event` waited its ten seconds for a process that exits at once, while the whole gate ran beside it. It passes alone. If it comes back, find why.
+- [ ] **The studio's engine keeps more than one processor core busy.** Read on 2026-09-28: 509,570 s of processor time in the 4 days 18 hours since its start, 1.2 cores on average, with nobody at the desk. It is a debug build, and Companion asks it for every display once a second. Measure the first studio build the same way; if it is still high, find what takes the time.
+- [ ] **Tests with a deadline failed in two slow runs of the gate** (2026-09-28): the shell's `exit_watcher_fails_pending_and_emits_event`, then the engine's `recall_pushes_the_snapshot_and_the_console_confirms_it` and `a_glass_that_goes_pauses_the_scroll_and_its_return_leaves_it_paused`, in a run where the engine's tests took 120 s (11 s alone). Each passed on the next run. The gate runs below normal priority, so whatever is busy beside it takes its time; what was busy was not found.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
 
@@ -201,12 +201,12 @@ One question about the lights, with no hurry:
 
 - [ ] Should the studio build hold the lights at every start? Today a hold is saved: held lights stay held across starts, and armed lights are armed again at the next start, so the rig follows the app at once. Setting `SSE_SAFE_START=1` for the Windows account makes every start held, at the cost of arming once per start, also after the hardware link restarts mid-session. Recommended: leave it as it is.
 
-Dependency updates no longer wait. The assistant takes them itself once a month, when the checks pass, and never with `npm audit fix`. Open now:
+Dependency updates wait on the owner's word. Asked on 2026-09-28, with no hurry: may the assistant take them itself once a month, when the checks pass, and never with `npm audit fix`? Recommended: yes. Open now:
 
-- pull requests #193 (`fuzzysort`), #217 (`getrandom`), #218 (the tooling group), #219 (`tauri-plugin-single-instance`), #220 (`@types/node`) and #223 (`qs`);
+- pull requests #217 (`getrandom`), #219 (`tauri-plugin-single-instance`), #223 (`qs`), #233 (the actions group), #234 (the npm group, whose checks fail) and #235 (`jsdom`, whose checks fail);
 - alerts #7 (`esbuild`, low) and #1 (`glib`, medium).
 
-Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Dependabot's alert stays open until a fix exists.
+`fuzzysort`, which nothing imported, is removed, so #193 closes by itself. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Dependabot's alert stays open until a fix exists.
 
 ## Decide later
 

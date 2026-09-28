@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { useSyncExternalStore } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createFixtureTransport, createShellStore, type JsonObject, type ShellStore } from "@sse/engine-client";
+import { createShellStore, type JsonObject, type ShellStore } from "@sse/engine-client";
+import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { OperatorLayoutProvider } from "../OperatorLayoutProvider";

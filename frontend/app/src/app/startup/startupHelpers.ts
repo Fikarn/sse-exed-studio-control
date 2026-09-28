@@ -186,6 +186,16 @@ export function formatFileSize(sizeBytes: number) {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/**
+ * The health snapshot's log excerpt as lines. The hardware link sends one
+ * string (the last lines of its log, `native/protocol/v1.md`). A list is
+ * still read, for a reply from an older build.
+ */
+export function readLogExcerpt(value: unknown): string[] {
+  const lines = typeof value === "string" ? value.split(/\r?\n/) : Array.isArray(value) ? value : [];
+  return lines.flatMap((line) => (typeof line === "string" && line.trim().length > 0 ? [line] : []));
+}
+
 export function formatPathLabel(key: string) {
   switch (key) {
     case "appDataDir":
