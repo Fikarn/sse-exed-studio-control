@@ -313,28 +313,52 @@ fn told_draws_after(report: &Value, told_draws: bool) -> bool {
 /// waits here while the hardware link answers the one before (up to ten
 /// seconds), and a newer one takes its place: the hardware link is told what
 /// is true now, and never an older report after a newer one.
+///
+/// But a report that the glass draws does not take the place of one that it
+/// does not: that one is sent first. Else a window lost and back while the
+/// hardware link was busy would never pause a text that scrolled with
+/// nothing on the glass (D12; the second look at the review of #251).
 #[derive(Default)]
 struct NewestReport {
-    report: Mutex<Option<Value>>,
+    waiting: Mutex<Waiting>,
     put: Condvar,
+}
+
+#[derive(Default)]
+struct Waiting {
+    /// A report that the glass does not draw, sent before `newest`.
+    stops: Option<Value>,
+    newest: Option<Value>,
 }
 
 impl NewestReport {
     fn put(&self, report: Value) {
-        *locked(&self.report) = Some(report);
+        {
+            let mut waiting = locked(&self.waiting);
+            if says_it_draws(&report) {
+                if let Some(before) = waiting.newest.take() {
+                    if !says_it_draws(&before) {
+                        waiting.stops = Some(before);
+                    }
+                }
+            } else {
+                waiting.stops = None;
+            }
+            waiting.newest = Some(report);
+        }
         self.put.notify_one();
     }
 
     /// Waits for a report, and takes it.
     fn take(&self) -> Value {
-        let mut slot = locked(&self.report);
+        let mut waiting = locked(&self.waiting);
         loop {
-            if let Some(report) = slot.take() {
+            if let Some(report) = waiting.stops.take().or_else(|| waiting.newest.take()) {
                 return report;
             }
-            slot = self
+            waiting = self
                 .put
-                .wait(slot)
+                .wait(waiting)
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
         }
     }
@@ -718,11 +742,17 @@ impl PrompterWindow {
         match step {
             Step::Keep => {}
             Step::Close => {
-                if !matches!(self.glass, Glass::Closed | Glass::Failed { .. }) {
-                    log_shell_line(
+                match self.glass {
+                    Glass::Closed => {}
+                    // shell.log said that it would be opened again.
+                    Glass::Failed { .. } => log_shell_line(
+                        app,
+                        &format!("The prompter's window is not opened again: {why_closed}."),
+                    ),
+                    Glass::Opened { .. } | Glass::Drawing { .. } => log_shell_line(
                         app,
                         &format!("The prompter's window was closed: {why_closed}."),
-                    );
+                    ),
                 }
                 close(app);
                 self.glass = Glass::Closed;
@@ -1240,10 +1270,31 @@ mod tests {
     // report after a newer one (the review of #251).
     #[test]
     fn the_hardware_link_is_told_the_newest_report() {
+        let draws = |width: u32| json!({ "found": true, "width": width, "height": 1080 });
+        let stops =
+            |why: &str| json!({ "found": true, "width": 1920, "height": 1080, "windowError": why });
         let newest = NewestReport::default();
-        newest.put(json!({ "found": true, "width": 1920, "height": 1080 }));
+        newest.put(draws(1920));
         newest.put(json!({ "found": false }));
         assert_eq!(newest.take(), json!({ "found": false }));
+        newest.put(stops("one"));
+        newest.put(stops("two"));
+        assert_eq!(newest.take(), stops("two"));
+
+        // A window lost and back while the hardware link was busy: the text
+        // that scrolled is paused first, then the glass draws again.
+        newest.put(stops(OPENING_AGAIN));
+        newest.put(draws(1920));
+        newest.put(draws(1921));
+        assert_eq!(newest.take(), stops(OPENING_AGAIN));
+        assert_eq!(newest.take(), draws(1921));
+        // Lost again before either was sent: only the newest is said.
+        newest.put(stops("one"));
+        newest.put(draws(1920));
+        newest.put(stops("two"));
+        assert_eq!(newest.take(), stops("two"));
+        newest.put(draws(1920));
+        assert_eq!(newest.take(), draws(1920));
         // A report put while the teller waits reaches it.
         let newest = Arc::new(NewestReport::default());
         let teller = {

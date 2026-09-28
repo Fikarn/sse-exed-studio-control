@@ -79,6 +79,15 @@ pub(crate) fn event_channel(window: &str) -> &'static str {
     }
 }
 
+/// Where an event of the hardware link goes: to each window it is for
+/// (`windows_for`), on that window's channel (`event_channel`). The shell's
+/// event sink sends by it (`engine.rs`).
+pub(crate) fn deliveries(event: &str) -> impl Iterator<Item = (&'static str, &'static str)> {
+    windows_for(event)
+        .iter()
+        .map(|&window| (window, event_channel(window)))
+}
+
 /// Whether a listener of this target is in one of `windows`. A page that
 /// listens without naming a target hears everything Tauri emits on its
 /// channel, whatever this answers: the prompter's page names its own window.
@@ -478,6 +487,27 @@ mod tests {
         assert_eq!(event_channel(MAIN_WINDOW_LABEL), MAIN_EVENT_CHANNEL);
         assert_eq!(event_channel(PROMPTER_WINDOW_LABEL), PROMPTER_EVENT_CHANNEL);
         assert_ne!(MAIN_EVENT_CHANNEL, PROMPTER_EVENT_CHANNEL);
+
+        // What the shell's event sink sends: every event on the operator's
+        // channel, and the prompter's three on its own as well.
+        assert_eq!(
+            deliveries("audio.meters").collect::<Vec<_>>(),
+            [(MAIN_WINDOW_LABEL, MAIN_EVENT_CHANNEL)]
+        );
+        assert_eq!(
+            deliveries("prompter.changed").collect::<Vec<_>>(),
+            [
+                (MAIN_WINDOW_LABEL, MAIN_EVENT_CHANNEL),
+                (PROMPTER_WINDOW_LABEL, PROMPTER_EVENT_CHANNEL)
+            ]
+        );
+        for event in studio_control_protocol::EVENT_NAMES {
+            for (window, channel) in deliveries(event) {
+                assert_eq!(channel, event_channel(window), "{event}");
+                assert!(windows_for(event).contains(&window), "{event}");
+            }
+            assert_eq!(deliveries(event).count(), windows_for(event).len());
+        }
 
         const OPERATOR_S_PAGE: &str = include_str!(
             "../../../frontend/packages/engine-client/src/transports/tauriTransport.ts"

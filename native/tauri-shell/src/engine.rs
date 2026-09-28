@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
 use crate::shell_prompter_window::WatchWake;
-use crate::shell_windows::{event_channel, listens_in, windows_for};
+use crate::shell_windows::{deliveries, listens_in};
 use studio_control_protocol::development::{
     default_app_data_dir, development_build, host_platform, refuse_studio_folders,
 };
@@ -66,8 +66,8 @@ fn app_event_sink(app: AppHandle) -> EventSink {
             }
         }
         let payload = json!({ "event": message });
-        for &window in windows_for(&name) {
-            let _ = app.emit_filter(event_channel(window), payload.clone(), |target| {
+        for (window, channel) in deliveries(&name) {
+            let _ = app.emit_filter(channel, payload.clone(), |target| {
                 listens_in(target, &[window])
             });
         }
