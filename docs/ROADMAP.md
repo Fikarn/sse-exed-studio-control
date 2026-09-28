@@ -10,9 +10,9 @@ One pull request each, in this order. Then the Cameras page.
 - [x] Step 1: the catch-up pull request merged (#230).
 - [x] Step 2: rulebook and docs. A short `AGENTS.md`, this roadmap, `docs/CHECKLIST.md`; the ledgers deleted.
 - [x] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
-- [ ] Step 4: builds, in two pull requests.
+- [x] Step 4: builds, in two pull requests.
   - [x] Development runs. `npm run app` starts the app on its own saved data with simulated devices; a development build refuses the studio's data and is an app of its own; the shell starts the engine beside it and no other; a release build keeps the overflow checks.
-  - [ ] Studio builds. One release command; the builds kept outside the repository, each with a release-profile engine; the release machinery nobody uses removed.
+  - [x] Studio builds. `npm run release` makes one from `main`, keeps it in `builds\` beside the repository and tries it on scratch data; only that command makes a build the studio's kind; `npm run release:verified` names the build the studio starts. The installer, update, signing, evidence and release scripts are removed.
 - [ ] Step 5: screenshots and the layout gate. Header and footer captured once; absolute thresholds instead of per-page ratchets.
 - [ ] Step 6: product code. Talkback out (D26), Graphite and Bone out (D25), update-folder leftovers, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
 - [ ] Step 7: local cleanup.
@@ -91,7 +91,7 @@ The shell's second window shows the glass (`PrompterGlass`) on the screen Window
 
 Guards:
 
-- "The studio build" is defined in code: a release build started with no `SSE_*` variable and without the test bridge. Anything else draws the glass into an ordinary window, and a test holds that.
+- "The studio build" is defined in code: a build `npm run release` made (`studio_build()` in `native/protocol/rust/src/development.rs`). Anything else draws the glass into an ordinary window, and a test holds that.
 - A test over plain monitor snapshots, run in CI, proves the window opens only on a screen named `Prompter XL`.
 - The display calls are `unsafe`. The shell's one allowance (`set_browser_accelerator_keys_off`) becomes a named list, each entry with its reason.
 - `native/tauri-shell/src/main.rs` is split first.
@@ -114,7 +114,7 @@ Ask the owner first: WebView2 saves the main window's clipboard answer in the pr
 Find out first, and write down what it changes between engine, shell and pages:
 
 - The frames' route. Today the engine reaches the page only through its line-by-line pipe, and the page may connect only to the shell (`connect-src ipc:` in `tauri.conf.json`). (a) The engine serves JPEG frames on 127.0.0.1 behind the bridge's token, with the policy widened for that address. (b) The engine hands the frames to the shell over a second channel, and the shell passes them on as raw data. (c) The shell receives NDI itself, which puts device I/O outside the engine.
-- Where the SDK's calls live. The NDI and LUMIX SDKs need `unsafe` code, which the engine forbids: a crate of their own that names each allowance, or a helper process. A new crate is checked against the licences in `native/deny.toml` first (`libloading` is ISC, which the list lacks).
+- Where the SDK's calls live. The NDI and LUMIX SDKs need `unsafe` code, which the engine forbids: a crate of their own that names each allowance, or a helper process. A new crate's licence is read first (`libloading` is ISC).
 - That finding the sources stays on this PC. NDI searches every network adapter unless told otherwise.
 - The processor's load of three pictures decoded while vMix records.
 
@@ -198,7 +198,7 @@ Dependency updates no longer wait. The assistant takes them itself once a month,
 - pull requests #193 (`fuzzysort`), #217 (`getrandom`), #218 (the tooling group), #219 (`tauri-plugin-single-instance`), #220 (`@types/node`) and #223 (`qs`);
 - alerts #7 (`esbuild`, low) and #1 (`glib`, medium).
 
-Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Its exception in `native/deny.toml` is looked at again before 2026-12-15, when the dependency check starts to fail on it.
+Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Dependabot's alert stays open until a fix exists.
 
 ## Decide later
 
@@ -245,3 +245,4 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D24** (2026-09-28) The lean workflow. `main` is the development line. The studio runs the latest verified build: a release build the owner has walked through `docs/CHECKLIST.md` on the real hardware. Merges to `main` need no go-ahead. No ledgers, run ids or archive tags.
 - **D25** (2026-09-28) Studio, the dark theme, is the only theme. Graphite and Bone are removed.
 - **D26** (2026-09-28) Talkback is removed from the app entirely.
+- **D27** (2026-09-28) Studio builds. Only `npm run release` makes one, from a commit on `main`, marked while it compiles. Every other build is a development build: it refuses the studio's folders, takes the safe value of every switch that is not set, and is an app of its own. Builds are kept in `builds\` beside the repository and never deleted by a script. `npm run release:verified` names the one the studio starts and tags its commit.

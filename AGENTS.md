@@ -25,14 +25,14 @@ Two rules hold the design together:
 ## Development and the studio are separate
 
 - **`main` is the development line.** Merging to it changes nothing in the studio.
-- **The studio runs the latest verified build:** a release build the owner has walked through `docs/CHECKLIST.md` on the real hardware. Promoting a build to verified is the owner's decision.
+- **The studio runs the latest verified build.** `npm run release` makes a studio build from `main` and keeps it in `builds\`, beside the repository. The owner walks `docs/CHECKLIST.md` with it on the real hardware; `npm run release:verified` then makes it the build that `builds\Studio Control.cmd` starts. Promoting a build is the owner's decision.
 - **The studio is not in use during development.** Close the app when it is in the way.
 
 ## The loop
 
 1. **Agree.** Ask the owner what only the owner can decide, once, before building, each with a recommendation. Decide everything else and say what was decided.
 2. **Build** on a branch from `main`.
-3. **Check** with `npm run check`. It runs everything, on this machine, in a few minutes.
+3. **Check** with `npm run check`. It runs what CI runs but the two shell lanes, on this machine, in a few minutes.
 4. **Merge.** Push, open a pull request, merge when CI is green. No go-ahead is needed.
 5. **Record.** The pull request says what changed, why, and how it was checked. `CHANGELOG.md` gets a line or two when the operator would notice the change. `docs/ROADMAP.md` is ticked.
 6. **Show.** When the change is something the owner can see or the hardware does, start the app and let the owner try it.
@@ -44,7 +44,7 @@ Two rules hold the design together:
 ## Safety
 
 - **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console and the cameras, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes and the Companion export ask the address they are given.
-- **Real devices are driven only by a release build,** or by a hardware test the owner asked for and is present at.
+- **Real devices are driven only by a studio build,** or by a hardware test the owner asked for and is present at. Only `npm run release` makes a studio build: every other build, a release build included, is a development build.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.
 - **Saved data:** a schema upgrade writes a backup first. Backups are never deleted by a script. A newer build upgrades the saved data, and an older build then refuses it: going back means restoring the backup.
@@ -62,15 +62,16 @@ Two rules hold the design together:
 
 ## Commands
 
-| Command                                | Does                                                                                                   |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests, then the page tests with their captures |
-| `npm run check:quick`                  | The same without the page tests (under a minute)                                                       |
-| `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                        |
-| `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)     |
-| `npm run app`                          | The app as a development run: its own saved data, simulated devices. It can run beside the studio app  |
-| `npm run protocol:generate`            | Regenerate the contract's generated files                                                              |
-| `npm run format`                       | Format everything with Prettier                                                                        |
+| Command                                | Does                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests and lanes, then the page tests            |
+| `npm run check:quick`                  | The same without the page tests (under a minute)                                                        |
+| `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                         |
+| `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)      |
+| `npm run app`                          | The app as a development run: its own saved data, simulated devices. It can run beside the studio app   |
+| `npm run release`                      | A studio build of `main`, in `builds\`, tried on scratch data. `release:verified` makes it the studio's |
+| `npm run protocol:generate`            | Regenerate the contract's generated files                                                               |
+| `npm run format`                       | Format everything with Prettier                                                                         |
 
 A capture that a change moved is refreshed with `npx playwright test --update-snapshots=changed` from `frontend/app`, and looked at before it is committed.
 

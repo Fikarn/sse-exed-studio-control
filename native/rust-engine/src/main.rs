@@ -456,11 +456,14 @@ fn main() -> io::Result<()> {
     if let Some(warning) = log_level_warning {
         log_event(LogLevel::Warn, &warning);
     }
-    if let Some(defaults) = development_defaults.as_deref() {
-        log_event(
+    match studio_control_protocol::development::studio_build_commit() {
+        Some(commit) => log_event(LogLevel::Info, &format!("Studio build of {commit}.")),
+        None => log_event(
             LogLevel::Info,
-            &development::development_defaults_line(defaults),
-        );
+            &development::development_defaults_line(
+                development_defaults.as_deref().unwrap_or_default(),
+            ),
+        ),
     }
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {

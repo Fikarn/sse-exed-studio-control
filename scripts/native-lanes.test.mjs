@@ -20,6 +20,7 @@ import {
   hardenedLaneEnv,
   isSameOrInside,
   LIVE_APP_CONTROL_SURFACE_PORT,
+  laneEngine,
   laneEnvRefusal,
   laneProcessEnv,
 } from "./native-runtime-harness.mjs";
@@ -27,7 +28,7 @@ import {
 // New pages program, Slice 2: Planning left the hardware link. Every lane that
 // still asked for it (a `planning.*` request, the PROJECTS and TASKS pages'
 // route `/api/deck/action`, the `project_nav` LCD) failed only when it ran,
-// and the packaged, installer, delivery and bridge lanes run only at a release.
+// and the bridge lane ran only at a release.
 // These tests read the lanes and hold them to what the hardware link answers:
 // the contract's methods, the bridge's routes and its LCD keys.
 //
@@ -44,7 +45,11 @@ import {
 // first-launch check once opened the real one, and no test held its fix);
 // any lane could leave the simulated console unnoticed; and importing
 // native-package.mjs deleted the folder the live app runs from. These tests
-// read the lane scripts as text and never import the destructive ones.
+// read the lane scripts as text and never import the ones that do work.
+//
+// Streamlining, 2026-09-28: the packaging, installer, delivery, signing and
+// release scripts are gone, native-package.mjs with them. What is left that
+// does work when started: the lanes, `npm run app` and `npm run release`.
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -53,9 +58,6 @@ const LANES = [
   "scripts/native-acceptance.mjs",
   "scripts/native-parity-acceptance.mjs",
   "scripts/native-control-surface-qualification.mjs",
-  "scripts/native-packaged-acceptance.mjs",
-  "scripts/native-installer-acceptance.mjs",
-  "scripts/native-delivery-acceptance.mjs",
   "scripts/native-release-safety.mjs",
 ];
 const BRIDGE_LANE = "scripts/native-control-surface-qualification.mjs";
@@ -64,11 +66,6 @@ const PROCESS_LANES = [
   "scripts/native-runtime-harness.mjs",
   "scripts/native-acceptance.mjs",
   "scripts/native-control-surface-qualification.mjs",
-  "scripts/native-package.mjs",
-  "scripts/native-packaged-acceptance.mjs",
-  "scripts/native-installer-acceptance.mjs",
-  "scripts/native-delivery-acceptance.mjs",
-  "scripts/legacy/tauri-package-candidate.mjs",
   "scripts/tauri-setup-support-qualification.mjs",
   "scripts/tauri-workspace-qualification.mjs",
   "scripts/tauri-smoke.mjs",
@@ -80,50 +77,28 @@ const SAFE_START_WAIVER_LANE = "scripts/tauri-setup-support-qualification.mjs";
 /** The one place a lane may leave the simulated console: the live console lane's engines (`SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1`). */
 const CONSOLE_WAIVER = "scripts/native-parity-acceptance.mjs acceptanceEngineEnv: simulatedAudio";
 /**
- * The scripts that do work when started — delete or rewrite folders under
- * release/ (on the studio workstation `release/native/windows` is the
- * installed app), write other files, start processes, open a server or end
- * the process — and so must do nothing when imported. Since 2026-09-26 that
+ * The scripts that do work when started — write files, start processes,
+ * open a server or end the process — and so must do nothing when imported
+ * (until 2026-09-28 some deleted or rewrote folders under release/, where the
+ * studio's app ran from). Since 2026-09-26 that
  * is every script under scripts/ that did any of it at load, except
  * scripts/dev-check-cli.mjs, the command line that always runs (its own
  * comment) and that nothing imports, and the scripts whose run was already
  * behind a main-module check.
  */
 const DESTRUCTIVE_SCRIPTS = [
-  "scripts/native-package.mjs",
-  "scripts/native-installer.mjs",
-  "scripts/native-update-repo.mjs",
-  "scripts/native-installer-acceptance.mjs",
-  "scripts/native-sign-windows.mjs",
-  "scripts/write-native-release-checksums.mjs",
-  "scripts/native-windows-release-evidence.mjs",
-  "scripts/native-release-build.mjs",
-  "scripts/verify-native-release-artifacts.mjs",
-  "scripts/verify-native-release-continuity.mjs",
   "scripts/native-acceptance.mjs",
   "scripts/native-control-surface-qualification.mjs",
-  "scripts/native-packaged-acceptance.mjs",
-  "scripts/native-delivery-acceptance.mjs",
   "scripts/tauri-smoke.mjs",
   "scripts/tauri-setup-support-qualification.mjs",
   "scripts/tauri-workspace-qualification.mjs",
-  "scripts/tauri-visual-review.mjs",
   "scripts/tauri-before-command.mjs",
   "scripts/protocol/generate-protocol-artifacts.mjs",
-  "scripts/legacy/tauri-package-candidate.mjs",
-  "scripts/legacy/tauri-candidate-ifw.mjs",
-  "scripts/legacy/tauri-windows-target-evidence.mjs",
-  "scripts/legacy/verify-tauri-candidate-artifacts.mjs",
-  "scripts/release/publish-release.mjs",
-  "scripts/release/verify-native-release.mjs",
-  "scripts/release/verify-release-anchor.mjs",
-  "scripts/release/validate-release.mjs",
-  "scripts/release/write-release-notes.mjs",
   "scripts/frontend/run-playwright.mjs",
   "scripts/frontend/storybook-static-server.mjs",
-  "scripts/dev-doctor.mjs",
   "scripts/file-health.mjs",
   "scripts/dev-app.mjs",
+  "scripts/release.mjs",
 ];
 
 function read(relative) {
@@ -1032,7 +1007,7 @@ test("a lane's app gets an absolute scratch app-data and log folder of its own, 
   }
 });
 
-test("every process a lane starts gets its environment from laneProcessEnv, the installer's QtIFW runs included", () => {
+test("every process a lane starts gets its environment from laneProcessEnv", () => {
   // The scan's own cases. The first is the installer lane before the review
   // of 2026-09-25: QtIFW's install ran the installed app's first-launch check
   // with the lane's plain environment unless a caller remembered to pass one.
@@ -1170,7 +1145,7 @@ test("every lane uses the simulated cameras, and only the harness names them", a
   assert.doesNotThrow(() => laneProcessEnv(env, { SSE_CAMERAS_SIMULATED: " 1 " }, { label: "A lane" }));
 });
 
-test("the scripts that do work do nothing when imported, and packaging refuses to replace the folder a running app uses", () => {
+test("the scripts that do work do nothing when imported", () => {
   // The scan's own cases: what only reads passes, and a call to anything
   // else is work, however deep in a constant's value it sits.
   const planted = [
@@ -1248,23 +1223,6 @@ test("the scripts that do work do nothing when imported, and packaging refuses t
   // does work when imported.
   const problems = DESTRUCTIVE_SCRIPTS.flatMap((script) => mainModuleProblems(script, read(script)));
   assert.deepEqual(problems, [], "scripts that do work when they are imported");
-
-  // Before it removes release/native/windows, the Windows packaging refuses
-  // while Studio Control runs from it or answers on the live app's port.
-  const packaging = withoutComments(read("scripts/native-package.mjs"));
-  const windows = functionBody(packaging, "packageWindowsLocal");
-  const refusalAt = windows.indexOf("await refuseToReplaceARunningApp(outputRoot);");
-  assert.notEqual(refusalAt, -1, "packageWindowsLocal never checks for a running app");
-  assert.ok(refusalAt < windows.indexOf("rmSync(outputRoot"), "the running-app check comes after the removal");
-  const refusal = functionBody(packaging, "refuseToReplaceARunningApp");
-  for (const part of [
-    "listProcessPaths()",
-    "isInside(processPath, outputRoot)",
-    "acceptsLocalConnections(LIVE_APP_CONTROL_SURFACE_PORT)",
-    "keep-and-restore",
-  ]) {
-    assert.ok(refusal.includes(part), `refuseToReplaceARunningApp lacks ${part}`);
-  }
 });
 
 /** Every script under scripts/ as a `scripts/…` path; the tests are not scripts. */
@@ -1357,9 +1315,7 @@ test("every other script under scripts/ does nothing when imported", () => {
   );
 
   const scripts = scriptFiles();
-  assert.ok(
-    scripts.includes("scripts/native-package.mjs") && scripts.includes("scripts/legacy/tauri-candidate-ifw.mjs")
-  );
+  assert.ok(scripts.includes("scripts/release.mjs") && scripts.includes("scripts/frontend/run-playwright.mjs"));
   assert.deepEqual(
     [...DESTRUCTIVE_SCRIPTS, ...RUNS_WHEN_LOADED].filter((script) => !scripts.includes(script)),
     [],
@@ -1635,4 +1591,35 @@ test("the page a lane seeds can be seen: new saved data opens on another, and th
   assert.equal(NEW_DATA_WORKSPACE, defaultWorkspace, "the lanes' new-data page is the hardware link's default");
   assert.notEqual(SEEDED_WORKSPACE, NEW_DATA_WORKSPACE, "the seeded page must differ from the default page");
   assert.notEqual(MOVED_WORKSPACE, SEEDED_WORKSPACE, "the page saved after the backup must differ from the seeded one");
+});
+
+// Streamlining, 2026-09-28: a lane runs against the development engine or
+// the one `--engine=<path>` names, and takes no other argument. An argument
+// it did not know (`--engine <path>`, the old `--target=windows`) ran the
+// development engine and passed, whatever was meant.
+test("a lane takes --engine=<file> and nothing else", () => {
+  const development = laneEngine(repoRoot, []);
+  assert.equal(development.what, "development");
+  assert.equal(
+    path.relative(repoRoot, development.enginePath).split(path.sep).slice(0, 3).join("/"),
+    "native/target/debug"
+  );
+  assert.match(path.basename(development.enginePath), /^studio-control-engine(\.exe)?$/);
+
+  const file = fileURLToPath(import.meta.url);
+  assert.deepEqual(laneEngine(repoRoot, [`--engine=${file}`]), { enginePath: file, what: "named" });
+
+  for (const refused of [
+    ["--target=windows"],
+    ["--engine", file],
+    ["--Engine=x"],
+    ["--engine="],
+    [`--engine=${file}`, "x"],
+  ]) {
+    assert.throws(() => laneEngine(repoRoot, refused), /is not an argument of this lane/, refused.join(" "));
+  }
+  // A folder is no engine, and neither is a file that is not there.
+  for (const notAFile of [path.dirname(file), path.join(path.dirname(file), "not-there.exe")]) {
+    assert.throws(() => laneEngine(repoRoot, [`--engine=${notAFile}`]), /which is not a file/, notAFile);
+  }
 });

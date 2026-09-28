@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
 
@@ -290,6 +290,31 @@ export function resolveDebugEngineExecutable(rootDir) {
   return process.platform === "win32"
     ? path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe")
     : path.join(rootDir, "native", "target", "debug", "studio-control-engine");
+}
+
+/**
+ * The engine a lane runs against: the one `--engine=<path>` names, which is
+ * how `npm run release` points a lane at the build it has made, or the
+ * development build in the repository. `what` says which, for the lane's
+ * messages. A lane takes no other argument: one it did not know ran the
+ * development engine and passed, whatever was meant.
+ */
+export function laneEngine(rootDir, args = process.argv.slice(2)) {
+  let named = null;
+  for (const arg of args) {
+    const found = /^--engine=(.+)$/.exec(arg);
+    if (!found) {
+      throw new Error(`'${arg}' is not an argument of this lane. It takes one: --engine=<path>.`);
+    }
+    named = path.resolve(found[1]);
+  }
+  if (named === null) {
+    return { enginePath: resolveDebugEngineExecutable(rootDir), what: "development" };
+  }
+  if (!existsSync(named) || !statSync(named).isFile()) {
+    throw new Error(`--engine names ${named}, which is not a file.`);
+  }
+  return { enginePath: named, what: "named" };
 }
 
 export function wait(ms) {

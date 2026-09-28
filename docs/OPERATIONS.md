@@ -5,7 +5,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 ## Before a session
 
 1. Start TotalMix FX and Companion, and vMix when the cameras are used.
-2. Start the verified build. It opens fullscreen on the studio display, on the page last used.
+2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the page last used. (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
 3. Read the header's lamps. `Lighting`, `Audio` and `Surface` should be green and read `ready`. `Prompter` reads `not connected` until the Prompter XL's window is built.
 4. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
 5. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.

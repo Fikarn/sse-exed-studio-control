@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import { assert, EngineHarness, laneEngine } from "./native-runtime-harness.mjs";
 import {
   acceptanceEngineEnv,
   assertAudioWorkflowParity,
@@ -25,10 +25,11 @@ import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 async function main() {
-  const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_ACCEPTANCE_DIR);
-  const acceptanceRoot = explicitRoot ?? mkdtempSync(path.join(os.tmpdir(), "sse-native-acceptance-"));
-  rmSync(acceptanceRoot, { force: true, recursive: true });
-  mkdirSync(acceptanceRoot, { recursive: true });
+  const { enginePath: engineExecutable } = laneEngine(rootDir);
+  // A scratch folder of the lane's own making. Until 2026-09-28
+  // SSE_NATIVE_ACCEPTANCE_DIR named another, which the lane emptied first,
+  // whatever it held.
+  const acceptanceRoot = mkdtempSync(path.join(os.tmpdir(), "sse-native-acceptance-"));
 
   const appDataDir = path.join(acceptanceRoot, "runtime");
   const logsDir = path.join(acceptanceRoot, "logs");
@@ -43,6 +44,7 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
+    engineExecutable,
     env: await acceptanceEngineEnv(),
   });
 
@@ -63,9 +65,8 @@ async function main() {
     // The page is seeded through the app's own request: new saved data opens
     // on the Console, and Lighting is saved instead.
     await seedSavedWorkspace(firstRun, "native-acceptance-installed", "Native acceptance engine");
-    // The continuity sentinel the installer and delivery lanes use, made here
-    // on the same fresh, unconfigured lighting, so the one lane CI runs on
-    // every push proves it survives a restart and comes back with a restore.
+    // The continuity sentinel, made on fresh, unconfigured lighting: the lane
+    // proves it survives a restart and comes back with a restore.
     sentinel = await createContinuitySentinel(
       firstRun,
       "native-acceptance-installed",
@@ -98,6 +99,7 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
+    engineExecutable,
     env: await acceptanceEngineEnv(),
   });
 

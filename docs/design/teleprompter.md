@@ -159,11 +159,11 @@ Each of these is a row in Setup / Support › Recent actions, with Screen as who
 
 ### 6.1 The live copy
 
-The bay shows the Prompter XL's screen as the glass gets it, unmirrored, at 1,688 × 950. That is 88 % of its pixels, so the standard 88 px text shows at 77 px on display 3.
+The bay shows the Prompter XL's screen as the glass gets it, unmirrored, at 1,688 × 950. That is 88 % of its pixels, so the standard 88 px text shows at 77 px on the studio display.
 
 - It is the same layout scaled down, never a second layout: the lines break in the same places, the reading arrow sits at the same height, and the dimming is the same.
 - Nothing is drawn on it that the presenter does not see. The operator's own marks (numbers, the place, the time) sit around it.
-- When the Prompter XL is not connected it keeps showing the script, dimmed and marked "Not on the glass", and the state display says so. The live copy is part of Studio Control's page on display 3 and never a window of its own; D12 is about the presenter's screen.
+- When the Prompter XL is not connected it keeps showing the script, dimmed and marked "Not on the glass", and the state display says so. The live copy is part of Studio Control's page on the studio display and never a window of its own; D12 is about the presenter's screen.
 - When nothing is on the prompter, the live copy is black, with one line under it: `Nothing on the prompter`.
 - For the §10 measures it counts as a picture, like a camera picture: its type is the presenter's, not the page's.
 
@@ -191,8 +191,8 @@ On Update, the same words stay at the reading line. If the paragraph at the read
 
 ## 7. The Prompter XL's screen
 
-- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window is fullscreen and borderless, with no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script is never shown for the presenter on any other screen or window, display 2 included; on display 3 it appears only as the Teleprompter page's own copy (§6.1; D12 as amended; D15 rule 4).
-- **Plugged in.** The window opens by itself and shows what the prompter held, paused. Studio Control's own window stays on display 3; if Windows moves it while rearranging screens, Studio Control puts it back.
+- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window is fullscreen and borderless, with no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script is never shown for the presenter on any other screen or window, display 2 included; on the studio display it appears only as the Teleprompter page's own copy (§6.1; D12 as amended; D15 rule 4).
+- **Plugged in.** The window opens by itself and shows what the prompter held, paused. Studio Control's own window stays on the studio display; if Windows moves it while rearranging screens, Studio Control puts it back.
 - **Unplugged.** The window closes; it is not moved anywhere. The scroll pauses at the place, and `NOT CONNECTED` says so. `PLAY` locks and shows its reason ("the Prompter XL is not connected"): nothing scrolls where nobody can read it. Jumps, speed, size and the editor keep working on the live copy, and the place they set is where the prompter comes back.
 - **Plugged back in.** The script returns at the same place, paused (Appendix B item 14).
 - **Duplicated.** If Windows shows a copy of another screen on the Prompter XL, Studio Control draws nothing there and shows `DUPLICATED` with the way to fix it.
@@ -253,7 +253,7 @@ Delete for good… asks in a dialog, like Delete fixture… on Lighting.
 | Never                                        | How                                                                                                                                                                                                                                                                  |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | show the script anywhere but the Prompter XL | The window opens only on a screen named `Prompter XL`. Unplugged, the window closes and never moves. There is no fallback, no preview window and no network view. Tests and lanes draw into an ordinary window (D15 rule 4), and a Part C test proves the name check |
-| move Studio Control off display 3            | Studio Control holds its window on display 3 by the screen's identity and puts it back if Windows moves it when a screen is plugged in or out                                                                                                                        |
+| move Studio Control off the studio display   | Studio Control holds its window on the studio display by the screen's identity and puts it back if Windows moves it when a screen is plugged in or out                                                                                                               |
 | jump                                         | Only the operator's keys, dials and presses move the place. A file changing on disk, an archive restore and an edit change nothing on the prompter. Update keeps the words at the reading line                                                                       |
 | lose its place                               | The place is stored as words, not pixels (§5.2), and saved about once a second while scrolling and at every change. Unplugging pauses at the place. After a crash while scrolling, the text comes back less than a line early                                        |
 | scroll by itself                             | The prompter is paused after every start: opening Studio Control, opening the page, plugging the Prompter XL in, a restart, a crash, a restore. Only `PLAY` and the speed dial's push start the scroll. At the end, the scroll stops and stays stopped               |
@@ -275,13 +275,13 @@ Delete for good… asks in a dialog, like Delete fixture… on Lighting.
 
 ## 13. What the walk checks (Appendix B)
 
-| Item | Check                                                                                                                                                                                                                                                                            |
-| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 13   | The script reads right in the glass (not mirrored) and on no other screen but the page's own copy; Studio Control stays fullscreen on display 3; with Studio Control closed, the Prompter XL shows a black desktop; Camera Hub's own prompter feature is off, if it is installed |
-| 14   | Unplugged, the page says `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script. Plugged back in, the script returns at the same place, paused                                                                                        |
-| 15   | A `.docx` and pasted text load, and the import sentence counts what was left out. Replacing the script on the prompter needs the second press                                                                                                                                    |
-| 16   | Play, pause, speed, position, size and the jumps work from the page and from the deck, and the scroll is smooth at the speeds used                                                                                                                                               |
-| 17   | After Studio Control is closed and reopened, the script and the place are still there, paused                                                                                                                                                                                    |
+| Item | Check                                                                                                                                                                                                                                                                                     |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13   | The script reads right in the glass (not mirrored) and on no other screen but the page's own copy; Studio Control stays fullscreen on the studio display; with Studio Control closed, the Prompter XL shows a black desktop; Camera Hub's own prompter feature is off, if it is installed |
+| 14   | Unplugged, the page says `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script. Plugged back in, the script returns at the same place, paused                                                                                                 |
+| 15   | A `.docx` and pasted text load, and the import sentence counts what was left out. Replacing the script on the prompter needs the second press                                                                                                                                             |
+| 16   | Play, pause, speed, position, size and the jumps work from the page and from the deck, and the scroll is smooth at the speeds used                                                                                                                                                        |
+| 17   | After Studio Control is closed and reopened, the script and the place are still there, paused                                                                                                                                                                                             |
 
 One risk to walk on purpose, under item 16: a full-screen scroll changes every frame, and DisplayLink compresses each changed frame on this PC's processor. The standard look (black background, plain text) is the cheapest picture it can carry, but only the walk can show the scroll is smooth. It should be walked with the Cameras page open and decoding its three pictures.
 

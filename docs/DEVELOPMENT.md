@@ -37,7 +37,7 @@ A change to the pages shows at once. After a change to the engine or the contrac
 
 | Command                            | Runs                                                                                                            | Takes               |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | under a minute      |
+| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | about a minute      |
 | `npm run frontend:playwright:test` | Builds the pages and Storybook, then the page tests: behaviour, the layout measures, the captures               | about three minutes |
 | `npm run check`                    | Both                                                                                                            | about four minutes  |
 
@@ -50,6 +50,8 @@ The layers, and what each is for:
 - **Page tests** (Playwright, `frontend/app/tests`): what the operator does on screen, against the test double of the engine (`frontend/packages/engine-client/src/transports/fixture/`).
 - **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.
 - **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`): screenshots at 2560×1440, compared on Windows only.
+- **Lanes** (`native:acceptance`, `native:bridge`, `tauri:smoke`): the engine driven from outside, over its pipe and over its Stream Deck bridge, on scratch data with simulated devices. They are part of `check:quick`. `npm run release` runs the first two against the build it makes.
+- **The two shell lanes** (`tauri:setup-support:qualify`, `tauri:workspaces:qualify`) run in CI only. They open the app's window, and the Setup lane connects to addresses of no network, which on this PC leave by one of its two default routes.
 - **Hardware tests** (`npm run native:test:hardware`): the engine tests marked `#[ignore]`, against the real console. Only when the owner asks and is present, with the studio app closed and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` set (`docs/HARDWARE.md`).
 
 ## Captures
@@ -118,4 +120,18 @@ The engine:
 
 ## Studio builds
 
-A studio build is a folder that holds a release build of the shell and a release build of the engine. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.
+A studio build is a folder that holds the shell and the engine, both release builds that `npm run release` marked as the studio's, and `build.json`, which names the commit and the hash of each file. Every other build is a development build and keeps off the studio, a release build made by hand included.
+
+```bash
+npm run release
+```
+
+It needs a clean working tree and a commit that is on `origin/main`. It builds, copies the two files into `builds\<day>_<commit>\` beside the repository, and then tries the copy on scratch data with simulated devices: the shell starts the engine beside it, and the acceptance lane and the bridge lane run against that engine. It takes about ten minutes. A build is never overwritten and never deleted by a script.
+
+To make a build the studio's:
+
+1. Close the studio app and start the new build's `sse-exed-tauri-shell.exe`. If its saved-data schema is newer, this start upgrades the studio's data, after a backup. An older build then refuses that data: going back means restoring the backup.
+2. Walk `docs/CHECKLIST.md`.
+3. `npm run release:verified -- <the build's name>`. It checks the folder against `build.json`, points `builds\Studio Control.cmd` at the build, adds a line to `builds\verified.txt` and tags the commit `verified/<name>`.
+
+`builds\Studio Control.cmd` always starts the verified build. `STUDIO_BUILDS_DIR` names another builds folder.

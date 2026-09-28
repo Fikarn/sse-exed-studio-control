@@ -37,8 +37,9 @@ jobs:
       - run: npm run scripts:test
       - run: npm run file:health
 
-  # The engine and the shell: format, clippy, the tests, and the engine driven
-  # end to end over its pipe. Every run uses the simulated console and cameras.
+  # The engine and the shell: format, clippy, the tests, the engine driven end
+  # to end over its pipe, and its Stream Deck bridge over HTTP. Every run uses
+  # the simulated lights, console and cameras.
   rust:
     runs-on: ubuntu-latest
     steps:
@@ -59,6 +60,7 @@ jobs:
       - run: npm run native:test
       - run: npm run native:test:dev-fixtures
       - run: npm run native:acceptance
+      - run: npm run native:bridge
       - run: npm run tauri:smoke
 
   # The page tests. On Linux they compare no capture and sample no contrast.

@@ -1,7 +1,7 @@
 //! What the engine and the shell agree on about the build they are and the
 //! folder the studio's saved data lives in.
 //!
-//! The studio runs a release build on the platform's default app-data folder.
+//! The studio runs a studio build on the platform's default app-data folder.
 //! Every other build is a development build, and a development build never
 //! opens that folder: a newer build would upgrade the saved data at its first
 //! start, after which the studio's own build refuses it, and the addresses
@@ -19,10 +19,43 @@ use std::path::{Component, Path, PathBuf};
 /// The studio's folder in the platform's app-data folder.
 pub const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 
-/// Whether this is a development build: one with debug assertions, which is
-/// what `cargo build`, `cargo test` and `tauri dev` make.
+/// The variable `npm run release` sets for the compiler: the commit it
+/// builds, all forty characters.
+pub const STUDIO_BUILD_ENV: &str = "SSE_STUDIO_BUILD";
+
+/// The commit a studio build was made from; `None` in a development build.
+///
+/// A studio build is a release build that `npm run release` made. The
+/// command sets `SSE_STUDIO_BUILD` to the commit while it compiles, and the
+/// answer is compiled in: nothing at run time makes a studio build of
+/// another. A release build made any other way (`cargo build --release`,
+/// `tauri build`) is development code the owner has not walked, and it is a
+/// development build like the rest.
+pub fn studio_build_commit() -> Option<&'static str> {
+    studio_build_commit_from(cfg!(debug_assertions), option_env!("SSE_STUDIO_BUILD"))
+}
+
+fn studio_build_commit_from(
+    debug_assertions: bool,
+    marker: Option<&'static str>,
+) -> Option<&'static str> {
+    marker.filter(|commit| {
+        !debug_assertions
+            && commit.len() == 40
+            && commit
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    })
+}
+
+/// Whether this is a studio build.
+pub fn studio_build() -> bool {
+    studio_build_commit().is_some()
+}
+
+/// Whether this is a development build: every build but the studio's.
 pub fn development_build() -> bool {
-    cfg!(debug_assertions)
+    !studio_build()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -92,7 +125,7 @@ where
 
 /// Refuses a development build a folder that is the studio's or inside it.
 /// `folders` are the folders the run would use, its saved data and its logs.
-/// A release build, the studio's, is refused nothing.
+/// A studio build is refused nothing.
 pub fn refuse_studio_folders<F>(
     development_build: bool,
     platform: HostPlatform,
@@ -235,6 +268,39 @@ mod tests {
         }
     }
 
+    // Streamlining, 2026-09-28: the studio's build is the one the release
+    // command marked with its commit. Until then every build without debug
+    // assertions counted, so `tauri build` on a branch made an app that
+    // opened the studio's saved data.
+    #[test]
+    fn only_a_marked_release_build_is_the_studios() {
+        let commit = "55efa2990123456789abcdef0123456789abcdef";
+        assert_eq!(commit.len(), 40);
+        assert_eq!(studio_build_commit_from(false, Some(commit)), Some(commit));
+        for (debug_assertions, marker) in [
+            (false, None),
+            (false, Some("")),
+            (false, Some("1")),
+            (false, Some("true")),
+            (false, Some("55efa29")),
+            (false, Some("55EFA2990123456789ABCDEF0123456789ABCDEF")),
+            (false, Some("55efa2990123456789abcdef0123456789abcdeg")),
+            (false, Some(" 55efa2990123456789abcdef0123456789abcde")),
+            (true, Some(commit)),
+            (true, None),
+        ] {
+            assert_eq!(
+                studio_build_commit_from(debug_assertions, marker),
+                None,
+                "{debug_assertions} {marker:?}"
+            );
+        }
+        // Tests are built with debug assertions.
+        assert!(development_build());
+        assert!(!studio_build());
+        assert_eq!(STUDIO_BUILD_ENV, "SSE_STUDIO_BUILD");
+    }
+
     #[test]
     fn every_platform_names_its_default_folders() {
         let windows = default_app_data_dirs(
@@ -340,7 +406,7 @@ mod tests {
                 assert!(error.contains(&studio.display().to_string()), "{error}");
             }
 
-            // The studio's build, a release build, opens it.
+            // A studio build opens it.
             refuse_studio_folders(false, platform, &[&studio, &studio.join("logs")], env())
                 .expect("a release build opens the studio's data");
         }

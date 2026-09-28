@@ -1,6 +1,6 @@
 # The studio walk
 
-The owner walks this list on a release build, on the real hardware. A build that passes is the verified build the studio runs.
+The owner walks this list with a studio build, on the real hardware: `npm run release` makes one and says where it is. A build that passes is made the studio's with `npm run release:verified`, and is then the verified build the studio runs.
 Walk everything for a build that changes saved data or devices. Otherwise walk the parts the changes touch, plus "Start and window".
 
 ## Start and window

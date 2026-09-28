@@ -2,12 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { assert, hardenedLaneEnv, LIVE_CONSOLE } from "./native-runtime-harness.mjs";
 
-// "Parity" here means dev-engine vs packaged-engine parity: this module holds
-// the shared contract assertions that `native-acceptance.mjs` (dev-built
-// engine) and `native-packaged-acceptance.mjs` (packaged engine) both run, so
-// the two runtime forms cannot drift apart. It is unrelated to the retired
-// Electron parity oracle (removed in v2.1.0) — audited and deliberately kept
-// under this name, 2026-08-12.
+// The assertions the acceptance lane and the bridge lane share. Both run
+// against the development engine, and against a studio build's engine when
+// `npm run release` names it (`--engine=<path>`), so the two cannot drift
+// apart: that is the parity in the name.
 
 // 2026-09 audit remediation, Slice 2 — the acceptance lanes and the studio
 // console. By default the harness runs the engine in simulated audio input
@@ -180,9 +178,8 @@ export async function seedSavedWorkspace(harness, requestIdPrefix, runtimeLabel)
  * Publishes the setup on a host without the studio's hardware, the way the
  * qualification lanes publish: `commissioning.update` to `ready` with the
  * explicit probe override the hardware link requires while a probe has not
- * passed (2026-09 audit Slice 8). The installer and delivery lanes published
- * without it until Slice 2b of the new pages program, which a fresh hardware
- * link refuses (COMMISSIONING_PROBES_INCOMPLETE).
+ * passed (2026-09 audit Slice 8): a fresh hardware link refuses a publish
+ * without it (COMMISSIONING_PROBES_INCOMPLETE).
  */
 export async function publishWithOverride(harness, requestIdPrefix, runtimeLabel) {
   const published = await harness.request(`${requestIdPrefix}-commissioning-ready`, "commissioning.update", {
@@ -244,9 +241,8 @@ export function assertBackupArchiveWithoutPlanning(exportSummary, expectedWorksp
 }
 
 /**
- * The installer and delivery lanes' continuity sentinel: a lighting group,
- * made by the app's own request and kept in the saved data. Until Slice 2 of
- * the new pages program it was a Planning project.
+ * The continuity sentinel: a lighting group, made by the app's own request
+ * and kept in the saved data.
  */
 export async function createContinuitySentinel(harness, requestIdPrefix, name, runtimeLabel) {
   const created = await harness.request(`${requestIdPrefix}-continuity-sentinel-create`, "lighting.group.create", {

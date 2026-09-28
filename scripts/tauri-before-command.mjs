@@ -41,8 +41,9 @@ function main() {
     process.exit(1);
   }
 
-  // `tauri build` makes the studio's kind of app, a release build, and its
-  // engine is one too; `tauri dev` runs the development builds of both.
+  // `tauri build` makes release builds of the shell and the engine (the
+  // studio's, when `npm run release` runs it); `tauri dev` runs the
+  // development builds of both.
   const engineArgs = ["build", "--package", "studio-control-engine", ...(command === "build" ? ["--release"] : [])];
   const engineBuild = spawnSync(cargo, engineArgs, {
     cwd: path.join(rootDirectory, "native"),

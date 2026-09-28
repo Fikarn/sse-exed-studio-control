@@ -73,6 +73,9 @@ test("the cargo steps form one chain, and what reads protocol:check's staging fo
   const byId = Object.fromEntries(DEV_CHECK_STEPS.map((step) => [step.id, step]));
   assert.deepEqual(byId["rust:clippy"].after, ["protocol:check"]);
   assert.deepEqual(byId["native:test"].after, ["rust:clippy"]);
+  assert.deepEqual(byId["native:acceptance"].after, ["native:test"]);
+  assert.deepEqual(byId["native:bridge"].after, ["native:acceptance"]);
+  assert.deepEqual(byId["tauri:smoke"].after, ["native:bridge"]);
   for (const reader of ["format:check", "frontend:typecheck"]) {
     assert.ok(byId[reader].after.includes("protocol:check"), reader);
   }
