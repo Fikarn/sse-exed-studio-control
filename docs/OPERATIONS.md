@@ -6,7 +6,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 1. Start TotalMix FX and Companion, and vMix when the cameras are used.
 2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the page last used. (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
-3. Read the header's lamps. `Lighting`, `Audio` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built, and `Prompter` reads `not connected` until the Prompter XL's window is built.
+3. Read the header's lamps. `Lighting`, `Audio`, `Prompter` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built. `Prompter` reads `not connected` while the Prompter XL is unplugged.
 4. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
 5. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.
 6. Press a key on the Stream Deck and watch the screen follow. No lamp shows whether the deck answers.
@@ -18,7 +18,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 - `Lighting`. `ready`: the bridge passed its last probe; the app never checks the bridge by itself. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
-- `Prompter`. `ready`, or the Teleprompter's state in small letters. Today that is `not connected`.
+- `Prompter`. `ready`: the Prompter XL shows Studio Control's window. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`.
 - `Surface`. `ready`: the app listens for the Stream Deck. `unavailable`: it could not open its port.
 
 A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`, `REC CAM 1`. Pressing it opens its page. The clock comes last.
@@ -77,7 +77,14 @@ The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never r
 
 ## Teleprompter
 
-The Prompter XL's own window is not built yet, so the page reads `NOT CONNECTED` and `PLAY` is locked. Everything else works on the page's copy of the glass.
+The presenter reads the script on the Prompter XL, in a window of Studio Control's own: the script on black, and nothing else. The page shows a copy of it, line for line.
+
+- **The Prompter XL's window** opens by itself when the Prompter XL is plugged in, and shows what the prompter held, paused. It fills that screen and is shown on no other. It takes no keyboard and shows no pointer. It closes when the Prompter XL is unplugged, and when Studio Control closes.
+- **`NOT CONNECTED`.** Windows does not see the Prompter XL. A text that scrolled is paused at its place, and `PLAY` is locked. Everything else works on the page's copy, and the place it sets is where the script comes back.
+- **`DUPLICATED`.** Windows shows a copy of another screen on the Prompter XL. Nothing is drawn there. In Windows' display settings, choose Extend these displays.
+- **`LOW RESOLUTION`.** Windows runs the Prompter XL below 1920×1080. The script is drawn, less sharp.
+- **`NOT SHOWING`.** The window does not show, or its page does not draw. The reason stands in small type under `Prompter XL` in the plate. Studio Control opens the window again by itself every few seconds; a text that scrolled is paused.
+- **When the hardware link stops,** the text on the Prompter XL stands where it was. After the restart it shows the saved place, paused.
 
 - **Scripts.** `Open file…` reads a Word document (`.docx`) or a text file (`.txt`). `Paste as a new script` takes the clipboard. `New script` opens an empty one. The app keeps its own copy and never changes the file.
 - **An import** keeps text, paragraphs, bold, italic and underline. Headings and text in square brackets become cues: directions, never read aloud. It says what it left out.

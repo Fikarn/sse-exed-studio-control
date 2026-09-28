@@ -165,7 +165,7 @@ export function screenSentence(screen: PrompterScreen): string {
     case "duplicated":
       return "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.";
     case "not-showing":
-      return "Studio Control could not open its window on the Prompter XL.";
+      return "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.";
   }
 }
 

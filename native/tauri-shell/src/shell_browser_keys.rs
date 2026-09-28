@@ -14,11 +14,14 @@ use tauri::{AppHandle, WebviewWindow};
 /// The guard binds no function; the page sees nothing of it. A refusal is one
 /// line in shell.log and the shell carries on with WebView2's defaults.
 ///
-/// Called from `.setup`, which runs on the main thread, where `with_webview`
-/// runs its closure at once: after the webview is built and before the event
-/// loop delivers its first `NavigationStarting`. That matters, because WebView2
-/// applies most settings changed after `NavigationStarting` only from the next
-/// top-level navigation — and the operator's screen never navigates again.
+/// For the operator's window it is called from `.setup`, which runs on the
+/// main thread, where `with_webview` runs its closure at once: after the
+/// webview is built and before the event loop delivers its first
+/// `NavigationStarting`. That matters, because WebView2 applies most settings
+/// changed after `NavigationStarting` only from the next top-level navigation
+/// — and the operator's screen never navigates again. The prompter's window
+/// is built on the watch's thread, where the closure is queued and may come
+/// late; that window takes no keyboard on the Prompter XL.
 pub(crate) fn switch_off_browser_keys(app: &AppHandle, window: &WebviewWindow) {
     let app_for_webview = app.clone();
     let queued = window.with_webview(move |webview| {

@@ -2,7 +2,7 @@
 
 The approved design of the Teleprompter (decision D20 in `docs/ROADMAP.md`), with its board, `docs/design/boards/A-teleprompter-1.html`. This text says what the operator can do and see; the board shows where it sits. Where the two differ the board wins: the editor opens in the bay (Edit script, with a quarter-size copy of the glass), the time left sits over the copy, the scripts list is in the plate, and the text size keys are in the look.
 
-The page and its editor are built. The Prompter XL's window (section 7) and the deck's PROMPTER page (section 9) are still to build. This file stays until they are, and is then folded into `docs/OPERATIONS.md`.
+The page, its editor, the deck's PROMPTER page (section 9) and the Prompter XL's window (section 7) are built. Where the building decided otherwise than this text, `docs/ROADMAP.md` says so under each of them. This file is folded into `docs/OPERATIONS.md` at the close-out.
 
 ## 1. What it is for
 
@@ -191,7 +191,7 @@ On Update, the same words stay at the reading line. If the paragraph at the read
 
 ## 7. The Prompter XL's screen
 
-- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window is fullscreen and borderless, with no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script is never shown for the presenter on any other screen or window, display 2 included; on the studio display it appears only as the Teleprompter page's own copy (§6.1; D12 as amended; D15 rule 4).
+- **Only the Prompter XL.** Studio Control opens its prompter window only on a screen that Windows names `Prompter XL` (the Part C drift guard). The window covers the whole screen and has no frame and no taskbar entry. It never takes the keyboard, it hides the mouse pointer, and it stays above other windows on that screen. The script is never shown for the presenter on any other screen or window, display 2 included; on the studio display it appears only as the Teleprompter page's own copy (§6.1; D12 as amended; D15 rule 4).
 - **Plugged in.** The window opens by itself and shows what the prompter held, paused. Studio Control's own window stays on the studio display; if Windows moves it while rearranging screens, Studio Control puts it back.
 - **Unplugged.** The window closes; it is not moved anywhere. The scroll pauses at the place, and `NOT CONNECTED` says so. `PLAY` locks and shows its reason ("the Prompter XL is not connected"): nothing scrolls where nobody can read it. Jumps, speed, size and the editor keep working on the live copy, and the place they set is where the prompter comes back.
 - **Plugged back in.** The script returns at the same place, paused (Appendix B item 14).
@@ -205,15 +205,15 @@ Setup / Support › Workstation shows the same facts in one line: `Prompter XL �
 
 ## 8. States
 
-| Word             | Tone      | Sentence (proposed)                                                                                                                                        | Way out                                   |
-| ---------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `ON SCREEN`      | ok        | "The Prompter XL shows Interview intro." followed by "Playing at 140 words a minute." / "Paused at paragraph 7 of 18." / "At the end."                     | —                                         |
-| `READY`          | ok        | "The Prompter XL is connected and blank. Choose a script and put it on the prompter."                                                                      | Put on the prompter (the selected script) |
-| `NOT UPDATED`    | attention | "Interview intro was edited after it went on the prompter. The prompter still shows the earlier text."                                                     | Update the prompter · press twice         |
-| `LOW RESOLUTION` | attention | "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080 in Windows' display settings for the sharpest text."                                        | —                                         |
-| `NOT CONNECTED`  | error     | "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen." | —                                         |
-| `DUPLICATED`     | error     | "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays." | —                                         |
-| `NOT SHOWING`    | error     | "Studio Control could not open its window on the Prompter XL." (the reason in small type under it)                                                         | Try again                                 |
+| Word             | Tone      | Sentence (proposed)                                                                                                                                               | Way out                                   |
+| ---------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `ON SCREEN`      | ok        | "The Prompter XL shows Interview intro." followed by "Playing at 140 words a minute." / "Paused at paragraph 7 of 18." / "At the end."                            | —                                         |
+| `READY`          | ok        | "The Prompter XL is connected and blank. Choose a script and put it on the prompter."                                                                             | Put on the prompter (the selected script) |
+| `NOT UPDATED`    | attention | "Interview intro was edited after it went on the prompter. The prompter still shows the earlier text."                                                            | Update the prompter · press twice         |
+| `LOW RESOLUTION` | attention | "Windows runs the Prompter XL at 1280×720. Set it to 1920×1080 in Windows' display settings for the sharpest text."                                               | —                                         |
+| `NOT CONNECTED`  | error     | "Windows does not see the Prompter XL. Check its USB-C cable; it needs 15 W. The script and the place are kept, and nothing is shown on any other screen."        | —                                         |
+| `DUPLICATED`     | error     | "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays."        | —                                         |
+| `NOT SHOWING`    | error     | "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself." (the reason in small type) | —                                         |
 
 The armed row sits under the word, as it does on the Console: `Replace Intro with Outro on the prompter · press again · 4.5 s`. The header lamp shows the worst of these states: `Prompter ok`, `Prompter · not updated` or `Prompter · not connected`. `PLAY` locks while the Prompter XL is not connected, and every run key locks while nothing is on the prompter. A locked key takes the locked form (a dashed outline at 55 %) and shows its reason within reach.
 

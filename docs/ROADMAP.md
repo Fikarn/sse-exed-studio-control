@@ -9,7 +9,7 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 
 - [x] The Cameras page (#243, #244)
 - [x] The two Stream Deck pages, PROMPTER and CAMERAS (#246, #247, #248)
-- [ ] The Prompter XL's window
+- [x] The Prompter XL's window (#249, #250, #251)
 - [ ] The camera pictures
 - [ ] The Pocket 6K Pro over Bluetooth
 - [ ] The BGH1s over the network (waits on the owner)
@@ -54,7 +54,7 @@ Built, in three pull requests, against the simulated cameras. The profile reache
 - [x] The hardware link's part (#247): the two pages' keys, dials and displays (`prompter/deck.rs`, `cameras/deck.rs`), the bridge's two routes, the page chain (D5), the dials' bank, the export and the contract. It had its one independent review, and a second look at what the review changed.
 - [x] The pages' part (#248): the Cameras page's section on what the dials set, Setup's deck steps with four pages, the manual and the checklist.
 
-PROMPTER is `docs/design/teleprompter.md` §9, CAMERAS is D14. In the studio's build the CAMERAS page selects and turns the bank, and refuses `REC` and the dials until the cameras' links are built; the PROMPTER page refuses `PLAY` until the Prompter XL's window is built.
+PROMPTER is `docs/design/teleprompter.md` §9, CAMERAS is D14. In the studio's build the CAMERAS page selects and turns the bank, and refuses `REC` and the dials until the cameras' links are built; the PROMPTER page refuses `PLAY` while the Prompter XL shows no script.
 
 Decided while they were built, and kept by the work that follows:
 
@@ -75,11 +75,11 @@ Decided while they were built, and kept by the work that follows:
 
 The shell's second window shows the glass (`PrompterGlass`) on the screen Windows names `Prompter XL`, and on no other. `docs/design/teleprompter.md` §7 has how it looks and behaves.
 
-Done so far:
+Built, in three pull requests. It has not drawn on the Prompter XL yet: only a studio build does, and the Prompter XL was not plugged in. The walk tries it (`docs/CHECKLIST.md`).
 
 - [x] The shell's `main.rs` is split (#249).
 - [x] The display route, and the window held on its display (#250). Found out first, on the workstation and drawing nothing: the route works. It names the studio's three screens and shows the primary's copy as a copy. The Prompter XL was not plugged in, so its name as Windows gives it is still to be read; `shell.log` will say it.
-- [ ] The glass window, its page and the report.
+- [x] The glass window, its page and the report (#251). It had its one independent review, and a second look at what the review changed.
 
 What the work holds to:
 
@@ -104,10 +104,22 @@ What the map of the shell found, for the glass window's pull request:
 - The hardware link's events go to every window, the meters 30 times a second among them. They go to a window by its name.
 - The shell sends no request of its own yet, and reads no event: it learns of `engine.ready` to report after a restart.
 
-Ask the owner first: WebView2 saves the main window's clipboard answer in the profile that every window shares, and the glass must be kept out of it. Try both ways (`GetNonDefaultPermissionSettings` shows what the profile holds), then ask which:
+Decided while it was built, and kept by the work that follows:
 
-- a profile of its own for the glass (`incognito`, or a data directory of its own); or
-- the shell's own `PermissionRequested` handler for the main window, which allows the read with `SetSavesInProfile(false)` and clears any saved answer. It adds a second `unsafe` call.
+- The glass has a profile of its own (`incognito` on its window's entry), and a test holds that every window but the main one has. Both ways were tried on 2026-09-28. The leak is real: once the main window had read the clipboard, a second window on its profile read it too. The other way, a handler of the shell's own that does not save the answer, does not work: the read is allowed and comes back empty. **The owner can overrule it** for a data directory of the glass's own, which does the same with a second browser process and files on disk.
+- The hardware link hears that the Prompter XL is connected only while the window's page says that it draws, once a second, through one command of its own. Without it a glass that stopped drawing would read `CONNECTED`, and `PLAY` would scroll where nobody can read. A page that does not draw within 10 s, or stops for 5 s, is `NOT SHOWING`, and its window is opened again after 5 s. The design's "Try again" key is not needed.
+- While the window opens, the hardware link is told nothing and keeps what it had. Once it was told that the glass draws, it is told at once when the glass does not, and a text that scrolls pauses.
+- The window is put and sized to cover the Prompter XL, not made fullscreen: the fullscreen call made it the window the keyboard goes to, which the design forbids. Tried on one of the workstation's own screens with a black page and no script. The cost: a window that takes no keyboard cannot ask Windows to hide a taskbar under it (`docs/HARDWARE.md`).
+- When Windows moves the window (a screen went), the window's own events hide it at once, and the next look closes it. Where the Prompter XL is still there, the window is `NOT SHOWING` and opens again after 5 s: a window moved again and again was opened again at once, without end (the review).
+- The prompter's window may call two of the shell's commands, and send two requests: `prompter.glass.snapshot` and `prompter.layout.report`. It needs nothing of `prompter.snapshot`.
+- Every command of the shell stands behind one gate that goes by the window's name, so a command added later is refused to the prompter's window until a test says otherwise.
+- Events go to a window by its name with one emit and a filter. A listener that names no target hears every emit, whichever window it was for, so the prompter's page names its own window.
+- When the hardware link is gone, the glass stands where the text was: nothing scrolls by itself, and nobody could pause it.
+- A development build's prompter is an ordinary window with a frame, and the hardware link is told of a screen of 1920×1080 at 60 Hz, so that the prompter can be tried in a development run.
+- The state's sentence for `NOT SHOWING` says that the window is opened again by itself, and the plate shows the reason as the shell words it. What keeps the page from drawing is said in the page's own words, never an error's.
+- The hardware link is told the newest report, and one that had the glass as drawing is told at every look that it does not, until it draws again. The review found that an older report could overtake a newer one, and a text could scroll on with nothing on the glass.
+- Each window hears the hardware link on a channel of its own: Tauri runs an event as script in every page that listens to its channel.
+- The window is put on the Prompter XL twice: on a screen of another scale Windows sizes and places it again. Read in the window library's code, not tried: the walk tries a Prompter XL at another scale than the studio display.
 
 ### The camera pictures, NDI from vMix (was Slice 10)
 

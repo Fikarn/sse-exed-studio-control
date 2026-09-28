@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Prompter XL shows the script: Studio Control opens a window of its own on it when it is plugged in, and closes it when it is unplugged. `PLAY` unlocks while the script is on the glass (#251).
 - Until the links to the cameras are built, a restore leaves a camera's address out and says which (#243).
 - Setup's `Map bindings` shows each dial's three controls under its cell of the strip, and its page tabs are keys like any other. In `Verify live echo` a key of another page turns the screen to its page (#248).
 - In Setup, the state display of a setup that is not published counts the probes that passed once all have; it read "nothing verified yet" (#248).

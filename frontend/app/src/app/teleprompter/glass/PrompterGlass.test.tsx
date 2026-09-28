@@ -203,6 +203,51 @@ describe("PrompterGlass", () => {
     expect(start - shiftAt()).toBeCloseTo(40);
   });
 
+  // The Prompter XL's window: the hardware link is gone while the text
+  // scrolls. Nothing scrolls by itself (D12), so the text stands where it
+  // stood at that moment: not back at the anchor's own place, and no further.
+  it("stands where the text stood when it is stopped, and moves no more", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frames = vi.spyOn(window, "requestAnimationFrame");
+    const playing = storyAnchor({
+      layoutKey: "g1-l0",
+      place: { paragraph: 0, word: 0 },
+      wordOffset: 0,
+      position: 0,
+      endPosition: 5_000,
+      pxPerReadWord: 10,
+      playing: true,
+      fromWpm: 60,
+      toWpm: 60,
+    });
+    const { container, rerender } = render(<PrompterGlass text={text()} anchor={playing} width={1920} />);
+    const column = container.querySelector<HTMLElement>("[data-p]")!.parentElement!;
+    const shiftAt = () => Number(/translate3d\(0, (-?[\d.]+)px, 0\)/.exec(column.style.transform)?.[1]);
+    const start = shiftAt();
+
+    // Stopped four seconds after the anchor came: four words on.
+    now += 4_000;
+    frames.mockClear();
+    rerender(<PrompterGlass text={text()} anchor={playing} width={1920} stoppedAfterMs={4_000} />);
+    expect(start - shiftAt()).toBeCloseTo(40);
+    expect(frames).not.toHaveBeenCalled();
+
+    // A minute on, and drawn again for another reason, it stands there still.
+    now += 60_000;
+    rerender(
+      <PrompterGlass
+        text={text({ look: standardLook({ dimReadText: false }) })}
+        anchor={playing}
+        width={1920}
+        stoppedAfterMs={4_000}
+      />
+    );
+    expect(start - shiftAt()).toBeCloseTo(40);
+    expect(frames).not.toHaveBeenCalled();
+  });
+
   it("stands a word that wraps on the line of its first piece", async () => {
     layOut();
     // The word's box spans two lines; its first piece is on the first.

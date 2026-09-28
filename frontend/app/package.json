@@ -4,7 +4,7 @@
   "version": "2.2.1",
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.app.json && vite build",
+    "build": "tsc -p tsconfig.app.json && vite build && vite build --config vite.prompter.config.ts",
     "dev": "vite",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "vitest run",

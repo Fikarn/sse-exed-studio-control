@@ -49,7 +49,7 @@ The layers, and what each is for:
 - **Unit tests** (Vitest, beside the source as `*.test.ts`): page logic.
 - **Page tests** (Playwright, `frontend/app/tests`): what the operator does on screen, against the test double of the engine (`frontend/packages/engine-client/src/transports/fixture/`).
 - **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.
-- **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`): screenshots at 2560×1440, compared on Windows only.
+- **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`, `prompter-window.spec.ts`): screenshots at 2560×1440 (the prompter's window at the Prompter XL's 1920×1080), compared on Windows only.
 - **Lanes** (`native:acceptance`, `native:bridge`, `tauri:smoke`): the engine driven from outside, over its pipe and over its Stream Deck bridge, on scratch data with simulated devices. They are part of `check:quick`. `npm run release` runs the first two against the build it makes.
 - **The two shell lanes** (`tauri:setup-support:qualify`, `tauri:workspaces:qualify`) run in CI only. They open the app's window, and the Setup lane connects to addresses of no network, which on this PC leave by one of its two default routes.
 - **Hardware tests** (`npm run native:test:hardware`): the engine tests marked `#[ignore]`, against the real console. Only when the owner asks and is present, with the studio app closed and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` set (`docs/HARDWARE.md`).
@@ -65,7 +65,7 @@ A board that a page reaches by a press (the Teleprompter's editor, Setup's Map s
 When a change moves a page:
 
 1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`
-2. `cd frontend/app && npx playwright test visual-review.spec.ts storybook.spec.ts --update-snapshots=changed`
+2. `cd frontend/app && npx playwright test visual-review.spec.ts storybook.spec.ts prompter-window.spec.ts --update-snapshots=changed`
 3. Look at every changed picture before `git add`.
 
 The comparison allows a hundred differing pixels, so a change of a digit or a letter can pass as no change. After a change of words or numbers, write the boards concerned again with `--update-snapshots=all`, keep the pictures that differ in more than noise, and put the others back with `git checkout`.
@@ -83,6 +83,8 @@ Two gates run beside it: `node scripts/check-operator-copy.mjs` (forbidden words
 Pages and their tests:
 
 - **The page tests serve the built pages.** Build before running Playwright by hand, or you test the previous build. `npm run frontend:playwright:test` builds first.
+- **The prompter's page has a build of its own** (`vite.prompter.config.ts`), into the same `dist` after the operator's pages; `npm run build --workspace frontend/app` runs both. The operator's pages keep one stylesheet in one order (`vite.config.ts`). A second page in their build changed that order, and the captures of every page moved. The dev server serves both pages as they are.
+- **The glass moves by a part of a pixel once its layout comes back.** It is drawn from the words until the hardware link has the layout it reported, and from the link's own pixels after. A capture of the prompter's window waits for `data-laid-out`.
 - **Never build Storybook while the page tests run.** Its pages vanish mid-run and unrelated tests fail.
 - **Port `4173` belongs to the page tests.** A preview server left on it after a run makes the next run fail or lie. End it first. The app's development run has `4174`, so the two can run at once.
 - **A page is on screen later than its shell.** Each page is a chunk fetched after the shell has drawn. A test whose first step is a key or a one-off read calls `expectWorkspaceMounted(page, workspace)` first.
@@ -121,6 +123,13 @@ The shell:
 - **`unsafe` has a list.** The shell's crate denies `unsafe`, and lifts it for the functions `SHELL_UNSAFE` names in `scripts/check-no-shortcuts.test.mjs`, each with its reason and its number of blocks. A block says why it is sound in a `// SAFETY:` comment above it. A new block changes the list.
 - **A command of the shell is named by its module** in `main.rs`'s two handler lists (`shell_commands::engine_start`): the macro that registers it lives beside the command.
 - **A rule about screens is a function over plain data.** `shell_displays.rs` reads Windows once and answers a list; everything else (which screen is the Prompter XL, whether the screens changed, where the window goes) takes that list, so it is tested without a screen.
+- **The prompter's window is never made fullscreen.** The window library's fullscreen call makes a window the one the keyboard goes to, whatever the window says of itself. The window is put and sized to cover the screen, which does not.
+- **A window that was closed is gone a moment later.** No second window of its name can be built until then: the watch opens it at its next look.
+- **A page that listens without naming a target hears every event,** whichever window it was sent to. The prompter's page names its own window (`glassLink.ts`).
+- **Tauri runs an event as script in every page that listens to its channel,** whether a listener there is for it or not. So each window has a channel of its own (`shell_windows::event_channel`): on the operator's, the prompter's page would run the meters 30 times a second.
+- **A window put on a screen of another scale is sized and placed again by Windows,** and the window library takes Windows' word for it. The prompter's window is put twice: the second time it already stands on the Prompter XL.
+- **The screens have settled a second after a change, not at the next look.** The watch is woken early (the hardware link's start, the prompter's page), and a woken look finds the screens as the look before did.
+- **A development run's prompter is an ordinary window** with the glass in it, and the hardware link reads `CONNECTED`. To try the page in a browser: `npm run dev --workspace frontend/app`, then `/prompter.html?fixture=teleprompter-ready`.
 - **The watch over the screens asks the window nothing while it holds a lock.** On its thread a question to a window (its monitor, whether it is fullscreen) waits for the main thread. The main thread runs the window commands, which take the same lock (`HeldDisplay`): a question asked under the lock would stop both. The watch looks first (`see`), then locks; what it tells the window is posted.
 
 ## Where the pages' code lives
@@ -128,6 +137,7 @@ The shell:
 - `frontend/app/src/app/OperatorShell.tsx`: the header, the tabs, the pages.
 - `lighting/`, `audio/`, `setup/`, `cameras/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
 - `teleprompter/glass/`: the prompter's glass, drawn both on the page and on the Prompter XL.
+- `frontend/app/src/prompterWindow/`, with `frontend/app/prompter.html`: the prompter's window's page, a page of its own with a build of its own. It follows the hardware link through `GlassLink` (`engine-client`), which sends two requests and starts nothing.
 - `cameras/pictures/`: the pictures' geometry (whole frame, 1:1, the loupe), the aids worked out from a picture's pixels, and the test pictures that stand in until the cameras' pictures are built.
 - `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double). The double has an entry of its own, `@sse/engine-client/fixture`, and the pages load it on request (`fixtureDouble.ts`): in a browser, never in the app's window.
 - `frontend/packages/design-system`, `frontend/packages/tokens`: the shared components, and the sizes and colours. Tokens are built with `npm run frontend:tokens:build`.

@@ -14,6 +14,8 @@ export {
 export { positionAt, speedAt, wordsAdvanced } from "./prompter/motion";
 export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
 export { EngineRequestError } from "./transports/engineRequestError";
+export { createTauriGlassLink, glassLinkOver, PROMPTER_WINDOW_LABEL } from "./transports/glassLink";
+export type { GlassLink } from "./transports/glassLink";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {
   CommissioningCheckRequest,

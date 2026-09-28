@@ -83,6 +83,12 @@ export interface PrompterGlassProps {
   onLayout?: (report: PrompterGlassLayoutReport) => void;
   /** Draws the anchor at its own moment and never animates: a still, for Storybook and the tests. */
   still?: boolean;
+  /**
+   * The text stands where the anchor had it this long after it came, and
+   * nothing moves: the hardware link is gone, and nothing scrolls by itself
+   * (D12). `null` draws the anchor as it runs.
+   */
+  stoppedAfterMs?: number | null;
   label?: string;
   testId?: string;
 }
@@ -209,7 +215,16 @@ async function fontsReady(sizePx: number): Promise<void> {
   }
 }
 
-export function PrompterGlass({ text, anchor, width, onLayout, still = false, label, testId }: PrompterGlassProps) {
+export function PrompterGlass({
+  text,
+  anchor,
+  width,
+  onLayout,
+  still = false,
+  stoppedAfterMs = null,
+  label,
+  testId,
+}: PrompterGlassProps) {
   const layoutKey = text?.layoutKey ?? null;
   const look = text?.look;
   const sizePx = text?.sizePx;
@@ -275,12 +290,13 @@ export function PrompterGlass({ text, anchor, width, onLayout, still = false, la
     const columnElement = columnRef.current;
     if (!layout || !metrics || !columnElement) return true;
     const { anchor: current, receivedAt } = anchorRef.current;
-    const elapsed = current && !still ? performance.now() - receivedAt : 0;
+    const stands = stoppedAfterMs !== null;
+    const elapsed = !current || still ? 0 : stands ? stoppedAfterMs : performance.now() - receivedAt;
     const position = current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0);
     const frame = glassFrame(layout, metrics, position);
     columnElement.style.transform = `translate3d(0, ${frame.shift}px, 0)`;
     if (readRef.current) readRef.current.style.height = `${frame.readHeight}px`;
-    return still || !current || glassSettled(current, elapsed);
+    return still || stands || !current || glassSettled(current, elapsed);
   });
 
   // Draws now, and on every frame after it until the text rests; nothing runs
@@ -357,10 +373,10 @@ export function PrompterGlass({ text, anchor, width, onLayout, still = false, la
     reportAgainIfAsked();
   }, [anchor, run, reportAgainIfAsked]);
 
-  // The reading line, the dimming or a still: drawn again, the anchor's moment kept.
+  // The reading line, the dimming, a still or a text that stands: drawn again, the anchor's moment kept.
   useLayoutEffect(() => {
     run();
-  }, [metrics, dim, still, run]);
+  }, [metrics, dim, still, stoppedAfterMs, run]);
 
   // A glass that was not drawn when it was measured (in a hidden view) is
   // measured, and reported, once it is.

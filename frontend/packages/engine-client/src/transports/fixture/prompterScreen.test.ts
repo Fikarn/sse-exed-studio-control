@@ -189,7 +189,8 @@ describe("the fixture double's Prompter XL: what the shell reports", () => {
       tone: "error",
       draws: false,
       windowError: "The window could not be created.",
-      sentence: "Studio Control could not open its window on the Prompter XL.",
+      sentence:
+        "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.",
     });
     const gone = await reportScreen({ found: false, width: 1920 });
     expect(gone.screen).toMatchObject({
@@ -642,7 +643,11 @@ describe("the fixture double's Prompter XL: the hardware link's words", () => {
 
   it("finds a changed sentence", () => {
     // The guard itself: a word changed on one side only is not found.
-    expect(inScreenRs("Studio Control could not open its window on the Prompter XL.")).toBe(true);
+    expect(
+      inScreenRs(
+        "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself."
+      )
+    ).toBe(true);
     expect(inScreenRs("Studio Control could not open a window on the Prompter XL.")).toBe(false);
     expect(inScreenRs("The Prompter XL is connected: 1920×1080 at 60 Hz.", ["1280×720 at 60 Hz"])).toBe(false);
   });

@@ -40,7 +40,8 @@ pub enum PrompterScreenState {
     Duplicated,
     /// Windows runs it below 1920×1080: the glass is drawn, soft.
     LowResolution,
-    /// Studio Control's window on it could not open.
+    /// Studio Control's window on it does not show: it could not be opened,
+    /// or its page does not draw. The shell opens it again by itself.
     NotShowing,
 }
 
@@ -212,7 +213,7 @@ impl PrompterScreen {
                 "Windows shows a copy of another screen on the Prompter XL, so the script is not drawn there. In Windows' display settings, choose Extend these displays.",
             ),
             PrompterScreenState::NotShowing => String::from(
-                "Studio Control could not open its window on the Prompter XL.",
+                "Studio Control's window on the Prompter XL does not show, so the script is not drawn there. Studio Control opens it again by itself.",
             ),
         }
     }
