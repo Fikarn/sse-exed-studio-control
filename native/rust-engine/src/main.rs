@@ -14,7 +14,6 @@ mod development;
 mod diagnostics;
 mod engine_events;
 mod exports;
-mod exports_audio;
 mod health;
 mod lighting;
 mod lighting_backend;

@@ -48,7 +48,7 @@ Decided while it was built, and kept by the work that follows:
 
 ### The two Stream Deck pages, PROMPTER and CAMERAS (were Slices 7 and 12)
 
-Built together: they share the split of `native/rust-engine/src/exports.rs` (done first), the page chain (D5) and Setup's deck steps, which draw every page's keys and dials. They bring the bridge's actions and feedback and the Companion export. The page's word on the deck is the engine's: `teleprompter`, `cameras`.
+Built together: they share the split of `native/rust-engine/src/exports.rs` into `exports/` (done, #246), the page chain (D5) and Setup's deck steps, which draw every page's keys and dials. They bring the bridge's actions and feedback and the Companion export. The page's word on the deck is the engine's: `teleprompter`, `cameras`.
 
 PROMPTER is `docs/design/teleprompter.md` §9: dials for speed, position, text size and paragraph; `PLAY`, `BACK`, `TOP`, `◂ CUE` and `CUE ▸`; the strip. `PLAY` and the speed dial's push go the deck's locked grey while nothing is drawn on the glass (`checks.prompter.screen.draws` is false), and at a script's end until a jump moves the place back. Every control is grey while nothing is on the prompter.
 

@@ -1412,7 +1412,7 @@ mod tests {
     fn the_pool_holds_the_decks_worst_instant() {
         let burst = crate::exports::deck_worst_instant_requests();
         assert!(
-            burst > crate::exports_audio::AUDIO_LCD_KEYS.len(),
+            burst > crate::exports::AUDIO_LCD_KEYS.len(),
             "the poll and a press: {burst}"
         );
         let test_dir = ready_audio_test_db("bridge-deck-burst");
