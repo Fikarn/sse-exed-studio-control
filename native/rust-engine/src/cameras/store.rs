@@ -41,12 +41,15 @@ impl StoredSetup {
         }
     }
 
+    /// The saved part of the summary; whether the build has a link to the
+    /// camera is the hardware link's to add (`CameraRuntime::setup_summary`).
     pub(crate) fn summary(&self) -> CameraSetupSummary {
         CameraSetupSummary {
             set_up: self.set_up(),
             address: self.address.clone().filter(|_| self.camera != 1),
             paired: self.camera == 1 && self.paired,
             vmix_input: self.vmix_input,
+            no_link: None,
         }
     }
 }

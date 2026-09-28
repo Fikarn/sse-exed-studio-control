@@ -618,6 +618,69 @@ fn a_format_7_archive_carries_the_cameras_and_restores_them_without_the_pairing(
     assert_eq!((rows[2].address.as_deref(), rows[2].vmix_input), (None, 7));
 }
 
+// The Cameras page: in a build with no link to a camera (the studio's,
+// before Slices 11 and 13) a restore leaves the archive's addresses out, as
+// Setup would refuse them, and says which. The vMix inputs come back, an
+// address the archive does not hold is taken away, and an address the saved
+// data already holds is not named.
+#[test]
+fn without_a_link_a_restore_leaves_the_addresses_out_and_says_so() {
+    let test_dir = TestDir::new("format-7-no-link");
+    let mut runtime = seeded_runtime(&test_dir);
+    write_camera(&runtime.db_path, 2, Some("172.16.16.85"), false, 12);
+    write_camera(&runtime.db_path, 3, Some("172.16.16.86"), false, 7);
+    let export = export_support_backup(&runtime).expect("export should succeed");
+
+    runtime.cameras_simulated = false;
+    write_camera(&runtime.db_path, 2, None, false, 2);
+    write_camera(&runtime.db_path, 3, None, false, 3);
+    let restored =
+        restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+            .expect("the archive restores");
+    let detail = restored.detail.expect("a detail");
+    assert!(
+        detail.ends_with(
+            "CAM 2's and CAM 3's addresses were not restored: Studio Control has no link to them yet."
+        ),
+        "{detail}"
+    );
+    assert_operator_words(&detail);
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!((rows[1].address.as_deref(), rows[1].vmix_input), (None, 12));
+    assert_eq!((rows[2].address.as_deref(), rows[2].vmix_input), (None, 7));
+
+    // CAM 3's address is in the saved data already; CAM 2's is another.
+    write_camera(&runtime.db_path, 2, Some("10.0.0.9"), false, 2);
+    write_camera(&runtime.db_path, 3, Some("172.16.16.86"), false, 3);
+    let restored =
+        restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+            .expect("the archive restores");
+    let detail = restored.detail.expect("a detail");
+    assert!(
+        detail.ends_with("CAM 2's address was not restored: Studio Control has no link to it yet."),
+        "{detail}"
+    );
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!(rows[1].address.as_deref(), Some("10.0.0.9"));
+    assert_eq!(rows[2].address.as_deref(), Some("172.16.16.86"));
+
+    // An archive without an address takes the saved one away, as Setup may.
+    write_camera(&runtime.db_path, 2, None, false, 2);
+    write_camera(&runtime.db_path, 3, None, false, 3);
+    runtime.cameras_simulated = true;
+    let export = export_support_backup(&runtime).expect("export should succeed");
+    runtime.cameras_simulated = false;
+    write_camera(&runtime.db_path, 2, Some("10.0.0.9"), false, 2);
+    let restored =
+        restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+            .expect("the archive restores");
+    assert!(
+        !restored.detail.unwrap_or_default().contains("not restored"),
+        "nothing was left out"
+    );
+    assert_eq!(camera_rows(&runtime.db_path)[1].address, None);
+}
+
 // Slice 8: an archive of format 6 or older has no cameras' part, and a
 // restore of it leaves the cameras' setup as it is; Verify names only its
 // scripts.

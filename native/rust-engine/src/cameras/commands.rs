@@ -16,16 +16,18 @@
 //! camera does not report or offer, a value it does not allow, and last the
 //! second press.
 
+use crate::action_log::{list_recent_domain_actions, DOMAIN_CAMERAS};
 use crate::cameras::model::{
     address_refusal, model, parse_camera_address, AutoKind, Setting, ALREADY_RECORDING,
-    CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, NO_LINK_TO_PAIR, RECORDING_CAMERA,
-    STARTED_RECORDING, STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
+    CAMERA_NUMBERS, NOT_CONFIRMED, NOT_RECORDING, RECORDING_CAMERA, STARTED_RECORDING,
+    STOPPED_RECORDING, VMIX_INPUT_MAX, VMIX_INPUT_MIN,
 };
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
-use crate::cameras::snapshot::{CameraState, CamerasHealthCheck};
+use crate::cameras::snapshot::{CameraRecentAction, CameraState, CamerasHealthCheck};
 use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::{CameraError, CamerasReply};
+use crate::diagnostics::{log_event, LogLevel};
 use crate::storage::open_connection;
 use serde_json::{json, Value};
 use std::path::Path;
@@ -33,6 +35,10 @@ use std::time::SystemTime;
 
 /// A request's answer and its `cameras.changed { reason, camera }`.
 type Handled = Result<(Value, Option<(&'static str, Option<u8>)>), CameraError>;
+
+/// How many of the cameras' Recent actions `cameras.snapshot` carries: what
+/// the page's list holds.
+pub(crate) const CAMERAS_RECENT_LIMIT: usize = 5;
 
 /// Answers one `cameras.*` request. `simulated` is `SSE_CAMERAS_SIMULATED`,
 /// read at the start.
@@ -45,7 +51,10 @@ pub(crate) fn handle_cameras_request(
     with_cameras(db_path, simulated, |cameras, bodies, now| {
         let before = cameras.health_check();
         let (result, event) = match method {
-            "cameras.snapshot" => (serde_json::to_value(cameras.snapshot())?, None),
+            "cameras.snapshot" => {
+                let recent = recent_actions(db_path, cameras);
+                (serde_json::to_value(cameras.snapshot(recent))?, None)
+            }
             "cameras.select" => select_request(cameras, params)?,
             "cameras.set" => set_request(cameras, bodies, params, now)?,
             "cameras.step" => step_request(cameras, bodies, params, now)?,
@@ -67,6 +76,39 @@ pub(crate) fn handle_cameras_request(
             health_changed: cameras.health_check() != before,
         })
     })
+}
+
+/// The cameras' newest Recent actions, as the action log holds them. A log
+/// that cannot be read never fails the cameras' read: the list is `None`,
+/// and the log says so once for as long as it lasts.
+fn recent_actions(db_path: &Path, cameras: &mut Cameras) -> Option<Vec<CameraRecentAction>> {
+    match list_recent_domain_actions(db_path, DOMAIN_CAMERAS, CAMERAS_RECENT_LIMIT) {
+        Ok(rows) => {
+            cameras.recent_unread = false;
+            Some(
+                rows.into_iter()
+                    .map(|row| CameraRecentAction {
+                        id: row.id,
+                        at: row.at,
+                        source: row.source,
+                        action: row.action,
+                        target: row.target,
+                        detail: row.detail,
+                    })
+                    .collect(),
+            )
+        }
+        Err(error) => {
+            if !cameras.recent_unread {
+                log_event(
+                    LogLevel::Warn,
+                    &format!("The cameras' Recent actions could not be read: {error}"),
+                );
+            }
+            cameras.recent_unread = true;
+            None
+        }
+    }
 }
 
 /// `checks.cameras` for `health.snapshot`.
@@ -699,14 +741,17 @@ fn save_setup(
     let camera = setup.camera;
     cameras.take_setup(setup, bodies, now, hold);
     Ok((
-        json!({ "camera": camera, "setup": cameras.camera(camera).setup.summary() }),
+        json!({ "camera": camera, "setup": cameras.camera(camera).setup_summary() }),
         Some(("setup", Some(camera))),
     ))
 }
 
 /// `cameras.setup.update { camera, address?, vmixInput? }`: CAM 2's or CAM
 /// 3's address (`null` takes it away), and any camera's vMix input. Saving
-/// an address holds the camera and reads it at once; nothing is sent.
+/// an address holds the camera and reads it at once; nothing is sent. In a
+/// build with no link to the camera an address is refused
+/// (`CAMERA_NO_LINK`), after its shape and its form were checked; taking
+/// one away and the vMix input stay.
 fn setup_update_request(
     db_path: &Path,
     cameras: &mut Cameras,
@@ -755,6 +800,12 @@ fn setup_update_request(
         })?)),
         other => other.map(|_| None),
     };
+    if matches!(address, Some(Some(_))) && !cameras.camera(camera).has_link {
+        return Err(CameraError::Refused(
+            "CAMERA_NO_LINK",
+            model(camera).no_link_refusal(),
+        ));
+    }
     let mut setup = cameras.camera(camera).setup.clone();
     if let Some(input) = vmix_input {
         setup.vmix_input = input;
@@ -781,10 +832,10 @@ fn setup_pair_request(
             "Only CAM 1 is paired; CAM 2 and CAM 3 take an address.",
         )));
     }
-    if !cameras.simulated {
+    if !cameras.camera(camera).has_link {
         return Err(CameraError::Refused(
             "CAMERA_NO_LINK",
-            String::from(NO_LINK_TO_PAIR),
+            model(camera).no_link_refusal(),
         ));
     }
     let mut setup = cameras.camera(camera).setup.clone();

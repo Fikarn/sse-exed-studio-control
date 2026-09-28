@@ -20,4 +20,9 @@ export type CameraSetupSummary = {
    * The vMix input that carries the camera's picture (1–1000).
    */
   vmixInput: number;
+  /**
+   * Why Setup cannot pair this camera (CAM 1) or take its address (CAM 2,
+   * CAM 3): this build has no link to it yet. `null` when it can.
+   */
+  noLink: string | null;
 };

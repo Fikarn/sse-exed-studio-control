@@ -5,9 +5,12 @@
 
 use super::tests::{app_for, TestDir};
 use super::EngineApp;
-use crate::action_log::list_recent_actions;
+use crate::action_log::{
+    list_recent_actions, record_actions, ActionRecord, ActionSource, DOMAIN_AUDIO, DOMAIN_CAMERAS,
+};
 use crate::cameras::runtime;
 use crate::cameras::test_support::take_announced;
+use crate::storage::open_connection;
 use serde_json::{json, Value};
 use studio_control_protocol::RequestEnvelope;
 
@@ -300,6 +303,134 @@ fn a_take_a_format_a_look_and_who_holds_a_camera_are_recent_actions() {
             row("held-again", "CAM 2", "CAM 2 held again."),
         ]
     );
+}
+
+// The page's Recent list (`v1.md`): `cameras.snapshot` carries the action
+// log's newest five rows about the cameras, newest first, as they were
+// written — the screen's and the deck's — and no row of another page. A
+// read leaves no row and raises nothing.
+#[test]
+fn the_cameras_read_carries_their_newest_recent_actions() {
+    let test_dir = TestDir::new("cameras-recent");
+    let app = app_for(&test_dir);
+    let _forget = Forget(&app);
+    assert_eq!(
+        result(&app, "cameras.snapshot", json!({}))["recent"],
+        json!([])
+    );
+
+    set_up(&app);
+    result(&app, "cameras.record.start", json!({}));
+    result(
+        &app,
+        "cameras.format.set",
+        json!({ "camera": 1, "frameRate": "50", "confirm": true }),
+    );
+    record_actions(
+        &app.runtime.db_path,
+        &[
+            ActionRecord::new(
+                ActionSource::Deck,
+                DOMAIN_AUDIO,
+                "mute",
+                "Host",
+                "Host muted",
+            ),
+            ActionRecord::new(
+                ActionSource::Deck,
+                DOMAIN_CAMERAS,
+                "recording-stopped",
+                "CAM 1",
+                "CAM 1 stopped recording.",
+            ),
+        ],
+    )
+    .expect("the rows write");
+    result(
+        &app,
+        "cameras.release",
+        json!({ "camera": 2, "confirm": true }),
+    );
+    result(&app, "cameras.connect", json!({ "camera": 2 }));
+    result(
+        &app,
+        "cameras.release",
+        json!({ "camera": 3, "confirm": true }),
+    );
+
+    let reply = request(&app, "cameras.snapshot", json!({}));
+    assert!(reply.events.is_empty());
+    let recent = reply.response.result.expect("a result")["recent"].clone();
+    let rows: Vec<(String, String, String, String)> = recent
+        .as_array()
+        .expect("a list")
+        .iter()
+        .map(|row| {
+            let text = |key: &str| row[key].as_str().expect(key).to_string();
+            (
+                text("source"),
+                text("action"),
+                text("target"),
+                text("detail"),
+            )
+        })
+        .collect();
+    let row = |source: &str, action: &str, target: &str, detail: &str| {
+        (
+            String::from(source),
+            String::from(action),
+            String::from(target),
+            String::from(detail),
+        )
+    };
+    assert_eq!(
+        rows,
+        vec![
+            row("ui", "released", "CAM 3", "CAM 3 released to LUMIX Tether."),
+            row("ui", "held-again", "CAM 2", "CAM 2 held again."),
+            row("ui", "released", "CAM 2", "CAM 2 released to LUMIX Tether."),
+            row(
+                "deck",
+                "recording-stopped",
+                "CAM 1",
+                "CAM 1 stopped recording."
+            ),
+            row("ui", "format-changed", "CAM 1", "CAM 1: 25p → 50p."),
+        ],
+        "the newest five, newest first"
+    );
+    let first = &recent[0];
+    assert!(first["id"].as_i64().expect("an id") > recent[1]["id"].as_i64().expect("an id"));
+    let at = first["at"].as_str().expect("a time");
+    assert!(at.len() == 24 && at.ends_with('Z'), "{at}");
+    assert_eq!(
+        first.as_object().expect("a row").len(),
+        6,
+        "id, at, source, action, target and detail: {first}"
+    );
+    assert_eq!(camera_rows(&app).len(), 6, "reading wrote no row");
+}
+
+// A Recent list that cannot be read never costs the cameras their read: the
+// list is `null`, and everything else is there.
+#[test]
+fn the_cameras_read_answers_when_the_action_log_cannot_be_read() {
+    let test_dir = TestDir::new("cameras-recent-unread");
+    let app = app_for(&test_dir);
+    let _forget = Forget(&app);
+    set_up(&app);
+    result(&app, "cameras.record.start", json!({}));
+    open_connection(&app.runtime.db_path)
+        .expect("connection should open")
+        .execute("DROP TABLE event_log", [])
+        .expect("the table drops");
+
+    for _ in 0..2 {
+        let snapshot = result(&app, "cameras.snapshot", json!({}));
+        assert_eq!(snapshot["recent"], Value::Null);
+        assert_eq!(snapshot["cameras"][0]["state"], "held");
+        assert_eq!(snapshot["cameras"][0]["recording"]["recording"], true);
+    }
 }
 
 // Format 7: an archive restore writes the cameras' addresses and vMix inputs,

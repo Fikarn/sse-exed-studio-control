@@ -34,6 +34,18 @@ impl LinkFailure {
     }
 }
 
+/// The cameras whose real link is built: none until Slice 11 (CAM 1) and
+/// Slice 13 (CAM 2 and CAM 3).
+const BUILT: [u8; 0] = [];
+
+/// Whether this build can reach the camera at all: through the simulated
+/// link, or through its real one once that is built. Without a link Setup
+/// takes no pairing and no address for it (`CAMERA_NO_LINK`), so the camera
+/// reads `NOT SET UP`, never a fault.
+pub(crate) fn has_link(camera: u8, simulated: bool) -> bool {
+    simulated || BUILT.contains(&camera)
+}
+
 /// The addresses a test build may connect to: this PC's own.
 const THIS_PC: [&str; 3] = ["127.0.0.1", "::1", "localhost"];
 

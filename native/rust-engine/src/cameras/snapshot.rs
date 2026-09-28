@@ -59,6 +59,10 @@ pub struct CameraSetupSummary {
     /// The vMix input that carries the camera's picture (1–1000).
     #[serde(rename = "vmixInput")]
     pub vmix_input: u32,
+    /// Why Setup cannot pair this camera (CAM 1) or take its address (CAM 2,
+    /// CAM 3): this build has no link to it yet. `null` when it can.
+    #[serde(rename = "noLink")]
+    pub no_link: Option<String>,
 }
 
 /// A value a choice cannot take now, and why (a frame rate not at this
@@ -208,6 +212,26 @@ pub struct CameraSnapshot {
     pub recording: CameraRecording,
 }
 
+/// One of the cameras' Recent actions: a row of the action log, as it was
+/// written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct CameraRecentAction {
+    pub id: i64,
+    /// UTC, `2026-09-27T14:03:22.123Z`.
+    pub at: String,
+    /// `ui` (the screen) or `deck` (the Stream Deck).
+    pub source: String,
+    /// `recording-started`, `recording-stopped`, `format-changed`,
+    /// `look-changed`, `released`, `held-again`.
+    pub action: String,
+    /// `CAM 1`, `CAM 2`, `CAM 3`.
+    pub target: String,
+    /// The sentence the operator read.
+    pub detail: String,
+}
+
 /// `cameras.snapshot`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
@@ -216,6 +240,9 @@ pub struct CamerasSnapshot {
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
     pub cameras: Vec<CameraSnapshot>,
+    /// The cameras' newest Recent actions, newest first; `null` when the
+    /// action log could not be read.
+    pub recent: Option<Vec<CameraRecentAction>>,
 }
 
 /// One camera in `checks.cameras`.

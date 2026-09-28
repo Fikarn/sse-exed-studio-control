@@ -3,9 +3,12 @@
 //! is Windows' own and stays with this PC, so the archive leaves it out and
 //! a restore keeps this PC's. A restore writes the saved data only and sends
 //! nothing to a camera (D12); the hardware link reads the cameras again from
-//! the new setup (`commands::after_archive_restore`).
+//! the new setup (`commands::after_archive_restore`). In a build with no link
+//! to a camera the restore leaves its address out, as Setup would refuse it,
+//! and says which it left out.
 
 use crate::cameras::model::{parse_camera_address, CAMERA_NUMBERS, VMIX_INPUT_MAX, VMIX_INPUT_MIN};
+use crate::cameras::real_link::has_link;
 use crate::cameras::store::{read_setup, write_setup};
 use crate::storage::EngineResult;
 use rusqlite::{Connection, Transaction};
@@ -37,12 +40,16 @@ pub(crate) fn build_cameras_archive(connection: &Connection) -> EngineResult<Vec
 /// transaction; the pairing stays as this PC has it. A camera the archive
 /// does not name keeps its setup, and so does a value this build would not
 /// take from Setup (an address that is not one machine's, a vMix input out
-/// of range): the restore never writes what Setup would refuse.
+/// of range, an address in a build with no link to the camera): the restore
+/// never writes what Setup would refuse. Answers the cameras whose address
+/// it left out for want of a link, in their order.
 pub(crate) fn restore_cameras_archive(
     transaction: &Transaction<'_>,
     cameras: &[ArchivedCamera],
-) -> EngineResult<()> {
+    simulated: bool,
+) -> EngineResult<Vec<u8>> {
     let mut rows = read_setup(transaction)?;
+    let mut left_out = Vec::new();
     for archived in cameras {
         if !CAMERA_NUMBERS.contains(&archived.camera) {
             continue;
@@ -53,7 +60,13 @@ pub(crate) fn restore_cameras_archive(
                 None => row.address = None,
                 Some(address) => {
                     if let Some(address) = parse_camera_address(address) {
-                        row.address = Some(address);
+                        if has_link(archived.camera, simulated) {
+                            row.address = Some(address);
+                        } else if row.address.as_deref() != Some(address.as_str())
+                            && !left_out.contains(&archived.camera)
+                        {
+                            left_out.push(archived.camera);
+                        }
                     }
                 }
             }
@@ -63,5 +76,6 @@ pub(crate) fn restore_cameras_archive(
         }
         write_setup(transaction, row)?;
     }
-    Ok(())
+    left_out.sort_unstable();
+    Ok(left_out)
 }
