@@ -9,7 +9,7 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 
 - [x] The Cameras page (#243, #244)
 - [x] The two Stream Deck pages, PROMPTER and CAMERAS (#246, #247, #248)
-- [x] The Prompter XL's window
+- [x] The Prompter XL's window (#249, #250, #251)
 - [ ] The camera pictures
 - [ ] The Pocket 6K Pro over Bluetooth
 - [ ] The BGH1s over the network (waits on the owner)
@@ -79,7 +79,7 @@ Built, in three pull requests. It has not drawn on the Prompter XL yet: only a s
 
 - [x] The shell's `main.rs` is split (#249).
 - [x] The display route, and the window held on its display (#250). Found out first, on the workstation and drawing nothing: the route works. It names the studio's three screens and shows the primary's copy as a copy. The Prompter XL was not plugged in, so its name as Windows gives it is still to be read; `shell.log` will say it.
-- [x] The glass window, its page and the report (#251). It had its one independent review.
+- [x] The glass window, its page and the report (#251). It had its one independent review, and a second look at what the review changed.
 
 What the work holds to:
 
