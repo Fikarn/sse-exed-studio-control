@@ -41,7 +41,9 @@ const BUILT: [u8; 0] = [];
 /// Whether this build can reach the camera at all: through the simulated
 /// link, or through its real one once that is built. Without a link Setup
 /// takes no pairing and no address for it (`CAMERA_NO_LINK`), so the camera
-/// reads `NOT SET UP`, never a fault.
+/// reads `NOT SET UP`, not a fault. Saved data that holds a pairing or an
+/// address all the same (a database backup restored whole) is the one way
+/// to a fault there: that camera reads `UNREACHABLE` until it is forgotten.
 pub(crate) fn has_link(camera: u8, simulated: bool) -> bool {
     simulated || BUILT.contains(&camera)
 }

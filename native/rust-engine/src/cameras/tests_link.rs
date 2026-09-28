@@ -356,6 +356,8 @@ fn without_a_link_setup_takes_no_pairing_and_no_address() {
         "CAMERA_ADDRESS_INVALID"
     );
     assert_eq!(announced_changes(), (Vec::new(), false));
+    // Nothing of a refused request is in the saved data: a start reads it again.
+    cameras.restart();
 
     let snapshot = cameras.snapshot();
     for (index, no_link, cannot) in [

@@ -4,7 +4,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 
 import type { JsonObject } from "../../generated/protocol";
 import { createFixtureTransport } from "../fixtureTransport";
-import { simulatedCameras } from "./camerasRequests";
+import { fixtureContextOf, restoreFixtureCamerasArchive, simulatedCameras } from "./camerasRequests";
 import { ALL_SET_UP, CAM2_ADDRESS, CAM3_ADDRESS, openCamerasDouble } from "./camerasTestSupport";
 import { withCamerasStatus } from "./state";
 
@@ -285,10 +285,42 @@ describe("the fixture double's cameras: the backup (format 7)", () => {
       "CAM 2's address was not restored: Studio Control has no link to it yet."
     );
     expect((await camera(3)).setup.address).toBe(CAM3_ADDRESS);
-    // Nothing is left out the second time either way: CAM 2's is still not there.
+    // A second restore says the same: CAM 2's address is still not in the saved data.
     expect((await call("support.backup.restore", { path })).detail).toBe(
       "CAM 2's address was not restored: Studio Control has no link to it yet."
     );
+  });
+
+  it("reads an archive written by hand to its last word on a camera", () => {
+    // Saved data that holds both addresses, in a build with no link.
+    const transport = createFixtureTransport({
+      ...getFixtureScenario("setup-ready"),
+      cameras: {
+        simulated: false,
+        cameras: [
+          { camera: 2, address: "10.0.0.5" },
+          { camera: 3, address: "10.0.0.6" },
+        ],
+      },
+    });
+    const context = fixtureContextOf(transport);
+    expect(
+      restoreFixtureCamerasArchive(context, [
+        { camera: 2, address: "10.0.0.2", vmixInput: 2 },
+        { camera: 2, address: null, vmixInput: 2 },
+        { camera: 3, address: "10.0.0.3", vmixInput: 3 },
+        { camera: 3, address: "10.0.0.6", vmixInput: 3 },
+      ]),
+      "CAM 2's address is taken away and CAM 3's is the saved one"
+    ).toBeNull();
+    expect(
+      restoreFixtureCamerasArchive(context, [
+        { camera: 3, address: "10.0.0.6", vmixInput: 3 },
+        { camera: 3, address: "10.0.0.3", vmixInput: 3 },
+        { camera: 2, address: null, vmixInput: 2 },
+        { camera: 2, address: "10.0.0.2", vmixInput: 2 },
+      ])
+    ).toBe("CAM 2's and CAM 3's addresses were not restored: Studio Control has no link to them yet.");
   });
 
   it("takes an address away that the archive does not hold", async () => {

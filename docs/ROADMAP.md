@@ -114,6 +114,7 @@ Ask the owner first: route (c), if it is wanted. It is an architecture decision.
 - The engine speaks Blackmagic's published Bluetooth protocol for CAM 1. Battery and card time are not in it, and read "not reported".
 - Pairing (`cameras.setup.pair`) happens once, in Setup, with the owner present, through Windows' own pairing on the `windows` crate.
 - A watch reads the camera between requests, off the request loop. A change on the camera shows within about a second, and a silent camera never holds up a request.
+- A value that keeps moving by itself (an auto setting) must not keep the pages reading: every `cameras.*` request reads the cameras and says `reported`, and the pages' store answers `cameras.changed` with a read. With the simulated cameras that ends after one read.
 
 Guards:
 

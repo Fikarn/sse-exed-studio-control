@@ -412,7 +412,8 @@ fn the_cameras_read_carries_their_newest_recent_actions() {
 }
 
 // A Recent list that cannot be read never costs the cameras their read: the
-// list is `null`, and everything else is there.
+// list is `null`, and everything else is there. The log says so once for as
+// long as it lasts (the page reads once a second), and again the next time.
 #[test]
 fn the_cameras_read_answers_when_the_action_log_cannot_be_read() {
     let test_dir = TestDir::new("cameras-recent-unread");
@@ -420,17 +421,35 @@ fn the_cameras_read_answers_when_the_action_log_cannot_be_read() {
     let _forget = Forget(&app);
     set_up(&app);
     result(&app, "cameras.record.start", json!({}));
-    open_connection(&app.runtime.db_path)
-        .expect("connection should open")
-        .execute("DROP TABLE event_log", [])
-        .expect("the table drops");
+    // What the link holds of the last read of the list: a line is written
+    // when this turns true, and never while it stays true.
+    let said = || {
+        runtime::with_cameras(&app.runtime.db_path, true, |cameras, _, _| {
+            Ok(cameras.recent_unread)
+        })
+        .expect("the cameras read")
+    };
+    result(&app, "cameras.snapshot", json!({}));
+    assert!(!said());
 
+    let connection = open_connection(&app.runtime.db_path).expect("connection should open");
+    connection
+        .execute("ALTER TABLE event_log RENAME TO event_log_away", [])
+        .expect("the table goes");
     for _ in 0..2 {
         let snapshot = result(&app, "cameras.snapshot", json!({}));
         assert_eq!(snapshot["recent"], Value::Null);
         assert_eq!(snapshot["cameras"][0]["state"], "held");
         assert_eq!(snapshot["cameras"][0]["recording"]["recording"], true);
+        assert!(said(), "said, and not again while it lasts");
     }
+
+    connection
+        .execute("ALTER TABLE event_log_away RENAME TO event_log", [])
+        .expect("the table is back");
+    let snapshot = result(&app, "cameras.snapshot", json!({}));
+    assert_eq!(snapshot["recent"].as_array().map(Vec::len), Some(1));
+    assert!(!said(), "the next failure is said again");
 }
 
 // Format 7: an archive restore writes the cameras' addresses and vMix inputs,

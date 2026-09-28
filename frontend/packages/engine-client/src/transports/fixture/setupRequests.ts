@@ -84,7 +84,10 @@ export function handleFixtureSetupRequest(
         if (typeof params.workspace !== "string") throw new Error("workspace must be a string");
         if (!(WORKSPACES as readonly string[]).includes(params.workspace)) throw new Error(workspaceRefusal());
       }
-      // The whole request is checked before anything of it is saved, as the hardware link does.
+      // The page and the section are checked before either is saved, as the hardware link
+      // does. (It checks the rest of the request as well, the window and the lighting
+      // marks, before it saves anything; the double takes those as they come.)
+      if (params.setup !== undefined && asRecord(params.setup) === null) throw new Error("setup must be an object");
       const section = asRecord(params.setup)?.activeSection;
       if (section !== undefined) {
         if (typeof section !== "string") throw new Error("setup.activeSection must be a string");

@@ -700,6 +700,19 @@ describe("the fixture double's cameras: their Recent actions in the read", () =>
     expect(logged).toHaveLength(6);
   });
 
+  it("answers no list, and everything else, while the action log cannot be read", async () => {
+    const { call, snapshot, seen, cameras } = held();
+    await call("cameras.record.start");
+    seen();
+    cameras.actionLogUnreadable(true);
+    const unread = await snapshot();
+    expect(unread.recent).toBeNull();
+    expect(unread.cameras[0]).toMatchObject({ state: "held", recording: { recording: true } });
+    expect(seen(), "a read raises nothing").toEqual([]);
+    cameras.actionLogUnreadable(false);
+    expect((await snapshot()).recent).toHaveLength(1);
+  });
+
   it("holds as many rows as the hardware link's read", () => {
     const commands = readFileSync(
       resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../native/rust-engine/src/cameras/commands.rs"),

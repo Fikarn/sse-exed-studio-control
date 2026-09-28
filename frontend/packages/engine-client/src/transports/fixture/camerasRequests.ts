@@ -4,6 +4,7 @@ import type { JsonObject, JsonValue, RequestMethod } from "../../generated/proto
 import type { EngineTransport, FixtureCameraValuesSeed } from "../../types";
 import {
   AUTO_WHATS,
+  CAMERA_NUMBERS,
   LEVEL_SETTINGS,
   PRESS_SETTINGS,
   cameraAddress,
@@ -648,6 +649,11 @@ export interface SimulatedCameraHooks {
   stopAnswering(camera: CameraNumber): void;
   /** It answers again: a held one is read at once. */
   answerAgain(camera: CameraNumber): void;
+  /**
+   * The action log cannot be read, or can again: while it cannot, `cameras.snapshot`
+   * answers `recent: null` and everything else as ever.
+   */
+  actionLogUnreadable(unreadable: boolean): void;
 }
 
 const bound = new WeakMap<EngineTransport, FixtureRequestContext>();
@@ -655,6 +661,13 @@ const bound = new WeakMap<EngineTransport, FixtureRequestContext>();
 /** Lets a test reach the double's simulated cameras through its transport (`fixtureTransport.ts`). */
 export function bindFixtureCameras(transport: EngineTransport, context: FixtureRequestContext) {
   bound.set(transport, context);
+}
+
+/** A double's own context, for the double's tests of what a restore does to it. */
+export function fixtureContextOf(transport: EngineTransport): FixtureRequestContext {
+  const context = bound.get(transport);
+  if (!context) throw new Error("fixtureContextOf needs a transport made by createFixtureTransport");
+  return context;
 }
 
 /** The simulated cameras of a fixture double made by `createFixtureTransport`. */
@@ -687,6 +700,9 @@ export function simulatedCameras(transport: EngineTransport): SimulatedCameraHoo
       onBody(() => {
         bodies()[camera].answering = true;
       }),
+    actionLogUnreadable: (unreadable) => {
+      fixtureCameras(context.state).recentUnreadable = unreadable;
+    },
   };
 }
 
@@ -714,8 +730,12 @@ export function restoreFixtureCamerasArchive(
   archive: ArchivedCamera[] | null
 ): string | null {
   const now = Date.now();
-  const leftOut: CameraNumber[] = [];
+  // The address the archive gives each camera, were it written; an archive that names a
+  // camera more than once is read to its last word on it.
+  const given = new Map<CameraNumber, string | null>();
+  let leftOut: CameraNumber[] = [];
   changeCameras(context, (cameras) => {
+    const before = new Map(CAMERA_NUMBERS.map((camera) => [camera, cameras.held[camera].address]));
     for (const entry of archive ?? []) {
       const held = cameras.held[entry.camera];
       if (Number.isInteger(entry.vmixInput) && entry.vmixInput >= 1 && entry.vmixInput <= 1000) {
@@ -723,15 +743,19 @@ export function restoreFixtureCamerasArchive(
       }
       if (entry.camera === 1) continue;
       const address = entry.address === null ? null : cameraAddress(entry.address);
-      if ((entry.address !== null && address === null) || address === held.address) continue;
-      if (address !== null && !hasLink(cameras, entry.camera)) {
-        if (!leftOut.includes(entry.camera)) leftOut.push(entry.camera);
-        continue;
-      }
-      held.address = address;
-      holdAfresh(cameras, entry.camera, now);
+      if (entry.address !== null && address === null) continue;
+      given.set(entry.camera, address);
+      if (address === null || hasLink(cameras, entry.camera)) held.address = address;
     }
+    // A camera whose address changed starts again, held and read.
+    for (const camera of CAMERA_NUMBERS) {
+      if (cameras.held[camera].address !== before.get(camera)) holdAfresh(cameras, camera, now);
+    }
+    leftOut = CAMERA_NUMBERS.filter((camera) => {
+      const address = given.get(camera);
+      return typeof address === "string" && cameras.held[camera].address !== address;
+    });
     return answer(null, "restore", null);
   });
-  return addressesNotRestoredSentence(leftOut.sort().map((camera) => cameraModel(camera)));
+  return addressesNotRestoredSentence(leftOut.map((camera) => cameraModel(camera)));
 }

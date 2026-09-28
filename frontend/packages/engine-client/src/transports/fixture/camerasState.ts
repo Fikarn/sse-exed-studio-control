@@ -99,6 +99,8 @@ export interface FixtureCameras {
   /** The simulated link (`SSE_CAMERAS_SIMULATED=1`); without it no camera has a link yet. */
   simulated: boolean;
   selected: CameraNumber;
+  /** The action log cannot be read (a test hook): `cameras.snapshot` answers `recent: null`. */
+  recentUnreadable: boolean;
   held: Record<CameraNumber, HeldCamera>;
   bodies: Record<CameraNumber, SimulatedCamera>;
 }
@@ -155,6 +157,7 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
     cameras = {
       simulated: true,
       selected: 1,
+      recentUnreadable: false,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
         1: { report: startingReport(1), answering: true, sent: 0 },
@@ -386,9 +389,12 @@ export const CAMERAS_RECENT_LIMIT = 5;
  * The cameras' newest Recent actions, newest first, from the double's action log
  * (`support.snapshot`'s `recentEvents`). The double's log keeps fifty rows where the
  * hardware link's keeps five thousand, so here a camera's row leaves the list after fifty
- * newer rows of any page.
+ * newer rows of any page. `null` while a test holds the log unreadable
+ * (`simulatedCameras(…).actionLogUnreadable`), as the hardware link answers when it cannot
+ * read its own.
  */
-export function recentCameraActions(state: MutableFixtureState): CameraRecentAction[] {
+export function recentCameraActions(state: MutableFixtureState): CameraRecentAction[] | null {
+  if (fixtureCameras(state).recentUnreadable) return null;
   const rows = Array.isArray(state.supportSnapshot.recentEvents) ? state.supportSnapshot.recentEvents : [];
   const recent: CameraRecentAction[] = [];
   for (const row of rows) {
@@ -407,7 +413,7 @@ export function recentCameraActions(state: MutableFixtureState): CameraRecentAct
 }
 
 /** `cameras.snapshot`: the selection, the three cameras and their newest Recent actions. */
-export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAction[]): CamerasSnapshot {
+export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAction[] | null): CamerasSnapshot {
   return {
     selected: cameras.selected,
     cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),

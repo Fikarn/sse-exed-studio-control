@@ -681,6 +681,59 @@ fn without_a_link_a_restore_leaves_the_addresses_out_and_says_so() {
     assert_eq!(camera_rows(&runtime.db_path)[1].address, None);
 }
 
+// An archive written by hand can name a camera twice. The restore reads it
+// to its last word on that camera, and names a camera only when it would
+// hold another address had the build a link.
+#[test]
+fn a_restore_reads_an_archive_to_its_last_word_on_a_camera() {
+    let test_dir = TestDir::new("format-7-twice");
+    let mut runtime = seeded_runtime(&test_dir);
+    runtime.cameras_simulated = false;
+    write_camera(&runtime.db_path, 2, Some("10.0.0.5"), false, 2);
+    write_camera(&runtime.db_path, 3, Some("10.0.0.6"), false, 3);
+    let mut archive =
+        serde_json::to_value(build_support_backup_archive(&runtime).expect("archive should build"))
+            .expect("archive should serialize to value");
+    archive["cameras"] = json!([
+        { "camera": 2, "address": "10.0.0.2", "vmixInput": 2 },
+        { "camera": 2, "address": null, "vmixInput": 2 },
+        { "camera": 3, "address": "10.0.0.3", "vmixInput": 3 },
+        { "camera": 3, "address": "10.0.0.6", "vmixInput": 3 }
+    ]);
+    let path = write_archive(&runtime, "native-backup-twice.json", &archive);
+    let restored = restore_support_backup(&runtime, &request_for(&runtime, &path))
+        .expect("the archive restores");
+    assert!(
+        !restored.detail.unwrap_or_default().contains("not restored"),
+        "CAM 2's address is taken away and CAM 3's is the saved one: nothing is left out"
+    );
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!(rows[1].address, None);
+    assert_eq!(rows[2].address.as_deref(), Some("10.0.0.6"));
+
+    // The other way round, each camera's last word is an address it cannot take.
+    write_camera(&runtime.db_path, 3, Some("10.0.0.6"), false, 3);
+    archive["cameras"] = json!([
+        { "camera": 3, "address": "10.0.0.6", "vmixInput": 3 },
+        { "camera": 3, "address": "10.0.0.3", "vmixInput": 3 },
+        { "camera": 2, "address": null, "vmixInput": 2 },
+        { "camera": 2, "address": "10.0.0.2", "vmixInput": 2 }
+    ]);
+    let path = write_archive(&runtime, "native-backup-twice-more.json", &archive);
+    let restored = restore_support_backup(&runtime, &request_for(&runtime, &path))
+        .expect("the archive restores");
+    let detail = restored.detail.expect("a detail");
+    assert!(
+        detail.ends_with(
+            "CAM 2's and CAM 3's addresses were not restored: Studio Control has no link to them yet."
+        ),
+        "{detail}"
+    );
+    let rows = camera_rows(&runtime.db_path);
+    assert_eq!(rows[1].address, None);
+    assert_eq!(rows[2].address.as_deref(), Some("10.0.0.6"));
+}
+
 // Slice 8: an archive of format 6 or older has no cameras' part, and a
 // restore of it leaves the cameras' setup as it is; Verify names only its
 // scripts.

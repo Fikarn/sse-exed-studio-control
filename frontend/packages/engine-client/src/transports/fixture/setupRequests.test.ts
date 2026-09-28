@@ -243,6 +243,11 @@ describe("the fixture double's pages", () => {
     await expect(request("settings.update", { setup: { activeSection: 3 } })).rejects.toThrow(
       "setup.activeSection must be a string"
     );
+    for (const notAnObject of ["cameras", null, ["cameras"]]) {
+      await expect(request("settings.update", { workspace: "audio", setup: notAnObject })).rejects.toThrow(
+        "setup must be an object"
+      );
+    }
     expect(await request("app.snapshot")).toEqual(before);
   });
 

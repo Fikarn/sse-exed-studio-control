@@ -1078,11 +1078,8 @@ describe("createShellStore identify flashes", () => {
   });
 });
 
-// New pages program, Slice 6a: the Teleprompter's two snapshots. Its state is
-// small and read after every change; the text on the glass can hold 30,000
-// words, so it is read only when the state's layout key says it moved.
 // The cameras' snapshot: read at the start without the start depending on
-// it, again after `cameras.changed`, and kept when a reply is malformed.
+// it, again after `cameras.changed`, and kept when a later reply is malformed.
 describe("createShellStore the cameras", () => {
   const cameras = (selected: number, recent: JsonValue = []) => ({ selected, cameras: [], recent });
 
@@ -1130,10 +1127,21 @@ describe("createShellStore the cameras", () => {
     malformed.answer("cameras.snapshot", cameras(1));
     await guarded.refreshCamerasSnapshot();
     expect(guarded.getSnapshot().camerasSnapshot).toEqual(cameras(1));
+    // A malformed reply after that is refused, and the last good one is kept.
+    malformed.answer("cameras.snapshot", { selected: 2, cameras: [], recent: "none" });
+    await guarded.refreshCamerasSnapshot();
+    expect(guarded.getSnapshot().camerasSnapshot).toEqual(cameras(1));
+    expect(guarded.getSnapshot().backgroundFailures.at(-1)).toMatchObject({
+      context: "reply refused",
+      message: "cameras.snapshot: recent is not a list",
+    });
     await guarded.dispose();
   });
 });
 
+// New pages program, Slice 6a: the Teleprompter's two snapshots. Its state is
+// small and read after every change; the text on the glass can hold 30,000
+// words, so it is read only when the state's layout key says it moved.
 describe("createShellStore the Teleprompter", () => {
   const prompter = (layoutKey: string | null) => ({
     look: {},
