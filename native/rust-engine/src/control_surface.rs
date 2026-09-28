@@ -7,6 +7,10 @@ use crate::control_surface_audio::{
     audio_strip_state_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
     AudioDeckStrip,
 };
+use crate::control_surface_presses::{
+    ask, asked_key_acted, asking_key_text, dwelling_press, end_arm, release_dwelling_press,
+    take_dwelling_press, Ask, AskTarget, AskingKey,
+};
 use crate::lighting::{
     create_lighting_scene_with_preview, delete_lighting_scene, load_lighting_editor_state,
     lock_shared_lighting_preview, parse_lighting_all_power_request,
@@ -188,7 +192,7 @@ fn read_deck_lcd_text_at(
     // Console or the rig, and are read once for a whole poll.
     match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key, at) {
         Some(text) => text,
-        None => lights_and_audio_lcd_text(db_path, key),
+        None => lights_and_audio_lcd_text(db_path, key, at),
     }
 }
 
@@ -211,7 +215,18 @@ pub fn read_control_surface_lcd_text_at(
     read_deck_lcd_text_at(db_path, true, key, at)
 }
 
-fn lights_and_audio_lcd_text(db_path: &Path, key: &str) -> Result<String, ControlSurfaceError> {
+fn lights_and_audio_lcd_text(
+    db_path: &Path,
+    key: &str,
+    at: Instant,
+) -> Result<String, ControlSurfaceError> {
+    // The two keys that ask first read the hardware link's memory, not the
+    // saved data: `OFF?` or `DEL?` while armed (2026-09-28).
+    match key {
+        "light_key_off" => return Ok(asking_key_text(db_path, AskingKey::AllOff, at)),
+        "light_key_del" => return Ok(asking_key_text(db_path, AskingKey::DeleteScene, at)),
+        _ => {}
+    }
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let audio_snapshot = read_audio_snapshot(&app_settings);
@@ -396,7 +411,10 @@ pub fn handle_control_surface_http_action_at(
 }
 
 /// A key or a dial of the deck, whatever its page. `cameras_simulated` is
-/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`).
+/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`). The
+/// bridge calls `handle_deck_http_action_at` with the moment the request
+/// arrived; this form, at the moment of the call, is the tests'.
+#[cfg(test)]
 pub fn handle_deck_http_action(
     db_path: &Path,
     cameras_simulated: bool,
@@ -407,8 +425,9 @@ pub fn handle_deck_http_action(
 }
 
 /// `handle_deck_http_action` at a moment of the caller's: the CAMERAS page's
-/// `REC` counts from it, and the two new pages keep their texts from it.
-fn handle_deck_http_action_at(
+/// `REC` counts from it, and the two new pages keep their texts from it. The
+/// bridge gives the moment the request arrived.
+pub(crate) fn handle_deck_http_action_at(
     db_path: &Path,
     cameras_simulated: bool,
     path: &str,
@@ -462,9 +481,22 @@ pub(crate) fn deck_key_stamped(
     };
     let value = body.get("value").and_then(Value::as_str);
 
+    // `Toggle`, `DIM`, a mute and `PLAY` drop a second press within the
+    // dwell (the owner's decision, 2026-09-28): it sends nothing, leaves no
+    // row and raises nothing. Counted from the press that last acted, so a
+    // steady stream of presses still switches at every other one.
+    let dwelling = dwelling_press(path, action, value);
+    let before = match &dwelling {
+        Some(press) => match take_dwelling_press(db_path, press, at) {
+            Some(before) => before,
+            None => return (Ok(json!({ "ok": true, "did": "kept" })), Vec::new()),
+        },
+        None => None,
+    };
+
     let mut events = Vec::new();
     let response = match path {
-        "/api/deck/light-action" => handle_light_action(db_path, action),
+        "/api/deck/light-action" => handle_light_action(db_path, action, at),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
         _ => match crate::control_surface_pages::handle_page_action(
             db_path,
@@ -489,6 +521,9 @@ pub(crate) fn deck_key_stamped(
         },
     };
     let Ok(reply) = &response else {
+        if let Some(press) = &dwelling {
+            release_dwelling_press(db_path, press, before, at);
+        }
         return (response, Vec::new());
     };
     // The action log (Slice 11 — F30): every key through the bridge is
@@ -507,7 +542,13 @@ pub(crate) fn deck_key_stamped(
             ),
         );
     }
-    if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
+    // An armed `All Off` or `Del Scene`, and a press that was the same press
+    // again, changed nothing for the screen to hear of.
+    let changed = !matches!(
+        reply.get("did").and_then(Value::as_str),
+        Some("armed" | "kept")
+    );
+    if let (true, Some(DeckChange::Lighting)) = (changed, deck_change_event(path, action)) {
         events.insert(0, KeyEvent::Lighting);
     }
     (response, events)
@@ -566,14 +607,83 @@ pub fn control_surface_last_event(db_path: &Path) -> Value {
         .unwrap_or(Value::Null)
 }
 
-fn handle_light_action(db_path: &Path, action: &str) -> Result<Value, ControlSurfaceError> {
+fn handle_light_action(
+    db_path: &Path,
+    action: &str,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
     // Every lighting key reads, decides and writes under the lighting state
     // lock, with the preview the IPC loop uses, and changes lighting state
     // only through the functions the screen's requests run (2026-09
     // production readiness, Slice 10 — F12): two keys, or a key and the
     // screen, can no longer overwrite each other's change, and a key pressed
     // while previewing edits the preview buffer, not the light output.
-    with_lighting_state_and_preview(|preview| locked_light_action(db_path, action, preview))
+    with_lighting_state_and_preview(|preview| asked_light_action(db_path, action, preview, at))
+}
+
+/// `All Off` and `Del Scene` ask first (the owner's decision, 2026-09-28):
+/// the first press arms and the key reads `OFF?` or `DEL?`, and a second
+/// press within 3 s, about the same rig, acts. Any other key of the page
+/// ends an arm. The answer's `did` says what the press did: `armed`, `kept`
+/// (nothing), or `switched` and `deleted` for the press that acted.
+fn asked_light_action(
+    db_path: &Path,
+    action: &str,
+    preview: &mut LightingPreviewRuntimeState,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
+    let Some(key) = AskingKey::from_action(action) else {
+        end_arm(db_path);
+        return locked_light_action(db_path, action, preview);
+    };
+    let target = match key {
+        AskingKey::AllOff => Ok(AskTarget::Previewing(preview.enabled)),
+        AskingKey::DeleteScene => list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
+            .and_then(|app_settings| {
+                let lighting_state = load_lighting_editor_state(&app_settings);
+                resolve_selected_inventory_id(
+                    &app_settings,
+                    SELECTED_SCENE_ID_KEY,
+                    lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
+                )
+                .map(AskTarget::Scene)
+                .ok_or_else(|| {
+                    ControlSurfaceError::Rejected(String::from("No lighting scene is selected."))
+                })
+            }),
+    };
+    // A refused press is a press of the page too: it ends another key's arm
+    // (the review of #254).
+    let target = match target {
+        Ok(target) => target,
+        Err(error) => {
+            end_arm(db_path);
+            return Err(error);
+        }
+    };
+    match ask(db_path, key, target, at) {
+        Ask::Armed => return Ok(json!({ "did": "armed" })),
+        Ask::Kept => return Ok(json!({ "did": "kept" })),
+        Ask::Act => {}
+    }
+    match locked_light_action(db_path, action, preview) {
+        Ok(mut reply) => {
+            asked_key_acted(db_path, key, at);
+            if let Some(fields) = reply.as_object_mut() {
+                let did = match key {
+                    AskingKey::AllOff => "switched",
+                    AskingKey::DeleteScene => "deleted",
+                };
+                fields.insert(String::from("did"), json!(did));
+            }
+            Ok(reply)
+        }
+        Err(error) => {
+            end_arm(db_path);
+            Err(error)
+        }
+    }
 }
 
 fn locked_light_action(

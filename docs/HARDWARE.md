@@ -81,12 +81,13 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - The bridge listens on `127.0.0.1` only and has no fallback port. `SSE_CONTROL_SURFACE_PORT` names another port.
 - Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
 - `401` in Companion's log means the profile's token is missing or wrong: export and import again.
-- The profile asks for every display once a second, a connection each: 41 of them. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
+- The profile asks for every display once a second, a connection each: 43 of them. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
 - A display never reads a camera by itself. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second, and once for a key, whose own read answers its displays.
 - `REC` on the deck starts a take with one press and stops it with two, and with nothing else: a press that arrives twice is one press, an armed stop stops the take it was made for and no other, and a press starts no take while the key can still read `STOP?`.
+- `All Off` and `Del Scene` ask as `REC`'s stop does: `OFF?` or `DEL?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, a mute and `Toggle` drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the two keys without showing it, so the build and the profile go together.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
-- The bridge writes one refusal line a minute at most for each status, and counts the rest in it.
+- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:

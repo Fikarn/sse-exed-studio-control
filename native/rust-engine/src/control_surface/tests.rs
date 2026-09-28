@@ -1,6 +1,25 @@
 use super::test_support::{ready_audio_test_db, TestDir};
 use super::*;
 use crate::storage::initialize_test_database;
+use std::cell::Cell;
+use std::time::Duration;
+
+thread_local! {
+    /// The test's own clock for the deck's presses: a second apart, so no
+    /// press of a test is the same press again (the dwell) unless it says so.
+    static PRESS_CLOCK: Cell<Option<Instant>> = const { Cell::new(None) };
+}
+
+/// The next moment of the test's clock, a second after the last.
+fn next_press_moment() -> Instant {
+    PRESS_CLOCK.with(|clock| {
+        let at = clock
+            .get()
+            .map_or_else(Instant::now, |last| last + Duration::from_secs(1));
+        clock.set(Some(at));
+        at
+    })
+}
 
 #[test]
 fn truncate_preserves_short_text() {
@@ -359,12 +378,20 @@ fn ready_lighting_deck_db(label: &str) -> TestDir {
 }
 
 fn light_action(db_path: &Path, action: &str) -> Value {
-    handle_control_surface_http_action(
+    handle_control_surface_http_action_at(
         db_path,
         "/api/deck/light-action",
         &json!({ "action": action }),
+        next_press_moment(),
     )
     .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
+}
+
+/// `All Off` or `Del Scene` as the operator presses it (2026-09-28): the
+/// first press arms and changes nothing, the second, a second later, acts.
+fn asked_light_action(db_path: &Path, action: &str) -> Value {
+    assert_eq!(light_action(db_path, action)["did"], "armed");
+    light_action(db_path, action)
 }
 
 fn deck_app_settings(db_path: &Path) -> HashMap<String, String> {
@@ -629,8 +656,9 @@ fn deck_save_scene_never_reuses_a_live_scene_id() {
         &[(String::from(SELECTED_SCENE_ID_KEY), first_id.clone())],
     )
     .expect("the deck's scene selection should persist");
-    let deleted = light_action(db_path, "deleteScene");
+    let deleted = asked_light_action(db_path, "deleteScene");
     assert_eq!(deleted["sceneId"], first_id.as_str());
+    assert_eq!(deleted["did"], "deleted");
     let third = light_action(db_path, "saveScene");
     let third_id = third["scene"]["id"].as_str().expect("an id").to_string();
     assert_ne!(third_id, second_id, "a live scene's id is never handed out");
@@ -753,7 +781,10 @@ fn deck_all_off_records_source_deck() {
     let db_path = db_path.as_path();
     assert!(recent_actions(db_path).is_empty());
 
-    light_action(db_path, "allOff");
+    // The first press arms: no row, and the key's display asks.
+    assert_eq!(light_action(db_path, "allOff")["did"], "armed");
+    assert!(recent_actions(db_path).is_empty(), "an arm is no row");
+    assert_eq!(light_action(db_path, "allOff")["did"], "switched");
     assert_eq!(
         recent_actions(db_path),
         vec![(
@@ -828,10 +859,11 @@ fn deck_audio_keys_record_source_deck() {
     let db_path = test_dir.db_path();
     let db_path = db_path.as_path();
     let audio_action = |action: &str, value: Option<&str>| {
-        handle_control_surface_http_action(
+        handle_control_surface_http_action_at(
             db_path,
             "/api/deck/audio-action",
             &json!({ "action": action, "value": value }),
+            next_press_moment(),
         )
         .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
     };
@@ -865,5 +897,297 @@ fn deck_audio_keys_record_source_deck() {
             .collect::<Vec<_>>(),
         vec![("deck", "dim"), ("deck", "mute")],
         "newest first"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The keys that ask first, and the ones that dwell (the owner's decisions,
+// 2026-09-28). The tests give the moment of each press themselves.
+// ---------------------------------------------------------------------------
+
+fn light_action_at(db_path: &Path, action: &str, at: Instant) -> Value {
+    handle_control_surface_http_action_at(
+        db_path,
+        "/api/deck/light-action",
+        &json!({ "action": action }),
+        at,
+    )
+    .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
+}
+
+fn lit_count(db_path: &Path) -> usize {
+    load_lighting_editor_state(&deck_app_settings(db_path))
+        .fixtures
+        .iter()
+        .filter(|fixture| fixture.on)
+        .count()
+}
+
+fn scene_count(db_path: &Path) -> usize {
+    load_lighting_editor_state(&deck_app_settings(db_path))
+        .scenes
+        .len()
+}
+
+// `All Off` arms at the first press and reads `OFF?`; the rig does not move
+// and nothing is written. A second press within 3 s switches every fixture
+// off, once, and a press sooner than the dwell after it changes nothing. The
+// key reads its name again once it acted, or once its 3 s are over.
+#[test]
+fn all_off_asks_first_and_switches_at_the_second_press() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("all-off-asks");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment();
+    light_action_at(db_path, "allOn", start);
+    let lit = lit_count(db_path);
+    assert!(lit > 0, "the rig is lit");
+    let rows = recent_actions(db_path).len();
+
+    let armed = start + Duration::from_secs(10);
+    assert_eq!(light_action_at(db_path, "allOff", armed)["did"], "armed");
+    assert_eq!(lit_count(db_path), lit, "an arm moves nothing");
+    assert_eq!(recent_actions(db_path).len(), rows, "an arm is no row");
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_off", armed).expect("a display"),
+        "OFF?"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_del", armed).expect("a display"),
+        "Del\\nScene"
+    );
+    // A bounce inside the dwell is the same press.
+    assert_eq!(
+        light_action_at(db_path, "allOff", armed + Duration::from_millis(100))["did"],
+        "kept"
+    );
+    assert_eq!(lit_count(db_path), lit);
+
+    let second = armed + Duration::from_secs(2);
+    assert_eq!(
+        light_action_at(db_path, "allOff", second)["did"],
+        "switched"
+    );
+    assert_eq!(lit_count(db_path), 0);
+    assert_eq!(recent_actions(db_path).len(), rows + 1);
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_off", second).expect("a display"),
+        "All\\nOff"
+    );
+    assert_eq!(
+        light_action_at(db_path, "allOff", second + Duration::from_millis(200))["did"],
+        "kept",
+        "a double press on the confirm switches once"
+    );
+    assert_eq!(recent_actions(db_path).len(), rows + 1);
+
+    // An arm that runs out: the key reads its name, and the next press
+    // arms again rather than acting.
+    let late = second + Duration::from_secs(10);
+    light_action_at(db_path, "allOn", late);
+    assert_eq!(
+        light_action_at(db_path, "allOff", late + Duration::from_secs(1))["did"],
+        "armed"
+    );
+    let over = late + Duration::from_secs(5);
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_off", over).expect("a display"),
+        "All\\nOff"
+    );
+    assert_eq!(light_action_at(db_path, "allOff", over)["did"], "armed");
+    assert!(lit_count(db_path) > 0, "nothing went off at one press");
+}
+
+// `Del Scene` asks about the scene the deck has selected. A press of another
+// key of the page ends the arm, and so does a selection that moved: the
+// second press never deletes a scene the first did not ask about.
+#[test]
+fn del_scene_asks_about_the_selected_scene_only() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("del-scene-asks");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    light_action(db_path, "saveScene");
+    light_action(db_path, "saveScene");
+    let scenes = scene_count(db_path);
+    assert!(scenes >= 2, "two scenes to choose from");
+
+    let start = next_press_moment() + Duration::from_secs(10);
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", start)["did"],
+        "armed"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_del", start).expect("a display"),
+        "DEL?"
+    );
+    // The scene dial moves the selection: the arm ends.
+    light_action_at(db_path, "selectPrevScene", start + Duration::from_secs(1));
+    assert_eq!(
+        read_control_surface_lcd_text_at(db_path, "light_key_del", start + Duration::from_secs(1))
+            .expect("a display"),
+        "Del\\nScene"
+    );
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", start + Duration::from_secs(2))["did"],
+        "armed",
+        "a press after the arm ended asks again"
+    );
+    assert_eq!(scene_count(db_path), scenes);
+
+    // The selection moved on screen, not at the deck: the second press is
+    // about another scene, and does nothing.
+    let other = load_lighting_editor_state(&deck_app_settings(db_path))
+        .scenes
+        .iter()
+        .map(|scene| scene.id.clone())
+        .find(|id| {
+            deck_app_settings(db_path)
+                .get(SELECTED_SCENE_ID_KEY)
+                .map(String::as_str)
+                != Some(id.as_str())
+        })
+        .expect("another scene");
+    set_settings_owned(db_path, &[(String::from(SELECTED_SCENE_ID_KEY), other)])
+        .expect("the selection should persist");
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", start + Duration::from_secs(3))["did"],
+        "kept"
+    );
+    assert_eq!(scene_count(db_path), scenes);
+
+    // Asked and confirmed: one scene goes, however fast the confirm bounces.
+    let armed = start + Duration::from_secs(10);
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", armed)["did"],
+        "armed"
+    );
+    let second = armed + Duration::from_secs(1);
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", second)["did"],
+        "deleted"
+    );
+    assert_eq!(
+        light_action_at(db_path, "deleteScene", second + Duration::from_millis(100))["did"],
+        "kept"
+    );
+    assert_eq!(scene_count(db_path), scenes - 1);
+}
+
+// `Toggle`, `DIM` and a mute switch at one press, and a second press within
+// the dwell (a bounce, a double press) switches nothing. The dwell counts
+// from the press that acted, and each strip's mute has its own.
+#[test]
+fn toggle_dim_and_a_mute_drop_a_second_press_within_the_dwell() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("toggle-dwells");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment() + Duration::from_secs(10);
+    let first = light_action_at(db_path, "toggleLight", start);
+    let on = first["light"]["on"]
+        .as_bool()
+        .expect("the reply says what was stored");
+    let rows = recent_actions(db_path).len();
+    assert_eq!(
+        light_action_at(db_path, "toggleLight", start + Duration::from_millis(200))["did"],
+        "kept"
+    );
+    assert_eq!(
+        recent_actions(db_path).len(),
+        rows,
+        "the same press leaves no row"
+    );
+    let third = light_action_at(db_path, "toggleLight", start + Duration::from_millis(400));
+    assert_eq!(
+        third["light"]["on"], !on,
+        "a press after the dwell switches"
+    );
+
+    let audio_dir = ready_audio_test_db("dim-and-mute-dwell");
+    let audio_db = audio_dir.db_path();
+    let audio_db = audio_db.as_path();
+    let audio = |action: &str, value: Option<&str>, at: Instant| {
+        handle_control_surface_http_action_at(
+            audio_db,
+            "/api/deck/audio-action",
+            &json!({ "action": action, "value": value }),
+            at,
+        )
+        .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
+    };
+    assert_eq!(audio("dimToggle", None, start)["dim"], true);
+    assert_eq!(
+        audio("dimToggle", None, start + Duration::from_millis(100))["did"],
+        "kept"
+    );
+    assert_eq!(
+        audio("dimToggle", None, start + Duration::from_millis(500))["dim"],
+        false
+    );
+
+    assert_eq!(audio("dialPress", Some("1"), start)["mute"], true);
+    assert_eq!(
+        audio("dialPress", Some("1"), start + Duration::from_millis(100))["did"],
+        "kept"
+    );
+    // Another strip's mute is a press of its own.
+    assert_eq!(
+        audio("dialPress", Some("2"), start + Duration::from_millis(100))["mute"],
+        true
+    );
+    assert_eq!(
+        recent_actions(audio_db)
+            .iter()
+            .filter(|(_, action, _)| action == "mute")
+            .count(),
+        2
+    );
+}
+
+// The review of #254: an armed or kept press of `All Off` raises no
+// `lighting.changed`, another key of the page ends its arm, and the press
+// that acts is heard.
+#[test]
+fn an_arm_raises_nothing_and_another_key_ends_it() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("asking-keys-events");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment() + Duration::from_secs(10);
+    let press = |action: &str, at: Instant| {
+        deck_key_stamped(
+            db_path,
+            true,
+            "/api/deck/light-action",
+            &json!({ "action": action }),
+            at,
+        )
+    };
+
+    let (armed, events) = press("allOff", start);
+    assert_eq!(armed.expect("an answer")["did"], "armed");
+    assert!(events.is_empty(), "an arm raises nothing: {events:?}");
+    let (kept, events) = press("allOff", start + Duration::from_millis(100));
+    assert_eq!(kept.expect("an answer")["did"], "kept");
+    assert!(
+        events.is_empty(),
+        "the same press raises nothing: {events:?}"
+    );
+
+    // Another key of the page ends the arm: the next press asks again.
+    let (moved, _) = press("selectNextScene", start + Duration::from_millis(500));
+    moved.expect("the dial moves the selection");
+    let (again, events) = press("allOff", start + Duration::from_secs(1));
+    assert_eq!(again.expect("an answer")["did"], "armed");
+    assert!(events.is_empty());
+
+    let (switched, events) = press("allOff", start + Duration::from_secs(2));
+    assert_eq!(switched.expect("an answer")["did"], "switched");
+    assert_eq!(
+        events,
+        vec![KeyEvent::Lighting],
+        "the press that acted is heard"
     );
 }

@@ -878,6 +878,11 @@ pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<Actio
         ActionRecord::new(ActionSource::Deck, DOMAIN_AUDIO, action, target, detail)
     };
 
+    // An armed `All Off`, `Del Scene` or `REC`, and a press that was the same
+    // press again, changed nothing (2026-09-28).
+    if matches!(text(reply, "/did"), Some("armed" | "kept")) {
+        return Vec::new();
+    }
     match (path, action) {
         ("/api/deck/light-action", _) if staged => Vec::new(),
         ("/api/deck/light-action", "allOn" | "allOff") => {

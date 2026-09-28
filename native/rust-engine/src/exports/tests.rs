@@ -1,7 +1,7 @@
 use super::audio::AUDIO_LCD_KEYS;
 use super::controls::{DECK_AMBER_BG, DECK_MUTED_INK};
 use super::controls::{DECK_GREY_INK, DECK_HAZARD_INK, DECK_LIVE_BG};
-use super::lights::LIGHT_LCD_KEYS;
+use super::lights::{LIGHT_LCD_KEYS, LIGHT_POLLED_LCD_KEYS};
 use super::profile::{
     generate_companion_config, polled_lcd_keys, streamdeck_surface_id_from,
     COMPANION_EXPORT_FORMAT_VERSION, INSTANCE_ID, INSTANCE_LABEL,
@@ -154,8 +154,9 @@ fn companion_export_is_a_native_v9_full_config() {
             + LIGHT_LCD_KEYS.len()
             + CAMERA_LCD_KEYS.len()
             + PROMPTER_LCD_KEYS.len()
+            + LIGHT_POLLED_LCD_KEYS.len()
     );
-    assert_eq!(custom_variables.len(), 45);
+    assert_eq!(custom_variables.len(), 47);
     assert!(custom_variables.contains_key("lcd_camera_key_rec"));
     assert!(custom_variables.contains_key("lcd_prompter_state_play"));
     assert!(custom_variables.contains_key("lcd_light_nav"));
@@ -299,7 +300,7 @@ fn companion_export_triggers_poll_and_follow_the_app() {
         poll["actions"].as_array().map(Vec::len),
         Some(polled_lcd_keys().len())
     );
-    assert_eq!(polled_lcd_keys().len(), 41);
+    assert_eq!(polled_lcd_keys().len(), 43);
 
     let follow = &triggers["sse-trigger-follow-audio"];
     assert_eq!(follow["events"][0]["type"], "condition_true");

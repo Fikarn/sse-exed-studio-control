@@ -5,7 +5,7 @@
 
 use super::audio::AUDIO_LCD_KEYS;
 use super::controls::{deck_asset, lcd_refreshes, ControlDef};
-use super::lights::LIGHT_LCD_KEYS;
+use super::lights::{LIGHT_LCD_KEYS, LIGHT_POLLED_LCD_KEYS};
 use super::pages::{deck_page_number, DECK_PAGES};
 use crate::bootstrap::RuntimeContext;
 use crate::cameras::deck::CAMERA_LCD_KEYS;
@@ -291,13 +291,15 @@ fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Optio
 }
 
 /// Every display the 1 s poll refreshes: the AUDIO page's (with `workspace`,
-/// which every page's follow reads), the CAMERAS page's and the PROMPTER
-/// page's. The LIGHTS page's are refreshed as the deck arrives.
+/// which every page's follow reads), the CAMERAS page's, the PROMPTER
+/// page's, and the two LIGHTS keys that ask first. The LIGHTS page's other
+/// displays are refreshed as the deck arrives.
 pub(crate) fn polled_lcd_keys() -> Vec<&'static str> {
     AUDIO_LCD_KEYS
         .iter()
         .chain(CAMERA_LCD_KEYS.iter())
         .chain(PROMPTER_LCD_KEYS.iter())
+        .chain(LIGHT_POLLED_LCD_KEYS.iter())
         .copied()
         .collect()
 }
@@ -527,7 +529,8 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
 /// `the_pool_holds_the_decks_worst_instant`). New pages program, Slice 2: the
 /// follow triggers sent nothing to the bridge until the lighting one took over
 /// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4). With
-/// the CAMERAS and PROMPTER pages the poll is 41 requests, and the instant 62.
+/// the CAMERAS and PROMPTER pages the poll was 41 requests, and the instant 62;
+/// with the LIGHTS page's `OFF?` and `DEL?` (2026-09-28) they are 43 and 64.
 #[cfg(test)]
 pub(crate) fn deck_worst_instant_requests() -> DeckWorstInstant {
     fn bridge_requests(value: &Value) -> usize {

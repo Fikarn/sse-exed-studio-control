@@ -1,6 +1,9 @@
 //! The LIGHTS page.
 
-use super::controls::{button, dial, http_post, lcd_refreshes, page_jump, ControlDef};
+use super::controls::{
+    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, page_jump,
+    ControlDef, DECK_AMBER_BG, DECK_AMBER_INK,
+};
 use super::pages::deck_page_number;
 use serde_json::json;
 
@@ -13,6 +16,41 @@ use serde_json::json;
 // was called `LEGACY_LCD_KEYS` until then.)
 pub(super) const LIGHT_LCD_KEYS: &[&str] =
     &["light_nav", "light_intensity", "light_cct", "scene_nav"];
+
+/// The LIGHTS page's two keys that ask first (2026-09-28): `All Off` reads
+/// `OFF?` and `Del Scene` `DEL?` while armed. They are polled with the other
+/// pages' displays, or the question would stand after its 3 s until the deck
+/// came back to the page.
+pub(crate) const LIGHT_POLLED_LCD_KEYS: [&str; 2] = ["light_key_off", "light_key_del"];
+
+/// A key that asks first: its name, or its question in amber while armed.
+/// The press refreshes the key, so the question shows at once.
+fn asking_key(
+    row: &'static str,
+    col: &'static str,
+    label: &'static str,
+    action: &'static str,
+    lcd_key: &'static str,
+    variable: &'static str,
+    question: &'static str,
+) -> ControlDef {
+    expression_button(
+        row,
+        col,
+        label,
+        variable,
+        http_post("/api/deck/light-action", json!({ "action": action }))
+            .into_iter()
+            .chain(lcd_refreshes(&[lcd_key]))
+            .collect(),
+    )
+    .with_feedbacks(vec![color_feedback(
+        lcd_key,
+        question,
+        DECK_AMBER_INK,
+        DECK_AMBER_BG,
+    )])
+}
 
 /// The LIGHTS page (page 1). New pages program, Slice 2: its `<< PROJ` key
 /// (row 0, column 0) left with Planning and the slot stays empty, since
@@ -32,11 +70,16 @@ pub(super) fn light_controls() -> Vec<ControlDef> {
             "All On",
             http_post("/api/deck/light-action", json!({"action":"allOn"})),
         ),
-        button(
+        // `All Off` and `Del Scene` ask first, as `REC` asks `STOP?`; `Save`
+        // stays one press (the owner's decision, 2026-09-28).
+        asking_key(
             "0",
             "3",
             "All Off",
-            http_post("/api/deck/light-action", json!({"action":"allOff"})),
+            "allOff",
+            "light_key_off",
+            "$(custom:lcd_light_key_off)",
+            "OFF?",
         ),
         button(
             "1",
@@ -50,11 +93,14 @@ pub(super) fn light_controls() -> Vec<ControlDef> {
             "Recall",
             http_post("/api/deck/light-action", json!({"action":"recallScene"})),
         ),
-        button(
+        asking_key(
             "1",
             "2",
             "Del Scene",
-            http_post("/api/deck/light-action", json!({"action":"deleteScene"})),
+            "deleteScene",
+            "light_key_del",
+            "$(custom:lcd_light_key_del)",
+            "DEL?",
         ),
         // The next page. Its LCD refreshes named four keys the audio surface
         // retired in 2026-09 (`audio_ch_nav`, `audio_gain1`–`3`), which the
