@@ -60,15 +60,21 @@ describe("the engine's test double", () => {
         staticImportsOfTheLoader.push(relative(file));
       }
     }
-    // `glassStoryScript.ts` is the stories' and the tests' text for the glass;
-    // no page imports it.
-    expect(importers.sort()).toEqual(["app/fixtureDouble.ts", "app/teleprompter/glass/glassStoryScript.ts"]);
+    // `glassStoryScript.ts` is the stories' and the tests' text for the glass,
+    // and `camerasTestData.ts` the cameras the Cameras page's tests read; no
+    // page imports either.
+    expect(importers.sort()).toEqual([
+      "app/cameras/camerasTestData.ts",
+      "app/fixtureDouble.ts",
+      "app/teleprompter/glass/glassStoryScript.ts",
+    ]);
     expect(staticImportsOfTheLoader).toEqual([]);
     expect(readFileSync(path.join(SRC, "app", "createShellEnvironment.ts"), "utf8")).toContain(
       'await import("./fixtureDouble")'
     );
     for (const file of productionModules(SRC)) {
       expect(readFileSync(file, "utf8"), relative(file)).not.toMatch(/from\s+"[^"]*glassStoryScript"/);
+      expect(readFileSync(file, "utf8"), relative(file)).not.toMatch(/from\s+"[^"]*camerasTestData"/);
     }
   });
 });

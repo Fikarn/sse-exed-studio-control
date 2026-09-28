@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ShellRegion, useArm } from "@sse/design-system";
 import {
@@ -73,10 +73,20 @@ export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspacePro
   const main = camerasSnapshot ? cameraOf(camerasSnapshot, 1) : null;
   const state = useMemo(() => (camerasSnapshot ? camerasStateView(camerasSnapshot) : null), [camerasSnapshot]);
 
+  // A read that fails is recorded when it begins to fail, not once a second.
+  const readFailing = useRef(false);
   useEffect(() => {
     const id = window.setInterval(() => {
       setNow(Date.now());
-      store.refreshCamerasSnapshot().catch((error: unknown) => store.reportBackgroundFailure(error, "the cameras"));
+      store.refreshCamerasSnapshot().then(
+        () => {
+          readFailing.current = false;
+        },
+        (error: unknown) => {
+          if (!readFailing.current) store.reportBackgroundFailure(error, "the cameras");
+          readFailing.current = true;
+        }
+      );
     }, 1000);
     return () => window.clearInterval(id);
   }, [store]);

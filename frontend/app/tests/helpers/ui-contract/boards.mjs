@@ -120,6 +120,7 @@ export const EXCEPTIONS = {
   "setup-required": { regionsPresent: 4 },
   "setup-ready": { regionsPresent: 4 },
   "setup-degraded": { regionsPresent: 4 },
+  "setup-cameras": { regionsPresent: 4 },
   "lighting-empty": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
   "lighting-loading": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
   "lighting-populated": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },

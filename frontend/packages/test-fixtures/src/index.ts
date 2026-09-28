@@ -1,5 +1,14 @@
 import fixtureMap from "./fixtures.json";
+import { expandCamerasRecord, type FixtureCamerasSeedRecord, type RawCamerasRecord } from "./camerasSeeds";
 import { expandPrompterRecord, type CompactPrompterRecord, type FixturePrompterSeedRecord } from "./prompterScripts";
+
+export {
+  expandCamerasRecord,
+  type FixtureCameraSeedRecord,
+  type FixtureCameraValuesSeedRecord,
+  type FixtureCamerasSeedRecord,
+  type RawCamerasRecord,
+} from "./camerasSeeds";
 
 export {
   INTERVIEW_INTRO,
@@ -17,7 +26,11 @@ type RawScenarioRecord = (typeof fixtureMap)[keyof typeof fixtureMap];
 type WithoutKey<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 // New pages program, Slice 6a: `fixtures.json` names a scenario's scripts
 // (`CompactPrompterRecord`); the scenario carries the double's seed they make.
-type FixtureScenarioRecord = WithoutKey<RawScenarioRecord, "prompter"> & { prompter?: FixturePrompterSeedRecord };
+// Its cameras are read the same way: the file's numbers made the three cameras.
+type FixtureScenarioRecord = WithoutKey<RawScenarioRecord, "prompter" | "cameras"> & {
+  prompter?: FixturePrompterSeedRecord;
+  cameras?: FixtureCamerasSeedRecord;
+};
 type FixtureMap = Record<string, FixtureScenarioRecord>;
 
 function cloneFixture<T>(value: T): T {
@@ -202,16 +215,42 @@ function buildAudioNoSendFixture(): FixtureScenarioRecord {
   return scenario;
 }
 
-/** Every scenario of `fixtures.json`, its `prompter` (the scripts by name) made the double's seed. */
+// Every page with something on it, for the header's fullest row: a rig whose
+// scene can drift, the Console's bank with a solo, a script on the prompter and
+// the three cameras held. Built here, not in `fixtures.json`, so it adds no
+// UI-contract board.
+function buildEveryPageFixture(): FixtureScenarioRecord {
+  const lighting = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
+    appSnapshot: Record<string, unknown>;
+  };
+  const prompter = (fixtureMap["teleprompter-ready"] as { prompter: CompactPrompterRecord }).prompter;
+  lighting.appSnapshot.shell = {
+    ...((lighting.appSnapshot.shell as Record<string, unknown> | undefined) ?? {}),
+    workspace: "cameras",
+  };
+  return {
+    ...lighting,
+    audioSnapshot: cloneFixture(fixtureMap["audio-populated"].audioSnapshot),
+    prompter: expandPrompterRecord("every-page", prompter),
+    cameras: expandCamerasRecord("every-page", (fixtureMap["cameras-held"] as { cameras: RawCamerasRecord }).cameras),
+  } as FixtureScenarioRecord;
+}
+
+/** Every scenario of `fixtures.json`, its `prompter` (the scripts by name) and its `cameras` made the double's seeds. */
 function expandedFixtureMap(): FixtureMap {
   return Object.fromEntries(
     Object.entries(fixtureMap).map(([id, record]) => {
-      const { prompter, ...rest } = record as RawScenarioRecord & { prompter?: CompactPrompterRecord };
+      const { prompter, cameras, ...rest } = record as RawScenarioRecord & {
+        prompter?: CompactPrompterRecord;
+        cameras?: RawCamerasRecord;
+      };
       return [
         id,
-        (prompter === undefined
-          ? rest
-          : { ...rest, prompter: expandPrompterRecord(id, prompter) }) as FixtureScenarioRecord,
+        {
+          ...rest,
+          ...(prompter === undefined ? {} : { prompter: expandPrompterRecord(id, prompter) }),
+          ...(cameras === undefined ? {} : { cameras: expandCamerasRecord(id, cameras) }),
+        } as FixtureScenarioRecord,
       ];
     })
   );
@@ -231,6 +270,7 @@ const derivedFixtureMap: FixtureMap = {
   "audio-hardware-metering": buildAudioHardwareMeteringFixture(),
   "audio-probe-passed-unsynced": buildAudioProbePassedUnsyncedFixture(),
   "audio-no-send": buildAudioNoSendFixture(),
+  "every-page": buildEveryPageFixture(),
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
   "lighting-palettes-preview-active": buildLightingPalettePreviewFixture(),

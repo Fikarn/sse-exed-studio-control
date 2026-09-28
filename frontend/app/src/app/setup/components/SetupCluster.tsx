@@ -1,12 +1,13 @@
 import { Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
 
 import type { CommissioningCheck } from "../../shellData";
+import type { SetupMode } from "../setupPilotModel";
 import type { SetupState } from "../setupState";
 import styles from "./SetupCluster.module.css";
 
 // Visual overhaul A, Slice 7 (system §2, §7; A-setup.html): Setup's cluster.
 // What commissioning is, first and fixed, with the one key that gets the
-// operator out of it; then Runner or Support, the five steps in the order they
+// operator out of it; then Runner, Support or Cameras, the five steps in the order they
 // are done, the three probes with what each one reports, and the standing
 // actions at the foot. The steps and the probes are keys, not tabs: a step is a
 // place the operator goes, and a probe is a thing the desk says.
@@ -23,14 +24,14 @@ export interface SetupClusterProps {
   busy?: boolean;
   canReturnToConsole: boolean;
   checks: readonly CommissioningCheck[];
-  mode: "runner" | "support";
+  mode: SetupMode;
   state: SetupState;
   steps: readonly SetupClusterStep[];
   onExportBackup: () => void;
   onOpenEngineLog: () => void;
   onReturnToConsole: () => void;
   onRunAllProbes: () => void;
-  onSelectMode: (mode: "runner" | "support") => void;
+  onSelectMode: (mode: SetupMode) => void;
   onSelectStep: (stepId: string) => void;
   onStartRunner: () => void;
 }
@@ -120,6 +121,15 @@ export function SetupCluster({
           aria-pressed={mode === "support"}
           testId="setup-mode-support"
           onClick={() => onSelectMode("support")}
+        />
+        <Key
+          mode="segmented"
+          cap="Cameras"
+          take
+          engaged={mode === "cameras"}
+          aria-pressed={mode === "cameras"}
+          testId="setup-mode-cameras"
+          onClick={() => onSelectMode("cameras")}
         />
       </Segmented>
 

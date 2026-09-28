@@ -56,6 +56,7 @@ function PilotOnStore({
     <OperatorLayoutProvider>
       <SetupSupportPilot
         appSnapshot={withBridge(state.appSnapshot, controlSurface)}
+        camerasSnapshot={state.camerasSnapshot}
         commissioningSnapshot={commissioningSnapshot}
         controlSurfaceSnapshot={state.controlSurfaceSnapshot}
         healthSnapshot={state.healthSnapshot}

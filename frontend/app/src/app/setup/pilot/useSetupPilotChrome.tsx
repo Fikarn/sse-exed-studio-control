@@ -90,7 +90,9 @@ export function useSetupPilotChrome({
 
   const bayHead = (
     <>
-      <span className={styles.bayTitle}>{mode === "runner" ? "Commissioning runner" : "Support dashboard"}</span>
+      <span className={styles.bayTitle}>
+        {mode === "runner" ? "Commissioning runner" : mode === "cameras" ? "Camera setup" : "Support dashboard"}
+      </span>
       <span className={styles.bayDetail}>
         {mode === "runner"
           ? `step ${stepIndex + 1} of ${runnerStepOrder.length} · ${
@@ -98,7 +100,9 @@ export function useSetupPilotChrome({
                 ? "the last step commits everything above it"
                 : "each step is finished before the next one opens"
             }`
-          : "what to do when something is wrong, and the archives to do it from"}
+          : mode === "cameras"
+            ? "what Studio Control holds for each camera · not a step of the runner"
+            : "what to do when something is wrong, and the archives to do it from"}
       </span>
     </>
   );

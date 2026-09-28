@@ -14,12 +14,14 @@ import { stepToBoard } from "./helpers/ui-contract/boards.mjs";
 // 2026-09-28 every capture held them, so a change to the header moved some
 // twenty-eight captures; it now moves the strips.
 
-// New pages program, Slice 6a: the Teleprompter joins with its ready board.
+// New pages program, Slice 6a: the Teleprompter joins with its ready board;
+// the Cameras with theirs, all three held.
 const FIXTURES = [
   "setup-ready",
   "protocol-mismatch",
   "lighting-populated",
   "audio-populated",
+  "cameras-held",
   "teleprompter-ready",
 ] as const;
 
@@ -226,6 +228,15 @@ const STATE_FIXTURES = [
   // on, and on a new script.
   "teleprompter-editing",
   "teleprompter-new-script",
+  // The Cameras: CAM 1 recording, a camera handed over, one that does not
+  // answer, CAM 1 lost while it recorded, the studio's build before the
+  // cameras' links are built, and the cameras' setup.
+  "cameras-recording",
+  "cameras-released",
+  "cameras-unreachable",
+  "cameras-lost-mid-take",
+  "cameras-no-link",
+  "setup-cameras",
 ] as const;
 
 test.describe("state coverage", () => {
@@ -252,12 +263,16 @@ const CHROME = [
   { name: "header-lighting", fixture: "lighting-populated", region: HEADER },
   { name: "header-audio", fixture: "audio-populated", region: HEADER },
   { name: "header-teleprompter", fixture: "teleprompter-ready", region: HEADER },
+  { name: "header-cameras", fixture: "cameras-held", region: HEADER },
+  { name: "header-cameras-recording", fixture: "cameras-recording", region: HEADER },
+  { name: "header-cameras-lost-mid-take", fixture: "cameras-lost-mid-take", region: HEADER },
   { name: "header-desk-offline", fixture: "audio-offline", region: HEADER },
   { name: "header-start-failed", fixture: "bootstrap-failed", region: HEADER },
   { name: "footer-setup", fixture: "setup-ready", region: FOOTER },
   { name: "footer-lighting", fixture: "lighting-populated", region: FOOTER },
   { name: "footer-audio", fixture: "audio-populated", region: FOOTER },
   { name: "footer-teleprompter", fixture: "teleprompter-ready", region: FOOTER },
+  { name: "footer-cameras", fixture: "cameras-held", region: FOOTER },
 ] as const;
 
 test.describe("the chrome", () => {

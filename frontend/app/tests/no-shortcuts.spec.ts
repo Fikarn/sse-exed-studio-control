@@ -62,7 +62,7 @@ async function settle(page: Page) {
   await page.waitForTimeout(150);
 }
 
-type Workspace = "setup" | "lighting" | "audio" | "teleprompter";
+type Workspace = "setup" | "lighting" | "audio" | "cameras" | "teleprompter";
 
 async function open(page: Page, fixture: string, workspace: Workspace) {
   await openFixture(page, fixture);
@@ -214,6 +214,54 @@ test.describe("No key does anything (new pages S3, D6)", () => {
       "Enter",
       "Escape",
     ]);
+  });
+
+  // The keys a camera program usually binds: R and Space to record, 1 to 3
+  // for the camera, the arrows and + and − for a value, F for focus, I and
+  // Shift+I for the iris, W for white balance, Z, P and G for the aids.
+  test("the Cameras: R and Space, 1 to 3, the arrows, + and −, F, I, W, Z, P and G", async ({ page }) => {
+    await open(page, "cameras-held", "cameras");
+    await expectNoKeyGlyphs(page, "the Cameras");
+    await expectKeysDoNothing(page, "cameras-held", "cameras", [
+      "r",
+      "Shift+R",
+      "Space",
+      "Enter",
+      "1",
+      "2",
+      "3",
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      "Equal",
+      "Minus",
+      "f",
+      "i",
+      "Shift+I",
+      "w",
+      "z",
+      "p",
+      "g",
+      "Control+4",
+      "Control+k",
+      "?",
+      "Escape",
+    ]);
+    // While CAM 1 records, no key stops the take or arms the stop.
+    await page.getByTestId("cameras-rec").click();
+    await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "recording");
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    for (const key of ["r", "Space", "Enter", "Escape", "s"]) {
+      await page.keyboard.press(key);
+      await settle(page);
+      await expect
+        .soft(page.getByTestId("cameras-rec"), `${key} while CAM 1 records`)
+        .toHaveAttribute("data-rec", "recording");
+      await expect
+        .soft(page.getByTestId("cameras-rec"), `${key} while CAM 1 records`)
+        .toHaveAttribute("data-armed", "false");
+    }
   });
 
   test("the Teleprompter's editor: the browser's formatting keys and the keys other programs bind change no text", async ({

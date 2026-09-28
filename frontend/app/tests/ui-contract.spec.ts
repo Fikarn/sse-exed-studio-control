@@ -141,7 +141,13 @@ test.describe("UI contract", () => {
   // measured once the regions are declared (Slice 2).
   test("the state display keeps one x-band across the workspaces", async ({ page }) => {
     const xs: Array<{ fixture: string; x: number }> = [];
-    for (const fixture of ["audio-populated", "lighting-populated", "setup-ready", "teleprompter-ready"]) {
+    for (const fixture of [
+      "audio-populated",
+      "lighting-populated",
+      "setup-ready",
+      "cameras-held",
+      "teleprompter-ready",
+    ]) {
       await openBoard(page, fixture);
       const { measures } = await measureBoard(page);
       if (measures.stateDisplayX !== null) xs.push({ fixture, x: measures.stateDisplayX });

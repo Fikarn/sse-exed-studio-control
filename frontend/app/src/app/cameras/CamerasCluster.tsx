@@ -164,21 +164,19 @@ export function CamerasCluster({
                 onClick={() => onSelect(camera.camera)}
               >
                 <span className={styles.cameraTag}>{camera.tag}</span>
-                <LampWord tone={camera.tone} cap={false} className={styles.cameraState}>
-                  {camera.word}
-                </LampWord>
+                <span className={styles.cameraWords}>
+                  {camera.rec === "recording" ? (
+                    <LampWord tone="error">REC</LampWord>
+                  ) : camera.rec === "last-known" ? (
+                    <LampWord tone="attention" cap={false}>
+                      last known REC
+                    </LampWord>
+                  ) : null}
+                  <LampWord tone={camera.tone} cap={false}>
+                    {camera.word}
+                  </LampWord>
+                </span>
                 <span className={styles.cameraMeta}>{camera.meta}</span>
-                {camera.rec === "recording" ? (
-                  <LampWord tone="error" className={styles.cameraRec}>
-                    REC
-                  </LampWord>
-                ) : camera.rec === "last-known" ? (
-                  <LampWord tone="attention" cap={false} className={styles.cameraRec}>
-                    last known REC
-                  </LampWord>
-                ) : (
-                  <span />
-                )}
                 <span className={styles.cameraValues} data-kind={camera.valuesKind}>
                   {camera.values}
                 </span>

@@ -20,6 +20,22 @@
   flex: none;
 }
 
+/* While CAM 1 records the key is a hazard: the red lamp beside the word,
+   the hint under them. */
+.rec[data-key-mode="hazard"] {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
+  justify-content: center;
+  column-gap: 10px;
+  row-gap: 10px;
+}
+
+.rec[data-key-mode="hazard"] > span:last-child {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
 /* Doubt on the take-time key: the last thing CAM 1 reported, not a fact now.
    A dashed amber keyline on a display, at full strength: it is to be read. */
 .recDoubt {
@@ -128,12 +144,15 @@
   letter-spacing: var(--font-tracking-cap);
 }
 
-.cameraState,
-.cameraRec {
+.cameraWords {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   justify-self: end;
 }
 
 .cameraMeta {
+  grid-column: 1 / -1;
   min-width: 0;
   overflow: hidden;
   color: var(--text-text2);
@@ -144,6 +163,7 @@
 
 .cameraValues {
   grid-column: 1 / -1;
+  min-width: 0;
   overflow: hidden;
   font: 500 var(--font-size-label) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
@@ -223,11 +243,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* A sentence takes two lines at most; the rest is cut. */
 .recentText {
+  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .recentSource {

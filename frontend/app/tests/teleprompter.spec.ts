@@ -19,10 +19,10 @@ async function expectLaidOut(page: Page) {
 }
 
 test.describe("the Teleprompter page (new pages S6a)", () => {
-  test("sits after Audio, and shows the script on the glass with its place and time", async ({ page }) => {
+  test("is the last tab, and shows the script on the glass with its place and time", async ({ page }) => {
     await openTeleprompter(page);
     const tabs = page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button");
-    await expect(tabs).toHaveText(["Setup / Support", "Lighting", "Audio", "Teleprompter"]);
+    await expect(tabs).toHaveText(["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"]);
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
     await expect(page.getByTestId("teleprompter-state-display")).toContainText(
       "The Prompter XL shows 02 Interview intro. Paused at paragraph 8"

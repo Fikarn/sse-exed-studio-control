@@ -41,11 +41,9 @@ export function zebraMask(pixels: Uint8ClampedArray, width: number, height: numb
 export function peakingMask(pixels: Uint8ClampedArray, width: number, height: number, step = PEAKING_STEP): Uint8Array {
   const mask = new Uint8Array(width * height);
   let above: Float32Array | null = null;
-  let row = new Float32Array(width);
   for (let y = 0; y < height; y += 1) {
-    const next = new Float32Array(width);
-    for (let x = 0; x < width; x += 1) next[x] = brightnessAt(pixels, y * width + x);
-    row = next;
+    const row = new Float32Array(width);
+    for (let x = 0; x < width; x += 1) row[x] = brightnessAt(pixels, y * width + x);
     for (let x = 0; x < width; x += 1) {
       const here = row[x] ?? 0;
       if (x + 1 < width && Math.abs((row[x + 1] ?? 0) - here) > step) {

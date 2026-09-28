@@ -1,0 +1,74 @@
+/* Setup / Support's Cameras screen: one card a camera, across the step's left
+   column, each with its fields in rows. The card is printed on the screen's
+   well, so its inks are the display's. */
+
+.camera {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--display-text) 20%, transparent);
+  border-radius: var(--radius-key);
+  color: var(--display-text);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.tag {
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.model {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 140px;
+  align-items: center;
+  gap: 12px;
+}
+
+.label {
+  color: var(--display-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  letter-spacing: var(--font-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.value {
+  font: 600 var(--font-size-name) / 1 var(--font-family-mono);
+}
+
+.foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  align-items: center;
+  gap: 12px;
+}
+
+.locked {
+  color: var(--role-amber-text);
+  font: 500 var(--font-size-label) / 1.35 var(--font-family-ui);
+}
+
+.waiting {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--display-text2);
+  font: 500 var(--font-size-body) / 1.4 var(--font-family-ui);
+}
