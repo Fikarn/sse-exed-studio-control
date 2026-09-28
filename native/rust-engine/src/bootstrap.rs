@@ -464,6 +464,13 @@ pub(crate) fn apply_pending_restore_at_start(
     if !pending.is_file() {
         return Ok(None);
     }
+    // Before the staged file is used or removed: until a start has written
+    // the hold this restore owes, every start holds (the review of #253). A
+    // start that fails after the restored file took its place — the backup
+    // before an upgrade could not be written, the process was ended during
+    // the upgrade — would otherwise leave the next start with the restored
+    // file's own flag, and no staged file to say why.
+    fs::write(restore_hold_marker(runtime_paths), b"")?;
     let refusal = match inspect_database_backup(&pending) {
         Ok(facts) if facts.schema_version <= STORAGE_SCHEMA_VERSION => None,
         Ok(facts) => Some(format!(
@@ -528,6 +535,16 @@ pub(crate) fn apply_pending_restore_at_start(
     Ok(Some(AppliedRestore { replaced }))
 }
 
+/// `<app-data>/restore-hold.marker`: a database restore was staged, and no
+/// start has written the hold it owes yet.
+pub(crate) const RESTORE_HOLD_MARKER_FILE_NAME: &str = "restore-hold.marker";
+
+fn restore_hold_marker(runtime_paths: &RuntimePaths) -> PathBuf {
+    runtime_paths
+        .app_data_dir
+        .join(RESTORE_HOLD_MARKER_FILE_NAME)
+}
+
 /// The light outputs at the start (Slice 11 — F31), in one transaction with
 /// the action-log rows that say so. A start that applied a database restore
 /// holds them, whatever the restored or the replaced database said (the
@@ -536,8 +553,11 @@ pub(crate) fn apply_pending_restore_at_start(
 /// a database that failed its check — the backup's own flag stood, and the
 /// restart could stream the restored look to a rig that was held. A start
 /// whose staged restore was refused holds them too: the operator asked for a
-/// restore, and every restore comes back held. Then `SSE_SAFE_START` holds,
-/// whatever the flag was.
+/// restore, and every restore comes back held; the row says it was refused,
+/// since the screen said the restore was applied. A start after one that
+/// applied a restore and did not finish holds them as well: the marker the
+/// restore left says so, and goes once the hold is written. Then
+/// `SSE_SAFE_START` holds, whatever the flag was.
 fn hold_light_outputs_at_start(
     runtime_paths: &RuntimePaths,
     applied_restore: Option<&AppliedRestore>,
@@ -550,6 +570,8 @@ fn hold_light_outputs_at_start(
     )?);
     let mut armed = stored;
     let mut actions = Vec::new();
+    let marker = restore_hold_marker(runtime_paths);
+    let hold_owed = marker.is_file();
     if applied_restore.is_some() {
         // The restored file brought its own, older action log: this row says
         // what the start did with it.
@@ -562,13 +584,22 @@ fn hold_light_outputs_at_start(
             "Database backup restored at start; light outputs held until they are armed in Setup / Support",
         ));
     } else if restore_was_staged {
+        armed = false;
+        actions.push(ActionRecord::new(
+            ActionSource::Launch,
+            DOMAIN_SETUP,
+            "database-restore-refused",
+            "Saved data",
+            "Database restore refused at start; the saved data is kept, and the light outputs are held",
+        ));
+    } else if hold_owed {
         if armed {
             actions.push(ActionRecord::new(
                 ActionSource::Launch,
                 DOMAIN_LIGHTING,
                 "outputs-held",
                 "Light outputs",
-                "Light outputs held at start: the database restore was refused",
+                "Light outputs held at start: the start that restored a database backup did not finish",
             ));
         }
         armed = false;
@@ -599,6 +630,20 @@ fn hold_light_outputs_at_start(
         set_settings_owned_and(db_path, &settings, |transaction| {
             insert_actions(transaction, &actions)
         })?;
+    }
+    // The hold is written: the restore owes nothing more. A marker that
+    // cannot be removed holds the next start too, which is the safe side.
+    if hold_owed {
+        if let Err(error) = fs::remove_file(&marker) {
+            append_log(
+                &runtime_paths.log_file_path,
+                "WARN",
+                &format!(
+                    "{} could not be removed ({error}); the next start holds the light outputs too",
+                    marker.display()
+                ),
+            )?;
+        }
     }
     // The light-output health entry belongs to the sACN thread, which starts
     // after the ready event — and the shell's first `health.snapshot`
@@ -1489,10 +1534,17 @@ mod tests {
             .expect("pending should stage");
 
         let db_path = paths.db_path.clone();
+        let marker = paths
+            .app_data_dir
+            .join(super::RESTORE_HOLD_MARKER_FILE_NAME);
         let runtime = bootstrap_runtime_from_paths(paths).expect("the restored database boots");
         assert!(
             !output_armed(&db_path),
             "the restored database said armed; the rig was held, and stays held"
+        );
+        assert!(
+            !marker.exists(),
+            "the hold is written, and the restore owes nothing"
         );
         assert_eq!(
             launch_rows(&db_path),
@@ -1602,7 +1654,8 @@ mod tests {
 
     // A staged restore that fails its check at the start is removed and the
     // saved data kept. The operator asked for a restore, and every restore
-    // comes back held: the start holds the outputs, and the row says why.
+    // comes back held: the start holds the outputs, and its row says the
+    // restore was refused, since the screen said it was applied.
     #[test]
     fn a_refused_restore_holds_the_light_outputs() {
         let test_dir = TestDir::new("refused-restore-held");
@@ -1626,8 +1679,10 @@ mod tests {
             launch_rows(&db_path),
             vec![(
                 String::from("launch"),
-                String::from("outputs-held"),
-                String::from("Light outputs held at start: the database restore was refused"),
+                String::from("database-restore-refused"),
+                String::from(
+                    "Database restore refused at start; the saved data is kept, and the light outputs are held"
+                ),
             )]
         );
         drop(runtime);
@@ -1638,6 +1693,66 @@ mod tests {
             bootstrap_runtime_from_paths(runtime_paths_for(&test_dir)).expect("the database boots");
         assert!(!output_armed(&db_path));
         assert_eq!(launch_rows(&db_path).len(), 1);
+        drop(runtime);
+    }
+
+    // The review of #253: the restored file takes its place before the start
+    // writes the hold. A start that fails in between — the backup before an
+    // upgrade could not be written, the process was ended during the upgrade —
+    // left the next start with the restored file's own flag and no staged file
+    // to say why, so a backup made while armed streamed to a rig that was
+    // held. The marker the restore left holds that next start too.
+    #[test]
+    fn a_restore_whose_start_did_not_finish_still_comes_back_held() {
+        let test_dir = TestDir::new("restore-start-did-not-finish");
+        let paths = runtime_paths_for(&test_dir);
+        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
+        initialize_database(&paths.db_path, &paths.backups_dir)
+            .expect("database should initialize");
+        // A backup made while armed (no key at all); the rig is then held.
+        let backup = snapshot_database(&paths.db_path, &paths.backups_dir, SnapshotReason::Daily)
+            .expect("backup should write");
+        set_settings_owned(&paths.db_path, &[lighting_output_armed_setting(false)])
+            .expect("the hold should persist");
+        fs::copy(&backup, paths.app_data_dir.join(RESTORE_PENDING_FILE_NAME))
+            .expect("pending should stage");
+
+        // The start takes the restore, and ends before it holds.
+        apply_pending_restore(&paths).expect("the restore is applied");
+        assert!(
+            output_armed(&paths.db_path),
+            "the restored file's own flag stands until a start holds it"
+        );
+        let marker = paths
+            .app_data_dir
+            .join(super::RESTORE_HOLD_MARKER_FILE_NAME);
+        assert!(marker.exists(), "the restore owes its hold");
+
+        let db_path = paths.db_path.clone();
+        let runtime = bootstrap_runtime_from_paths(paths).expect("the next start boots");
+        assert!(!output_armed(&db_path), "the next start holds");
+        assert!(!marker.exists());
+        assert_eq!(
+            launch_rows(&db_path),
+            vec![(
+                String::from("launch"),
+                String::from("outputs-held"),
+                String::from(
+                    "Light outputs held at start: the start that restored a database backup did not finish"
+                ),
+            )]
+        );
+        drop(runtime);
+
+        // The start after it owes nothing: the operator's arm stands.
+        set_settings_owned(&db_path, &[lighting_output_armed_setting(true)])
+            .expect("arming should persist");
+        let runtime =
+            bootstrap_runtime_from_paths(runtime_paths_for(&test_dir)).expect("the database boots");
+        assert!(
+            output_armed(&db_path),
+            "an arm after the hold is the operator's"
+        );
         drop(runtime);
     }
 }

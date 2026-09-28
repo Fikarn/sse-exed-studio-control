@@ -163,12 +163,12 @@ export function SetupRecoverySurface({
   const restoreBackup = async (path: string) => {
     const result = asRecord(await store.restoreSupportBackup(path));
     return {
-      message: withRestoreDetail(
+      message: `${withRestoreDetail(
         result?.requiresRestart === true
-          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it. ${RESTORE_HOLD_SENTENCE}`
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
           : `Restore requested from ${String(result?.sourcePath ?? path)}.`,
         result
-      ),
+      )} ${RESTORE_HOLD_SENTENCE}`,
       tone: "ok" as const,
     };
   };

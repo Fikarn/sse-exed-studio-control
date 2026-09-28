@@ -575,9 +575,8 @@ fn set_armed_holds_and_arms_the_light_outputs() {
 
 // The owner's decision (2026-09-28): a restore always comes back with the
 // light outputs held. An archive restore applies at once, without a restart:
-// it holds an armed rig, says so in its row, and tells the screen, which reads
-// the lighting again (until then an archive restore raised no
-// `lighting.changed`, and the Lighting page kept the look it replaced).
+// it holds an armed rig, says so in its row, and says that the lighting
+// changed.
 #[test]
 fn an_archive_restore_holds_the_light_outputs_and_the_screen_hears_of_it() {
     let _preview_guard = crate::lighting::shared_preview_test_guard();

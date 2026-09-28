@@ -652,8 +652,10 @@ impl EngineApp {
                                         "backup-restored",
                                     );
                                     // The archive rewrote the lighting and held
-                                    // the light outputs (2026-09-28): the pages
-                                    // read the lighting again.
+                                    // the light outputs (2026-09-28). The
+                                    // pages read the lighting again on
+                                    // `commissioning.changed` already; this
+                                    // says it to whoever listens for it.
                                     reply.events.push(event_message(
                                         EVENT_LIGHTING_CHANGED,
                                         json!({ "reason": "backup-restored" }),

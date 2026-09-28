@@ -1180,7 +1180,13 @@ fn an_archive_restore_holds_the_light_outputs_and_takes_no_flag_from_the_archive
         "an archive restore holds an armed rig"
     );
 
-    // ...and from one that names the flag anywhere it could be written.
+    // ...and from one that names the flag anywhere it could be written. The
+    // flag is never written from the archive: the count of settings the
+    // restore wrote is the genuine archive's, whatever the forged one names
+    // (the hold at the end would hide a key written on the way).
+    let genuine = restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+        .expect("restore should succeed")
+        .settings_restored;
     for place in ["lighting", "audio", "settings"] {
         let mut forged: Value =
             serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
@@ -1203,12 +1209,14 @@ fn an_archive_restore_holds_the_light_outputs_and_takes_no_flag_from_the_archive
         .expect("forged archive should write");
         set_settings_owned(&runtime.db_path, &[lighting_output_armed_setting(true)])
             .expect("arming should persist");
-        restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
-            .expect("restore should succeed");
+        let written = restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
+            .expect("restore should succeed")
+            .settings_restored;
         assert!(
             !armed_now(&runtime),
             "an archive naming the flag in its {place} does not arm the rig"
         );
+        assert_eq!(written, genuine, "the flag in its {place} is not written");
     }
 }
 

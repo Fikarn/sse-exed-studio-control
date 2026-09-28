@@ -215,12 +215,12 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     // (2026-09 production readiness, Slice 7 — F20); the restored data is
     // what comes back on screen.
     return {
-      message: withRestoreDetail(
+      message: `${withRestoreDetail(
         result?.requiresRestart === true
-          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it. ${RESTORE_HOLD_SENTENCE}`
-          : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}. ${RESTORE_HOLD_SENTENCE}`,
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
+          : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
         result
-      ),
+      )} ${RESTORE_HOLD_SENTENCE}`,
       tone: "ok" as const,
     };
   };
