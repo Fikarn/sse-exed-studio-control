@@ -32,15 +32,6 @@ export { Button } from "./components/Button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/Button";
 export { Crest } from "./components/Crest";
 export type { CrestProps, CrestSize } from "./components/Crest";
-export { DenseList, DenseListRow, DenseTable } from "./components/DenseRows";
-export type {
-  DenseListProps,
-  DenseListRowProps,
-  DenseRowTone,
-  DenseTableColumn,
-  DenseTableProps,
-  DenseTableRow,
-} from "./components/DenseRows";
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";
 export { ConfirmDialog } from "./components/ConfirmDialog";
@@ -62,20 +53,12 @@ export type {
   EmptyStateProps,
   LoadingStateProps,
 } from "./components/OperationalState";
-export { HealthBar, HealthItem } from "./components/HealthBar";
-export type { HealthBarItemData, HealthBarProps, HealthBarVariant, HealthItemProps } from "./components/HealthBar";
 export { IconButton } from "./components/IconButton";
 export type { IconButtonProps, IconButtonSize, IconButtonTone } from "./components/IconButton";
 export { InlineRename } from "./components/InlineRename";
 export type { InlineRenameHandle, InlineRenameProps } from "./components/InlineRename";
 export { InspectorPanel, InspectorSection } from "./components/InspectorPanel";
 export type { InspectorPanelProps, InspectorSectionProps } from "./components/InspectorPanel";
-export { MeterBridge } from "./components/MeterBridge";
-export type { MeterBridgeChannel, MeterBridgeProps, MeterState } from "./components/MeterBridge";
-export { MetricCard } from "./components/MetricCard";
-export type { MetricCardProps } from "./components/MetricCard";
-export { NavItem } from "./components/NavItem";
-export type { NavItemProps } from "./components/NavItem";
 export { PlotMeta } from "./components/PlotMeta";
 export type { PlotMetaProps, PlotMetaTone } from "./components/PlotMeta";
 export { PlotPill } from "./components/PlotPill";
@@ -103,7 +86,3 @@ export { Surface } from "./components/Surface";
 export type { SurfaceProps } from "./components/Surface";
 export { Toast } from "./components/Toast";
 export type { ToastAction, ToastProps, ToastTone } from "./components/Toast";
-export { ToggleButton } from "./components/ToggleButton";
-export type { ToggleButtonProps, ToggleButtonTone } from "./components/ToggleButton";
-export { Toolbar, ToolbarGroup } from "./components/Toolbar";
-export type { ToolbarDensity, ToolbarGroupProps, ToolbarProps } from "./components/Toolbar";
