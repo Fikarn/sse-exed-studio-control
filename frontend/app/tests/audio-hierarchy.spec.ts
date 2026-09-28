@@ -28,12 +28,11 @@ test("selected channel lane is visually distinct from its neighbours", async ({ 
   expect(selectedStyle.background).not.toBe(neighbourStyle.background);
 });
 
-test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", async ({ page }) => {
+test("output lane exposes inline Mute; the cluster owns Dim and Mono", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
-  // 2026-05-27 redesign: Mute is still the only per-output toggle on the
-  // Output card. Dim / Mono / Talkback are room-monitor controls — now
-  // single-sourced on the new AudioMonitorBar (the old rail is gone).
+  // Mute is the only per-output toggle on the Output card. Dim and Mono are
+  // room-monitor controls, in the cluster. Talkback is gone (D26).
   const mainOut = page.getByTestId("audio-output-audio-mix-main");
   await expect(mainOut).toBeVisible();
   const mute = mainOut.locator('[data-control="mute"]');
@@ -43,28 +42,18 @@ test("output lane exposes inline Mute; monitor bar owns Dim / Mono / Talkback", 
     await expect(mainOut.locator(`[data-control="${removed}"]`)).toHaveCount(0);
   }
 
-  // The monitor bar now owns Dim / Mono / Talkback.
   const monitorBar = page.getByTestId("audio-monitor-bar");
   await expect(monitorBar).toBeVisible();
-  for (const testid of ["audio-monitor-dim", "audio-monitor-mono", "audio-monitor-talkback"] as const) {
+  for (const testid of ["audio-monitor-dim", "audio-monitor-mono"] as const) {
     const button = page.getByTestId(testid);
     await expect(button).toBeVisible();
     await expect(button).toHaveAttribute("aria-pressed", /true|false/);
   }
-
-  // 2026-09 audit Slice 6: Talkback is a hold, not a toggle — the caption says
-  // so, and a plain click never leaves it engaged (the hold specs in
-  // audio-talkback.spec.ts drive the press / release paths).
-  // New pages program, Slice 3 (D7). Old: the caption read "Hold · T". New:
-  // "Hold". Reason: the T key went, and its hint with it.
-  const talkback = page.getByTestId("audio-monitor-talkback");
-  await expect(talkback).toContainText("Hold");
-  await expect(talkback).not.toContainText("· T");
-  await talkback.click();
-  await expect(talkback).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("audio-monitor-talkback")).toHaveCount(0);
+  await expect(monitorBar.locator('[data-control="talk"]')).toHaveCount(0);
 });
 
 // New pages program, Slice SW (D22): the case "1920 fallback keeps the output
 // lane Mute control tappable" went with the 1920 fallback. At 2560×1440 the case
-// above finds Mute on the lane and Dim / Mono / Talk off it, and the UI
+// above finds Mute on the lane and Dim and Mono off it, and the UI
 // contract holds every key to its 24 px floor.

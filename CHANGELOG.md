@@ -16,7 +16,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - The hardware link keeps the three cameras (Pocket 6K Pro, two BGH1) and their setup; the Cameras page and the links to the real cameras come later. A start or a restore sends nothing to a camera (#229).
 - The saved data holds the Teleprompter's scripts and look (schema 9) and the cameras' setup (schema 10); backups carry both (formats 6 and 7). A restore adds scripts and never removes one (#225, #229).
 - Light outputs: Armed / Held, in Setup / Support › Workstation. Held, nothing is sent to the rig, which is not a blackout; the hold is remembered, and no start or restore arms the rig (#201).
-- Recent actions, in Setup / Support, lists every switch that reached a device and who made it: Screen, Stream Deck, Console (a switch at TotalMix), Watchdog or Start-up (#201).
+- Recent actions, in Setup / Support, lists every switch that reached a device and who made it: Screen, Stream Deck, Console (a switch at TotalMix) or Start-up (#201, #239).
 - The saved data is checked at every start; damaged data stops the start at SAVED DATA NEEDS ATTENTION and is left as it was. It is backed up on its own before an upgrade, daily and at every close (#201).
 - Setup / Support and the recovery screen list the backups, verify one without changing anything and restore it, database backups included. A backup from a newer Studio Control is refused (#201).
 - A stopped hardware link restarts on its own, and a slow one no longer freezes the window. A page that fails says so (LIGHTING STOPPED, Reload this area) while the rest keeps working (#201).
@@ -24,7 +24,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - Publish needs every probe green. With one that is not, the key reads Publish with override… and the override is recorded; Run all probes says how many of the three passed (#201).
 - The Console drives the desk: faders, mutes, solos, 48 V, gain, the equaliser, dim and mono reach TotalMix. Each change is read back, a change at TotalMix shows on screen, and the desk wins (#85, #201).
 - Live meters come from TotalMix (its remote controller 4, Global OSC): the right channels whatever its layout, the outputs too, and back on their own after the app or TotalMix restarts (#85, #201).
-- The Stream Deck+ is the Console's control surface: the AUDIO page has eight keys, four touch strips (name, level, fader bar) and four dials. The screen follows the deck, and the deck the screen (#201).
+- The Stream Deck+ is the Console's control surface: the AUDIO page has seven keys, four touch strips (name, level, fader bar) and four dials. The screen follows the deck, and the deck the screen (#201).
 - Lighting drives the rig: the light output goes to the Apollo bridge over sACN as soon as lighting is on, the bridge has an address and a fixture is patched, unless the light outputs are held (#201).
 - Add fixture picks a verified fixture from a catalog by manufacturer, family, model and mode. The DMX monitor shows every universe, and DMX values read 0–255, not hex (#73, #201).
 - New controls for what only keys did: Previous bank and Next bank on the Console's Inputs (to Line 1–8); Undo (25 steps), Stop on Find and Add to selection in Lighting; Reset in typed entry (#216).
@@ -40,10 +40,9 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - Sync from TotalMix reads the whole desk and changes nothing on it. The Console reads SYNC NEEDED, and the meters wait, while the desk has not been read since the link changed (#201, #204).
 - Recalling a snapshot sets the desk, in order: mutes on, every value, mutes off, dim and mono. 48 V is never recalled: the report lists the channels that differ, each with its own Arm 48V (#201).
 - Fader dB readings match TotalMix (RME's fader curve) on screen and on the Stream Deck. Unity is TotalMix's 0 dB, typed entry runs from −65 dB (off) to +6 dB, and fader positions are unchanged (#201).
-- Talkback is a hold, on the screen and on the Stream Deck's TALK key: on only while held, and let go by itself when the hold is not renewed within 2 s (#201).
 - The Console takes no change until the audio probe has passed: each tier says "locked · run the audio probe", every refused control is outlined and says why, and Run audio probe is on the left (#201).
 - 48 V, a snapshot's recall and a snapshot's save arm on the first press and apply on a second, separate press at least 350 ms later; a double-click no longer applies them (#85, #201).
-- The Audio page is the Console: a mixer of Inputs, Playback and Outputs and, on the left, its state, the way out, Talkback, Dim, Mono, the mix target, the main level and eight snapshots (#111, #201).
+- The Audio page is the Console: a mixer of Inputs, Playback and Outputs and, on the left, its state, the way out, Dim, Mono, the mix target, the main level and eight snapshots (#111, #201, #239).
 - A strip reads in one order: name, level, source, Mute and Solo, fader and meter; 48 V and the preamp gain, in whole dB, are on the strip. The panel shows the whole selected channel, without tabs (#201).
 - Lighting says what the rig is doing on the left, above Lighting on, Cut all, the grand master, scenes, groups and the rig's actions. The panel shows the whole selected fixture, without tabs (#201).
 - Setup says where commissioning stands: READY, DEGRADED or SETUP REQUIRED. Each of its five steps fits a page without scrolling, and Support, always on the right, has the interface size (#201, #238).
@@ -54,6 +53,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Removed
 
+- Talkback is gone: the Console has no Talkback key and the Stream Deck's AUDIO page no TALK key, whose place is empty. Export the profile again and import it with Full Reset & Import (#239).
 - The Graphite and Bone themes are gone, with their keys in Setup / Support: Studio Control has one look, Studio (#238).
 - The Planning page is gone, and the first start of this build drops its saved data (projects and tasks) after a backup copy. An older backup restores without its Planning part (#211, #213).
 - The Stream Deck profile has two pages, LIGHTS and AUDIO: PROJECTS and TASKS are gone, and the Teleprompter and the Cameras have no deck page yet. Export and import the profile again (#213).

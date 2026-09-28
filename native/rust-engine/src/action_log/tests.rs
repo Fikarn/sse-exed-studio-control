@@ -47,11 +47,11 @@ fn record_list_prune() {
     record_actions(
         db_path.as_path(),
         &[ActionRecord::new(
-            ActionSource::Watchdog,
+            ActionSource::Console,
             DOMAIN_AUDIO,
-            "talkback-off",
-            "Talkback",
-            "Talkback released: nobody was holding it",
+            "dim",
+            "Main out",
+            "Dim on at TotalMix: Main out",
         )],
     )
     .expect("a row should be written");
@@ -63,7 +63,7 @@ fn record_list_prune() {
             .map(|entry| (entry.source.as_str(), entry.detail.as_str()))
             .collect::<Vec<_>>(),
         vec![
-            ("watchdog", "Talkback released: nobody was holding it"),
+            ("console", "Dim on at TotalMix: Main out"),
             ("deck", "Mute on: Host mic"),
             ("ui", "first"),
         ],
@@ -76,7 +76,7 @@ fn record_list_prune() {
             newest.action.as_str(),
             newest.target.as_str()
         ),
-        ("audio", "talkback-off", "Talkback")
+        ("audio", "dim", "Main out")
     );
     assert!(
         newest.at.len() == 24 && newest.at.ends_with('Z') && newest.at.contains('T'),
@@ -220,11 +220,6 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             "audio.snapshot.recall",
             json!({ "snapshotId": "snap-1" }),
             json!({ "snapshotName": "Panel", "recalled": true }),
-        ),
-        (
-            "audio.talkback.hold",
-            json!({ "engaged": true }),
-            json!({ "mixTargetId": "audio-mix-main", "talkback": true, "changed": true }),
         ),
         ("audio.solo.clearAll", json!({}), json!({})),
         (
@@ -459,11 +454,6 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
         ),
         (
             "/api/deck/audio-action",
-            "talkOn",
-            json!({ "mixTargetId": "audio-mix-main", "talkback": true, "changed": true }),
-        ),
-        (
-            "/api/deck/audio-action",
             "soloClearAll",
             json!({ "cleared": 2 }),
         ),
@@ -471,7 +461,7 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
 }
 
 // The screen's table: a discrete change is a row, a ride in the same request
-// is not, a staged change is not, and the heartbeat of a held key is not.
+// is not, and a staged change is not.
 #[test]
 fn ui_requests_leave_rows_for_discrete_changes_only() {
     for (method, params, result) in ui_examples() {
@@ -563,14 +553,7 @@ fn ui_requests_leave_rows_for_discrete_changes_only() {
     }
     assert!(!ui_method_stages_in_preview("lighting.output.setArmed"));
 
-    // A heartbeat of the held talkback key, a staged database restore.
-    assert!(details(
-        "audio.talkback.hold",
-        json!({ "engaged": true }),
-        json!({ "talkback": true, "changed": false }),
-        false
-    )
-    .is_empty());
+    // A staged database restore.
     assert!(details(
         "support.backup.restore",
         json!({ "path": "backups/db.sqlite3" }),
@@ -658,11 +641,6 @@ fn deck_keys_leave_rows_for_discrete_changes_only() {
             "/api/deck/audio-action",
             "cycleBank",
             json!({ "bank": "outputs" }),
-        ),
-        (
-            "/api/deck/audio-action",
-            "talkOn",
-            json!({ "mixTargetId": "audio-mix-main", "talkback": true, "changed": false }),
         ),
         (
             "/api/deck/audio-action",

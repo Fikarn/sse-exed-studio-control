@@ -37,10 +37,17 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         );
     let last_snapshot_recall_at =
         read_optional_setting(settings, AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY);
-    let last_action_status = read_optional_setting(settings, AUDIO_LAST_ACTION_STATUS_KEY)
-        .unwrap_or_else(|| String::from("idle"));
-    let last_action_code = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY);
-    let last_action_message = read_optional_setting(settings, AUDIO_LAST_ACTION_MESSAGE_KEY);
+    // D26 (2026-09-28): the build before could leave a refused talkback as the
+    // Console's last action, and nothing clears a last action at start. This
+    // build has no talkback, so that refusal reads as no action at all; the
+    // next action writes over it.
+    let retired_refusal = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY).as_deref()
+        == Some(RETIRED_TALKBACK_REFUSED_CODE);
+    let last_action = |key: &str| read_optional_setting(settings, key).filter(|_| !retired_refusal);
+    let last_action_status =
+        last_action(AUDIO_LAST_ACTION_STATUS_KEY).unwrap_or_else(|| String::from("idle"));
+    let last_action_code = last_action(AUDIO_LAST_ACTION_CODE_KEY);
+    let last_action_message = last_action(AUDIO_LAST_ACTION_MESSAGE_KEY);
     let channels = apply_channel_state(settings, inventory.channels);
     let mut mix_targets = apply_mix_target_state(settings, inventory.mix_targets);
     apply_mix_target_metering(&channels, &mut mix_targets);

@@ -202,16 +202,41 @@ describe("SetupSupportPilot light outputs and recent actions", () => {
       "deck",
       "deck",
       "console",
-      "watchdog",
+      "deck",
       "ui",
       "ui",
       "ui",
     ]);
-    for (const word of ["Screen", "Stream Deck", "Console", "Watchdog"]) {
+    for (const word of ["Screen", "Stream Deck", "Console"]) {
       expect(list.textContent).toContain(word);
     }
     // The ninth row — the start-up hold — is in the snapshot, not on the plate.
     expect(list.textContent).not.toContain("safe start");
+    await store.dispose();
+  });
+
+  it("recent actions prints a source it has no word for as it was saved", async () => {
+    // Saved data of the build before 2026-09-28 can hold rows of talkback's
+    // watchdog, a source this build does not write (D26).
+    const store = await renderPilot((snapshot) => ({
+      ...(snapshot ?? {}),
+      recentEvents: [
+        {
+          id: 12,
+          at: "2026-09-24T11:50:12.000Z",
+          source: "watchdog",
+          domain: "audio",
+          action: "talkback-off",
+          target: "Talkback",
+          detail: "Talkback released: nobody was holding it",
+        },
+      ],
+    }));
+    const rows = screen.getAllByTestId("support-recent-action");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].getAttribute("data-source")).toBe("watchdog");
+    expect(rows[0].textContent).toContain("Talkback released: nobody was holding it");
+    expect(rows[0].textContent).toContain("watchdog");
     await store.dispose();
   });
 

@@ -1,6 +1,5 @@
 use crate::exports::{
-    audio_action_with_refreshes, button, dial, expression_button, momentary_button, next_action_id,
-    ControlDef,
+    audio_action_with_refreshes, button, dial, expression_button, next_action_id, ControlDef,
 };
 use serde_json::{json, Map, Value};
 
@@ -23,13 +22,11 @@ pub(crate) const AUDIO_LCD_KEYS: &[&str] = &[
     "audio_key_4",
     "audio_key_5",
     "audio_key_6",
-    "audio_key_7",
     "audio_key_8",
     "audio_state_target",
     "audio_state_bank",
     "audio_state_mode",
     "audio_state_dim",
-    "audio_state_talk",
     "audio_state_solo",
     "audio_state_gated",
     "workspace",
@@ -69,8 +66,6 @@ pub(crate) const DECK_AMBER_BG: u32 = 0x00E8_B13D;
 pub(crate) const DECK_AMBER_INK: u32 = 0x0024_1D0B;
 pub(crate) const DECK_WARN_BG: u32 = 0x00FF_D33D;
 pub(crate) const DECK_WARN_INK: u32 = 0x002A_2206;
-pub(crate) const DECK_TALK_BG: u32 = 0x003F_7F48;
-pub(crate) const DECK_TALK_INK: u32 = 0x00EA_FBE9;
 pub(crate) const DECK_SELECT_BG: u32 = 0x0024_1C08;
 pub(crate) const DECK_SELECT_INK: u32 = 0x00E8_B13D;
 pub(crate) const DECK_MUTED_BG: u32 = 0x001A_0F0C;
@@ -114,7 +109,6 @@ pub(crate) fn deck_asset(name: &str) -> &'static str {
         "ico_phones" => include_str!("../assets/deck/ico_phones.b64"),
         "ico_bank" => include_str!("../assets/deck/ico_bank.b64"),
         "ico_dim" => include_str!("../assets/deck/ico_dim.b64"),
-        "ico_talk" => include_str!("../assets/deck/ico_talk.b64"),
         "ico_solo" => include_str!("../assets/deck/ico_solo.b64"),
         "ico_gain" => include_str!("../assets/deck/ico_gain.b64"),
         _ => "",
@@ -343,27 +337,7 @@ pub(crate) fn audio_controls() -> Vec<ControlDef> {
             color_feedback("audio_state_mode", "gain", DECK_AMBER_INK, DECK_AMBER_BG),
             gated_grey_feedback(),
         ]),
-        momentary_button(
-            "1",
-            "2",
-            "TALK",
-            "$(custom:lcd_audio_key_7)",
-            audio_action_with_refreshes(
-                json!({"action":"talkOn"}),
-                &["audio_state_talk", "audio_key_7"],
-            ),
-            audio_action_with_refreshes(
-                json!({"action":"talkOff"}),
-                &["audio_state_talk", "audio_key_7"],
-            ),
-        )
-        .png("ico_talk")
-        .size("14")
-        .no_topbar()
-        .with_feedbacks(vec![
-            color_feedback("audio_state_talk", "live", DECK_TALK_INK, DECK_TALK_BG),
-            gated_grey_feedback(),
-        ]),
+        // Row 1, column 2 is empty: it held TALK until 2026-09-28 (D26).
         expression_button(
             "1",
             "3",

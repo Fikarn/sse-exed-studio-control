@@ -84,7 +84,7 @@ fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
 }
 
 #[test]
-fn audio_key_lcd_reflects_target_bank_and_talk() {
+fn audio_key_lcd_reflects_target_and_bank() {
     let test_dir = ready_audio_test_db("lcd-keys");
     let db_path = test_dir.db_path();
 
@@ -117,18 +117,10 @@ fn audio_key_lcd_reflects_target_bank_and_talk() {
             .expect("lcd text should render"),
         "BANK\\nINPUTS"
     );
-    assert_eq!(
-        read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-            .expect("lcd text should render"),
-        "TALK\\nHOLD"
-    );
-    handle_audio_action(db_path.as_path(), "talkOn", None).expect("talk should engage");
-    assert_eq!(
-        read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-            .expect("lcd text should render"),
-        "TALK\\nLIVE"
-    );
-    handle_audio_action(db_path.as_path(), "talkOff", None).expect("talk should release");
+    // Key 7 held TALK until 2026-09-28 (D26): the bridge answers no display
+    // for it, and a deck with the old profile reads an error there.
+    assert!(read_control_surface_lcd_text(db_path.as_path(), "audio_key_7").is_err());
+    assert!(read_control_surface_lcd_text(db_path.as_path(), "audio_state_talk").is_err());
 
     assert_eq!(
         read_control_surface_lcd_text(db_path.as_path(), "audio_key_8")
@@ -261,6 +253,45 @@ fn the_deck_mode_key_is_refused_and_stores_nothing() {
         "a refused deck-mode key writes nothing"
     );
     assert!(control_surface_last_event(db_path.as_path()).is_null());
+}
+
+// D26 (2026-09-28): talkback left the app. A deck that still has the profile
+// of the build before posts `talkOn` while its TALK key is held and `talkOff`
+// at the release, and polls the key's two displays every second: each is
+// refused, and none stores anything or stamps an event.
+#[test]
+fn the_talk_key_of_an_old_profile_is_refused_and_stores_nothing() {
+    let test_dir = ready_audio_test_db("old-talk-key");
+    let db_path = test_dir.db_path();
+    let settings_before = list_settings_by_prefix(db_path.as_path(), "").expect("settings");
+
+    for action in ["talkOn", "talkOff"] {
+        let refused = handle_control_surface_http_action(
+            db_path.as_path(),
+            "/api/deck/audio-action",
+            &json!({ "action": action }),
+        )
+        .expect_err("talkback left the app");
+        assert_eq!(
+            refused.status_code(),
+            501,
+            "{action}: {}",
+            refused.message()
+        );
+    }
+    for key in ["audio_key_7", "audio_state_talk"] {
+        let refused = read_control_surface_lcd_text(db_path.as_path(), key)
+            .expect_err("the TALK key's displays left with it");
+        assert_eq!(refused.status_code(), 400, "{key}: {}", refused.message());
+    }
+
+    assert_eq!(
+        list_settings_by_prefix(db_path.as_path(), "").expect("settings"),
+        settings_before,
+        "a refused TALK key writes nothing"
+    );
+    assert!(control_surface_last_event(db_path.as_path()).is_null());
+    assert!(recent_actions(db_path.as_path()).is_empty());
 }
 
 #[test]
@@ -789,9 +820,8 @@ fn deck_all_off_records_source_deck() {
     assert_eq!(recent_actions(db_path).len(), 3);
 }
 
-// The audio half: a mute, the dim key and the first and last of a held TALK
-// key are rows; the dial, a strip tap and the repeats Companion sends while
-// TALK is held are not.
+// The audio half: a mute and the dim key are rows; the dial and a strip tap
+// are not.
 #[test]
 fn deck_audio_keys_record_source_deck() {
     let test_dir = ready_audio_test_db("deck-audio-action-log");
@@ -827,20 +857,13 @@ fn deck_audio_keys_record_source_deck() {
         )
     );
 
-    assert_eq!(audio_action("talkOn", None)["changed"], true);
-    assert_eq!(audio_action("talkOn", None)["changed"], false);
-    assert_eq!(audio_action("talkOn", None)["changed"], false);
-    assert_eq!(audio_action("talkOff", None)["changed"], true);
+    assert_eq!(audio_action("dimToggle", None)["dim"], true);
     let rows = recent_actions(db_path);
     assert_eq!(
         rows.iter()
             .map(|(source, action, _)| (source.as_str(), action.as_str()))
             .collect::<Vec<_>>(),
-        vec![
-            ("deck", "talkback-off"),
-            ("deck", "talkback-on"),
-            ("deck", "mute")
-        ],
-        "the press and the release, not the repeats in between"
+        vec![("deck", "dim"), ("deck", "mute")],
+        "newest first"
     );
 }

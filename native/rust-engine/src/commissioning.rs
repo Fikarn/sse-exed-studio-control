@@ -1014,6 +1014,18 @@ mod tests {
         assert!(!message.to_lowercase().contains("planning"), "{message}");
     }
 
+    // The test double says this sentence word for word
+    // (`controlSurface.test.ts`), and the pages' captures print its number:
+    // when the deck's model changes, both change. 7 keys and 12 dial
+    // controls on LIGHTS, 7 keys, 4 strips and 12 dial controls on AUDIO.
+    #[test]
+    fn the_control_surface_probe_counts_the_decks_controls() {
+        assert_eq!(
+            summarize_control_surface_probe(),
+            "Control surface bridge exposes 42 mapped controls across 2 pages."
+        );
+    }
+
     #[test]
     fn audio_probe_rejects_invalid_host() {
         let test_dir = TestDir::new("commissioning-audio-invalid-host");

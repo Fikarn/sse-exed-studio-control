@@ -276,7 +276,7 @@ pub fn read_control_surface_lcd_text(
             ))
         }
         "audio_key_1" | "audio_key_2" | "audio_key_3" | "audio_key_4" | "audio_key_5"
-        | "audio_key_6" | "audio_key_7" | "audio_key_8" => {
+        | "audio_key_6" | "audio_key_8" => {
             let key_index = key
                 .rsplit('_')
                 .next()
@@ -305,7 +305,7 @@ pub fn read_control_surface_lcd_text(
             audio_strip_key_index(key),
         )),
         "audio_state_target" | "audio_state_bank" | "audio_state_mode" | "audio_state_dim"
-        | "audio_state_talk" | "audio_state_solo" | "audio_state_gated" => audio_state_value_text(
+        | "audio_state_solo" | "audio_state_gated" => audio_state_value_text(
             &app_settings,
             &audio_snapshot,
             key.trim_start_matches("audio_state_"),

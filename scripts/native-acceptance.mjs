@@ -258,8 +258,7 @@ async function main() {
           target.id === targets.mixTargetId &&
           target.volume === audioMutations.baselineMixTarget.volume &&
           target.dim === audioMutations.baselineMixTarget.dim &&
-          target.mono === audioMutations.baselineMixTarget.mono &&
-          target.talkback === audioMutations.baselineMixTarget.talkback
+          target.mono === audioMutations.baselineMixTarget.mono
       ),
       "Expected restore to return the control-room mix state to the restart baseline."
     );

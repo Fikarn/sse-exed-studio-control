@@ -38,7 +38,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 
 ## Stream Deck
 
-- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER (the last two once built), with no PROJECTS or TASKS, and the deck follows the app's page.
+- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER (the last two once built), with no PROJECTS or TASKS, and the deck follows the app's page. The AUDIO page has no `TALK` key: its place, second row, third key, is empty.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, its displays read `PREVIEW` and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
@@ -82,6 +82,7 @@ Once the Prompter XL's window is built:
 ## Saved data and recovery
 
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
+- [ ] After that first start, the Console's snapshots are all there by name, and Main Out, Phones 1 and Phones 2 stand where they stood; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.

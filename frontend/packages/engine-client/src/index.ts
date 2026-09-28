@@ -38,7 +38,6 @@ export type {
   AudioSnapshotCreateRequest,
   AudioSnapshotDeleteRequest,
   AudioSnapshotUpdateRequest,
-  AudioTalkbackHoldRequest,
   BackgroundFailure,
   LightingPaletteApplyRequest,
   LightingPaletteCreateRequest,

@@ -576,9 +576,7 @@ fn main() -> io::Result<()> {
 
     serve_requests(&app, &mut reader, &output_sender)?;
 
-    // stdin closed: the shell is going away. Release talkback holds before we
-    // do (2026-09 audit, Slice 6) — a hard kill cannot, and that is documented.
-    app.shutdown();
+    // stdin closed: the shell is going away.
     // A verified copy of the database on every graceful stop (2026-09
     // production readiness, Slice 3 — F02); a failure is logged, never fatal.
     write_database_backup(

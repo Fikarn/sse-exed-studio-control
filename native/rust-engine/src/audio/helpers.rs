@@ -94,7 +94,6 @@ pub(super) fn apply_mix_target_state(
                 mix_target.mute = state.mute;
                 mix_target.dim = state.dim;
                 mix_target.mono = state.mono;
-                mix_target.talkback = state.talkback;
             }
             mix_target
         })
@@ -798,7 +797,6 @@ pub(super) fn stored_mix_target_state_from_snapshot(
         mute: mix_target.mute,
         dim: mix_target.dim,
         mono: mix_target.mono,
-        talkback: mix_target.talkback,
     }
 }
 
@@ -921,7 +919,6 @@ fn audio_mix_target_state_changed(
         || current.mute != stored.mute
         || current.dim != stored.dim
         || current.mono != stored.mono
-        || current.talkback != stored.talkback
 }
 
 pub(super) fn channel_supports_instrument_from_role(

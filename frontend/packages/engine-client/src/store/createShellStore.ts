@@ -32,7 +32,6 @@ import type {
   AudioMeterFrame,
   AudioMixTargetUpdateRequest,
   AudioSettingsUpdateRequest,
-  AudioTalkbackHoldRequest,
   BackgroundFailure,
   CommissioningCheckRequest,
   CommissioningUpdateRequest,
@@ -417,24 +416,6 @@ function patchAudioMixTarget(snapshot: AudioSnapshot, value: JsonValue): AudioSn
   };
 }
 
-// `audio.talkback.hold` answers `{ mixTargetId, talkback, changed }` — patch
-// the one flag locally so a hold heartbeat (every 750 ms) never triggers a
-// full snapshot refetch.
-function patchAudioTalkback(snapshot: AudioSnapshot, value: JsonValue): AudioSnapshot | null {
-  const result = asRecord(value);
-  const id = typeof result?.mixTargetId === "string" ? result.mixTargetId : null;
-  const talkback = result?.talkback;
-  if (!id || typeof talkback !== "boolean" || !snapshot.mixTargets.some((mixTarget) => mixTarget.id === id)) {
-    return null;
-  }
-  return {
-    ...snapshot,
-    mixTargets: snapshot.mixTargets.map((mixTarget) =>
-      mixTarget.id === id && mixTarget.talkback !== talkback ? { ...mixTarget, talkback } : mixTarget
-    ),
-  };
-}
-
 function patchAudioSnapshotList(method: string, snapshot: AudioSnapshot, params: JsonObject, value: JsonValue) {
   const result = asRecord(value);
   const scene = asRecord(result?.snapshot);
@@ -635,11 +616,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
     if (method === "audio.mixTarget.update") {
       const patched = patchAudioMixTarget(currentAudioSnapshot, result);
-      return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
-    }
-
-    if (method === "audio.talkback.hold") {
-      const patched = patchAudioTalkback(currentAudioSnapshot, result);
       return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
     }
 
@@ -1421,9 +1397,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async updateAudioMixTarget(request: AudioMixTargetUpdateRequest) {
       return performAudioRequest("audio.mixTarget.update", request as unknown as JsonObject);
-    },
-    async holdAudioTalkback(request: AudioTalkbackHoldRequest) {
-      return performAudioRequest("audio.talkback.hold", request as unknown as JsonObject);
     },
     async updateAudioSettings(request: AudioSettingsUpdateRequest) {
       return performAudioRequest("audio.settings.update", request as unknown as JsonObject);

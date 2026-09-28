@@ -202,7 +202,6 @@ export function attachInterviewBlockContents(snapshot: JsonObject) {
       mute: mixTarget.mute === true,
       dim: mixTarget.dim === true,
       mono: mixTarget.mono === true,
-      talkback: mixTarget.talkback === true,
     };
   }
   for (const entry of asArray(snapshot.snapshots).map((item) => asRecord(item))) {
@@ -451,7 +450,6 @@ export function buildDefaultAudioSnapshot(): JsonObject {
         mute: false,
         dim: false,
         mono: false,
-        talkback: false,
       },
       {
         id: "audio-mix-phones-a",
@@ -468,7 +466,6 @@ export function buildDefaultAudioSnapshot(): JsonObject {
         mute: false,
         dim: false,
         mono: false,
-        talkback: true,
       },
       {
         id: "audio-mix-phones-b",
@@ -485,7 +482,6 @@ export function buildDefaultAudioSnapshot(): JsonObject {
         mute: false,
         dim: false,
         mono: true,
-        talkback: false,
       },
     ],
     snapshots: [
@@ -672,7 +668,6 @@ export function captureFixtureAudioScene(audioSnapshot: JsonObject) {
       mute: asBoolean(mixTarget.mute, false),
       dim: asBoolean(mixTarget.dim, false),
       mono: asBoolean(mixTarget.mono, false),
-      talkback: asBoolean(mixTarget.talkback, false),
     };
   }
 

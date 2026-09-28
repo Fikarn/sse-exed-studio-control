@@ -17,7 +17,7 @@ import { assert, hardenedLaneEnv, LIVE_CONSOLE } from "./native-runtime-harness.
 // confirms every write by read-back, only surfaces the studio does not use
 // are written (Phones 2, playback 7/8), and everything is restored in a
 // `finally`. Before this the plain lane pushed test values to the live desk
-// (main volume / dim / mono / talkback, preamp 12 gain + 48V, a solo on the
+// (main volume / dim / mono, preamp 12 gain + 48V, a solo on the
 // main mix) and left them there. The opt-in is read in
 // native-runtime-harness.mjs, which holds every lane's hardening (new pages
 // program, Slice 2b).
@@ -673,21 +673,19 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
 
   try {
     // Control-room mix target. On the live lane this is Phones 2: volume and
-    // mute reach the (unused) hardware output, while dim / mono / talkback are
+    // mute reach the (unused) hardware output, while dim and mono are
     // main-only functions the engine keeps app-local and reports as such.
     const updatedMixTarget = await harness.request(`${requestIdPrefix}-audio-mix-target`, "audio.mixTarget.update", {
       mixTargetId: targets.mixTargetId,
       volume: 0.81,
       dim: true,
       mono: true,
-      talkback: true,
     });
     assert(
       updatedMixTarget.id === targets.mixTargetId &&
         updatedMixTarget.volume === 0.81 &&
         updatedMixTarget.dim === true &&
-        updatedMixTarget.mono === true &&
-        updatedMixTarget.talkback === true,
+        updatedMixTarget.mono === true,
       `${runtimeLabel} audio.mixTarget.update did not persist the expected control-room mix state.`
     );
 
@@ -871,8 +869,7 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       mutatedMixTarget &&
         nearFader(mutatedMixTarget.volume, 0.81) &&
         mutatedMixTarget.dim === true &&
-        mutatedMixTarget.mono === true &&
-        mutatedMixTarget.talkback === true,
+        mutatedMixTarget.mono === true,
       `${runtimeLabel} audio snapshot did not retain the expected control-room state.`
     );
   } finally {
@@ -917,7 +914,6 @@ async function restoreLiveConsoleWrites(
     mute: baselineMixTarget.mute,
     dim: baselineMixTarget.dim,
     mono: baselineMixTarget.mono,
-    talkback: baselineMixTarget.talkback,
   });
   await harness.request(`${requestIdPrefix}-audio-live-restore-playback`, "audio.channel.update", {
     channelId: targets.playbackChannelId,

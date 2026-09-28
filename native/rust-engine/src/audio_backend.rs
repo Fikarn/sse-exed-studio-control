@@ -280,7 +280,6 @@ impl AudioBackend for SimulatedAudioBackend {
                     mute: false,
                     dim: false,
                     mono: false,
-                    talkback: false,
                 },
                 AudioMixTargetSnapshot {
                     id: String::from("audio-mix-phones-a"),
@@ -297,7 +296,6 @@ impl AudioBackend for SimulatedAudioBackend {
                     mute: false,
                     dim: false,
                     mono: false,
-                    talkback: false,
                 },
                 AudioMixTargetSnapshot {
                     id: String::from("audio-mix-phones-b"),
@@ -314,7 +312,6 @@ impl AudioBackend for SimulatedAudioBackend {
                     mute: false,
                     dim: false,
                     mono: false,
-                    talkback: false,
                 },
             ],
             snapshots: vec![
@@ -463,9 +460,6 @@ impl AudioBackend for SimulatedAudioBackend {
         }
         if let Some(mono) = request.mono {
             changes.push(format!("mono -> {}", bool_label(mono)));
-        }
-        if let Some(talkback) = request.talkback {
-            changes.push(format!("talkback -> {}", bool_label(talkback)));
         }
 
         Ok(AudioMixTargetUpdateOutcome {
@@ -1148,7 +1142,6 @@ mod tests {
                 mute: Some(false),
                 dim: Some(true),
                 mono: None,
-                talkback: None,
             },
         )
         .expect("mix target update should succeed");

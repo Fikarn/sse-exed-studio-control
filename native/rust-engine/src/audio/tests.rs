@@ -37,6 +37,86 @@ impl Drop for TestDir {
     }
 }
 
+// D26 (2026-09-28): talkback is gone, and what the build before wrote is still
+// read. The mix targets' saved state and a Console snapshot's contents carry a
+// `talkback` field; it is read past, and nothing writes it again.
+#[test]
+fn saved_state_with_the_old_talkback_field_still_reads() {
+    let mut settings = HashMap::new();
+    settings.insert(
+        String::from(AUDIO_MIX_TARGET_STATE_KEY),
+        String::from(
+            r#"{"audio-mix-main":{"volume":0.61,"mute":true,"dim":true,"mono":false,"talkback":true}}"#,
+        ),
+    );
+    settings.insert(
+        String::from(AUDIO_SNAPSHOTS_STATE_KEY),
+        String::from(
+            r#"[{"id":"audio-snapshot-1","name":"Panel","oscIndex":0,"order":0,"contents":{"capturedAt":"2026-09-20T10:00:00Z","channels":{},"mixTargets":{"audio-mix-main":{"volume":0.5,"mute":false,"dim":false,"mono":true,"talkback":true}}}}]"#,
+        ),
+    );
+
+    let snapshot = read_audio_snapshot(&settings);
+    let main = snapshot
+        .mix_targets
+        .iter()
+        .find(|target| target.id == "audio-mix-main")
+        .expect("the main out");
+    assert_eq!(main.volume, 0.61);
+    assert!(main.mute && main.dim && !main.mono);
+
+    let panel = snapshot
+        .snapshots
+        .iter()
+        .find(|entry| entry.id == "audio-snapshot-1")
+        .expect("the saved Console snapshot");
+    assert_eq!(panel.name, "Panel");
+    let saved_main = &panel.contents.as_ref().expect("its contents").mix_targets["audio-mix-main"];
+    assert_eq!(saved_main.volume, 0.5);
+    assert!(saved_main.mono);
+    let written = serde_json::to_string(saved_main).expect("the state serializes");
+    assert!(!written.contains("talkback"), "{written}");
+}
+
+// The same build could leave a refused talkback as the Console's last action.
+// It must not greet this build with ACTION FAILED over a key it does not have.
+#[test]
+fn a_saved_talkback_refusal_reads_as_no_action() {
+    let refusal = |code: &str| {
+        HashMap::from([
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("failed"),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::from(code)),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from("TotalMix refused talkback."),
+            ),
+        ])
+    };
+
+    let retired = read_audio_snapshot(&refusal("AUDIO_TALKBACK_REFUSED"));
+    assert_eq!(retired.last_action_status, "idle");
+    assert_eq!(retired.last_action_code, None);
+    assert_eq!(retired.last_action_message, None);
+    let never_acted = read_audio_snapshot(&HashMap::new());
+    assert_eq!(retired.status, never_acted.status);
+    assert_eq!(retired.summary, never_acted.summary);
+
+    // Any other failure is still the Console's state.
+    let failed = read_audio_snapshot(&refusal("AUDIO_SYNC_FAILED"));
+    assert_eq!(failed.last_action_status, "failed");
+    assert_eq!(
+        failed.last_action_code.as_deref(),
+        Some("AUDIO_SYNC_FAILED")
+    );
+    assert_eq!(
+        failed.last_action_message.as_deref(),
+        Some("TotalMix refused talkback.")
+    );
+}
+
 #[test]
 fn audio_snapshot_defaults_to_not_verified() {
     let snapshot = read_audio_snapshot(&HashMap::new());
@@ -530,7 +610,6 @@ fn meter_test_mix_target(volume: f64) -> AudioMixTargetSnapshot {
         mute: false,
         dim: false,
         mono: false,
-        talkback: false,
     }
 }
 
@@ -1156,7 +1235,6 @@ fn audio_mix_target_update_is_refused_before_probe_passes() {
         mute: Some(true),
         dim: Some(true),
         mono: Some(true),
-        talkback: Some(true),
     };
 
     let error = update_audio_mix_target(test_dir.db_path().as_path(), &request)
@@ -1182,7 +1260,6 @@ fn audio_mix_target_update_is_refused_before_probe_passes() {
     assert!(!untouched.mute);
     assert!(!untouched.dim);
     assert!(!untouched.mono);
-    assert!(!untouched.talkback);
     assert_eq!(snapshot.status, "not-verified");
     assert_eq!(snapshot.last_action_status, "failed");
     assert_eq!(
@@ -1203,7 +1280,7 @@ fn audio_mix_target_update_is_refused_before_probe_passes() {
     let updated = update_audio_mix_target(test_dir.db_path().as_path(), &request)
         .expect("mix target update should succeed once the probe passed");
     assert_eq!(updated.volume, 0.81);
-    assert!(updated.talkback);
+    assert!(updated.mono);
     assert_console_datagram_received(&receiver, "allowed mix target update");
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)

@@ -167,9 +167,10 @@ export function countControls(state: MutableFixtureState) {
  * models them (new pages program, Slice 2: PROJECTS and TASKS left with
  * Planning, so LIGHTS is page 1 and AUDIO page 2). The shape and the counts
  * are the hardware link's: LIGHTS has seven keys, at places 2–8 (place 1 held
- * `<< PROJ`); AUDIO has eight keys and four touch-strip cells, at places 1–12;
- * each page has four dials that are pressed and turned either way, three
- * controls apiece — 43 controls in all. The labels stay the double's own.
+ * `<< PROJ`); AUDIO has seven keys and four touch-strip cells, at places 1–6
+ * and 8–12 (place 7 held `TALK`); each page has four dials that are pressed
+ * and turned either way, three controls apiece — 42 controls in all. The
+ * labels stay the double's own.
  */
 export function buildDefaultControlSurfaceSnapshot(): JsonObject {
   const makeButtons = (pageId: string, prefix: string, positions: number[]) =>
@@ -208,7 +209,7 @@ export function buildDefaultControlSurfaceSnapshot(): JsonObject {
       {
         id: "audio",
         label: "AUDIO",
-        buttons: makeButtons("audio", "Channel", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+        buttons: makeButtons("audio", "Channel", [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12]),
         dials: makeDials("audio", "Gain"),
       },
     ],

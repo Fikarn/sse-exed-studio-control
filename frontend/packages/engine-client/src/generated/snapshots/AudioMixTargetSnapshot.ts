@@ -15,5 +15,4 @@ export type AudioMixTargetSnapshot = {
   mute: boolean;
   dim: boolean;
   mono: boolean;
-  talkback: boolean;
 };

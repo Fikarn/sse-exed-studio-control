@@ -60,7 +60,7 @@ function Keys() {
           hint={engaged ? "engaged" : undefined}
           take
         />
-        <Key mode="momentary" cap="Talkback" live hint="live · for the hold" layout="stack" size="tall" take />
+        <Key mode="momentary" cap="Hold" live hint="live · for the hold" layout="stack" size="tall" take />
         <ArmKey armed timeoutMs={4500} secondsLeft={3.9} cap="3" take>
           Interview block
         </ArmKey>

@@ -61,7 +61,7 @@ test("a raw AUDIO_* code as the first thing read is a hit", () => {
 test("a lone AUDIO_* code compared against is a value, not copy", () => {
   assert.deepEqual(
     scanSource(
-      `const refused = String(snapshot.lastActionCode) === "AUDIO_TALKBACK_REFUSED";
+      `const refused = String(snapshot.lastActionCode) === "AUDIO_CONSOLE_UNCONFIRMED";
        switch (code) { case "AUDIO_SYNC_FAILED": return 1; }
        const CODES = new Set(["AUDIO_SYNC_FAILED"]);`,
       "frontend/app/src/app/audio/x.tsx"

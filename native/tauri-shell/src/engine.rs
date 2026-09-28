@@ -70,7 +70,7 @@ pub struct EngineBridge {
 struct EngineProcess {
     child: Child,
     /// `None` once a stop closed the pipe: the engine's request loop ends on
-    /// EOF and it releases any talkback hold on its way out.
+    /// EOF.
     stdin: Option<ChildStdin>,
     binary_path: PathBuf,
     generation: u64,
@@ -303,8 +303,7 @@ impl EngineBridge {
     }
 
     /// Stops the engine gracefully (2026-09 audit Slice 11): close its stdin
-    /// so the request loop ends — the engine releases any talkback hold on
-    /// its way out — wait up to `ENGINE_STOP_GRACE` for it to exit, and kill
+    /// so the request loop ends, wait up to `ENGINE_STOP_GRACE` for it to exit, and kill
     /// it only if it does not. Used by the close confirmation and by engine
     /// restarts alike. The exit is reported like any other, with
     /// `graceful: true` (2026-09 production readiness, Slice 5 — finding F09).

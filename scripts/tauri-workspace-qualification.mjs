@@ -587,7 +587,7 @@ async function runWorkspaceQualification() {
       `Expected the scene recall in Recent actions with the screen as its source, got ${JSON.stringify(recentEvents)}.`
     );
     assert(
-      recentEvents.every((row) => ["ui", "deck", "console", "watchdog", "launch"].includes(row?.source)),
+      recentEvents.every((row) => ["ui", "deck", "console", "launch"].includes(row?.source)),
       `Expected every recent action to name a known source, got ${JSON.stringify(recentEvents)}.`
     );
     assert(

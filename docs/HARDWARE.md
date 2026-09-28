@@ -47,7 +47,7 @@ What the app never does:
 - Nothing is written while the audio probe has not passed or OSC is off in Setup.
 - Closing the app recalls and resets nothing.
 
-Talkback is not used. TotalMix has no talkback channel assigned and refuses it (`AUDIO_TALKBACK_REFUSED`).
+Talkback is not used, and the app has none: it sends TotalMix no talkback and reads past the desk's report of it.
 
 ## Lights
 

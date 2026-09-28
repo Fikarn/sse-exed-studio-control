@@ -9,18 +9,16 @@ import { createThrottledCommit } from "../audioContinuousControls";
 import { dbfsToMeterPercent, formatAudioDb, formatAudioTimestamp, meterFill } from "../audioFormatting";
 import type { AudioArmedAction } from "../audioArming";
 import type { AudioWorkspaceViewModel } from "../audioViewModel";
-import { useMomentaryTalkback } from "../hooks/useMomentaryTalkback";
 import { AudioSnapshotKeys } from "./AudioSnapshotKeys";
 
 // Visual overhaul A, Slice 4 (plan D1, D5, D6, D8; console-a-states): the
 // Console's cluster — the fixed left column the operator's hand learns once.
 // The state display is first and never moves; below it the take-time keys
-// (talkback, dim, mono, the mix target, the main level, the master meter),
+// (dim, mono, the mix target, the main level, the master meter),
 // the snapshot keys and the standing actions. Arming renders in the display
 // and on the key, so nothing else moves (finding C1).
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
-type AudioTalkbackHold = Parameters<ShellStore["holdAudioTalkback"]>[0];
 
 // The marks the mock prints under the monitor meter, in dBFS.
 const MASTER_METER_MARKS = [-60, -40, -30, -18, -12, -6, 0] as const;
@@ -36,7 +34,6 @@ export interface AudioClusterProps {
   onClearAllSolo: () => void;
   onClearClips: () => void;
   onDeleteSnapshot: (snapshotId: string, snapshotName: string) => void;
-  onHoldTalkback: (request: AudioTalkbackHold) => void;
   onOpenSetup: () => void;
   onRecallSnapshot: (snapshotId: string) => void;
   onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
@@ -81,7 +78,6 @@ export function AudioCluster({
   onClearAllSolo,
   onClearClips,
   onDeleteSnapshot,
-  onHoldTalkback,
   onOpenSetup,
   onRecallSnapshot,
   onRenameSnapshot,
@@ -142,17 +138,6 @@ export function AudioCluster({
       ) : null}
     </>
   );
-
-  // Talkback is a hold, never a toggle (2026-09 audit Slice 6): the hook owns
-  // engage / heartbeat / release for the key (the page-wide T key went in the
-  // new pages program's Slice 3, D7).
-  const talkback = useMomentaryTalkback({
-    enabled: Boolean(selectedMixTarget) && actionsAllowed,
-    hold: (engaged) => {
-      if (selectedMixTarget) onHoldTalkback({ mixTargetId: selectedMixTarget.id, engaged });
-    },
-  });
-  const talkbackRefused = String(snapshot.lastActionCode ?? "") === "AUDIO_TALKBACK_REFUSED";
 
   const volumeDraftKey = `mixTarget:${selectedMixTarget?.id ?? "none"}:volume`;
   const volume = useAudioControlDraftValue(
@@ -230,57 +215,35 @@ export function AudioCluster({
 
       <div className={styles.monitorRow}>
         <Key
-          mode="momentary"
-          cap="Talkback"
-          hint={talkbackRefused ? "refused · set a talkback channel in TotalMix" : "Hold"}
-          layout="stack"
-          size="tall"
-          live={selectedMixTarget?.talkback ?? false}
+          mode="toggle"
+          cap="Dim"
+          hint="-20 dB"
+          engaged={selectedMixTarget?.dim ?? false}
           locked={!actionsAllowed}
           reason={lockedReason}
           take
-          testId="audio-monitor-talkback"
-          className={talkbackRefused ? styles.refused : undefined}
-          aria-pressed={selectedMixTarget?.talkback ?? false}
-          data-active={selectedMixTarget?.talkback ?? false}
-          data-control="talk"
-          data-holding={talkback.holding ? "true" : undefined}
-          title="Hold to talk to the monitor output; release to stop."
-          {...talkback.buttonProps}
+          testId="audio-monitor-dim"
+          data-active={selectedMixTarget?.dim ?? false}
+          data-control="dim"
+          onClick={() =>
+            selectedMixTarget && onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim })
+          }
         />
-        <div className={styles.monitorToggles}>
-          <Key
-            mode="toggle"
-            cap="Dim"
-            hint="-20 dB"
-            engaged={selectedMixTarget?.dim ?? false}
-            locked={!actionsAllowed}
-            reason={lockedReason}
-            take
-            testId="audio-monitor-dim"
-            data-active={selectedMixTarget?.dim ?? false}
-            data-control="dim"
-            onClick={() =>
-              selectedMixTarget && onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim })
-            }
-          />
-          <Key
-            mode="toggle"
-            cap="Mono"
-            hint="L+R"
-            engaged={selectedMixTarget?.mono ?? false}
-            locked={!actionsAllowed}
-            reason={lockedReason}
-            take
-            testId="audio-monitor-mono"
-            data-active={selectedMixTarget?.mono ?? false}
-            data-control="mono"
-            onClick={() =>
-              selectedMixTarget &&
-              onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, mono: !selectedMixTarget.mono })
-            }
-          />
-        </div>
+        <Key
+          mode="toggle"
+          cap="Mono"
+          hint="L+R"
+          engaged={selectedMixTarget?.mono ?? false}
+          locked={!actionsAllowed}
+          reason={lockedReason}
+          take
+          testId="audio-monitor-mono"
+          data-active={selectedMixTarget?.mono ?? false}
+          data-control="mono"
+          onClick={() =>
+            selectedMixTarget && onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, mono: !selectedMixTarget.mono })
+          }
+        />
       </div>
 
       <span className={styles.mixTargetCaption}>Mix target · faders set sends into</span>

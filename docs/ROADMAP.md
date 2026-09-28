@@ -16,7 +16,7 @@ One pull request each, in this order. Then the Cameras page.
 - [x] Step 5: screenshots and the layout gate. Header and footer captured once; one set of limits in place of each page's ratchets. Done with the themes' removal, which was two thirds of the gate's boards.
 - [ ] Step 6: product code.
   - [x] Graphite and Bone out (D25).
-  - [ ] Talkback out (D26).
+  - [x] Talkback out (D26).
   - [ ] The leftovers: the update folder, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
 - [ ] Step 7: local cleanup.
 
@@ -184,6 +184,8 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **The deck's `LIGHTS` strip refreshes only on arriving at the page** and on a push of the `LIGHT` dial.
 - [ ] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine".
 - [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
+- [ ] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`.
+- [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
 
 ## Waiting on the owner
@@ -247,5 +249,5 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D23** Superseded (2026-09-28): everything is built on the workstation. It moved the pages' work to cloud sessions.
 - **D24** (2026-09-28) The lean workflow. `main` is the development line. The studio runs the latest verified build: a release build the owner has walked through `docs/CHECKLIST.md` on the real hardware. Merges to `main` need no go-ahead. No ledgers, run ids or archive tags.
 - **D25** (2026-09-28) Studio, the dark theme, is the only theme. Graphite and Bone are removed.
-- **D26** (2026-09-28) Talkback is removed from the app entirely.
+- **D26** (2026-09-28) Talkback is removed from the app entirely. The Stream Deck's AUDIO page keeps its other keys where they were; the TALK key's place is empty.
 - **D27** (2026-09-28) Studio builds. Only `npm run release` makes one, from a commit on `main`, marked while it compiles. Every other build is a development build: it refuses the studio's folders, takes the safe value of every switch that is not set, and is an app of its own. Builds are kept in `builds\` beside the repository and never deleted by a script. `npm run release:verified` names the one the studio starts and tags its commit.

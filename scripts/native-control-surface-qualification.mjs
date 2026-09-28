@@ -27,6 +27,8 @@ const PROFILE_CHANGED =
   "New pages program, Slice 2: the profile has two pages, LIGHTS and AUDIO, a page-follow trigger for each, and every LCD it reads is answered by this bridge; until then it had four pages, PROJECTS and TASKS first.";
 /** The two routes a key of the exported profile may post to. */
 const DECK_ACTION_ROUTES = ["/api/deck/light-action", "/api/deck/audio-action"];
+/** Actions the bridge answered once and refuses now: the deck-mode key (Planning) and talkback's (D26). */
+const RETIRED_DECK_ACTIONS = ["switchToDeckMode", "talkOn", "talkOff"];
 const FOLLOW_TRIGGER_PREFIX = "sse-trigger-follow-";
 // The bridge answers only requests that carry the per-install token the engine
 // writes into <app-data>/control-surface.token (2026-09 production readiness,
@@ -768,7 +770,7 @@ async function main() {
         action.definitionId !== "post" ||
         !DECK_ACTION_ROUTES.includes(url) ||
         typeof body?.action !== "string" ||
-        body.action === "switchToDeckMode"
+        RETIRED_DECK_ACTIONS.includes(body.action)
       ) {
         strayRequests.push(`${action.definitionId} ${url} ${action.options?.body ?? ""}`.trim());
       }

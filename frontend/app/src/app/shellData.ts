@@ -168,7 +168,6 @@ export interface AudioMixTargetEntry {
   peakHoldRight: number;
   role: string;
   shortName: string;
-  talkback: boolean;
   volume: number;
 }
 
@@ -446,7 +445,6 @@ export function getAudioMixTargets(snapshot: AudioSnapshot | null): AudioMixTarg
     peakHoldRight: m.peakHoldRight,
     role: m.role,
     shortName: m.shortName,
-    talkback: m.talkback,
     volume: m.volume,
   }));
 }

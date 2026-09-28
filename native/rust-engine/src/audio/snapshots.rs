@@ -123,8 +123,8 @@ pub fn recall_audio_snapshot_with_timing(
         )
     };
 
-    // 1. App state follows the snapshot (48V / talkback keep the console's
-    //    values) and is honest about it: assumed until the console confirms.
+    // 1. App state follows the snapshot (48V keeps the console's values) and
+    //    is honest about it: assumed until the console confirms.
     {
         let _state_guard = lock_audio_state();
         let preliminary = if simulated {
