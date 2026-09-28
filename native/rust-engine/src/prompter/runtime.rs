@@ -40,6 +40,9 @@ pub(crate) struct Prompter {
     /// memory only: every start begins at `NOT CONNECTED` until the shell
     /// reports again.
     pub screen: PrompterScreen,
+    /// When the Stream Deck last set the text size: its strip shows the
+    /// size for a moment after (`deck.rs`). Kept in memory only.
+    pub deck_size_shown_at: Option<Instant>,
     /// The glass script's place as last saved, and when.
     saved_place: Option<PrompterPlace>,
     saved_at: Instant,
@@ -77,6 +80,7 @@ impl Prompter {
             look_revision: stored.look_revision,
             glass,
             screen: PrompterScreen::default(),
+            deck_size_shown_at: None,
             saved_place,
             saved_at: now,
         })

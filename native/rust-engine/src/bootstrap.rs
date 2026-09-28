@@ -348,6 +348,7 @@ pub(crate) fn bootstrap_runtime_from_paths(
         &runtime_paths.log_file_path,
         resolve_control_surface_port(),
         control_surface_token.clone(),
+        runtime_paths.cameras_simulated,
     )?;
 
     Ok(RuntimeContext {
@@ -372,8 +373,15 @@ fn start_logged_control_surface_bridge(
     log_file_path: &Path,
     requested_port: u16,
     token: String,
+    cameras_simulated: bool,
 ) -> EngineResult<ControlSurfaceBridgeInfo> {
-    let bridge = start_control_surface_bridge(db_path, log_file_path, requested_port, token);
+    let bridge = start_control_surface_bridge(
+        db_path,
+        log_file_path,
+        requested_port,
+        token,
+        cameras_simulated,
+    );
     append_log(
         log_file_path,
         if bridge.available { "INFO" } else { "WARN" },
@@ -916,6 +924,7 @@ mod tests {
             &paths.log_file_path,
             0,
             String::from("bridge-token-for-tests"),
+            true,
         )
         .expect("the line should be written");
         assert!(serving.available);
@@ -930,6 +939,7 @@ mod tests {
             &paths.log_file_path,
             taken,
             String::from("bridge-token-for-tests"),
+            true,
         )
         .expect("the line should be written");
         assert!(!refused.available);

@@ -164,10 +164,33 @@ pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurf
     }))
 }
 
+/// What a display of the deck says, whatever its page. `cameras_simulated`
+/// is `SSE_CAMERAS_SIMULATED`, read at the start: when the deck asks before
+/// the screen does, the bridge is the cameras' first caller, and the cameras
+/// it loads must be the ones the screen will get.
+pub fn read_deck_lcd_text(
+    db_path: &Path,
+    cameras_simulated: bool,
+    key: &str,
+) -> Result<String, ControlSurfaceError> {
+    // The PROMPTER and CAMERAS displays first: they need nothing of the
+    // Console or the rig, and are read once for a whole poll.
+    match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key) {
+        Some(text) => text,
+        None => lights_and_audio_lcd_text(db_path, key),
+    }
+}
+
+/// The tests' short form: the simulated cameras, which every test has (D15).
+#[cfg(test)]
 pub fn read_control_surface_lcd_text(
     db_path: &Path,
     key: &str,
 ) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text(db_path, true, key)
+}
+
+fn lights_and_audio_lcd_text(db_path: &Path, key: &str) -> Result<String, ControlSurfaceError> {
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let audio_snapshot = read_audio_snapshot(&app_settings);
@@ -330,8 +353,21 @@ fn read_active_workspace(db_path: &Path) -> Result<String, ControlSurfaceError> 
 // Mirrors the operator app's fader curve (normalizedToFaderDb in
 // frontend/app/src/app/audio/audioFormatting.ts) — the deck and the screen
 // must always print the same dB number for the same wire value.
+/// The tests' short form: the simulated cameras, which every test has (D15).
+#[cfg(test)]
 pub fn handle_control_surface_http_action(
     db_path: &Path,
+    path: &str,
+    body: &Value,
+) -> Result<Value, ControlSurfaceError> {
+    handle_deck_http_action(db_path, true, path, body)
+}
+
+/// A key or a dial of the deck, whatever its page. `cameras_simulated` is
+/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`).
+pub fn handle_deck_http_action(
+    db_path: &Path,
+    cameras_simulated: bool,
     path: &str,
     body: &Value,
 ) -> Result<Value, ControlSurfaceError> {
@@ -346,9 +382,19 @@ pub fn handle_control_surface_http_action(
     let response = match path {
         "/api/deck/light-action" => handle_light_action(db_path, action),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
-        _ => Err(ControlSurfaceError::InvalidParams(format!(
-            "Unsupported action route: {path}"
-        ))),
+        // The PROMPTER and CAMERAS pages raise their own events.
+        _ => crate::control_surface_pages::handle_page_action(
+            db_path,
+            cameras_simulated,
+            path,
+            action,
+            value,
+        )
+        .unwrap_or_else(|| {
+            Err(ControlSurfaceError::InvalidParams(format!(
+                "Unsupported action route: {path}"
+            )))
+        }),
     };
     if let Ok(reply) = &response {
         // The action log (Slice 11 — F30): every key through the bridge is

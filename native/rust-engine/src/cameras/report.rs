@@ -6,7 +6,7 @@ use crate::cameras::model::{model, CameraModel, Setting, CAMERA_NUMBERS, RECORDI
 use crate::cameras::runtime::{CameraRuntime, Cameras};
 use crate::cameras::simulated::CameraReading;
 use crate::cameras::snapshot::{
-    CameraChoice, CameraHealthEntry, CameraLevel, CameraRecentAction, CameraRecording,
+    CameraChoice, CameraDials, CameraHealthEntry, CameraLevel, CameraRecentAction, CameraRecording,
     CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable, CameraValues,
     CamerasHealthCheck, CamerasSnapshot,
 };
@@ -142,8 +142,22 @@ impl Cameras {
     pub(crate) fn snapshot(&self, recent: Option<Vec<CameraRecentAction>>) -> CamerasSnapshot {
         CamerasSnapshot {
             selected: self.selected,
+            dials: self.dials(),
             cameras: self.all().iter().map(camera_snapshot).collect(),
             recent,
+        }
+    }
+
+    /// What the deck's dials set, as the snapshot says it.
+    pub(crate) fn dials(&self) -> CameraDials {
+        CameraDials {
+            bank: self.bank,
+            sets: self
+                .bank
+                .dials()
+                .into_iter()
+                .map(|setting| setting.map(|setting| String::from(setting.key())))
+                .collect(),
         }
     }
 

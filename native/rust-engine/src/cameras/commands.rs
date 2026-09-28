@@ -24,7 +24,9 @@ use crate::cameras::model::{
 };
 use crate::cameras::runtime::{with_cameras, Cameras};
 use crate::cameras::simulated::{CameraCommand, CameraReading, CameraValue, SimulatedCameras};
-use crate::cameras::snapshot::{CameraRecentAction, CameraState, CamerasHealthCheck};
+use crate::cameras::snapshot::{
+    CameraDialBank, CameraRecentAction, CameraState, CamerasHealthCheck,
+};
 use crate::cameras::store::{read_setup, write_setup, StoredSetup};
 use crate::cameras::{CameraError, CamerasReply};
 use crate::diagnostics::{log_event, LogLevel};
@@ -34,7 +36,7 @@ use std::path::Path;
 use std::time::SystemTime;
 
 /// A request's answer and its `cameras.changed { reason, camera }`.
-type Handled = Result<(Value, Option<(&'static str, Option<u8>)>), CameraError>;
+pub(super) type Handled = Result<(Value, Option<(&'static str, Option<u8>)>), CameraError>;
 
 /// How many of the cameras' Recent actions `cameras.snapshot` carries: what
 /// the page's list holds.
@@ -56,6 +58,7 @@ pub(crate) fn handle_cameras_request(
                 (serde_json::to_value(cameras.snapshot(recent))?, None)
             }
             "cameras.select" => select_request(cameras, params)?,
+            "cameras.bank.set" => bank_request(cameras, params)?,
             "cameras.set" => set_request(cameras, bodies, params, now)?,
             "cameras.step" => step_request(cameras, bodies, params, now)?,
             "cameras.auto" => auto_request(cameras, bodies, params, now)?,
@@ -210,7 +213,7 @@ fn not_allowed(sentence: String) -> CameraError {
 
 /// A control needs a held camera: `CAMERA_NOT_SET_UP`, `CAMERA_RELEASED` or
 /// `CAMERA_UNREACHABLE` otherwise, with its sentence.
-fn held(cameras: &Cameras, camera: u8) -> Result<(), CameraError> {
+pub(super) fn held(cameras: &Cameras, camera: u8) -> Result<(), CameraError> {
     let runtime = cameras.camera(camera);
     let model = model(camera);
     match runtime.state() {
@@ -231,7 +234,7 @@ fn held(cameras: &Cameras, camera: u8) -> Result<(), CameraError> {
 }
 
 /// What a held camera last reported.
-fn reading(cameras: &Cameras, camera: u8) -> CameraReading {
+pub(super) fn reading(cameras: &Cameras, camera: u8) -> CameraReading {
     cameras.camera(camera).reading.clone().unwrap_or_default()
 }
 
@@ -277,13 +280,38 @@ fn press(
 
 /// `cameras.select { camera }`: the big picture, the plate and the deck's
 /// dials follow it (D19). A camera that is not set up can be selected.
-fn select_request(cameras: &mut Cameras, params: &Value) -> Handled {
+pub(super) fn select_request(cameras: &mut Cameras, params: &Value) -> Handled {
     let camera = camera_param(params)?;
     cameras.selected = camera;
     Ok((
         json!({ "selected": camera }),
         Some(("select", Some(camera))),
     ))
+}
+
+/// `cameras.bank.set { bank }`: what the deck's dials set on the selected
+/// camera (D14): `exposure`, `colour` or `focus`. Nothing reaches a camera.
+fn bank_request(cameras: &mut Cameras, params: &Value) -> Handled {
+    let bank = params
+        .get("bank")
+        .and_then(Value::as_str)
+        .and_then(CameraDialBank::from_key)
+        .ok_or_else(|| {
+            CameraError::Invalid(String::from("bank must be exposure, colour or focus."))
+        })?;
+    Ok(set_bank(cameras, bank))
+}
+
+/// Puts the deck's dials on `bank`, for the page's key and the deck's.
+pub(super) fn set_bank(
+    cameras: &mut Cameras,
+    bank: CameraDialBank,
+) -> (Value, Option<(&'static str, Option<u8>)>) {
+    cameras.bank = bank;
+    (
+        json!({ "bank": bank.key(), "dials": cameras.dials() }),
+        Some(("bank", None)),
+    )
 }
 
 /// `cameras.set { camera, setting, value }`: a choice's value from its
@@ -349,7 +377,7 @@ fn set_request(
 /// steppers, in the camera's own steps, stopping at the ends. Focus on a
 /// camera with `focusSteps` moves nearer (`-`) or farther (`+`) without a
 /// position, and answers no value.
-fn step_request(
+pub(super) fn step_request(
     cameras: &mut Cameras,
     bodies: &mut SimulatedCameras,
     params: &Value,
@@ -389,7 +417,7 @@ fn step_request(
 
 /// `cameras.auto { camera, what }`: a one-shot autofocus, auto white balance
 /// or auto iris the camera offers; the answer is the value it settles on.
-fn auto_request(
+pub(super) fn auto_request(
     cameras: &mut Cameras,
     bodies: &mut SimulatedCameras,
     params: &Value,
@@ -597,7 +625,7 @@ fn look_request(
 
 /// `cameras.record.start` (one press) and `cameras.record.stop { confirm }`
 /// (armed).
-fn record_request(
+pub(super) fn record_request(
     cameras: &mut Cameras,
     bodies: &mut SimulatedCameras,
     params: &Value,
@@ -629,6 +657,9 @@ fn record_request(
         CameraCommand::RecordStop
     };
     let after = press(cameras, bodies, camera, &[command], now)?;
+    // A take that starts or stops, from the screen or the deck, ends the
+    // deck's armed stop: `STOP?` is about the take that was running.
+    cameras.stop_armed_at = None;
     let sentence = if start {
         STARTED_RECORDING
     } else {

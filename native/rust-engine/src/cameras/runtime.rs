@@ -16,7 +16,7 @@
 use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::real_link::{self, LinkFailure};
 use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
-use crate::cameras::snapshot::{CameraSetupSummary, CameraState};
+use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
@@ -26,7 +26,7 @@ use crate::storage_backups::civil_from_days;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// UTC as `2026-09-27T14:03:22.123Z`, the shape the other times in the
 /// snapshots take.
@@ -165,13 +165,19 @@ impl CameraRuntime {
     }
 }
 
-/// The three cameras and the selection.
+/// The three cameras, the selection and the deck's dials.
 #[derive(Debug, Clone)]
 pub(crate) struct Cameras {
     /// The simulated link (`SSE_CAMERAS_SIMULATED=1`), or the real ones.
     pub simulated: bool,
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
+    /// What the deck's dials set on it (D14); exposure after a start. Kept
+    /// in memory only, as the selection is.
+    pub bank: CameraDialBank,
+    /// When the deck's `REC` armed the stop (D14: `STOP?`); `None` while it
+    /// is not armed. The window and the dwell are `deck.rs`'s.
+    pub stop_armed_at: Option<Instant>,
     /// The last read of the cameras' Recent actions failed: the log says so
     /// once for as long as it lasts.
     pub recent_unread: bool,
@@ -191,6 +197,8 @@ impl Cameras {
         let mut cameras = Self {
             simulated,
             selected: RECORDING_CAMERA,
+            bank: CameraDialBank::default(),
+            stop_armed_at: None,
             recent_unread: false,
             cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
         };
@@ -439,6 +447,30 @@ pub(crate) fn with_cameras<T>(
         None => cameras.insert(Cameras::load(db_path, simulated, bodies, now)?),
     };
     action(cameras, bodies, now)
+}
+
+/// Runs `action` on the cameras of this saved data as they were last read:
+/// no camera is read, so the Stream Deck's displays can ask as often as they
+/// like (`deck.rs`). The first call after a start loads them, which reads
+/// every set-up camera once, as any first request does.
+pub(crate) fn with_cameras_as_read<T>(
+    db_path: &Path,
+    simulated: bool,
+    action: impl FnOnce(&Cameras) -> T,
+) -> Result<T, CameraError> {
+    let entry = entry(db_path);
+    let mut guard = lock(&entry);
+    let EntryState { cameras, bodies } = &mut *guard;
+    let cameras = match cameras {
+        Some(cameras) => cameras,
+        None => cameras.insert(Cameras::load(
+            db_path,
+            simulated,
+            bodies,
+            SystemTime::now(),
+        )?),
+    };
+    Ok(action(cameras))
 }
 
 /// `cameras.changed { reason, camera }` from outside a request's own reply.

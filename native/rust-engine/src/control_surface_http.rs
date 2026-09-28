@@ -7,9 +7,8 @@
 //! method, target, headers and body.
 
 use crate::control_surface::{
-    handle_control_surface_http_action, read_control_surface_context,
-    read_control_surface_lcd_text, ControlSurfaceBridgeInfo, ControlSurfaceError,
-    DEFAULT_CONTROL_SURFACE_HOST,
+    handle_deck_http_action, read_control_surface_context, read_deck_lcd_text,
+    ControlSurfaceBridgeInfo, ControlSurfaceError, DEFAULT_CONTROL_SURFACE_HOST,
 };
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
@@ -99,11 +98,14 @@ fn write_bridge_token_file(path: &Path, token: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+/// `cameras_simulated` is `SSE_CAMERAS_SIMULATED`, read at the start: the
+/// CAMERAS page's keys and displays reach the cameras the screen reaches.
 pub fn start_control_surface_bridge(
     db_path: &Path,
     log_file_path: &Path,
     requested_port: u16,
     token: String,
+    cameras_simulated: bool,
 ) -> ControlSurfaceBridgeInfo {
     match bind_control_surface_listener(requested_port) {
         Ok(listener) => {
@@ -127,6 +129,7 @@ pub fn start_control_surface_bridge(
                     token,
                     port,
                 )
+                .with_cameras_simulated(cameras_simulated)
                 .keeping_read_connections(),
             );
             thread::spawn(move || {
@@ -178,6 +181,11 @@ struct BridgeContext {
     /// The engine's bridge does; a test's bridge does not, because its
     /// workers outlive the test and would hold its temporary database open.
     keep_read_connections: bool,
+    /// `SSE_CAMERAS_SIMULATED`, read at the start. A context that was not
+    /// told has none of the simulated cameras: a bridge that forgot to ask
+    /// reads every camera as having no link, and never shows a simulated
+    /// camera as a real one.
+    cameras_simulated: bool,
 }
 
 impl BridgeContext {
@@ -189,7 +197,13 @@ impl BridgeContext {
             port,
             rejection_log: Mutex::new(HashMap::new()),
             keep_read_connections: false,
+            cameras_simulated: false,
         }
+    }
+
+    fn with_cameras_simulated(mut self, cameras_simulated: bool) -> Self {
+        self.cameras_simulated = cameras_simulated;
+        self
     }
 
     fn keeping_read_connections(mut self) -> Self {
@@ -383,7 +397,9 @@ fn respond(
     let authorized = request
         .and_then(|request| authorize(&request, &context.token, context.port).map(|()| request));
     match authorized {
-        Ok(request) => route_control_surface_request(&context.db_path, &request),
+        Ok(request) => {
+            route_control_surface_request(&context.db_path, context.cameras_simulated, &request)
+        }
         Err(error) => {
             context.note_rejection(error.status_code(), error.message());
             HttpResponse::from_error(&error)
@@ -665,7 +681,11 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
     difference == 0
 }
 
-fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpResponse {
+fn route_control_surface_request(
+    db_path: &Path,
+    cameras_simulated: bool,
+    request: &HttpRequest,
+) -> HttpResponse {
     let (path, query) = split_target(&request.target);
 
     let result = match (request.method.as_str(), path) {
@@ -674,14 +694,17 @@ fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpR
             let key = query_parameter(query, "key").ok_or_else(|| {
                 ControlSurfaceError::InvalidParams(String::from("Missing ?key= parameter"))
             });
-            key.and_then(|key| read_control_surface_lcd_text(db_path, &key).map(Value::String))
+            key.and_then(|key| {
+                read_deck_lcd_text(db_path, cameras_simulated, &key).map(Value::String)
+            })
         }
         // New pages program, Slice 2: `POST /api/deck/action`, the PROJECTS
-        // and TASKS keys' route, left with Planning.
-        ("POST", "/api/deck/light-action") | ("POST", "/api/deck/audio-action") => {
-            parse_json_body(&request.body)
-                .and_then(|body| handle_control_surface_http_action(db_path, path, &body))
-        }
+        // and TASKS keys' route, left with Planning. One route a page (D5).
+        ("POST", "/api/deck/light-action")
+        | ("POST", "/api/deck/audio-action")
+        | ("POST", "/api/deck/camera-action")
+        | ("POST", "/api/deck/prompter-action") => parse_json_body(&request.body)
+            .and_then(|body| handle_deck_http_action(db_path, cameras_simulated, path, &body)),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported bridge endpoint: {} {}",
             request.method, path
@@ -1230,12 +1253,15 @@ mod tests {
         let listener = TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, 0))
             .expect("an ephemeral loopback port");
         let port = listener.local_addr().expect("local address").port();
-        let context = Arc::new(BridgeContext::new(
-            test_dir.db_path(),
-            test_dir.path().join("engine.log"),
-            TEST_TOKEN.to_string(),
-            port,
-        ));
+        let context = Arc::new(
+            BridgeContext::new(
+                test_dir.db_path(),
+                test_dir.path().join("engine.log"),
+                TEST_TOKEN.to_string(),
+                port,
+            )
+            .with_cameras_simulated(true),
+        );
         thread::spawn(move || run_control_surface_bridge(listener, context, workers, queue));
         port
     }

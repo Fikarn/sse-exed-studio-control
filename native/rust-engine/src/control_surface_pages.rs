@@ -1,0 +1,200 @@
+//! The PROMPTER and CAMERAS pages at the bridge (D5, D14). What a key does
+//! and what a display says is the prompter's and the cameras' own
+//! (`prompter::deck`, `cameras::deck`). This module hands a request over,
+//! turns a refusal into the bridge's answer, raises the events the screen
+//! follows, and keeps a page's texts for a moment, so that one poll of the
+//! deck — every display at once, a connection each — costs one read.
+
+use crate::cameras::deck::CAMERA_LCD_KEYS;
+use crate::cameras::CameraError;
+use crate::control_surface::ControlSurfaceError;
+use crate::engine_events::{emit_app_changed, emit_cameras_changed, emit_prompter_changed};
+use crate::health::APP_CHANGED_REASON_HEALTH;
+use crate::prompter::deck::PROMPTER_LCD_KEYS;
+use crate::prompter::PrompterError;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::time::{Duration, Instant};
+
+/// The PROMPTER page's keys and dials.
+pub(crate) const PROMPTER_ROUTE: &str = "/api/deck/prompter-action";
+/// The CAMERAS page's keys and dials.
+pub(crate) const CAMERA_ROUTE: &str = "/api/deck/camera-action";
+
+/// How long a page's texts answer its displays before they are read again:
+/// longer than one poll's burst, shorter than the second between two polls.
+const TEXTS_KEPT_FOR: Duration = Duration::from_millis(250);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Page {
+    Prompter,
+    Cameras,
+}
+
+struct KeptTexts {
+    at: Instant,
+    texts: Vec<(&'static str, String)>,
+}
+
+type Kept = Mutex<Option<KeptTexts>>;
+/// One page's texts for each saved data: the tests, each with a database of
+/// its own, never share one.
+type KeptByPage = Mutex<HashMap<(PathBuf, Page), Arc<Kept>>>;
+
+static KEPT: OnceLock<KeptByPage> = OnceLock::new();
+
+fn kept(db_path: &Path, page: Page) -> Arc<Kept> {
+    let registry = KEPT.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut registry = registry
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    Arc::clone(
+        registry
+            .entry((db_path.to_path_buf(), page))
+            .or_insert_with(|| Arc::new(Mutex::new(None))),
+    )
+}
+
+fn lock(kept: &Kept) -> MutexGuard<'_, Option<KeptTexts>> {
+    kept.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// A key or a dial changed the page: its displays are read again at once.
+fn forget_texts(db_path: &Path, page: Page) {
+    *lock(&kept(db_path, page)) = None;
+}
+
+fn prompter_error(error: PrompterError) -> ControlSurfaceError {
+    match error {
+        PrompterError::Invalid(message) => ControlSurfaceError::InvalidParams(message),
+        PrompterError::Refused(_, message) => ControlSurfaceError::Rejected(message),
+        PrompterError::Storage(message) => ControlSurfaceError::Storage(message),
+    }
+}
+
+fn camera_error(error: CameraError) -> ControlSurfaceError {
+    match error {
+        CameraError::Invalid(message) => ControlSurfaceError::InvalidParams(message),
+        CameraError::Refused(_, message) => ControlSurfaceError::Rejected(message),
+        CameraError::Storage(message) => ControlSurfaceError::Storage(message),
+    }
+}
+
+/// The page a display's key belongs to, when it is one of the two pages'.
+fn page_of(key: &str) -> Option<Page> {
+    if PROMPTER_LCD_KEYS.contains(&key) {
+        Some(Page::Prompter)
+    } else if CAMERA_LCD_KEYS.contains(&key) {
+        Some(Page::Cameras)
+    } else {
+        None
+    }
+}
+
+/// What a display of the PROMPTER or the CAMERAS page says; `None` for a
+/// key of another page. `cameras_simulated` is `SSE_CAMERAS_SIMULATED`, read
+/// at the start.
+pub(crate) fn page_lcd_text(
+    db_path: &Path,
+    cameras_simulated: bool,
+    key: &str,
+) -> Option<Result<String, ControlSurfaceError>> {
+    let page = page_of(key)?;
+    let kept = kept(db_path, page);
+    // Held while the texts are read: the other displays of the same poll
+    // wait for this read instead of making their own.
+    let mut guard = lock(&kept);
+    let fresh = guard
+        .as_ref()
+        .is_some_and(|kept| kept.at.elapsed() < TEXTS_KEPT_FOR);
+    if !fresh {
+        let texts = match page {
+            Page::Prompter => crate::prompter::deck::deck_texts(db_path).map_err(prompter_error),
+            Page::Cameras => crate::cameras::deck::deck_texts(db_path, cameras_simulated, true)
+                .map_err(camera_error),
+        };
+        match texts {
+            Ok(texts) => {
+                *guard = Some(KeptTexts {
+                    at: Instant::now(),
+                    texts,
+                });
+            }
+            Err(error) => {
+                *guard = None;
+                return Some(Err(error));
+            }
+        }
+    }
+    let text = guard.as_ref().and_then(|kept| {
+        kept.texts
+            .iter()
+            .find(|(name, _)| *name == key)
+            .map(|(_, text)| text.clone())
+    });
+    Some(
+        text.ok_or_else(|| {
+            ControlSurfaceError::InvalidParams(format!("Unsupported LCD key: {key}"))
+        }),
+    )
+}
+
+/// A key or a dial of the PROMPTER or the CAMERAS page; `None` for another
+/// page's route. The answer says what the key did (`did`), and the screen
+/// hears of it as it hears of its own requests: `prompter.changed` or
+/// `cameras.changed`, and `app.changed` when a lamp changed.
+pub(crate) fn handle_page_action(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    action: &str,
+    value: Option<&str>,
+) -> Option<Result<Value, ControlSurfaceError>> {
+    match path {
+        PROMPTER_ROUTE => Some(
+            crate::prompter::deck::handle_deck_action(db_path, action, value)
+                .map(|reply| {
+                    forget_texts(db_path, Page::Prompter);
+                    if let Some(reason) = reply.reason {
+                        emit_prompter_changed(reason, reply.anchor.clone());
+                    }
+                    if reply.health_changed {
+                        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+                    }
+                    answer(reply.result, reply.reason)
+                })
+                .map_err(prompter_error),
+        ),
+        CAMERA_ROUTE => Some(
+            crate::cameras::deck::handle_deck_action(db_path, cameras_simulated, action, value)
+                .map(|reply| {
+                    forget_texts(db_path, Page::Cameras);
+                    if let Some((reason, camera)) = reply.event {
+                        emit_cameras_changed(reason, camera);
+                    }
+                    if reply.health_changed {
+                        emit_app_changed(APP_CHANGED_REASON_HEALTH);
+                    }
+                    answer(reply.result, reply.event.map(|(reason, _)| reason))
+                })
+                .map_err(camera_error),
+        ),
+        _ => None,
+    }
+}
+
+/// The bridge's answer to a key: the request's own answer, `ok`, and what
+/// the key did when the answer does not say it itself.
+fn answer(result: Value, reason: Option<&'static str>) -> Value {
+    let mut answer = match result {
+        Value::Object(fields) => fields,
+        _ => serde_json::Map::new(),
+    };
+    answer.insert(String::from("ok"), json!(true));
+    if !answer.contains_key("did") {
+        answer.insert(String::from("did"), json!(reason));
+    }
+    Value::Object(answer)
+}

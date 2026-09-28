@@ -12,6 +12,7 @@
 
 pub(crate) mod archive;
 pub(crate) mod commands;
+pub(crate) mod deck;
 pub(crate) mod model;
 pub(crate) mod real_link;
 pub(crate) mod report;
@@ -23,6 +24,8 @@ pub(crate) mod store;
 pub(crate) mod test_support;
 #[cfg(test)]
 mod tests_controls;
+#[cfg(test)]
+mod tests_deck;
 #[cfg(test)]
 mod tests_link;
 #[cfg(test)]

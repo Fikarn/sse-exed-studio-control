@@ -232,6 +232,33 @@ pub struct CameraRecentAction {
     pub detail: String,
 }
 
+/// What the Stream Deck's four dials set on the selected camera (D14): the
+/// deck's `BANK` key and the page's keys choose one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "lowercase")]
+pub enum CameraDialBank {
+    /// ISO, shutter, iris and ND: the bank after a start.
+    #[default]
+    Exposure,
+    /// White balance and tint.
+    Colour,
+    /// Focus; a push is a one-shot autofocus where the lens allows.
+    Focus,
+}
+
+/// The deck's dials, as the page says them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct CameraDials {
+    pub bank: CameraDialBank,
+    /// The setting each dial sets, left to right, by its name in the
+    /// requests; `null` for a dial that sets nothing in this bank.
+    pub sets: Vec<Option<String>>,
+}
+
 /// `cameras.snapshot`.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
@@ -239,6 +266,8 @@ pub struct CameraRecentAction {
 pub struct CamerasSnapshot {
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
+    /// What the deck's dials set on it.
+    pub dials: CameraDials,
     pub cameras: Vec<CameraSnapshot>,
     /// The cameras' newest Recent actions, newest first; `null` when the
     /// action log could not be read.

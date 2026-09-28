@@ -10,6 +10,7 @@ mod commissioning;
 mod control_surface;
 mod control_surface_audio;
 mod control_surface_http;
+mod control_surface_pages;
 mod development;
 mod diagnostics;
 mod engine_events;
