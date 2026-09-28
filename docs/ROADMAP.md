@@ -18,7 +18,7 @@ One pull request each, in this order. Then the Cameras page.
   - [x] Graphite and Bone out (D25).
   - [x] Talkback out (D26).
   - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, eight unused components of the design system and three of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
-  - [x] Three changes of behaviour: one recovery screen and one startup screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine is a chunk of its own, which the app's window never loads.
+  - [x] Three changes of behaviour: one recovery screen and one startup screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine is a chunk of its own, which the app's window never loads. And a fourth: a development build's Companion export asks Companion nothing, so the gate's bridge lane leaves the studio's Companion alone.
 - [ ] Step 7: local cleanup.
 
 ## Next: the Cameras and Teleprompter pages
