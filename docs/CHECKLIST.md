@@ -38,12 +38,16 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 
 ## Stream Deck
 
-- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER (the last two once built), with no PROJECTS or TASKS, and the deck follows the app's page. The AUDIO page has no `TALK` key: its place, second row, third key, is empty.
+- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, with no PROJECTS or TASKS, and the deck follows the app's page to each of the four.
+- [ ] The page keys turn the deck round: `AUDIO >>`, `CAMS >>`, `PROMPTER >>`, `LIGHTS >>`. The AUDIO page has no `TALK` key: `CAMS >>` stands in its place, second row, third key.
+- [ ] The deck draws `CUE <` and `CUE >`, and on the strips `¶`, `·` and `°`, as they are written here.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, its displays read `PREVIEW` and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
 
-The PROMPTER and CAMERAS pages (once built) are walked under Teleprompter and Cameras.
+- [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
+
+The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 
 ## Teleprompter
 
@@ -53,6 +57,7 @@ The PROMPTER and CAMERAS pages (once built) are walked under Teleprompter and Ca
 - [ ] Ctrl+V pastes into the editor and keeps the formatting; Ctrl+B, Ctrl+I and Ctrl+U do nothing.
 - [ ] Replacing the script on the prompter needs the second press.
 - [ ] After a restart the script and the place are still there, paused.
+- [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows; `PLAY` is grey and the strip reads `XL NOT CONNECTED`. With nothing on the prompter every control is grey.
 
 Once the Prompter XL's window is built:
 
@@ -61,7 +66,7 @@ Once the Prompter XL's window is built:
 - [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
 - [ ] Unplugged: the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script.
 - [ ] Plugged back in: the script returns at the same place, paused.
-- [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page (once built).
+- [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page. `PLAY` is green while the text scrolls.
 - [ ] The scroll is smooth at the speeds you use, also with the Cameras page open.
 
 ## Cameras
@@ -71,6 +76,7 @@ Until the links to the cameras are built:
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
 - [ ] The pictures are test pictures, and the page says so. Guides, peaking, zebras, 1:1 and the loupe change the pictures on the screen.
 - [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and a vMix input is saved and still there after a restart.
+- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC` and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
 Once the links and the pictures are built:
@@ -82,6 +88,8 @@ Once the links and the pictures are built:
 - [ ] Every setting changed from the page or the deck reaches the camera, and the page shows what the camera reports.
 - [ ] A change made on the camera shows on the page within about a second.
 - [ ] `REC` starts CAM 1 whichever camera is selected; stopping needs the second press, on the page and on the deck (`STOP?`).
+- [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds.
+- [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
 - [ ] After `Release` the iPad reaches CAM 1 and LUMIX Tether reaches a BGH1; `Connect` takes the camera back.

@@ -19,6 +19,9 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - Guides, peaking, zebras, a 1:1 view and a loupe are drawn on this screen only and are off at every start. Until the cameras' pictures are built, the pictures are test pictures (#244).
 - Setup / Support has a `CAMERAS` screen: CAM 1's pairing, the BGH1s' addresses and each camera's vMix input. Saving sends nothing to a camera (#244).
 - The header has a Cameras lamp. Until the links to the real cameras are built it reads `not set up`, every camera says that its link comes with a later version, and `REC` is locked (#244).
+- The Stream Deck has four pages, LIGHTS, AUDIO, CAMERAS and PROMPTER, and follows the app to each. A key on every page turns the deck to the next. They reach the deck with the next import of the profile (#247).
+- The deck's CAMERAS page selects the camera, puts the dials on exposure, colour or focus, and has `REC`: one press starts CAM 1, two stop it (`STOP?`). The Cameras page shows and sets what the dials set (#247, #248).
+- The deck's PROMPTER page has `PLAY`, `BACK`, `TOP`, the two cue keys and dials for speed, position, text size and paragraph. Its strip shows the speed, the place, the time left and the script's name (#247).
 - The hardware link keeps the three cameras (Pocket 6K Pro, two BGH1) and their setup; the links to the real cameras come later. A start or a restore sends nothing to a camera (#229).
 - The saved data holds the Teleprompter's scripts and look (schema 9) and the cameras' setup (schema 10); backups carry both (formats 6 and 7). A restore adds scripts and never removes one (#225, #229).
 - Light outputs: Armed / Held, in Setup / Support › Workstation. Held, nothing is sent to the rig, which is not a blackout; the hold is remembered, and no start or restore arms the rig (#201).
@@ -38,6 +41,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 ### Changed
 
 - Until the links to the cameras are built, a restore leaves a camera's address out and says which (#243).
+- Setup's `Map bindings` shows each dial's three controls under its cell of the strip, and its page tabs are keys like any other. In `Verify live echo` a key of another page turns the screen to its page (#248).
+- In Setup, the state display of a setup that is not published counts the probes that passed once all have; it read "nothing verified yet" (#248).
 - A stop of the hardware link during a session shows the same recovery screen as a failed start, with `Export diagnostics`, the restore keys and the log's last lines (#241).
 - The window opens on the display it was last on, found by its place on the desktop. Windows' display numbers can swap between starts, and the window then opened on the other display (#241).
 - A start that fails because the two program files are of different builds says so in plain words (#238).
