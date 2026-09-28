@@ -128,18 +128,6 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
             </button>
             <button
               className={styles.railButton}
-              disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
-              onClick={() =>
-                void performAction("open-update-repo", () =>
-                  openReferencePath("Update folder", String(runtimePaths?.updateRepositoryPath ?? ""))
-                )
-              }
-              type="button"
-            >
-              Update folder
-            </button>
-            <button
-              className={styles.railButton}
               disabled={!String(runtimePaths?.appDataDir ?? "").trim()}
               onClick={() =>
                 void performAction("open-app-data", () =>

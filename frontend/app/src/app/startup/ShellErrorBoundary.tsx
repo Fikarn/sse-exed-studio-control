@@ -81,7 +81,7 @@ export class ShellErrorBoundary extends Component<ShellErrorBoundaryProps, Shell
       });
       this.setState({
         exporting: false,
-        exportMessage: `Diagnostics exported to ${path}. Attach it to the support ticket.`,
+        exportMessage: `Diagnostics exported to ${path}.`,
       });
     } catch (exportError) {
       const reason = exportError instanceof Error ? exportError.message : String(exportError);

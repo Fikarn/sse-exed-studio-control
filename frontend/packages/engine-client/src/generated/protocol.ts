@@ -23,7 +23,6 @@ export const REQUEST_METHODS = [
   "commissioning.snapshot",
   "commissioning.update",
   "controlSurface.snapshot",
-  "dev.parityFixture.load",
   "engine.ping",
   "exports.companion.export",
   "health.snapshot",
@@ -131,9 +130,6 @@ export const STARTUP_LIFECYCLE_STATES = [
   "failed",
 ] as const;
 export type StartupLifecycleState = (typeof STARTUP_LIFECYCLE_STATES)[number];
-
-export const DEV_PARITY_FIXTURES = ["lighting-populated", "audio-populated", "setup-required", "setup-ready"] as const;
-export type DevParityFixtureId = (typeof DEV_PARITY_FIXTURES)[number];
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };

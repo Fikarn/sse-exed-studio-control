@@ -27,7 +27,6 @@
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@sse/design-system": "file:../packages/design-system",
     "@sse/engine-client": "file:../packages/engine-client",
-    "@sse/shared-graphics": "file:../packages/shared-graphics",
     "@sse/test-fixtures": "file:../packages/test-fixtures",
     "@sse/tokens": "file:../packages/tokens",
     "@tauri-apps/api": "^2.11.0",

@@ -198,8 +198,6 @@ export function formatPathLabel(key: string) {
       return "Engine log";
     case "logsDir":
       return "Logs";
-    case "updateRepositoryPath":
-      return "Update folder";
     default:
       return key
         .replace(/([A-Z])/g, " $1")

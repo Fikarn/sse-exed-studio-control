@@ -7,7 +7,7 @@ import styles from "./SupportPlate.module.css";
 
 // Visual overhaul A, Slice 7 (A-setup.html's plate): Support is always here,
 // whatever step the runner is on — the workstation's own settings, the backup
-// the operator would restore from, the two things a support ticket needs, the
+// the operator would restore from, the two things that show what went wrong, the
 // sample data that asks first, what version everything is, and the one red
 // command on the surface.
 
@@ -199,7 +199,7 @@ export function SupportPlate({
         </div>
       </Section>
 
-      <Section title="Diagnostics" detail="for a support ticket" testId="support-diagnostics">
+      <Section title="Diagnostics" detail="what happened, in a file" testId="support-diagnostics">
         <div className={styles.keys}>
           <Key size="small" disabled={busy} testId="support-export-diagnostics" onClick={onExportDiagnostics}>
             Export diagnostics
