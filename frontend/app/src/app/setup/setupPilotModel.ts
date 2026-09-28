@@ -32,6 +32,8 @@ export interface ControlSurfaceControl {
   label: string;
   position: number;
   type: string;
+  /** The bridge's route the control posts to; `null` for one that sends nothing. */
+  url: string | null;
 }
 
 export interface ControlSurfacePage {
@@ -103,6 +105,7 @@ export function parseControlSurfacePages(snapshot: SnapshotRecord | null): Contr
             label: String(controlRecord.label ?? "Control"),
             position: typeof controlRecord.position === "number" ? controlRecord.position : 0,
             type: String(controlRecord.type ?? "button"),
+            url: typeof controlRecord.url === "string" ? controlRecord.url : null,
           },
         ];
       });

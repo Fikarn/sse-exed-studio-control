@@ -1,6 +1,8 @@
 export interface EchoControl {
   body?: { action?: string; value?: string } | null;
   id: string;
+  /** The bridge's route the control posts to (`/api/deck/camera-action`); none for a control that sends nothing. */
+  url?: string | null;
 }
 
 export interface EchoPage {
@@ -14,6 +16,12 @@ export interface ControlSurfaceLastEvent {
   at: number;
   route: string;
   value: string | null;
+}
+
+/** The control a press of the deck was, and the page it is on. */
+export interface EchoMatch {
+  controlId: string;
+  pageId: string;
 }
 
 export function parseControlSurfaceLastEvent(candidate: unknown): ControlSurfaceLastEvent | null {
@@ -32,16 +40,22 @@ export function parseControlSurfaceLastEvent(candidate: unknown): ControlSurface
   };
 }
 
-// The deck page each bridge route's keys live on. New pages program, Slice 2: the
-// PROJECTS and TASKS pages and their route (`/api/deck/action`) left with Planning.
-const routePagePreference: Record<string, string[]> = {
-  "/api/deck/audio-action": ["audio"],
-  "/api/deck/light-action": ["lights"],
-};
+/** A route without the address before it: the page model gives it bare, a profile may not. */
+function routeOf(url: string): string {
+  return url.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, "");
+}
 
+// Each page of the deck posts to a route of its own (LIGHTS, AUDIO, CAMERAS and
+// PROMPTER; `native/protocol/v1.md`, "Stream Deck bridge"), and a press says
+// which route it arrived on: a control of another route is not the one that was
+// pressed, whatever its action is called. A control or a press that does not
+// say its route is matched by what it sends alone.
 function controlMatches(control: EchoControl, event: ControlSurfaceLastEvent) {
   const body = control.body;
   if (!body || body.action !== event.action) {
+    return false;
+  }
+  if (control.url && event.route && routeOf(control.url) !== event.route) {
     return false;
   }
   if (body.value === undefined || body.value === null) {
@@ -50,16 +64,22 @@ function controlMatches(control: EchoControl, event: ControlSurfaceLastEvent) {
   return body.value === event.value;
 }
 
-export function findEchoControlId(
+/**
+ * The control a press of the deck was: on the page Setup shows when that page
+ * has it, else on the first page that has it. Two controls of a page may send
+ * the same (`PLAY` and a push of the speed dial): the first is taken, a key
+ * before a dial.
+ */
+export function findEcho(
   pages: EchoPage[],
   event: ControlSurfaceLastEvent | null,
   selectedPageId: string | null
-): string | null {
+): EchoMatch | null {
   if (!event) {
     return null;
   }
 
-  const matches: { controlId: string; pageId: string }[] = [];
+  const matches: EchoMatch[] = [];
   for (const page of pages) {
     for (const control of [...page.buttons, ...page.dials]) {
       if (controlMatches(control, event)) {
@@ -67,22 +87,13 @@ export function findEchoControlId(
       }
     }
   }
-  if (matches.length === 0) {
-    return null;
-  }
+  return matches.find((match) => match.pageId === selectedPageId) ?? matches[0] ?? null;
+}
 
-  const onSelectedPage = matches.find((match) => match.pageId === selectedPageId);
-  if (onSelectedPage) {
-    return onSelectedPage.controlId;
-  }
-
-  const preferredPages = routePagePreference[event.route] ?? [];
-  for (const pageId of preferredPages) {
-    const preferred = matches.find((match) => match.pageId === pageId);
-    if (preferred) {
-      return preferred.controlId;
-    }
-  }
-
-  return matches[0]?.controlId ?? null;
+export function findEchoControlId(
+  pages: EchoPage[],
+  event: ControlSurfaceLastEvent | null,
+  selectedPageId: string | null
+): string | null {
+  return findEcho(pages, event, selectedPageId)?.controlId ?? null;
 }

@@ -95,9 +95,16 @@ fn control_surface_page(
             let row = control.row.parse::<i64>().unwrap_or(0);
             let col = control.col.parse::<i64>().unwrap_or(0);
             let position = row * 4 + col + 1;
+            // A cell of the touch strip that only shows: it sends nothing and
+            // turns no page. (AUDIO's cells are tapped, and are buttons.)
+            let control_type = if control.down.is_empty() {
+                "display"
+            } else {
+                "button"
+            };
             buttons.push(control_surface_control(
                 format!("{prefix}-btn-{position}"),
-                String::from("button"),
+                String::from(control_type),
                 position,
                 String::from(control.label),
                 control_description(&control.down, control.label, "button"),
@@ -336,6 +343,8 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         "deleteScene" => String::from("Delete the selected lighting scene."),
         "selectPrevLight" => String::from("Select the previous light."),
         "selectNextLight" => String::from("Select the next light."),
+        "selectPrevScene" => String::from("Select the previous scene."),
+        "selectNextScene" => String::from("Select the next scene."),
         "resetIntensity" => String::from("Reset the selected light intensity."),
         "intensityDown" => String::from("Lower the selected light intensity."),
         "intensityUp" => String::from("Raise the selected light intensity."),
@@ -358,12 +367,16 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
             "Select strip {} in the app inspector.",
             value.unwrap_or_else(|| String::from("the tapped"))
         ),
+        // The outputs by the names the Audio page gives them.
         "setMixTarget" => format!(
             "Make {} the active mix target.",
-            value
-                .as_deref()
-                .map(format_payload_value)
-                .unwrap_or_else(|| String::from("the selected output"))
+            match value.as_deref() {
+                Some("main") => String::from("Main Out"),
+                Some("phones-a") => String::from("Phones 1"),
+                Some("phones-b") => String::from("Phones 2"),
+                Some(other) => format_payload_value(other),
+                None => String::from("the selected output"),
+            }
         ),
         "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
         "toggleDialMode" => String::from("Toggle the input dials between fader and gain."),

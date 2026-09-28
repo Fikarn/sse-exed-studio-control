@@ -237,6 +237,10 @@ const STATE_FIXTURES = [
   "cameras-lost-mid-take",
   "cameras-no-link",
   "setup-cameras",
+  // Setup's Map step on the deck's two pages of 2026-09-28, CAMERAS and
+  // PROMPTER, as the hardware link's page model gives them.
+  "setup-map-cameras",
+  "setup-map-prompter",
 ] as const;
 
 test.describe("state coverage", () => {

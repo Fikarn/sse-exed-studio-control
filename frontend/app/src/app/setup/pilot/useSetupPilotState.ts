@@ -8,7 +8,7 @@ import {
 } from "../../shellData";
 import { getRecentActions } from "../components/RecentActions";
 import { useOperatorLayout } from "../../OperatorLayoutProvider";
-import { parseControlSurfaceLastEvent, findEchoControlId } from "../setupControlEcho";
+import { parseControlSurfaceLastEvent, findEcho } from "../setupControlEcho";
 import {
   parseControlSurfacePages,
   normalizeSetupMode,
@@ -125,9 +125,15 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     }
     lastEchoEventAtRef.current = lastEvent.at;
 
-    const changedControlId = findEchoControlId(pages, lastEvent, selectedPageId || null);
-    if (changedControlId) {
-      setEchoControlId(changedControlId);
+    const echo = findEcho(pages, lastEvent, selectedPageId || null);
+    if (echo) {
+      // A cell can pulse only where it is drawn: a key of another page of the
+      // deck turns Setup to that page, and the record to the key.
+      if (echo.pageId !== selectedPageId) {
+        setSelectedPageId(echo.pageId);
+        setSelectedControlId(echo.controlId);
+      }
+      setEchoControlId(echo.controlId);
       if (echoTimeoutRef.current !== null) {
         window.clearTimeout(echoTimeoutRef.current);
       }

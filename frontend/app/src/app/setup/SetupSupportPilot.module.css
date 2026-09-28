@@ -426,9 +426,13 @@
     font: var(--font-weight-medium) var(--font-size-tick) / 1.4 var(--font-family-mono);
   }
 
+  /* A dial a column, under its cell of the strip, as on the deck: its push,
+     its turn to the left, its turn to the right. */
   .dialRow {
     display: grid;
+    grid-auto-flow: column;
     grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(3, auto);
     gap: var(--space-3);
   }
 

@@ -28,8 +28,17 @@ export function isLoading(fixture) {
 // New pages program, Slice 6b: a board a page reaches by a press, not by its
 // data alone — the Teleprompter's editor is the bay's second view, chosen on
 // the page. The fixture holds the data; these are the presses that bring the
-// page to the board, and the mark that says it is there.
+// page to the board, and the mark that says it is there. Setup's Map step is
+// on the deck's first page until another page's tab is pressed.
 export const BOARD_STEPS = {
+  "setup-map-cameras": {
+    presses: ["setup-deck-page-cameras"],
+    ready: "[data-testid=setup-deck-page-cameras][data-active=true]",
+  },
+  "setup-map-prompter": {
+    presses: ["setup-deck-page-prompter"],
+    ready: "[data-testid=setup-deck-page-prompter][data-active=true]",
+  },
   "teleprompter-editing": {
     presses: ["teleprompter-bay-edit"],
     ready: "[data-testid=teleprompter-editor-text][contenteditable=true]",
@@ -121,6 +130,8 @@ export const EXCEPTIONS = {
   "setup-ready": { regionsPresent: 4 },
   "setup-degraded": { regionsPresent: 4 },
   "setup-cameras": { regionsPresent: 4 },
+  "setup-map-cameras": { regionsPresent: 4 },
+  "setup-map-prompter": { regionsPresent: 4 },
   "lighting-empty": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
   "lighting-loading": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
   "lighting-populated": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },

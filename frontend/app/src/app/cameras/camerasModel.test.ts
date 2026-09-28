@@ -9,6 +9,8 @@ import {
   clockTime,
   colourRows,
   controlsLock,
+  DIAL_BANKS,
+  dialsView,
   exposureRows,
   formatTakeLength,
   heldWord,
@@ -437,6 +439,76 @@ describe("the plate", () => {
     expect(sectionDetail(cam3!, "one press")).toBe("locked · last read 09:11");
     const never = (await openCameras({ cameras: [] }).read()).cameras[0]!;
     expect(sectionDetail(never, "one press")).toBe("not set up");
+  });
+});
+
+describe("what the Stream Deck's dials set", () => {
+  it("says what the bank's dials set on the selected camera, in the hardware link's own list", async () => {
+    const { transport, read } = openCameras();
+    expect(dialsView(await read())).toEqual({
+      bank: "exposure",
+      bankWord: "Exposure",
+      hint: "The dials drive CAM 1: ISO · shutter · iris · ND.",
+      live: true,
+      footer: "CAM 1 · Exposure",
+    });
+
+    await transport.request("cameras.bank.set", { bank: "colour" });
+    await transport.request("cameras.select", { camera: 2 });
+    expect(dialsView(await read())).toMatchObject({
+      bank: "colour",
+      hint: "The dials drive CAM 2: white balance · tint.",
+      footer: "CAM 2 · Colour",
+    });
+
+    await transport.request("cameras.bank.set", { bank: "focus" });
+    expect(dialsView(await read())).toMatchObject({
+      bank: "focus",
+      hint: "The dials drive CAM 2: focus · a push is autofocus once.",
+      footer: "CAM 2 · Focus",
+    });
+  });
+
+  it("has a key for every bank the hardware link knows, in the deck's order", () => {
+    expect(DIAL_BANKS.map((entry) => [entry.bank, entry.label])).toEqual([
+      ["exposure", "Exposure"],
+      ["colour", "Colour"],
+      ["focus", "Focus"],
+    ]);
+  });
+
+  it("says why the dials set nothing on a camera that is not held, and what brings them back", async () => {
+    const { transport, hooks, read } = openCameras();
+    await transport.request("cameras.select", { camera: 2 });
+    await transport.request("cameras.release", { camera: 2, confirm: true });
+    expect(dialsView(await read())).toMatchObject({
+      hint: "CAM 2 is released: the dials set nothing until you press Connect.",
+      live: false,
+      footer: "CAM 2 · Exposure",
+    });
+
+    await transport.request("cameras.select", { camera: 3 });
+    hooks.stopAnswering(3);
+    expect(dialsView(await read())).toMatchObject({
+      hint: "CAM 3 does not answer: the dials set nothing until it does.",
+      live: false,
+    });
+
+    const bare = openCameras({ cameras: [] });
+    expect(dialsView(await bare.read())).toMatchObject({
+      hint: "CAM 1 is not set up: the dials set nothing until it is.",
+      live: false,
+    });
+  });
+
+  it("prints a setting it has no word for as the hardware link names it", async () => {
+    const snapshot = await openCameras().read();
+    expect(dialsView({ ...snapshot, dials: { bank: "exposure", sets: ["gain", null, null, null] } })?.hint).toBe(
+      "The dials drive CAM 1: gain."
+    );
+    expect(dialsView({ ...snapshot, dials: { bank: "exposure", sets: [null, null, null, null] } })?.hint).toBe(
+      "The dials set nothing on CAM 1."
+    );
   });
 });
 

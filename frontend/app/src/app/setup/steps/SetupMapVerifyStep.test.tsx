@@ -18,6 +18,7 @@ function key(pageId: string, position: number, label: string): ControlSurfaceCon
     label,
     position,
     type: "button",
+    url: null,
   };
 }
 

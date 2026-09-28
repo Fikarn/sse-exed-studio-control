@@ -66,6 +66,7 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
                       key={page.id}
                       className={styles.pageTab}
                       data-active={page.id === selectedPage?.id}
+                      data-testid={`setup-deck-page-${page.id}`}
                       onClick={() => {
                         setSelectedPageId(page.id);
                         setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);

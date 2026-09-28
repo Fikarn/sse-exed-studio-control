@@ -897,9 +897,11 @@ fn the_prompter_page_is_the_takes_keys_and_four_dials() {
     }
 }
 
-// Setup draws every page from the page model: each control of the two new
-// pages says what it does in the operator's words, and none falls back to
-// the words of a control nobody described.
+// Setup draws every page from the page model: each control says what it
+// does in the operator's words, and none falls back to the words of a
+// control nobody described. (Until the CAMERAS and PROMPTER pages the scene
+// dial's turns read `left Scene.` and `right Scene.`, and a mix target's key
+// `Make phones a the active mix target.`.)
 #[test]
 fn the_page_model_says_what_the_new_pages_controls_do() {
     let snapshot = build_control_surface_snapshot();
@@ -913,6 +915,30 @@ fn the_page_model_says_what_the_new_pages_controls_do() {
             page.label
         );
         assert_eq!(page.dials.len(), 12, "{}", page.label);
+        // The strip's cells only show; every other key is pressed.
+        for control in &page.buttons {
+            assert_eq!(
+                control.control_type,
+                if control.position > 8 {
+                    "display"
+                } else {
+                    "button"
+                },
+                "{}",
+                control.id
+            );
+            assert_eq!(
+                control.position > 8,
+                control.url.is_none() && control.is_page_nav.is_none()
+            );
+        }
+    }
+    for page in &snapshot.pages[..2] {
+        for control in &page.buttons {
+            assert_eq!(control.control_type, "button", "{}", control.id);
+        }
+    }
+    for page in &snapshot.pages {
         for control in page.buttons.iter().chain(&page.dials) {
             assert!(
                 control.description.ends_with('.')
@@ -943,6 +969,23 @@ fn the_page_model_says_what_the_new_pages_controls_do() {
             .unwrap_or_else(|| panic!("{id}"))
             .clone()
     };
+    assert_eq!(
+        by_id(&snapshot.pages[0], "lights-dial-4-left").description,
+        "Select the previous scene."
+    );
+    assert_eq!(
+        by_id(&snapshot.pages[0], "lights-dial-4-right").description,
+        "Select the next scene."
+    );
+    assert_eq!(
+        ["audio-btn-1", "audio-btn-2", "audio-btn-3"]
+            .map(|id| by_id(&snapshot.pages[1], id).description),
+        [
+            "Make Main Out the active mix target.",
+            "Make Phones 1 the active mix target.",
+            "Make Phones 2 the active mix target."
+        ]
+    );
     assert_eq!(
         by_id(cameras, "cameras-btn-5").description,
         "Start recording on CAM 1. While it records: arm the stop, then stop."
@@ -976,5 +1019,29 @@ fn the_page_model_says_what_the_new_pages_controls_do() {
     assert_eq!(
         by_id(prompter, "prompter-btn-8").page_nav_target.as_deref(),
         Some("LIGHTS")
+    );
+}
+
+/// The pages' test double draws the deck's pages from a file, so that Setup
+/// shows in development the keys, the words and the descriptions it shows in
+/// the studio. The file is the page model itself, and this test holds it so:
+/// a key, a label or a description that changes here is written to the file
+/// (`SSE_WRITE_DECK_PAGES=1`, this test alone, then Prettier on the file).
+#[test]
+fn the_doubles_deck_pages_are_the_page_model() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../frontend/packages/engine-client/src/transports/fixture/deckPages.json");
+    let model = serde_json::to_value(build_control_surface_snapshot()).expect("page model");
+    if std::env::var_os("SSE_WRITE_DECK_PAGES").is_some() {
+        let text = serde_json::to_string_pretty(&model).expect("page model");
+        std::fs::write(&path, text).expect("deckPages.json is written");
+    }
+    let file: Value = serde_json::from_str(
+        &std::fs::read_to_string(&path).expect("deckPages.json is beside the double"),
+    )
+    .expect("deckPages.json is JSON");
+    assert!(
+        file == model,
+        "deckPages.json is not the page model. Write it again: SSE_WRITE_DECK_PAGES=1 cargo test -p studio-control-engine --bins the_doubles_deck_pages_are_the_page_model, then npx prettier --write on the file."
     );
 }
