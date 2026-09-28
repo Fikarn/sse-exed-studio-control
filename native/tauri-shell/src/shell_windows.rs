@@ -30,7 +30,8 @@
 //! prompter's window shows the glass and never reads the clipboard.
 //!
 //! The prompter's window is the second window (`shell_prompter_window.rs`).
-//! What the hardware link says goes to a window by its name (`windows_for`).
+//! What the hardware link says goes to a window by its name (`windows_for`),
+//! on a channel of that window's own (`event_channel`).
 
 use std::error::Error;
 
@@ -59,9 +60,28 @@ pub(crate) fn windows_for(event: &str) -> &'static [&'static str] {
     }
 }
 
+/// The operator's window's channel: every event of the hardware link.
+pub(crate) const MAIN_EVENT_CHANNEL: &str = "engine://event";
+
+/// The prompter's window's channel: the events its glass follows.
+pub(crate) const PROMPTER_EVENT_CHANNEL: &str = "prompter://event";
+
+/// The channel an event of the hardware link reaches a window on. Each
+/// window has one of its own. Tauri runs an event as script in every page
+/// that listens to its channel, whether a listener there is for it or not:
+/// on one channel the prompter's page would run the meters, 30 times a
+/// second, while it scrolls the glass.
+pub(crate) fn event_channel(window: &str) -> &'static str {
+    if window == PROMPTER_WINDOW_LABEL {
+        PROMPTER_EVENT_CHANNEL
+    } else {
+        MAIN_EVENT_CHANNEL
+    }
+}
+
 /// Whether a listener of this target is in one of `windows`. A page that
-/// listens without naming a target hears everything Tauri emits, whatever
-/// this answers: the prompter's page names its own window.
+/// listens without naming a target hears everything Tauri emits on its
+/// channel, whatever this answers: the prompter's page names its own window.
 pub(crate) fn listens_in(target: &EventTarget, windows: &[&str]) -> bool {
     match target {
         EventTarget::AnyLabel { label }
@@ -447,6 +467,30 @@ mod tests {
             },
             windows_for("prompter.changed")
         ));
+    }
+
+    // Each window hears the hardware link on a channel of its own: Tauri runs
+    // an event as script in every page that listens to its channel, whether
+    // a listener there is for it or not (the review of #251). The pages
+    // listen on theirs, the prompter's for its own window.
+    #[test]
+    fn each_window_hears_the_hardware_link_on_a_channel_of_its_own() {
+        assert_eq!(event_channel(MAIN_WINDOW_LABEL), MAIN_EVENT_CHANNEL);
+        assert_eq!(event_channel(PROMPTER_WINDOW_LABEL), PROMPTER_EVENT_CHANNEL);
+        assert_ne!(MAIN_EVENT_CHANNEL, PROMPTER_EVENT_CHANNEL);
+
+        const OPERATOR_S_PAGE: &str = include_str!(
+            "../../../frontend/packages/engine-client/src/transports/tauriTransport.ts"
+        );
+        const PROMPTER_S_PAGE: &str =
+            include_str!("../../../frontend/packages/engine-client/src/transports/glassLink.ts");
+        let listens_on = |page: &str, channel: &str| page.contains(&format!("\"{channel}\""));
+        assert!(listens_on(OPERATOR_S_PAGE, MAIN_EVENT_CHANNEL));
+        assert!(!listens_on(OPERATOR_S_PAGE, PROMPTER_EVENT_CHANNEL));
+        assert!(listens_on(PROMPTER_S_PAGE, PROMPTER_EVENT_CHANNEL));
+        assert!(!listens_on(PROMPTER_S_PAGE, MAIN_EVENT_CHANNEL));
+        assert!(PROMPTER_S_PAGE
+            .contains("target: { kind: \"WebviewWindow\", label: PROMPTER_WINDOW_LABEL }"));
     }
 
     // Slice 6b: the permission is granted in code, by `may_read_clipboard`'s

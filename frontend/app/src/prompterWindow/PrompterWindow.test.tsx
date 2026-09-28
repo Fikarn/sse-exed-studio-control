@@ -10,7 +10,20 @@ import type {
 } from "@sse/engine-client";
 
 import { paragraph, standardLook, storyAnchor } from "../app/teleprompter/glass/glassStoryScript";
-import { glassWidthIn, PrompterWindow } from "./PrompterWindow";
+import { glassWidthIn, PrompterWindow, STOPPED_BY_AN_ERROR } from "./PrompterWindow";
+
+// The glass, as it is, unless a test breaks it.
+const glassBreaks = vi.hoisted(() => ({ now: false }));
+vi.mock("../app/teleprompter/glass/PrompterGlass", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../app/teleprompter/glass/PrompterGlass")>();
+  return {
+    ...real,
+    PrompterGlass: (props: Parameters<typeof real.PrompterGlass>[0]) => {
+      if (glassBreaks.now) throw new Error("Cannot read properties of undefined (reading 'lines')");
+      return <real.PrompterGlass {...props} />;
+    },
+  };
+});
 
 // The prompter's window's page: the glass and nothing else. jsdom lays
 // nothing out, so what the page draws is proven here by what it holds, and
@@ -51,6 +64,7 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.useRealTimers();
+  glassBreaks.now = false;
 });
 
 describe("PrompterWindow", () => {
@@ -100,6 +114,47 @@ describe("PrompterWindow", () => {
     for (const call of hardware.alive.mock.calls) {
       expect(call[0]).toBeUndefined();
     }
+  });
+
+  it("tells the shell that an error stopped it, in words of its own", async () => {
+    vi.useFakeTimers();
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const stop of [
+      () => new ErrorEvent("error", { error: new Error("Cannot read properties of undefined (reading 'paragraphs')") }),
+      () =>
+        Object.assign(new Event("unhandledrejection"), { reason: new Error("The command was refused"), promise: null }),
+    ]) {
+      const hardware = linkTo(async () => glass());
+      const { unmount } = render(<PrompterWindow link={hardware.link} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(hardware.alive).toHaveBeenLastCalledWith(undefined);
+      act(() => {
+        window.dispatchEvent(stop());
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      // The Teleprompter page shows the shell's sentence: the error's own
+      // words go to the console.
+      expect(hardware.alive).toHaveBeenLastCalledWith(STOPPED_BY_AN_ERROR);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(hardware.alive).toHaveBeenLastCalledWith(STOPPED_BY_AN_ERROR);
+      unmount();
+    }
+    expect(logged).toHaveBeenCalled();
+  });
+
+  it("leaves the window black when the glass cannot be drawn, and says so in words of its own", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    glassBreaks.now = true;
+    const hardware = linkTo(async () => glass());
+    render(<PrompterWindow link={hardware.link} />);
+    await waitFor(() => expect(hardware.alive).toHaveBeenLastCalledWith(STOPPED_BY_AN_ERROR));
+    expect(screen.getByTestId("prompter-window").textContent).toBe("");
   });
 
   it("stands when the hardware link is gone", async () => {

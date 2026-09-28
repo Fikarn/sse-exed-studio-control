@@ -4,9 +4,9 @@
 //! passes on when a screen comes or goes, so the shell looks.
 //!
 //! Windows moves windows about while the screens change, and the change can
-//! take more than one look. So the watch waits until two looks in a row find
-//! the same screens before it puts anything back, and saves the window's
-//! display only while the screens stand still.
+//! take more than one look. So the watch waits until the screens have stood
+//! still for a look's second before it puts anything back, and saves the
+//! window's display only while the screens stand still.
 //!
 //! The watch keeps the prompter's window too (`shell_prompter_window.rs`):
 //! at every look it says what the Prompter XL is among the screens. That
@@ -28,7 +28,7 @@ use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 /// How often the shell looks at the screens.
@@ -45,7 +45,11 @@ pub(crate) enum Screens {
     Still,
     /// Not as they were: Windows may still be moving windows about.
     Changing,
-    /// They changed, and have stood still for one look.
+    /// As they were at the look before, which found them changed; but that
+    /// was less than a look's second ago (a woken look), which is too soon
+    /// to say that they stand still.
+    Settling,
+    /// They changed, and have stood still for a second.
     Settled,
 }
 
@@ -55,6 +59,8 @@ pub(crate) enum Screens {
 pub(crate) struct DisplayWatch {
     last: Option<Vec<DisplayPath>>,
     unsettled: bool,
+    /// When a look last found the screens changed.
+    changed_at: Option<Instant>,
     /// The looks in a row that each found the screens changed.
     changing: u32,
 }
@@ -76,8 +82,11 @@ impl DisplayWatch {
         self.changing == UNSETTLED_SAID_AFTER
     }
 
-    /// One look. The first finds the screens as they are, and no change.
-    pub(crate) fn look(&mut self, screens: Vec<DisplayPath>) -> Screens {
+    /// One look, at `now`. The first finds the screens as they are, and no
+    /// change. A change has settled once the screens have stood still for a
+    /// look's second: a look woken sooner (the hardware link started, the
+    /// prompter's page said something new) does not say so.
+    pub(crate) fn look(&mut self, screens: Vec<DisplayPath>, now: Instant) -> Screens {
         let same = self
             .last
             .as_ref()
@@ -85,14 +94,20 @@ impl DisplayWatch {
         self.last = Some(screens);
         if !same {
             self.unsettled = true;
+            self.changed_at = Some(now);
             self.changing = self.changing.saturating_add(1);
             Screens::Changing
-        } else if self.unsettled {
+        } else if !self.unsettled {
+            Screens::Still
+        } else if self
+            .changed_at
+            .is_some_and(|at| now.saturating_duration_since(at) < LOOK_EVERY)
+        {
+            Screens::Settling
+        } else {
             self.unsettled = false;
             self.changing = 0;
             Screens::Settled
-        } else {
-            Screens::Still
         }
     }
 }
@@ -170,13 +185,13 @@ fn look(
             *unread = false;
             let first = !displays.has_looked();
             let line = screens_line(&screens);
-            let looked = displays.look(screens);
+            let looked = displays.look(screens, Instant::now());
             // The prompter's window first: it closes at this look when the
             // Prompter XL is not there, before anything else is done.
             prompter.look(
                 app,
                 Some(&prompter_screen(displays.screens())),
-                looked != Screens::Changing,
+                matches!(looked, Screens::Still | Screens::Settled),
             );
             match looked {
                 Screens::Still => {
@@ -195,6 +210,7 @@ fn look(
                         );
                     }
                 }
+                Screens::Settling => {}
                 Screens::Settled => {
                     log_shell_line(app, &line);
                     hold_once_the_screens_changed(app, displays.screens());
@@ -217,16 +233,35 @@ mod tests {
     use super::*;
     use crate::shell_displays::tests::{prompter, the_studio};
 
+    /// The watch's clock: a look a second, as the watch takes them.
+    struct Clock(Instant);
+
+    impl Clock {
+        fn new() -> Self {
+            Self(Instant::now())
+        }
+
+        fn tick(&mut self) -> Instant {
+            self.0 += LOOK_EVERY;
+            self.0
+        }
+    }
+
     // §7: the Prompter XL is plugged in, and out. Windows takes its time to
     // rearrange the screens, and moves windows while it does: nothing is put
     // back, and no display is saved, until the screens stand still.
     #[test]
     fn a_change_of_the_screens_is_acted_on_once_they_stand_still() {
         let mut watch = DisplayWatch::default();
+        let mut clock = Clock::new();
         assert!(!watch.has_looked());
-        assert_eq!(watch.look(the_studio()), Screens::Still, "the first look");
+        assert_eq!(
+            watch.look(the_studio(), clock.tick()),
+            Screens::Still,
+            "the first look"
+        );
         assert!(watch.has_looked());
-        assert_eq!(watch.look(the_studio()), Screens::Still);
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
 
         // Plugged in: first on the desktop's far side, then where Windows
         // settles it.
@@ -234,20 +269,20 @@ mod tests {
         arriving.push(prompter(r"\\.\DISPLAY4", (5120, 0)));
         let mut arrived = the_studio();
         arrived.push(prompter(r"\\.\DISPLAY4", (-1920, 0)));
-        assert_eq!(watch.look(arriving), Screens::Changing);
-        assert_eq!(watch.look(arrived.clone()), Screens::Changing);
-        assert_eq!(watch.look(arrived.clone()), Screens::Settled);
-        assert_eq!(watch.look(arrived.clone()), Screens::Still);
+        assert_eq!(watch.look(arriving, clock.tick()), Screens::Changing);
+        assert_eq!(watch.look(arrived.clone(), clock.tick()), Screens::Changing);
+        assert_eq!(watch.look(arrived.clone(), clock.tick()), Screens::Settled);
+        assert_eq!(watch.look(arrived.clone(), clock.tick()), Screens::Still);
 
         // Windows lists the same screens in another order: no change.
         let mut listed_otherwise = arrived.clone();
         listed_otherwise.reverse();
-        assert_eq!(watch.look(listed_otherwise), Screens::Still);
+        assert_eq!(watch.look(listed_otherwise, clock.tick()), Screens::Still);
 
         // Unplugged.
-        assert_eq!(watch.look(the_studio()), Screens::Changing);
-        assert_eq!(watch.look(the_studio()), Screens::Settled);
-        assert_eq!(watch.look(the_studio()), Screens::Still);
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Changing);
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Settled);
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
     }
 
     // Where there is nothing to read (any system but Windows) every look
@@ -255,9 +290,10 @@ mod tests {
     #[test]
     fn no_screens_at_all_are_no_change() {
         let mut watch = DisplayWatch::default();
+        let mut clock = Clock::new();
         assert!(watch.screens().is_empty());
         for _ in 0..3 {
-            assert_eq!(watch.look(Vec::new()), Screens::Still);
+            assert_eq!(watch.look(Vec::new(), clock.tick()), Screens::Still);
             assert!(watch.screens().is_empty());
         }
     }
@@ -268,12 +304,13 @@ mod tests {
     #[test]
     fn screens_that_do_not_stand_still_are_said_once() {
         let mut watch = DisplayWatch::default();
-        assert_eq!(watch.look(the_studio()), Screens::Still);
+        let mut clock = Clock::new();
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
         let mut said = 0;
         for look in 0..40 {
             let mut screens = the_studio();
             screens.push(prompter(r"\\.\DISPLAY4", (5120 + look, 0)));
-            assert_eq!(watch.look(screens), Screens::Changing);
+            assert_eq!(watch.look(screens, clock.tick()), Screens::Changing);
             said += u32::from(watch.unsettled_for_long());
         }
         assert_eq!(said, 1);
@@ -281,15 +318,48 @@ mod tests {
 
         let mut settled = the_studio();
         settled.push(prompter(r"\\.\DISPLAY4", (5120 + 39, 0)));
-        assert_eq!(watch.look(settled), Screens::Settled);
+        assert_eq!(watch.look(settled, clock.tick()), Screens::Settled);
         assert!(!watch.unsettled_for_long());
         for look in 0..UNSETTLED_SAID_AFTER {
             let mut screens = the_studio();
             screens.push(prompter(r"\\.\DISPLAY4", (0, 1440 + look as i32)));
-            assert_eq!(watch.look(screens), Screens::Changing);
+            assert_eq!(watch.look(screens, clock.tick()), Screens::Changing);
             said += u32::from(watch.unsettled_for_long());
         }
         assert_eq!(said, 2);
+    }
+
+    // A look woken before its second is over (the hardware link started,
+    // the prompter's page said something new) finds the screens as the look
+    // before did; but they have not stood still for a second yet, and
+    // nothing is put back or opened (the review of #251).
+    #[test]
+    fn a_woken_look_does_not_say_that_the_screens_stand_still() {
+        let mut watch = DisplayWatch::default();
+        let mut clock = Clock::new();
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
+        let mut arrived = the_studio();
+        arrived.push(prompter(r"\\.\DISPLAY4", (5120, 0)));
+        let changed = clock.tick();
+        assert_eq!(watch.look(arrived.clone(), changed), Screens::Changing);
+        let woken = changed + Duration::from_millis(30);
+        assert_eq!(watch.look(arrived.clone(), woken), Screens::Settling);
+        assert_eq!(
+            watch.look(
+                arrived.clone(),
+                changed + LOOK_EVERY - Duration::from_millis(1)
+            ),
+            Screens::Settling
+        );
+        assert!(!watch.unsettled_for_long());
+        assert_eq!(
+            watch.look(arrived.clone(), changed + LOOK_EVERY),
+            Screens::Settled
+        );
+        assert_eq!(
+            watch.look(arrived, changed + LOOK_EVERY + Duration::from_millis(5)),
+            Screens::Still
+        );
     }
 
     #[test]

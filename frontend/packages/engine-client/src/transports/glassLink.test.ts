@@ -64,11 +64,11 @@ describe("createTauriGlassLink", () => {
     const link = createTauriGlassLink();
     const stop = await link.listen(() => {});
     expect(listened).toEqual([
-      { name: "engine://event", options: { target: { kind: "WebviewWindow", label: "prompter" } } },
+      { name: "prompter://event", options: { target: { kind: "WebviewWindow", label: "prompter" } } },
     ]);
     expect(PROMPTER_WINDOW_LABEL).toBe("prompter");
     stop();
-    expect(listened.at(-1)?.name).toBe("unlisten:engine://event");
+    expect(listened.at(-1)?.name).toBe("unlisten:prompter://event");
     // Listening starts nothing.
     expect(invoked).toEqual([]);
   });

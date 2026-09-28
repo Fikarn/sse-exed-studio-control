@@ -126,6 +126,9 @@ The shell:
 - **The prompter's window is never made fullscreen.** The window library's fullscreen call makes a window the one the keyboard goes to, whatever the window says of itself. The window is put and sized to cover the screen, which does not.
 - **A window that was closed is gone a moment later.** No second window of its name can be built until then: the watch opens it at its next look.
 - **A page that listens without naming a target hears every event,** whichever window it was sent to. The prompter's page names its own window (`glassLink.ts`).
+- **Tauri runs an event as script in every page that listens to its channel,** whether a listener there is for it or not. So each window has a channel of its own (`shell_windows::event_channel`): on the operator's, the prompter's page would run the meters 30 times a second.
+- **A window put on a screen of another scale is sized and placed again by Windows,** and the window library takes Windows' word for it. The prompter's window is put twice: the second time it already stands on the Prompter XL.
+- **The screens have settled a second after a change, not at the next look.** The watch is woken early (the hardware link's start, the prompter's page), and a woken look finds the screens as the look before did.
 - **A development run's prompter is an ordinary window** with the glass in it, and the hardware link reads `CONNECTED`. To try the page in a browser: `npm run dev --workspace frontend/app`, then `/prompter.html?fixture=teleprompter-ready`.
 - **The watch over the screens asks the window nothing while it holds a lock.** On its thread a question to a window (its monitor, whether it is fullscreen) waits for the main thread. The main thread runs the window commands, which take the same lock (`HeldDisplay`): a question asked under the lock would stop both. The watch looks first (`see`), then locks; what it tells the window is posted.
 

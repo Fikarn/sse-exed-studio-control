@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
 use crate::shell_prompter_window::WatchWake;
-use crate::shell_windows::{listens_in, windows_for};
+use crate::shell_windows::{event_channel, listens_in, windows_for};
 use studio_control_protocol::development::{
     default_app_data_dir, development_build, host_platform, refuse_studio_folders,
 };
@@ -24,7 +24,6 @@ use studio_control_protocol::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 
-const ENGINE_EVENT_CHANNEL: &str = "engine://event";
 /// Sub-directory of the app-data directory that receives the shell's
 /// diagnostics exports (2026-09 production readiness, Slice 4 — finding F15).
 pub(crate) const EXPORTS_DIR_NAME: &str = "exports";
@@ -49,10 +48,11 @@ const ENGINE_STOP_POLL_INTERVAL: Duration = Duration::from_millis(25);
 type EventSink = Arc<dyn Fn(Value) + Send + Sync>;
 
 /// An event goes to the windows it is for (`shell_windows::windows_for`),
-/// once: every window heard every event, the meters 30 times a second among
-/// them. When the hardware link has started, the watch over the screens is
-/// woken, so that the hardware link hears of the Prompter XL at once and not
-/// a second later: it starts knowing nothing of it.
+/// each on its own channel (`shell_windows::event_channel`): every window
+/// heard every event, the meters 30 times a second among them. When the
+/// hardware link has started, the watch over the screens is woken, so that
+/// the hardware link hears of the Prompter XL at once and not a second
+/// later: it starts knowing nothing of it.
 fn app_event_sink(app: AppHandle) -> EventSink {
     Arc::new(move |message: Value| {
         let name = message
@@ -65,12 +65,12 @@ fn app_event_sink(app: AppHandle) -> EventSink {
                 wake.wake();
             }
         }
-        let windows = windows_for(&name);
-        let _ = app.emit_filter(
-            ENGINE_EVENT_CHANNEL,
-            json!({ "event": message }),
-            |target| listens_in(target, windows),
-        );
+        let payload = json!({ "event": message });
+        for &window in windows_for(&name) {
+            let _ = app.emit_filter(event_channel(window), payload.clone(), |target| {
+                listens_in(target, &[window])
+            });
+        }
     })
 }
 

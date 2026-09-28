@@ -21,6 +21,14 @@ import styles from "./PrompterWindow.module.css";
 /** Once a second the page tells the shell that it draws. */
 const ALIVE_EVERY_MS = 1000;
 
+/**
+ * What keeps the page from drawing when an error stopped it: the glass, or
+ * anything else of the page's. The shell words the sentence around it ("The
+ * window's page could not draw: …"), and the Teleprompter page shows that
+ * sentence, so the error's own words go to the console.
+ */
+export const STOPPED_BY_AN_ERROR = "an error stopped it.";
+
 function windowSize() {
   return { width: window.innerWidth, height: window.innerHeight };
 }
@@ -31,11 +39,11 @@ export function glassWidthIn(width: number, height: number): number {
 }
 
 interface GlassBoundaryProps {
-  onProblem: (problem: string) => void;
+  onError: (error: unknown) => void;
   children: ReactNode;
 }
 
-/** A glass that cannot be drawn leaves the window black, and says why. */
+/** A glass that cannot be drawn leaves the window black, and says so. */
 class GlassBoundary extends Component<GlassBoundaryProps, { failed: boolean }> {
   state = { failed: false };
 
@@ -44,7 +52,7 @@ class GlassBoundary extends Component<GlassBoundaryProps, { failed: boolean }> {
   }
 
   componentDidCatch(error: unknown) {
-    this.props.onProblem(error instanceof Error ? error.message : String(error));
+    this.props.onError(error);
   }
 
   render() {
@@ -59,7 +67,25 @@ export interface PrompterWindowProps {
 export function PrompterWindow({ link }: PrompterWindowProps) {
   const [view, setView] = useState<GlassView>(NOTHING_DRAWN);
   const [size, setSize] = useState(windowSize);
-  const [drawProblem, setDrawProblem] = useState<string | null>(null);
+  const [pageProblem, setPageProblem] = useState<string | null>(null);
+
+  // An error the page did not catch (the glass's frames, a promise nobody
+  // waited on) leaves it drawing nobody knows what: it says so, and the shell
+  // opens the window again.
+  const stoppedBy = useLiveCallback((error: unknown) => {
+    console.error("The prompter's window stopped on an error:", error);
+    setPageProblem(STOPPED_BY_AN_ERROR);
+  });
+  useEffect(() => {
+    const thrown = (event: ErrorEvent) => stoppedBy(event.error ?? event.message);
+    const rejected = (event: PromiseRejectionEvent) => stoppedBy(event.reason);
+    window.addEventListener("error", thrown);
+    window.addEventListener("unhandledrejection", rejected);
+    return () => {
+      window.removeEventListener("error", thrown);
+      window.removeEventListener("unhandledrejection", rejected);
+    };
+  }, [stoppedBy]);
 
   useEffect(
     () =>
@@ -77,7 +103,7 @@ export function PrompterWindow({ link }: PrompterWindowProps) {
 
   // The sign of life, once a second from the moment the page draws. What
   // keeps the page from drawing goes with it.
-  const problem = drawProblem ?? view.problem;
+  const problem = pageProblem ?? view.problem;
   useEffect(() => {
     const say = () => {
       link.alive(problem ?? undefined).catch((error: unknown) => {
@@ -107,7 +133,7 @@ export function PrompterWindow({ link }: PrompterWindowProps) {
       data-laid-out={view.anchor !== null && view.anchor.position !== null ? "" : undefined}
       onContextMenu={(event) => event.preventDefault()}
     >
-      <GlassBoundary onProblem={setDrawProblem}>
+      <GlassBoundary onError={stoppedBy}>
         <PrompterGlass
           text={view.text}
           anchor={view.anchor}

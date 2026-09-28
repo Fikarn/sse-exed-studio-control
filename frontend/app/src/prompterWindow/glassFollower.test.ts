@@ -11,7 +11,7 @@ import {
 } from "@sse/engine-client";
 
 import { paragraph, standardLook, storyAnchor } from "../app/teleprompter/glass/glassStoryScript";
-import { followGlass, type GlassView } from "./glassFollower";
+import { CANNOT_HEAR, followGlass, type GlassView } from "./glassFollower";
 
 // The prompter's window follows the hardware link: what it reads, what it
 // hears, and what it does when the hardware link is gone.
@@ -240,6 +240,26 @@ describe("followGlass", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(last().problem).toBeNull();
     expect(last().text?.layoutKey).toBe("g1-l0");
+  });
+
+  it("says that it cannot follow the take when it cannot listen, whatever a read says", async () => {
+    const failures: string[] = [];
+    const hardware = fakeLink(new EngineRequestError("INTERNAL", "The prompter's state could not be read."));
+    vi.mocked(hardware.link.listen).mockRejectedValueOnce(new Error("event.listen not allowed"));
+    followGlass(hardware.link, (view) => views.push(view), {
+      now: () => now,
+      onFailure: (_error, doing) => failures.push(doing),
+    });
+    await settle();
+    expect(failures).toContain("listening to the hardware link");
+    expect(hardware.listening()).toBe(false);
+
+    // The read that is tried again answers: the glass it read is drawn (the
+    // shell decides what is shown), and the problem stays.
+    hardware.answers(glass());
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(last().text?.layoutKey).toBe("g1-l0");
+    expect(last().problem).toBe(CANNOT_HEAR);
   });
 
   it("takes a hardware link that does not answer for one that is not there yet", async () => {

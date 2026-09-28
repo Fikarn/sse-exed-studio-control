@@ -25,6 +25,9 @@ import type { PrompterGlassText } from "../app/teleprompter/glass/PrompterGlass"
 //   Its start reads the glass again: it starts paused, at the saved place.
 // - A read that fails is tried again in a second. A hardware link that
 //   answers and refuses is a problem the shell is told of.
+// - A page that cannot listen cannot follow the take: that is a problem the
+//   shell is told of, whatever a read says, and the shell opens the window
+//   again.
 
 /** What the page draws. */
 export interface GlassView {
@@ -41,6 +44,13 @@ export const NOTHING_DRAWN: GlassView = { text: null, anchor: null, stoppedAfter
 
 /** A read that failed is tried again after this long. */
 const READ_AGAIN_MS = 1000;
+
+/**
+ * What keeps the page from drawing when it cannot listen. The shell words
+ * the sentence around it ("The window's page could not draw: …"), and the
+ * Teleprompter page shows that sentence.
+ */
+export const CANNOT_HEAR = "it cannot hear the hardware link.";
 
 /** The events of the take: the text is the same, and the anchor says where it stands. */
 const MOVES_THE_TEXT: ReadonlySet<string> = new Set(["played", "paused", "speed", "jumped", "at-end", "laid-out"]);
@@ -90,6 +100,8 @@ export function followGlass(
   let stopped = false;
   let retry: ReturnType<typeof setTimeout> | null = null;
   let stopListening: (() => void) | null = null;
+  /** Why the page cannot follow the take, whatever a read says. */
+  let deaf: string | null = null;
 
   const show = (next: Partial<GlassView>) => {
     view = { ...view, ...next };
@@ -124,7 +136,7 @@ export function followGlass(
       const newer =
         heard !== heardBefore && view.anchor !== null && text !== null && view.anchor.layoutKey === text.layoutKey;
       if (!newer) anchorAt = now();
-      show({ text, anchor: newer ? view.anchor : snapshot.anchor, stoppedAfterMs: null, problem: null });
+      show({ text, anchor: newer ? view.anchor : snapshot.anchor, stoppedAfterMs: null, problem: deaf });
     } catch (error) {
       if (stopped) return;
       if (error instanceof EngineRequestError && error.code !== "ENGINE_EXITED") {
@@ -183,7 +195,12 @@ export function followGlass(
       stopListening = stop;
       void read();
     },
-    (error: unknown) => failed(error, "listening to the hardware link")
+    (error: unknown) => {
+      failed(error, "listening to the hardware link");
+      if (stopped) return;
+      deaf = CANNOT_HEAR;
+      show({ problem: deaf });
+    }
   );
 
   return () => {

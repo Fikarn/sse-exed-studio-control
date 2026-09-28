@@ -110,13 +110,16 @@ Decided while it was built, and kept by the work that follows:
 - The hardware link hears that the Prompter XL is connected only while the window's page says that it draws, once a second, through one command of its own. Without it a glass that stopped drawing would read `CONNECTED`, and `PLAY` would scroll where nobody can read. A page that does not draw within 10 s, or stops for 5 s, is `NOT SHOWING`, and its window is opened again after 5 s. The design's "Try again" key is not needed.
 - While the window opens, the hardware link is told nothing and keeps what it had. Once it was told that the glass draws, it is told at once when the glass does not, and a text that scrolls pauses.
 - The window is put and sized to cover the Prompter XL, not made fullscreen: the fullscreen call made it the window the keyboard goes to, which the design forbids. Tried on one of the workstation's own screens with a black page and no script. The cost: a window that takes no keyboard cannot ask Windows to hide a taskbar under it (`docs/HARDWARE.md`).
-- When Windows moves the window (a screen went), the window's own events hide it at once, and the next look closes it. It opens again once the screens stand still.
+- When Windows moves the window (a screen went), the window's own events hide it at once, and the next look closes it. Where the Prompter XL is still there, the window is `NOT SHOWING` and opens again after 5 s: a window moved again and again was opened again at once, without end (the review).
 - The prompter's window may call two of the shell's commands, and send two requests: `prompter.glass.snapshot` and `prompter.layout.report`. It needs nothing of `prompter.snapshot`.
 - Every command of the shell stands behind one gate that goes by the window's name, so a command added later is refused to the prompter's window until a test says otherwise.
 - Events go to a window by its name with one emit and a filter. A listener that names no target hears every emit, whichever window it was for, so the prompter's page names its own window.
 - When the hardware link is gone, the glass stands where the text was: nothing scrolls by itself, and nobody could pause it.
 - A development build's prompter is an ordinary window with a frame, and the hardware link is told of a screen of 1920×1080 at 60 Hz, so that the prompter can be tried in a development run.
-- The state's sentence for `NOT SHOWING` says that the window is opened again by itself, and the plate shows the reason as the shell words it.
+- The state's sentence for `NOT SHOWING` says that the window is opened again by itself, and the plate shows the reason as the shell words it. What keeps the page from drawing is said in the page's own words, never an error's.
+- The hardware link is told the newest report, and one that had the glass as drawing is told at every look that it does not, until it draws again. The review found that an older report could overtake a newer one, and a text could scroll on with nothing on the glass.
+- Each window hears the hardware link on a channel of its own: Tauri runs an event as script in every page that listens to its channel.
+- The window is put on the Prompter XL twice: on a screen of another scale Windows sizes and places it again. Read in the window library's code, not tried: the walk tries a Prompter XL at another scale than the studio display.
 
 ### The camera pictures, NDI from vMix (was Slice 10)
 

@@ -66,7 +66,8 @@ The Prompter XL:
 - [ ] Plugged in, the header's `Prompter` lamp is green within a few seconds, and `shell.log` says `The prompter's window opened on the Prompter XL`, `The prompter's page draws` and `The hardware link has the Prompter XL as CONNECTED`.
 - [ ] The script reads correctly in the glass, not mirrored, and fills the Prompter XL's screen: no taskbar, no frame, no pointer.
 - [ ] No other screen shows the script but the page's own copy. The page's copy and the glass break every line alike.
-- [ ] While the window opens, and after it, typing in `Edit script` goes on: the window takes no keyboard.
+- [ ] While the window opens, and after it, typing in `Edit script` goes on: the window takes no keyboard. A click on the Prompter XL's screen leaves the keyboard with the app too.
+- [ ] With the Prompter XL at another scale than the studio display in Windows' display settings (100 % and 125 %), the script still fills its screen.
 - [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page. `PLAY` is green while the text scrolls, and the scroll is smooth at the speeds used, with the Cameras page open.
 - [ ] Unplugged while the text scrolls: the text pauses, the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", the deck's `PLAY` is grey and its strip reads `XL NOT CONNECTED`, and no other screen shows the script, not for a moment.
 - [ ] Plugged back in: the script returns at the same place, paused.

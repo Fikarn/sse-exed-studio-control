@@ -26,6 +26,14 @@ import { createSessionNonce } from "./sessionNonce";
 /** The prompter's window, as the shell's `tauri.conf.json` names it. */
 export const PROMPTER_WINDOW_LABEL = "prompter";
 
+/**
+ * The channel the shell sends this window what the hardware link says
+ * (`shell_windows::event_channel`). It is the window's own: Tauri runs an
+ * event as script in every page that listens to its channel, and on the
+ * operator's this page would run the meters, 30 times a second.
+ */
+const PROMPTER_EVENT_CHANNEL = "prompter://event";
+
 /** The two requests the prompter's window sends. */
 type GlassMethod = "prompter.glass.snapshot" | "prompter.layout.report";
 
@@ -78,9 +86,8 @@ export function createTauriGlassLink(): GlassLink {
   return {
     listen(listener) {
       // This window is the target. A listener without one hears everything
-      // the shell emits, whichever window it is for: the meters, 30 times a
-      // second, among them.
-      return listen<TauriEventPayload>("engine://event", (payload) => listener(payload.payload.event), {
+      // the shell emits on the channel, whichever window it is for.
+      return listen<TauriEventPayload>(PROMPTER_EVENT_CHANNEL, (payload) => listener(payload.payload.event), {
         target: { kind: "WebviewWindow", label: PROMPTER_WINDOW_LABEL },
       });
     },

@@ -11,7 +11,8 @@
 //! link is told (`prompter.screen.report`). The window is built hidden, put
 //! on the Prompter XL's part of the desktop, checked to stand there, and only
 //! then shown. When Windows moves it (a screen went), its own events hide it
-//! at once, and the next look closes it.
+//! at once, and the next look closes it; where the Prompter XL still stands
+//! where it was, the window is opened again after a while.
 //!
 //! The window never takes the keyboard from the operator's window. It is put
 //! and sized to cover the Prompter XL's part of the desktop, and is not made
@@ -27,14 +28,14 @@
 //! The rules are functions over plain data, tested without a window:
 //! `glass_for`, `next_step`, `with_sign`, `screen_report`.
 
-use crate::shell_displays::{DisplayPath, PrompterScreen};
+use crate::shell_displays::{prompter_screen, read_display_paths, DisplayPath, PrompterScreen};
 use crate::shell_window_layout::{log_shell_line, main_window};
 use crate::shell_windows::{build_prompter_window, PROMPTER_WINDOW_LABEL};
 use crate::EngineState;
 use serde_json::{json, Value};
 use std::sync::atomic::Ordering;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::mpsc::SyncSender;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::development::studio_build;
@@ -63,6 +64,14 @@ const OPENED_AGAIN_AFTER: Duration = Duration::from_secs(5);
 
 /// The longest problem a page's sign carries.
 const MAX_PROBLEM_CHARS: usize = 240;
+
+/// What the hardware link is told while a window that drew opens again.
+const OPENING_AGAIN: &str = "The window is opening again.";
+
+/// What the hardware link is told while the screens cannot be read, when it
+/// had the glass as drawing.
+const SCREENS_UNREAD: &str =
+    "Windows' screens could not be read, so nothing is drawn on the Prompter XL.";
 
 /// A part of the desktop, in pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -256,12 +265,9 @@ fn screen_report(
             Some(PrompterScreen::Connected(path)) => (path.width, path.height, path.refresh_hz),
             // Nothing is known of the screens, and nothing is drawn.
             None => {
-                return last_found.filter(|_| told_draws).map(|size| {
-                    not_showing(
-                        size,
-                        "Windows' screens could not be read, so nothing is drawn on the Prompter XL.",
-                    )
-                });
+                return last_found
+                    .filter(|_| told_draws)
+                    .map(|size| not_showing(size, SCREENS_UNREAD));
             }
         }
     } else {
@@ -275,7 +281,7 @@ fn screen_report(
         Glass::Drawing { .. } => Some(found(size)),
         Glass::Failed { reason, .. } => Some(not_showing(size, reason)),
         Glass::Closed | Glass::Opened { .. } if told_draws => {
-            Some(not_showing(size, "The window is opening again."))
+            Some(not_showing(size, OPENING_AGAIN))
         }
         Glass::Closed | Glass::Opened { .. } => None,
     }
@@ -286,6 +292,52 @@ fn says_it_draws(report: &Value) -> bool {
     report["found"] == json!(true)
         && report.get("duplicated").is_none()
         && report.get("windowError").is_none()
+}
+
+/// Whether the hardware link may still have the glass as drawing once this
+/// report is sent. A report that the glass draws says so. The two reports
+/// that are sent only because the hardware link had the glass as drawing
+/// (`OPENING_AGAIN`, `SCREENS_UNREAD`) leave it so: they are sent again at
+/// every look, until the glass draws again or the hardware link is told
+/// something else. A report can be lost (a hardware link that is busy past a
+/// request's ten seconds), and nothing else would send that one again.
+fn told_draws_after(report: &Value, told_draws: bool) -> bool {
+    let reminder = matches!(
+        report["windowError"].as_str(),
+        Some(OPENING_AGAIN | SCREENS_UNREAD)
+    );
+    says_it_draws(report) || (told_draws && reminder)
+}
+
+/// The newest report, for the thread that tells the hardware link. A report
+/// waits here while the hardware link answers the one before (up to ten
+/// seconds), and a newer one takes its place: the hardware link is told what
+/// is true now, and never an older report after a newer one.
+#[derive(Default)]
+struct NewestReport {
+    report: Mutex<Option<Value>>,
+    put: Condvar,
+}
+
+impl NewestReport {
+    fn put(&self, report: Value) {
+        *locked(&self.report) = Some(report);
+        self.put.notify_one();
+    }
+
+    /// Waits for a report, and takes it.
+    fn take(&self) -> Value {
+        let mut slot = locked(&self.report);
+        loop {
+            if let Some(report) = slot.take() {
+                return report;
+            }
+            slot = self
+                .put
+                .wait(slot)
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+        }
+    }
 }
 
 /// What the window's page last said.
@@ -441,6 +493,10 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
     shared.begin(placed);
     let window = build_prompter_window(app, place == Place::Ordinary)
         .map_err(|error| format!("The window could not be built: {error}"))?;
+    // From this thread the switch is queued for the main thread, and may come
+    // after the page has begun to load: WebView2 then holds it only from the
+    // next load. The window on the Prompter XL takes no keyboard, so only a
+    // development build's ordinary window could be given a browser key.
     #[cfg(windows)]
     crate::shell_browser_keys::switch_off_browser_keys(app, &window);
     let shown = match placed {
@@ -471,18 +527,42 @@ fn show_the_ordinary_window(app: &AppHandle, window: &WebviewWindow) -> Result<(
 /// keyboard goes to; making it fullscreen would (the module's head).
 fn put_on_the_prompter(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<(), String> {
     guard_its_place(app, window);
-    window
-        .set_position(PhysicalPosition::new(rect.x, rect.y))
-        .map_err(|error| format!("The window could not be put on the Prompter XL: {error}"))?;
-    window
-        .set_size(PhysicalSize::new(rect.width, rect.height))
-        .map_err(|error| format!("The window could not be sized for the Prompter XL: {error}"))?;
+    // Twice. The window is built on another screen, and the first put can
+    // take it onto a screen of another scale: Windows then sizes and places
+    // it again for that scale, and the window library takes Windows' word
+    // for both. The second put is made on the Prompter XL itself.
+    for _ in 0..2 {
+        window
+            .set_position(PhysicalPosition::new(rect.x, rect.y))
+            .map_err(|error| format!("The window could not be put on the Prompter XL: {error}"))?;
+        window
+            .set_size(PhysicalSize::new(rect.width, rect.height))
+            .map_err(|error| {
+                format!("The window could not be sized for the Prompter XL: {error}")
+            })?;
+    }
     stands_on(window, rect).map_err(|found| format!("The window was not shown. {found}"))?;
+    // The screens may have changed since the look: the script is shown on
+    // the Prompter XL alone (D12).
+    let screens = read_display_paths().map_err(|error| {
+        format!("The window was not shown: the screens could not be read. {error}")
+    })?;
+    if !stands_alone_on(&screens, rect) {
+        return Err(String::from(
+            "The window was not shown: the screens changed while it was put in its place.",
+        ));
+    }
     // The page hides the pointer too; this holds while the page loads.
     let _ = window.set_cursor_visible(false);
     window
         .show()
         .map_err(|error| format!("The window could not be shown: {error}"))
+}
+
+/// Whether the Prompter XL, among these screens, still shows this part of
+/// the desktop and no other screen shows it.
+fn stands_alone_on(screens: &[DisplayPath], rect: &Rect) -> bool {
+    matches!(prompter_screen(screens), PrompterScreen::Connected(path) if Rect::of(&path) == *rect)
 }
 
 fn close(app: &AppHandle) {
@@ -511,7 +591,9 @@ fn closing(app: &AppHandle) -> bool {
 pub(crate) struct PrompterWindow {
     studio: bool,
     glass: Glass,
-    /// Whether the hardware link was last told that the glass draws.
+    /// Whether the hardware link may have the glass as drawing: it was told
+    /// so, and since then only reminders that it does not
+    /// (`told_draws_after`).
     told_draws: bool,
     /// The Prompter XL's size and rate, when a look last found it with a
     /// part of the desktop of its own.
@@ -519,14 +601,15 @@ pub(crate) struct PrompterWindow {
     /// What shell.log was last told of a window that does not draw: each
     /// reason is said once.
     said: Option<String>,
-    reports: SyncSender<Value>,
+    reports: Arc<NewestReport>,
 }
 
 impl PrompterWindow {
     /// Starts the thread that tells the hardware link, and answers the
     /// window's keeper.
     pub(crate) fn start(app: &AppHandle) -> Self {
-        let (reports, told) = sync_channel::<Value>(1);
+        let reports = Arc::new(NewestReport::default());
+        let told = Arc::clone(&reports);
         let teller = app.clone();
         let started = thread::Builder::new()
             .name(String::from("prompter-screen-report"))
@@ -574,7 +657,7 @@ impl PrompterWindow {
             (false, None) => glass_for(self.studio, &PrompterScreen::NotConnected),
         };
 
-        self.check_its_place(app);
+        self.check_its_place(app, wanted, now);
         let step = next_step(&self.glass, wanted, still, sign.problem.as_deref(), now);
         self.act(app, step, why_closed(closing, screen), now);
 
@@ -589,30 +672,31 @@ impl PrompterWindow {
             self.told_draws,
         );
         if let Some(report) = report {
-            self.told_draws = says_it_draws(&report);
-            // A teller that is busy takes the next look's report.
-            let _ = self.reports.try_send(report);
+            self.told_draws = told_draws_after(&report, self.told_draws);
+            self.reports.put(report);
         }
     }
 
     /// A window on the Prompter XL that stands elsewhere than it was put, or
-    /// that its own events hid, is closed. The next look opens it again if
-    /// the Prompter XL is there.
-    fn check_its_place(&mut self, app: &AppHandle) {
-        let (Glass::Opened {
-            place: Place::PrompterXl(rect),
-            ..
-        }
-        | Glass::Drawing {
-            place: Place::PrompterXl(rect),
-            ..
-        }) = &self.glass
-        else {
+    /// that its own events hid, while the Prompter XL is still where it was
+    /// put: Windows moved it. It does not show, and is opened again after a
+    /// while, as a window whose page does not draw. Where the Prompter XL
+    /// went, or stands elsewhere now, the look closes the window
+    /// (`next_step`).
+    fn check_its_place(&mut self, app: &AppHandle, wanted: Option<Place>, now: Instant) {
+        let (Glass::Opened { place, .. } | Glass::Drawing { place, .. }) = &self.glass else {
             return;
         };
+        let place = *place;
+        let Place::PrompterXl(rect) = place else {
+            return;
+        };
+        if wanted != Some(place) {
+            return;
+        }
         let found = match app.get_webview_window(PROMPTER_WINDOW_LABEL) {
             None => Err(String::from("It is gone.")),
-            Some(window) => stands_on(&window, rect).and_then(|()| {
+            Some(window) => stands_on(&window, &rect).and_then(|()| {
                 if window.is_visible().unwrap_or(false) {
                     Ok(())
                 } else {
@@ -621,14 +705,12 @@ impl PrompterWindow {
             }),
         };
         if let Err(found) = found {
-            log_shell_line(
-                app,
-                &format!(
-                    "The prompter's window was closed: it did not stand on the Prompter XL. {found}"
-                ),
-            );
             close(app);
-            self.glass = Glass::Closed;
+            self.failed(
+                app,
+                format!("The window did not stay on the Prompter XL. {found}"),
+                now,
+            );
         }
     }
 
@@ -654,7 +736,13 @@ impl PrompterWindow {
                     close(app);
                     return;
                 }
+                // The operator may have closed Studio Control since the look
+                // began: no window opens then, nor stays open.
+                if closing(app) {
+                    return;
+                }
                 match open(app, place) {
+                    Ok(()) if closing(app) => close(app),
                     Ok(()) => {
                         log_shell_line(app, &opened_line(place));
                         self.glass = Glass::Opened { at: now, place };
@@ -713,12 +801,13 @@ fn why_closed(closing: bool, screen: Option<&PrompterScreen>) -> &'static str {
 
 /// The thread that tells the hardware link. A request waits up to ten
 /// seconds for its answer, which the watch over the screens must not.
-fn tell_the_hardware_link(app: &AppHandle, reports: &Receiver<Value>) {
+fn tell_the_hardware_link(app: &AppHandle, reports: &NewestReport) {
     let mut told = 0_u64;
     // What shell.log was last told of the hardware link's answer: each is
     // said when it is another than the last.
     let mut said: Option<String> = None;
-    for params in reports {
+    loop {
+        let params = reports.take();
         let bridge = &app.state::<EngineState>().bridge;
         // No hardware link runs: there is nobody to tell, and the next
         // look tells again. It starts knowing nothing, so what it answers
@@ -1092,6 +1181,94 @@ mod tests {
         );
         assert_eq!(screen_report(true, None, size, &Glass::Closed, false), None);
         assert_eq!(screen_report(true, None, None, &Glass::Closed, true), None);
+    }
+
+    // D12: nothing scrolls where nobody can read it. A hardware link that
+    // had the glass as drawing is told at every look that it does not, until
+    // it draws again: a report can be lost, and this one would be sent by
+    // nothing else (the review of #251).
+    #[test]
+    fn a_hardware_link_that_had_the_glass_drawing_is_told_until_it_draws_again() {
+        let at = Instant::now();
+        let place = Place::PrompterXl(XL);
+        let screen = connected();
+        let size = Some((1920, 1080, Some(60.0)));
+        let failed = Glass::Failed {
+            at,
+            reason: String::from("The window's page stopped drawing."),
+        };
+        // The looks of a window that Windows moved, closed, opened again,
+        // and whose page draws again.
+        let mut told = false;
+        for (glass, reported, still_told) in [
+            (Glass::Drawing { alive: at, place }, true, true),
+            (Glass::Closed, true, true),
+            (Glass::Closed, true, true),
+            (Glass::Opened { at, place }, true, true),
+            (Glass::Opened { at, place }, true, true),
+            (Glass::Drawing { alive: at, place }, true, true),
+            // Given up: said at every look anyway, and the window that
+            // opens after it is nothing new.
+            (failed.clone(), true, false),
+            (Glass::Opened { at, place }, false, false),
+        ] {
+            let report = screen_report(true, Some(&screen), size, &glass, told);
+            assert_eq!(report.is_some(), reported, "{glass:?}");
+            if let Some(report) = report {
+                if matches!(glass, Glass::Closed | Glass::Opened { .. }) {
+                    assert_eq!(report["windowError"], OPENING_AGAIN);
+                }
+                told = told_draws_after(&report, told);
+            }
+            assert_eq!(told, still_told, "{glass:?}");
+        }
+        // The screens cannot be read: said until they can.
+        let unread = screen_report(true, None, size, &Glass::Closed, true).expect("a report");
+        assert!(told_draws_after(&unread, true));
+        assert!(!told_draws_after(&unread, false));
+        // Anything else that says it does not draw is said at every look by
+        // itself, and ends it.
+        for screen in [PrompterScreen::NotConnected, duplicated()] {
+            let report =
+                screen_report(true, Some(&screen), size, &Glass::Closed, true).expect("a report");
+            assert!(!told_draws_after(&report, true), "{screen:?}");
+        }
+    }
+
+    // A report waits while the hardware link answers the one before, and a
+    // newer one takes its place: the hardware link is never told an older
+    // report after a newer one (the review of #251).
+    #[test]
+    fn the_hardware_link_is_told_the_newest_report() {
+        let newest = NewestReport::default();
+        newest.put(json!({ "found": true, "width": 1920, "height": 1080 }));
+        newest.put(json!({ "found": false }));
+        assert_eq!(newest.take(), json!({ "found": false }));
+        // A report put while the teller waits reaches it.
+        let newest = Arc::new(NewestReport::default());
+        let teller = {
+            let newest = Arc::clone(&newest);
+            thread::spawn(move || newest.take())
+        };
+        newest.put(json!({ "found": true, "duplicated": true }));
+        assert_eq!(
+            teller.join().expect("the teller"),
+            json!({ "found": true, "duplicated": true })
+        );
+    }
+
+    // D12: the window is shown only where the Prompter XL still shows its
+    // part of the desktop, alone, when the screens are read again.
+    #[test]
+    fn the_window_is_shown_only_where_the_prompter_xl_still_stands_alone() {
+        let mut screens = the_studio();
+        screens.push(prompter(r"\\.\DISPLAY4", (5120, 0)));
+        assert!(stands_alone_on(&screens, &XL));
+        assert!(!stands_alone_on(&screens, &Rect { x: -1920, ..XL }));
+        assert!(!stands_alone_on(&the_studio(), &XL));
+        let mut copied = the_studio();
+        copied.push(prompter(r"\\.\DISPLAY2", (2560, 0)));
+        assert!(!stands_alone_on(&copied, &Rect { x: 2560, ..XL }));
     }
 
     // A build that is not the studio's reports the Prompter XL's own size
