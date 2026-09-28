@@ -3,25 +3,7 @@
 What is being built now, what comes next, and the decisions that bind the work.
 The ledgers this file replaces are in git history at the tag `archive/records-2026-09`.
 
-## Now: streamlining
-
-One pull request each, in this order. Then the Cameras page.
-
-- [x] Step 1: the catch-up pull request merged (#230).
-- [x] Step 2: rulebook and docs. A short `AGENTS.md`, this roadmap, `docs/CHECKLIST.md`; the ledgers deleted.
-- [x] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
-- [x] Step 4: builds, in two pull requests.
-  - [x] Development runs. `npm run app` starts the app on its own saved data with simulated devices; a development build refuses the studio's data and is an app of its own; the shell starts the engine beside it and no other; a release build keeps the overflow checks.
-  - [x] Studio builds. `npm run release` makes one from `main`, keeps it in `builds\` beside the repository and tries it on scratch data; only that command makes a build the studio's kind; `npm run release:verified` names the build the studio starts. The installer, update, signing, evidence and release scripts are removed.
-- [x] Step 5: screenshots and the layout gate. Header and footer captured once; one set of limits in place of each page's ratchets. Done with the themes' removal, which was two thirds of the gate's boards.
-- [ ] Step 6: product code.
-  - [x] Graphite and Bone out (D25).
-  - [x] Talkback out (D26).
-  - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, eight unused components of the design system and three of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
-  - [x] Three changes of behaviour: one recovery screen and one startup screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine is a chunk of its own, which the app's window never loads. And a fourth: a development build's Companion export asks Companion nothing, so the gate's bridge lane leaves the studio's Companion alone.
-- [ ] Step 7: local cleanup.
-
-## Next: the Cameras and Teleprompter pages
+## Now: the Cameras and Teleprompter pages
 
 Built so far: the Teleprompter page and its editor, the prompter and the cameras' model in the engine, and the simulated cameras. What is left, in the agreed order:
 
@@ -186,6 +168,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
 - [ ] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`.
 - [ ] **The studio's engine keeps more than one processor core busy.** Read on 2026-09-28: 509,570 s of processor time in the 4 days 18 hours since its start, 1.2 cores on average, with nobody at the desk. It is a debug build, and Companion asks it for every display once a second. Measure the first studio build the same way; if it is still high, find what takes the time.
+- [ ] **Tests and lanes leave their scratch folders behind.** About 13,000 of them stood in `%TEMP%` on 2026-09-28, 675 MB, named `sse-*` and `studio-control-*`. Most are from scripts that are gone; find which tests still leave one.
 - [ ] **Tests with a deadline failed in two slow runs of the gate** (2026-09-28): the shell's `exit_watcher_fails_pending_and_emits_event`, then the engine's `recall_pushes_the_snapshot_and_the_console_confirms_it` and `a_glass_that_goes_pauses_the_scroll_and_its_return_leaves_it_paused`, in a run where the engine's tests took 120 s (11 s alone). Each passed on the next run. The gate runs below normal priority, so whatever is busy beside it takes its time; what was busy was not found.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
@@ -221,6 +204,15 @@ Two follow-ups from the visual overhaul were never decided. Decide or drop:
 
 - **F1** The Stream Deck marks the selected strip amber; on screen amber means engaged and a selection is neutral. Changing it means new deck drawings, new Companion colours and a profile import.
 - **F2** Per-channel `ASSUMED` marks on the Console. The engine reports one confidence for the whole desk; single marks need a field for each channel and mix target.
+
+## Done: the streamlining
+
+Seven steps on 2026-09-28, pull requests #230 to #242. What it decided is D24 to D27, and the rulebook it left is `AGENTS.md`.
+
+- The ledgers became eleven documents, CI's ten jobs four, and `npm run check` the one gate.
+- A development build keeps off the studio by itself. Only `npm run release` makes a studio build, and keeps it in `builds\`.
+- Out of the program: the Graphite and Bone themes, talkback, the installer's leftovers, the engine's developer-only fixtures, unused components and switches. One recovery screen, and a window that finds its display by its place.
+- The owner got the commands for what stands on the workstation outside git.
 
 ## Decisions
 
