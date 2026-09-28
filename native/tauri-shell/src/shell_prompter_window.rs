@@ -13,6 +13,12 @@
 //! then shown. When Windows moves it (a screen went), its own events hide it
 //! at once, and the next look closes it.
 //!
+//! The window never takes the keyboard from the operator's window. It is put
+//! and sized to cover the Prompter XL's part of the desktop, and is not made
+//! fullscreen the way the operator's window is: that call makes a window the
+//! one the keyboard goes to, whatever the window says of itself (tried on
+//! 2026-09-28, on one of the workstation's own screens).
+//!
 //! The hardware link is told that the glass draws only when it does: the
 //! window's page says so, once a second (`prompter_window_alive`). A report
 //! that the screen is there unlocks `PLAY`, and nothing may scroll where
@@ -438,9 +444,7 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
     #[cfg(windows)]
     crate::shell_browser_keys::switch_off_browser_keys(app, &window);
     let shown = match placed {
-        None => window
-            .show()
-            .map_err(|error| format!("The window could not be shown: {error}")),
+        None => show_the_ordinary_window(app, &window),
         Some(rect) => put_on_the_prompter(app, &window, &rect),
     };
     if shown.is_err() {
@@ -449,6 +453,22 @@ fn open(app: &AppHandle, place: Place) -> Result<(), String> {
     shown
 }
 
+/// An ordinary window takes the keyboard when it is shown, as any window
+/// does. The operator's window gets it back: a development run is driven
+/// there.
+fn show_the_ordinary_window(app: &AppHandle, window: &WebviewWindow) -> Result<(), String> {
+    window
+        .show()
+        .map_err(|error| format!("The window could not be shown: {error}"))?;
+    if let Ok(main) = main_window(app) {
+        let _ = main.set_focus();
+    }
+    Ok(())
+}
+
+/// Puts the window on the Prompter XL's part of the desktop, all of it, and
+/// shows it once it stands there. Neither call makes it the window the
+/// keyboard goes to; making it fullscreen would (the module's head).
 fn put_on_the_prompter(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> Result<(), String> {
     guard_its_place(app, window);
     window
@@ -457,9 +477,6 @@ fn put_on_the_prompter(app: &AppHandle, window: &WebviewWindow, rect: &Rect) -> 
     window
         .set_size(PhysicalSize::new(rect.width, rect.height))
         .map_err(|error| format!("The window could not be sized for the Prompter XL: {error}"))?;
-    window
-        .set_fullscreen(true)
-        .map_err(|error| format!("The window could not fill the Prompter XL: {error}"))?;
     stands_on(window, rect).map_err(|found| format!("The window was not shown. {found}"))?;
     // The page hides the pointer too; this holds while the page loads.
     let _ = window.set_cursor_visible(false);
@@ -629,13 +646,22 @@ impl PrompterWindow {
                 self.glass = Glass::Closed;
                 self.said = None;
             }
-            Step::Open(place) => match open(app, place) {
-                Ok(()) => {
-                    log_shell_line(app, &opened_line(place));
-                    self.glass = Glass::Opened { at: now, place };
+            Step::Open(place) => {
+                // A window that was closed is gone a moment later, not at
+                // once, and no second one of its name can be built until
+                // then: the next look opens it.
+                if app.get_webview_window(PROMPTER_WINDOW_LABEL).is_some() {
+                    close(app);
+                    return;
                 }
-                Err(reason) => self.failed(app, reason, now),
-            },
+                match open(app, place) {
+                    Ok(()) => {
+                        log_shell_line(app, &opened_line(place));
+                        self.glass = Glass::Opened { at: now, place };
+                    }
+                    Err(reason) => self.failed(app, reason, now),
+                }
+            }
             Step::GiveUp(reason) => {
                 close(app);
                 self.failed(app, reason, now);
