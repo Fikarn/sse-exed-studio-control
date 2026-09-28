@@ -201,12 +201,12 @@ One question about the lights, with no hurry:
 
 - [ ] Should the studio build hold the lights at every start? Today a hold is saved: held lights stay held across starts, and armed lights are armed again at the next start, so the rig follows the app at once. Setting `SSE_SAFE_START=1` for the Windows account makes every start held, at the cost of arming once per start, also after the hardware link restarts mid-session. Recommended: leave it as it is.
 
-Dependency updates no longer wait. The assistant takes them itself once a month, when the checks pass, and never with `npm audit fix`. Open now:
+Dependency updates wait on the owner's word. Asked on 2026-09-28, with no hurry: may the assistant take them itself once a month, when the checks pass, and never with `npm audit fix`? Recommended: yes. Open now:
 
-- pull requests #193 (`fuzzysort`), #217 (`getrandom`), #218 (the tooling group), #219 (`tauri-plugin-single-instance`), #220 (`@types/node`) and #223 (`qs`);
+- pull requests #217 (`getrandom`), #219 (`tauri-plugin-single-instance`), #223 (`qs`), #233 (the actions group), #234 (the npm group, whose checks fail) and #235 (`jsdom`, whose checks fail);
 - alerts #7 (`esbuild`, low) and #1 (`glib`, medium).
 
-Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Dependabot's alert stays open until a fix exists.
+`fuzzysort`, which nothing imported, is removed, so #193 closes by itself. `glib` sits in Tauri's Linux-only part, which the Windows build never compiles, and no fix fits yet. Dependabot's alert stays open until a fix exists.
 
 ## Decide later
 
