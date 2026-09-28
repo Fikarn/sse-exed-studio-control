@@ -51,8 +51,8 @@ describe("domainRefresh", () => {
     for (const domain of ALL_DOMAINS) {
       expect(REQUEST_METHODS).toContain(DOMAIN_REQUESTS[domain]);
     }
-    // Nine, and the Teleprompter's two since the new pages program's Slice 6a.
-    expect(ALL_DOMAINS).toHaveLength(11);
+    // Nine, the Teleprompter's two since the new pages program's Slice 6a, and the cameras'.
+    expect(ALL_DOMAINS).toHaveLength(12);
   });
 
   it("maps a request by its own name before its prefix", () => {
@@ -114,5 +114,13 @@ describe("domainRefresh", () => {
       expect(domainsForMethod(method), method).toEqual(["prompter"]);
     }
     expect(domainsForMethod("prompter.paste.convert")).toEqual([]);
+  });
+
+  it("reads the cameras again after each of their requests and their event, and when their page opens", () => {
+    for (const method of ["cameras.select", "cameras.set", "cameras.record.start", "cameras.setup.update"]) {
+      expect(domainsForMethod(method), method).toEqual(["cameras"]);
+    }
+    expect(domainsForEvent("cameras.changed")).toEqual({ domains: ["cameras"], known: true });
+    expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
   });
 });

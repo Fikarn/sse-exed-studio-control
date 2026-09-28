@@ -340,13 +340,16 @@ export function handleFixtureSetupRequest(
         // Format 6 (Slice 4): the scripts come back — added, never removed or overwritten
         // — with the look, and the prompter stays paused where it was (D12).
         const archive = exportedArchives.get(state)?.get(path) ?? null;
-        detail = restoreFixturePrompterArchive(context, archive?.prompter ?? null);
+        const scripts = restoreFixturePrompterArchive(context, archive?.prompter ?? null);
         // Format 7 (Slice 8): the cameras' addresses and vMix inputs, and nothing sent to a
         // camera; an older archive leaves their setup as it is.
-        restoreFixtureCamerasArchive(context, archive?.cameras ?? null);
+        const addresses = restoreFixtureCamerasArchive(context, archive?.cameras ?? null);
+        const said = [scripts, addresses].filter((sentence): sentence is string => sentence !== null);
+        detail = said.length > 0 ? said.join(" ") : null;
       }
       // No Planning counts (the double's backups hold no Planning data); a `detail` only
-      // when the restore added scripts or brought one back as an earlier version.
+      // when the restore added scripts or brought one back as an earlier version, or left
+      // a camera's address out.
       return {
         ...(detail === null ? {} : { detail }),
         requiresRestart: databaseRestore,

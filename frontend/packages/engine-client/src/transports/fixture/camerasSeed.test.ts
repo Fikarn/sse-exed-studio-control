@@ -84,6 +84,8 @@ describe("the fixture double's cameras seed", () => {
     expect((await snapshot()).cameras[1]!.values.shutter.value).toBe("1/100");
   });
 
+  // Saved data that holds a pairing and an address in a build with no link, as a database
+  // backup restored whole brings them: Setup itself would take neither.
   it("starts a hardware link with no link to a camera yet, when the scenario says so", async () => {
     const { camera } = openCamerasDouble({
       simulated: false,

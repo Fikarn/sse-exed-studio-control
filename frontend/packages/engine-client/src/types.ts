@@ -7,6 +7,7 @@ import type {
   StartupLifecycleState,
 } from "./generated/protocol";
 import type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
+import type { CamerasSnapshot } from "./generated/snapshots/CamerasSnapshot";
 import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
 import type { LightingFixtureCatalogSnapshot } from "./generated/snapshots/LightingFixtureCatalogSnapshot";
 import type { LightingPaletteKind } from "./generated/snapshots/LightingPaletteKind";
@@ -134,6 +135,56 @@ export interface PrompterPasteRequest {
 export interface PrompterPasteConvertResult {
   paragraphs: PrompterParagraph[];
   sentence: string;
+}
+
+/** CAM 1, the Pocket 6K Pro; CAM 2 and CAM 3, the BGH1s. */
+export type CameraNumber = 1 | 2 | 3;
+
+/** A setting one press sets (`cameras.set`, `cameras.step`; D11). */
+export type CameraPressSetting = "iso" | "shutter" | "iris" | "nd" | "whiteBalance" | "tint" | "focus";
+
+/** `cameras.set`: a choice's value from its options, in the camera's own words, or a level's number in its range. */
+export interface CameraSetRequest {
+  camera: CameraNumber;
+  setting: CameraPressSetting;
+  value: string | number;
+}
+
+/** `cameras.step`: a whole number of the camera's own steps, not 0 (`step: -1` is one step down). */
+export interface CameraStepRequest {
+  camera: CameraNumber;
+  setting: CameraPressSetting;
+  step: number;
+}
+
+/** `cameras.auto`: a one-shot auto the camera offers. */
+export interface CameraAutoRequest {
+  camera: CameraNumber;
+  what: "focus" | "whiteBalance" | "iris";
+}
+
+/** `cameras.format.set`: the page's second press sends `confirm: true` (D11). */
+export interface CameraFormatRequest {
+  camera: CameraNumber;
+  resolution?: string;
+  frameRate?: string;
+  confirm?: boolean;
+}
+
+/** `cameras.look.set`: the picture profile and the display LUT; the second press sends `confirm: true`. */
+export interface CameraLookRequest {
+  camera: CameraNumber;
+  dynamicRange?: string;
+  displayLut?: string;
+  displayLutOn?: boolean;
+  confirm?: boolean;
+}
+
+/** `cameras.setup.update`: CAM 2's or CAM 3's address (`null` takes it away), a camera's vMix input, or both. */
+export interface CameraSetupUpdateRequest {
+  camera: CameraNumber;
+  address?: string | null;
+  vmixInput?: number;
 }
 
 export interface AudioSnapshotCreateRequest {
@@ -521,6 +572,12 @@ export interface ShellState {
    * `prompterSnapshot`, which is always current.
    */
   prompterGlassSnapshot: PrompterGlassSnapshot | null;
+  /**
+   * The cameras: who holds each, what each reports, the selection, and their
+   * newest Recent actions. `null` until it was read; the header's lamp and
+   * its `REC` chip read `checks.cameras` in the health snapshot instead.
+   */
+  camerasSnapshot: CamerasSnapshot | null;
   startupFailure: StartupFailure | null;
   lastEvent: EventName | null;
   errorSummary: string | null;
@@ -628,6 +685,28 @@ export interface ShellStore {
   pastePrompterScript(request: PrompterPasteRequest): Promise<JsonValue>;
   /** What a paste into the editor inserts, read by the hardware link's own reader; changes nothing. */
   convertPrompterPaste(request: PrompterPasteRequest): Promise<PrompterPasteConvertResult>;
+  // The cameras. Each answers what the hardware link answered, or throws its
+  // refusal (`EngineRequestError`), and the cameras' state is read again.
+  selectCamera(camera: CameraNumber): Promise<JsonValue>;
+  setCameraValue(request: CameraSetRequest): Promise<JsonValue>;
+  stepCameraValue(request: CameraStepRequest): Promise<JsonValue>;
+  runCameraAuto(request: CameraAutoRequest): Promise<JsonValue>;
+  setCameraFormat(request: CameraFormatRequest): Promise<JsonValue>;
+  setCameraLook(request: CameraLookRequest): Promise<JsonValue>;
+  /** One press; always CAM 1, whichever camera is selected (D14). */
+  startCameraRecording(): Promise<JsonValue>;
+  /** The second press sends `confirm: true`. */
+  stopCameraRecording(confirm: boolean): Promise<JsonValue>;
+  releaseCamera(camera: CameraNumber, confirm: boolean): Promise<JsonValue>;
+  connectCamera(camera: CameraNumber): Promise<JsonValue>;
+  updateCameraSetup(request: CameraSetupUpdateRequest): Promise<JsonValue>;
+  pairCamera(camera: CameraNumber): Promise<JsonValue>;
+  forgetCamera(camera: CameraNumber): Promise<JsonValue>;
+  /**
+   * Reads the cameras again (`cameras.snapshot`), which leaves no event and no
+   * row: the page does once a second while it is open, and for its "again" keys.
+   */
+  refreshCamerasSnapshot(): Promise<void>;
   refreshControlSurfaceSnapshot(): Promise<void>;
   getAudioMeterFrame(): AudioMeterFrame;
   subscribeAudioMeters(listener: () => void): () => void;

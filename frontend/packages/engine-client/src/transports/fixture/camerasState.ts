@@ -3,6 +3,7 @@
 import type { CameraChoice } from "../../generated/snapshots/CameraChoice";
 import type { CameraHealthEntry } from "../../generated/snapshots/CameraHealthEntry";
 import type { CameraLevel } from "../../generated/snapshots/CameraLevel";
+import type { CameraRecentAction } from "../../generated/snapshots/CameraRecentAction";
 import type { CameraSetupSummary } from "../../generated/snapshots/CameraSetupSummary";
 import type { CameraSnapshot } from "../../generated/snapshots/CameraSnapshot";
 import type { CameraState } from "../../generated/snapshots/CameraState";
@@ -24,6 +25,7 @@ import {
   STATE_TONES,
   STATE_WORDS,
   heldSentence,
+  noLinkRefusalSentence,
   noLinkSentence,
   notSetUpSentence,
   releasedSentence,
@@ -38,8 +40,9 @@ import type { MutableFixtureState } from "./state";
 //
 // Each camera's link is the simulated one — the double stands for every test, lane and
 // scratch run (`SSE_CAMERAS_SIMULATED=1`) — unless a scenario says `simulated: false`, as
-// the live app is until Slices 11 and 13: a set-up camera then reads UNREACHABLE, with no
-// link to it yet. The simulated camera ("the body") holds its own values, answers or not,
+// the studio's build is until Slices 11 and 13: Setup then takes no pairing and no address
+// (`CAMERA_NO_LINK`), so a camera reads NOT SET UP and says there is no link to it yet; one
+// the saved data holds all the same reads UNREACHABLE with that sentence. The simulated camera ("the body") holds its own values, answers or not,
 // and counts what it is sent (D12: nothing is sent by itself); the hardware link reads it
 // and keeps what it read. A held camera that answers is read before every request; one
 // that stops answering keeps what it last reported and when (`readAt`), as doubt; a
@@ -164,6 +167,11 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
   return cameras;
 }
 
+/** Whether this build can reach the camera at all (`real_link::has_link`): through the simulated link. */
+export function hasLink(cameras: FixtureCameras, _camera: CameraNumber): boolean {
+  return cameras.simulated;
+}
+
 /** CAM 1 once it is paired, CAM 2 and CAM 3 once their address is entered. */
 export function isSetUp(cameras: FixtureCameras, camera: CameraNumber): boolean {
   const held = cameras.held[camera];
@@ -192,7 +200,7 @@ export function cameraSentence(cameras: FixtureCameras, camera: CameraNumber): s
     case "released":
       return releasedSentence(model);
     case "not-set-up":
-      return notSetUpSentence(model);
+      return notSetUpSentence(model, hasLink(cameras, camera));
     case "unreachable":
       return unreachableSentenceOf(cameras, camera);
   }
@@ -279,6 +287,7 @@ export function setupSummary(cameras: FixtureCameras, camera: CameraNumber): Cam
     address: camera === 1 ? null : held.address,
     paired: camera === 1 ? held.paired : false,
     vmixInput: held.vmixInput,
+    noLink: hasLink(cameras, camera) ? null : noLinkRefusalSentence(cameraModel(camera)),
   };
 }
 
@@ -370,11 +379,39 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
   };
 }
 
-/** `cameras.snapshot`: the selection and the three cameras. */
-export function camerasSnapshot(cameras: FixtureCameras): CamerasSnapshot {
+/** How many of the cameras' Recent actions `cameras.snapshot` carries (`CAMERAS_RECENT_LIMIT`). */
+export const CAMERAS_RECENT_LIMIT = 5;
+
+/**
+ * The cameras' newest Recent actions, newest first, from the double's action log
+ * (`support.snapshot`'s `recentEvents`). The double's log keeps fifty rows where the
+ * hardware link's keeps five thousand, so here a camera's row leaves the list after fifty
+ * newer rows of any page.
+ */
+export function recentCameraActions(state: MutableFixtureState): CameraRecentAction[] {
+  const rows = Array.isArray(state.supportSnapshot.recentEvents) ? state.supportSnapshot.recentEvents : [];
+  const recent: CameraRecentAction[] = [];
+  for (const row of rows) {
+    if (recent.length === CAMERAS_RECENT_LIMIT) break;
+    if (row === null || typeof row !== "object" || Array.isArray(row) || row.domain !== "cameras") continue;
+    recent.push({
+      id: Number(row.id),
+      at: String(row.at),
+      source: String(row.source),
+      action: String(row.action),
+      target: String(row.target),
+      detail: String(row.detail),
+    });
+  }
+  return recent;
+}
+
+/** `cameras.snapshot`: the selection, the three cameras and their newest Recent actions. */
+export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAction[]): CamerasSnapshot {
   return {
     selected: cameras.selected,
     cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),
+    recent,
   };
 }
 

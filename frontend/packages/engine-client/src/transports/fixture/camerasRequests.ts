@@ -31,10 +31,12 @@ import {
   camerasStatusPart,
   fixtureCameras,
   forgetRead,
+  hasLink,
   isSetUp,
   lastReport,
   readCamera,
   readHeldCameras,
+  recentCameraActions,
   setupSummary,
   type ArchivedCamera,
   type CameraReport,
@@ -43,6 +45,7 @@ import {
 } from "./camerasState";
 import {
   addressInvalidRefusal,
+  addressesNotRestoredSentence,
   alreadyHeldRefusal,
   alreadyRecordingRefusal,
   autoNotOfferedRefusal,
@@ -184,7 +187,7 @@ function heldCamera(cameras: FixtureCameras, camera: CameraNumber): { model: Cam
   const model = cameraModel(camera);
   switch (cameraState(cameras, camera)) {
     case "not-set-up":
-      throw notSetUpRefusal(model);
+      throw notSetUpRefusal(model, hasLink(cameras, camera));
     case "released":
       throw releasedRefusal(model);
     case "unreachable":
@@ -409,7 +412,7 @@ function releaseRequest(cameras: FixtureCameras, params: JsonObject): Answer {
   const camera = cameraParam(params);
   const confirm = confirmParam(params);
   const model = cameraModel(camera);
-  if (!isSetUp(cameras, camera)) throw notSetUpRefusal(model);
+  if (!isSetUp(cameras, camera)) throw notSetUpRefusal(model, hasLink(cameras, camera));
   if (cameras.held[camera].released) throw releasedRefusal(model);
   if (!confirm) throw notConfirmedRefusal();
   cameras.held[camera].released = true;
@@ -429,7 +432,7 @@ function releaseRequest(cameras: FixtureCameras, params: JsonObject): Answer {
 function connectRequest(cameras: FixtureCameras, params: JsonObject, now: number): Answer {
   const camera = cameraParam(params);
   const model = cameraModel(camera);
-  if (!isSetUp(cameras, camera)) throw notSetUpRefusal(model);
+  if (!isSetUp(cameras, camera)) throw notSetUpRefusal(model, hasLink(cameras, camera));
   if (cameraState(cameras, camera) === "held") throw alreadyHeldRefusal(model);
   const held = cameras.held[camera];
   held.released = false;
@@ -455,7 +458,9 @@ function holdAfresh(cameras: FixtureCameras, camera: CameraNumber, now: number) 
 /**
  * `cameras.setup.update { camera, address?, vmixInput? }`: CAM 2's or CAM 3's address (`null`
  * takes it away), and any camera's vMix input. Saving an address holds the camera and reads
- * it at once; nothing is sent.
+ * it at once; nothing is sent. In a build with no link to the camera an address is refused
+ * (`CAMERA_NO_LINK`), after its shape and its form were checked; taking one away and the
+ * vMix input stay.
  */
 function setupUpdateRequest(cameras: FixtureCameras, params: JsonObject, now: number): Answer {
   const camera = cameraParam(params);
@@ -477,6 +482,7 @@ function setupUpdateRequest(cameras: FixtureCameras, params: JsonObject, now: nu
   if (text !== undefined && text !== null) {
     address = cameraAddress(text);
     if (address === null) throw addressInvalidRefusal(text);
+    if (!hasLink(cameras, camera)) throw noLinkRefusal(cameraModel(camera));
   }
   const held = cameras.held[camera];
   if (input !== undefined) held.vmixInput = input as number;
@@ -491,7 +497,7 @@ function setupUpdateRequest(cameras: FixtureCameras, params: JsonObject, now: nu
 function setupPairRequest(cameras: FixtureCameras, params: JsonObject, now: number): Answer {
   const camera = cameraParam(params);
   if (camera !== 1) throw invalidParams("Only CAM 1 is paired; CAM 2 and CAM 3 take an address.");
-  if (!cameras.simulated) throw noLinkRefusal();
+  if (!hasLink(cameras, camera)) throw noLinkRefusal(cameraModel(camera));
   cameras.held[1].paired = true;
   holdAfresh(cameras, 1, now);
   return answer({ camera, setup: setupSummary(cameras, camera) }, "setup", camera);
@@ -508,10 +514,16 @@ function setupForgetRequest(cameras: FixtureCameras, params: JsonObject): Answer
   return answer({ camera, setup: setupSummary(cameras, camera) }, "setup", camera);
 }
 
-function answerRequest(cameras: FixtureCameras, method: RequestMethod, params: JsonObject, now: number): Answer {
+function answerRequest(
+  context: FixtureRequestContext,
+  cameras: FixtureCameras,
+  method: RequestMethod,
+  params: JsonObject,
+  now: number
+): Answer {
   switch (method) {
     case "cameras.snapshot":
-      return answer(camerasSnapshot(cameras));
+      return answer(camerasSnapshot(cameras, recentCameraActions(context.state)) as unknown as JsonValue);
     case "cameras.select": {
       // In memory; a camera not set up can be selected (D19). Not a Recent action.
       const camera = cameraParam(params);
@@ -615,7 +627,7 @@ export function handleFixtureCamerasRequest(
   if (!CAMERAS_METHODS.has(method)) return NOT_HANDLED;
   const now = Date.now();
   settle(context, now);
-  return changeCameras(context, (cameras) => answerRequest(cameras, method, params, now)).result;
+  return changeCameras(context, (cameras) => answerRequest(context, cameras, method, params, now)).result;
 }
 
 // ---------------------------------------------------------------------------
@@ -693,10 +705,16 @@ export function exportFixtureCamerasArchive(context: FixtureRequestContext): Arc
  * input Setup would refuse left as it was — and nothing sent to a camera; a camera whose
  * address changed starts again, held and read. An archive of format 6 or older (`null`)
  * leaves the cameras' setup as it is. Either way `cameras.changed { reason: "restore",
- * camera: null }` says the cameras took their setup again.
+ * camera: null }` says the cameras took their setup again. In a build with no link to a
+ * camera its address is left out, as Setup would refuse it; the answer is the sentence that
+ * names those cameras for the restore's `detail`, or `null`.
  */
-export function restoreFixtureCamerasArchive(context: FixtureRequestContext, archive: ArchivedCamera[] | null) {
+export function restoreFixtureCamerasArchive(
+  context: FixtureRequestContext,
+  archive: ArchivedCamera[] | null
+): string | null {
   const now = Date.now();
+  const leftOut: CameraNumber[] = [];
   changeCameras(context, (cameras) => {
     for (const entry of archive ?? []) {
       const held = cameras.held[entry.camera];
@@ -705,11 +723,15 @@ export function restoreFixtureCamerasArchive(context: FixtureRequestContext, arc
       }
       if (entry.camera === 1) continue;
       const address = entry.address === null ? null : cameraAddress(entry.address);
-      if ((entry.address === null || address !== null) && address !== held.address) {
-        held.address = address;
-        holdAfresh(cameras, entry.camera, now);
+      if ((entry.address !== null && address === null) || address === held.address) continue;
+      if (address !== null && !hasLink(cameras, entry.camera)) {
+        if (!leftOut.includes(entry.camera)) leftOut.push(entry.camera);
+        continue;
       }
+      held.address = address;
+      holdAfresh(cameras, entry.camera, now);
     }
     return answer(null, "restore", null);
   });
+  return addressesNotRestoredSentence(leftOut.sort().map((camera) => cameraModel(camera)));
 }

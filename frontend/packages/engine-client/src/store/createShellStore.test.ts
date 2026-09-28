@@ -6,6 +6,7 @@ import { createFixtureTransport } from "../transports/fixtureTransport";
 import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
 import type { EngineTransport } from "../types";
 import { createShellStore, prompterGlassIsStale } from "./createShellStore";
+import { domainsForMethod } from "./domainRefresh";
 
 function recordingTransport(inner: EngineTransport, log: string[]): EngineTransport {
   return {
@@ -117,6 +118,8 @@ const TYPED_SNAPSHOT_REQUESTS = new Set([
   // New pages program, Slice 6a: the Teleprompter's, absent while nothing is on it.
   "prompter.snapshot",
   "prompter.glass.snapshot",
+  // The cameras', absent until they were read.
+  "cameras.snapshot",
 ]);
 
 function supervisedTransport() {
@@ -441,8 +444,8 @@ describe("createShellStore scoped refresh", () => {
       "app.changed": ["app.snapshot", "health.snapshot"],
       "audio.changed": ["audio.snapshot"],
       "audio.meters": [],
-      // New pages program, Slice 8: no cameras snapshot in the store until Slice 9.
-      "cameras.changed": [],
+      // Every change of the cameras' is in their snapshot.
+      "cameras.changed": ["cameras.snapshot"],
       "commissioning.changed": [
         "app.snapshot",
         "audio.snapshot",
@@ -517,6 +520,7 @@ describe("createShellStore scoped refresh", () => {
     expect(snapshotRequests()).toEqual([
       "app.snapshot",
       "audio.snapshot",
+      "cameras.snapshot",
       "commissioning.snapshot",
       "health.snapshot",
       "lighting.dmxMonitor.snapshot",
@@ -555,8 +559,8 @@ describe("createShellStore scoped refresh", () => {
     calls.length = 0;
     await store.refresh();
     expect(catalogRequests()).toBe(1);
-    // Eleven since the Teleprompter's two (new pages program, Slice 6a).
-    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(11);
+    // Twelve: the Teleprompter's two (new pages program, Slice 6a) and the cameras'.
+    expect(calls.filter((call) => call.endsWith(".snapshot"))).toHaveLength(12);
     await store.dispose();
   });
 
@@ -612,8 +616,71 @@ describe("createShellStore scoped refresh", () => {
     // An applied archive rewrites lighting and audio settings too, and no
     // lighting or audio event says so.
     answer("support.backup.restore", { requiresRestart: false });
-    // Eight since the Teleprompter's snapshot (new pages program, Slice 6a).
-    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(8);
+    // Nine: the Teleprompter's snapshot (new pages program, Slice 6a) and the cameras'.
+    expect(await after(() => store.restoreSupportBackup("C:/app-data/backups/native-backup.json"))).toHaveLength(9);
+
+    // The cameras: every request reads their snapshot again, and nothing else. What moves
+    // the Cameras lamp is followed by `app.changed { reason: "health" }`.
+    const cameras = ["cameras.snapshot"];
+    expect(await after(() => store.selectCamera(2))).toEqual(cameras);
+    expect(await after(() => store.setCameraValue({ camera: 1, setting: "iso", value: "800" }))).toEqual(cameras);
+    expect(await after(() => store.stepCameraValue({ camera: 1, setting: "whiteBalance", step: -2 }))).toEqual(cameras);
+    expect(await after(() => store.runCameraAuto({ camera: 1, what: "focus" }))).toEqual(cameras);
+    expect(await after(() => store.setCameraFormat({ camera: 1, frameRate: "50", confirm: true }))).toEqual(cameras);
+    expect(await after(() => store.setCameraLook({ camera: 1, displayLutOn: false, confirm: true }))).toEqual(cameras);
+    expect(await after(() => store.startCameraRecording())).toEqual(cameras);
+    expect(await after(() => store.stopCameraRecording(true))).toEqual(cameras);
+    expect(await after(() => store.releaseCamera(2, true))).toEqual(cameras);
+    expect(await after(() => store.connectCamera(2))).toEqual(cameras);
+    expect(await after(() => store.updateCameraSetup({ camera: 2, address: null }))).toEqual(cameras);
+    expect(await after(() => store.pairCamera(1))).toEqual(cameras);
+    expect(await after(() => store.forgetCamera(1))).toEqual(cameras);
+    expect(await after(() => store.refreshCamerasSnapshot())).toEqual(cameras);
+    // Opening the Cameras page reads them too (the page comes with the next change).
+    expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
+    await store.dispose();
+  });
+
+  it("sends the cameras' requests as the contract names them", async () => {
+    const { calls, transport } = supervisedTransport();
+    const sent: Array<[string, unknown]> = [];
+    const store = createShellStore({
+      ...transport,
+      request: (method, params) => {
+        if (method.startsWith("cameras.") && method !== "cameras.snapshot") sent.push([method, params ?? {}]);
+        return transport.request(method, params);
+      },
+    });
+    await store.initialize();
+    calls.length = 0;
+    await store.selectCamera(3);
+    await store.setCameraValue({ camera: 1, setting: "whiteBalance", value: 5600 });
+    await store.stepCameraValue({ camera: 2, setting: "iso", step: 1 });
+    await store.runCameraAuto({ camera: 1, what: "iris" });
+    await store.setCameraFormat({ camera: 1, resolution: "UHD" });
+    await store.setCameraLook({ camera: 1, dynamicRange: "Video", confirm: true });
+    await store.startCameraRecording();
+    await store.stopCameraRecording(false);
+    await store.releaseCamera(1, true);
+    await store.connectCamera(1);
+    await store.updateCameraSetup({ camera: 3, vmixInput: 7 });
+    await store.pairCamera(1);
+    await store.forgetCamera(2);
+    expect(sent).toEqual([
+      ["cameras.select", { camera: 3 }],
+      ["cameras.set", { camera: 1, setting: "whiteBalance", value: 5600 }],
+      ["cameras.step", { camera: 2, setting: "iso", step: 1 }],
+      ["cameras.auto", { camera: 1, what: "iris" }],
+      ["cameras.format.set", { camera: 1, resolution: "UHD" }],
+      ["cameras.look.set", { camera: 1, dynamicRange: "Video", confirm: true }],
+      ["cameras.record.start", {}],
+      ["cameras.record.stop", { confirm: false }],
+      ["cameras.release", { camera: 1, confirm: true }],
+      ["cameras.connect", { camera: 1 }],
+      ["cameras.setup.update", { camera: 3, vmixInput: 7 }],
+      ["cameras.setup.pair", { camera: 1 }],
+      ["cameras.setup.forget", { camera: 2 }],
+    ]);
     await store.dispose();
   });
 
@@ -1000,6 +1067,59 @@ describe("createShellStore identify flashes", () => {
 // New pages program, Slice 6a: the Teleprompter's two snapshots. Its state is
 // small and read after every change; the text on the glass can hold 30,000
 // words, so it is read only when the state's layout key says it moved.
+// The cameras' snapshot: read at the start without the start depending on
+// it, again after `cameras.changed`, and kept when a reply is malformed.
+describe("createShellStore the cameras", () => {
+  const cameras = (selected: number, recent: JsonValue = []) => ({ selected, cameras: [], recent });
+
+  it("reads the cameras at the start and again when they change", async () => {
+    const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
+    answer("cameras.snapshot", cameras(1));
+    const store = createShellStore(transport);
+    await store.initialize();
+    expect(store.getSnapshot().camerasSnapshot).toEqual(cameras(1));
+
+    calls.length = 0;
+    answer("cameras.snapshot", cameras(2, null));
+    emit({ type: "event", event: "cameras.changed", payload: { reason: "select", camera: 2 } });
+    await tick();
+    expect(snapshotRequests()).toEqual(["cameras.snapshot"]);
+    expect(store.getSnapshot().camerasSnapshot).toEqual(cameras(2, null));
+    await store.dispose();
+  });
+
+  it("starts when the cameras' state cannot be read, and records why", async () => {
+    const { refuse, transport } = supervisedTransport();
+    refuse("cameras.snapshot");
+    const store = createShellStore(transport);
+    await store.initialize();
+    const state = store.getSnapshot();
+    expect(state.lifecycle).toBe("ready");
+    expect(state.camerasSnapshot).toBeNull();
+    expect(state.backgroundFailures.map((failure) => failure.context)).toEqual(["the cameras' state"]);
+    // The page's own read says that it failed.
+    await expect(store.refreshCamerasSnapshot()).rejects.toThrow("cameras.snapshot refused");
+    await store.dispose();
+
+    // A reply that is not the cameras' is refused, and the start goes on.
+    const malformed = supervisedTransport();
+    malformed.answer("cameras.snapshot", { selected: 1, cameras: "none", recent: [] });
+    const guarded = createShellStore(malformed.transport);
+    await guarded.initialize();
+    expect(guarded.getSnapshot().lifecycle).toBe("ready");
+    expect(guarded.getSnapshot().camerasSnapshot).toBeNull();
+    expect(guarded.getSnapshot().backgroundFailures[0]).toMatchObject({
+      context: "reply refused",
+      message: "cameras.snapshot: cameras is not a list",
+    });
+    // The next read that answers is taken.
+    malformed.answer("cameras.snapshot", cameras(1));
+    await guarded.refreshCamerasSnapshot();
+    expect(guarded.getSnapshot().camerasSnapshot).toEqual(cameras(1));
+    await guarded.dispose();
+  });
+});
+
 describe("createShellStore the Teleprompter", () => {
   const prompter = (layoutKey: string | null) => ({
     look: {},

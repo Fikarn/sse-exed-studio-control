@@ -242,10 +242,61 @@ describe("the fixture double's cameras: the backup (format 7)", () => {
       address: null,
       paired: false,
       vmixInput: 1,
+      noLink: null,
     });
     expect(await camera(2)).toMatchObject({ state: "held", setup: { address: CAM2_ADDRESS, vmixInput: 12 } });
     expect(await camera(3)).toMatchObject({ state: "held", setup: { address: CAM3_ADDRESS, vmixInput: 3 } });
     expect([cameras.sent(1), cameras.sent(2), cameras.sent(3)]).toEqual([0, 0, 0]);
+  });
+
+  it("leaves an address out in a build with no link to the camera, and says which", async () => {
+    // Saved data that holds both addresses in a build with no link (a database backup
+    // restored whole brings what it holds), so its archive holds them too.
+    const { call, camera, cameras } = openCamerasDouble({
+      simulated: false,
+      cameras: [
+        { camera: 2, address: CAM2_ADDRESS, vmixInput: 12 },
+        { camera: 3, address: CAM3_ADDRESS },
+      ],
+    });
+    const path = (await call("support.backup.export")).path as string;
+    await call("cameras.setup.update", { camera: 2, address: null, vmixInput: 5 });
+    await call("cameras.setup.update", { camera: 3, address: null });
+
+    expect((await call("support.backup.restore", { path })).detail).toBe(
+      "CAM 2's and CAM 3's addresses were not restored: Studio Control has no link to them yet."
+    );
+    expect(await camera(2)).toMatchObject({ state: "not-set-up", setup: { address: null, vmixInput: 12 } });
+    expect(await camera(3)).toMatchObject({ state: "not-set-up", setup: { address: null, vmixInput: 3 } });
+    expect([cameras.sent(1), cameras.sent(2), cameras.sent(3)]).toEqual([0, 0, 0]);
+  });
+
+  it("does not name an address the saved data holds already", async () => {
+    const { call, camera } = openCamerasDouble({
+      simulated: false,
+      cameras: [
+        { camera: 2, address: CAM2_ADDRESS },
+        { camera: 3, address: CAM3_ADDRESS },
+      ],
+    });
+    const path = (await call("support.backup.export")).path as string;
+    await call("cameras.setup.update", { camera: 2, address: null });
+    expect((await call("support.backup.restore", { path })).detail).toBe(
+      "CAM 2's address was not restored: Studio Control has no link to it yet."
+    );
+    expect((await camera(3)).setup.address).toBe(CAM3_ADDRESS);
+    // Nothing is left out the second time either way: CAM 2's is still not there.
+    expect((await call("support.backup.restore", { path })).detail).toBe(
+      "CAM 2's address was not restored: Studio Control has no link to it yet."
+    );
+  });
+
+  it("takes an address away that the archive does not hold", async () => {
+    const { call, camera } = openCamerasDouble({ cameras: [{ camera: 1, paired: true }] });
+    const path = (await call("support.backup.export")).path as string;
+    await call("cameras.setup.update", { camera: 2, address: CAM2_ADDRESS });
+    expect(await call("support.backup.restore", { path })).not.toHaveProperty("detail");
+    expect(await camera(2)).toMatchObject({ state: "not-set-up", setup: { address: null } });
   });
 
   it("leaves the cameras' setup as it is for an archive of format 6 or older", async () => {

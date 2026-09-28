@@ -38,7 +38,9 @@ export function releasedSentence(model: CameraModel): string {
   return `${model.tag} is released to ${model.app}. Studio Control does not read it or send it anything until you connect it again.`;
 }
 
-export function notSetUpSentence(model: CameraModel): string {
+/** A camera that is not set up; in a build with no link to it, that there is none yet, not what to enter. */
+export function notSetUpSentence(model: CameraModel, hasLink = true): string {
+  if (!hasLink) return noLinkSentence(model);
   return model.camera === 1
     ? "CAM 1 is not paired. Pair it in Setup, with the camera beside you."
     : `${model.tag} has no address. Enter it in Setup.`;
@@ -51,7 +53,7 @@ export function unreachableSentence(model: CameraModel, address: string | null):
     : `${model.tag} does not answer at ${address ?? "its address"}. Check that it is on and on the network.`;
 }
 
-/** A set-up camera without the simulated link, before Slices 11 and 13 bring the real one. */
+/** A camera in a build with no link to it, before Slices 11 and 13 bring the real one. */
 export function noLinkSentence(model: CameraModel): string {
   return `Studio Control has no link to ${model.tag} yet: it comes with a later version.`;
 }
@@ -64,8 +66,8 @@ export function invalidParams(message: string): EngineRequestError {
   return new EngineRequestError("INVALID_PARAMS", message);
 }
 
-export function notSetUpRefusal(model: CameraModel): EngineRequestError {
-  return new EngineRequestError("CAMERA_NOT_SET_UP", notSetUpSentence(model));
+export function notSetUpRefusal(model: CameraModel, hasLink = true): EngineRequestError {
+  return new EngineRequestError("CAMERA_NOT_SET_UP", notSetUpSentence(model, hasLink));
 }
 
 export function releasedRefusal(model: CameraModel): EngineRequestError {
@@ -83,8 +85,15 @@ export function alreadyHeldRefusal(model: CameraModel): EngineRequestError {
 
 export const NO_LINK_SENTENCE = "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version.";
 
-export function noLinkRefusal(): EngineRequestError {
-  return new EngineRequestError("CAMERA_NO_LINK", NO_LINK_SENTENCE);
+/** Why Setup cannot pair the camera (CAM 1) or take its address (CAM 2, CAM 3) in a build with no link to it. */
+export function noLinkRefusalSentence(model: CameraModel): string {
+  return model.camera === 1
+    ? NO_LINK_SENTENCE
+    : `Studio Control cannot take ${model.tag}'s address yet: its network link comes with a later version.`;
+}
+
+export function noLinkRefusal(model: CameraModel): EngineRequestError {
+  return new EngineRequestError("CAMERA_NO_LINK", noLinkRefusalSentence(model));
 }
 
 /** A setting the camera does not report: its not-reported sentence. */
@@ -188,4 +197,15 @@ export function releasedToSentence(model: CameraModel): string {
 /** Connect's sentence when the camera is held again: its answer and its Recent actions row. */
 export function heldAgainSentence(model: CameraModel): string {
   return `${model.tag} held again.`;
+}
+
+/**
+ * What an archive restore says of the addresses it left out, in a build with no link to
+ * those cameras; `null` when it left none out.
+ */
+export function addressesNotRestoredSentence(models: readonly CameraModel[]): string | null {
+  if (models.length === 0) return null;
+  const whose = models.map((model) => `${model.tag}'s`).join(" and ");
+  const [what, which] = models.length === 1 ? ["address was", "it"] : ["addresses were", "them"];
+  return `${whose} ${what} not restored: Studio Control has no link to ${which} yet.`;
 }

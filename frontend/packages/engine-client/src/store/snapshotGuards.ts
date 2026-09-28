@@ -100,6 +100,12 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
       );
     case "prompterGlass":
       return firstProblem(listProblem(value, "paragraphs", { ids: false }), objectProblem(value, "look"));
+    case "cameras":
+      return firstProblem(
+        listProblem(value, "cameras", { ids: false }),
+        // `null` when the action log could not be read.
+        value.recent === null ? null : listProblem(value, "recent", { ids: false })
+      );
     default:
       return null;
   }

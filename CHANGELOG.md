@@ -31,6 +31,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Until the links to the cameras are built, the Cameras lamp says that Studio Control has no link to them yet. A restore leaves a camera's address out and says which (#243).
 - A stop of the hardware link during a session shows the same recovery screen as a failed start, with `Export diagnostics`, the restore keys and the log's last lines (#241).
 - The window opens on the display it was last on, found by its place on the desktop. Windows' display numbers can swap between starts, and the window then opened on the other display (#241).
 - A start that fails because the two program files are of different builds says so in plain words (#238).
