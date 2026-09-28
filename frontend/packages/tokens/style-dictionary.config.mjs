@@ -32,10 +32,9 @@ export default {
           options: {
             selector: ":root",
             // Emit `var(--base)` for any token whose value is a reference, so
-            // the Slice 1 semantic aliases stay theme-aware: Slice 3's
-            // `[data-theme]` blocks then only override the base tokens and the
-            // aliases cascade. Functionally identical in the single dark theme
-            // (var() resolves to the same value the literal would have).
+            // an alias names its base in the stylesheet as it does in
+            // core.json, and a scope that re-points a base (the wells, in
+            // wells.css) carries its aliases with it.
             outputReferences: true,
           },
         },

@@ -12,9 +12,8 @@ for (const relativePath of required) {
 }
 
 // Visual overhaul A, Slice 1: the generated CSS must carry every A family
-// (one representative per family) and themes.css must re-map the material
-// and the role text variants for Graphite and Bone. A stale build after a
-// core.json edit fails here before it reaches a render.
+// (one representative per family). A stale build after a core.json edit fails
+// here before it reaches a render.
 const css = readFileSync(path.join(packageDir, "generated/tokens.css"), "utf8");
 const A_FAMILIES = [
   "--material-bg",
@@ -84,21 +83,11 @@ for (const gone of [
   }
 }
 
-const themes = readFileSync(path.join(packageDir, "themes.css"), "utf8");
-for (const theme of ["graphite", "bone"]) {
-  const start = themes.lastIndexOf(`:root[data-theme="${theme}"] {`);
-  const body = themes.slice(start, themes.indexOf("}", start));
-  for (const name of [
-    "--material-bg",
-    "--material-well",
-    "--text-text2",
-    "--accent",
-    "--role-green-text",
-    "--audio-console-bg",
-  ]) {
-    if (!body.includes(`${name}:`)) throw new Error(`themes.css ${theme} block lacks ${name}`);
-  }
+const wells = readFileSync(path.join(packageDir, "wells.css"), "utf8");
+if (!wells.includes("[data-well]")) throw new Error("wells.css lacks the .well / [data-well] display-ink scope");
+// One theme, Studio (D25): nothing re-maps the tokens for another.
+if (/data-theme/.test(wells) || /data-theme/.test(css)) {
+  throw new Error("A token stylesheet names a theme: Studio is the only one, and it is the :root block");
 }
-if (!themes.includes("[data-well]")) throw new Error("themes.css lacks the .well / [data-well] display-ink scope");
 
 console.log("Token generated artifacts are present and carry the A families.");

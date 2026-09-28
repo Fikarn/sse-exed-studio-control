@@ -26,7 +26,7 @@ describe("StateDisplay", () => {
         tone="error"
         word="OFFLINE"
         sentence="Audio may still pass, but the app cannot see or change the console right now."
-        code="Console did not answer OSC ping · AUDIO_SYNC_FAILED"
+        code="TotalMix did not answer · AUDIO_SYNC_FAILED"
         actions={<Key mode="primary">Run audio probe</Key>}
         testId="audio-state-display"
       />

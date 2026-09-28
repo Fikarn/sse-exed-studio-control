@@ -402,7 +402,7 @@
     "startupFailure": {
       "stage": "protocol-negotiation",
       "code": "PROTOCOL_MISMATCH",
-      "message": "Shell expected protocol 1 but engine reported 2.",
+      "message": "The app asked for protocol 1 and the hardware link speaks protocol 2: the two files are of different builds.",
       "requestedProtocol": "1",
       "supportedProtocol": "2",
       "paths": {
@@ -1347,14 +1347,14 @@
           "id": "audio",
           "label": "Audio OSC Probe",
           "status": "failed",
-          "message": "Console did not answer OSC ping."
+          "message": "TotalMix did not answer on the Global OSC remote (send 7004 → receive 9004). Check that remote 4 is In Use in Global OSC mode with these ports."
         }
       ]
     },
     "audioSnapshot": {
       "consoleStateConfidence": "assumed",
       "lastActionCode": "AUDIO_SYNC_FAILED",
-      "lastActionMessage": "Console did not answer OSC ping.",
+      "lastActionMessage": "TotalMix did not answer on the Global OSC remote (send 7004 → receive 9004). Check that remote 4 is In Use in Global OSC mode with these ports.",
       "lastActionStatus": "failed"
     }
   },

@@ -5,20 +5,18 @@ import { OperatorLayoutProvider, useOperatorLayout } from "./OperatorLayoutProvi
 
 // New pages program, Slice SW (D22): Studio Control runs at 2560 × 1440 only,
 // so the provider measures nothing (jsdom has no ResizeObserver or matchMedia,
-// and none is stubbed here). What it keeps is the operator's UI scale and
-// theme: remembered across starts, and stamped where the tokens read them —
-// the root, body (for overlays that portal there) and <html>.
+// and none is stubbed here). What it keeps is the operator's UI scale:
+// remembered across starts, and stamped where the tokens read it — the root
+// and body (for overlays that portal there). One theme, Studio (D25): a theme
+// an older build remembered, or one an address names, changes nothing.
 
 function Preferences() {
-  const { setTheme, setUiScale, theme, uiScale } = useOperatorLayout();
+  const { setUiScale, uiScale } = useOperatorLayout();
   return (
     <>
-      <p>{`${uiScale} ${theme}`}</p>
+      <p>{`scale ${uiScale}`}</p>
       <button type="button" onClick={() => setUiScale(90)}>
         90 %
-      </button>
-      <button type="button" onClick={() => setTheme("graphite")}>
-        Graphite
       </button>
     </>
   );
@@ -41,41 +39,42 @@ afterEach(() => {
   cleanup();
   window.localStorage.clear();
   window.history.replaceState(null, "", "/");
-  document.documentElement.removeAttribute("data-theme");
 });
 
 describe("OperatorLayoutProvider", () => {
-  it("starts from the remembered UI scale and theme and stamps them on the root, body and <html>", () => {
+  it("starts from the remembered UI scale and stamps it on the root and body", () => {
     window.localStorage.setItem("app.operator.uiScale", "125");
-    window.localStorage.setItem("app.operator.theme", "bone");
     renderProvider();
 
-    expect(screen.getByText("125 bone")).toBeTruthy();
+    expect(screen.getByText("scale 125")).toBeTruthy();
     expect(document.querySelector("[data-operator-layout-root]")?.getAttribute("data-ui-scale")).toBe("125");
     expect(document.body.hasAttribute("data-operator-scale-host")).toBe(true);
     expect(document.body.getAttribute("data-ui-scale")).toBe("125");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("bone");
   });
 
-  it("reads an unknown UI scale as 100 %, and the address's theme before the remembered one", () => {
+  it("reads an unknown UI scale as 100 %", () => {
     window.localStorage.setItem("app.operator.uiScale", "150");
+    renderProvider();
+
+    expect(screen.getByText("scale 100")).toBeTruthy();
+  });
+
+  it("leaves a theme an older build remembered, or an address names, unread", () => {
     window.localStorage.setItem("app.operator.theme", "bone");
     window.history.replaceState(null, "", "/?theme=graphite");
     renderProvider();
 
-    expect(screen.getByText("100 graphite")).toBeTruthy();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    expect(window.localStorage.getItem("app.operator.theme")).toBe("bone");
   });
 
   it("remembers a new choice, stamps it, and takes the body stamp away when it unmounts", () => {
     const { unmount } = renderProvider();
     fireEvent.click(screen.getByRole("button", { name: "90 %" }));
-    fireEvent.click(screen.getByRole("button", { name: "Graphite" }));
 
-    expect(screen.getByText("90 graphite")).toBeTruthy();
+    expect(screen.getByText("scale 90")).toBeTruthy();
     expect(window.localStorage.getItem("app.operator.uiScale")).toBe("90");
-    expect(window.localStorage.getItem("app.operator.theme")).toBe("graphite");
     expect(document.body.getAttribute("data-ui-scale")).toBe("90");
-    expect(document.documentElement.getAttribute("data-theme")).toBe("graphite");
 
     unmount();
     expect(document.body.hasAttribute("data-operator-scale-host")).toBe(false);

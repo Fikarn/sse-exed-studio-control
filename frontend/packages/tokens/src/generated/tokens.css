@@ -3,53 +3,53 @@
  */
 
 :root {
-  --color-background-700: #24342B;
-  --color-background-800: #1C2922;
+  --color-background-700: #24342b;
+  --color-background-800: #1c2922;
   --color-background-850: #152019;
   --color-background-900: #101813;
-  --color-background-950: #09110B;
-  --color-surface-600: #2C4036;
+  --color-background-950: #09110b;
+  --color-surface-600: #2c4036;
   --color-surface-700: #213028;
-  --color-surface-800: #18221B;
+  --color-surface-800: #18221b;
   --color-surface-900: #111914;
-  --color-primary-400: #B6D8AD;
-  --color-primary-500: #99BA92;
-  --color-primary-700: #62835F;
-  --color-danger-500: #D56A65;
+  --color-primary-400: #b6d8ad;
+  --color-primary-500: #99ba92;
+  --color-primary-700: #62835f;
+  --color-danger-500: #d56a65;
   --color-danger-soft: rgba(213, 106, 101, 0.16);
   --color-danger-soft-strong: rgba(213, 106, 101, 0.28);
   --color-danger-glow: rgba(213, 106, 101, 0.06);
   --color-danger-border: rgba(213, 106, 101, 0.5);
   --color-danger-border-strong: rgba(213, 106, 101, 0.7);
-  --color-warning-500: #D8A95A;
+  --color-warning-500: #d8a95a;
   --color-warning-soft: color-mix(in srgb, var(--color-warning-500) 16%, transparent);
   --color-warning-border: color-mix(in srgb, var(--color-warning-500) 50%, transparent);
-  --color-info-500: #69A9D1;
-  --color-border-default: #2A3B31;
+  --color-info-500: #69a9d1;
+  --color-border-default: #2a3b31;
   --color-border-strong: #406050;
-  --color-brand-green-hot: #B5D4AD;
+  --color-brand-green-hot: #b5d4ad;
   --color-brand-green-soft: rgba(153, 186, 146, 0.16);
-  --color-brand-green-glow: rgba(153, 186, 146, 0.10);
+  --color-brand-green-glow: rgba(153, 186, 146, 0.1);
   --color-brand-green-border: rgba(153, 186, 146, 0.5);
-  --color-brand-dark-green: #1F4D38;
-  --color-brand-dark-green-mid: #2C6A4F;
+  --color-brand-dark-green: #1f4d38;
+  --color-brand-dark-green-mid: #2c6a4f;
   --color-brand-dark-green-soft: rgba(31, 77, 56, 0.5);
   --color-brand-dark-green-ambient: rgba(31, 77, 56, 0.12);
-  --color-brand-yellow: #E8D561;
+  --color-brand-yellow: #e8d561;
   --color-brand-yellow-soft: rgba(232, 213, 97, 0.14);
   --color-brand-yellow-glow: rgba(232, 213, 97, 0.06);
   --color-brand-yellow-border: rgba(232, 213, 97, 0.5);
-  --color-brand-burgundy: #6B1F1F;
+  --color-brand-burgundy: #6b1f1f;
   --color-brand-burgundy-soft: rgba(107, 31, 31, 0.16);
-  --color-brand-coral: #ED7C5E;
+  --color-brand-coral: #ed7c5e;
   --color-brand-coral-soft: rgba(237, 124, 94, 0.16);
   --color-brand-coral-border: rgba(237, 124, 94, 0.5);
   --color-brand-coral-glow: rgba(237, 124, 94, 0.06);
-  --color-brand-sky: #C8D4DD;
-  --color-brand-text-primary: #FAF6E6;
-  --color-brand-text-secondary: #D4CDB3;
-  --color-brand-text-muted: #948E7B;
-  --color-brand-text-faint: #8C846E;
+  --color-brand-sky: #c8d4dd;
+  --color-brand-text-primary: #faf6e6;
+  --color-brand-text-secondary: #d4cdb3;
+  --color-brand-text-muted: #948e7b;
+  --color-brand-text-faint: #8c846e;
   --color-scrim: rgba(0, 0, 0, 0.45);
   --color-shell-header-bottom: #060706;
   --color-shell-action-glass-top: rgba(250, 246, 230, 0.045);
@@ -59,24 +59,24 @@
   --color-inset-hairline-bg: rgba(255, 255, 255, 0.03);
   --color-inset-hairline-border: rgba(255, 255, 255, 0.2);
   --color-inset-hairline-border-soft: rgba(255, 255, 255, 0.18);
-  --color-bg-deep: #08090A;
-  --color-bg-canvas: #0D0F0D;
+  --color-bg-deep: #08090a;
+  --color-bg-canvas: #0d0f0d;
   --color-bg-default: #121412;
-  --color-bg-soft: #0F110F;
+  --color-bg-soft: #0f110f;
   --color-bg-raised: #161916;
-  --color-bg-strong: #1C201C;
-  --color-bg-elevated: #20251F;
-  --color-bg-stroke: #21251F;
+  --color-bg-strong: #1c201c;
+  --color-bg-elevated: #20251f;
+  --color-bg-stroke: #21251f;
   --color-bg-hairline: rgba(250, 246, 230, 0.04);
-  --color-bg-border: #2A2F28;
-  --color-bg-border-strong: #383F35;
-  --color-cct-2700: #EF8E5A;
-  --color-cct-3200: #F3A87A;
-  --color-cct-3800: #F6C39A;
-  --color-cct-4400: #F0DFB8;
-  --color-cct-5000: #EBE5D2;
-  --color-cct-5600: #D4DDE2;
-  --color-cct-6500: #C8D4DD;
+  --color-bg-border: #2a2f28;
+  --color-bg-border-strong: #383f35;
+  --color-cct-2700: #ef8e5a;
+  --color-cct-3200: #f3a87a;
+  --color-cct-3800: #f6c39a;
+  --color-cct-4400: #f0dfb8;
+  --color-cct-5000: #ebe5d2;
+  --color-cct-5600: #d4dde2;
+  --color-cct-6500: #c8d4dd;
   --color-fixture-shell-fill: rgba(8, 9, 10, 0.92);
   --color-fixture-shell-stroke: rgba(212, 205, 179, 0.4);
   --color-fixture-ghost-stroke: rgba(153, 186, 146, 0.45);
@@ -130,7 +130,7 @@
   --audio-warning-band-simulated: #f59e0b;
   --audio-engaged-soft: rgba(216, 169, 90, 0.16);
   --audio-engaged-border: rgba(216, 169, 90, 0.5);
-  --audio-engaged-glow: rgba(216, 169, 90, 0.10);
+  --audio-engaged-glow: rgba(216, 169, 90, 0.1);
   --audio-console-bg: #0c0a08;
   --audio-console-bg1: #131110;
   --audio-console-bg2: #1a1714;
@@ -167,13 +167,13 @@
   --material-panel-top: #17171b; /** plate, top of its gradient */
   --material-key: #1b1c21; /** key, level +2, bottom of its gradient */
   --material-key-top: #26272e; /** key, top of its gradient */
-  --material-well: #000000; /** display floor, a backlit well, the same in every theme */
+  --material-well: #000000; /** display floor, a backlit well */
   --material-line: rgba(255, 255, 255, 0.09); /** hairline */
   --material-line2: rgba(255, 255, 255, 0.2); /** stronger hairline, unlit lamp */
   --material-sheen: rgba(255, 255, 255, 0.08); /** the 1 px top highlight of a plate or key */
   --material-shade: rgba(0, 0, 0, 0.6); /** the shade under a key or a cap */
   --material-well-shade: rgba(0, 0, 0, 0.85); /** the inset shade at the top of a well */
-  --material-strip-floor: rgba(255, 255, 255, 0.025); /** a strip's lift on the bay; a white lift in every theme, never a shade */
+  --material-strip-floor: rgba(255, 255, 255, 0.025); /** a strip's lift on the bay; a white lift, never a shade */
   --material-strip-floor-sel: rgba(255, 255, 255, 0.045); /** the selected strip's lift */
   --text-text: #f4f4f5;
   --text-text2: #a6a6ad; /** muted: 7.8:1 on bg, 6.9:1 on panel, 6.2:1 on key */
@@ -218,8 +218,28 @@
   --signal-meter-over: #ff4d4d;
   --signal-peak: #ffffff;
   --signal-peak-bloom: rgba(255, 255, 255, 0.45);
-  --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** ramp stops on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 90 % (-6), orange to 95 % (-3), red above */
-  --signal-ramp-h: linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 90%, var(--signal-meter-hot) 90%, var(--signal-meter-hot) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%);
+  --signal-ramp-v: linear-gradient(
+    to top,
+    var(--signal-meter-low) 0%,
+    var(--signal-meter-low) 70%,
+    var(--signal-meter-mid) 70%,
+    var(--signal-meter-mid) 90%,
+    var(--signal-meter-hot) 90%,
+    var(--signal-meter-hot) 95%,
+    var(--signal-meter-over) 95%,
+    var(--signal-meter-over) 100%
+  ); /** ramp stops on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 90 % (-6), orange to 95 % (-3), red above */
+  --signal-ramp-h: linear-gradient(
+    to right,
+    var(--signal-meter-low) 0%,
+    var(--signal-meter-low) 70%,
+    var(--signal-meter-mid) 70%,
+    var(--signal-meter-mid) 90%,
+    var(--signal-meter-hot) 90%,
+    var(--signal-meter-hot) 95%,
+    var(--signal-meter-over) 95%,
+    var(--signal-meter-over) 100%
+  );
   --signal-cct-track: linear-gradient(to right, #ffb060, #ffd6a8 45%, #dfe8ff 70%, #a9c4ff);
   --prompter-glass-floor: #000000; /** the glass's background, black in every look */
   --prompter-glass-text: #ffffff; /** white text, the standard */
@@ -239,14 +259,18 @@
   --elevation-plate: inset 0 1px 0 var(--material-sheen); /** level +1, with plateFill */
   --elevation-plate-fill: linear-gradient(180deg, var(--material-panel-top), var(--material-panel));
   --elevation-bay: inset 0 2px 10px var(--material-well-shade); /** level -1 */
-  --elevation-well: inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05); /** a display */
+  --elevation-well:
+    inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05); /** a display */
   --elevation-key: inset 0 1px 0 var(--material-sheen), 0 1px 2px var(--material-shade); /** level +2, with keyFill */
   --elevation-key-fill: linear-gradient(180deg, var(--material-key-top), var(--material-key));
   --elevation-key-lit-amber: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 14px var(--role-amber-bloom); /** engaged */
-  --elevation-key-lit-amber-fill: linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill)) var(--role-amber-fill);
+  --elevation-key-lit-amber-fill: linear-gradient(180deg, var(--role-amber-fill-top), var(--role-amber-fill))
+    var(--role-amber-fill);
   --elevation-key-lit-green: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 18px var(--role-green-bloom); /** live */
-  --elevation-key-lit-green-fill: linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill)) var(--role-green-fill);
-  --elevation-cap: inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade); /** a fader cap, with capFill */
+  --elevation-key-lit-green-fill: linear-gradient(180deg, var(--role-green-fill-top), var(--role-green-fill))
+    var(--role-green-fill);
+  --elevation-cap:
+    inset 0 1px 0 var(--role-cap-sheen), 0 2px 4px var(--material-shade); /** a fader cap, with capFill */
   --elevation-cap-fill: linear-gradient(180deg, var(--role-cap-fill), var(--role-cap-fill2));
   --elevation-lamp-amber: 0 0 10px var(--role-amber-bloom); /** a lit lamp; unlit lamps have none */
   --elevation-lamp-green: 0 0 10px var(--role-green-bloom);
@@ -254,12 +278,19 @@
   --elevation-lamp-blue: 0 0 10px var(--role-blue-bloom);
   --elevation-peak: 0 0 6px var(--signal-peak-bloom);
   --elevation-float: 0 12px 32px rgba(0, 0, 0, 0.6); /** level +3: dialogs, the palette, toasts, the drawer; the only large blur */
-  --elevation-tint-ok: radial-gradient(110% 90% at 0% 0%, rgba(61, 220, 122, 0.14), transparent 60%); /** the state display's tint over the well, at most 16 % */
+  --elevation-tint-ok: radial-gradient(
+    110% 90% at 0% 0%,
+    rgba(61, 220, 122, 0.14),
+    transparent 60%
+  ); /** the state display's tint over the well, at most 16 % */
   --elevation-tint-attention: radial-gradient(110% 90% at 0% 0%, rgba(240, 179, 91, 0.16), transparent 60%);
   --elevation-tint-error: radial-gradient(110% 90% at 0% 0%, rgba(255, 97, 97, 0.16), transparent 60%);
   --elevation-tint-info: radial-gradient(110% 90% at 0% 0%, rgba(124, 196, 255, 0.16), transparent 60%);
-  --elevation-key-primary: inset 0 1px 0 var(--role-primary-sheen), 0 1px 2px var(--material-shade); /** the primary command key */
-  --elevation-key-armed: inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 0 14px var(--display-bloom-amber); /** an armed key: a well with the amber bloom */
+  --elevation-key-primary:
+    inset 0 1px 0 var(--role-primary-sheen), 0 1px 2px var(--material-shade); /** the primary command key */
+  --elevation-key-armed:
+    inset 0 2px 6px var(--material-well-shade), inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 0 14px var(--display-bloom-amber); /** an armed key: a well with the amber bloom */
   --elevation-bar: 0 0 8px var(--display-bloom-amber); /** the armed countdown bar's glow */
   --target-min: 24px;
   --target-take: 28px; /** take-time controls */
@@ -324,7 +355,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(250, 246, 230, 0.04);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(250, 246, 230, 0.05);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(250, 246, 230, 0.06);
-  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.10);
+  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(250, 246, 230, 0.1);
   --shadow-glow-green-sm: 0 0 12px rgba(153, 186, 146, 0.35);
   --shadow-glow-green-dot: 0 0 5px rgba(153, 186, 146, 0.55);
   --shadow-glow-green-dot-subtle: 0 0 6px rgba(153, 186, 146, 0.55);
@@ -393,8 +424,10 @@
   --font-size-state: var(--font-base-state); /** the state word, plate titles */
   --font-size-hero-small: var(--font-base-hero-small); /** Setup's step title */
   --font-size-hero: var(--font-base-hero); /** the one number read from a metre away */
-  --shadow-glow-yellow: 0 0 0 1px var(--color-brand-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
-  --shadow-glow-amber: 0 0 0 1px var(--color-warning-500), 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+  --shadow-glow-yellow:
+    0 0 0 1px var(--color-brand-yellow), 0 12px 28px rgba(232, 213, 97, 0.16), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+  --shadow-glow-amber:
+    0 0 0 1px var(--color-warning-500), 0 12px 28px rgba(216, 169, 90, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
   --color-text-primary: var(--color-text-strong);
   --color-studio-100: var(--color-text-strong);
   --color-studio-200: var(--color-text-muted);
@@ -403,5 +436,6 @@
   --color-studio-050: var(--color-text-strong);
   --color-plot-guide: var(--color-brand-green);
   --audio-peak-hold-calm: var(--color-text-subtle);
-  --shadow-glow-green: 0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
+  --shadow-glow-green:
+    0 0 0 1px var(--color-brand-green), 0 12px 28px rgba(153, 186, 146, 0.18), inset 0 1px 0 rgba(250, 246, 230, 0.08);
 }

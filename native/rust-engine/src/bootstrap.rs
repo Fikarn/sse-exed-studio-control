@@ -221,8 +221,9 @@ pub fn validate_protocol_version(requested_protocol_version: &str) -> Result<(),
         return Ok(());
     }
 
+    // The start-up screen prints this sentence as it is.
     Err(format!(
-        "Shell requested protocol '{}' but this engine supports '{}'.",
+        "The app asked for protocol {} and the hardware link speaks protocol {}: the two files are of different builds.",
         requested_protocol_version, SUPPORTED_PROTOCOL_VERSION
     ))
 }
@@ -874,8 +875,16 @@ mod tests {
     #[test]
     fn protocol_validation_rejects_mismatched_version() {
         let error = validate_protocol_version("99").expect_err("mismatched protocol should fail");
-        assert!(error.contains("supports"));
-        assert!(error.contains(SUPPORTED_PROTOCOL_VERSION));
+        assert!(error.contains("asked for protocol 99"), "{error}");
+        assert!(
+            error.contains(&format!("speaks protocol {SUPPORTED_PROTOCOL_VERSION}")),
+            "{error}"
+        );
+        // The start-up screen prints it, so it names neither program by its
+        // name in the code.
+        for word in ["engine", "Shell", "shell"] {
+            assert!(!error.contains(word), "{word}: {error}");
+        }
     }
 
     // 2026-09 production readiness, Slice 1 (finding F22): with no

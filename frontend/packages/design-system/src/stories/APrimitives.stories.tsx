@@ -18,10 +18,9 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Toast } from "../components/Toast";
 import { Field, Readout, Screen } from "../components/Well";
 
-// Visual overhaul A, Slice 3: every primitive per theme, as
-// `docs/DESIGN.md` section 7 lists them. Each story
-// declares its theme through `parameters.theme`; the Storybook lane measures
-// these pages with the UI contract's light and target checks.
+// Visual overhaul A, Slice 3: every primitive, as `docs/DESIGN.md` section 7
+// lists them. The layout gate measures these pages (ui-contract.spec.ts), and
+// the Sheet, which holds them all, is captured (storybook.spec.ts).
 
 const plate: React.CSSProperties = {
   display: "flex",
@@ -114,7 +113,7 @@ function States() {
         tone="error"
         word="OFFLINE"
         sentence="Audio may still pass, but the app cannot see or change the console right now."
-        code="Console did not answer OSC ping · AUDIO_SYNC_FAILED"
+        code="TotalMix did not answer · AUDIO_SYNC_FAILED"
         actions={
           <Key mode="primary" size="small">
             Run audio probe
@@ -312,25 +311,6 @@ type Story = StoryObj<typeof meta>;
 
 export const KeysStudio: Story = {
   name: "Keys · Studio",
-  parameters: { theme: "studio" },
-  render: () => (
-    <div style={board}>
-      <Keys />
-    </div>
-  ),
-};
-export const KeysGraphite: Story = {
-  name: "Keys · Graphite",
-  parameters: { theme: "graphite" },
-  render: () => (
-    <div style={board}>
-      <Keys />
-    </div>
-  ),
-};
-export const KeysBone: Story = {
-  name: "Keys · Bone",
-  parameters: { theme: "bone" },
   render: () => (
     <div style={board}>
       <Keys />
@@ -339,25 +319,6 @@ export const KeysBone: Story = {
 };
 export const StatesStudio: Story = {
   name: "State displays · Studio",
-  parameters: { theme: "studio" },
-  render: () => (
-    <div style={board}>
-      <States />
-    </div>
-  ),
-};
-export const StatesGraphite: Story = {
-  name: "State displays · Graphite",
-  parameters: { theme: "graphite" },
-  render: () => (
-    <div style={board}>
-      <States />
-    </div>
-  ),
-};
-export const StatesBone: Story = {
-  name: "State displays · Bone",
-  parameters: { theme: "bone" },
   render: () => (
     <div style={board}>
       <States />
@@ -366,25 +327,6 @@ export const StatesBone: Story = {
 };
 export const WellsStudio: Story = {
   name: "Wells · Studio",
-  parameters: { theme: "studio" },
-  render: () => (
-    <div style={board}>
-      <Wells />
-    </div>
-  ),
-};
-export const WellsGraphite: Story = {
-  name: "Wells · Graphite",
-  parameters: { theme: "graphite" },
-  render: () => (
-    <div style={board}>
-      <Wells />
-    </div>
-  ),
-};
-export const WellsBone: Story = {
-  name: "Wells · Bone",
-  parameters: { theme: "bone" },
   render: () => (
     <div style={board}>
       <Wells />
@@ -393,35 +335,10 @@ export const WellsBone: Story = {
 };
 export const PlateStudio: Story = {
   name: "Plate and overlays · Studio",
-  parameters: { theme: "studio" },
   render: () => (
     <div style={board}>
       <PlateAndOverlays />
     </div>
   ),
 };
-export const PlateGraphite: Story = {
-  name: "Plate and overlays · Graphite",
-  parameters: { theme: "graphite" },
-  render: () => (
-    <div style={board}>
-      <PlateAndOverlays />
-    </div>
-  ),
-};
-export const PlateBone: Story = {
-  name: "Plate and overlays · Bone",
-  parameters: { theme: "bone" },
-  render: () => (
-    <div style={board}>
-      <PlateAndOverlays />
-    </div>
-  ),
-};
-export const SheetStudio: Story = { name: "Sheet · Studio", parameters: { theme: "studio" }, render: () => <Sheet /> };
-export const SheetGraphite: Story = {
-  name: "Sheet · Graphite",
-  parameters: { theme: "graphite" },
-  render: () => <Sheet />,
-};
-export const SheetBone: Story = { name: "Sheet · Bone", parameters: { theme: "bone" }, render: () => <Sheet /> };
+export const SheetStudio: Story = { name: "Sheet · Studio", render: () => <Sheet /> };

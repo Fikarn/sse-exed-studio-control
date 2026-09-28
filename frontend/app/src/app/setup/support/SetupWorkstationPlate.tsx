@@ -22,12 +22,11 @@ export function prompterXlRow(
 }
 
 /** The plate's wiring: the workstation's facts, the light outputs switch, the
- *  recent actions, theme, scale and the window, and the backup and diagnostics
+ *  recent actions, scale and the window, and the backup and diagnostics
  *  keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot, healthSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
-  const { backups, lastBackup, busyAction, runtime, recentActions, theme, uiScale, setTheme, setUiScale } =
-    editor.state;
+  const { backups, lastBackup, busyAction, runtime, recentActions, uiScale, setUiScale } = editor.state;
   const { engineLogPath, openEngineLog } = editor.chrome;
   const { performAction, exportSupportBackup, exportDiagnostics, restoreBackup, setLightOutputsArmed, verifyBackup } =
     editor.actions;
@@ -46,7 +45,6 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       protocolVersion={String(runtime?.protocol ?? runtime?.protocolVersion ?? "2")}
       recentActions={recentActions}
       restoreDisabled={!lastBackup}
-      theme={theme}
       uiScale={uiScale}
       onExportBackup={() => void performAction("support-export-main", exportSupportBackup)}
       onExportDiagnostics={() => void performAction("export-shell-diagnostics", exportDiagnostics)}
@@ -56,7 +54,6 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
         if (!lastBackup) return;
         void performAction("restore-latest", () => restoreBackup(lastBackup.path));
       }}
-      onSelectTheme={setTheme}
       onSelectUiScale={setUiScale}
       // New pages program, Slice 3 (decision 2): a window key says nothing when
       // the window moves; a refusal carries the native shell's sentence to the

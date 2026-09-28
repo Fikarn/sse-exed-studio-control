@@ -2,7 +2,7 @@
    cluster 424, plate 416, footer 40 at 2560×1440, every value a chrome
    token scaled by the operator UI scale; the material is the A model (chassis
    floor, plates with a top sheen, a recessed bay). Every colour here is a
-   theme token so Graphite and Bone re-theme the chrome from themes.css alone. */
+   token, so the chrome has one source. */
 
 .shell {
   display: grid;
