@@ -124,8 +124,8 @@ pub(crate) async fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<
 /// (its stdin closes and its loop ends, two
 /// seconds of grace before a kill — waited for off the main thread), mark
 /// the close confirmed so the `CloseRequested` hook lets it through, then
-/// close the window — which also persists the window preferences on the way
-/// out.
+/// close the window. Nothing is saved at the close: the window's display is
+/// saved while the app runs (`shell_window_layout.rs`).
 #[tauri::command]
 pub(crate) async fn shell_confirm_close(
     app: AppHandle,

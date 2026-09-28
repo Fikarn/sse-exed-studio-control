@@ -57,12 +57,13 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 - [ ] Ctrl+V pastes into the editor and keeps the formatting; Ctrl+B, Ctrl+I and Ctrl+U do nothing.
 - [ ] Replacing the script on the prompter needs the second press.
 - [ ] After a restart the script and the place are still there, paused.
+- [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
+- [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.
 - [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows; `PLAY` is grey and the strip reads `XL NOT CONNECTED`. With nothing on the prompter every control is grey.
 
 Once the Prompter XL's window is built:
 
 - [ ] The script reads correctly in the glass, not mirrored, and on no other screen but the page's own copy.
-- [ ] The app stays fullscreen on the studio display when the Prompter XL is plugged in or out.
 - [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
 - [ ] Unplugged: the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script.
 - [ ] Plugged back in: the script returns at the same place, paused.

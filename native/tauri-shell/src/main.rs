@@ -14,6 +14,9 @@
 //   diagnostics report it writes.
 // - `shell_window_layout.rs`: the display the window is shown on, and the
 //   two window commands.
+// - `shell_displays.rs`: the screens, as Windows' display configuration
+//   gives them.
+// - `shell_display_watch.rs`: the watch over the screens, once a second.
 // - `shell_windows.rs`: building a window from its `tauri.conf.json` entry.
 // - `shell_browser_keys.rs`: WebView2's own keys, switched off.
 // - `shell_smoke.rs`: the `--smoke-test` mode.
@@ -24,6 +27,8 @@ mod engine;
 #[cfg(windows)]
 mod shell_browser_keys;
 mod shell_commands;
+mod shell_display_watch;
+mod shell_displays;
 mod shell_log;
 mod shell_paths;
 mod shell_smoke;
@@ -35,10 +40,9 @@ mod shell_windows;
 use engine::EngineBridge;
 #[cfg(windows)]
 use shell_browser_keys::switch_off_browser_keys;
+use shell_display_watch::start_display_watch;
 use shell_smoke::run_smoke_test;
-use shell_window_layout::{
-    focus_main_window, persist_current_window_preferences, restore_or_route_initial_window,
-};
+use shell_window_layout::{focus_main_window, restore_or_route_initial_window, HeldDisplay};
 use shell_windows::build_main_window;
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -82,6 +86,7 @@ fn main() {
             bridge: Arc::new(EngineBridge::default()),
             close_confirmed: AtomicBool::new(false),
         })
+        .manage(HeldDisplay::default())
         .setup(|app| {
             // Slice 6b: the main window is `"create": false` in tauri.conf.json,
             // so Tauri no longer builds it just before this closure: it is
@@ -97,6 +102,12 @@ fn main() {
             let _ = window.show();
             let app_handle = app.handle().clone();
             restore_or_route_initial_window(&app_handle, &window);
+            // The window's display is saved by the watch over the screens,
+            // which starts now that the window stands on it, and by the
+            // window commands: no longer at every move of the window, which
+            // saved the display Windows moved it to when a screen came or
+            // went.
+            start_display_watch(&app_handle);
             let window_for_events = window.clone();
             window.on_window_event(move |event| {
                 // 2026-09 audit Slice 11: closing asks first. Until the
@@ -110,20 +121,8 @@ fn main() {
                     if !confirmed {
                         api.prevent_close();
                         let _ = window_for_events.emit(SHELL_CLOSE_REQUESTED_EVENT, ());
-                        return;
                     }
                 }
-                if !matches!(
-                    event,
-                    tauri::WindowEvent::Resized(_)
-                        | tauri::WindowEvent::Moved(_)
-                        | tauri::WindowEvent::ScaleFactorChanged { .. }
-                        | tauri::WindowEvent::Focused(false)
-                        | tauri::WindowEvent::CloseRequested { .. }
-                ) {
-                    return;
-                }
-                persist_current_window_preferences(&app_handle, &window_for_events);
             });
             Ok(())
         });

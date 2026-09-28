@@ -47,6 +47,7 @@ The app is unsigned, by decision: it runs on one workstation its developer contr
 ## The shell
 
 - **One window, always fullscreen.** It opens on the display it was last on, else on the 2560×1440 display, else where it is. **Studio fullscreen** and **Reset the window layout** in Setup / Support put it back.
+- **The shell watches the screens.** Once a second it reads Windows' display configuration, which names each screen and shows a duplicated one as it is; Tauri does neither, and says nothing when a screen comes or goes. When the screens have changed and stand still again, a window that Windows moved is put back on its display. The display is known by its screen's own name (`HP E273q`), then by its place on the desktop. While it is away (switched off, asleep) the window stays where Windows put it, and goes back when the display returns. `shell.log` names the screens at the start and after every change, and says what was done about the window.
 - **The engine sits beside the shell.** The shell starts `studio-control-engine.exe` from its own folder and from nowhere else. A build is a folder that holds both.
 - **Commands never block the window.** Every command that can wait runs on the blocking pool.
 - **The shell watches the engine.** It polls the process every 250 ms. When the engine is gone, every waiting request is answered `ENGINE_EXITED` and the pages are told, so they can offer a restart.
@@ -68,6 +69,6 @@ Engine (`native/rust-engine/src/`):
 - `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.
 - `health.rs`, `action_log.rs`, `engine_events.rs`: the health the header shows, Recent actions, events.
 
-Shell (`native/tauri-shell/src/`): `main.rs` (the app and its window), `engine.rs` (the engine process and its watcher), `shell_commands.rs` (what the pages ask of the engine), `shell_window_layout.rs` (the display the window is on), `shell_windows.rs` (building windows), `shell_paths.rs` (folders and the diagnostics report), `shell_browser_keys.rs` (WebView2's own keys, off), `shell_smoke.rs` and `shell_test_bridge.rs` (the lanes' ways in).
+Shell (`native/tauri-shell/src/`): `main.rs` (the app and its window), `engine.rs` (the engine process and its watcher), `shell_commands.rs` (what the pages ask of the engine), `shell_window_layout.rs` (the display the window is on), `shell_displays.rs` and `shell_display_watch.rs` (the screens, and the watch over them), `shell_windows.rs` (building windows), `shell_paths.rs` (folders and the diagnostics report), `shell_browser_keys.rs` (WebView2's own keys, off), `shell_smoke.rs` and `shell_test_bridge.rs` (the lanes' ways in).
 
 Pages (`frontend/app/src/app/`): `OperatorShell.tsx` assembles the header, the tabs and the pages. Each page is a chunk of its own (`workspaceChunks.ts`). The shared parts are in `frontend/packages/design-system` and the colours and sizes in `frontend/packages/tokens`.

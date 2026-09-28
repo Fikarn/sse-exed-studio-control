@@ -43,6 +43,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - Until the links to the cameras are built, a restore leaves a camera's address out and says which (#243).
 - Setup's `Map bindings` shows each dial's three controls under its cell of the strip, and its page tabs are keys like any other. In `Verify live echo` a key of another page turns the screen to its page (#248).
 - In Setup, the state display of a setup that is not published counts the probes that passed once all have; it read "nothing verified yet" (#248).
+- The window stays on its display when a screen is plugged in or out, and goes back to it when the display was switched off and returns. Windows could move it, and the next start then opened on the display it was moved to (#250).
 - A stop of the hardware link during a session shows the same recovery screen as a failed start, with `Export diagnostics`, the restore keys and the log's last lines (#241).
 - The window opens on the display it was last on, found by its place on the desktop. Windows' display numbers can swap between starts, and the window then opened on the other display (#241).
 - A start that fails because the two program files are of different builds says so in plain words (#238).

@@ -116,6 +116,9 @@ What limits the design:
 ## Teleprompter
 
 - The Elgato Prompter XL is a 1920×1080 screen on one USB-C cable that carries picture and power (15 W). Windows treats it as one more display, named `Prompter XL`.
+- Studio Control knows it by that name and by nothing else. `shell.log`, in the logs folder, names every screen as Windows does, at the start and whenever a screen comes or goes: `The screens: … Prompter XL 1920×1080 at 5120,0. The Prompter XL is connected, 1920×1080 at 60 Hz.` A Prompter XL that Windows calls otherwise reads there under the name it has.
+- Plugging it in or out leaves Studio Control on the studio display: if Windows moves the window, it is put back a second or two after the screens have stopped changing.
+- The studio display switched off, or asleep, is away from Windows' desktop, and Windows moves the window to another screen. Studio Control remembers its display, by the screen's own name, and goes back to it when it returns. **Studio fullscreen** in Setup / Support makes the display the window is sent to its own.
 - The app finds it by that name and draws the script there and on no other screen. This window is not built yet, so the page reads `NOT CONNECTED`.
 - The Prompter XL flips what it shows, so the app draws the script unmirrored.
 - In Windows' display settings it extends the desktop at 1920×1080. Otherwise the page reads `DUPLICATED` or `LOW RESOLUTION`.
