@@ -535,8 +535,9 @@ pub(crate) fn apply_pending_restore_at_start(
     Ok(Some(AppliedRestore { replaced }))
 }
 
-/// `<app-data>/restore-hold.marker`: a database restore was staged, and no
-/// start has written the hold it owes yet.
+/// `<app-data>/restore-hold.marker`: a start found a staged database restore
+/// (and applied or refused it), and no start has written the hold it owes
+/// yet.
 pub(crate) const RESTORE_HOLD_MARKER_FILE_NAME: &str = "restore-hold.marker";
 
 fn restore_hold_marker(runtime_paths: &RuntimePaths) -> PathBuf {
@@ -593,16 +594,17 @@ fn hold_light_outputs_at_start(
             "Database restore refused at start; the saved data is kept, and the light outputs are held",
         ));
     } else if hold_owed {
-        if armed {
-            actions.push(ActionRecord::new(
-                ActionSource::Launch,
-                DOMAIN_LIGHTING,
-                "outputs-held",
-                "Light outputs",
-                "Light outputs held at start: the start that restored a database backup did not finish",
-            ));
-        }
+        // Always a row: a restore that was applied brought its own, older
+        // action log, and nothing else would say the saved data changed. The
+        // words claim no restore: the start before may have refused it.
         armed = false;
+        actions.push(ActionRecord::new(
+            ActionSource::Launch,
+            DOMAIN_SETUP,
+            "database-restore-unfinished",
+            "Saved data",
+            "The start after a database restore did not finish; the light outputs are held",
+        ));
     }
     if runtime_paths.safe_start {
         if armed {
@@ -1736,9 +1738,9 @@ mod tests {
             launch_rows(&db_path),
             vec![(
                 String::from("launch"),
-                String::from("outputs-held"),
+                String::from("database-restore-unfinished"),
                 String::from(
-                    "Light outputs held at start: the start that restored a database backup did not finish"
+                    "The start after a database restore did not finish; the light outputs are held"
                 ),
             )]
         );
