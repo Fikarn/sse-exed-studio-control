@@ -17,14 +17,13 @@ export interface RecentAction {
 /** How many rows the plate shows; the rest travel in the diagnostics export. */
 export const RECENT_ACTIONS_SHOWN = 8;
 
-// Who did it, in the operator's words. The watchdog acted because nobody did,
-// so its word stands out; a start-up row is information, not a state.
+// Who did it, in the operator's words. A start-up row is information, not a
+// state. A source without a word here is printed as it was saved.
 const SOURCE_WORDS: Record<string, { tone: StatusTone; word: string }> = {
   console: { tone: "neutral", word: "Console" },
   deck: { tone: "neutral", word: "Stream Deck" },
   launch: { tone: "info", word: "Start-up" },
   ui: { tone: "neutral", word: "Screen" },
-  watchdog: { tone: "attention", word: "Watchdog" },
 };
 
 const timeFormat = new Intl.DateTimeFormat("en-GB", {
@@ -94,7 +93,7 @@ export function RecentActions({ actions }: RecentActionsProps) {
         </ol>
       ) : (
         <p className={styles.empty} data-testid="support-recent-actions-empty">
-          Nothing yet. Power, recalls, mutes, 48 V and talkback show here, with who did them.
+          Nothing yet. Power, recalls, mutes and 48 V show here, with who did them.
         </p>
       )}
     </Section>

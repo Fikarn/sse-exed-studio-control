@@ -341,7 +341,7 @@ test.describe("Light outputs: Armed / Held", () => {
     const rows = plate.getByTestId("support-recent-action");
     await expect(rows).toHaveCount(8);
     await expect(rows.first()).toContainText("Light outputs armed");
-    for (const word of ["Screen", "Stream Deck", "Console", "Watchdog"]) {
+    for (const word of ["Screen", "Stream Deck", "Console"]) {
       await expect(plate.getByTestId("support-recent-actions")).toContainText(word);
     }
     // Nothing on the plate scrolls, and the list ends above the red key.

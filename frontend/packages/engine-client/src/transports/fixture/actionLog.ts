@@ -22,7 +22,6 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "audio.settings.update",
   "audio.snapshot.recall",
   "audio.solo.clearAll",
-  "audio.talkback.hold",
   // The cameras (new pages program, Slice 8): the record's start and stop, the format and
   // the look, and who holds a camera.
   "cameras.connect",
@@ -275,7 +274,6 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
           ["mute", "mute", "Mute"],
           ["dim", "dim", "Dim"],
           ["mono", "mono", "Mono"],
-          ["talkback", "talkback", "Talkback"],
         ] as const
       ).flatMap(([key, action, label]) => {
         const on = flag(params, key);
@@ -320,11 +318,6 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
     case "audio.snapshot.recall": {
       const name = text(result, ["snapshotName"]) ?? "Console mix";
       return [audio("console-snapshot-recalled", name, `Console mix recalled: ${name}`)];
-    }
-    case "audio.talkback.hold": {
-      if (flag(result, "changed") !== true) return [];
-      const on = flag(result, "talkback") ?? false;
-      return [audio(on ? "talkback-on" : "talkback-off", "Talkback", `Talkback ${onOff(on)}`)];
     }
     case "audio.solo.clearAll":
       return [audio("solo-cleared", "Console", "Every solo cleared")];

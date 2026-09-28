@@ -178,13 +178,6 @@ describe("the fixture double's action log", () => {
       { snapshotName: "Show open" },
       [row("audio", "console-snapshot-recalled", "Show open", "Console mix recalled: Show open")],
     ],
-    [
-      "audio.talkback.hold",
-      { mixTargetId: "audio-mix-main", engaged: true },
-      { changed: true, talkback: true },
-      [row("audio", "talkback-on", "Talkback", "Talkback on")],
-    ],
-    ["audio.talkback.hold", { mixTargetId: "audio-mix-main", engaged: true }, { changed: false, talkback: true }, []],
     ["audio.solo.clearAll", {}, {}, [row("audio", "solo-cleared", "Console", "Every solo cleared")]],
     [
       "audio.settings.update",

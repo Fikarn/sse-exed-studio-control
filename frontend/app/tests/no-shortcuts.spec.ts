@@ -110,9 +110,7 @@ async function expectKeysDoNothing(page: Page, fixture: string, workspace: Works
 }
 
 test.describe("No key does anything (new pages S3, D6)", () => {
-  test("the Console: the page keys, the strip keys, the bank keys, the snapshot keys, talkback's T", async ({
-    page,
-  }) => {
+  test("the Console: the page keys, the strip keys, the bank keys, the snapshot keys, a held T", async ({ page }) => {
     await open(page, "audio-selected-channel", "audio");
     await expectNoKeyGlyphs(page, "the Console");
     await expectKeysDoNothing(page, "audio-selected-channel", "audio", [

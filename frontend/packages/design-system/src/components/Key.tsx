@@ -14,7 +14,7 @@ export type KeyMode = "command" | "primary" | "danger" | "toggle" | "momentary" 
 export interface KeyProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   "data-armed"?: "true" | "false";
   mode?: KeyMode;
-  /** The deck's word, printed mono uppercase (TALKBACK, DIM, → MAIN, 48 V). */
+  /** The deck's word, printed mono uppercase (DIM, MONO, → MAIN, 48 V). */
   cap?: ReactNode;
   /** A sentence-case label; used when there is no cap, or under one. */
   children?: ReactNode;
@@ -22,7 +22,7 @@ export interface KeyProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   hint?: ReactNode;
   /** The lit amber fill: an active mix target, solo, dim, mono, lighting on. */
   engaged?: boolean;
-  /** The lit green fill: a held talkback, a running timer. */
+  /** The lit green fill: something running (the prompter, a Find sequence). */
   live?: boolean;
   /** Refused by the engine: dashed outline at 55 %, aria-disabled. */
   locked?: boolean;
@@ -32,7 +32,7 @@ export interface KeyProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   lit?: boolean;
   /** A take-time control (≥ 28 px; measured by the UI contract). */
   take?: boolean;
-  /** Layout: `row` (default) or `stack` (cap over hint, the tall talk key). */
+  /** Layout: `row` (default) or `stack` (cap over hint, a tall key). */
   layout?: "row" | "stack";
   size?: "default" | "tall" | "small";
   testId?: string;

@@ -103,7 +103,7 @@
   --strip-bg-selected: var(--audio-console-strip-bg-selected);
 
   /* Recessed-housing material: used by the topbar cluster, monitor meter,
-     monitor controls, talkback button, etc. Theme-swap-aware. */
+     monitor controls, etc. */
   --housing-bg-top: var(--audio-console-housing-bg-top);
   --housing-bg-bot: var(--audio-console-housing-bg-bot);
   --housing-shadow: var(--audio-console-housing-shadow);

@@ -217,20 +217,20 @@
         {
           "id": 5,
           "at": "2026-04-22T07:31:09.640Z",
-          "source": "watchdog",
+          "source": "deck",
           "domain": "audio",
-          "action": "talkback-off",
-          "target": "Talkback",
-          "detail": "Talkback released: nobody held it"
+          "action": "dim",
+          "target": "Main out",
+          "detail": "Dim on: main out"
         },
         {
           "id": 4,
           "at": "2026-04-22T07:31:07.122Z",
           "source": "ui",
           "domain": "audio",
-          "action": "talkback-on",
-          "target": "Talkback",
-          "detail": "Talkback on"
+          "action": "mono",
+          "target": "Main Out",
+          "detail": "Mono on: Main Out"
         },
         {
           "id": 3,

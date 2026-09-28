@@ -202,12 +202,12 @@ describe("SetupSupportPilot light outputs and recent actions", () => {
       "deck",
       "deck",
       "console",
-      "watchdog",
+      "deck",
       "ui",
       "ui",
       "ui",
     ]);
-    for (const word of ["Screen", "Stream Deck", "Console", "Watchdog"]) {
+    for (const word of ["Screen", "Stream Deck", "Console"]) {
       expect(list.textContent).toContain(word);
     }
     // The ninth row — the start-up hold — is in the snapshot, not on the plate.

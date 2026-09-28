@@ -16,12 +16,11 @@ import {
   normalizeEqBandType,
   buildAudioDynamics,
   buildAudioSendModes,
-  ensureAudioSnapshotAvailable,
 } from "./audioConsole";
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
 
-/** The `audio.*` requests that change the console: settings, sync, console mixes, channels, talkback. */
+/** The `audio.*` requests that change the console: settings, sync, console mixes, channels. */
 export function handleFixtureAudioRequest(
   context: FixtureRequestContext,
   method: RequestMethod,
@@ -161,8 +160,7 @@ export function handleFixtureAudioRequest(
 
       // Mirrors the engine's recall push (Slice 4): every captured console
       // value is "pushed" and confirmed by the fixture console, 48V is never
-      // pushed (kept at the console's value and listed), talkback is
-      // momentary and stays.
+      // pushed (kept at the console's value and listed).
       const recalledAt = new Date().toISOString();
       const snapshotName = asString(snapshot.name, snapshotId);
       const phantomDifferences: JsonObject[] = [];
@@ -194,9 +192,7 @@ export function handleFixtureAudioRequest(
           if (!mixTarget) continue;
           const stateEntry = asRecord(sceneMixTargets[asString(mixTarget.id)]);
           if (!stateEntry) continue;
-          const currentTalkback = mixTarget.talkback === true;
           Object.assign(mixTarget, cloneJson(stateEntry));
-          mixTarget.talkback = currentTalkback;
           pushed += asString(mixTarget.id) === "audio-mix-main" ? 4 : 2;
         }
       }
@@ -498,41 +494,6 @@ export function handleFixtureAudioRequest(
       emit("audio.changed", { reason: "audio-channel-send-updated" });
       return cloneJson(channel);
     }
-    case "audio.talkback.hold": {
-      // 2026-09 audit Slice 6: momentary talkback, mirroring the engine.
-      // Engaging passes the console gate; a heartbeat while already on
-      // changes nothing; releasing turns it off; only real changes announce.
-      const engaged = params.engaged === true;
-      const audioSnapshot = engaged ? ensureAudioActionAllowed(state) : ensureAudioSnapshotAvailable(state);
-      const mixTargets = asArray(audioSnapshot.mixTargets)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      const requestedId = typeof params.mixTargetId === "string" ? params.mixTargetId.trim() : "";
-      const mixTarget = requestedId
-        ? mixTargets.find((entry) => asString(entry.id) === requestedId)
-        : (mixTargets.find((entry) => asString(entry.role) === "main-out") ?? mixTargets[0]);
-      if (!mixTarget) {
-        throw new Error(
-          requestedId
-            ? `Audio mix target '${requestedId}' is not exposed by the fixture transport.`
-            : "No main output mix target is available."
-        );
-      }
-      const mixTargetId = asString(mixTarget.id);
-      const changed = (mixTarget.talkback === true) !== engaged;
-      if (changed) {
-        mixTarget.talkback = engaged;
-        audioSnapshot.lastActionStatus = "succeeded";
-        audioSnapshot.lastActionCode = null;
-        audioSnapshot.lastActionMessage = engaged
-          ? `Talkback on ${asString(mixTarget.name, mixTargetId)}`
-          : `Talkback released on ${asString(mixTarget.name, mixTargetId)}`;
-        state.audioSnapshot = audioSnapshot;
-        synchronizeFixtureState(state);
-        emit("audio.changed", { reason: engaged ? "talkback-engaged" : "talkback-released" });
-      }
-      return { mixTargetId, talkback: engaged, changed };
-    }
     case "audio.mixTarget.update": {
       const audioSnapshot = ensureAudioActionAllowed(state);
       const mixTargetId = asString(params.mixTargetId).trim();
@@ -555,9 +516,6 @@ export function handleFixtureAudioRequest(
       }
       if ("mono" in params) {
         mixTarget.mono = asBoolean(params.mono, false);
-      }
-      if ("talkback" in params) {
-        mixTarget.talkback = asBoolean(params.talkback, false);
       }
 
       audioSnapshot.lastActionStatus = "succeeded";

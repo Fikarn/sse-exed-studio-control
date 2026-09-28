@@ -99,7 +99,7 @@ describe("Key", () => {
     expect(key).toHaveAttribute("data-lit");
     expect(key).toHaveAttribute("aria-pressed", "true");
     rerender(
-      <Key mode="momentary" cap="Talkback" live>
+      <Key mode="momentary" cap="Hold" live>
         live
       </Key>
     );

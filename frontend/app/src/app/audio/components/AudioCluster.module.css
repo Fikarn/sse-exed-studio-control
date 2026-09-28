@@ -14,30 +14,12 @@
   overflow: hidden;
 }
 
-/* The mock's monitor block: the talk key across the cluster, Dim and Mono
-   side by side under it. */
+/* The monitor block: Dim and Mono side by side. */
 .monitorRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   flex: none;
-}
-
-.monitorRow > :first-child {
-  grid-column: 1 / -1;
-}
-
-.monitorToggles {
-  display: contents;
-}
-
-/* Talkback refused: the key carries the red keyline and says why. */
-.refused {
-  border-color: var(--role-red-text);
-}
-
-.refused .hint {
-  color: var(--role-red-text);
 }
 
 .mainLevel {
