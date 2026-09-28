@@ -31,6 +31,8 @@ mod fixture_catalog;
 mod fixtures;
 mod groups;
 mod helpers;
+#[cfg(test)]
+pub(crate) use helpers::lighting_refusal;
 mod identify;
 mod output_arming;
 mod palettes;

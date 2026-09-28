@@ -19,7 +19,7 @@ Every page is one grid: **header · cluster · bay · plate · footer**. There i
 | Plate         | right plate: the selection (strip, fixture, script, camera) or Support                                       |  416 wide |
 | Footer        | telemetry as `Label value` items and one action key                                                          |   40 high |
 
-The tabs are Setup / Support · Lighting · Audio · Cameras · Teleprompter. The header's lamps follow the tab order with the deck last: Lighting · Audio · Cameras · Prompter · Surface. Density never comes from the type; the sizes stay.
+The tabs are Setup / Support · Lighting · Audio · Cameras · Teleprompter. The header's lamps follow the tab order with the deck last: Lighting · Audio · Cameras · Prompter · Surface. A `Backup` chip follows them only while the automatic backup failed or is overdue. Density never comes from the type; the sizes stay.
 
 ## 3. Type
 
@@ -45,13 +45,13 @@ A picture is the exception: the prompter's glass and a camera's picture are mark
 
 The chassis is colourless. Hue names the family, form names the meaning, and colour never stands alone: a lamp always has a word within 8 px, and a keyline always encloses a value or a word.
 
-| Hue     | Fill on a key (it is on)                                                                                       | Lamp and word, or keyline (look here)                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Amber   | **engaged**: active mix target, solo, dim, mono, peak hold, lighting on, the current view                      | attention: `NOT VERIFIED`, `ASSUMED`, `STALE`, `UNSAVED`, `DEGRADED`, `NOT UPDATED`, `RELEASED`, armed, a latch, doubt on a value |
-| Green   | **live**: a running timer, the prompter playing                                                                | ok: `VERIFIED`, `REACHABLE`, `READY`, `ON SCREEN`, `HELD`, passed, done                                                           |
-| Red     | no fill at rest; `CUT ALL` and `Restart the hardware link…` are red-keylined commands, at most one per surface | error and hazard: `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`, `UNREACHABLE`, `NOT CONNECTED`, 48 V on, recording (`REC`), clip    |
-| Blue    | none                                                                                                           | information: `PREVIEW`, editing offline, a cue in a script                                                                        |
-| Neutral | the primary command key (white)                                                                                | **selected**: a neutral keyline on the strip, fixture, script, camera or step                                                     |
+| Hue     | Fill on a key (it is on)                                                                                       | Lamp and word, or keyline (look here)                                                                                                                |
+| ------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Amber   | **engaged**: active mix target, solo, dim, mono, peak hold, lighting on, the current view                      | attention: `NOT VERIFIED`, `ASSUMED`, `STALE`, `UNSAVED`, `DEGRADED`, `NOT UPDATED`, `RELEASED`, Lighting's `HELD`, armed, a latch, doubt on a value |
+| Green   | **live**: a running timer, the prompter playing                                                                | ok: `VERIFIED`, `REACHABLE`, `READY`, `ON SCREEN`, `HELD`, passed, done                                                                              |
+| Red     | no fill at rest; `CUT ALL` and `Restart the hardware link…` are red-keylined commands, at most one per surface | error and hazard: `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`, `UNREACHABLE`, `NOT CONNECTED`, 48 V on, recording (`REC`), clip                       |
+| Blue    | none                                                                                                           | information: `PREVIEW`, editing offline, a cue in a script                                                                                           |
+| Neutral | the primary command key (white)                                                                                | **selected**: a neutral keyline on the strip, fixture, script, camera or step                                                                        |
 
 Hazards are a red lamp and a word on a dark key, never a red fill: 48 V on, and `REC` while the main camera records. Doubt is amber: a value the engine has not confirmed, or a last known value from a device that stopped answering.
 
@@ -108,7 +108,7 @@ Every state word is the engine's. Its sentence is printed as the engine gives it
 | Page         | Words                                                                                                    |
 | ------------ | -------------------------------------------------------------------------------------------------------- |
 | Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED` |
-| Lighting     | `REACHABLE` · `UNSAVED` · `UNREACHABLE` · `PREVIEW`                                                      |
+| Lighting     | `REACHABLE` · `HELD` · `UNSAVED` · `UNREACHABLE` · `PREVIEW`                                             |
 | Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                   |
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`    |
 | Cameras      | `HELD` · `RELEASED`, `NOT SET UP` · `UNREACHABLE`                                                        |

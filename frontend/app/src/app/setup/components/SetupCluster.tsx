@@ -243,7 +243,7 @@ export function SetupCluster({
             Export backup
           </Key>
           <Key size="small" disabled={busy} testId="setup-engine-log" onClick={onOpenEngineLog}>
-            Engine log
+            Open the log
           </Key>
           {/* New pages program, Slice 3 (D6): the key stays; its small print,
               the key that did the same, went with that key. */}

@@ -984,7 +984,7 @@ mod tests {
         )
         .expect("the line should be written");
         assert!(serving.available);
-        let served = lines("control-surface bridge is serving");
+        let served = lines("The deck's bridge is ready at");
         assert_eq!(served.len(), 1, "{served:?}");
         assert!(served[0].contains(" INFO "), "{served:?}");
 
@@ -999,10 +999,10 @@ mod tests {
         )
         .expect("the line should be written");
         assert!(!refused.available);
-        let unavailable = lines("control-surface bridge is unavailable");
+        let unavailable = lines("The deck's bridge could not open its port");
         assert_eq!(unavailable.len(), 1, "{unavailable:?}");
         assert!(unavailable[0].contains(" WARN "), "{unavailable:?}");
-        assert_eq!(lines("control-surface bridge is serving").len(), 1);
+        assert_eq!(lines("The deck's bridge is ready at").len(), 1);
     }
 
     // 2026-09 production readiness, Slice 3 (F02): a database SQLite refuses

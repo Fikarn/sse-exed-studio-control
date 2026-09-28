@@ -481,7 +481,8 @@ export function buildDefaultAudioSnapshot(): JsonObject {
         peakHoldRight: 0,
         mute: false,
         dim: false,
-        mono: true,
+        // Dim and mono are Main Out's alone (2026-09-28): no phones target holds one.
+        mono: false,
       },
     ],
     snapshots: [

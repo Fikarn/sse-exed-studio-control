@@ -205,7 +205,7 @@ export function formatPathLabel(key: string) {
     case "dbPath":
       return "Database path";
     case "logFilePath":
-      return "Engine log";
+      return "Log file";
     case "logsDir":
       return "Logs";
     default:

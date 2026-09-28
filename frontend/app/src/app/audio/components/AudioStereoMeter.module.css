@@ -56,7 +56,7 @@
 }
 
 /* DP2 (2026-06-04 Console polish): mono meters render as a single bar.
-   Mic preamp inputs (and the Phones 2 cue) are mono — they are flagged
+   Mic preamp inputs are mono — they are flagged
    data-meter-mirror-right="true" and just mirror the left bar into the right.
    A mono source shouldn't read as a stereo pair, so collapse the mirrored
    pair to one full-width bar and hide the redundant right track. The canvas

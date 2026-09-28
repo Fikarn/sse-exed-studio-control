@@ -363,7 +363,7 @@
           "body": {
             "action": "dimToggle"
           },
-          "description": "Toggle control-room dim on the main out.",
+          "description": "Toggle control-room dim on Main Out.",
           "id": "audio-btn-5",
           "label": "DIM",
           "lcdKey": "audio_key_5",

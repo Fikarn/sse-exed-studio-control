@@ -11,6 +11,7 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
     bridgeUniverse,
     fixtures,
     highlightActive,
+    outputsHeld,
     previewMode,
     scenes,
     soloActive,
@@ -81,6 +82,7 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
       <LightingCluster
         bridgeIp={bridgeIp}
         bridgeReachable={bridgeReachable}
+        outputsHeld={outputsHeld}
         bridgeUniverse={bridgeUniverse}
         channelCount={lightingDmxMonitorSnapshot?.channels.length ?? 0}
         fixtureOnCount={fixtures.filter((fixture) => fixture.on).length}

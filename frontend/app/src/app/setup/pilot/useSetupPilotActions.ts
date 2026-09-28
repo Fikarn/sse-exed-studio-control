@@ -105,7 +105,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     }
 
     return {
-      message: `Exported Companion profile to ${String(result?.path ?? "the native exports directory")}.`,
+      message: `Exported Companion profile to ${String(result?.path ?? "the exports folder")}.`,
       tone: "ok" as const,
     };
   };

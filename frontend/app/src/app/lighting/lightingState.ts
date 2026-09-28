@@ -5,7 +5,7 @@ import type { StateDisplayTone } from "@sse/design-system";
 // engine reports (the bridge's reachability), the scene-drift detector and
 // preview mode. The front end never invents a state the engine does not report.
 
-export type LightingStateWord = "UNREACHABLE" | "PREVIEW" | "UNSAVED" | "REACHABLE";
+export type LightingStateWord = "UNREACHABLE" | "PREVIEW" | "HELD" | "UNSAVED" | "REACHABLE";
 
 export interface LightingStateInput {
   bridgeIp: string;
@@ -14,6 +14,8 @@ export interface LightingStateInput {
   fixtureOnCount: number;
   fixtureTotal: number;
   lastRecalledLabel: string | null;
+  /** The light outputs are held: the hardware link sends the rig nothing. */
+  outputsHeld?: boolean;
   previewDirty: boolean;
   previewMode: boolean;
   sceneModified: boolean;
@@ -41,6 +43,7 @@ export function deriveLightingState({
   fixtureOnCount,
   fixtureTotal,
   lastRecalledLabel,
+  outputsHeld = false,
   previewDirty,
   previewMode,
   sceneModified,
@@ -76,6 +79,22 @@ export function deriveLightingState({
         previewDirty && sceneName
           ? `You are editing offline. Save puts the edits into ${sceneName}; the rig takes them when it is recalled.`
           : "You are editing offline. The rig is unchanged.",
+      meta,
+      locked: false,
+      lockNote: null,
+    };
+  }
+
+  // Found, to check (2026-09-28): the display read REACHABLE, "the rig is
+  // following it", while the outputs were held; only the header's lamp said
+  // held. HELD ranks as the lamp does, above an unsaved scene: nothing
+  // reaches the rig at all. Preview's sentence stays true while held, and its
+  // keys are the only way out of it, so PREVIEW ranks above HELD.
+  if (outputsHeld) {
+    return {
+      word: "HELD",
+      tone: "attention",
+      sentence: "The light outputs are held: nothing is sent to the rig until they are armed in Setup / Support.",
       meta,
       locked: false,
       lockNote: null,

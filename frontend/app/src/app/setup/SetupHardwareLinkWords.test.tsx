@@ -23,12 +23,13 @@ import { SetupSupportPilot } from "./SetupSupportPilot";
 const SERVING = {
   available: true,
   status: "ready",
-  summary: "Native control-surface bridge is serving deck actions and LCD payloads at http://127.0.0.1:38201.",
+  summary: "The deck's bridge is ready at http://127.0.0.1:38201.",
 };
 const REFUSED = {
   available: false,
   status: "unavailable",
-  summary: "Native control-surface bridge is unavailable because the listener could not bind: address in use",
+  summary:
+    "The deck's bridge could not open its port: address in use. Close what holds it, then restart the hardware link.",
 };
 
 function withBridge(appSnapshot: JsonObject | null, controlSurface: JsonObject): JsonObject | null {

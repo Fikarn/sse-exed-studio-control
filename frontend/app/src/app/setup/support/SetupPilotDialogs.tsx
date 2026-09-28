@@ -38,7 +38,7 @@ export function SetupPilotDialogs({ editor }: { editor: SetupPilot }) {
               </ul>
               <p>
                 Publishing anyway unlocks operator mode with unverified hardware. The override is recorded in the setup
-                summary and the Engine log.
+                summary and the log.
               </p>
             </>
           }

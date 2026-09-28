@@ -152,7 +152,7 @@ export function censusInPage() {
   // cluster the workspace portals into the shell.
   const audioRoots = [...root.querySelectorAll('[data-testid="audio-workspace"], [data-audio-cluster]')];
   const FORBIDDEN = [
-    { name: "engine", re: /\bengine\b/i, exempt: /\bengine log\b/i },
+    { name: "engine", re: /\bengine\b/i },
     { name: "backend", re: /\bbackend\b/i },
     { name: "transport", re: /\btransport\b/i },
     { name: "IPC", re: /\bIPC\b/ },

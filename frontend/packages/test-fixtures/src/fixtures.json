@@ -53,7 +53,7 @@
       "hasCompletedSetup": false,
       "runnerStage": "import",
       "stage": "setup-required",
-      "summary": "Complete commissioning to unlock operator mode.",
+      "summary": "Setup is not published yet: Lighting, Audio, Cameras and Teleprompter stay locked until it is.",
       "checks": [
         {
           "id": "lighting",
@@ -140,7 +140,7 @@
       "hasCompletedSetup": true,
       "runnerStage": "publish",
       "stage": "ready",
-      "summary": "Commissioning complete and operator mode unlocked.",
+      "summary": "Setup is published: Lighting, Audio, Cameras and Teleprompter are open.",
       "checks": [
         {
           "id": "lighting",
@@ -220,8 +220,8 @@
           "source": "deck",
           "domain": "audio",
           "action": "dim",
-          "target": "Main out",
-          "detail": "Dim on: main out"
+          "target": "Main Out",
+          "detail": "Dim on: Main Out"
         },
         {
           "id": 4,
@@ -321,7 +321,7 @@
       "hasCompletedSetup": true,
       "runnerStage": "publish",
       "stage": "ready",
-      "summary": "Commissioning complete and operator mode unlocked.",
+      "summary": "Setup is published: Lighting, Audio, Cameras and Teleprompter are open.",
       "checks": [
         {
           "id": "lighting",
@@ -2648,7 +2648,7 @@
       "hasCompletedSetup": false,
       "runnerStage": "map",
       "stage": "setup-required",
-      "summary": "Complete commissioning to unlock operator mode.",
+      "summary": "Setup is not published yet: Lighting, Audio, Cameras and Teleprompter stay locked until it is.",
       "checks": [
         {
           "id": "control-surface",
@@ -2735,7 +2735,7 @@
       "hasCompletedSetup": false,
       "runnerStage": "map",
       "stage": "setup-required",
-      "summary": "Complete commissioning to unlock operator mode.",
+      "summary": "Setup is not published yet: Lighting, Audio, Cameras and Teleprompter stay locked until it is.",
       "checks": [
         {
           "id": "control-surface",

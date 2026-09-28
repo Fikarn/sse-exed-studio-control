@@ -20,6 +20,8 @@ mod health;
 mod lighting;
 mod lighting_backend;
 mod lighting_sacn_output;
+#[cfg(test)]
+mod operator_words;
 mod prompter;
 mod protocol;
 mod rme_console_link;
@@ -92,7 +94,7 @@ fn spawn_output_writer(receiver: Receiver<Value>) {
             if let Err(error) = write_json(&mut writer, &message) {
                 log_event(
                     LogLevel::Error,
-                    &format!("Engine output writer failed: {error}"),
+                    &format!("The hardware link could not answer the app: {error}"),
                 );
                 break;
             }
@@ -442,7 +444,7 @@ fn main() -> io::Result<()> {
             // No runtime paths means no log file to write to: this is one of
             // the two stderr sites the readiness ledger documents
             // (Slice 8 — F16); the shell keeps engine stderr in shell.log.
-            eprintln!("Engine bootstrap failed: {message}");
+            eprintln!("The hardware link did not start: {message}");
             return Err(io::Error::other(message));
         }
     };
@@ -487,7 +489,7 @@ fn main() -> io::Result<()> {
         let _ = write_json(&mut writer, &startup_failure);
         log_event(
             LogLevel::Error,
-            &format!("Engine protocol mismatch: {message}"),
+            &format!("The hardware link and the app are different versions: {message}"),
         );
         return Err(io::Error::other(message));
     }
@@ -517,7 +519,7 @@ fn main() -> io::Result<()> {
             let _ = write_json(&mut writer, &startup_failure);
             log_event(
                 LogLevel::Error,
-                &format!("Engine bootstrap failed: {error}"),
+                &format!("The hardware link did not start: {error}"),
             );
             if code == STARTUP_CODE_STORAGE_CORRUPT || code == STARTUP_CODE_STORAGE_MIGRATION_FAILED
             {

@@ -382,7 +382,7 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         ),
         "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
         "toggleDialMode" => String::from("Toggle the input dials between fader and gain."),
-        "dimToggle" => String::from("Toggle control-room dim on the main out."),
+        "dimToggle" => String::from("Toggle control-room dim on Main Out."),
         "soloClearAll" => String::from("Clear solo on every audio channel."),
         _ => format!("{interaction} {fallback_label}."),
     }

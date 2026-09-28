@@ -141,7 +141,7 @@ fn pull_console_state(
                 db_path,
                 "AUDIO_GLOBAL_OSC_UNBOUND",
                 format!(
-                    "The engine is not listening on the Global OSC receive port {}. Another program may be using it, or audio metering is not running; check Setup and try again.",
+                    "Studio Control is not listening on TotalMix's Global OSC port {}. Another program may hold it, or metering is off; check Setup and try again.",
                     config.receive_port + 3
                 ),
                 None,

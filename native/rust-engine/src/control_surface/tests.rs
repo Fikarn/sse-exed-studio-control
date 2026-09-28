@@ -891,6 +891,8 @@ fn deck_audio_keys_record_source_deck() {
 
     assert_eq!(audio_action("dimToggle", None)["dim"], true);
     let rows = recent_actions(db_path);
+    // The main output as the screen and TotalMix name it (2026-09-28).
+    assert_eq!(rows[0].2, "Dim on: Main Out");
     assert_eq!(
         rows.iter()
             .map(|(source, action, _)| (source.as_str(), action.as_str()))

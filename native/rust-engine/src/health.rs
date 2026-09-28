@@ -103,7 +103,18 @@ impl HealthRegistry {
 static REGISTRY: OnceLock<Mutex<HealthRegistry>> = OnceLock::new();
 
 fn registry() -> &'static Mutex<HealthRegistry> {
+    process_started_at();
     REGISTRY.get_or_init(|| Mutex::new(HealthRegistry::default()))
+}
+
+static STARTED_AT: OnceLock<u64> = OnceLock::new();
+
+/// Unix seconds when this hardware link first reported its health: its
+/// start, near enough. A backup is overdue two days after the later of its
+/// last copy and this, so a start after a long break does not read overdue
+/// before its first daily backup has had its turn (2026-09-28).
+pub(crate) fn process_started_at() -> u64 {
+    *STARTED_AT.get_or_init(unix_now_secs)
 }
 
 fn unix_now_secs() -> u64 {
@@ -146,16 +157,22 @@ pub(crate) fn registry_entries() -> HealthEntries {
 }
 
 /// The entries as `checks.engine` shows them: a backups entry whose last
-/// success is older than [`BACKUP_WARNING_AGE_SECS`] reads `warning`.
-pub(crate) fn effective_entries(entries: &HealthEntries, now: u64) -> HealthEntries {
+/// success is older than [`BACKUP_WARNING_AGE_SECS`] reads `warning`, counted
+/// from `started_at` at the earliest (the hardware link's start).
+pub(crate) fn effective_entries(
+    entries: &HealthEntries,
+    now: u64,
+    started_at: u64,
+) -> HealthEntries {
     entries
         .iter()
         .map(|(id, status)| {
             let mut status = status.clone();
             let age = now.saturating_sub(status.at);
+            let overdue_for = now.saturating_sub(status.at.max(started_at));
             if *id == SUBSYSTEM_BACKUPS
                 && status.state == SubsystemState::Ok
-                && age > BACKUP_WARNING_AGE_SECS
+                && overdue_for > BACKUP_WARNING_AGE_SECS
             {
                 status.state = SubsystemState::Warning;
                 status.detail = format!(
@@ -240,7 +257,7 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
     let audio = build_audio_health_check(&app_settings);
     let control_surface = build_control_surface_health_check(runtime);
     let sqlite_version = read_sqlite_version(&runtime.db_path)?;
-    let engine = effective_entries(&registry_entries(), unix_now_secs());
+    let engine = effective_entries(&registry_entries(), unix_now_secs(), process_started_at());
     // The Teleprompter's lamp (Slice 5a). A check that cannot be read is
     // `null` and a `WARN` line, never a failed snapshot: a fault of the
     // prompter's alone must not stop Studio Control's start (review of the
@@ -496,7 +513,7 @@ mod tests {
                 now - BACKUP_WARNING_AGE_SECS - 3_600,
             ),
         );
-        let effective = effective_entries(&late, now);
+        let effective = effective_entries(&late, now, 0);
         let backups = &effective[SUBSYSTEM_BACKUPS];
         assert_eq!(backups.state, SubsystemState::Warning);
         assert!(backups
@@ -514,8 +531,24 @@ mod tests {
                 now - BACKUP_WARNING_AGE_SECS + 60,
             ),
         );
-        assert_eq!(derive_status(&effective_entries(&recent, now), true), "ok");
+        assert_eq!(
+            derive_status(&effective_entries(&recent, now, 0), true),
+            "ok"
+        );
         assert_eq!(derive_status(&HealthEntries::new(), true), "ok");
+
+        // A start after a long break: the last copy is old, but the daily
+        // backup has not had its turn yet (2026-09-28). Overdue counts from
+        // the start, and reads so two days after it.
+        assert_eq!(
+            effective_entries(&late, now, now - 300)[SUBSYSTEM_BACKUPS].state,
+            SubsystemState::Ok
+        );
+        assert_eq!(
+            effective_entries(&late, now, now - BACKUP_WARNING_AGE_SECS - 60)[SUBSYSTEM_BACKUPS]
+                .state,
+            SubsystemState::Warning
+        );
     }
 
     // A transition is a change of state — a first `ok` is not one, a first

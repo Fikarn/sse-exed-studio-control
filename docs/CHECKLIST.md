@@ -19,6 +19,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Lighting
 
 - [ ] Started with `SSE_SAFE_START=1`, the header's Lighting lamp reads `held`, a recalled scene does not reach the rig, and the DMX monitor shows what would be sent.
+- [ ] With the light outputs held, the Lighting page reads `HELD` and `Open Setup` goes to the switch.
 - [ ] With the light outputs armed, a restore of a backup (Setup / Support › Support) comes back with them held: the lamp reads `held`, and the rig keeps its look until `Light outputs` is armed.
 - [ ] `Light outputs` set to `Armed` in Setup / Support › Workstation: the rig follows at once.
 - [ ] Set to `Held` while the rig is lit: the rig keeps its last look.
@@ -35,7 +36,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] A recalled snapshot brings back a changed fader and mute and leaves a changed 48 V alone; the Console names the channel, and arming it there switches its 48 V.
 - [ ] An armed recall moves nothing: the key is amber with its countdown, the state display shows the armed row, and Esc clears both.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
-- [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level.
+- [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
 
 ## Stream Deck
 

@@ -184,9 +184,7 @@ pub fn update_lighting_settings(
         ));
         updates.push((
             format!("app.commissioning.check.{LIGHTING_CHECK_ID}.message"),
-            String::from(
-                "Lighting transport settings changed in the native lighting workspace. Rerun the lighting probe.",
-            ),
+            String::from("The bridge's address or universe changed. Run the lighting probe again."),
         ));
         updates.push((
             format!("app.commissioning.check.{LIGHTING_CHECK_ID}.checked_at"),

@@ -375,41 +375,38 @@ pub(super) fn read_lighting_editor_inventory(
     read_default_lighting_inventory(&inventory_config)
 }
 
+/// Why the rig refuses a change in the lighting's status, as the page prints
+/// it (2026-09-28: it spoke of the transport and the native scenes); `None`
+/// when it is ready.
+pub(crate) fn lighting_refusal(status: &str) -> Option<(&'static str, &'static str)> {
+    match status {
+        "ready" => None,
+        "attention" => Some((
+            "LIGHTING_PROBE_FAILED",
+            "The bridge did not answer its last probe. Check its power and network, run the lighting probe in Setup, then recall.",
+        )),
+        "not-verified" => Some((
+            "LIGHTING_NOT_VERIFIED",
+            "Run the lighting probe in Setup before recalling a scene.",
+        )),
+        "disabled" => Some((
+            "LIGHTING_DISABLED",
+            "Lighting is switched off. Switch it on in Setup and run the lighting probe, then recall.",
+        )),
+        _ => Some((
+            "LIGHTING_UNCONFIGURED",
+            "The bridge's address or universe is missing. Set them in Setup, then recall.",
+        )),
+    }
+}
+
 pub(super) fn ensure_lighting_action_allowed(
     db_path: &Path,
     snapshot: &LightingSnapshot,
 ) -> Result<(), LightingCommandError> {
-    let rejected = match snapshot.status.as_str() {
-        "ready" => None,
-        "attention" => Some((
-            "LIGHTING_PROBE_FAILED",
-            String::from(
-                "Lighting transport is in attention state. Fix the bridge connection and rerun the commissioning lighting probe before recalling scenes.",
-            ),
-        )),
-        "not-verified" => Some((
-            "LIGHTING_NOT_VERIFIED",
-            String::from(
-                "Run the commissioning lighting probe before recalling native lighting scenes.",
-            ),
-        )),
-        "disabled" => Some((
-            "LIGHTING_DISABLED",
-            String::from(
-                "Lighting output is disabled. Enable the transport and rerun the commissioning lighting probe before recalling native lighting scenes.",
-            ),
-        )),
-        _ => Some((
-            "LIGHTING_UNCONFIGURED",
-            String::from(
-                "Lighting bridge settings are incomplete. Configure the bridge and universe before recalling native lighting scenes.",
-            ),
-        )),
-    };
-
-    if let Some((code, message)) = rejected {
-        record_lighting_action_failure(db_path, code, &message)?;
-        return Err(LightingCommandError::Rejected(code, message));
+    if let Some((code, message)) = lighting_refusal(snapshot.status.as_str()) {
+        record_lighting_action_failure(db_path, code, message)?;
+        return Err(LightingCommandError::Rejected(code, String::from(message)));
     }
 
     Ok(())

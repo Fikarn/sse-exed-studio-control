@@ -29,6 +29,8 @@ export interface LightingClusterProps {
   bridgeIp: string;
   bridgeReachable: boolean;
   bridgeUniverse: number;
+  /** The light outputs are held (the lighting snapshot's `outputArmed === false`). */
+  outputsHeld?: boolean;
   channelCount: number;
   fixtureOnCount: number;
   fixtureTotal: number;
@@ -96,6 +98,7 @@ export function LightingCluster(props: LightingClusterProps) {
   const {
     bridgeIp,
     bridgeReachable,
+    outputsHeld = false,
     bridgeUniverse,
     channelCount,
     fixtureOnCount,
@@ -157,6 +160,7 @@ export function LightingCluster(props: LightingClusterProps) {
     fixtureOnCount,
     fixtureTotal,
     lastRecalledLabel,
+    outputsHeld,
     previewDirty,
     previewMode,
     sceneModified,
@@ -182,7 +186,7 @@ export function LightingCluster(props: LightingClusterProps) {
     <>
       {/* The bridge probe lives in Setup / Support, so the way out of an
           unreachable bridge is the key that takes the operator there. */}
-      {state.word === "UNREACHABLE" ? (
+      {state.word === "UNREACHABLE" || state.word === "HELD" ? (
         <Key size="small" testId="lighting-state-setup" onClick={onOpenSetup}>
           Open Setup
         </Key>

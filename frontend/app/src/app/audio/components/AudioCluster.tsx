@@ -14,7 +14,8 @@ import { AudioSnapshotKeys } from "./AudioSnapshotKeys";
 // Visual overhaul A, Slice 4 (plan D1, D5, D6, D8; console-a-states): the
 // Console's cluster — the fixed left column the operator's hand learns once.
 // The state display is first and never moves; below it the take-time keys
-// (dim, mono, the mix target, the main level, the master meter),
+// (dim and mono, Main Out's whatever the mix target, the mix target, the main
+// level, the master meter),
 // the snapshot keys and the standing actions. Arming renders in the display
 // and on the key, so nothing else moves (finding C1).
 
@@ -93,6 +94,10 @@ export function AudioCluster({
   const status = viewModel.status;
   const snapshot = viewModel.audioSnapshot;
   const selectedMixTarget = viewModel.selectedMixTarget ?? viewModel.mixTargets[0] ?? null;
+  // Dim and mono are the control room's, Main Out's alone, whichever output
+  // is the mix target: TotalMix has none for the phones, and the deck's DIM
+  // dims Main Out too (the owner's decision, 2026-09-28).
+  const mainOut = viewModel.mixTargets.find((mixTarget) => mixTarget.role === "main-out") ?? null;
   const actionsAllowed = viewModel.actionsAllowed;
   const consoleLink = snapshot.consoleLink;
 
@@ -218,31 +223,27 @@ export function AudioCluster({
           mode="toggle"
           cap="Dim"
           hint="-20 dB"
-          engaged={selectedMixTarget?.dim ?? false}
+          engaged={mainOut?.dim ?? false}
           locked={!actionsAllowed}
           reason={lockedReason}
           take
           testId="audio-monitor-dim"
-          data-active={selectedMixTarget?.dim ?? false}
+          data-active={mainOut?.dim ?? false}
           data-control="dim"
-          onClick={() =>
-            selectedMixTarget && onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, dim: !selectedMixTarget.dim })
-          }
+          onClick={() => mainOut && onUpdateMixTarget({ mixTargetId: mainOut.id, dim: !mainOut.dim })}
         />
         <Key
           mode="toggle"
           cap="Mono"
           hint="L+R"
-          engaged={selectedMixTarget?.mono ?? false}
+          engaged={mainOut?.mono ?? false}
           locked={!actionsAllowed}
           reason={lockedReason}
           take
           testId="audio-monitor-mono"
-          data-active={selectedMixTarget?.mono ?? false}
+          data-active={mainOut?.mono ?? false}
           data-control="mono"
-          onClick={() =>
-            selectedMixTarget && onUpdateMixTarget({ mixTargetId: selectedMixTarget.id, mono: !selectedMixTarget.mono })
-          }
+          onClick={() => mainOut && onUpdateMixTarget({ mixTargetId: mainOut.id, mono: !mainOut.mono })}
         />
       </div>
 

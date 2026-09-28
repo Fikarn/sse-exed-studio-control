@@ -434,14 +434,18 @@ export function getAudioChannels(snapshot: AudioSnapshot | null): AudioChannelEn
   }));
 }
 
+/** Dim and mono are the control room's, Main Out's alone: TotalMix has none
+ *  for the phones, and nothing is sent for them (the owner's decision,
+ *  2026-09-28). A phones target reads neither, whatever older saved data
+ *  holds, so no strip, key or meter of the pages shows one. */
 export function getAudioMixTargets(snapshot: AudioSnapshot | null): AudioMixTargetEntry[] {
   return (snapshot?.mixTargets ?? []).map((m: AudioMixTargetSnapshot) => ({
-    dim: m.dim,
+    dim: m.role === "main-out" ? m.dim : false,
     id: m.id,
     meterLeft: m.meterLeft,
     meterLevel: m.meterLevel,
     meterRight: m.meterRight,
-    mono: m.mono,
+    mono: m.role === "main-out" ? m.mono : false,
     mute: m.mute,
     name: m.name,
     peakHold: m.peakHold,
@@ -650,10 +654,26 @@ export function deriveLightingWorkspaceTone(
   return sceneDrift ? { tone: "attention", word: "unsaved" } : null;
 }
 
+/** One of the hardware link's own entries in `checks.engine` (Slice 8):
+ *  `sacn`, `backups`, …, with its state and, in Unix seconds, when it was
+ *  reported. */
+function engineEntry(healthSnapshot: SnapshotRecord | null, id: string) {
+  const entry = asRecord(asRecord(asRecord(healthSnapshot?.checks)?.engine)?.[id]);
+  if (!entry) return null;
+  return {
+    state: typeof entry.state === "string" ? entry.state : null,
+    at: typeof entry.at === "number" ? entry.at : null,
+  };
+}
+
+/** A backup older than this is overdue (`BACKUP_WARNING_AGE_SECS`, `health.rs`). */
+const BACKUP_OVERDUE_SECS = 48 * 60 * 60;
+
 export function buildMonitorItems(
   healthSnapshot: SnapshotRecord | null,
   latched?: LatchedShellState,
-  workspaceTones?: WorkspaceStateTones
+  workspaceTones?: WorkspaceStateTones,
+  nowMs: number = Date.now()
 ) {
   const checks =
     healthSnapshot && typeof healthSnapshot.checks === "object" && healthSnapshot.checks
@@ -684,8 +704,16 @@ export function buildMonitorItems(
       status: tone,
     };
   };
+  // Found, to check (2026-09-28): a light output that could not open its port
+  // lit no lamp, and the rig never followed. It is the Lighting lamp's worst
+  // word: nothing reaches the rig, and arming does not help.
+  const sacn = engineEntry(healthSnapshot, "sacn");
+  const outputFailed = sacn?.state === "attention" || sacn?.state === "error";
+  const lightingTone: WorkspaceStateTone | null | undefined = outputFailed
+    ? { tone: "error", winsTies: true, word: "no output" }
+    : workspaceTones?.lighting;
   const items = [
-    lamp("lighting", "Lighting", checks.lighting ?? undefined, workspaceTones?.lighting),
+    lamp("lighting", "Lighting", checks.lighting ?? undefined, lightingTone),
     lamp("audio", "Audio", checks.audio ?? undefined, workspaceTones?.audio),
     // D19: the lamps follow the tabs, so the cameras' stands before the prompter's.
     {
@@ -720,6 +748,21 @@ export function buildMonitorItems(
     status: "ok" | "attention" | "error" | "info";
     target?: string;
   }>;
+
+  // Found, to check (2026-09-28): an automatic backup that failed, or none for
+  // two days, lit no lamp. A chip after the five lamps, only while it is so:
+  // D19's five lamps stand as they are, and a press opens Setup / Support,
+  // where the backups are.
+  const backups = engineEntry(healthSnapshot, "backups");
+  if (backups?.state === "warning" || backups?.state === "error") {
+    const overdue = backups.at !== null && nowMs / 1000 - backups.at > BACKUP_OVERDUE_SECS;
+    items.push({
+      id: "backups",
+      label: "Backup",
+      detail: overdue ? "overdue" : "failed",
+      status: "attention",
+    });
+  }
 
   if (latched?.lightingSceneDrift) {
     items.push({

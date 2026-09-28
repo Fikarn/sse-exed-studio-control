@@ -271,3 +271,54 @@ describe("the header's Cameras lamp and REC chip", () => {
     });
   });
 });
+
+// Found, to check (2026-09-28): a light output that could not open its port,
+// and an automatic backup that failed or is two days old, lit no lamp. The
+// hardware link reports both in `checks.engine`.
+describe("the header says what fails in the background", () => {
+  const NOW_MS = Date.UTC(2026, 8, 28, 12, 0, 0);
+  const nowSecs = NOW_MS / 1000;
+  const health = (engine: Record<string, { state: string; detail?: string; at: number }>) =>
+    ({ checks: { lighting: { status: "ready" }, engine } }) as unknown as Parameters<typeof buildMonitorItems>[0];
+  const item = (items: ReturnType<typeof buildMonitorItems>, id: string) => items.find((entry) => entry.id === id);
+
+  it("a light output that could not open reads no output, above held and no bridge", () => {
+    const failed = health({ sacn: { state: "attention", at: nowSecs } });
+    const held = { lighting: { tone: "attention" as const, winsTies: true, word: "held" } };
+    for (const tones of [undefined, held, { lighting: { tone: "error" as const, word: "no bridge" } }]) {
+      expect(item(buildMonitorItems(failed, undefined, tones, NOW_MS), "lighting")).toMatchObject({
+        detail: "no output",
+        status: "error",
+      });
+    }
+    expect(
+      item(buildMonitorItems(health({ sacn: { state: "ok", at: nowSecs } }), undefined, held, NOW_MS), "lighting")
+    ).toMatchObject({ detail: "held" });
+  });
+
+  it("a failed backup is a chip after the five lamps, and an old one reads overdue", () => {
+    const failed = buildMonitorItems(
+      health({ backups: { state: "warning", at: nowSecs - 60 } }),
+      undefined,
+      undefined,
+      NOW_MS
+    );
+    expect(failed.map((entry) => entry.id)).toEqual(["lighting", "audio", "cameras", "prompter", "surface", "backups"]);
+    expect(item(failed, "backups")).toMatchObject({ label: "Backup", detail: "failed", status: "attention" });
+
+    const overdue = buildMonitorItems(
+      health({ backups: { state: "warning", at: nowSecs - 49 * 3600 } }),
+      undefined,
+      undefined,
+      NOW_MS
+    );
+    expect(item(overdue, "backups")?.detail).toBe("overdue");
+
+    for (const state of ["ok", "attention"]) {
+      expect(
+        item(buildMonitorItems(health({ backups: { state, at: nowSecs } }), undefined, undefined, NOW_MS), "backups")
+      ).toBeUndefined();
+    }
+    expect(buildMonitorItems(null, undefined, undefined, NOW_MS)).toHaveLength(5);
+  });
+});
