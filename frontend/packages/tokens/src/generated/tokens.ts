@@ -305,7 +305,6 @@ export const tokenValues = {
   FontFamilySans: '"Inter Variable", "Inter", system-ui, sans-serif',
   FontFamilyMono: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace',
   FontFamilyUi: '"Inter Variable", "Inter", system-ui, sans-serif',
-  FontFamilyDisplay: '"Fraunces Variable", "Fraunces", "Source Serif 4", Georgia, serif',
   FontSize5xs: "7px",
   FontSize4xs: "8px",
   FontSize4xsPlus: "8.5px",

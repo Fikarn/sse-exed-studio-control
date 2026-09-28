@@ -38,7 +38,7 @@ const dColumn: React.CSSProperties = {
 };
 
 const dDisplayName: React.CSSProperties = {
-  fontFamily: "var(--font-family-display)",
+  fontFamily: "var(--font-family-ui)",
   fontWeight: 600,
   fontSize: 16,
 };

@@ -168,8 +168,7 @@
 }
 
 .masterName {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 17px;
   color: var(--color-brand-text-primary);
@@ -524,8 +523,7 @@
 }
 
 .tileName {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 13px;
   color: var(--color-brand-text-primary);

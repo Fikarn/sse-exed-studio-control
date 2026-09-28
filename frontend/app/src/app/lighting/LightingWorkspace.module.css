@@ -132,8 +132,7 @@
 }
 
 .connectingTitle {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 18px;
   color: var(--color-brand-text-primary);

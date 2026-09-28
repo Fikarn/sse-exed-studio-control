@@ -337,8 +337,7 @@
 }
 
 .sceneTitle {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 32;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 22px;
   line-height: 1.15;
@@ -395,13 +394,12 @@
 }
 
 .sceneStatValue {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 18px;
   color: var(--color-brand-text-primary);
   margin: 0;
-  font-feature-settings: "tnum", "zero";
+  font-variant-numeric: tabular-nums;
 }
 
 .sceneStatValue small {
@@ -537,8 +535,7 @@
 }
 
 .fixtureName {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: 16px;
   color: var(--color-brand-text-primary);

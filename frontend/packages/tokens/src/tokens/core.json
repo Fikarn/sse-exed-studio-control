@@ -1057,9 +1057,6 @@
       },
       "ui": {
         "$value": "\"Inter Variable\", \"Inter\", system-ui, sans-serif"
-      },
-      "display": {
-        "$value": "\"Fraunces Variable\", \"Fraunces\", \"Source Serif 4\", Georgia, serif"
       }
     },
     "size": {
