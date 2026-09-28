@@ -534,6 +534,59 @@ export interface LatchedShellState {
   prompterPlaying?: string | null;
 }
 
+/** `checks.cameras`: the worst camera's state with its word, whether CAM 1
+ *  reports recording (an unreachable CAM 1 as it last did), and each camera. */
+interface CamerasLampCheck {
+  status?: string;
+  word?: string;
+  recording?: boolean;
+  cameras?: unknown;
+}
+
+/** The Cameras lamp's word: the hardware link's word for the worst camera in
+ *  the header's lower case (`released`, `not set up`, `unreachable`), `ready`
+ *  when every camera is held, `pending` before the first health snapshot. */
+export function camerasLampWord(check: CamerasLampCheck | null | undefined): string {
+  if (!check || typeof check.status !== "string") {
+    return "pending";
+  }
+  if (check.status === "ok" || typeof check.word !== "string" || check.word.length === 0) {
+    return statusLabelFor(check, "pending");
+  }
+  return check.word.toLowerCase();
+}
+
+/** The header's `REC` chip, on every page, which opens the Cameras page. */
+export interface RecChip {
+  /** `CAM 1`, `last known`, `not read while released`. */
+  detail: string;
+  /** Red while CAM 1 reports recording; amber when that is not known now. */
+  status: "error" | "attention";
+}
+
+/**
+ * What the `REC` chip says, from `checks.cameras`; `null` when there is none.
+ * Red while CAM 1 is held and reports recording. Amber `last known` when CAM
+ * 1 does not answer and last reported recording: the take is left as it was,
+ * and nobody knows that it still runs. Amber whenever CAM 1 is released: a
+ * take it records goes on, and Studio Control does not read it.
+ */
+export function recChipOf(check: CamerasLampCheck | null | undefined): RecChip | null {
+  const cameras = Array.isArray(check?.cameras) ? check.cameras : [];
+  const main = cameras.map((entry) => asRecord(entry)).find((entry) => entry?.camera === 1);
+  const state = typeof main?.state === "string" ? main.state : null;
+  if (state === "released") {
+    return { detail: "not read while released", status: "attention" };
+  }
+  if (check?.recording !== true) {
+    return null;
+  }
+  if (state === "unreachable") {
+    return { detail: "last known", status: "attention" };
+  }
+  return state === "held" ? { detail: "CAM 1", status: "error" } : null;
+}
+
 /** `checks.prompter` (new pages program, Slices 5a and 6a): the worse of the
  *  Prompter XL's state and `NOT UPDATED`, with its own word. */
 interface PrompterLampCheck {
@@ -604,6 +657,9 @@ export function buildMonitorItems(
       : {};
   // The hardware link sends `null` when it could not read the prompter's check (Slice 5a).
   const prompterCheck = checks.prompter ?? undefined;
+  // The same when it could not read the cameras'.
+  const camerasCheck = (checks.cameras ?? undefined) as CamerasLampCheck | undefined;
+  const recChip = recChipOf(camerasCheck);
 
   const lamp = (
     id: "lighting" | "audio",
@@ -627,6 +683,13 @@ export function buildMonitorItems(
   const items = [
     lamp("lighting", "Lighting", checks.lighting ?? undefined, workspaceTones?.lighting),
     lamp("audio", "Audio", checks.audio ?? undefined, workspaceTones?.audio),
+    // D19: the lamps follow the tabs, so the cameras' stands before the prompter's.
+    {
+      id: "cameras",
+      label: "Cameras",
+      detail: camerasLampWord(camerasCheck),
+      status: healthCheckTone(camerasCheck?.status),
+    },
     // New pages program, Slice 6a (D19): the Teleprompter's lamp, before the deck's.
     {
       id: "prompter",
@@ -681,6 +744,17 @@ export function buildMonitorItems(
       detail: `${latched.prompterPlaying} left`,
       status: "ok",
       target: "Teleprompter",
+    });
+  }
+  // Recording is a hazard: a red lamp and the word (system section 4), last
+  // in the row, where it stands whatever else is latched.
+  if (recChip) {
+    items.push({
+      id: "latched:rec",
+      label: "REC",
+      detail: recChip.detail,
+      status: recChip.status,
+      target: "Cameras",
     });
   }
 

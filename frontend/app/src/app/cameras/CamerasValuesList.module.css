@@ -1,0 +1,81 @@
+/* The values list: a plate that floats beside the Cameras page's plate, at
+   the drawer's level, left of it so the readout it was opened from stays in
+   view. */
+
+.list {
+  position: fixed;
+  top: calc(var(--chrome-studio-header) + 200px);
+  right: calc(var(--chrome-studio-plate) + 12px);
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 400px;
+  padding: 16px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-screen);
+  background: var(--elevation-plate-fill);
+  box-shadow: var(--elevation-float);
+  color: var(--text-text);
+  outline: none;
+}
+
+.list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.head,
+.foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.foot {
+  align-items: center;
+}
+
+.title {
+  color: var(--text-text2);
+  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+}
+
+.title b {
+  color: var(--text-text);
+  font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.detail {
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-screen);
+  background: var(--material-well);
+  box-shadow: var(--elevation-well);
+}
+
+/* A value's key on the list's well: a segmented key without its own well. */
+.grid > * {
+  min-height: 40px;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--display-text);
+}
+
+.grid > *[data-engaged] {
+  background: var(--elevation-key-lit-amber-fill);
+  color: var(--role-amber-ink);
+  box-shadow: var(--elevation-key-lit-amber);
+}

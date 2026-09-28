@@ -1,5 +1,5 @@
 import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Mic, ScrollText, Sliders, Sun } from "lucide-react";
+import { Mic, ScrollText, Sliders, Sun, Video } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
@@ -47,7 +47,7 @@ const WORKSPACES = [
   { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
   { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
   { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
-  // New pages program, Slice 6a (D4): after Audio (Slice 9 puts Cameras before it).
+  { id: "cameras", label: "Cameras", meta: "primary", icon: <Video size={16} /> },
   { id: "teleprompter", label: "Teleprompter", meta: "primary", icon: <ScrollText size={16} /> },
 ] as const;
 
@@ -264,7 +264,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   const operatorModeUnlocked =
     String(asRecord(shellState.appSnapshot?.startup)?.targetSurface ?? "commissioning") === "dashboard";
   const tabsDisabled = shellExperience !== "ready";
-  const disabledWorkspaces = !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "teleprompter"] : [];
+  const disabledWorkspaces =
+    !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "cameras", "teleprompter"] : [];
   const monitorItems = buildMonitorItems(
     shellState.healthSnapshot,
     // The prompter's latch counts down, so it shows only while the hardware
@@ -277,17 +278,14 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   // footer regions once it has moved onto the cluster rule. The Console did in
   // Slice 4, Lighting in Slice 5 and Setup in Slice 7; the Teleprompter was
   // built on it (new pages program, Slice 6a), and is the first to fill the
-  // shell's own plate (the others draw theirs inside the bay).
+  // shell's own plate (the others draw theirs inside the bay); the Cameras
+  // page does the same. Every page is a workspace, so every page fills them.
   // The pre-ready surfaces render their own frame (they are not workspaces).
-  const workspaceRegions =
-    shellExperience === "ready" &&
-    (activeWorkspace === "audio" ||
-      activeWorkspace === "lighting" ||
-      activeWorkspace === "setup" ||
-      activeWorkspace === "teleprompter")
+  const workspaceRegions = shellExperience === "ready" ? ("slot" as const) : undefined;
+  const plateRegion =
+    shellExperience === "ready" && (activeWorkspace === "teleprompter" || activeWorkspace === "cameras")
       ? ("slot" as const)
       : undefined;
-  const plateRegion = shellExperience === "ready" && activeWorkspace === "teleprompter" ? ("slot" as const) : undefined;
 
   // What the workspace boundary calls the area it wraps (Slice 9).
   const areaLabel =
@@ -301,6 +299,7 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   const LightingSurface = workspaceChunks.lighting.Surface;
   const AudioSurface = workspaceChunks.audio.Surface;
   const TeleprompterSurface = workspaceChunks.teleprompter.Surface;
+  const CamerasSurface = workspaceChunks.cameras.Surface;
 
   let surface: ReactNode;
   if (shellExperience === "startup") {
@@ -342,6 +341,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         store={environment.store}
       />
     );
+  } else if (activeWorkspace === "cameras") {
+    surface = <CamerasSurface camerasSnapshot={shellState.camerasSnapshot} store={environment.store} />;
   } else if (activeWorkspace === "teleprompter") {
     surface = (
       <TeleprompterSurface
@@ -352,8 +353,8 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       />
     );
   } else {
-    // The Console. Setup is drawn above in every shell state, and Lighting and
-    // the Teleprompter just above, so Audio is the one workspace left to reach
+    // The Console. Setup is drawn above in every shell state, and Lighting, the
+    // Cameras and the Teleprompter just above, so Audio is the one workspace left to reach
     // this branch (new pages program, D1: a page saved while Planning was open
     // reads as the Console).
     surface = (
@@ -387,7 +388,9 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
                 ? "audio"
                 : item.id === "latched:prompter-playing"
                   ? "teleprompter"
-                  : "setup";
+                  : item.id === "latched:rec"
+                    ? "cameras"
+                    : "setup";
           void tryNavigateWorkspace(target);
         }}
         onWorkspaceChange={(workspaceId) => {

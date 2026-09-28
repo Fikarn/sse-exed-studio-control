@@ -111,6 +111,12 @@ export interface ArmKeyProps extends Omit<KeyProps, "mode"> {
   armedWord?: string;
   /** Test id of the countdown bar; the Console's is `audio-arm-countdown`. */
   countdownTestId?: string;
+  /**
+   * At rest the key is a hazard, a red lamp and the word (`REC` while the
+   * camera records); armed, it is an armed key like any other. It stays the
+   * same key, so the focus stays on it between the two presses.
+   */
+  hazard?: boolean;
 }
 
 // The arm-then-apply key: arming renders on the key itself (the tag, the
@@ -122,6 +128,7 @@ export function ArmKey({
   secondsLeft,
   armedWord = "ARMED · press again",
   countdownTestId = "audio-arm-countdown",
+  hazard = false,
   cap,
   children,
   hint,
@@ -130,7 +137,8 @@ export function ArmKey({
 }: ArmKeyProps) {
   return (
     <Key
-      mode="arm"
+      mode={hazard && !armed ? "hazard" : "arm"}
+      lit={hazard && !armed}
       cap={cap}
       hint={armed ? undefined : hint}
       className={[armed ? styles.armed : "", className].filter(Boolean).join(" ")}

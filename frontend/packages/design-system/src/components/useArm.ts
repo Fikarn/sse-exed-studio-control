@@ -34,8 +34,12 @@ export interface UseArmOptions {
 
 export interface UseArmResult {
   armed: ArmedKey | null;
-  /** Arms `key`, or applies when `key` is already armed and the dwell has passed. */
-  armOrApply: (key: string, label: string, apply: () => void) => void;
+  /**
+   * Arms `key`, or applies when `key` is already armed and the dwell has passed.
+   * `windowMs` is this key's own arm window, where it differs from the
+   * surface's (the Cameras page's stop has the deck's 3 s).
+   */
+  armOrApply: (key: string, label: string, apply: () => void, windowMs?: number) => void;
   cancel: () => boolean;
   clear: () => void;
   /** Milliseconds left on the current arm, for a countdown; 0 when idle. */
@@ -82,7 +86,7 @@ export function useArm({
   }, [armed]);
 
   const armOrApply = useCallback(
-    (key: string, label: string, apply: () => void) => {
+    (key: string, label: string, apply: () => void, windowMs?: number) => {
       const current = armedRef.current;
       if (current?.key === key) {
         // Inside the dwell the second press is a double-click or a bounced
@@ -93,7 +97,7 @@ export function useArm({
         apply();
         return;
       }
-      setArmed({ key, label, armedAt: now(), timeoutMs });
+      setArmed({ key, label, armedAt: now(), timeoutMs: windowMs ?? timeoutMs });
     },
     [dwellMs, now, timeoutMs]
   );

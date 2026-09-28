@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-const CRASH_TARGETS: readonly WorkspaceId[] = ["setup", "lighting", "audio", "teleprompter"];
+const CRASH_TARGETS: readonly WorkspaceId[] = ["setup", "lighting", "audio", "cameras", "teleprompter"];
 
 /**
  * The store the shell runs on. In the app's window it talks to the hardware

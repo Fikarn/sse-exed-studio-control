@@ -1,0 +1,248 @@
+/* The Cameras page's cluster: board 2's left column. The state display first
+   and fixed, the take under it, the three cameras, the pictures, the Recent
+   list, the standing actions at the foot. Every value is a token or a board
+   dimension. */
+
+.cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+/* REC, the take-time key: 88 px, across the cluster. */
+.rec {
+  width: 100%;
+  min-height: 88px;
+  flex: none;
+}
+
+/* Doubt on the take-time key: the last thing CAM 1 reported, not a fact now.
+   A dashed amber keyline on a display, at full strength: it is to be read. */
+.recDoubt {
+  opacity: 1;
+  border: 2px dashed var(--display-amber);
+  background: var(--material-well);
+  color: var(--display-amber);
+}
+
+.recDoubt:hover {
+  border-color: var(--display-amber);
+}
+
+.recDoubt > span:nth-child(2) {
+  color: var(--display-text);
+}
+
+.recWhy {
+  color: var(--display-amber);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.take {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.takeRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: 12px;
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.takeRow dt {
+  white-space: nowrap;
+}
+
+.takeRow dd {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  text-align: right;
+}
+
+.takeRow b {
+  color: var(--text-text);
+  font: 600 var(--font-size-body) / 1.2 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.takeRow b[data-doubt] {
+  color: var(--role-amber-text);
+}
+
+.cameras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* A camera's key: its tag and state, how it is reached, what it reports. */
+.camera {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 6px;
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--elevation-key-fill);
+  box-shadow: var(--elevation-key);
+  color: var(--text-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
+}
+
+.camera:hover {
+  border-color: var(--material-line2);
+}
+
+.camera:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Selected: a neutral keyline, which takes the hairline's place. */
+.camera[data-selected] {
+  padding: 9px 11px;
+  border: 2px solid var(--accent);
+}
+
+.cameraTag {
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.cameraState,
+.cameraRec {
+  justify-self: end;
+}
+
+.cameraMeta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cameraValues {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cameraValues[data-kind="doubt"] {
+  color: var(--role-amber-text);
+}
+
+.cameraValues[data-kind="plain"] {
+  color: var(--text-text2);
+  font-family: var(--font-family-ui);
+}
+
+.fine {
+  margin: 0;
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+}
+
+.pictures {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pictureRow {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: baseline;
+  column-gap: 8px;
+  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.pictureTag {
+  font: 600 var(--font-size-label) / 1.2 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.pictureDetail {
+  color: var(--text-text2);
+}
+
+/* The Recent list takes what room is left, and never scrolls: it holds the
+   newest five, each on one line. */
+.recentSection {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentRow {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: baseline;
+  column-gap: 8px;
+  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.recentTime {
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1.2 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.recentText {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.recentSource {
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  white-space: nowrap;
+}
+
+.standing {
+  display: flex;
+  gap: 8px;
+  flex: none;
+  margin-top: auto;
+}
+
+.standing > * {
+  flex: 1 1 0;
+}

@@ -193,6 +193,23 @@ describe("ArmKey", () => {
   });
 });
 
+describe("ArmKey as a hazard", () => {
+  it("is a red lamp and the word at rest, an armed key when armed, and the same key all along", () => {
+    const { rerender } = render(<ArmKey hazard armed={false} timeoutMs={3000} cap="REC" hint="press twice to stop" />);
+    const key = screen.getByRole("button");
+    expect(key).toHaveAttribute("data-key-mode", "hazard");
+    expect(key.querySelector("[data-lamp='error']")).toHaveAttribute("data-lit");
+    expect(key).toHaveTextContent("REC");
+
+    rerender(<ArmKey hazard armed timeoutMs={3000} cap="STOP?" hint="press twice to stop" />);
+    expect(screen.getByRole("button")).toBe(key);
+    expect(key).toHaveAttribute("data-key-mode", "arm");
+    expect(key).toHaveAttribute("data-armed", "true");
+    expect(key.querySelector("[data-lamp]")).toBeNull();
+    expect(key).toHaveTextContent("STOP?");
+  });
+});
+
 describe("useArm", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -238,6 +255,27 @@ describe("useArm", () => {
     });
     expect(result.current.armed).toBeNull();
     expect(onDisarm).toHaveBeenLastCalledWith(expect.objectContaining({ key: "k" }), "escape");
+  });
+
+  // A key with a window of its own (the Cameras page's stop has the deck's
+  // 3 s) disarms after that, and the next key has the surface's again.
+  it("gives a key its own window when it names one", () => {
+    const onDisarm = vi.fn();
+    const { result } = renderHook(() => useArm({ now: () => 0, onDisarm }));
+    act(() => result.current.armOrApply("stop", "Stop recording", () => {}, 3000));
+    expect(result.current.armed).toMatchObject({ key: "stop", timeoutMs: 3000 });
+    act(() => {
+      vi.advanceTimersByTime(2999);
+    });
+    expect(result.current.armed?.key).toBe("stop");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.armed).toBeNull();
+    expect(onDisarm).toHaveBeenCalledWith(expect.objectContaining({ key: "stop" }), "timeout");
+
+    act(() => result.current.armOrApply("release", "Release CAM 1", () => {}));
+    expect(result.current.armed).toMatchObject({ key: "release", timeoutMs: 4500 });
   });
 
   // Slice 3 review (#27): Enter held on the focused arm key repeats, and the

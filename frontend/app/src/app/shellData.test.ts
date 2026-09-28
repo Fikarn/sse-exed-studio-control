@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMonitorItems, deriveLightingWorkspaceTone, withRestoreDetail } from "./shellData";
+import { buildMonitorItems, deriveLightingWorkspaceTone, recChipOf, withRestoreDetail } from "./shellData";
 
 // New pages program, Slice 2 (D3): a restore's `detail` (the hardware link's
 // note that a backup's Planning data was not restored) follows the shell's
@@ -152,9 +152,9 @@ describe("the header lamps read the hardware link's own words", () => {
 describe("the header's Prompter lamp, Surface lamp and playing latch", () => {
   const byId = (items: ReturnType<typeof buildMonitorItems>, id: string) => items.find((item) => item.id === id);
 
-  it("orders the lamps Lighting, Audio, Prompter, Surface, and calls the deck's lamp Surface", () => {
+  it("orders the lamps as the tabs with the deck last, and calls the deck's lamp Surface", () => {
     const items = buildMonitorItems({ checks: {} }, undefined, undefined);
-    expect(items.map((item) => item.label)).toEqual(["Lighting", "Audio", "Prompter", "Surface"]);
+    expect(items.map((item) => item.label)).toEqual(["Lighting", "Audio", "Cameras", "Prompter", "Surface"]);
   });
 
   it("reads the Prompter lamp from checks.prompter in the hardware link's word", () => {
@@ -191,5 +191,83 @@ describe("the header's Prompter lamp, Surface lamp and playing latch", () => {
       { lightingSceneDrift: false, audioSolo: false, prompterPlaying: null }
     );
     expect(byId(paused, "latched:prompter-playing")).toBeUndefined();
+  });
+});
+
+// The cameras in the header: their lamp from `checks.cameras`, in the hardware
+// link's word, and the `REC` chip, which reads CAM 1's state there.
+describe("the header's Cameras lamp and REC chip", () => {
+  const byId = (items: ReturnType<typeof buildMonitorItems>, id: string) => items.find((item) => item.id === id);
+  const camera = (number: number, state: string) => ({ camera: number, tag: `CAM ${number}`, state });
+  const check = (status: string, word: string, recording: boolean, main: string) => ({
+    status,
+    word,
+    recording,
+    cameras: [camera(1, main), camera(2, "held"), camera(3, "held")],
+  });
+
+  it("reads the lamp from checks.cameras in the hardware link's word", () => {
+    const lamp = (cameras: unknown) =>
+      byId(buildMonitorItems({ checks: { cameras } } as never, undefined, undefined), "cameras");
+    expect(lamp(check("ok", "HELD", false, "held"))).toMatchObject({ detail: "ready", status: "ok" });
+    expect(lamp(check("attention", "RELEASED", false, "held"))).toMatchObject({
+      detail: "released",
+      status: "attention",
+    });
+    expect(lamp(check("attention", "NOT SET UP", false, "not-set-up"))).toMatchObject({
+      detail: "not set up",
+      status: "attention",
+    });
+    expect(lamp(check("error", "UNREACHABLE", false, "held"))).toMatchObject({
+      detail: "unreachable",
+      status: "error",
+    });
+    expect(lamp(undefined)).toMatchObject({ detail: "pending", status: "attention" });
+    expect(lamp(null)).toMatchObject({ detail: "pending", status: "attention" });
+  });
+
+  it("shows REC red while CAM 1 is held and reports recording, and not otherwise", () => {
+    expect(recChipOf(check("ok", "HELD", true, "held"))).toEqual({ detail: "CAM 1", status: "error" });
+    expect(recChipOf(check("ok", "HELD", false, "held"))).toBeNull();
+    expect(recChipOf(check("attention", "NOT SET UP", false, "not-set-up"))).toBeNull();
+    expect(recChipOf(undefined)).toBeNull();
+    expect(recChipOf(null)).toBeNull();
+    expect(recChipOf({ status: "ok", recording: true })).toBeNull();
+  });
+
+  it("shows REC amber, last known, when CAM 1 does not answer and last reported recording", () => {
+    expect(recChipOf(check("error", "UNREACHABLE", true, "unreachable"))).toEqual({
+      detail: "last known",
+      status: "attention",
+    });
+    expect(recChipOf(check("error", "UNREACHABLE", false, "unreachable"))).toBeNull();
+  });
+
+  it("shows REC amber whenever CAM 1 is released: it is not read", () => {
+    expect(recChipOf(check("attention", "RELEASED", false, "released"))).toEqual({
+      detail: "not read while released",
+      status: "attention",
+    });
+  });
+
+  it("puts the chip last, after the other latches, and it opens the Cameras page", () => {
+    const items = buildMonitorItems({ checks: { cameras: check("ok", "HELD", true, "held") } } as never, {
+      lightingSceneDrift: true,
+      audioSolo: true,
+      prompterPlaying: "3:12",
+    });
+    expect(items.map((item) => item.id).slice(-4)).toEqual([
+      "latched:scene-drift",
+      "latched:solo",
+      "latched:prompter-playing",
+      "latched:rec",
+    ]);
+    expect(byId(items, "latched:rec")).toEqual({
+      id: "latched:rec",
+      label: "REC",
+      detail: "CAM 1",
+      status: "error",
+      target: "Cameras",
+    });
   });
 });

@@ -1,0 +1,196 @@
+/* The Cameras page's bay: board 2's middle. A caption row, the big picture
+   at exactly 1680 × 945, and a row of two small pictures and the loupe under
+   it. The pictures' sizes are the board's: they are the picture's own pixels
+   at a whole share, so nothing here is a token. */
+
+.bay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* Everything that would sit on the picture sits here, so the frame's edges
+   stay clear. */
+.caption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 1680px;
+  height: 34px;
+  flex: none;
+  white-space: nowrap;
+}
+
+.title {
+  color: var(--text-text2);
+  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+}
+
+.title b {
+  color: var(--text-text);
+  font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.detail {
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.lockNote {
+  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.lockNote[data-tone="attention"] {
+  color: var(--role-amber-text);
+}
+
+.lockNote[data-tone="error"] {
+  color: var(--role-red-text);
+}
+
+.aids {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.aidsNote {
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+}
+
+/* A small segmented pair: two keys as wide as their words. */
+.view,
+.zoom {
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--radius-key);
+}
+
+.view > *,
+.zoom > * {
+  flex: none;
+  min-height: 28px;
+}
+
+/* The picture's area is exactly the picture: its edge is an outline outside
+   it, not a border inside it. */
+.hero,
+.tile {
+  appearance: none;
+  position: relative;
+  display: block;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-ctl);
+  outline: 1px solid var(--material-line);
+  background: var(--material-well);
+  overflow: hidden;
+}
+
+.hero {
+  width: 1680px;
+  height: 945px;
+  cursor: crosshair;
+}
+
+.tile {
+  width: 544px;
+  height: 306px;
+  cursor: pointer;
+}
+
+.tile:hover {
+  outline-color: var(--material-line2);
+}
+
+.hero:focus-visible,
+.tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hero canvas,
+.tile canvas,
+.loupeBody canvas {
+  display: block;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  width: 1680px;
+  height: 306px;
+  flex: none;
+}
+
+/* A caption on a small picture: a display of its own, so its inks hold on
+   any picture. */
+.chip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  color: var(--display-text);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  white-space: nowrap;
+}
+
+.chip b {
+  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  letter-spacing: var(--font-tracking-cap);
+}
+
+.loupe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 568px;
+  flex: none;
+}
+
+.loupeHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  flex: none;
+}
+
+.loupeTitle {
+  color: var(--text-text);
+  font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+}
+
+.loupeNote {
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.zoom {
+  margin-left: auto;
+}
+
+.loupeBody {
+  width: 568px;
+  height: 272px;
+  flex: none;
+  border-radius: var(--radius-key);
+  outline: 1px solid var(--material-line);
+  background: var(--material-well);
+  overflow: hidden;
+}
