@@ -1,6 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LightingSceneSnapshot } from "@sse/engine-client";
-import { Key, NumberEntryDialog, Readout, Section, Slider, StateDisplay } from "@sse/design-system";
+import {
+  ARM_TIMEOUT_MS,
+  ArmKey,
+  Key,
+  NumberEntryDialog,
+  Readout,
+  Section,
+  Slider,
+  StateDisplay,
+  useArm,
+} from "@sse/design-system";
 
 import styles from "./LightingCluster.module.css";
 import { GroupRail, type GroupRailEntry } from "./GroupRail";
@@ -135,6 +145,10 @@ export function LightingCluster(props: LightingClusterProps) {
 
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [fadeDialogOpen, setFadeDialogOpen] = useState(false);
+  // Found, to check (2026-09-28): `Save · press twice` saved at the first
+  // press. It arms now, as its label says, and saves at a second press.
+  const arm = useArm();
+  const saveArmed = arm.armed?.key === "save-scene";
 
   const state: LightingState = deriveLightingState({
     bridgeIp,
@@ -152,6 +166,11 @@ export function LightingCluster(props: LightingClusterProps) {
 
   const anyOn = fixtureOnCount > 0;
   const rigLocked = state.locked || patchMode;
+  // A key that locks takes its arm with it.
+  const clearArm = arm.clear;
+  useEffect(() => {
+    if (rigLocked) clearArm();
+  }, [clearArm, rigLocked]);
   const lockedReason = state.locked
     ? state.sentence
     : patchMode
@@ -189,7 +208,9 @@ export function LightingCluster(props: LightingClusterProps) {
             testId="lighting-state-preview-save"
             onClick={onResaveScene}
           >
-            Save to the rig
+            {/* It saves the preview into the scene; the rig takes it when the
+                scene is recalled (it read `Save to the rig` until 2026-09-28). */}
+            Save into the scene
           </Key>
           <Key size="small" disabled={previewBusy} testId="lighting-state-preview-discard" onClick={onDiscardPreview}>
             Discard
@@ -206,6 +227,7 @@ export function LightingCluster(props: LightingClusterProps) {
         word={state.word}
         sentence={state.sentence}
         meta={state.meta}
+        armed={arm.armed ? { text: `${arm.armed.label} · press again`, timeoutMs: arm.armed.timeoutMs } : null}
         actions={stateActions}
         data-toolbar-primary="title"
         testId="lighting-state-display"
@@ -286,16 +308,19 @@ export function LightingCluster(props: LightingClusterProps) {
       >
         <SceneRail {...sceneRailProps} scenes={scenes} bridgeReachable={bridgeReachable} />
         <div className={styles.sectionKeys}>
-          <Key
+          <ArmKey
+            armed={saveArmed}
+            timeoutMs={ARM_TIMEOUT_MS}
+            countdownTestId="lighting-save-scene-countdown"
             size="small"
             locked={rigLocked}
             reason={lockedReason}
             take
             testId="lighting-save-scene"
-            onClick={onSaveScene}
+            onClick={() => arm.armOrApply("save-scene", "Save as a new scene", onSaveScene)}
           >
-            Save · press twice
-          </Key>
+            {saveArmed ? "Save" : "Save · press twice"}
+          </ArmKey>
         </div>
       </Section>
 

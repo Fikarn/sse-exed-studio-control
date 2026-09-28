@@ -26,10 +26,10 @@ export function prompterXlRow(
  *  keys. */
 export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
   const { commissioningSnapshot, healthSnapshot, lightOutputsArmed, onRequestRestart } = editor.props;
-  const { backups, lastBackup, busyAction, runtime, recentActions, uiScale, setUiScale } = editor.state;
+  const { backups, lastBackup, busyAction, runtime, recentActions, uiScale, setUiScale, setRestorePrompt } =
+    editor.state;
   const { engineLogPath, openEngineLog } = editor.chrome;
-  const { performAction, exportSupportBackup, exportDiagnostics, restoreBackup, setLightOutputsArmed, verifyBackup } =
-    editor.actions;
+  const { performAction, exportSupportBackup, exportDiagnostics, setLightOutputsArmed, verifyBackup } = editor.actions;
   return (
     <SupportPlate
       appVersion={APP_VERSION}
@@ -50,9 +50,10 @@ export function SetupWorkstationPlate({ editor }: { editor: SetupPilot }) {
       onExportDiagnostics={() => void performAction("export-shell-diagnostics", exportDiagnostics)}
       onOpenEngineLog={openEngineLog}
       onRestartBridge={onRequestRestart}
+      // A restore asks first, and says what it replaces (SetupPilotDialogs).
       onRestoreLatest={() => {
         if (!lastBackup) return;
-        void performAction("restore-latest", () => restoreBackup(lastBackup.path));
+        setRestorePrompt({ actionId: "restore-latest", path: lastBackup.path });
       }}
       onSelectUiScale={setUiScale}
       // New pages program, Slice 3 (decision 2): a window key says nothing when

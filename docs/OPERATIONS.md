@@ -25,7 +25,7 @@ A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Pro
 
 **Page.** The cluster on the left, the bay in the middle, the plate on the right. The state display, top left, says what is true in one word and one sentence, and offers the way out as a key. The footer holds the page's facts, such as `Metering TotalMix · live`.
 
-**Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s (3 s for the cameras' stop). A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
+**Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s (3 s for the cameras' stop and for a press that would unpublish the setup). A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
 
 **Keyboard.** No shortcuts. Tab, Enter and Space, typing, the arrows on a slider or a list, and `Esc` do what they do in any program.
 
@@ -35,13 +35,13 @@ The state display reads one of four words.
 
 - `REACHABLE`: the bridge passed its last probe. It reads so while the outputs are held too: only the header's lamp says `held`.
 - `UNSAVED`: the rig differs from the recalled scene. `Save changes` writes the rig into the scene. `Recall it again` puts the scene back.
-- `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save to the rig` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
+- `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
 - `UNREACHABLE`: the bridge has not passed its probe, and the rig's controls are locked. `Open Setup`, run the bridge probe, publish again.
 
 Held is not a blackout: the rig keeps its last look. Scenes and fixtures still move on screen. `DMX monitor` shows every channel as it is sent, or as it would be while held.
 
 - **Recall** is one press on a scene. `Fade` sets the fade, 0 to 10 s.
-- **Save.** `Save · press twice` and `New scene` save the rig as a new scene. `Save changes` saves over the recalled one. Each acts at the first press: no key on this page arms.
+- **Save.** `Save · press twice` arms at the first press and saves the rig as a new scene at the second. `New scene` does the same at one press. `Save changes` saves over the recalled scene at one press. `Undo` takes back a scene saved.
 - **Scenes.** Right-click one to rename, pin or delete it. Deleting asks first.
 - **All lights.** `LIGHTING` switches every fixture on or off. `CUT ALL` takes them all to off and asks first. `Grand master` is one level over them all.
 - **Select** a fixture on the plot. While `Add to selection` is lit, a press adds or removes one and a dragged box adds several. Press a group to switch it on or off.
@@ -155,13 +155,13 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 4. `Verify live echo`: a control pressed on the deck pulses on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
 
-A press on a step or on `Run all probes` unpublishes the setup at once: `Lighting`, `Audio`, `Cameras` and `Teleprompter` lock until `Publish setup` is pressed again. The devices and the deck keep working. Leave the runner alone during a session; the Console has its own `Run audio probe`.
+On a published setup, a press on a step, on `Back to …` or on `Run all probes` arms first: the state display says that `Lighting`, `Audio`, `Cameras` and `Teleprompter` would lock, and a second press within 3 s unpublishes the setup. They stay locked until `Publish setup` is pressed again. The devices and the deck keep working. A press on `Publish`, the step a published setup stands on, does nothing. Leave the runner alone during a session; the Console has its own `Run audio probe`.
 
 **Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` is `ARMED` or `HELD`; arming sends the current state at once. `Prompter XL` shows what Windows reports.
 
 **Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing, CAM 2's and CAM 3's addresses, and the vMix input that carries each picture. Saving sends nothing to a camera. `Forget` removes a pairing or an address and keeps the vMix input. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked, and the vMix input can be set.
 
-**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it, at one press. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore replaces the saved data and keeps a copy of what it replaced. A database backup restarts the hardware link. The light outputs stay armed or held as they were.
+**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. The light outputs stay armed or held as they were.
 
 **Diagnostics.** `Export diagnostics` writes a report. `Engine log` opens the log.
 
@@ -189,7 +189,7 @@ A press on a step or on `Run all probes` unpublishes the setup at once: `Lightin
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
 | Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
 
-The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, or press one in the list and `Restore path`. The link restarts into it, with the light outputs armed or held as that backup had them.
+The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs armed or held as that backup had them.
 
 Closing asks first. It resets and recalls nothing: TotalMix keeps its state, the light output stops and the fixtures hold their last levels.
 

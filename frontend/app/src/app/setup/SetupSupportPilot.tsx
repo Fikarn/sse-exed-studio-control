@@ -28,12 +28,20 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
   const { store } = props;
   const { busyAction, canReturnToConsole, checks, mode, feedback, runnerSteps, stepIndex } = editor.state;
   const { setupState, clusterSteps, openEngineLog } = editor.chrome;
-  const { performAction, exportSupportBackup, persistMode, activateStep, runAllProbes, requestStepSelection } =
-    editor.actions;
+  const { arm } = editor.state;
+  const {
+    performAction,
+    exportSupportBackup,
+    persistMode,
+    activateStep,
+    runAllProbesFromCluster,
+    requestStepSelection,
+  } = editor.actions;
   return (
     <div className={styles.workspaceStack} data-testid="setup-workspace">
       <ShellRegion region="cluster">
         <SetupCluster
+          armed={arm.armed}
           busy={busyAction !== null}
           canReturnToConsole={canReturnToConsole}
           checks={probeChecks(checks)}
@@ -43,11 +51,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
           onExportBackup={() => void performAction("support-export", exportSupportBackup)}
           onOpenEngineLog={openEngineLog}
           onReturnToConsole={() => void store.setWorkspace("audio")}
-          onRunAllProbes={() => {
-            persistMode("runner");
-            void activateStep("probe");
-            void performAction("run-all-probes", () => runAllProbes(true));
-          }}
+          onRunAllProbes={runAllProbesFromCluster}
           onSelectMode={persistMode}
           onSelectStep={(stepId) => requestStepSelection(stepId as RunnerStepId)}
           onStartRunner={() => {

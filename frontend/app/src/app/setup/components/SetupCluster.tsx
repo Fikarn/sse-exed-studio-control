@@ -1,7 +1,7 @@
-import { Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
+import { ArmKey, type ArmedKey, Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
 
 import type { CommissioningCheck } from "../../shellData";
-import type { SetupMode } from "../setupPilotModel";
+import { type SetupMode, UNPUBLISH_ARMED_SENTENCE } from "../setupPilotModel";
 import type { SetupState } from "../setupState";
 import styles from "./SetupCluster.module.css";
 
@@ -21,6 +21,9 @@ export interface SetupClusterStep {
 }
 
 export interface SetupClusterProps {
+  /** The press that would unpublish the setup, armed: `step:<id>`, `back` or
+   *  `run-all-probes` (owner's decision, 2026-09-28). */
+  armed?: ArmedKey | null;
   busy?: boolean;
   canReturnToConsole: boolean;
   checks: readonly CommissioningCheck[];
@@ -63,6 +66,7 @@ function probeWord(status: CommissioningCheck["status"]) {
 }
 
 export function SetupCluster({
+  armed = null,
   busy = false,
   canReturnToConsole,
   checks,
@@ -78,13 +82,28 @@ export function SetupCluster({
   onStartRunner,
 }: SetupClusterProps) {
   const firstStep = steps[0];
+  const probesArmed = armed?.key === "run-all-probes";
 
   // The way out of the state commissioning is in, as a key on the display.
   const stateActions =
     state.wayOut === "run-probes" ? (
-      <Key size="small" mode="primary" disabled={busy} testId="setup-state-run-probes" onClick={onRunAllProbes}>
-        Run all probes
-      </Key>
+      probesArmed && armed ? (
+        <ArmKey
+          armed
+          timeoutMs={armed.timeoutMs}
+          size="small"
+          disabled={busy}
+          countdownTestId="setup-state-run-probes-countdown"
+          testId="setup-state-run-probes"
+          onClick={onRunAllProbes}
+        >
+          Run all probes
+        </ArmKey>
+      ) : (
+        <Key size="small" mode="primary" disabled={busy} testId="setup-state-run-probes" onClick={onRunAllProbes}>
+          Run all probes
+        </Key>
+      )
     ) : state.wayOut === "start-runner" && firstStep ? (
       <Key size="small" mode="primary" testId="setup-state-start" onClick={onStartRunner}>
         Start with {firstStep.label}
@@ -96,8 +115,17 @@ export function SetupCluster({
       <StateDisplay
         tone={state.tone}
         word={state.word}
-        sentence={state.sentence}
-        meta={state.meta}
+        // While a press to unpublish is armed the sentence says what it locks.
+        // The way out's own key says it is armed; the armed row is for the
+        // others (the Teleprompter's rule), so everything fits the display.
+        sentence={armed ? UNPUBLISH_ARMED_SENTENCE : state.sentence}
+        // Its three lines take the meta line's room for the 3 s.
+        meta={armed ? undefined : state.meta}
+        armed={
+          armed && !(probesArmed && state.wayOut === "run-probes")
+            ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs }
+            : null
+        }
         actions={stateActions}
         data-toolbar-primary="title"
         testId="setup-state-display"
@@ -140,29 +168,33 @@ export function SetupCluster({
         testId="setup-steps-section"
       >
         <div className={styles.steps} role="tablist" aria-label="Commissioning runner">
-          {steps.map((step, index) => (
-            <button
-              key={step.id}
-              type="button"
-              role="tab"
-              aria-selected={step.standing === "current"}
-              aria-label={`Step ${index + 1} ${step.label}`}
-              className={styles.step}
-              data-material="key"
-              data-current={step.standing === "current"}
-              data-standing={step.standing}
-              data-testid={`setup-step-${step.id}`}
-              onClick={() => onSelectStep(step.id)}
-            >
-              <span className={styles.stepNumber}>{index + 1}</span>
-              <span className={styles.stepName}>{step.label}</span>
-              <span className={styles.stepHint}>{step.hint}</span>
-              <span className={styles.stepStanding}>
-                <Lamp tone={stepLampTone(step.standing)} />
-                {STANDING_WORD[step.standing]}
-              </span>
-            </button>
-          ))}
+          {steps.map((step, index) => {
+            const stepArmed = armed?.key === `step:${step.id}`;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                role="tab"
+                aria-selected={step.standing === "current"}
+                aria-label={`Step ${index + 1} ${step.label}`}
+                className={styles.step}
+                data-material="key"
+                data-current={step.standing === "current"}
+                data-standing={step.standing}
+                data-armed={stepArmed ? "true" : "false"}
+                data-testid={`setup-step-${step.id}`}
+                onClick={() => onSelectStep(step.id)}
+              >
+                <span className={styles.stepNumber}>{index + 1}</span>
+                <span className={styles.stepName}>{step.label}</span>
+                <span className={styles.stepHint}>{step.hint}</span>
+                <span className={styles.stepStanding}>
+                  <Lamp tone={stepArmed ? "attention" : stepLampTone(step.standing)} />
+                  {stepArmed ? "press again" : STANDING_WORD[step.standing]}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </Section>
 
@@ -172,9 +204,23 @@ export function SetupCluster({
         detail={`${state.passedProbeCount} of ${state.probeCount} passed`}
         testId="setup-probes-section"
         actions={
-          <Key size="small" disabled={busy} testId="setup-run-all-probes" onClick={onRunAllProbes}>
-            Run all probes
-          </Key>
+          probesArmed && armed ? (
+            <ArmKey
+              armed
+              timeoutMs={armed.timeoutMs}
+              size="small"
+              disabled={busy}
+              countdownTestId="setup-run-all-probes-countdown"
+              testId="setup-run-all-probes"
+              onClick={onRunAllProbes}
+            >
+              Run all probes
+            </ArmKey>
+          ) : (
+            <Key size="small" disabled={busy} testId="setup-run-all-probes" onClick={onRunAllProbes}>
+              Run all probes
+            </Key>
+          )
         }
       >
         <div className={styles.probes}>

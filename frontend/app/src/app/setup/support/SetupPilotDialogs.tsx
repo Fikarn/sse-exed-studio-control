@@ -1,18 +1,29 @@
 import { useCallback } from "react";
 
 import { ConfirmDialog } from "@sse/design-system";
+import { RestoreConfirmDialog } from "../components/RestoreConfirmDialog";
 import type { SetupPilot } from "../useSetupPilot";
 
-/** The pilot's confirmations: publishing over probes that are not green, and
- *  leaving a step. */
+/** The pilot's confirmations: publishing over probes that are not green,
+ *  leaving a step, and restoring a backup. */
 export function SetupPilotDialogs({ editor }: { editor: SetupPilot }) {
-  const { publishOverridePrompt, setPublishOverridePrompt, pendingStepId, setPendingStepId } = editor.state;
-  const { performAction, publishSetup, activateStep } = editor.actions;
+  const {
+    publishOverridePrompt,
+    setPublishOverridePrompt,
+    pendingStepId,
+    setPendingStepId,
+    restorePrompt,
+    setRestorePrompt,
+    backups,
+    busyAction,
+  } = editor.state;
+  const { performAction, publishSetup, activateStep, restoreBackup } = editor.actions;
   // A dialog moves focus in again whenever its close handler changes, so the
   // handlers keep one identity while the dialog is open: the Verify step asks
   // the deck twice a second, and every answer draws the pilot again.
   const cancelPublishOverride = useCallback(() => setPublishOverridePrompt(null), [setPublishOverridePrompt]);
   const cancelSkipAhead = useCallback(() => setPendingStepId(null), [setPendingStepId]);
+  const cancelRestore = useCallback(() => setRestorePrompt(null), [setRestorePrompt]);
   return (
     <>
       {publishOverridePrompt ? (
@@ -57,6 +68,19 @@ export function SetupPilotDialogs({ editor }: { editor: SetupPilot }) {
             setPendingStepId(null);
           }}
           title="Skip ahead?"
+        />
+      ) : null}
+
+      {restorePrompt ? (
+        <RestoreConfirmDialog
+          backups={backups}
+          busy={busyAction !== null}
+          prompt={restorePrompt}
+          onCancel={cancelRestore}
+          onConfirm={() => {
+            setRestorePrompt(null);
+            void performAction(restorePrompt.actionId, () => restoreBackup(restorePrompt.path));
+          }}
         />
       ) : null}
     </>

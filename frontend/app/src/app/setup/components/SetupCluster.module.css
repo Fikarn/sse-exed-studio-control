@@ -53,6 +53,16 @@
   border-color: var(--accent);
 }
 
+/* A press that would unpublish the setup, armed: the armed key's amber
+   keyline, without moving the key. */
+.step[data-armed="true"] {
+  border-color: var(--display-amber);
+}
+
+.step[data-armed="true"] .stepStanding {
+  color: var(--role-amber-text);
+}
+
 .stepNumber {
   grid-row: 1 / span 2;
   font: 600 var(--font-size-label) / 1 var(--font-family-mono);

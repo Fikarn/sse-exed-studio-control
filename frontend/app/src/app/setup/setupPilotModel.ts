@@ -72,6 +72,14 @@ export interface RunnerStep {
 
 export const runnerStepOrder: RunnerStepId[] = ["import", "probe", "map", "verify", "publish"];
 
+/** A press that would unpublish a published setup arms for 3 s, the Cameras
+ *  stop's window (owner's decision, 2026-09-28). */
+export const UNPUBLISH_WINDOW_MS = 3000;
+export const UNPUBLISH_ARM_LABEL = "Unpublish the setup";
+/** What the state display says while that press is armed: what gets locked. */
+export const UNPUBLISH_ARMED_SENTENCE =
+  "A second press unpublishes the setup: Lighting, Audio, Cameras and Teleprompter lock until it is published again.";
+
 export function parseControlSurfacePages(snapshot: SnapshotRecord | null): ControlSurfacePage[] {
   const pages = snapshot?.pages;
   if (!Array.isArray(pages)) {
