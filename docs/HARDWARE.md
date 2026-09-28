@@ -111,8 +111,8 @@ The studio build is the release build the owner starts on the real saved data.
 Always:
 
 - Never let a test write to TotalMix's ports `7001`–`7010` or to the sACN bridge.
-- Give every test and development run its own data folder (`SSE_APP_DATA_DIR`), the simulated console (`SSE_AUDIO_SIMULATED_INPUT_MODE=1`), the simulated cameras (`SSE_CAMERAS_SIMULATED=1`), a safe start (`SSE_SAFE_START=1`) and a bridge port other than `38201` (`SSE_CONTROL_SURFACE_PORT`).
-- Open the real saved data, `%APPDATA%\ExEd Studio Control Native`, only with the studio build.
+- Give every test and development run its own data folder (`SSE_APP_DATA_DIR`), the simulated console (`SSE_AUDIO_SIMULATED_INPUT_MODE=1`), the simulated cameras (`SSE_CAMERAS_SIMULATED=1`), a safe start (`SSE_SAFE_START=1`) and a bridge port other than `38201` (`SSE_CONTROL_SURFACE_PORT`). `npm run app` and the test lanes set all five.
+- Open the real saved data, `%APPDATA%\ExEd Studio Control Native`, only with the studio build. A development build refuses it.
 - Do not close TotalMix FX, Companion or vMix. They are the owner's to start and stop.
 - Never write the Pocket's status characteristic.
 - Never scan the network. Talk only to the addresses typed into Setup.

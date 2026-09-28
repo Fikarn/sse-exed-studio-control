@@ -564,8 +564,66 @@ pub(crate) fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String
     if !app_data_dir.is_absolute() || !logs_dir.is_absolute() {
         return Err("Runtime paths must resolve to absolute directories.".to_string());
     }
+    refuse_studio_data_in_development(
+        cfg!(debug_assertions),
+        current_runtime_platform(),
+        &app_data_dir,
+        |name| std::env::var_os(name),
+    )?;
 
     Ok((app_data_dir, logs_dir))
+}
+
+/// A development build never opens the studio's saved data: the twin of the
+/// engine's `refuse_studio_data_in_development` (bootstrap.rs), which says
+/// why. Every folder the shell creates, writes or opens comes from
+/// `resolve_runtime_directories`, so a development shell stops here before
+/// it writes as much as a line of `shell.log` into the studio's folder.
+fn refuse_studio_data_in_development<F>(
+    development_build: bool,
+    platform: RuntimePlatform,
+    app_data_dir: &Path,
+    get_env: F,
+) -> Result<(), String>
+where
+    F: FnMut(&str) -> Option<OsString>,
+{
+    if !development_build {
+        return Ok(());
+    }
+    let Ok(studio_data_dir) = default_app_data_dir_for_platform(platform, get_env) else {
+        // No default folder on this host: there is no studio data to open.
+        return Ok(());
+    };
+    if !same_folder(app_data_dir, &studio_data_dir) {
+        return Ok(());
+    }
+    Err(format!(
+        "This is a development build, and {} holds the studio's saved data. Start it with `npm run app`, which gives it a folder of its own, or name another folder in SSE_APP_DATA_DIR.",
+        studio_data_dir.display()
+    ))
+}
+
+/// Whether two paths name one folder: as the file system resolves them when
+/// they exist, as written otherwise; part by part, so a trailing separator
+/// or the other separator changes nothing, and without regard to case on
+/// Windows.
+fn same_folder(left: &Path, right: &Path) -> bool {
+    let parts = |path: &Path| -> Vec<String> {
+        std::fs::canonicalize(path)
+            .unwrap_or_else(|_| path.to_path_buf())
+            .components()
+            .map(|part| {
+                let part = part.as_os_str().to_string_lossy();
+                if cfg!(target_os = "windows") {
+                    part.to_lowercase()
+                } else {
+                    part.into_owned()
+                }
+            })
+            .collect()
+    };
+    parts(left) == parts(right)
 }
 
 fn env_path(name: &str) -> Option<PathBuf> {
@@ -622,8 +680,14 @@ where
     })
 }
 
+/// The engine this shell starts: the one in the shell's own folder, and no
+/// other. A studio build is a folder that holds both, and cargo puts both in
+/// one folder as well (`native/target/debug`, where `npm run app` and the
+/// lanes run them). Until 2026-09-28 a shell with no engine beside it went
+/// on to the repository's `target/debug` and `target/release`, whose path is
+/// compiled in, and `SSE_ENGINE_BIN` named any other: a studio build could
+/// start whatever engine the last development build had left there.
 pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let binary_name = if cfg!(target_os = "windows") {
         "studio-control-engine.exe"
     } else {
@@ -631,44 +695,27 @@ pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
         "studio-control-engine"
     };
 
-    resolve_engine_binary_from(
-        std::env::var_os("SSE_ENGINE_BIN").map(PathBuf::from),
-        std::env::current_exe().ok(),
-        &manifest_dir,
-        binary_name,
-    )
+    resolve_engine_binary_from(std::env::current_exe().ok(), binary_name)
 }
 
 fn resolve_engine_binary_from(
-    explicit_path: Option<PathBuf>,
     current_exe: Option<PathBuf>,
-    manifest_dir: &Path,
     binary_name: &str,
 ) -> Result<PathBuf, String> {
-    if let Some(binary_path) = explicit_path {
-        if binary_exists(&binary_path) {
-            return Ok(binary_path);
-        }
-        return Err(format!(
-            "Configured engine binary does not exist: {}",
-            binary_path.display()
-        ));
-    }
-
-    let candidates = [
-        current_exe.and_then(|path| path.parent().map(|parent| parent.join(binary_name))),
-        Some(manifest_dir.join("../target/debug").join(binary_name)),
-        Some(manifest_dir.join("../target/release").join(binary_name)),
-    ];
-
-    candidates
-        .into_iter()
-        .flatten()
-        .find(|candidate| binary_exists(candidate))
+    let beside = current_exe
+        .as_deref()
+        .and_then(Path::parent)
+        .map(|folder| folder.join(binary_name))
         .ok_or_else(|| {
-            "Unable to locate the Rust engine binary. Set SSE_ENGINE_BIN or build native/rust-engine first."
-                .to_string()
-        })
+            format!("The app could not read its own folder, where it starts {binary_name}.")
+        })?;
+    if binary_exists(&beside) {
+        return Ok(beside);
+    }
+    Err(format!(
+        "{} is missing. The app starts it from its own folder and from nowhere else, so this build is incomplete.",
+        beside.display()
+    ))
 }
 
 fn binary_exists(path: &Path) -> bool {
@@ -1009,71 +1056,121 @@ mod tests {
         );
     }
 
+    // Streamlining, 2026-09-28: the shell starts the engine in its own folder
+    // and no other. Until then a shell with none beside it took the
+    // repository's `target/debug`, then its `target/release`, and
+    // `SSE_ENGINE_BIN` named any other.
     #[test]
-    fn engine_override_wins_before_packaged_and_dev_candidates() {
-        let tree = TempTree::new("override");
+    fn the_engine_beside_the_shell_is_the_one_started() {
+        let tree = TempTree::new("beside");
         let binary_name = "studio-control-engine";
-        let override_engine = tree.path("override/studio-control-engine");
-        let shell_exe = tree.path("package/sse-exed-tauri-shell");
-        let packaged_engine = tree.path("package/studio-control-engine");
-        let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
-
-        touch(&override_engine);
+        let shell_exe = tree.path("build/sse-exed-tauri-shell");
+        let engine = tree.path("build/studio-control-engine");
         touch(&shell_exe);
-        touch(&packaged_engine);
-        touch(&manifest_dir.join("Cargo.toml"));
-        touch(&dev_engine);
+        touch(&engine);
 
-        let resolved = resolve_engine_binary_from(
-            Some(override_engine.clone()),
-            Some(shell_exe),
-            &manifest_dir,
-            binary_name,
-        )
-        .expect("explicit engine override should resolve");
+        let resolved = resolve_engine_binary_from(Some(shell_exe), binary_name)
+            .expect("the engine beside the shell resolves");
 
-        assert_eq!(resolved, override_engine);
+        assert_eq!(resolved, engine);
     }
 
     #[test]
-    fn packaged_engine_next_to_shell_wins_before_dev_candidate() {
-        let tree = TempTree::new("packaged");
+    fn a_shell_with_no_engine_beside_it_starts_none() {
+        let tree = TempTree::new("alone");
         let binary_name = "studio-control-engine";
-        let shell_exe = tree.path("package/sse-exed-tauri-shell");
-        let packaged_engine = tree.path("package/studio-control-engine");
-        let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
-
+        let shell_exe = tree.path("build/sse-exed-tauri-shell");
         touch(&shell_exe);
-        touch(&packaged_engine);
-        touch(&manifest_dir.join("Cargo.toml"));
-        touch(&dev_engine);
+        // What the old search went on to: the engines a development build
+        // leaves in the repository.
+        touch(&tree.path("repo/native/target/debug/studio-control-engine"));
+        touch(&tree.path("repo/native/target/release/studio-control-engine"));
+        // A folder of that name is not an engine.
+        fs::create_dir_all(tree.path("folder/studio-control-engine")).expect("a folder");
+        touch(&tree.path("folder/sse-exed-tauri-shell"));
 
-        let resolved =
-            resolve_engine_binary_from(None, Some(shell_exe), &manifest_dir, binary_name)
-                .expect("packaged side-by-side engine should resolve");
+        let expected = shell_exe
+            .parent()
+            .expect("the shell's folder")
+            .join(binary_name);
+        let error = resolve_engine_binary_from(Some(shell_exe), binary_name)
+            .expect_err("no engine beside the shell");
+        assert!(error.contains(&expected.display().to_string()), "{error}");
+        assert!(error.contains("missing"), "{error}");
 
-        assert_eq!(resolved, packaged_engine);
+        resolve_engine_binary_from(Some(tree.path("folder/sse-exed-tauri-shell")), binary_name)
+            .expect_err("a folder is not an engine");
+        let error = resolve_engine_binary_from(None, binary_name)
+            .expect_err("a shell that cannot read its own path starts nothing");
+        assert!(error.contains(binary_name), "{error}");
+    }
+
+    // Streamlining, 2026-09-28: a development build (one with debug
+    // assertions) is refused the studio's saved data; the engine's test of
+    // the same name says why (bootstrap.rs).
+    #[test]
+    fn a_development_build_is_refused_the_studios_saved_data() {
+        let platform = current_runtime_platform();
+        let host: &[(&str, &str)] = if cfg!(target_os = "windows") {
+            &[("APPDATA", "C:\\Users\\operator\\AppData\\Roaming")]
+        } else {
+            &[("HOME", "/home/operator")]
+        };
+        let studio = default_app_data_dir_for_platform(platform, env_fixture(host))
+            .expect("the platform base resolves");
+
+        let error = refuse_studio_data_in_development(true, platform, &studio, env_fixture(host))
+            .expect_err("the default folder is the studio's");
+        assert!(error.contains("npm run app"), "{error}");
+        assert!(error.contains("SSE_APP_DATA_DIR"), "{error}");
+        assert!(error.contains(&studio.display().to_string()), "{error}");
+        let with_separator =
+            PathBuf::from(format!("{}{}", studio.display(), std::path::MAIN_SEPARATOR));
+        refuse_studio_data_in_development(true, platform, &with_separator, env_fixture(host))
+            .expect_err("a separator at its end names the same folder");
+
+        // The studio's build, a release build, opens it.
+        refuse_studio_data_in_development(false, platform, &studio, env_fixture(host))
+            .expect("a release build opens the studio's data");
+
+        // A folder of the run's own: a scratch folder, one beside the
+        // studio's, one inside it.
+        let tree = TempTree::new("development-data");
+        for own in [
+            tree.path("app-data"),
+            studio.with_file_name(format!("{DEFAULT_APP_DATA_DIR_NAME} Dev")),
+            studio.join("development"),
+        ] {
+            refuse_studio_data_in_development(true, platform, &own, env_fixture(host))
+                .unwrap_or_else(|error| panic!("{} is not the studio's: {error}", own.display()));
+        }
+        // A host with no platform base has no studio data to open.
+        refuse_studio_data_in_development(true, platform, &tree.path("app-data"), env_fixture(&[]))
+            .expect("nothing to refuse without a default folder");
     }
 
     #[test]
-    fn dev_engine_resolves_when_packaged_candidate_is_missing() {
-        let tree = TempTree::new("dev");
-        let binary_name = "studio-control-engine";
-        let shell_exe = tree.path("package/sse-exed-tauri-shell");
-        let manifest_dir = tree.path("repo/native/tauri-shell");
-        let dev_engine = manifest_dir.join("../target/debug").join(binary_name);
+    fn one_folder_is_recognised_however_it_is_written() {
+        let tree = TempTree::new("same-folder");
+        let folder = tree.path("Studio Data");
+        fs::create_dir_all(folder.join("logs")).expect("folders");
 
-        touch(&shell_exe);
-        touch(&manifest_dir.join("Cargo.toml"));
-        touch(&dev_engine);
-
-        let resolved =
-            resolve_engine_binary_from(None, Some(shell_exe), &manifest_dir, binary_name)
-                .expect("dev engine candidate should resolve");
-
-        assert_eq!(resolved, dev_engine);
+        assert!(same_folder(&folder, &folder));
+        assert!(same_folder(&folder.join("logs").join(".."), &folder));
+        assert!(!same_folder(&folder, &folder.join("logs")));
+        let missing = tree.path("missing");
+        assert!(same_folder(&missing, &missing));
+        assert!(!same_folder(&missing, &tree.path("other")));
+        // Windows does not tell `Studio Data` from `STUDIO DATA`; the Linux
+        // CI runners do.
+        assert_eq!(
+            same_folder(&folder, &tree.path("STUDIO DATA")),
+            cfg!(target_os = "windows")
+        );
+        assert_eq!(
+            same_folder(&missing, &tree.path("MISSING")),
+            cfg!(target_os = "windows")
+        );
     }
 
     // 2026-09 production readiness, Slice 4 (finding F08): an id that is

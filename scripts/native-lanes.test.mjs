@@ -123,6 +123,7 @@ const DESTRUCTIVE_SCRIPTS = [
   "scripts/frontend/storybook-static-server.mjs",
   "scripts/dev-doctor.mjs",
   "scripts/file-health.mjs",
+  "scripts/dev-app.mjs",
 ];
 
 function read(relative) {

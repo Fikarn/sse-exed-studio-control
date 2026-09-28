@@ -550,3 +550,74 @@ fn second_engine_on_the_same_app_data_dir_is_refused() {
     third.shutdown();
     let _ = fs::remove_dir_all(&shared_dir);
 }
+
+// Streamlining, 2026-09-28: a development build (one with debug assertions,
+// which `cargo test` builds) is refused the studio's saved data, the
+// platform's default folder. Started with no SSE_APP_DATA_DIR it reports
+// BOOTSTRAP_FAILED and ends, and the folder it would have opened is not even
+// created. The platform's base is a scratch folder here, so the default is
+// never this machine's own.
+#[test]
+fn a_development_build_is_refused_the_default_data_folder() {
+    if !cfg!(debug_assertions) {
+        // `cargo test --release` builds the studio's kind of engine, which
+        // opens the default folder: nothing to refuse.
+        return;
+    }
+    let base = unique_runtime_dir("refused-default-folder");
+    let refused = |data_dir: Option<PathBuf>| {
+        let mut command = Command::new(engine_binary_path());
+        command
+            .env_remove("SSE_APP_DATA_DIR")
+            .env_remove("SSE_LOG_DIR")
+            .env("APPDATA", &base)
+            .env("LOCALAPPDATA", &base)
+            .env("XDG_DATA_HOME", &base)
+            .env("HOME", &base)
+            .env("SSE_CONTROL_SURFACE_PORT", "0")
+            .env("SSE_SAFE_START", "1")
+            .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
+            .env("SSE_CAMERAS_SIMULATED", "1")
+            .stdin(Stdio::null());
+        if let Some(data_dir) = data_dir {
+            command.env("SSE_APP_DATA_DIR", data_dir);
+        }
+        let output = command.output().expect("engine binary should run");
+        assert!(
+            !output.status.success(),
+            "a refused engine exits with an error status (got {:?})",
+            output.status
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let failure: Value = stdout
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok())
+            .find(|value| {
+                value.get("event").and_then(Value::as_str) == Some("engine.startupFailed")
+            })
+            .unwrap_or_else(|| panic!("no engine.startupFailed event in {stdout:?}"));
+        assert_eq!(failure["payload"]["code"], json!("BOOTSTRAP_FAILED"));
+        let message = failure["payload"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(message.contains("development build"), "{message}");
+        assert!(message.contains("npm run app"), "{message}");
+        let left_behind: Vec<_> = fs::read_dir(&base)
+            .expect("the scratch base reads")
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect();
+        assert!(
+            left_behind.is_empty(),
+            "the refused start created {left_behind:?}"
+        );
+    };
+
+    // No folder named: the platform's default.
+    refused(None);
+    // The default folder named outright is refused as well.
+    refused(Some(base.join("ExEd Studio Control Native")));
+
+    let _ = fs::remove_dir_all(&base);
+}

@@ -195,8 +195,19 @@ where
         })
 }
 
+/// The folders and switches of this start, read from the environment. A
+/// development build is refused the studio's saved data here, so every start
+/// passes the refusal before it creates or opens anything.
 pub fn resolve_runtime_paths() -> Result<RuntimePaths, String> {
-    resolve_runtime_paths_from(current_runtime_platform(), |name| env::var_os(name))
+    let platform = current_runtime_platform();
+    let paths = resolve_runtime_paths_from(platform, |name| env::var_os(name))?;
+    refuse_studio_data_in_development(
+        cfg!(debug_assertions),
+        platform,
+        &paths.app_data_dir,
+        |name| env::var_os(name),
+    )?;
+    Ok(paths)
 }
 
 fn resolve_runtime_paths_from<F>(
@@ -236,6 +247,67 @@ where
         safe_start,
         cameras_simulated,
     })
+}
+
+/// A development build never opens the studio's saved data.
+///
+/// A build with debug assertions (`cargo build`, `tauri dev`) is a development
+/// build; the studio runs a release build. A newer development build would
+/// upgrade the studio's saved data at its first start, after which the
+/// studio's own build refuses it, and the addresses saved there would put a
+/// development run on the real console and rig. So a development build whose
+/// data folder is the studio's own (the platform's default, which is also
+/// what a missing `SSE_APP_DATA_DIR` gives) stops before it creates or opens
+/// anything there, the log included.
+///
+/// `npm run app` gives a development run a folder of its own. To work on the
+/// studio's data, copy the folder and name the copy in `SSE_APP_DATA_DIR`.
+/// The shell's `refuse_studio_data_in_development` is this one's twin.
+fn refuse_studio_data_in_development<F>(
+    development_build: bool,
+    platform: RuntimePlatform,
+    app_data_dir: &Path,
+    mut get_env: F,
+) -> Result<(), String>
+where
+    F: FnMut(&str) -> Option<OsString>,
+{
+    if !development_build {
+        return Ok(());
+    }
+    let Ok(studio_data_dir) = default_app_data_dir_for_platform(platform, &mut get_env) else {
+        // No default folder on this host: there is no studio data to open.
+        return Ok(());
+    };
+    if !same_folder(app_data_dir, &studio_data_dir) {
+        return Ok(());
+    }
+    Err(format!(
+        "This is a development build, and {} holds the studio's saved data. Start it with `npm run app`, which gives it a folder of its own, or name another folder in SSE_APP_DATA_DIR.",
+        studio_data_dir.display()
+    ))
+}
+
+/// Whether two paths name one folder: as the file system resolves them when
+/// they exist, as written otherwise; part by part, so a trailing separator
+/// or the other separator changes nothing, and without regard to case on
+/// Windows.
+fn same_folder(left: &Path, right: &Path) -> bool {
+    let parts = |path: &Path| -> Vec<String> {
+        fs::canonicalize(path)
+            .unwrap_or_else(|_| path.to_path_buf())
+            .components()
+            .map(|part| {
+                let part = part.as_os_str().to_string_lossy();
+                if cfg!(target_os = "windows") {
+                    part.to_lowercase()
+                } else {
+                    part.into_owned()
+                }
+            })
+            .collect()
+    };
+    parts(left) == parts(right)
 }
 
 /// `SSE_SAFE_START=1` is the documented form. The variable holds the light
@@ -823,10 +895,10 @@ mod tests {
     use super::{
         acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
         current_runtime_platform, default_app_data_dir_for_platform, left_over_db_json_from,
-        resolve_runtime_paths_from, safe_start_requested, startup_failure_code,
-        storage_startup_failure, validate_protocol_version, warn_about_a_left_over_db_json,
-        RuntimePaths, RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME,
-        INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
+        refuse_studio_data_in_development, resolve_runtime_paths_from, safe_start_requested,
+        same_folder, startup_failure_code, storage_startup_failure, validate_protocol_version,
+        warn_about_a_left_over_db_json, RuntimePaths, RuntimePlatform, StartupFailure,
+        DEFAULT_APP_DATA_DIR_NAME, INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
         STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
         STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
     };
@@ -1019,6 +1091,105 @@ mod tests {
         assert_eq!(
             paths.update_repository_path,
             Some(PathBuf::from("/tmp/sse-updates"))
+        );
+    }
+
+    // Streamlining, 2026-09-28: a development build (one with debug
+    // assertions) is refused the studio's saved data, the platform's default
+    // folder, before it creates or opens anything there. Until then
+    // `npm run tauri:dev` and an engine started by hand opened the studio's
+    // data whenever SSE_APP_DATA_DIR was not set: a newer build upgraded it at
+    // that start, and the studio's own build then refused it.
+    #[test]
+    fn a_development_build_is_refused_the_studios_saved_data() {
+        let (base_name, base_value) = host_platform_base();
+        let platform = current_runtime_platform();
+        let host = [(base_name, base_value)];
+        let studio = default_app_data_dir_for_platform(platform, &mut env_fixture(&host))
+            .expect("the platform base resolves");
+
+        // No SSE_APP_DATA_DIR: the start would land in the studio's folder.
+        let unnamed = resolve_runtime_paths_from(platform, env_fixture(&host))
+            .expect("the default resolves")
+            .app_data_dir;
+        let error = refuse_studio_data_in_development(true, platform, &unnamed, env_fixture(&host))
+            .expect_err("the default folder is the studio's");
+        assert!(error.contains("npm run app"), "{error}");
+        assert!(error.contains("SSE_APP_DATA_DIR"), "{error}");
+        assert!(error.contains(&studio.display().to_string()), "{error}");
+
+        // The studio's folder named outright is the same folder, with a
+        // separator at its end as well.
+        let named = format!("{}{}", studio.display(), std::path::MAIN_SEPARATOR);
+        let named = resolve_runtime_paths_from(
+            platform,
+            env_fixture(&[(base_name, base_value), ("SSE_APP_DATA_DIR", &named)]),
+        )
+        .expect("the named folder resolves")
+        .app_data_dir;
+        refuse_studio_data_in_development(true, platform, &named, env_fixture(&host))
+            .expect_err("the studio's folder is refused by name too");
+
+        // The studio's build, a release build, opens it.
+        refuse_studio_data_in_development(false, platform, &unnamed, env_fixture(&host))
+            .expect("a release build opens the studio's data");
+    }
+
+    #[test]
+    fn a_development_build_opens_a_folder_of_its_own() {
+        let (base_name, base_value) = host_platform_base();
+        let platform = current_runtime_platform();
+        let host = [(base_name, base_value)];
+        let studio = default_app_data_dir_for_platform(platform, &mut env_fixture(&host))
+            .expect("the platform base resolves");
+
+        let scratch = TestDir::new("development-data");
+        refuse_studio_data_in_development(true, platform, scratch.path(), env_fixture(&host))
+            .expect("a scratch folder is the run's own");
+        // A folder beside the studio's, or inside it, is not the studio's data.
+        for own in [
+            studio.with_file_name(format!("{DEFAULT_APP_DATA_DIR_NAME} Dev")),
+            studio.join("development"),
+        ] {
+            refuse_studio_data_in_development(true, platform, &own, env_fixture(&host))
+                .unwrap_or_else(|error| panic!("{} is not the studio's: {error}", own.display()));
+        }
+        // A host with no platform base has no studio data to open.
+        refuse_studio_data_in_development(true, platform, scratch.path(), env_fixture(&[]))
+            .expect("nothing to refuse without a default folder");
+    }
+
+    #[test]
+    fn one_folder_is_recognised_however_it_is_written() {
+        let test_dir = TestDir::new("same-folder");
+        let folder = test_dir.path().join("Studio Data");
+        fs::create_dir_all(folder.join("logs")).expect("folders");
+
+        assert!(same_folder(&folder, &folder));
+        assert!(
+            same_folder(&folder.join("logs").join(".."), &folder),
+            "a path through a subfolder and back is the same folder"
+        );
+        assert!(!same_folder(&folder, &folder.join("logs")));
+        assert!(!same_folder(&folder, test_dir.path()));
+
+        // Folders that do not exist are compared as written.
+        let missing = test_dir.path().join("missing");
+        assert!(same_folder(&missing, &missing));
+        assert!(!same_folder(&missing, &test_dir.path().join("other")));
+
+        // Windows does not tell `Studio Data` from `STUDIO DATA`; the Linux
+        // CI runners do.
+        let shouted = test_dir.path().join("STUDIO DATA");
+        assert_eq!(
+            same_folder(&folder, &shouted),
+            cfg!(target_os = "windows"),
+            "case matters only off Windows"
+        );
+        let missing_shouted = test_dir.path().join("MISSING");
+        assert_eq!(
+            same_folder(&missing, &missing_shouted),
+            cfg!(target_os = "windows")
         );
     }
 

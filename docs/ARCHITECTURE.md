@@ -40,13 +40,14 @@ These are part of the design. Do not remove one because it looks like weight.
 - **The shell opens and writes only inside its own folders:** the app-data, logs, backups and exports folders. The packaged pages run under a Content Security Policy with no inline or remote scripts.
 - **The parsers of outside bytes have fuzz tests:** the bridge's HTTP reader, the OSC reader and the Word import.
 - **Tests cannot reach a device.** Test builds drop every datagram aimed at TotalMix and refuse any camera address that is not on this PC. The simulated console and the simulated cameras stand in.
+- **A development build cannot open the studio's data.** A build with debug assertions refuses `%APPDATA%\ExEd Studio Control Native` before it creates or opens anything there, in the engine and in the shell. It is also an app of its own (`.dev` at the end of its identifier), so the studio's saved display and browser profile are not its to write.
 
 The app is unsigned, by decision: it runs on one workstation its developer controls.
 
 ## The shell
 
 - **One window, always fullscreen.** It opens on the display it was last on, else on the 2560×1440 display, else where it is. **Studio fullscreen** and **Reset the window layout** in Setup / Support put it back.
-- **The engine sits beside the shell.** A release build starts `studio-control-engine.exe` from its own folder. `SSE_ENGINE_BIN` names another one.
+- **The engine sits beside the shell.** The shell starts `studio-control-engine.exe` from its own folder and from nowhere else. A build is a folder that holds both.
 - **Commands never block the window.** Every command that can wait runs on the blocking pool.
 - **The shell watches the engine.** It polls the process every 250 ms. When the engine is gone, every waiting request is answered `ENGINE_EXITED` and the pages are told, so they can offer a restart.
 - **A second launch brings the first window forward** and exits.

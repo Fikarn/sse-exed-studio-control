@@ -1309,9 +1309,49 @@ fn main() {
         shell_confirm_close
     ]);
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("failed to run tauri shell");
+    let mut context = tauri::generate_context!();
+    if cfg!(debug_assertions) {
+        mark_as_development(context.config_mut());
+    }
+
+    builder.run(context).expect("failed to run tauri shell");
+}
+
+/// A development build (one with debug assertions) is an app of its own
+/// beside the studio's. Tauri keys three things on the identifier: the
+/// one-shell lock, the folder of `shell-window-layout.json`, and WebView2's
+/// profile, where the pages keep the operator's column widths and stage
+/// view. Under the studio's identifier a development shell handed its launch
+/// to the running studio app and exited, and one started alone wrote the
+/// studio's saved display and profile. The saved data has its own refusal
+/// (`engine::resolve_runtime_directories`).
+fn mark_as_development(config: &mut tauri::Config) {
+    config.identifier = format!("{}.dev", config.identifier);
+    for window in &mut config.app.windows {
+        window.title = format!("{} (development)", window.title);
+    }
+}
+
+#[cfg(test)]
+mod development_identity_tests {
+    use super::*;
+
+    #[test]
+    fn a_development_build_is_an_app_of_its_own() {
+        let mut config: tauri::Config =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json");
+        let studio_identifier = config.identifier.clone();
+        let studio_title = config.app.windows[0].title.clone();
+
+        mark_as_development(&mut config);
+
+        assert_eq!(config.identifier, format!("{studio_identifier}.dev"));
+        assert_eq!(
+            config.app.windows[0].title,
+            format!("{studio_title} (development)")
+        );
+        assert_eq!(config.app.windows[0].label, "main");
+    }
 }
 
 #[cfg(test)]

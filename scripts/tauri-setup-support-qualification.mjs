@@ -24,7 +24,7 @@ import { shellStillRunning } from "./tauri-shell-running.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const devServerPort = 4173;
+const devServerPort = 4174;
 // The lane's evidence folder; main() makes it, so an import makes nothing.
 let evidence = null;
 
@@ -406,7 +406,7 @@ function debugShellBinaryPath() {
 // A second copy of the shell, launched as the debug binary the first
 // `tauri dev` run compiled: it loads the same devUrl, which the first run's
 // Vite serves. `tauri dev` itself cannot be the second copy — its Vite
-// would refuse port 4173 before the shell ever ran, proving nothing about
+// would refuse port 4174 before the shell ever ran, proving nothing about
 // the shell.
 async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
   const binaryPath = debugShellBinaryPath();

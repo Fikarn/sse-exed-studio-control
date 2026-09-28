@@ -36,3 +36,9 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 all = "warn"
+
+# The studio runs release builds. Arithmetic that overflows stops there as it
+# does in a development build, rather than wrap around into a level or an
+# address nobody chose: every test ran with the check on.
+[profile.release]
+overflow-checks = true

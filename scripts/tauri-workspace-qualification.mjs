@@ -13,7 +13,7 @@ import { shellStillRunning } from "./tauri-shell-running.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-const devServerPort = 4173;
+const devServerPort = 4174;
 // The lane's evidence folder; main() makes it, so an import makes nothing.
 let evidence = null;
 

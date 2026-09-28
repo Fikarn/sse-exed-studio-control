@@ -84,7 +84,7 @@ function verifyContentSecurityPolicy(shellConfig) {
     throw new Error("Tauri shell must set app.security.devCsp so the dev document keeps a policy of its own.");
   }
   const devDirectives = parseContentSecurityPolicy(devCsp);
-  expectCspSources(devDirectives, "connect-src", ["ipc:", "http://ipc.localhost", "ws://127.0.0.1:4173"]);
+  expectCspSources(devDirectives, "connect-src", ["ipc:", "http://ipc.localhost", "ws://127.0.0.1:4174"]);
 }
 
 function parseContentSecurityPolicy(value) {

@@ -31,7 +31,7 @@ function main() {
 
   const args =
     command === "dev"
-      ? ["--workspace", "frontend/app", "run", "dev", "--", "--host", "127.0.0.1", "--port", "4173", "--strictPort"]
+      ? ["--workspace", "frontend/app", "run", "dev", "--", "--host", "127.0.0.1", "--port", "4174", "--strictPort"]
       : command === "build"
         ? ["--workspace", "frontend/app", "run", "build"]
         : null;
