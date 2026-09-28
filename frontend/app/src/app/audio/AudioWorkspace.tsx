@@ -24,7 +24,6 @@ import { AudioInspector } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
 import { AudioTextDialog } from "./components/AudioTextDialog";
-import { useOperatorLayout } from "../OperatorLayoutProvider";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 
@@ -80,14 +79,6 @@ const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "software-playback": [],
 };
 
-// Console redesign themes (Studio / Graphite / Bone) — applied via the
-// `data-audio-theme` attribute on the shell; CSS in AudioWorkspace.module.css
-// overrides Audio's private token family per theme. Slice 3c: the active theme
-// is now driven by the GLOBAL theme (OperatorLayoutProvider / `data-theme` on
-// <html>) instead of an audio-local state + storage, so flipping the theme
-// anywhere carries the mixer along — the dark-chrome/light-mixer seam is closed.
-export type AudioTheme = "studio" | "graphite" | "bone";
-
 // Slice 8 (system §9): a write the desk did not take has one way out, and
 // every message that reports one names it.
 const SYNC_HINT = "Press Sync from TotalMix to pull the current state.";
@@ -112,10 +103,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
-  // Slice 3c — follow the global theme rather than an audio-local state, so the
-  // mixer re-themes in lockstep with the chrome (seam closed). The switcher in
-  // AudioTopBar drives the same global setter.
-  const { theme: audioTheme } = useOperatorLayout();
   const recallPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -565,7 +552,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   return (
     <div
       className={styles.audioShell}
-      data-audio-theme={audioTheme}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}

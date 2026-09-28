@@ -3,17 +3,16 @@ import { expect, test, type Page } from "@playwright/test";
 import { openFixture } from "./helpers/openFixture";
 
 // 2026-09 audit remediation, Slice 10. The audit found Console captions at 8
-// and 8.5 px painted with the 22 %-alpha hairline colour, and a Bone chrome
-// header whose gradient ended in a Studio-only literal. Nothing tested type
-// size or contrast; the per-theme visual baselines pinned the broken renders.
-// These checks read the live DOM, so a regression fails here before it
-// reaches a baseline review.
+// and 8.5 px painted with the 22 %-alpha hairline colour. Nothing tested type
+// size or contrast; the captures pinned the broken renders. These checks read
+// the live DOM, so a regression fails here before it reaches a capture, and on
+// CI's Linux runner too, where no contrast is sampled from pixels.
 
 const MICROTYPE_FLOOR_PX = 9.5;
 // Visual overhaul A, Slice 10: the system's own number. This spec was
 // seeded at 3:1 when the Console's captions were the worst thing on the
-// screen; the pixel-sampled gate now reads 0 failures at 4.5:1 in all three
-// themes, so this reads the same line from the live DOM.
+// screen; the pixel-sampled gate now reads 0 failures at 4.5:1, so this
+// reads the same line from the live DOM.
 const BODY_CONTRAST_MIN = 4.5;
 const NAV_CONTRAST_MIN = 4.5;
 
@@ -24,12 +23,6 @@ interface TextRun {
   fontSize: number;
   text: string;
   path: string;
-}
-
-async function settleTheme(page: Page, theme: "studio" | "graphite" | "bone") {
-  if (theme === "studio") return;
-  await page.waitForSelector(`html[data-theme="${theme}"]`, { state: "attached" });
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
 // Runs inside the page: every element under the root that owns non-blank text
@@ -183,18 +176,14 @@ async function readFg4(page: Page) {
 // New pages program, Slice SW (D22): 2560×1440 only; the 1920×1080 rows went.
 // These contrasts are computed from the DOM's colours, not sampled from pixels,
 // so they are checked on every platform.
-const SURFACES = [
-  { width: 2560, height: 1440, theme: "studio" as const },
-  { width: 2560, height: 1440, theme: "bone" as const },
-];
+const SURFACES = [{ width: 2560, height: 1440 }];
 
-for (const { width, height, theme } of SURFACES) {
-  test(`Console text at ${width}x${height} (${theme}) meets the 9.5 px floor and ${BODY_CONTRAST_MIN}:1 contrast`, async ({
+for (const { width, height } of SURFACES) {
+  test(`Console text at ${width}x${height} meets the 9.5 px floor and ${BODY_CONTRAST_MIN}:1 contrast`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
-    await openFixture(page, "audio-populated", theme === "bone" ? { theme } : undefined);
-    await settleTheme(page, theme);
+    await openFixture(page, "audio-populated");
     await expect(page.getByTestId("audio-workspace")).toBeVisible();
     await expect(page.getByTestId("audio-tiered-mixer")).toBeVisible();
 
@@ -224,11 +213,10 @@ for (const { width, height, theme } of SURFACES) {
   });
 }
 
-for (const theme of ["studio", "graphite", "bone"] as const) {
-  test(`workspace navigation labels read at 4.5:1 on the ${theme} header`, async ({ page }) => {
+{
+  test("workspace navigation labels read at 4.5:1 on the header", async ({ page }) => {
     await page.setViewportSize({ width: 2560, height: 1440 });
-    await openFixture(page, "audio-populated", theme === "studio" ? undefined : { theme });
-    await settleTheme(page, theme);
+    await openFixture(page, "audio-populated");
     const nav = page.getByRole("navigation", { name: "Workspace navigation" });
     await expect(nav).toBeVisible();
 
@@ -293,7 +281,7 @@ for (const theme of ["studio", "graphite", "bone"] as const) {
     const weak = (result.labels ?? []).filter((label) => label.contrast < NAV_CONTRAST_MIN);
     expect(
       weak.map((label) => `${label.label}: ${label.contrast}:1 (${label.color} on ${result.top} → ${result.bottom})`),
-      `nav labels below ${NAV_CONTRAST_MIN}:1 on ${theme}`
+      `nav labels below ${NAV_CONTRAST_MIN}:1`
     ).toEqual([]);
   });
 }

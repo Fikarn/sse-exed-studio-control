@@ -58,6 +58,8 @@ The layers, and what each is for:
 
 The committed captures are under `frontend/app/tests/__visual__/`. CI compares none of them, so the local run is the one that counts.
 
+A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (six headers, four footers). A change to the header moves the strips and no page.
+
 When a change moves a page:
 
 1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`
@@ -66,17 +68,9 @@ When a change moves a page:
 
 ## The layout measures
 
-`ui-contract.spec.ts` renders every fixture at 2560×1440 and measures it: type sizes and families, contrast sampled from the screenshot, target sizes, radii, shadows, gradients, idle animations, chrome sizes, scroll, and forbidden words. Each page's numbers are held in `frontend/app/tests/ui-contract.ratchets.json`: a measure may fall, never rise.
+`ui-contract.spec.ts` renders every fixture at 2560×1440 and measures it: type sizes and families, contrast sampled from the screenshot, target sizes, radii, shadows, gradients, idle animations, chrome sizes, scroll, and forbidden words.
 
-```bash
-# from frontend/app: measure every page and write a report to artifacts/ui-census/
-node scripts/ui-census.mjs
-
-# the same, and write the numbers it measured as the new ratchets
-node scripts/ui-census.mjs --write-ratchets
-```
-
-The report names the elements behind a number, not only the count. Write new ratchets only on Windows (contrast is sampled nowhere else), and read `git diff` on the ratchet file before committing: nothing may rise.
+Every page holds the same limits, `LIMITS` in `frontend/app/tests/helpers/ui-contract/boards.mjs`. The pages that differ are listed beside them, in `EXCEPTIONS`, each with its reason. A page that fails prints all its measures and its worst contrasts. A new exception needs a reason that would satisfy the owner.
 
 Two gates run beside it: `node scripts/check-operator-copy.mjs` (forbidden words in the source, from the repository root) and the design system's `css-literals.test.ts` (raw values in stylesheets, against a list that may only shrink).
 

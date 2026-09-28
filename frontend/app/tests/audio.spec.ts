@@ -368,7 +368,9 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // The state display carries the engine's word and its sentence (old: the
   // band's title "CONSOLE UNREACHABLE").
   await expect(page.getByTestId("audio-state-display")).toContainText("OFFLINE");
-  await expect(page.getByText("Console did not answer OSC ping.").first()).toBeVisible();
+  await expect(
+    page.getByText("TotalMix did not answer on the Global OSC remote", { exact: false }).first()
+  ).toBeVisible();
 
   await openFixture(page, "audio-action-failed");
   // Visual overhaul A, Slice 4a. Old: the sentence read

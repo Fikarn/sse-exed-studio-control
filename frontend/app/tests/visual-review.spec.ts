@@ -3,14 +3,16 @@ import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { liveAudioMasks } from "./helpers/liveAudioMasks";
 import { stepToBoard } from "./helpers/ui-contract/boards.mjs";
 
-// Visual review baselines for the operator shell at 2560×1440, the one screen
-// Studio Control runs on. Replaces the screenshot-only loop that used to live
-// in `scripts/tauri-visual-review.mjs`: the captures are `toHaveScreenshot`
-// baselines committed under `tests/__visual__/visual-review.spec.ts-snapshots/`.
-// New pages program, Slice SW (D22): the other sizes of the ladder and Scaled
-// Studio Preview went, and the captures are compared on the Windows workstation
-// only (`ignoreSnapshots` in playwright.config.ts) — on CI's Linux runner these
-// cases make their other checks and compare no screenshot.
+// The captures of the pages at 2560×1440, the one screen Studio Control runs
+// on: `toHaveScreenshot` baselines under
+// `tests/__visual__/visual-review.spec.ts-snapshots/`, compared on the Windows
+// workstation only (`ignoreSnapshots` in playwright.config.ts) — on CI's Linux
+// runner these cases make their other checks and compare no screenshot.
+//
+// A page's capture is its workspace: the header and the footer are masked,
+// and captured once, as strips of their own (the last block). Until
+// 2026-09-28 every capture held them, so a change to the header moved some
+// twenty-eight captures; it now moves the strips.
 
 // New pages program, Slice 6a: the Teleprompter joins with its ready board.
 const FIXTURES = [
@@ -34,8 +36,7 @@ const STUDIO: Viewport = { width: 2560, height: 1440, label: "2560x1440" };
 // cards), and every shell prints the header clock. Freezing the clock for every
 // fixture keeps them stable across runs — a guard for one workspace's fixtures
 // only let the lighting scene-card label drift with wall-clock time until
-// baselines rotted past the diff budget (first hit: lighting-populated bone
-// 2560x1440, 2026-08-12).
+// baselines rotted past the diff budget (2026-08-12).
 const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 
 // The live-audio masks are shared with storybook.spec.ts since production
@@ -52,16 +53,21 @@ const FIXTURE_NOW = new Date("2026-04-23T09:11:00+02:00");
 // still far below a real layout regression, which moves thousands of pixels.
 const FULL_RENDER_MAX_DIFF_PX = 800;
 
-function masksFor(page: Page, fixture: string): Locator[] {
+const HEADER = '[data-region="header"]';
+const FOOTER = '[data-region="footer"]';
+
+function liveMasksFor(page: Page, fixture: string): Locator[] {
   return fixture.startsWith("audio-") ? liveAudioMasks(page) : [];
 }
 
-async function gotoFixture(page: Page, fixture: string, options: { theme?: "graphite" | "bone" } = {}) {
+/** A page's capture leaves out the chrome, which has captures of its own. */
+function masksFor(page: Page, fixture: string): Locator[] {
+  return [page.locator(HEADER), page.locator(FOOTER), ...liveMasksFor(page, fixture)];
+}
+
+async function gotoFixture(page: Page, fixture: string) {
   await page.clock.setFixedTime(FIXTURE_NOW);
   const params = new URLSearchParams({ fixture, transport: "fixture" });
-  if (options.theme) {
-    params.set("theme", options.theme);
-  }
   const response = await page.goto(`/?${params.toString()}`, { waitUntil: "networkidle" });
   expect(response, `fixture ${fixture} should return a document response`).not.toBeNull();
   expect(response!.status(), `fixture ${fixture} should not fail to load`).toBeLessThan(400);
@@ -188,50 +194,6 @@ test.describe(`viewport ${STUDIO.label}`, () => {
   }
 });
 
-// Slice 3 — per-theme foundation; Slice 14 — the full per-surface set.
-// Graphite/Bone become app-wide via the global `data-theme` attribute. One
-// fixture per surface at the primary resolution: setup (runner), lighting,
-// startup/recovery (protocol-mismatch) and the audio mixer. Theming
-// is colour-only, so no-scroll is unaffected and only the at-rest render is
-// captured. The audio capture needs the explicit theme settle below (the S3-era
-// canvas-dark quirk): the theme attribute lands post-mount, and the screenshot
-// stabilizer could grab the pre-flip frame on the canvas-heavy mixer — so wait
-// until the attribute + the themed background are live before capturing.
-const PER_THEME_FIXTURES = [
-  "setup-ready",
-  "lighting-populated",
-  "protocol-mismatch",
-  "audio-populated",
-  "teleprompter-ready",
-] as const;
-const NON_STUDIO_THEMES = ["graphite", "bone"] as const;
-
-async function settleTheme(page: Page, theme: (typeof NON_STUDIO_THEMES)[number]) {
-  await page.waitForSelector(`html[data-theme="${theme}"]`, { state: "attached" });
-  // Two rAF ticks so the themed custom properties have painted (the audio
-  // meter canvas re-reads its palette from computed styles after the flip).
-  await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
-  );
-}
-
-test.describe("per-theme foundation", () => {
-  test.use({ viewport: { width: 2560, height: 1440 } });
-
-  for (const fixture of PER_THEME_FIXTURES) {
-    for (const theme of NON_STUDIO_THEMES) {
-      test(`${fixture} @ ${theme}`, async ({ page }) => {
-        await gotoFixture(page, fixture, { theme });
-        await settleTheme(page, theme);
-        await expect(page).toHaveScreenshot(`${fixture}-${theme}-2560x1440.png`, {
-          mask: masksFor(page, fixture),
-          maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
-        });
-      });
-    }
-  }
-});
-
 // R2-C (round-2 audit, R2-FIX-01): the designed empty/degraded states were
 // functionally tested but never visually locked — the lighting "No fixtures
 // on the rig yet" canvas state, the setup degraded banner posture and the
@@ -242,6 +204,12 @@ test.describe("per-theme foundation", () => {
 // warning bands + the lighting DMX-unreachable posture) join the loop —
 // the full designed-state set is now locked.
 const STATE_FIXTURES = [
+  // The three screens before and beside a page: Setup not yet published, the
+  // start, and a start that failed. Until 2026-09-28 Storybook's shell
+  // stories captured them, with six boards this file captured as well.
+  "setup-required",
+  "startup-loading",
+  "bootstrap-failed",
   "lighting-empty",
   "setup-degraded",
   "audio-state-assumed",
@@ -270,6 +238,36 @@ test.describe("state coverage", () => {
       await expect(page).toHaveScreenshot(`${fixture}-2560x1440.png`, {
         mask: masksFor(page, fixture),
         maxDiffPixels: FULL_RENDER_MAX_DIFF_PX,
+      });
+    });
+  }
+});
+
+// The chrome, captured once: what the masks above leave out. The header on
+// each page (its tab is the lit one, and its lamps are that board's), on a
+// board whose desk does not answer, and on a start that failed; and each
+// page's footer.
+const CHROME = [
+  { name: "header-setup", fixture: "setup-ready", region: HEADER },
+  { name: "header-lighting", fixture: "lighting-populated", region: HEADER },
+  { name: "header-audio", fixture: "audio-populated", region: HEADER },
+  { name: "header-teleprompter", fixture: "teleprompter-ready", region: HEADER },
+  { name: "header-desk-offline", fixture: "audio-offline", region: HEADER },
+  { name: "header-start-failed", fixture: "bootstrap-failed", region: HEADER },
+  { name: "footer-setup", fixture: "setup-ready", region: FOOTER },
+  { name: "footer-lighting", fixture: "lighting-populated", region: FOOTER },
+  { name: "footer-audio", fixture: "audio-populated", region: FOOTER },
+  { name: "footer-teleprompter", fixture: "teleprompter-ready", region: FOOTER },
+] as const;
+
+test.describe("the chrome", () => {
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  for (const { name, fixture, region } of CHROME) {
+    test(`${name}`, async ({ page }) => {
+      await gotoFixture(page, fixture);
+      await expect(page.locator(region)).toHaveScreenshot(`${name}.png`, {
+        mask: liveMasksFor(page, fixture),
       });
     });
   }

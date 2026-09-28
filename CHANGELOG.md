@@ -31,6 +31,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- A start that fails because the two program files are of different builds says so in plain words (#238).
 - Studio Control is started with `Studio Control.cmd` in the builds folder, which always starts the verified build. Older builds stay beside it, each in a folder named by its day (#237).
 - Studio Control always opens fullscreen, on the display it was last on or else the 2560×1440 one. Reset the window layout is in Setup / Support › Workstation and on the recovery screens (#216, #221).
 - The first start of this build upgrades the saved data to schema 10. An older Studio Control then refuses it, so going back means the older app and the backup copy written before the upgrade (#201, #229).
@@ -45,14 +46,15 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - The Audio page is the Console: a mixer of Inputs, Playback and Outputs and, on the left, its state, the way out, Talkback, Dim, Mono, the mix target, the main level and eight snapshots (#111, #201).
 - A strip reads in one order: name, level, source, Mute and Solo, fader and meter; 48 V and the preamp gain, in whole dB, are on the strip. The panel shows the whole selected channel, without tabs (#201).
 - Lighting says what the rig is doing on the left, above Lighting on, Cut all, the grand master, scenes, groups and the rig's actions. The panel shows the whole selected fixture, without tabs (#201).
-- Setup says where commissioning stands: READY, DEGRADED or SETUP REQUIRED. Each of its five steps fits a page without scrolling, and Support, always on the right, has the theme and the interface size (#201).
+- Setup says where commissioning stands: READY, DEGRADED or SETUP REQUIRED. Each of its five steps fits a page without scrolling, and Support, always on the right, has the interface size (#201, #238).
 - One header on every page, recovery screens included: the page tabs, the lamps and the latches. A lamp shows the worst state of its page, and a bar along the bottom carries the page's facts (#201).
 - The screen names each piece of gear one way (the desk, the bridge, the deck, the hardware link), and every state says what happened and what to do next (#201).
-- Nothing on the Console or the Lighting panel is printed under 12 px or is under 24 px to press, and every label is legible in every theme. Nothing moves under the pointer or on an idle page (#201).
+- Nothing on the Console or the Lighting panel is printed under 12 px or is under 24 px to press, and every label is legible. Nothing moves under the pointer or on an idle page (#201).
 - With Preview on, the Stream Deck's lighting keys stage their change and show PREVIEW, and the rig does not move. All On / All Off with no fixture patched is refused (#201).
 
 ### Removed
 
+- The Graphite and Bone themes are gone, with their keys in Setup / Support: Studio Control has one look, Studio (#238).
 - The Planning page is gone, and the first start of this build drops its saved data (projects and tasks) after a backup copy. An older backup restores without its Planning part (#211, #213).
 - The Stream Deck profile has two pages, LIGHTS and AUDIO: PROJECTS and TASKS are gone, and the Teleprompter and the Cameras have no deck page yet. Export and import the profile again (#213).
 - Every keyboard shortcut and key hint is gone, with the command palette and the shortcut guide; each has a control on screen. Tab, Enter, Space, the arrows and Esc still work on what has the focus (#216).

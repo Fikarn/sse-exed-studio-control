@@ -1,7 +1,6 @@
 import { Danger, Key, PlateHead, Readouts, Section, Segmented } from "@sse/design-system";
 
 import { OPERATOR_UI_SCALES } from "../../operatorLayout";
-import type { OperatorTheme } from "../../OperatorLayoutProvider";
 import type { OperatorUiScale } from "../../operatorLayout";
 import { RecentActions, type RecentAction } from "./RecentActions";
 import styles from "./SupportPlate.module.css";
@@ -11,21 +10,6 @@ import styles from "./SupportPlate.module.css";
 // the operator would restore from, the two things a support ticket needs, the
 // sample data that asks first, what version everything is, and the one red
 // command on the surface.
-
-// Dim control room first, then the two the room can be lit for.
-const THEME_ORDER: readonly OperatorTheme[] = ["studio", "graphite", "bone"];
-
-const THEME_LABELS: Record<OperatorTheme, string> = {
-  bone: "Bone",
-  graphite: "Graphite",
-  studio: "Studio",
-};
-
-const THEME_HINTS: Record<OperatorTheme, string> = {
-  bone: "daylight",
-  graphite: "neutral",
-  studio: "dim control room",
-};
 
 export interface SupportPlateProps {
   archiveCount: number;
@@ -44,7 +28,6 @@ export interface SupportPlateProps {
   protocolVersion: string;
   /** Slice 11 (F30): the action log's newest rows, newest first. */
   recentActions: readonly RecentAction[];
-  theme: OperatorTheme;
   uiScale: OperatorUiScale;
   appVersion: string;
   canOpenEngineLog: boolean;
@@ -53,7 +36,6 @@ export interface SupportPlateProps {
   onOpenEngineLog: () => void;
   onRestartBridge: () => void;
   onRestoreLatest: () => void;
-  onSelectTheme: (theme: OperatorTheme) => void;
   onSelectUiScale: (scale: OperatorUiScale) => void;
   /** New pages program, Slice 3 (D6, decision 2): the window keys. The native
    *  shell moves the window and keeps the choice for the next launch; outside
@@ -78,7 +60,6 @@ export function SupportPlate({
   prompterXl = null,
   protocolVersion,
   recentActions,
-  theme,
   uiScale,
   appVersion,
   canOpenEngineLog,
@@ -87,7 +68,6 @@ export function SupportPlate({
   onOpenEngineLog,
   onRestartBridge,
   onRestoreLatest,
-  onSelectTheme,
   onSelectUiScale,
   onEnterStudioFullscreen,
   onResetWindowLayout,
@@ -104,21 +84,6 @@ export function SupportPlate({
       />
 
       <Section title="Workstation" detail="applies to every workspace" testId="support-workstation">
-        <Readouts rows={[{ id: "theme", label: "Theme", value: THEME_HINTS[theme] }]} />
-        <Segmented label="Theme" className={styles.segmented} testId="support-theme-switch">
-          {THEME_ORDER.map((entry) => (
-            <Key
-              key={entry}
-              mode="segmented"
-              cap={THEME_LABELS[entry]}
-              take
-              engaged={theme === entry}
-              aria-pressed={theme === entry}
-              testId={`support-theme-${entry}`}
-              onClick={() => onSelectTheme(entry)}
-            />
-          ))}
-        </Segmented>
         <Readouts rows={[{ id: "scale", label: "UI scale", value: `${uiScale} %` }]} />
         <Segmented label="UI scale" className={styles.segmented} testId="support-scale-switch">
           {OPERATOR_UI_SCALES.map((scale) => (

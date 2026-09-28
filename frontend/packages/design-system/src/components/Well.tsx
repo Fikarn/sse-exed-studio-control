@@ -3,8 +3,8 @@ import type { HTMLAttributes, ReactNode } from "react";
 import styles from "./Well.module.css";
 
 // Visual overhaul A, Slice 3 (system §5, §7): a well is a black backlit
-// display in every theme — whatever is printed on it uses the display inks
-// (the `.well, [data-well]` scope in themes.css). Readout, Field and Screen
+// display — whatever is printed on it uses the display inks
+// (the `.well, [data-well]` scope in wells.css). Readout, Field and Screen
 // are wells; Slider, Groove and Meter live in their own files.
 
 export interface WellProps extends HTMLAttributes<HTMLDivElement> {

@@ -560,7 +560,7 @@
       }
     },
     "console": {
-      "$description": "Visual overhaul A, Slice 1: the Console's private theme values (the 2026-05-27 prototype palette), moved out of AudioWorkspace.module.css so the Console renders pixel-identically from tokens; themes.css carries Graphite and Bone. Deprecated: Slice 4 moves the Console onto the role tokens and Slice 11 removes this family.",
+      "$description": "Visual overhaul A, Slice 1: the Console's private theme values (the 2026-05-27 prototype palette), moved out of AudioWorkspace.module.css so the Console renders pixel-identically from tokens. Deprecated: Slice 4 moves the Console onto the role tokens and Slice 11 removes this family.",
       "bg": {
         "$value": "#0c0a08"
       },
@@ -654,7 +654,7 @@
     }
   },
   "material": {
-    "$description": "Visual overhaul A (Slice 1, 2026-09): the material model, Studio values; themes.css re-maps Graphite and Bone. Level -1 bay, 0 bg (chassis), +1 panel (plate), +2 key; wells are black backlit displays in every theme.",
+    "$description": "Visual overhaul A (Slice 1, 2026-09): the material model. Level -1 bay, 0 bg (chassis), +1 panel (plate), +2 key; wells are black backlit displays.",
     "bg": {
       "$value": "#0b0b0d",
       "$description": "chassis floor, level 0"
@@ -681,7 +681,7 @@
     },
     "well": {
       "$value": "#000000",
-      "$description": "display floor, a backlit well, the same in every theme"
+      "$description": "display floor, a backlit well"
     },
     "line": {
       "$value": "rgba(255, 255, 255, 0.09)",
@@ -705,7 +705,7 @@
     },
     "stripFloor": {
       "$value": "rgba(255, 255, 255, 0.025)",
-      "$description": "a strip's lift on the bay; a white lift in every theme, never a shade"
+      "$description": "a strip's lift on the bay; a white lift, never a shade"
     },
     "stripFloorSel": {
       "$value": "rgba(255, 255, 255, 0.045)",
@@ -727,7 +727,7 @@
     "$description": "Visual overhaul A: the selection keyline is neutral so colour stays for state."
   },
   "role": {
-    "$description": "Visual overhaul A: hue names the family, form names the meaning. fill = a key that is on (amber engaged, green live), lamp or keyline = attention / ok / error, text = the word. Studio values; themes.css re-maps Graphite and Bone.",
+    "$description": "Visual overhaul A: hue names the family, form names the meaning. fill = a key that is on (amber engaged, green live), lamp or keyline = attention / ok / error, text = the word.",
     "amber": {
       "fill": {
         "$value": "#f0b35b"
@@ -785,7 +785,7 @@
       }
     },
     "primary": {
-      "$description": "the primary command key: white in the dark themes, ink in Bone",
+      "$description": "the primary command key: white",
       "fill": {
         "$value": "#eeeef0"
       },
@@ -816,7 +816,7 @@
     }
   },
   "display": {
-    "$description": "Visual overhaul A: the inks printed on a well (a black backlit display) in every theme; the .well scope in themes.css re-points the text and role text tokens at these.",
+    "$description": "Visual overhaul A: the inks printed on a well (a black backlit display); the .well scope in wells.css re-points the role text tokens at these.",
     "text": {
       "$value": "#f4f4f5"
     },

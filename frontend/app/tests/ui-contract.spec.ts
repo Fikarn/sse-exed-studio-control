@@ -4,42 +4,35 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  EXCEPTIONS,
   FIXTURES,
+  LIMITS,
   SURFACE,
   STATE_DISPLAY_X_TOLERANCE_PX,
-  THEMES,
-  boardName,
+  TARGETS,
   isLoading,
+  limitsOf,
 } from "./helpers/ui-contract/boards.mjs";
-import { SAMPLES_CONTRAST, checkRatchet, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
-import { TARGETS } from "./helpers/ui-contract/boards.mjs";
+import { SAMPLES_CONTRAST, checkLimits, measureBoard, openBoard } from "./helpers/ui-contract/measure.mjs";
 
-// Visual overhaul A, Slice 0 — the UI contract lanes (system §10 as tests).
+// The layout gate (docs/DESIGN.md, section 10, as tests).
 //
-// Every fixture × 2560×1440 × {studio, graphite, bone} is rendered and
-// measured by the same census and pixel sampler that measured the A mocks
-// (`gold-standard-evidence-2026-09/probe/`): page scroll, the type census
-// (floor, distinct sizes, families), radii, pointer targets (`data-take` marks
-// take-time controls), pixel-sampled text contrast from the screenshot, the
-// light census (shadow direction and blur, gradients, backdrop blur), idle
-// animations, the chrome regions against plan D4, targets off the viewport and
-// the operator-copy scan.
+// Every fixture is rendered at 2560×1440 and measured by one census and one
+// pixel sampler: page scroll, the type census (floor, distinct sizes,
+// families), radii, pointer targets (`data-take` marks take-time controls),
+// pixel-sampled text contrast from the screenshot, the light census (shadow
+// direction and blur, gradients, backdrop blur), idle animations, the chrome
+// regions against plan D4, targets off the viewport and the operator-copy
+// scan.
 //
-// The numbers are ratchets seeded at the current program's values
-// (`ui-contract.ratchets.json`, written by `node scripts/ui-census.mjs
-// --write-ratchets`) and tightened per slice towards the system's thresholds:
-// a count may only fall, a floor may only rise, and a board that scrolls today
-// may not start scrolling. Re-seed only at a slice close, after inspecting the
-// diff — the diff is the "numbers that moved" report.
+// Every board holds the same limits (`LIMITS` in boards.mjs); the boards that
+// differ are listed there with their reasons (`EXCEPTIONS`). Until 2026-09-28
+// each board had sixteen numbers of its own in `ui-contract.ratchets.json`,
+// for three themes: 81 boards, of which thirteen numbers never differed.
 //
 // New pages program, Slice SW (D22): the contrast is sampled on Windows only
 // (`SAMPLES_CONTRAST` in measure.mjs). On CI's Linux runner every other measure
 // is checked and the contrast is not.
-
-const RATCHETS = JSON.parse(readFileSync(new URL("./ui-contract.ratchets.json", import.meta.url), "utf8")) as Record<
-  string,
-  Record<string, number | boolean | null>
->;
 
 interface ContrastFail {
   ratio: number;
@@ -66,31 +59,31 @@ test.describe("UI contract", () => {
   // regression fails both runs.
   test.describe.configure({ retries: 1 });
 
-  for (const theme of THEMES) {
-    for (const fixture of FIXTURES) {
-      const name = boardName(fixture, theme);
-      test(`${fixture} @ ${theme} holds its ratchet`, async ({ page }) => {
-        const ratchet = RATCHETS[name];
-        expect(ratchet, `no ratchet seeded for ${name}; run node scripts/ui-census.mjs --write-ratchets`).toBeTruthy();
-        await openBoard(page, fixture, theme);
-        const { measures, contrast } = await measureBoard(page);
-        const problems = checkRatchet(measures, ratchet!);
-        const detail = problems.length
-          ? `\n${JSON.stringify(measures, null, 1)}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
-          : "";
-        expect(problems, `${name} moved the wrong way:${detail}`).toEqual([]);
-      });
+  test("every exception names a board and a limit there is", () => {
+    for (const [fixture, own] of Object.entries(EXCEPTIONS)) {
+      expect(FIXTURES, `${fixture} is no fixture`).toContain(fixture);
+      for (const key of Object.keys(own)) expect(Object.keys(LIMITS), `${fixture}: ${key}`).toContain(key);
     }
+  });
+
+  for (const fixture of FIXTURES) {
+    test(`${fixture} holds the limits`, async ({ page }) => {
+      await openBoard(page, fixture);
+      const { measures, contrast } = await measureBoard(page);
+      const problems = checkLimits(measures, limitsOf(fixture));
+      const detail = problems.length
+        ? `\n${JSON.stringify(measures, null, 1)}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
+        : "";
+      expect(problems, `${fixture} is outside its limits:${detail}`).toEqual([]);
+    });
   }
 
   // Visual overhaul A, Slice 9 (system §6): "Nothing on an idle surface
-  // animates." The ratchet lets a count fall; this says the floor for a ready
-  // board is zero, so a new pulse cannot be seeded in. A loading board is not
-  // idle — its skeleton sweep is what says the app has not finished — so the
-  // loading families are excluded by name, not by ratchet.
+  // animates." A loading board is not idle — its skeleton sweep is what says
+  // the app has not finished — so the loading families are excluded by name.
   for (const fixture of FIXTURES.filter((name) => !isLoading(name))) {
     test(`${fixture} animates nothing at rest`, async ({ page }) => {
-      await openBoard(page, fixture, "studio");
+      await openBoard(page, fixture);
       const running = await page.evaluate(() =>
         document
           .getAnimations()
@@ -134,12 +127,12 @@ test.describe("UI contract", () => {
     const running = () =>
       page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running").length);
 
-    await openBoard(page, "audio-loading", "studio");
+    await openBoard(page, "audio-loading");
     await addProbe();
     expect(await running(), "the probe must run while motion is allowed").toBeGreaterThan(0);
 
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await openBoard(page, "audio-loading", "studio");
+    await openBoard(page, "audio-loading");
     await addProbe();
     await expect.poll(running, { message: "reduced motion left something running" }).toBe(0);
   });
@@ -149,7 +142,7 @@ test.describe("UI contract", () => {
   test("the state display keeps one x-band across the workspaces", async ({ page }) => {
     const xs: Array<{ fixture: string; x: number }> = [];
     for (const fixture of ["audio-populated", "lighting-populated", "setup-ready", "teleprompter-ready"]) {
-      await openBoard(page, fixture, "studio");
+      await openBoard(page, fixture);
       const { measures } = await measureBoard(page);
       if (measures.stateDisplayX !== null) xs.push({ fixture, x: measures.stateDisplayX });
     }
@@ -163,43 +156,31 @@ test.describe("UI contract", () => {
   });
 
   // 2026-09 production readiness, Slice 11: held light outputs are a state no
-  // fixture board shows — a board of its own would be three more boards, three
-  // more baselines per platform and a re-seed, for one amber readout and one
-  // lit key. It is measured here instead: the Setup board, the Held key
-  // pressed, and the same census against the same board's ratchet, in every
-  // theme. What the state adds — the amber `nothing is sent to the rig`, the
-  // engaged Held key, the new Recent actions row — may not move a measure the
-  // wrong way.
-  //
-  // The pilot's feedback band is on screen here (every plate action shows it)
-  // and on no board. Until readiness Slice 14 it carried a pre-A gradient and
-  // this case allowed it by name and count; it is on system A's material now
-  // and is measured like everything else.
-  for (const theme of THEMES) {
-    test(`setup-ready @ ${theme} holds its ratchet with the light outputs held`, async ({ page }) => {
-      const ratchet = RATCHETS[boardName("setup-ready", theme)];
-      expect(ratchet, "no ratchet seeded for setup-ready").toBeTruthy();
-      await openBoard(page, "setup-ready", theme);
-      await page.getByTestId("support-outputs-held").click();
-      await expect(page.getByTestId("support-outputs-held")).toHaveAttribute("aria-pressed", "true");
-      await expect(page.getByTestId("setup-feedback")).toContainText("nothing is sent to the rig");
-      await expect(page.getByTestId("support-recent-action").first()).toContainText("Light outputs held");
-      // The band's enter transition and the key's press have to be at rest.
-      await page.waitForTimeout(1000);
-      const { census, measures, contrast } = await measureBoard(page);
-      const offPolicy: string[] = census.light.gradientsOffEls;
-      const problems = checkRatchet(measures, ratchet!);
-      const detail = problems.length
-        ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
-        : "";
-      expect(problems, `setup-ready @ ${theme}, held, moved the wrong way:${detail}`).toEqual([]);
-    });
-  }
+  // fixture board shows. It is measured here: the Setup board, the Held key
+  // pressed, and the same census against the same board's limits. What the
+  // state adds — the amber `nothing is sent to the rig`, the engaged Held key,
+  // the new Recent actions row, the pilot's feedback band — may not take the
+  // board outside them.
+  test("setup-ready holds the limits with the light outputs held", async ({ page }) => {
+    await openBoard(page, "setup-ready");
+    await page.getByTestId("support-outputs-held").click();
+    await expect(page.getByTestId("support-outputs-held")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("setup-feedback")).toContainText("nothing is sent to the rig");
+    await expect(page.getByTestId("support-recent-action").first()).toContainText("Light outputs held");
+    // The band's enter transition and the key's press have to be at rest.
+    await page.waitForTimeout(1000);
+    const { census, measures, contrast } = await measureBoard(page);
+    const offPolicy: string[] = census.light.gradientsOffEls;
+    const problems = checkLimits(measures, limitsOf("setup-ready"));
+    const detail = problems.length
+      ? `\n${JSON.stringify(measures, null, 1)}\noff-policy gradients: ${offPolicy.join(", ")}\nworst contrast: ${worstContrast(contrast, 8, "\n")}`
+      : "";
+    expect(problems, `setup-ready, held, is outside its limits:${detail}`).toEqual([]);
+  });
 });
 
 // Visual overhaul A, Slice 3: the primitives' Storybook pages pass the
-// system's light, target, radius, type and contrast checks outright — no
-// ratchet, since they are new. The stories live under
+// system's light, target, radius, type and contrast checks. The stories live under
 // "Design System/A primitives" and are served by the Storybook static server
 // (built by `npm run frontend:storybook:build`, chained into
 // `frontend:playwright:test`); the lane skips when no build is present.
@@ -251,9 +232,10 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
 
 // New pages program, the workstation catch-up: the census measures a text where
 // it is on screen. The Teleprompter's editor opens scrolled to the reading line,
-// and in Bone the lines scrolled out of its dark field lay over the light header
-// and footer, where the sampler read them as white on white — four failures no
-// operator could see. A field scrolled over a light page holds the rule, and the
+// and in the light theme there was then (Bone) the lines scrolled out of its
+// dark field lay over the light header and footer, where the sampler read them
+// as white on white — four failures no operator could see. A field scrolled
+// over a light page holds the rule, and the
 // cases around it hold what may clip a text and what may not (the catch-up's
 // review): a positioned text escaping a clipping box, a containing block made
 // by a transform, one axis clipped, and boxes `overflow` does not apply to.

@@ -6,7 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/generated/tokens.css",
-    "./themes.css": "./src/themes.css"
+    "./wells.css": "./src/wells.css"
   },
   "scripts": {
     "build": "style-dictionary build --config ./style-dictionary.config.mjs",

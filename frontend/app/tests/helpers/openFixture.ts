@@ -16,16 +16,12 @@ export async function openFixture(
   options?: {
     /** Slice 9: make this workspace throw while it renders (fixture double only). */
     crash?: "setup" | "lighting" | "audio";
-    theme?: "graphite" | "bone";
   }
 ) {
   const params = new URLSearchParams({
     fixture: fixtureId,
     transport: "fixture",
   });
-  if (options?.theme) {
-    params.set("theme", options.theme);
-  }
   if (options?.crash) {
     params.set("crash", options.crash);
   }

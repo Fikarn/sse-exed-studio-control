@@ -36,7 +36,7 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     [commissioningSnapshot, pages]
   );
 
-  const { setTheme, setUiScale, theme, uiScale } = useOperatorLayout();
+  const { setUiScale, uiScale } = useOperatorLayout();
   const [mode, setMode] = useState<SetupMode>(persistedMode);
   const [activeStepId, setActiveStepId] = useState<RunnerStepId>(recommendedStepId);
   const [pendingStepId, setPendingStepId] = useState<RunnerStepId | null>(null);
@@ -213,9 +213,7 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     checks,
     backups,
     recentActions,
-    setTheme,
     setUiScale,
-    theme,
     uiScale,
     mode,
     setMode,
