@@ -9,7 +9,7 @@ One pull request each, in this order. Then the Cameras page.
 
 - [x] Step 1: the catch-up pull request merged (#230).
 - [x] Step 2: rulebook and docs. A short `AGENTS.md`, this roadmap, `docs/CHECKLIST.md`; the ledgers deleted.
-- [ ] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
+- [x] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
 - [ ] Step 4: builds. One release command; studio builds kept outside the repository; a release-profile engine; the shell never falls back to the repository's engine; development runs get their own data and simulated devices by default; a simulated lighting output.
 - [ ] Step 5: screenshots and the layout gate. Header and footer captured once; absolute thresholds instead of per-page ratchets.
 - [ ] Step 6: product code. Talkback out (D26), Graphite and Bone out (D25), update-folder leftovers, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.

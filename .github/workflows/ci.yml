@@ -1,0 +1,136 @@
+name: ci
+
+# A backstop, not the gate. The gate is `npm run check` on the studio
+# workstation, which also compares the captures and compiles the Windows-only
+# code; these jobs run the same checks from a clean checkout, on Linux.
+on:
+  push:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Format, lint, types, the contract's generated files, and the unit tests of
+  # the pages and the scripts.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run protocol:check
+      - run: npm run frontend:typecheck
+      - run: npm run frontend:test
+      - run: npm run scripts:test
+      - run: npm run file:health
+
+  # The engine and the shell: format, clippy, the tests, and the engine driven
+  # end to end over its pipe. Every run uses the simulated console and cameras.
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: ./.github/actions/setup-rust
+      - uses: ./.github/actions/setup-tauri-linux
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native -> target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: npm ci
+      - run: npm run rust:fmt:check
+      - run: npm run rust:clippy
+      - run: npm run native:test
+      - run: npm run native:test:dev-fixtures
+      - run: npm run native:acceptance
+      - run: npm run tauri:smoke
+
+  # The page tests. On Linux they compare no capture and sample no contrast.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/app/package.json', 'package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+      - name: Install the browser
+        working-directory: frontend/app
+        run: npx playwright install --with-deps chromium
+      - run: npm run frontend:playwright:test
+      - name: Upload the report and the traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: |
+            frontend/app/playwright-report/
+            frontend/app/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The real shell with the real engine and the real pages, driven through
+  # recovery, restart, restore and a second launch. Under xvfb, with software
+  # rendering.
+  shell:
+    runs-on: ubuntu-latest
+    env:
+      SSE_TAURI_QUALIFICATION_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/qualification
+      SSE_TAURI_QUALIFICATION_TIMEOUT_MS: "180000"
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - uses: ./.github/actions/setup-rust
+      - uses: ./.github/actions/setup-tauri-linux
+      - name: Install xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native -> target
+          shared-key: qualification
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: npm ci
+      - name: Build the shell the lanes run
+        working-directory: native/tauri-shell
+        run: cargo build --no-default-features --features test-bridge
+      - run: xvfb-run -a npm run tauri:setup-support:qualify
+      - run: xvfb-run -a npm run tauri:workspaces:qualify
+      - name: Upload the lanes' evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-lanes
+          path: ${{ github.workspace }}/artifacts/qualification/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -27,8 +27,6 @@ frontend/**/dist/
 frontend/**/storybook-static/
 frontend/**/playwright-report/
 frontend/**/test-results/
-frontend/**/test-results-quarantine/
-frontend/**/playwright-report-quarantine/
 frontend/**/coverage/
 test-results/
 
