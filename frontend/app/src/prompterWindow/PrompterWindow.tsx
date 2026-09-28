@@ -102,6 +102,9 @@ export function PrompterWindow({ link }: PrompterWindowProps) {
       className={styles.window}
       data-testid="prompter-window"
       data-stands={view.stoppedAfterMs === null ? undefined : ""}
+      // The text stands where the hardware link's own layout has it: the
+      // layout was reported, and its anchor came back.
+      data-laid-out={view.anchor !== null && view.anchor.position !== null ? "" : undefined}
       onContextMenu={(event) => event.preventDefault()}
     >
       <GlassBoundary onProblem={setDrawProblem}>

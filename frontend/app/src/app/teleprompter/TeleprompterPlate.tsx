@@ -397,9 +397,10 @@ export function TeleprompterPlate({
           ]}
           data-testid="teleprompter-screen-readouts"
         />
+        {/* The reason, in the shell's words: a sentence of its own. */}
         {snapshot.screen.windowError ? (
           <p className={styles.windowError} data-testid="teleprompter-window-error">
-            The window did not open: {snapshot.screen.windowError}
+            {snapshot.screen.windowError}
           </p>
         ) : null}
       </Section>

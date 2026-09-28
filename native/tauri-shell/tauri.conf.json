@@ -32,6 +32,7 @@
         "focusable": false,
         "decorations": false,
         "shadow": false,
+        "backgroundColor": "#000000",
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,

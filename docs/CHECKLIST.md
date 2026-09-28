@@ -59,15 +59,19 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 - [ ] After a restart the script and the place are still there, paused.
 - [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
 - [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.
-- [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows; `PLAY` is grey and the strip reads `XL NOT CONNECTED`. With nothing on the prompter every control is grey.
+- [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows. With nothing on the prompter every control is grey.
 
-Once the Prompter XL's window is built:
+The Prompter XL:
 
-- [ ] The script reads correctly in the glass, not mirrored, and on no other screen but the page's own copy.
-- [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
-- [ ] Unplugged: the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script.
+- [ ] Plugged in, the header's `Prompter` lamp is green within a few seconds, and `shell.log` says `The prompter's window opened on the Prompter XL`, `The prompter's page draws` and `The hardware link has the Prompter XL as CONNECTED`.
+- [ ] The script reads correctly in the glass, not mirrored, and fills the Prompter XL's screen: no taskbar, no frame, no pointer.
+- [ ] No other screen shows the script but the page's own copy. The page's copy and the glass break every line alike.
+- [ ] While the window opens, and after it, typing in `Edit script` goes on: the window takes no keyboard.
+- [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page. `PLAY` is green while the text scrolls, and the scroll is smooth at the speeds used, with the Cameras page open.
+- [ ] Unplugged while the text scrolls: the text pauses, the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", the deck's `PLAY` is grey and its strip reads `XL NOT CONNECTED`, and no other screen shows the script, not for a moment.
 - [ ] Plugged back in: the script returns at the same place, paused.
-- [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page. `PLAY` is green while the text scrolls.
+- [ ] Set to duplicate another screen in Windows' display settings: the page reads `DUPLICATED` and the Prompter XL shows the copy, not the script. Set back to extend: the script returns.
+- [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
 - [ ] The scroll is smooth at the speeds you use, also with the Cameras page open.
 
 ## Cameras

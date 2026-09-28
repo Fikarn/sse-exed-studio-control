@@ -19,13 +19,6 @@ export default defineConfig({
     // on which workspace the operator opened first. One stylesheet, one order.
     cssCodeSplit: false,
     rolldownOptions: {
-      // Two pages: the operator's, and the prompter's window's
-      // (`prompter.html`), which shows the glass on the Prompter XL and loads
-      // nothing of the operator's.
-      input: {
-        main: fileURLToPath(new URL("index.html", import.meta.url)),
-        prompter: fileURLToPath(new URL("prompter.html", import.meta.url)),
-      },
       output: {
         manualChunks(id) {
           return id.includes("/node_modules/") ? "vendor" : undefined;

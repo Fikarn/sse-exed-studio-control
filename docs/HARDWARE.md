@@ -119,7 +119,10 @@ What limits the design:
 - Studio Control knows it by that name and by nothing else. `shell.log`, in the logs folder, names every screen as Windows does, at the start and whenever a screen comes or goes: `The screens: … Prompter XL 1920×1080 at 5120,0. The Prompter XL is connected, 1920×1080 at 60 Hz.` A Prompter XL that Windows calls otherwise reads there under the name it has.
 - Plugging it in or out leaves Studio Control on the studio display: if Windows moves the window, it is put back a second or two after the screens have stopped changing.
 - The studio display switched off, or asleep, is away from Windows' desktop, and Windows moves the window to another screen. Studio Control remembers its display, by the screen's own name, and goes back to it when it returns. **Studio fullscreen** in Setup / Support makes the display the window is sent to its own.
-- The app finds it by that name and draws the script there and on no other screen. This window is not built yet, so the page reads `NOT CONNECTED`.
+- The app finds it by that name and draws the script there and on no other screen, in a window of its own that fills the screen. The window is put there only once it stands on the Prompter XL's part of the desktop, and it is hidden at once when Windows moves it: Windows moves the windows of a screen that goes.
+- The window's page tells the app once a second that it draws. The hardware link hears that the Prompter XL is connected only while it does, so `PLAY` unlocks only with the script on the glass. A page that stops is `NOT SHOWING`, and its window is opened again.
+- `shell.log` says each step: `The prompter's window opened on the Prompter XL: 1920×1080 at 5120,0.`, `The prompter's page draws.`, `The hardware link has the Prompter XL as CONNECTED.`
+- The taskbar: a window that takes no keyboard cannot ask Windows to hide a taskbar under it. If a taskbar shows on the Prompter XL, switch it off for that screen in Windows' taskbar settings (taskbar behaviours, show my taskbar on all displays).
 - The Prompter XL flips what it shows, so the app draws the script unmirrored.
 - In Windows' display settings it extends the desktop at 1920×1080. Otherwise the page reads `DUPLICATED` or `LOW RESOLUTION`.
 - Set by hand: a black desktop background on the Prompter XL, and Elgato Camera Hub's own prompter off, if Camera Hub is installed.
@@ -142,7 +145,7 @@ Cameras and the prompter, the six rules the code's comments cite as D15:
 1. Use a camera address only once the owner has typed it into Setup. Test builds refuse any address that is not on this PC.
 2. Use Bluetooth only in the studio build. Pair once, in Setup, with the owner present.
 3. Never open the DeckLink, the Cam Link or a camera stream from a test. Tests get a still test picture.
-4. Draw on the Prompter XL only from the studio build. Anything else draws into an ordinary window.
+4. Draw on the Prompter XL only from the studio build. Anything else draws into an ordinary window: a development build's prompter is a window with a frame, wherever the Prompter XL is, and the hardware link is told of a screen of 1920×1080 so that the prompter can be tried.
 5. Check against the real cameras only with the owner present and nothing recording. Put back every setting touched.
 6. Learn the BGH1's protocol by listening only, and only with the owner's go-ahead at the time.
 

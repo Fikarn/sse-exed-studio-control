@@ -291,6 +291,14 @@ mod tests {
         assert!(!prompter.focusable, "it never takes the keyboard");
         assert!(!prompter.decorations);
         assert!(!prompter.shadow, "a shadow draws a white edge");
+        // The shell shows the window once it stands in its place, which can
+        // be before its page has drawn: the browser's own white would show
+        // until then.
+        assert_eq!(
+            prompter.background_color,
+            Some(tauri::utils::config::Color(0, 0, 0, 255)),
+            "black before its page draws"
+        );
         assert!(prompter.always_on_top);
         assert!(prompter.skip_taskbar);
         assert!(!prompter.resizable);
@@ -327,12 +335,13 @@ mod tests {
         assert!(ordinary.resizable);
         assert!(!ordinary.fullscreen);
         assert_eq!((ordinary.width, ordinary.height), (960.0, 540.0));
-        // What it keeps: its name, its page, its profile, and that it is
-        // shown by the shell and takes no keyboard by itself.
+        // What it keeps: its name, its page, its profile, its black, and
+        // that it is shown by the shell and takes no keyboard by itself.
         assert_eq!(ordinary.label, PROMPTER_WINDOW_LABEL);
         assert_eq!(ordinary.url, prompter.url);
         assert_eq!(ordinary.title, prompter.title);
         assert!(ordinary.incognito);
+        assert_eq!(ordinary.background_color, prompter.background_color);
         assert!(!ordinary.visible);
         assert!(!ordinary.focus);
         assert!(!ordinary.create);

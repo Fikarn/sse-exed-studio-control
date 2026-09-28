@@ -63,6 +63,9 @@ test.describe("the prompter's window", () => {
     await openPrompterWindow(page);
     const glass = page.getByTestId("prompter-window-glass");
     await expect(glass).toHaveAttribute("data-layout-key", /^g\d+-l\d+$/);
+    // The text is drawn from the words until the layout is reported, and
+    // from the hardware link's own pixels after: a part of a pixel apart.
+    await expect(page.getByTestId("prompter-window")).toHaveAttribute("data-laid-out", "");
 
     // All of the Prompter XL's screen, and nothing beside it to scroll to.
     expect(await glass.boundingBox()).toEqual({ x: 0, y: 0, ...PROMPTER_XL });
