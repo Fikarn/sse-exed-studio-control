@@ -1,603 +1,110 @@
 # Development
 
-## Goal
+How to run, test and debug Studio Control on the studio workstation, and the traps that have cost time. The workflow itself is in [AGENTS.md](../AGENTS.md).
 
-This project should be developed as a production-grade local studio console, not as a casual prototype.
+## Setting up
 
-That means every change should aim for:
-
-- operator reliability
-- maintainable code structure
-- clear UI behavior
-- test coverage for meaningful risk
-- disciplined Git history
-
-## Project Priorities
-
-When deciding what matters most, use this order:
-
-1. Studio operations stability
-2. Lighting, audio, and control-surface workflows
-3. Data safety and recovery
-4. UI clarity under pressure
-
-If a change improves a workflow but risks studio reliability, studio reliability wins. (Production planning was fifth on this list until the new pages program removed it in 2026-09.)
-
-## Recommended Daily Workflow
-
-### 1. Start from a clean base
-
-Before doing any work:
+Node 24 (`.nvmrc`), the Rust toolchain that `native/rust-toolchain.toml` pins, and WebView2 (part of Windows 11).
 
 ```bash
-git switch main
-git pull origin main
 npm install
-npm run doctor
+npm run check:quick
 ```
 
-If you are starting a real feature or fix:
+## Running it
+
+**The pages in a browser, on test data.** The fastest way to look at a state by hand. No engine and no shell are involved; the page is drawn for 2560×1440, so look at it fullscreen (F11).
 
 ```bash
-git switch -c feature-short-description
+npm run dev --workspace frontend/app -- --port 4180 --strictPort --host 127.0.0.1
 ```
 
-Use short branch names such as:
+Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`. Every state is a name in `frontend/packages/test-fixtures/src/fixtures.json`. Use any port but `4173`: the page tests bind that one.
 
-- `feature-lighting-scenes`
-- `fix-audio-meter-polling`
-- `chore-release-workflow`
+**The real app.** `npm run tauri:dev` starts the pages and the shell. It opens the real saved data and the real devices unless told otherwise, so set the variables in AGENTS.md's Safety section first. It does not rebuild the engine: after a change to the engine or the contract, run `npm run native:engine:build` and start it again. If the app opens on its recovery screen straight after such a change, that is why.
 
-### 2. Launch the app
+## Checking a change
 
-For selected Tauri-shell visual review:
+| Command                            | Runs                                                                                                            | Takes               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------- |
+| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | under a minute      |
+| `npm run frontend:playwright:test` | Builds the pages and Storybook, then the page tests: behaviour, the layout measures, the captures               | about three minutes |
+| `npm run check`                    | Both                                                                                                            | about four minutes  |
 
-```bash
-npm run tauri:visual:review
-```
+Each step of `check:quick` logs to `node_modules/.cache/dev-check/`. A step that fails on timing is re-run alone with `npm run dev:check:serial` before it is believed.
 
-For shipping-runtime architecture work:
+The layers, and what each is for:
 
-```bash
-npm run native:check
-npm run native:test
-npm run native:foundation
-npm run frontend:foundation
-npm run tauri:foundation
-npm run tauri:setup-support:qualify
-npm run tauri:workspaces:qualify
-npm run native:package:win:local
-npm run native:package:win:smoke
-npm run native:package:win:clean-smoke
-npm run native:installer:win:prepare
-npm run native:installer:win:local
-npm run native:update-repo:win:prepare
-npm run native:update-repo:win:local
-npm run native:release:win:local
-npm run native:acceptance
-```
+- **Engine tests** (`cargo test`, in `native/rust-engine`): behaviour. This is where a feature is tested first. The three readers of outside bytes also have fuzz tests; a failing case leaves its seed under `proptest-regressions/`, which is committed with the fix.
+- **Unit tests** (Vitest, beside the source as `*.test.ts`): page logic.
+- **Page tests** (Playwright, `frontend/app/tests`): what the operator does on screen, against the test double of the engine (`frontend/packages/engine-client/src/transports/fixture/`).
+- **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.
+- **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`): screenshots at 2560×1440, compared on Windows only.
+- **Hardware tests** (`npm run native:test:hardware`): the engine tests marked `#[ignore]`, against the real console. Only when the owner asks and is present, with the studio app closed and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` set (`docs/HARDWARE.md`).
 
-`npm run native:foundation` is the active shipping-runtime foundation lane. It runs Rust engine checks/tests plus the selected Tauri foundation.
+## Captures
 
-For the parallel frontend replatform foundation:
+The committed captures are under `frontend/app/tests/__visual__/`. CI compares none of them, so the local run is the one that counts.
+
+When a change moves a page:
+
+1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`
+2. `cd frontend/app && npx playwright test visual-review.spec.ts storybook.spec.ts --update-snapshots=changed`
+3. Look at every changed picture before `git add`.
+
+## The layout measures
+
+`ui-contract.spec.ts` renders every fixture at 2560×1440 and measures it: type sizes and families, contrast sampled from the screenshot, target sizes, radii, shadows, gradients, idle animations, chrome sizes, scroll, and forbidden words. Each page's numbers are held in `frontend/app/tests/ui-contract.ratchets.json`: a measure may fall, never rise.
 
 ```bash
-npm run protocol:generate
-npm run dev:check
-npm run frontend:tokens:build
-npm run frontend:storybook
-npm run frontend:foundation
-npm run tauri:foundation
-npm run tauri:setup-support:qualify
-npm run tauri:workspaces:qualify
-npm run tauri:visual:review
-npm run tauri:cutover:candidate
-npm run tauri:package:win:ifw-staged
-npm run tauri:package:win:ifw-local
-npm run tauri:package:win:evidence
-npm run native:release:win:evidence -- --issue-url <active-evidence-issue-url>
-```
-
-`npm run tauri:setup-support:qualify` launches the real Tauri dev shell and covers the Setup/Support pilot (including the shell staying responsive while the engine sits in a stalled lighting probe against an unrouted address, and the diagnostics export landing in the app-data `exports` folder — 2026-09 production readiness, Slice 4), persisted restart, a database backup verified and restored through the running shell (`database-restore`: the graceful restart's `shutdown` backup is verified — junk beside it is called junk — then restored; the store restarts the link on `requiresRestart`, the bootstrap moves the backup into place and keeps the old file as `replaced` — 2026-09 production readiness, Slice 7), degraded startup/recovery posture (a blocked app-data directory and a corrupt database, the latter restored from the recovery surface through the engine's recovery mode and restarted into the restored data), an engine ended from outside (`engine-crash`: `ENGINE_EXITED` on the recovery surface within two seconds, then the automatic restart with a new process — 2026-09 production readiness, Slice 5) and a second copy of the shell launched while the first is up (`second-instance`: refused by the single-instance plugin — within 5 s on Windows, on CI's Linux runner only after GTK's start-up, which waits about 30 s on the AT-SPI bus lookup under xvfb — or by the engine's `engine.lock` on a Linux session without a D-Bus session bus). `npm run tauri:workspaces:qualify` launches the same real shell and covers the commissioned dashboard plus live Lighting and Audio mutations across restart persistence. Since the new pages program's Slice 1 the setup-support lane follows a snapshot slot of the Console, found by name, through the archive restore, the restart, the database restore and the recovery restore (it followed the Planning projects); the workspaces lane dropped its Planning round-trip and checks the Lighting fixture and recalled scene after its restart; both save Lighting as the page to come back to.
-
-Both Tauri qualification lanes and Playwright preview use the fixed local port `127.0.0.1:4173` with strict port binding. Do not run them concurrently with each other or with the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`); a stale or competing server makes the result invalid.
-
-Both Tauri qualification commands write a `summary.json` evidence file. By default the summary is written to a temp directory and the path is printed. For target-host evidence capture, set `SSE_TAURI_QUALIFICATION_EVIDENCE_DIR=artifacts/tauri-qualification` before running the commands; this directory is intentionally ignored by git.
-
-The promotion gate for the Tauri shipping switch lives in [FRONTEND_CUTOVER_PLAN.md](./archive/FRONTEND_CUTOVER_PLAN.md). Do not change shipping behavior, installer paths, or target-host gate status by inference; use that checklist as the cutover authority.
-
-`npm run tauri:cutover:candidate` is the local Checkpoint A gate. It runs protocol checking, frontend foundation, Tauri foundation, Setup/Support qualification, workspace qualification, and visual review serially. None of those lanes calls the dev parity-fixture method; a session that needs it builds the engine with `npm run native:engine:build:dev-fixtures` first.
-
-`npm run tauri:visual:review` is the repeatable replacement-shell visual evidence lane. It builds the React app, serves the fixture transport on `127.0.0.1:4173`, captures Setup/Support recovery plus Lighting and Audio screenshots at `2560x1440` logical CSS pixels, writes ignored evidence under `artifacts/visual/tauri-cutover/`, and fails if any captured operator path requires page scroll. Lighting also asserts toolbar primary-control fit and stage minimum bounds. The captures are compared with the committed win32 baselines on Windows only (§2b). This complements, but does not replace, live human review on the fixed studio monitor.
-
-`npm run tauri:package:win:ifw-staged` is a Checkpoint C hardening lane for historical/pre-switch replacement-shell evidence. It stages the Tauri shell and `studio-control-engine` side by side under `release/tauri-candidate/**`, runs the packaged Tauri smoke test, prepares QtIFW installer/update-repository payloads under separate `release/tauri-candidate-installer/**` and `release/tauri-candidate-updates/**` roots, and verifies staged payload parity. The switched shipping path is now the `native:*` release lane selected by `scripts/native-release-runtime.json`.
-
-`npm run native:release:win:local` is the target-host shipping packaging gate for the selected runtime when QtIFW tools are installed. It builds the packaged app, real offline installer with `binarycreator`, real maintenance-tool update repository with `repogen`, verifies full artifacts, installs through QtIFW, verifies the installed shell launches against the bundled engine, verifies the maintenance tool can see the package and repository, purges through the maintenance tool, reinstalls, and verifies operator data survives. `npm run tauri:package:win:ifw-local` remains a candidate-evidence lane under `release/tauri-candidate*`.
-
-Use the Windows QtIFW tools on the Windows 11 `x64` host for `npm run native:release:win:evidence -- --issue-url <active-issue-url>` when collecting post-switch shipping evidence; it wraps `npm run native:release:win:local`, records host/tool/git/runtime context, writes logs, and stores the summary under `artifacts/native-release/windows-target-host/`. `npm run tauri:package:win:evidence -- --issue-url <active-issue-url>` remains useful for candidate evidence under `artifacts/tauri-qualification/windows-target-host/`. The runbook is [WINDOWS_TARGET_HOST_EVIDENCE.md](./WINDOWS_TARGET_HOST_EVIDENCE.md).
-
-### 2b. Visual review
-
-When the task changes any operator-visible selected Tauri surface, do not stop at code. Run the fixture-driven visual lane and inspect the result on the fixed studio monitor:
-
-```bash
-npm run tauri:visual:review
-```
-
-Required selected-runtime workflow:
-
-1. build and validate the selected Tauri shell
-2. capture repeatable `2560x1440` visual evidence with `tauri:visual:review`
-3. launch the real app when human inspection is needed
-4. compare against the intended operator state before accepting the change
-
-**Operator ruling, 2026-09-26 (the new pages program's D22): Studio Control always runs at `2560x1440`, fullscreen on an external display, on a Windows machine, and nothing is designed, fixed, tested or verified for another size or system.** Slice SW removed what existed only for them: the smaller layouts (compact chrome and density, the Console's compact banks, Lighting's narrow drawer), Scaled Studio Preview, the windowed layout, the size-only Playwright cases, the captures at other sizes and on Linux and macOS, and the macOS packaging. Do not add any of it back. (The ruling of 2026-09-18, which kept the other sizes' and systems' guards, and the decision of 2026-09-23, which made a board change refresh its linux capture, ended with that slice.)
-
-**Captures.** The committed captures are win32 only, at `2560x1440`: 27 from `visual-review.spec.ts` and 47 from `storybook.spec.ts`, under `frontend/app/tests/__visual__/` (see its README). Playwright compares them on Windows only — on any other system `ignoreSnapshots` is on, so the Storybook spec only checks that each story loads and paints — so CI's `frontend-e2e`, on Linux, compares none, and the UI contract samples contrast only on Windows (§2c). Run `npm run frontend:playwright:test` on the studio workstation before each push: it builds first and checks both. (The new pages program's cloud slices, S5a to S8, pushed without it; their captures and contrast were caught up on the workstation, the program's ledger, Part C, and every slice since is checked here again.) When a change moves a board, refresh its captures there: `npm run build --workspace frontend/app && npm run frontend:storybook:build`, copy the `*-diff.png` files out of `frontend/app/test-results` (the update run replaces them), then `cd frontend/app && npm exec playwright test visual-review.spec.ts storybook.spec.ts -- --update-snapshots=changed` (narrow with `-g "<title words>"`; titles are joined by spaces, not `›`), and inspect every changed PNG before `git add`. A board that goes loses its captures.
-
-Do not accept stale live evidence. If the current Tauri visual review output or live screenshot does not clearly correspond to the operator state being checked, regenerate it before continuing.
-
-`npm run tauri:dev` starts Vite and the selected Tauri shell; it does not rebuild `studio-control-engine`. If the dev shell lands on Incident Recovery immediately after protocol or engine changes, run `npm run native:engine:build` and relaunch `npm run tauri:dev`.
-
-### 2c. The UI contract (visual overhaul A)
-
-Every operator surface is built to one written visual system, and that system is
-measured rather than reviewed by eye. If you change anything the operator sees,
-this is the lane that tells you whether you broke it.
-
-**The system** is `docs/redesign/system-a-2026-09.md` — the cluster rule (header ·
-cluster · bay · plate · footer), five elevation levels, four role hues, a 9-step
-type scale with a 12 px floor, four radii, the motion policy, and §10's measures.
-`docs/plans/visual-overhaul-a-2026-09.md` is the implementation record: thirteen
-slices, each with a Status line saying what landed, what moved, and what was
-deliberately left. Read the slice status before changing a surface it names — it
-usually explains why something is the way it is.
-
-**The gate** is `frontend/app/tests/ui-contract.spec.ts`. It renders 81 boards —
-27 fixtures × 3 themes at 2560×1440 (a board a page reaches by a press, such as
-the Teleprompter's editor, names its presses in `BOARD_STEPS`,
-`tests/helpers/ui-contract/boards.mjs`) — plus the Storybook primitive pages, and
-measures each one: type floor and distinct sizes, font families, pixel-sampled
-text contrast, pointer-target size, radii, shadows and blur, gradients, running
-animations at idle, chrome heights, page scroll, targets off the viewport, and a
-forbidden-word scan of the rendered copy. Each board's numbers are ratcheted in
-`frontend/app/tests/ui-contract.ratchets.json`: a measure may fall, never rise.
-Contrast is sampled on Windows only: CI's Linux runner measures the rest, so the
-workstation's run before each push (§2b, Captures) is the one that checks it.
-
-```bash
-# from frontend/app — measures every board and writes the report + artifacts
+# from frontend/app: measure every page and write a report to artifacts/ui-census/
 node scripts/ui-census.mjs
 
-# same, and re-seeds the ratchets from what it measured
+# the same, and write the numbers it measured as the new ratchets
 node scripts/ui-census.mjs --write-ratchets
 ```
 
-The census takes about four minutes. It writes per-board JSON to
-`artifacts/ui-census/*.json` (untracked) with the offenders named, not just
-counted — `outerBlurOver8UnlitEls`, `gradientsOffEls`, `backdropBlurEls`,
-`runningEls` — plus `artifacts/ui-census/census.md` and `contrast.md`. Read those
-lists when a measure is non-zero; the counts alone will not tell you which
-element is wrong.
-
-Off Windows the census takes no screenshot and samples no contrast, so a board
-seeded there has `contrastFails: null`, which the Windows run reads as no
-failure allowed, and a full `--write-ratchets` off Windows would null every
-board's contrast figure. Seed the ratchets on the studio workstation. (The new
-pages program's cloud slices, S5a to S8, seeded their boards off Windows with
-`--fixtures <their fixtures> --write-ratchets`; the workstation catch-up
-re-seeded all of them with contrast.)
-
-Re-seed the ratchets only after you have looked at the diff. `git diff` on
-`ui-contract.ratchets.json` is the "numbers that moved" report, and the rule is
-that nothing rises. To check that mechanically:
-
-```bash
-git diff --stat frontend/app/tests/ui-contract.ratchets.json
-```
-
-**Three sibling gates** run outside the census:
-
-```bash
-node scripts/check-operator-copy.mjs                 # repo root — forbidden words in operator copy
-npm run test --workspace @sse/design-system          # incl. the CSS-literal allowlist test
-```
-
-- `scripts/check-operator-copy.mjs` (repo root, **not** `frontend/app/scripts/`)
-  scans source for words that must never reach the operator — "engine",
-  "backend", "transport", "IPC", "snapshot" outside the Console's scene
-  primitive, and a raw `AUDIO_*` code leading a sentence. It holds at 0.
-- `src/__tests__/css-literals.test.ts` in `frontend/packages/design-system`
-  counts raw literals per stylesheet against an allowlist that may only shrink.
-  A `box-shadow` whose value does not start with `var(` counts as a literal even
-  when its colour is a token, and so does a raw `999px` radius — use
-  `var(--radius-pill)`. Re-seed with
-  `UPDATE_CSS_LITERALS=1 npx vitest run src/__tests__/css-literals.test.ts`.
-- `themes.contrast.test.ts` in `frontend/packages/tokens` checks the role and
-  display inks at the token layer, in all three themes, before anything renders.
-
-**Traps that have cost real time here:**
-
-- Playwright serves `frontend/app/dist`. Run `npm run build --workspace @sse/frontend-app`
-  before any Playwright command or you will test the previous build. The
-  Storybook lanes read `storybook-static` the same way.
-- Never run `npm run frontend:storybook:build` while a Playwright run is in
-  flight — the Storybook contract boards 404 mid-run and seven `ui-contract`
-  tests fail for no reason.
-- Raising a type size breaks layouts written for the old one, and only
-  measurement finds it. Slice 11's 9.5 → 12 px raise silently pushed all 38 dBFS
-  meter marks off the meters and clipped `PRE FADER` on the 1920 fallback. After
-  a type change, re-run the workspace spec and sweep every leaf text node for
-  `range.width > content width` on each fixture at 2560.
-- To give a control a 24 px pointer target without moving the layout, grow the
-  element and pay it back with a matching negative margin, painting the visible
-  part on `::before`. `ScrubSlider` and `ScrubLabel` are the worked examples.
-- Style Dictionary emits kebab-case. A stylesheet asking for
-  `--size-compactControlHeight` silently gets nothing; the name is
-  `--size-compact-control-height`.
-- A Playwright case that fails now and then is a case with a cause. Production
-  readiness S13 read the traces of the five that had failed on CI and every one
-  was the test: a second click expected inside the 350 ms arm dwell in real time
-  (a CI runner's clicks are over a second apart — use `helpers/pageClock.ts`),
-  a key sent while `audio-workspace` was still the "Loading the console…" surface
-  (wait for the control the key belongs to), a field read once straight after the
-  pointer came up (wait for it to move). Only a wall-clock measurement goes on the
-  quarantine list — see "Quarantined Playwright cases" under §4.
-- Each workspace is a chunk of its own (production readiness S14), fetched after
-  the shell has drawn, so `openFixture` returning says nothing about whether the
-  workspace is on screen. A spec whose first step after `openFixture` is a key or
-  a one-shot DOM read calls `expectWorkspaceMounted(page, workspace)` first
-  (`tests/helpers/openFixture.ts`; it waits for a mark only the mounted workspace
-  draws). Since 2026-09-23 the Console's loading surface is
-  `data-testid="audio-workspace-loading"`, and `audio-workspace` is drawn only
-  by the mounted Console (before, the loading surface carried it too).
-- A value that depends on the page's clock is pinned or driven, never waited out
-  (S15). The fixture double's simulated meters are a function of `Date.now()`, and
-  the four strip levels are the Console's audio state as it was fetched at start —
-  they do not move with the meter ticks, only the painter's canvas does; a timer
-  that ends something (the recall pulse, 1.5 s) is waited for by what it ends. Use
-  `page.clock.install()` before `openFixture`, `pausePageClock(page)` once the
-  workspace is mounted, then `page.clock.runFor(...)` to run the metering
-  interval and the painter's frames; `audio-metering.spec.ts` and
-  `audio-render-budget.spec.ts` are the worked examples.
-
-**Fixtures.** Every board is a fixture id from
-`frontend/packages/test-fixtures/src/fixtures.json`, and any of them opens in the
-browser at `/?fixture=<id>&transport=fixture` (add `&theme=graphite|bone`). That
-URL against a preview server is the fastest way to look at a state by hand — no
-engine, no Tauri shell; the page is drawn for `2560x1440` only, so look at it full
-screen on the studio monitor (F11 in the browser):
-
-```bash
-npm run build --workspace @sse/frontend-app
-npm run preview --workspace @sse/frontend-app -- --host 127.0.0.1 --port 4180 --strictPort
-# then http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture
-```
-
-Use a port other than `4173`: Playwright binds that one with `--strictPort` and
-will fail to start if you are holding it.
-
-A scenario seeds the Teleprompter with its `prompter` entry (the new pages
-program's Slice 6a): scripts by name from `test-fixtures/src/prompterScripts.ts`,
-the removed ones, the script on the glass and its place, `NOT UPDATED`, the look
-and the size, applied through the double's own requests
-(`transports/fixture/prompterSeed.ts`); `prompterScreen` says how the Prompter XL
-starts (connected unless it says otherwise). The `teleprompter-*` fixtures are
-the worked examples.
-
-**Front-end map** (after production readiness S14). The shell is
-`frontend/app/src/app/OperatorShell.tsx`; each workspace is a chunk cut by the four
-`import()` calls in `workspaceChunks.ts` (the active one is fetched after the
-shell's first draw, the others at idle once ready; the fallback is
-`startup/WorkspaceLoadingSurface.tsx`, test id `workspace-loading`). There is
-deliberately no `manualChunks` rule by folder, and `build.cssCodeSplit` is `false`
-so rule order never depends on which workspace opened first. Planning, the fourth
-workspace, left the screen in the new pages program's Slice 1
-(`docs/plans/new-pages-2026-09.md`). The two large workspaces are assemblers:
-
-- Lighting — `lighting/LightingWorkspace.tsx` over `lighting/useLightingEditor.ts`,
-  which composes the five hooks in `lighting/editor/` (rig, session, scene editor,
-  fixture editor, rig controls — the sixth, the commands hook with the page's key
-  handlers and palette entries, went in the new pages program's Slice 3); the
-  render is the five components in `lighting/regions/` (cluster, plate, bay,
-  bottom strips, dialogs — the quick palette panel went in Slice 3 too), and
-  `lighting/lightingWorkspaceModel.ts` holds the module-level helpers.
-- Setup / Support — `setup/SetupSupportPilot.tsx` over `setup/useSetupPilot.ts`,
-  `setup/pilot/` (state, actions, chrome), the runner's four steps in
-  `setup/steps/` and `setup/support/` (the support screen, the dialogs, and
-  `SetupWorkstationPlate.tsx` with Recent actions and the light-outputs switch).
-
-The Console (`audio/AudioWorkspace.tsx` and `audio/components/`) was never over
-the size guard and was not split. The Teleprompter (the new pages program's
-Slice 6a) is `teleprompter/TeleprompterWorkspace.tsx` over
-`teleprompter/teleprompterModel.ts` (what the page shows, from the hardware
-link's figures) and its cluster, bay, plate, look and footer; it is the first
-page to fill the shell's plate region, and `teleprompter/glass/` is the glass
-both it and the Prompter XL's window draw. Its script editor (Slice 6b) is
-`teleprompter/editor/`: the browser makes the edits (so its own undo covers
-them) and `editorDom.ts` reads the script back from the page's markup after
-each one; `beforeinput` cancels only the browser's formatting keys, lists, links and
-drops, and a native paste, which goes through `prompter.paste.convert` first. The fixture double is
-`frontend/packages/engine-client/src/transports/fixtureTransport.ts` over the
-modules in `transports/fixture/`, one request handler per domain
-(`lightingRequests.ts`, `audioRequests.ts`, `setupRequests.ts`,
-`prompterRequests.ts` and the prompter's model, clock, reads, import and screen
-beside it); `scripts/check-operator-copy.mjs` skips that folder. The
-boundaries are `startup/ShellErrorBoundary.tsx` (root) and
-`startup/WorkspaceErrorBoundary.tsx` (per workspace).
-
-### 3. Implement in small batches
-
-Prefer scoped, reviewable changes over sweeping rewrites. For larger work, break it into: analysis + plan, first implementation slice, validation, follow-up polish.
-
-### 4. Run the right level of validation
-
-Match the checks to the risk.
-
-#### Selected Tauri shell or frontend tweaks
-
-```bash
-npm run format:check
-npm run frontend:foundation
-npm run tauri:foundation
-```
-
-The store refreshes by domain (2026-09 production readiness, Slice 9 — findings F10, F11, F32). `engine-client/src/store/domainRefresh.ts` holds the two maps: `EVENT_DOMAIN_REFRESH satisfies Record<EventName, …>` (an event added to the protocol fails the typecheck until it is mapped) and the method-prefix list behind `domainsForMethod`, which also adds a workspace's own snapshots to the `settings.update` that opens it. Write a mapping from what the engine's snapshot builder reads, not from the event's name: the DMX monitor is built from the lighting snapshot, the commissioning snapshot carried the planning counts (until the new pages program's Slice 2, which removed them with the `planning.changed` event and its mapping), a probe decides the lighting snapshot's `reachable` and the audio capabilities — both qualification lanes failed on couplings like these while the slice was written, and `domainRefresh.test.ts` holds the rules that came out of it. Every refresh goes through one queue in `createShellStore.ts` (`refreshDomains`): one batch in flight, whatever is asked for meanwhile goes out as the next, a partial refresh writes only the snapshots it fetched, and only the bootstrap writes the lifecycle. The fixture catalog is fetched once per session. Replies pass `snapshotGuards.ts` (top-level lists and ids only). `createShellStore(transport, { development })` — the app passes `import.meta.env.DEV` — decides what a malformed reply does: a development build throws, and `useShellSnapshot` rethrows it while rendering so the root boundary names the request and the field; a production build keeps the last good snapshot and records the failure. `vite dev`, Vitest and both qualification lanes (`tauri dev`) run the development store, so a reply the guards refuse fails them loudly; Playwright runs the production build. Boundaries: `startup/ShellErrorBoundary.tsx` at the root in `main.tsx` (works with no store), `startup/WorkspaceErrorBoundary.tsx` around the bay's surface in `OperatorShell.tsx`, keyed by experience, workspace and a reload counter, adding no element of its own. `?crash=<workspace>` on a fixture URL makes that workspace throw while rendering (fixture transport only, never inside the Tauri runtime); `window.__SSE_TEST_DISARM_CRASH__()` ends the fault. Record UI failures through `startup/reportUiFailure.ts`, which keeps each error object once.
-
-#### Engine changes
-
-```bash
-npm run native:check
-npm run native:test
-npm run native:engine:build
-```
-
-Tests that drive the shared console link against a fake TotalMix on loopback (`audio/tests_console_link.rs`) wait on the link's own state, never on a sleep (production readiness S15): `settle_console_link(&pump)` returns once no send is pending, no read-back is outstanding and the test pump has flushed twice more, and a pull that must end incomplete gets a quiet window its timeout cannot reach. Two of them failed under load before that — a 150 ms quiet window raced a fake that streamed every 40 ms from another thread, and a recall test slept 500 ms between phases whose read-backs could still be in flight.
-
-`npm run native:engine:build:dev-fixtures` builds the engine with the `dev-fixtures` cargo feature — the only build that answers `dev.parityFixture.load`; release engines and every other lane run without it and answer `METHOD_UNAVAILABLE`. `npm run native:test:dev-fixtures` runs that build's clippy and tests (2026-09 production readiness, Slice 1; in CI's `rust` job since 2026-09-23) and then builds the plain engine again, because the feature build's tests leave a `dev-fixtures` engine at `native/target/debug`, the path `native:package:*` copies.
-
-The RME metering receive ports bind by the commissioned TotalMix address (2026-09 production readiness, Slice 6 — finding F05): `127.0.0.1` for a loopback console (`127.0.0.1` or `localhost`), every interface for a console on another host, and in both cases only datagrams from that address are read (`accept_source`; a foreign datagram is dropped and logged `WARN` once a minute per source address). `SSE_OSC_BIND_HOST=<ip>` overrides the bind address for a lab bench; a value that is not an IP address is logged and ignored. Unit tests bind their slots on ephemeral loopback ports and never touch 7001–7010 (`receive_sockets_bind_loopback_for_loopback_console` takes a free four-port base from a throwaway socket), and the hardware lane's `bind_live_global_slot_for_test` follows the engine's rule. The module is split by remote generation: `rme_totalmix_osc.rs` (the meter state, both metering paths, the metering thread with its ingress rule, the console-link service), `rme_totalmix_osc/classic_eq.rs` (the classic page-2 EQ command path), `rme_totalmix_osc/global_commands.rs` (the Global OSC channel and output-mix commands with the surface ↔ hardware maps) and `rme_totalmix_osc/tests.rs`; the module's `file:health` allowlist entry is gone.
-
-Lighting state has one lock, one preview and one render generation, all in `native/rust-engine/src/lighting/state_lock.rs` (2026-09 production readiness, Slice 10 — findings F12, F18). Every lighting mutation loads the whole editor-state value, changes it and writes the whole of it back, so every entry point that can run one takes the lock around the whole of it: `with_lighting_state(|| …)` for the plain mutations and `with_lighting_state_and_preview(|preview| …)` for the preview-aware ones — the two lighting dispatchers in `app.rs`, the Stream Deck's lighting keys in `control_surface.rs`, the archive restore and the dev parity fixture. The lighting functions themselves take no lock, so they can call each other (`*_with_preview` falls through to the plain function); `std::sync::Mutex` is not re-entrant, and a lighting function that called `with_lighting_state` would hang, not fail. Lock order, everywhere: the lighting state lock, then the shared preview (`shared_lighting_preview()`); a reader (`lighting.snapshot`, the deck's LCD) takes the preview alone through `lock_shared_lighting_preview()`, before it reads the settings. Never hold the lighting lock and `AUDIO_STATE_LOCK` together — no lighting function calls into audio and no audio function into lighting; keep it that way. A new writer of `app.lighting.*` goes through a lighting function under the lock; a new writer of something the wire depends on that is not a lighting setting (the commissioned bridge address and universe today) calls `bump_lighting_render_generation()` after its write. The sACN thread (`lighting_sacn_output.rs`, `RenderSettingsCache`) reads the database only when that generation has moved, plus once every two seconds as a safety net, and renders every 40 ms tick from the settings it kept — settings, never frames: a fade and an identify burst are timestamps inside the settings and move with the clock. Tests: the preview and the generation are process-wide, so a test that reads or writes through the shared preview starts with `let _guard = crate::lighting::shared_preview_test_guard();`, and the generation is only ever asserted to have advanced. A commit waits for the disk (about 35 ms on the studio workstation), so a test that loops over writes stays in the tens.
-
-The action log (`native/rust-engine/src/action_log.rs`, table `event_log`, schema 7; 2026-09 production readiness, Slice 11 — finding F30) records a discrete action that changed what a device receives, with who did it. It is not `engine_events.rs`, which _sends_ protocol events. The source is known at the entry points, not inside the functions they share, so that is where a row is written: `EngineApp::handle_request` (one hook after the dispatch, source `ui`; `action_log::ui_actions` is the method → row table), `handle_control_surface_http_action` (source `deck`; `action_log::deck_actions` reads the route, the key and the reply), `audio::apply_console_activity` (source `console`), the talkback watchdog's `release_expired_hold` (`watchdog`) and the bootstrap (`launch`). Rules a change has to keep: a ride is never a row (a fader, a gain, an intensity, a dial detent — a commit waits for the disk, about 35 ms here, and a dial sends a key per detent), nor a change staged in the lighting preview, a refused action or a selection; **a new protocol method fails `action_log::tests::every_contract_method_is_classified` until it is put in `RECORDED_UI_METHODS` or `NOT_AN_ACTION_UI_METHODS`**, and a recorded method needs an example in `ui_examples()`; a row that can ride a write its entry point already makes does (`storage::set_settings_owned_and` — the deck's last-event stamp, the console flush on the metering thread), so only a screen action pays a second commit; the engine writes the sentence the operator reads, the copy gate scans front-end source only, so `sentences_avoid_the_words_the_operator_never_reads` holds the rule on this side. `support.snapshot` carries the newest fifty as `recentEvents` and must never query in recovery mode (no database). Recording raises no event: the store fetches support when Setup opens and after `lighting.output.setArmed` (`domainRefresh.ts`).
-
-Held light outputs (`lighting/output_arming.rs`, Slice 11 — F31): `app.lighting.output_armed` is `"false"` while held and anything else — above all absent — is armed, so a default launch is unchanged. The hold is applied in the sACN output loop (`SacnOutput::tick`), not in the renderer: `read_lighting_sacn_output_state` and the DMX monitor keep answering what _would_ be sent. `SSE_SAFE_START` is read with the other variables through the injected reader in `bootstrap::resolve_runtime_paths_from` and written by `hold_or_carry_light_outputs` right after the database is initialised, before any thread exists; never `std::env::set_var` in the test binary. The flag must survive both restores unchanged (`support.rs` leaves the key out of the archive and out of the prefix delete; the bootstrap carries it across a pending database restore). The `sacn` health entry stays `ok` while held — `attention` would turn the store's recovery state to `degraded` — and the output thread raises `app.changed { reason: "health" }` itself when its detail moves, because the registry only announces changes of state. `SacnOutput` takes its destination port as a field so `held_outputs_send_nothing` can listen on a loopback port of its own: tests never bind or send to 5568, and "nothing was sent" is asserted without a sleep (a marker datagram must be the next thing read; the first packet after arming has sequence 0).
-
-Schema migrations (`storage.rs::migrate_schema`): every step is `if schema_version < N` with its own literal `N` in the inserted row and the assignment. Never key a step to `STORAGE_SCHEMA_VERSION` — the v5 → v6 step was, and raising the constant to 7 would have re-run its palette seed on every v6 database (Slice 11; `migrate_v6_to_v7_after_snapshot` tests the fresh, v5 and v6 roads). Schema 8 (the new pages program's Slice 2, decision D2) drops Planning's four tables and every `planning.*` setting and turns a saved `shell.workspace` of `planning` into `audio`; a new database still takes steps 2 and 3 and loses their tables at step 8, and no older step was edited. `storage/tests_schema_8.rs` holds it: `migrate_v7_to_v8_drops_planning_after_snapshot` checks that nothing else moves, that the verified `pre-migration` copy still holds schema 7 with its Planning rows, settings and saved page, and that a migrated schema-7 database ends object for object like a new one; `a_database_from_a_newer_build_is_refused_by_name` refuses schema 9 before any step runs or any copy is written. The `planning.*` defaults are no longer seeded at start, or the drop would come back at every start. **A build with a higher schema migrates the operator's real database the first time it is started against the default app-data directory, and older builds then refuse it: never start `tauri:dev`, a release exe or `studio-control-engine.exe` by hand without `SSE_APP_DATA_DIR` pointing at a scratch directory.** The lanes and `native:test` use temporary directories.
-
-`storage::list_settings_by_prefix` opens a connection per call, except on a thread that called `storage::enable_thread_read_connection()` — the sACN output, the TotalMix metering and the engine's bridge workers, the three threads that live as long as the engine and read settings all day (Slice 10 — F18). Their connection is opened read-write and made `query_only` (a read-only open fails on a write-ahead-log database whose `-shm` file is gone), is replaced when the database path differs, is dropped after a failed read, and never holds a statement between calls. Do not opt a test thread or the IPC thread in: a kept connection holds the database file open, which on Windows blocks removing a test's directory and renaming the database. A test bridge's workers do not opt in (`BridgeContext::keeping_read_connections` is set by `start_control_surface_bridge` only). Because those threads never close their connection, SQLite's checkpoint-on-last-close no longer happens while the engine runs or when it exits: `main.rs` calls `storage::checkpoint_database` after the shutdown backup, and `bootstrap::apply_pending_restore` calls it before it moves the database aside and deletes the `-wal` file. Anything new that moves, copies or replaces the database file must do the same first.
-
-The engine logs through one process-wide writer (2026-09 production readiness, Slice 8 — findings F11, F14, F16, F27): `diagnostics::init_log` is called once in `main.rs` as soon as the runtime paths resolve, `log_event(level, message)` and the older `append_log(path, level, message)` with the engine's log path both go through it, `<logs>/engine.log` rotates at 5 MiB into `engine.log.1` … `.5`, and `read_log_tail` reads only the last 64 KiB of the current file for `health.snapshot`. Slice 8's 100 MB case, `diagnostics::tests::read_log_tail_scans_only_the_tail_of_a_large_log`, is opt-in because it writes 100 MB to the temp directory: run it after any change to `diagnostics.rs` with `SSE_ENGINE_TEST_LARGE_LOG=1 npm run native:test -- read_log_tail_scans_only_the_tail_of_a_large_log` (Git Bash; in PowerShell set `$env:SSE_ENGINE_TEST_LARGE_LOG='1'` first). It must read the tail in under 50 ms. `SSE_ENGINE_LOG_LEVEL` (`DEBUG` | `INFO` | `WARN` | `ERROR`, default `INFO`) is the level; `DEBUG` turns on the one line per request (`method=… id=… ms=… ok=…`), which is otherwise absent — the lanes and their status files never depend on it. `append_log` with any other path (the tests' temp logs) opens and appends that file per call as before. Exactly two `eprintln!` sites remain in `native/rust-engine/src`, both documented in the readiness ledger: the bootstrap failure before any runtime path exists (`main.rs`) and the stderr fallback inside `log_event` for a line the file could not take; the shell keeps engine stderr in `<logs>/shell.log` (`tauri-shell/src/shell_log.rs`, same rotation), and debug shells echo it to the console too. Health: `health::report(subsystem, state, detail)` feeds the registry `health.snapshot` derives its `status` from (`checks.engine` lists the entries); a change of state raises `app.changed { reason: "health" }` — report state changes, not attempts.
-
-#### Opt-in real-hardware lane
-
-```bash
-npm run native:test:hardware
-```
-
-`npm run native:test:hardware` runs `cargo test --workspace -- --ignored` so it executes only the Rust tests marked `#[ignore]`. Those markers are reserved for device-bound tests that need real RME UFX III + TotalMix OSC traffic, a connected Stream Deck +, or a live DMX universe — environments CI cannot supply on stock `ubuntu-latest` runners and that the maintainer's laptop only partially supplies. The default `npm run native:test` and the CI `rust` job both skip these tests by design; the operator workstation runs `npm run native:test:hardware` as part of the pre-release smoke pass and records pass/fail per device. Today the lane runs `live_totalmix_pull_round_trip` (`native/rust-engine/src/audio/tests_console_link.rs`): a real `/sendall` + `/sendstate` pull from the studio TotalMix over Global OSC remote 4, asserting the dump is ingested and the console state lands `aligned`. It is read-only and never changes desk state; since Slice 6 its Global OSC slot binds `127.0.0.1:9004` by the engine's own rule, so the studio app must be closed first. New hardware-bound tests join the lane by carrying `#[ignore]`; nothing in package.json or AGENTS.md needs to change.
-
-#### Changes affecting operator flows
-
-```bash
-npm run native:foundation
-```
-
-#### Changes affecting native release or packaging
-
-```bash
-npm run native:acceptance
-npm run release:verify
-```
-
-The hardware-link lanes — `native:acceptance` (`scripts/native-acceptance.mjs` with the shared checks in `native-parity-acceptance.mjs`), and the packaged, installer, delivery and bridge lanes that run only at a release — asked for Planning until the new pages program's Slice 2. They now prove the same things with data that still exists: the seeded page (new saved data opens on the Console, and the lane saves Lighting; until Slice 2b a sample `db.json` was imported to open on Lighting), the restart and the rollback by that page, the backup by the exported archive itself (format 6 since Slice 4: no `planning` part, no `planning.*` setting, the Teleprompter's part, the saved page in it; `native-lanes.test.mjs` holds the lanes' format to the hardware link's) and a restore reply with no `detail`, and the saved data's survival across an install, update and reinstall by a lighting group (`lighting.group.create`), which `native:acceptance` also creates and checks after its restart and its restore. The bridge lane (`native:bridge:*:verify`) checks the exported profile's two pages, LIGHTS and AUDIO, their page-follow triggers, that its keys post only to the lighting and audio routes, and that the bridge answers every LCD it reads. `scripts/native-lanes.test.mjs`, part of `scripts:test`, reads the lanes and fails on a request that is not a contract method, a bridge path the bridge does not route, an LCD key the bridge does not answer, a name of the retired `db.json` import, a publish without the probe override, or app data handed to a process outside `laneProcessEnv` (below) — so a lane that runs only at a release cannot go on asking for something the hardware link dropped.
-
-No lane goes through the `db.json` import any more: the new pages program's Slice 2b retired it. The seven lanes and scripts that put a test engine into a set-up state through it (`SSE_LEGACY_DB_PATH` and the fixtures `commissioning-sample-db.json` and `dashboard-ready-db.json`, both deleted) — `native:acceptance`, `native:bridge:*:verify`, the packaging smoke's `dashboard` scenario, the packaged, installer and delivery acceptance scripts and `scripts/legacy/tauri-package-candidate.mjs` — start on fresh saved data and seed it with the app's own requests, through two helpers in `native-parity-acceptance.mjs`: `seedSavedWorkspace` checks that new saved data opens on the Console and saves Lighting with `settings.update`, and `publishWithOverride` sends `commissioning.update { stage: "ready", overrideProbes: true }` and checks the dashboard (no lane host has the studio's hardware, and a publish without the override is refused while a probe has not passed). The packaging smoke's and the old candidate's `dashboard` scenario publish through an `EngineHarness` on the packaged engine and the smoke's app data before the shell smoke runs. The development parity fixtures (`dev.parityFixture.load`) write their settings directly, in one transaction: the setup flag, the page, the fixture's own settings and, for `lighting-populated`, the rig in `native/rust-engine/fixtures/parity-lighting-populated.json`, read by `lighting/parity_lighting.rs`, which refuses a field it does not read; the four `parity-*-db.json` files are deleted. A load over a completed setup needs `replaceExistingData: true`. `each_fixture_writes_its_setup_and_page` holds every fixture's setup flag and page.
-
-Every engine and shell a lane starts gets its scratch app-data folder and its hardening in one place, `laneProcessEnv` in `scripts/native-runtime-harness.mjs` (Slice 2b), which `EngineHarness.start()` uses too: a bridge port of its own (`SSE_CONTROL_SURFACE_PORT` from `reserveLocalPort`, never the live app's 38201), `SSE_SAFE_START=1`, `SSE_AUDIO_SIMULATED_INPUT_MODE=1` and, since the new pages program's Slice 8, `SSE_CAMERAS_SIMULATED=1` (the simulated cameras; D15 rules 1–2). An environment without them is refused before anything is spawned or created. The workstation-only live console lane (`SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1`) keeps the real console and nothing else (the cameras stay simulated on it too), and one launch waives the safe start: step 8 of the Setup/Support Tauri lane starts with `SSE_SAFE_START=0` to prove that a hold outlives the launch that made it (its saved data names no lighting bridge, so arming sends nothing). The installer lane's install and reinstall run QtIFW's first-launch check (`--smoke-test`) with a scratch app-data folder and the hardening; until Slice 2b it inherited the lane's environment and, on Windows, would have opened `%APPDATA%\ExEd Studio Control Native`. The engine's end-to-end tests (`native/rust-engine/tests/end_to_end.rs`) start their engines the same way, with `SSE_CONTROL_SURFACE_PORT=0` (the system picks the port). `npm run tauri:smoke` (`scripts/tauri-smoke.mjs`, part of `tauri:foundation`) goes through `laneProcessEnv` too.
-
-#### Release preparation
-
-```bash
-npm run doctor:release
-npm run release:verify
-```
-
-#### Supply chain
-
-```bash
-npm run supply-chain:check
-```
-
-Two halves, which also run one by one (`supply-chain:npm`, `supply-chain:cargo`) and on every push as the `supply-chain` CI job. Both read lockfiles only and both need the network — they judge today's advisory databases, so they are deliberately **not** part of `dev:check`, which has to work offline and must not change its answer overnight.
-
-- **npm** — `scripts/check-npm-audit.mjs` runs `npm audit` for every lockfile in the repository with its own bar: what ships inside the app (`--omit=dev`) fails from `moderate`; what builds, lints and tests it fails from `high`; the SBOM generator's own tree under `tools/sbom/` fails from `high`. An advisory at or above the bar fails unless `scripts/npm-audit-allowlist.json` names it — advisory id and package — with a reason and an `expires` date at most 90 days out. An expired or malformed entry fails by itself and covers nothing; a report that is not an audit report (offline, registry error) is exit 2, never a pass.
-- **cargo** — `cargo deny check` against `native/deny.toml` (advisories, bans, licenses, sources; `cargo install cargo-deny --locked` once), preceded by `scripts/check-deny-ignores.mjs`. cargo-deny keeps no time, so every advisory `deny.toml` ignores must be written on one line as `{ id = "RUSTSEC-…", reason = "… review by YYYY-MM-DD" }`, and the script fails once that date has passed (the same 90-day rule).
-
-When the job is red: **take the fix first** — `npm update <package>` for a transitive npm package, `cargo update -p <crate>` (or `-p` the crate that pins it) in `native/` — and re-run the lanes the moved packages can touch. Do **not** reach for `npm audit fix`: on 2026-09-17 it proposed downgrading `esbuild`, the bundler that produces the shipped `dist`. List an exception only when there is no fix to take, say why it is acceptable _here_, and date it. A new licence in the Rust tree is a decision, not a formality: `deny.toml` names, per licence, the crates that need it.
-
-#### Coverage floors
-
-```bash
-npm run frontend:test:coverage
-npm run rust:coverage
-```
-
-Floors, not targets (production readiness Slice 13 — finding F25). A floor is the figure measured when it was set, minus two points: it fails when tests rot away or a large untested file lands, and says nothing about whether the coverage is good. Raise a floor when coverage has risen; lower one only with the reason written in the commit.
-
-- **Vitest** — `frontend:test:coverage` runs every frontend workspace's tests with v8 coverage (since 2026-09-25 the only Vitest run in `dev:check` and CI; `scripts/frontend-test-gate.test.mjs` keeps every workspace with tests in it); the app's, the design system's and the engine client's `vitest.config.ts` carry the four thresholds. Every source file counts, loaded by a test or not, which is why the app's figure is low: its behaviour is covered by the Playwright suite, not by Vitest. The tokens package (its one test reads CSS) and shared-graphics (no tests) have no floor. It is part of `dev:check` and of the `frontend-test` CI job.
-- **Rust** — `rust:coverage` is `cargo llvm-cov --workspace --fail-under-lines N` with the floor in the script (`cargo install cargo-llvm-cov --locked` and, from `native/`, `rustup component add llvm-tools-preview` once). The floor is the Linux runner's figure minus two points, because the `rust-coverage` CI job is where it is enforced; the workstation measures about the same but compiles different platform code. It rebuilds the workspace instrumented (several minutes, its own target folder), so it is a CI job and not part of `dev:check`.
-
-#### Property tests
-
-The two parsers that read bytes from outside the process have property tests beside their example tests (production readiness Slice 13; `proptest`, a dev-dependency of the engine): `control_surface_http/fuzz.rs` (the bridge's request reader and query decoder — no panic, a bounded read, a request that says what was sent) and `rme_totalmix_osc/fuzz.rs` (arbitrary and damaged datagrams through decode, the meter state and a console link of their own — no panic, and an accepted level is a level). They run with `native:test`. A failing case is shrunk and its seed written under `native/rust-engine/proptest-regressions/`: commit that file with the fix, so the case is replayed first on every later run. The first run found one: a NaN from the wire was taken as a meter level.
-
-#### Quarantined Playwright cases
-
-Playwright has two projects (production readiness Slice 13 — findings F25, F03). `default` is everything except the cases named in `frontend/app/tests/quarantine.json`, and it is what the `frontend-e2e` CI job fails on (`npm run frontend:playwright:test:blocking`). `quarantine` runs the listed cases one at a time with two retries, on CI in a step that reports and never fails the job (`frontend:playwright:test:quarantine`; its report and traces are the `playwright-quarantine` artifact). `npm run frontend:playwright:test` runs both, as the workstation lane always has.
-
-The list is the membership — there is no tag to add in a spec — and a listed case blocks nothing, so `scripts/check-playwright-quarantine.mjs` holds it to rules: every entry names exactly one existing test and says why its assertion depends on the runner's speed and where that was seen; the visual and contract gates (`visual-review.spec.ts`, `storybook.spec.ts`, `ui-contract.spec.ts`) can never be listed; at most six cases; one exit date, at most 90 days out. `scripts:test` checks all of that except the date's distance from today; the CI job checks the date too, and **fails from the day after it** until the cases are back in `default` or deleted — the same deliberate behaviour as the supply-chain dates.
-
-Before listing a case, find out why it fails: download the run's `playwright-test-results` artifact and read the case's `trace.zip` (action timings and DOM snapshots), and reproduce it locally by throttling the page's CPU over CDP (`Emulation.setCPUThrottlingRate`, rate 6–20). Only an assertion that _is_ a wall-clock measurement belongs on the list.
-
-**The list has been empty since production readiness S15 (2026-09-21).** The last three cases were not wall-clock measurements after all, once their cause was found: the two `audio-render-budget.spec.ts` cases read their baseline inside the Console's own start-up renders (its mount, and a recall pulse that a 1.5 s timer ends) and now wait for the pulse to end; the metering case compared four strip levels rounded to whole percent that are fixed when the Console fetches its state — at 2 % of instants they round to one value — and now compares them as they are, with the page's clock running the canvas checks. An empty list quarantines nothing: `playwright.config.ts` builds `(?!)` for it (an empty `new RegExp("")` would match every title and leave `default` with no case), `frontend:playwright:test:quarantine` passes with no tests (`--pass-with-no-tests`), and `check-playwright-quarantine.test.mjs` lists both projects with an empty and a one-case list. A case put back on the list needs an `exit` date again.
-
-#### Pull Request CI
-
-Every branch push triggers the ten-job workflow, once per commit (since 2026-09-25, Dependabot's branches included; a pull request reads the checks on its head commit, so it no longer runs the same commit again, and a pull request from a fork gets no run — to merge one, push its head commit to a branch of this repository, which puts the ten checks on that commit). Rust caches are saved from `main` only; branches read main's, and each job installs only the Rust `native/rust-toolchain.toml` names (`.github/actions/setup-rust`), so a new Rust on the runner image does not change the cache key. The workflow at [.github/workflows/dev-checks.yml](../.github/workflows/dev-checks.yml): `format-protocol`, `lint`, `frontend-typecheck`, `frontend-test`, `supply-chain`, `frontend-e2e`, `rust`, `rust-coverage`, `tauri-foundation`, and `qualification`. `format-protocol` runs `format:check`, repository script tests, `release:check`, `file:health`, and `protocol:check`; `frontend-test` runs `frontend:test:coverage` (Vitest across the frontend workspaces, once, with the coverage floors of production readiness Slice 13); `supply-chain` (production readiness Slice 12) runs the npm audit gate, the date check on `native/deny.toml`'s ignored advisories and `cargo deny check` — see "Supply chain" above; it reads today's advisory databases, so it can turn red on a push that changed nothing; `frontend-e2e` checks the quarantine list, then runs Playwright's `default` project (`frontend:playwright:test:blocking`: every behaviour spec and the UI contract, on the Linux runner with no screenshot comparison and no contrast sampling — the captures and the contrast are checked on the studio workstation before each push, §2b) and fails on it, then the `quarantine` project in a step that reports and never fails the job — see "Quarantined Playwright cases" above — and uploads the Playwright report plus traces as the `playwright-report`, `playwright-test-results` and `playwright-quarantine` artifacts; `rust` runs `rust:fmt:check`, `rust:clippy`, `native:test`, `native:test:dev-fixtures` and `native:acceptance` (the acceptance harness runs the engine in simulated audio input mode by default, so the audio probe passes honestly, sync and recall answer from the simulated console, and nothing is ever written to a real TotalMix — the same default applies on the workstation; `SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1` opts into the live lane, which binds the real Global OSC remote, confirms every write by read-back, touches only unused surfaces (Phones 2, playback 7/8) and restores them in a `finally`; `native:test` runs unsimulated so the probe's no-traffic failure test stays honest); `rust-coverage` (production readiness Slice 13) runs `rust:coverage`, the instrumented `cargo test --workspace` with its line-coverage floor; `tauri-foundation` runs `tauri:foundation` (protocol generate → engine build → Tauri build → smoke); `qualification` runs `tauri:setup-support:qualify` and `tauri:workspaces:qualify` under `xvfb` with extended timeouts and the audio-probe skipped; it starts with the other jobs, on a Rust cache of its own, and is the longest job. These jobs are required merge hygiene on `main`. A second workflow, [.github/workflows/release-evidence.yml](../.github/workflows/release-evidence.yml), runs only on a `v*` tag or by hand and builds the packaged bundle, its SHA256 manifest and its SBOMs on a clean Windows runner ([RELEASE.md §Release Evidence](./RELEASE.md#release-evidence-ci)); it publishes nothing. Target-host release evidence on Windows 11 `x64` remains the release acceptance gate per [HANDOFF.md §Validation Baseline](./HANDOFF.md). Treat any red CI job the same way you would treat the same command failing locally before pushing.
-
-### 4a. Cleanup
-
-Use the normal cleanup command for generated build and release output:
-
-```bash
-npm run clean
-```
-
-Use the deeper local cleanup before handoff or evidence collection:
-
-```bash
-npm run clean:local
-```
-
-`clean:local` removes ignored local debris such as generated build targets, root test results, local install logs, generated visual/evidence folders, and release output. It intentionally does not remove `.tools/`.
-
-**The packaged app is kept.** `release/` is not only build output: on a workstation that runs Studio Control from the repository — the studio workstation does — `release/native/windows/` is the installed app, and nothing in the repository can rebuild that exact build. Both commands therefore keep the whole `release/native` folder whenever a packaged shell or engine executable is anywhere inside it (a `windows.production-keep` folder left by a packaging lane counts), remove everything else as before — the other children of `release/` included — and say what they kept, with each file's size and date. `npm run clean -- --include-release` (or `clean:local`) removes the app as well; it refuses, before removing anything at all, while a process is running from that folder or when the running processes cannot be listed. `--dry-run` prints what would happen and removes nothing. A mistyped option stops the command instead of falling back to a plain clean. Until 2026-09-18 both commands deleted `release/` whole, the installed app with it; `scripts/clean.test.mjs` holds the rule, in temporary directories only. `scripts/native-package.mjs` is a different matter and is **not** guarded: it rebuilds `release/native/windows` by design, so on the workstation it runs only with that folder moved aside first (the procedure in the production readiness ledger).
-
-## Recommended Development Rules
-
-### 1. Always preserve working software
-
-Prefer incremental change over rewrites.
-
-### 2. Follow existing domain boundaries
-
-Keep changes in the correct layer:
-
-- `frontend/...` for the selected React/Storybook/Playwright frontend
-- `native/tauri-shell/...` for the selected native shell
-- `native/rust-engine/src/...` for domain state, persistence, and device logic
-- `native/protocol/...` for IPC contract changes
-- `docs/...` for process and operator documentation
-
-### 3. Validate write paths carefully
-
-If a change mutates state:
-
-- validate input
-- handle errors clearly
-- add or update tests
-
-### 4. Protect operator workflows
-
-Anything that touches:
-
-- light output
-- audio control
-- startup
-- shutdown
-- backups
-- setup/commissioning
-
-should be treated as high risk and tested more carefully.
-
-### 5. Keep files modular
-
-If a file starts becoming hard to read, split it before it becomes a problem.
-
-`npm run file:health` (in `dev:check` and the `format-protocol` CI job) fails any tracked `.ts`, `.tsx`, `.css`, `.mjs` or `.rs` file over 2,000 lines, and since production readiness S14 it has **no allowlist for source files** — `scripts/file-health.test.mjs` fails if one comes back. Split before a file gets there, along the lines the code already has: S14 split the three workspace orchestrators, the fixture double and the Rust lighting tests by line range, every body verbatim ("Front-end map" in §2c), and S15 moved `audio.spec.ts`'s metering cases into `audio-metering.spec.ts` the same way. The largest product source is now `native/rust-engine/src/rme_totalmix_osc.rs`.
-
-### 6. Update docs when behavior changes
-
-Update documentation when you change:
-
-- release flow
-- startup/shutdown behavior
-- setup steps
-- operator recovery paths
-- architecture patterns
-
-## Definition Of Done
-
-A change is done when:
-
-- the code works
-- the code is understandable
-- the right tests pass
-- the UI is coherent
-- the docs are updated if needed
-- Git history is clean
-
-## Git Workflow
-
-### Normal feature work
-
-```bash
-git switch main
-git pull origin main
-git switch -c feature-short-description
-```
-
-Then:
-
-```bash
-git status
-git add -A
-git commit -m "feat: short description"
-git push -u origin feature-short-description
-```
-
-Open a PR for reviewable work. Do not consider a session fully closed just because the PR exists or is green. The normal closeout is:
-
-1. push the branch
-2. open the PR as draft while validation or human review is still in progress
-3. mark the PR ready only after the relevant validation and review are complete
-4. merge the approved PR through GitHub
-5. prune deleted remotes, switch back to `main`, fast-forward from `origin/main`, and delete the local feature branch
-6. verify `git status -sb` shows clean `main...origin/main`
-
-### Recommended commit types
-
-- `feat:` new capability
-- `fix:` bug fix
-- `refactor:` structure change without feature change
-- `docs:` documentation only
-- `chore:` tooling, workflow, housekeeping
-- `release:` version prep
-
-## Testing Strategy
-
-### Use engine `cargo test` for:
-
-- persistence behavior
-- domain logic
-- protocol contract validation
-- regression coverage
-
-### Use Tauri frontend and shell tests for:
-
-- selected operator UI behavior
-- selected shell integration
-- fixture-driven visual review
-- Playwright-covered workspace behavior
-
-### Use Tauri smoke / native acceptance / bridge-qualification lanes for:
-
-- startup and recovery changes
-- lifecycle, routing, and clean-start coverage
-- packaging or installer changes
-- native diagnostics, backup, or update-path changes
-- control-surface bridge bind/listen/HTTP changes
-
-## Release Workflow
-
-Release details live in [docs/RELEASE.md](./RELEASE.md), but the short version is:
-
-1. bump version
-2. update changelog
-3. run `npm run release:verify`
-4. commit release prep
-5. push `main`
-6. create and push tag
-7. publish the locally built target-host artifacts with `npm run release:publish -- --tag vX.Y.Z`
+The report names the elements behind a number, not only the count. Write new ratchets only on Windows (contrast is sampled nowhere else), and read `git diff` on the ratchet file before committing: nothing may rise.
+
+Two gates run beside it: `node scripts/check-operator-copy.mjs` (forbidden words in the source, from the repository root) and the design system's `css-literals.test.ts` (raw values in stylesheets, against a list that may only shrink).
+
+## Traps
+
+Pages and their tests:
+
+- **The page tests serve the built pages.** Build before running Playwright by hand, or you test the previous build. `npm run frontend:playwright:test` builds first.
+- **Never build Storybook while the page tests run.** Its pages vanish mid-run and unrelated tests fail.
+- **Port `4173` belongs to the page tests.** A preview server left on it after a run makes the next run fail or lie. End it first.
+- **A page is on screen later than its shell.** Each page is a chunk fetched after the shell has drawn. A test whose first step is a key or a one-off read calls `expectWorkspaceMounted(page, workspace)` first.
+- **Time is driven, never waited out.** Use `page.clock` and `helpers/pageClock.ts`. A second press inside an arm's dwell, a meter tick, a countdown: none of them is tested with a real wait.
+- **A test that fails now and then has a cause.** Every one so far was the test: a click sent before the page had drawn the state it needed. Find it; do not retry it away.
+- **Raising a type size breaks layouts** written for the old one, and only measurement finds it. After a type change, run the layout measures.
+- **A 24 px target without moving the layout:** grow the element, pay it back with a matching negative margin, and paint the visible part on `::before`. `ScrubSlider` is the worked example.
+- **Tokens are kebab-case.** `--size-compactControlHeight` silently gives nothing; the name is `--size-compact-control-height`.
+- **Test ids are extended, never renamed.**
+
+The engine:
+
+- **Lighting has one lock.** Every lighting change runs inside `with_lighting_state` (or `with_lighting_state_and_preview`), taken at the entry point: the dispatcher, the deck's keys, a restore. The lighting functions themselves take no lock, because the lock is not re-entrant: a function that took it again would hang. Lock order is always the lighting lock, then the shared preview. Never hold the lighting lock and the audio lock together.
+- **What the wire depends on bumps the render generation.** The sACN thread reads the database only when `bump_lighting_render_generation()` has moved it.
+- **A new request must be classified.** `action_log::tests::every_contract_method_is_classified` fails until the method is in `RECORDED_UI_METHODS` or `NOT_AN_ACTION_UI_METHODS`. A ride (a fader, a dial detent) is never a row in Recent actions. The pages' store needs the method and its event mapped in `domainRefresh.ts`.
+- **A migration step names its own number.** Every step is `if schema_version < N` with a literal `N`, never the constant for the newest schema, or raising the constant re-runs the step.
+- **Checkpoint before moving the database.** The long-lived threads keep a read connection open, so anything that moves, copies or replaces the database file calls `storage::checkpoint_database` first.
+- **A commit waits for the disk,** about 35 ms here. A test that loops over writes stays in the tens.
+- **Tests that share the console link wait on its state** (`settle_console_link`), never on a sleep.
+- **Tests never bind the real ports.** TotalMix's `7001` to `7010` and sACN's `5568` are never bound or sent to by a test; test builds drop datagrams aimed at TotalMix.
+- **One log writer.** `diagnostics::log_event` writes `<logs>/engine.log`, which rotates at 5 MiB. `SSE_ENGINE_LOG_LEVEL=DEBUG` adds one line per request. The shell keeps the engine's stderr in `<logs>/shell.log`.
+- **Health reports changes of state, not attempts:** `health::report(subsystem, state, detail)`.
+- **No file over 2,000 lines.** `npm run file:health` fails on one. Split before a file gets there.
+
+## Where the pages' code lives
+
+- `frontend/app/src/app/OperatorShell.tsx`: the header, the tabs, the pages.
+- `lighting/`, `audio/`, `setup/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
+- `teleprompter/glass/`: the prompter's glass, drawn both on the page and on the Prompter XL.
+- `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double).
+- `frontend/packages/design-system`, `frontend/packages/tokens`: the shared components, and the sizes and colours. Tokens are built with `npm run frontend:tokens:build`.
+
+## Studio builds
+
+A studio build is a release build of the shell with the engine beside it. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.

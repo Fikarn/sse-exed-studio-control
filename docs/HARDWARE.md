@@ -1,0 +1,131 @@
+# Hardware
+
+The studio's devices, how Studio Control reaches each one, and the rules that keep tests away from them. Operation and recovery: [OPERATIONS.md](OPERATIONS.md).
+
+## The room
+
+- **Workstation.** One PC, Windows 11, for development and for the studio.
+- **Display.** The app runs fullscreen on the studio display: 2560×1440 at 100 % Windows scaling. It opens on the display it was last on, else on that one. `Reset the window layout` in Setup / Support › Workstation puts it back.
+- **Keep that display at 100 %.** The primary display is the same size at 125 %, and the scaling tells them apart. Windows' display numbers can change.
+- **Networks.** `Ethernet 2` is the office network (`172.16.16.0/21`), with the BGH1s. `Ethernet 3` is the lighting network (`10.1.0.0/16`), with the Apollo Bridge.
+- **Beside the app** run TotalMix FX, Bitfocus Companion and vMix.
+
+## Devices
+
+| Device                     | For                   | How the app reaches it                   | Set up in          |
+| -------------------------- | --------------------- | ---------------------------------------- | ------------------ |
+| RME Fireface UFX III       | Audio console         | OSC over UDP to `127.0.0.1:7001`–`7004`  | TotalMix FX, Setup |
+| Litepanels Apollo Bridge   | Lights                | sACN over UDP to `10.1.0.1:5568`         | Setup, the bridge  |
+| Stream Deck+               | Keys and dials        | Companion calls `http://127.0.0.1:38201` | Setup, Companion   |
+| Blackmagic Pocket 6K Pro   | `CAM 1`, main camera  | Bluetooth                                | Setup              |
+| Panasonic LUMIX BGH1 (two) | `CAM 2`, `CAM 3`      | Ethernet, to the address in Setup        | Setup              |
+| vMix                       | The cameras' pictures | NDI, from vMix on this PC only           | vMix, Setup        |
+| Elgato Prompter XL         | Teleprompter          | A Windows display named `Prompter XL`    | Windows            |
+
+## Audio console
+
+The app talks to the console's mixer, TotalMix FX 2.1 or newer (for Global OSC). Front preamps 9–12 are the live inputs; rear line inputs 1–8 are secondary. The outputs are Main, Phones 1 and Phones 2.
+
+In TotalMix FX, `Options › Settings › OSC`, four remote controllers are `In Use`, each with the address `127.0.0.1`:
+
+- Remote 1: port incoming `7001`, port outgoing `9001`. Hardware inputs.
+- Remote 2: `7002`, `9002`. Software playback.
+- Remote 3: `7003`, `9003`. Hardware outputs.
+- Remote 4: `7004`, `9004`, in `Global OSC` mode. Control and metering.
+- Remotes 1 to 3 have `Send Peak Level Data` on. They are the meters' fallback, and remote 1 carries EQ and Low Cut.
+- Remote 4 has `Send changes` on, `Follow Submix` off and re-sending off. The engine reads each value back itself.
+- In the Channel Layout, keep the channels in use visible, or turn on `Receive on hidden channels`. A hidden channel drops writes silently.
+
+Setup holds the TotalMix address `127.0.0.1`, the send port `7001` and the receive port `9001`. The other ports are these plus 1, 2 and 3.
+
+The engine listens on UDP `9001`–`9004`, bound to `127.0.0.1`, and reads only what comes from the TotalMix address. `netstat -an | findstr 900` shows the four ports.
+
+What the app never does:
+
+- A snapshot recall never sends 48 V. Each difference is listed, then armed and confirmed per channel.
+- `Sync from TotalMix` only reads.
+- Nothing is written while the audio probe has not passed or OSC is off in Setup.
+- Closing the app recalls and resets nothing.
+
+Talkback is not used. TotalMix has no talkback channel assigned and refuses it (`AUDIO_TALKBACK_REFUSED`).
+
+## Lights
+
+The engine streams to the Litepanels Apollo Bridge as unicast sACN (E1.31) on UDP port `5568`. The bridge drives the fixtures: Litepanels Astra Bi-Color Soft, Aputure Infinimat 2x4 and Aputure Infinibar PB12.
+
+- The bridge is at `10.1.0.1`. Setup's lighting probe connects to it on TCP port `80`.
+- Setup holds the bridge address and the universe, `1` unless changed. New saved data has no address, so nothing is sent.
+- The bridge must route that universe to its DMX/CRMX output. Each fixture's DMX address, mode and universe must match its patch on the Lighting page.
+- The stream has priority `100` and the source name `SSE ExEd Studio Control`.
+
+`Held` means nothing is sent: no frame, no keep-alive. It is not a blackout: the rig keeps its last look. The DMX monitor shows what would be sent, and the header's Lighting lamp reads `held`.
+
+`Armed` means the rig follows the app. Arming sends the current state within 40 ms.
+
+The switch is `Light outputs` in Setup / Support › Workstation. A start with `SSE_SAFE_START=1` holds the outputs before anything is sent. Set for the Windows account (`setx SSE_SAFE_START 1`), it holds every start. A hold is saved, so later starts are held until the switch arms. Saved data that has never been held is armed.
+
+## Stream Deck
+
+Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Studio_Control` calls the engine's bridge at `http://127.0.0.1:38201`.
+
+- The bridge listens on `127.0.0.1` only and has no fallback port. `SSE_CONTROL_SURFACE_PORT` names another port.
+- Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
+- `401` in Companion's log means the profile's token is missing or wrong: export and import again.
+
+To put the profile on the deck:
+
+1. Start Companion. The export asks it for the deck, at `http://127.0.0.1:8000`.
+2. In Setup step 1, export the Companion profile. It lands in the app-data `exports` folder.
+3. In Companion's Import / Export page, import it with `Full Reset & Import`, never `Import Preserving Unselected`.
+4. In Setup's Verify step, press each control: its cell pulses.
+
+The pages are `LIGHTS` and `AUDIO`. `CAMERAS` and `PROMPTER` follow once built. The deck follows the app's page. When the pages change, export and import again.
+
+## Cameras
+
+- **`CAM 1`** is the Blackmagic Pocket Cinema Camera 6K Pro, the only camera that records. Its link is Bluetooth, with Blackmagic's published protocol (service `291D567A-6D75-11E6-8B77-86F30CA893D3`). It is paired once, in Setup: the camera shows a 6-digit PIN.
+- **`CAM 2` and `CAM 3`** are Panasonic LUMIX BGH1s on the office network, powered over Ethernet (`172.16.16.85` and `172.16.16.30` when last read). Their link is Panasonic's LUMIX SDK, to the address typed into Setup. Two checks come first: the SDK's licence, and that a BGH1 goes back to LUMIX Tether without a settings reset.
+- `Release` hands a camera to the iPad (Bluetooth+) or LUMIX Tether. `Connect` takes it back.
+- **Pictures.** Each camera's HDMI goes to vMix: `CAM 1` into the DeckLink 8K Pro, one BGH1 through an SDI converter into the DeckLink, the other into a Cam Link 4K. The app gets pictures only as NDI from vMix on this PC. vMix's NDI option for cameras (`Settings › Outputs`) must be on, and Setup holds each camera's vMix input. There is no OBS path.
+- **Not built yet:** the Cameras page, Setup's camera fields, the links and the pictures.
+
+What limits the design:
+
+- A DeckLink input belongs to one program at a time, so the app never opens one.
+- A BGH1's own network stream switches off its recording, its menus and LUMIX Tether's live view, so it is not used.
+- A write to the Pocket's status characteristic can switch the camera off.
+- The app never changes a camera or a recording by itself. A start, a reconnect, a restore, a close and a crash send nothing. The camera wins a disagreement.
+
+## Teleprompter
+
+- The Elgato Prompter XL is a 1920×1080 screen on one USB-C cable that carries picture and power (15 W). Windows treats it as one more display, named `Prompter XL`.
+- The app finds it by that name and draws the script there and on no other screen. This window is not built yet, so the page reads `NOT CONNECTED`.
+- The Prompter XL flips what it shows, so the app draws the script unmirrored.
+- In Windows' display settings it extends the desktop at 1920×1080. Otherwise the page reads `DUPLICATED` or `LOW RESOLUTION`.
+- Set by hand: a black desktop background on the Prompter XL, and Elgato Camera Hub's own prompter off, if Camera Hub is installed.
+
+## Safety rules
+
+The studio build is the release build the owner starts on the real saved data.
+
+Always:
+
+- Never let a test write to TotalMix's ports `7001`–`7010` or to the sACN bridge.
+- Give every test and development run its own data folder (`SSE_APP_DATA_DIR`), the simulated console (`SSE_AUDIO_SIMULATED_INPUT_MODE=1`), the simulated cameras (`SSE_CAMERAS_SIMULATED=1`), a safe start (`SSE_SAFE_START=1`) and a bridge port other than `38201` (`SSE_CONTROL_SURFACE_PORT`).
+- Open the real saved data, `%APPDATA%\ExEd Studio Control Native`, only with the studio build.
+- Do not close TotalMix FX, Companion or vMix. They are the owner's to start and stop.
+- Never write the Pocket's status characteristic.
+- Never scan the network. Talk only to the addresses typed into Setup.
+
+Cameras and the prompter, the six rules the code's comments cite as D15:
+
+1. Use a camera address only once the owner has typed it into Setup. Test builds refuse any address that is not on this PC.
+2. Use Bluetooth only in the studio build. Pair once, in Setup, with the owner present.
+3. Never open the DeckLink, the Cam Link or a camera stream from a test. Tests get a still test picture.
+4. Draw on the Prompter XL only from the studio build. Anything else draws into an ordinary window.
+5. Check against the real cameras only with the owner present and nothing recording. Put back every setting touched.
+6. Learn the BGH1's protocol by listening only, and only with the owner's go-ahead at the time.
+
+## Hardware tests
+
+Tests that need a real device are opt-in: `npm run native:test:hardware`. Run them only when the owner asks and is present. Today's one test reads the console and changes nothing. It needs the app closed, because it binds `127.0.0.1:9004`, and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1`.

@@ -1,53 +1,27 @@
-# Visual baselines
+# Captures
 
-Committed Playwright `toHaveScreenshot` captures of the operator shell
-(`visual-review.spec.ts`) and of every Storybook story (`storybook.spec.ts`).
-Studio Control runs on Windows at 2560×1440 and nowhere else (decision D22,
-new pages program, Slice SW), so these are the win32 captures at 2560×1440 and
-nothing else.
+Committed Playwright screenshots of the app's pages (`visual-review.spec.ts`) and of the Storybook stories (`storybook.spec.ts`), at 2560×1440 on Windows, the one system Studio Control runs on.
 
 ## Layout
 
 ```
-__visual__/<spec-filename>-snapshots/<arg>-win32.png
+__visual__/<spec-filename>-snapshots/<name>-win32.png
 ```
 
-The `-win32` suffix is Node's `process.platform`, added by `snapshotPathTemplate`
-in [`playwright.config.ts`](../../playwright.config.ts). There are 74:
-
-- `visual-review.spec.ts-snapshots/` — 27: Setup, the recovery screen
-  (`protocol-mismatch`), Lighting, the Console and the Teleprompter at
-  2560×1440, the same five in Graphite and Bone, and twelve designed states
-  (Lighting empty and unreachable, Setup degraded, the Console's four warning
-  bands, and the Teleprompter empty, not connected, not updated, editing and
-  on a new script — the last two reached by the spec's press on Edit script or
-  New script).
-- `storybook.spec.ts-snapshots/` — 47: one per story; the shell stories paint
-  full 2560×1440 frames, and the glass's seven (`teleprompter-glass--*`) draw
-  the Prompter XL's 1920×1080 screen.
+The `-win32` suffix is Node's `process.platform`, added by `snapshotPathTemplate` in [`playwright.config.ts`](../../playwright.config.ts).
 
 ## Where they are compared
 
-On the Windows workstation, by the local Playwright lane, before every push:
-`npm run frontend:playwright:test` (it builds the app and Storybook first).
+On the studio workstation, by `npm run frontend:playwright:test` (part of `npm run check`).
 
-CI compares none of them. Its `frontend-e2e` job runs on a Linux runner, where
-`ignoreSnapshots` is on (`playwright.config.ts`), so `storybook.spec.ts` only
-checks that each story loads and paints, and the UI contract takes no screenshot and samples no contrast
-(`helpers/ui-contract/measure.mjs`). Every other check in those specs runs
-there as everywhere.
+CI compares none of them: its runner is Linux, where `ignoreSnapshots` is on. Every other check in those specs runs there as everywhere.
 
-## Refreshing captures
+## Refreshing
 
-Only for a change that is meant to move them, and only for the captures it
-explains:
+Only for a change that is meant to move them:
 
-1. Build first: `npm run build --workspace frontend/app && npm run frontend:storybook:build`.
-2. Run the lane; copy the `*-diff.png` files out of `frontend/app/test-results/`
-   before the update run replaces them.
-3. `cd frontend/app && npm exec playwright test visual-review.spec.ts storybook.spec.ts -- --update-snapshots=changed`
-4. Inspect every changed PNG before `git add`, and commit the captures on their
-   own.
+1. `npm run build --workspace frontend/app && npm run frontend:storybook:build`
+2. `cd frontend/app && npx playwright test visual-review.spec.ts storybook.spec.ts --update-snapshots=changed`
+3. Look at every changed picture before `git add`.
 
-A capture whose case goes is deleted with it. Never run Playwright and a
-qualification lane at the same time.
+A capture whose case goes is deleted with it.

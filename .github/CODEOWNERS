@@ -1,8 +1,0 @@
-# Default ownership
-* @Fikarn
-
-# Operationally sensitive areas
-/docs/ @Fikarn
-/native/ @Fikarn
-/scripts/ @Fikarn
-/.github/ @Fikarn

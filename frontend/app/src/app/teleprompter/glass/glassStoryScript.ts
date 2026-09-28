@@ -1,7 +1,7 @@
 import type { PrompterAnchor, PrompterLook } from "@sse/engine-client";
 
 // A script for the glass's stories and tests (new pages program, Slice 5a):
-// board 1's "02 Interview intro" (`docs/redesign/assets/concepts/
+// board 1's "02 Interview intro" (`docs/design/boards/
 // A-teleprompter-1.html`), with its emphasis and its three cues, each on a line
 // of its own (¶ 12's from a Word heading). Since Slice 6a the text lives in
 // `@sse/test-fixtures` (`prompterScripts.ts`), whole as the board has it (18

@@ -3,8 +3,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 // New pages program, Slice 6a: the Teleprompter page against the fixture
-// double (board 1, "Live mirror"; the proposal, docs/redesign/teleprompter-
-// 2026-09.md). The double answers every prompter request as the hardware link
+// double (board 1, "Live mirror"; the proposal, docs/design/
+// teleprompter.md). The double answers every prompter request as the hardware link
 // does (Slices 4 and 5a); the page's copy of the glass reports its layout, so
 // PLAY unlocks once the fonts are in.
 

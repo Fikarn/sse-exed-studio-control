@@ -1,224 +1,37 @@
-# SSE ExEd Studio Control
+# Studio Control
 
-SSE ExEd Studio Control is a local-first desktop control application for a fixed studio workstation. It combines lighting control, audio control, and Stream Deck commissioning into one operator-facing surface designed to stay open full-time on a dedicated second monitor.
+A desktop app that runs one studio from one screen: the lights, the audio console, the Stream Deck, the teleprompter and the cameras. It is built for a single workstation (Windows 11, one display at 2560×1440, fullscreen) and for working under time pressure during a live session.
 
-This repository is intentionally optimized for a specific deployment profile rather than a generic SaaS dashboard:
+It is developed by one person, working with Claude. Nothing here is packaged for anyone else to install.
 
-- desktop-first, local-only operation
-- permanent 27-inch 16:9 second-monitor layout
-- live lighting and audio control under time pressure
-- fixed studio hardware assumptions instead of broad hardware abstraction
+## How it is built
 
-## Architecture
+- **Engine** (`native/rust-engine`, Rust): state, saved data and every device.
+- **Shell** (`native/tauri-shell`, Tauri 2): the window; it starts the engine and watches it.
+- **Pages** (`frontend/`, React and TypeScript): what the operator sees.
+- **Contract** (`native/protocol`): the requests and events between the engine and the pages.
 
-- selected native `Tauri + React + TypeScript` operator shell for the shipping runtime
-- separate `Rust` engine (persistence, safety, device logic)
-- an offline Qt Installer Framework package on Windows 11 `x64`, the only system it runs on
-- no legacy code: the one-way importer for the pre-`v2.0.0` `db.json` was retired in the new pages program's Slice 2b (2026-09), so a `db.json` is neither imported nor restored
+## Start here
 
-The Qt/QML fallback shell was retired through Checkpoint D after the Tauri shipping runtime passed macOS and Windows target-host evidence. QtIFW remains the installer and update-repository wrapper.
+| To                           | Read                                         |
+| ---------------------------- | -------------------------------------------- |
+| Work in this repository      | [AGENTS.md](AGENTS.md)                       |
+| See what is next             | [docs/ROADMAP.md](docs/ROADMAP.md)           |
+| Run, test and debug          | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)   |
+| Understand the design        | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Set up or check the hardware | [docs/HARDWARE.md](docs/HARDWARE.md)         |
+| Operate the studio           | [docs/OPERATIONS.md](docs/OPERATIONS.md)     |
+| Verify a build in the studio | [docs/CHECKLIST.md](docs/CHECKLIST.md)       |
 
-## Distribution Targets
-
-- Windows 11 `x64` packaged as a Qt Installer Framework offline installer (the only target since 2026-09-26: there is no macOS or Linux package)
-- GitHub Releases as the installer and update-repository artifact backend
-- One fixed studio workstation as the primary production target
-
-## Download
-
-Release artifacts are published through [GitHub Releases](https://github.com/Fikarn/sse-exed-studio-control/releases/latest).
-
-- Windows: install the generated native `.exe` offline installer
-- Updates: use the published native maintenance-tool update repository artifacts for controlled workstation updates
-- Integrity: verify downloads against the published `SHA256` manifest before operator rollout
-- Trust: expect unsigned-installer warnings on Windows and handle them as a deliberate operator-managed install, not a public self-serve consumer install
-
-Productization work and release gates are tracked in [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md) and [docs/RELEASE.md](docs/RELEASE.md).
-
-## Screenshots
-
-All captures below are deterministic Tauri native renders at the target `2560x1440` operator-monitor resolution. Current visual review is produced through the local evidence lanes described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
-
-| Lighting                                                                                                    | Audio                                                                                             |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| ![Lighting workspace with populated fixtures and spatial plot](docs/release-assets/screenshot-lighting.png) | ![Audio workspace with the RME UFX III control surface](docs/release-assets/screenshot-audio.png) |
-
-| Setup / Commissioning                                                                                            |
-| ---------------------------------------------------------------------------------------------------------------- |
-| ![Setup control-surface commissioning with a selected control](docs/release-assets/screenshot-setup-control.png) |
-
-## Operator Lifecycle
-
-- First launch starts the selected native shell, launches the bundled Rust engine, and waits for engine readiness before routing into commissioning or the dashboard
-- First-run commissioning is available from inside the app for lighting, audio, and Companion setup
-- Closing the main window shows a warning and then fully quits the app if confirmed
-- Restored workspace and shell state come from the engine snapshot, not shell-local browser state
-- User data stays local on the workstation and survives reinstall/update flows unless manually removed
-- The saved data is checked at every start and backed up on its own — before an upgrade, daily and at every close; backups are verified and restored from Setup / Support or the recovery screen
-- One copy runs per workstation; if its hardware link stops during a session it is restarted on its own
-- The light outputs can be held until armed (the switch in Setup / Support, or `SSE_SAFE_START=1` at launch), and Setup / Support lists recent actions with who did them — screen, Stream Deck, TotalMix or the talkback watchdog
-- The Stream Deck bridge answers only the exported Companion profile, which carries a per-install token (re-import it once with Full Reset & Import after upgrading from a build older than 2026-09-10)
-
-Operator support details live in [docs/OPERATIONS.md](docs/OPERATIONS.md).
-
-## Product Surface
-
-Every workspace reads as one instrument. The shell is the same on all three —
-header, a fixed cluster down the left that says what the subsystem is and carries
-the take-time keys, the bay in the middle, the plate on the right showing the
-whole selected thing at once, and one footer along the bottom. Nothing scrolls
-during normal operation, and the front-end never shows a state the engine has not
-reported. The visual system is specified in
-[docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md) and
-measured on every board by the UI contract — see
-[docs/DEVELOPMENT.md §2c](docs/DEVELOPMENT.md).
-
-The Planning workspace was removed in 2026-09 at the operator's request (the new pages program, [docs/plans/new-pages-2026-09.md](docs/plans/new-pages-2026-09.md)); the same program is to add a Cameras and a Teleprompter workspace.
-
-### Lighting
-
-- fixture control for the current studio lighting rig over sACN
-- a backlit 2D studio plot as the bay, with the rig's state and the take-time keys in the cluster beside it
-- DMX status visibility, scenes, groups, palettes, and live spatial editing
-
-### Audio
-
-- fixed RME Fireface UFX III control surface
-- front preamps `9-12`, rear line inputs `1-8`, software playback returns, and output-mix control
-- main monitor and headphone mix workflows aligned to TotalMix FX concepts
-- explicit safety model for live sync, recall, and phantom power handling
-
-### Setup / Commissioning
-
-- import-first Companion / Stream Deck setup workflow
-- workstation-specific control-surface documentation
-- commissioning layout that matches the production console language
-
-## Hardware Profile
-
-This project is deliberately tuned to the current studio installation.
-
-- Display: dedicated second monitor at `2560x1440`, the program fullscreen on it, on Windows — the only size and the only system (operator ruling 2026-09-26; the new pages program's Slice SW removed the smaller layouts and everything else that existed for another size or system)
-- Audio interface: RME Fireface UFX III
-- Lighting bridge: Litepanels Apollo Bridge
-- Control surface: Stream Deck+
-- Companion workflow: local Bitfocus Companion instance
-
-Full deployment assumptions live in [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md).
-
-## Repo Map
-
-- [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPER_QUICKSTART.md): cold-start path for engineers joining the project
-- [docs/HANDOFF.md](docs/HANDOFF.md): authoritative engineering handoff and current operating truth
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): runtime and domain boundaries
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): day-to-day engineering workflow
-- [docs/OPERATIONS.md](docs/OPERATIONS.md): local operations and operator support
-- [docs/RELEASE.md](docs/RELEASE.md): versioning, tagging, installers, and release flow
-- [docs/OPERATOR_WORKSTATION_ROLLOUT.md](docs/OPERATOR_WORKSTATION_ROLLOUT.md): final published-installer verification on the intended studio workstation
-- [docs/HARDWARE_PROFILE.md](docs/HARDWARE_PROFILE.md): supported studio hardware and scope
-- [docs/redesign/system-a-2026-09.md](docs/redesign/system-a-2026-09.md): the visual system every operator surface is built to, and the measures that enforce it
-- [docs/plans/visual-overhaul-a-2026-09.md](docs/plans/visual-overhaul-a-2026-09.md): the thirteen-slice record of how it was implemented
-- [docs/plans/audit-remediation-2026-09.md](docs/plans/audit-remediation-2026-09.md): the thirteen-slice record of the 2026-09 truthfulness remediation
-- [docs/plans/production-readiness-2026-09.md](docs/plans/production-readiness-2026-09.md): the sixteen-slice record of the 2026-09 production readiness remediation (32 findings, each with the guard that holds it; Appendix B is the operator's hardware checklist)
-- [docs/PRODUCTIZATION_PLAN.md](docs/PRODUCTIZATION_PLAN.md): current production-readiness plan and open decisions
-- [docs/archive/FRONTEND_CUTOVER_PLAN.md](docs/archive/FRONTEND_CUTOVER_PLAN.md): acceptance gate for completing the Tauri shipping switch
-- [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md): completed Checkpoint D impact audit and safe Qt fallback retirement sequence
-- [docs/archive/](docs/archive/): historical planning and parity documents preserved for reference
-- [native/README.md](native/README.md): native workspace scaffold for the selected Tauri shell, Rust engine, and IPC protocol
-- [docs/adr/0001-frontend-replatform.md](docs/adr/0001-frontend-replatform.md): locked frontend replatform decision
-- `frontend/`: Tauri web frontend workspace and design-system packages
-- `native/tauri-shell/`: selected native shell track for the current published Tauri runtime
-
-## Local Development
-
-Start with the cold-start guide:
-
-- [docs/DEVELOPER_QUICKSTART.md](docs/DEVELOPER_QUICKSTART.md)
-
-Prerequisites:
-
-- Node.js 24 LTS
-- npm
-- Rust stable toolchain
-- Qt Installer Framework for local installer/update generation and release evidence
+## Quick start
 
 ```bash
 npm install
-npm run doctor
 npm run dev:check
-npm run file:health
-npm run format:check
-npm run release:check
-npm run native:check
-npm run native:test
-npm run native:foundation
-npm run frontend:foundation
-npm run tauri:foundation
-npm run tauri:setup-support:qualify
-npm run tauri:workspaces:qualify
-npm run native:package:win:local
-npm run native:package:win:smoke
-npm run native:package:win:clean-smoke
-npm run native:installer:win:prepare
-npm run native:installer:win:local
-npm run native:update-repo:win:prepare
-npm run native:update-repo:win:local
-npm run native:release:win:local
-npm run native:acceptance
 ```
 
-Common commands:
+`npm run dev:check` runs the code checks and the unit tests in under a minute. [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) has the rest.
 
-```bash
-npm run clean
-npm run clean:local
-npm run doctor
-npm run doctor:release
-npm run dev:check
-npm run file:health
-npm run format:check
-npm run native:foundation
-npm run frontend:foundation
-npm run tauri:foundation
-npm run tauri:setup-support:qualify
-npm run tauri:workspaces:qualify
-npm run tauri:cutover:candidate
-npm run ci
-```
+## Licence
 
-Beyond `dev:check`, which also enforces the Vitest coverage floors, three gates need the network or a long build and run as CI jobs: `npm run supply-chain:check` (npm audit for every lockfile and `cargo deny`, against dated exceptions), `npm run rust:coverage` (the Rust line-coverage floor) and the Playwright suite (`npm run frontend:playwright:test`; CI fails on its `default` project, and the quarantine project for wall-clock cases is empty since 2026-09-21). The `dev-checks` workflow runs ten jobs once per pushed commit, on every branch; a pull request reads the checks on its head commit. `docs/DEVELOPMENT.md §4` explains each.
-
-`tauri:setup-support:qualify` and `tauri:workspaces:qualify` launch the real Tauri dev shell on the fixed local port `4173`. Run them serially and do not run them alongside the frontend workspace dev/preview servers (`npm run dev --workspace frontend/app`, `npm run preview --workspace frontend/app`) or Playwright preview.
-
-`tauri:cutover:candidate` is the local Checkpoint A gate for the replacement shell.
-
-The selected shipping release runtime is declared in `scripts/native-release-runtime.json`. `v2.2.0` completed the Tauri shipping-switch gate through the `native:*` release lane with macOS Apple Silicon and Windows 11 `x64` target-host evidence; `v2.2.1` is the current published operator-rollout build after the durable app-data default fix. The fallback window is closed, and Qt retirement is complete through issue #5 plus [docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md](docs/archive/QT_FALLBACK_RETIREMENT_AUDIT.md). Validation lane split, runtime selector lockdown, packaging/signing cleanup, Qt source/test removal, parity asset retirement, macOS shipping validation, and Windows target-host release evidence are complete.
-
-`npm run clean` removes generated native build output and packaged release folders. `npm run clean:local` also removes ignored local debris such as root test results, local install logs, generated evidence folders, and release output; it does not remove `.tools/`. Both keep `release/native` when a packaged app is in it (on a workstation that runs the app from the repository, that folder is the installed app) and say so; `-- --include-release` removes it as well and refuses while the app is running, and `-- --dry-run` removes nothing.
-
-## Release Model
-
-Releases are changelog-driven and tag-driven:
-
-1. Land changes on `main`
-2. Bump `package.json` / `package-lock.json`
-3. Move release notes from `[Unreleased]` into a versioned `CHANGELOG.md` section
-4. Run `npm run release:verify`
-5. Commit release metadata
-6. Push `main`
-7. Create and push a `vX.Y.Z` tag
-8. Publish the locally built target-host artifacts with `npm run release:publish -- --tag vX.Y.Z`
-
-Release builds are local/target-host gates, not GitHub Actions gates. The Windows 11 `x64` release host builds and verifies the installer, the update-repository archive and the SHA256 manifest; `release:publish` uploads the checked artifacts to GitHub Releases using release notes generated from `CHANGELOG.md`.
-
-## Engineering Standards
-
-- local-first reliability beats feature breadth
-- operator clarity beats decorative UI
-- hardware-facing changes require explicit validation
-- no silent live-state writes on screen open unless that behavior is intentional and documented
-- repo docs should reflect the actual supported hardware and workflows
-
-## License
-
-[MIT](LICENSE)
+See [LICENSE](LICENSE).

@@ -3,7 +3,7 @@
 //! the operator reads about them. Each camera's model says what it reports,
 //! so Slices 11 and 13 can narrow or widen it once the real links read the
 //! cameras themselves. The values are board 2's
-//! (`docs/redesign/assets/concepts/A-cameras-2.html`).
+//! (`docs/design/boards/A-cameras-2.html`).
 
 use crate::cameras::snapshot::{CameraAutos, CameraLink, CameraState, CameraTone};
 
