@@ -58,7 +58,6 @@ jobs:
       - run: npm run rust:fmt:check
       - run: npm run rust:clippy
       - run: npm run native:test
-      - run: npm run native:test:dev-fixtures
       - run: npm run native:acceptance
       - run: npm run native:bridge
       - run: npm run tauri:smoke

@@ -17,7 +17,8 @@ One pull request each, in this order. Then the Cameras page.
 - [ ] Step 6: product code.
   - [x] Graphite and Bone out (D25).
   - [x] Talkback out (D26).
-  - [ ] The leftovers: the update folder, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
+  - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, seven unused components of the design system and four of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
+  - [ ] Three changes of behaviour: one recovery screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine leaves the studio build's bundle.
 - [ ] Step 7: local cleanup.
 
 ## Next: the Cameras and Teleprompter pages
@@ -185,6 +186,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine".
 - [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
 - [ ] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`.
+- [ ] **A shell test timed out once under load** (2026-09-28): `exit_watcher_fails_pending_and_emits_event` waited its ten seconds for a process that exits at once, while the whole gate ran beside it. It passes alone. If it comes back, find why.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
 
@@ -211,7 +213,7 @@ Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` 
 Four larger changes, each decided on its own:
 
 - **Replace the fixture double** with recorded data for the layout tests and the real engine for the behaviour tests. It ends writing every engine feature twice. It needs a simulated lighting output, which shows what the rig would be sent while the lights are held, and a way for a page test to reach a real engine. Try one page first.
-- **Replace the JSON backup archive** with the database backup the engine already makes. It removes the archive's code and a new format with every page. It needs the owner's word on what is lost: an archive restore adds scripts and never removes one.
+- **Replace the JSON backup archive** with the database backup the engine already makes. It removes the archive's code and a new format with every page. It needs the owner's word on what is lost: an archive restore adds scripts and never removes one. The engine's `shell.window.*` settings go with it: nothing reads them, but the archive's format carries them.
 - **Collapse migrations 1–10 into one baseline.** It removes the upgrade chain and the code that only explains retired features. It needs the studio data at schema 10, and a decision on whether older database backups must still restore.
 - **Move CI to a Windows runner.** CI would then compile and test the Windows-only code, and the Linux-only leftovers could go. It needs the four-job CI (step 3) and a measure of a Windows runner's time and cost.
 

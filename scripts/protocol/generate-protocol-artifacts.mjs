@@ -71,10 +71,6 @@ const schema = {
       type: "array",
       items: { enum: contract.startupLifecycleStates },
     },
-    devParityFixtures: {
-      type: "array",
-      items: { enum: contract.devParityFixtures },
-    },
     ...(contract.snapshotShapes
       ? {
           snapshotShapes: { const: contract.snapshotShapes },
@@ -93,7 +89,6 @@ const schema = {
     "version",
     "transport",
     "startupLifecycleStates",
-    "devParityFixtures",
     ...(contract.snapshotShapes ? ["snapshotShapes"] : []),
     "methods",
     "events",
@@ -114,9 +109,6 @@ export type EventName = (typeof EVENT_NAMES)[number];
 
 export const STARTUP_LIFECYCLE_STATES = ${JSON.stringify(contract.startupLifecycleStates, null, 2)} as const;
 export type StartupLifecycleState = (typeof STARTUP_LIFECYCLE_STATES)[number];
-
-export const DEV_PARITY_FIXTURES = ${JSON.stringify(contract.devParityFixtures, null, 2)} as const;
-export type DevParityFixtureId = (typeof DEV_PARITY_FIXTURES)[number];
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };

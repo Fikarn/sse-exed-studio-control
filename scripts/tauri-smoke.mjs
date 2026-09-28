@@ -35,10 +35,6 @@ async function main() {
     throw new Error("Tauri shell must remain single-window during the migration foundation phase.");
   }
 
-  if (!protocolContract.devParityFixtures.includes("setup-required")) {
-    throw new Error("Protocol contract must include the setup-required parity fixture.");
-  }
-
   verifyContentSecurityPolicy(config);
 
   const engineBinary = resolveEngineBinary();

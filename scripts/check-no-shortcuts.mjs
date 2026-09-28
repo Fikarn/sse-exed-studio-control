@@ -52,7 +52,6 @@ export const DEFAULT_ROOTS = [
   "frontend/app/src",
   "frontend/packages/design-system/src",
   "frontend/packages/engine-client/src",
-  "frontend/packages/shared-graphics/src",
 ];
 
 // Where a key listener on a window, a document or an element is plain keyboard
@@ -87,8 +86,6 @@ export const KEY_HANDLERS = {
     "a focused segmented switch is a list: the arrows, Home and End choose a segment (D6)",
   "frontend/packages/design-system/src/components/Slider.tsx":
     "a focused slider or fader: the arrows, Home and End, and Enter for typed entry (decision 9)",
-  "frontend/packages/design-system/src/components/Toolbar.tsx":
-    "a focused toolbar is a list: the arrows, Home and End move between its keys (D6)",
   "frontend/app/src/app/audio/components/AudioKnob.tsx":
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/audio/components/AudioSliderControl.tsx":

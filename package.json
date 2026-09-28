@@ -61,8 +61,6 @@
     "tauri:workspaces:qualify": "npm run native:engine:build && node scripts/tauri-workspace-qualification.mjs",
     "native:test": "cd native && cargo test --workspace",
     "native:engine:build": "cd native && cargo build --package studio-control-engine",
-    "native:engine:build:dev-fixtures": "cd native && cargo build --package studio-control-engine --features dev-fixtures",
-    "native:test:dev-fixtures": "cd native && cargo clippy --package studio-control-engine --all-targets --features dev-fixtures -- -D warnings && cargo test --package studio-control-engine --features dev-fixtures && cargo build --package studio-control-engine",
     "native:acceptance": "npm run native:engine:build && node scripts/native-acceptance.mjs",
     "native:bridge": "npm run native:engine:build && node scripts/native-control-surface-qualification.mjs",
     "native:test:hardware": "cd native && cargo test --workspace -- --ignored",
