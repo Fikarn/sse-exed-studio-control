@@ -9,6 +9,8 @@ const AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY: &str = "app.audio.last_recalled_snaps
 const AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY: &str = "app.audio.last_snapshot_recall_at";
 const AUDIO_LAST_ACTION_STATUS_KEY: &str = "app.audio.last_action_status";
 const AUDIO_LAST_ACTION_CODE_KEY: &str = "app.audio.last_action_code";
+/// The code of a refusal only the builds before 2026-09-28 wrote (D26).
+const RETIRED_TALKBACK_REFUSED_CODE: &str = "AUDIO_TALKBACK_REFUSED";
 const AUDIO_LAST_ACTION_MESSAGE_KEY: &str = "app.audio.last_action_message";
 const AUDIO_CHANNEL_STATE_KEY: &str = "app.audio.channels_state";
 const AUDIO_MIX_TARGET_STATE_KEY: &str = "app.audio.mix_targets_state";

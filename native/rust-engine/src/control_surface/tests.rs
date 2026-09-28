@@ -255,6 +255,45 @@ fn the_deck_mode_key_is_refused_and_stores_nothing() {
     assert!(control_surface_last_event(db_path.as_path()).is_null());
 }
 
+// D26 (2026-09-28): talkback left the app. A deck that still has the profile
+// of the build before posts `talkOn` while its TALK key is held and `talkOff`
+// at the release, and polls the key's two displays every second: each is
+// refused, and none stores anything or stamps an event.
+#[test]
+fn the_talk_key_of_an_old_profile_is_refused_and_stores_nothing() {
+    let test_dir = ready_audio_test_db("old-talk-key");
+    let db_path = test_dir.db_path();
+    let settings_before = list_settings_by_prefix(db_path.as_path(), "").expect("settings");
+
+    for action in ["talkOn", "talkOff"] {
+        let refused = handle_control_surface_http_action(
+            db_path.as_path(),
+            "/api/deck/audio-action",
+            &json!({ "action": action }),
+        )
+        .expect_err("talkback left the app");
+        assert_eq!(
+            refused.status_code(),
+            501,
+            "{action}: {}",
+            refused.message()
+        );
+    }
+    for key in ["audio_key_7", "audio_state_talk"] {
+        let refused = read_control_surface_lcd_text(db_path.as_path(), key)
+            .expect_err("the TALK key's displays left with it");
+        assert_eq!(refused.status_code(), 400, "{key}: {}", refused.message());
+    }
+
+    assert_eq!(
+        list_settings_by_prefix(db_path.as_path(), "").expect("settings"),
+        settings_before,
+        "a refused TALK key writes nothing"
+    );
+    assert!(control_surface_last_event(db_path.as_path()).is_null());
+    assert!(recent_actions(db_path.as_path()).is_empty());
+}
+
 #[test]
 fn successful_actions_stamp_the_last_event_for_verify_echo() {
     let test_dir = ready_audio_test_db("last-event");

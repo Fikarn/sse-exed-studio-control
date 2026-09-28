@@ -78,6 +78,45 @@ fn saved_state_with_the_old_talkback_field_still_reads() {
     assert!(!written.contains("talkback"), "{written}");
 }
 
+// The same build could leave a refused talkback as the Console's last action.
+// It must not greet this build with ACTION FAILED over a key it does not have.
+#[test]
+fn a_saved_talkback_refusal_reads_as_no_action() {
+    let refusal = |code: &str| {
+        HashMap::from([
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("failed"),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::from(code)),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from("TotalMix refused talkback."),
+            ),
+        ])
+    };
+
+    let retired = read_audio_snapshot(&refusal("AUDIO_TALKBACK_REFUSED"));
+    assert_eq!(retired.last_action_status, "idle");
+    assert_eq!(retired.last_action_code, None);
+    assert_eq!(retired.last_action_message, None);
+    let never_acted = read_audio_snapshot(&HashMap::new());
+    assert_eq!(retired.status, never_acted.status);
+    assert_eq!(retired.summary, never_acted.summary);
+
+    // Any other failure is still the Console's state.
+    let failed = read_audio_snapshot(&refusal("AUDIO_SYNC_FAILED"));
+    assert_eq!(failed.last_action_status, "failed");
+    assert_eq!(
+        failed.last_action_code.as_deref(),
+        Some("AUDIO_SYNC_FAILED")
+    );
+    assert_eq!(
+        failed.last_action_message.as_deref(),
+        Some("TotalMix refused talkback.")
+    );
+}
+
 #[test]
 fn audio_snapshot_defaults_to_not_verified() {
     let snapshot = read_audio_snapshot(&HashMap::new());

@@ -42,10 +42,10 @@ const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
 /// Sized for the deck's worst instant: the exported profile's once-a-second
-/// LCD poll sends one request per audio LCD key, all at once, and the control
-/// with the most LCD refreshes sends its own burst on one press (25 + 17 on
-/// 2026-09-22; since the new pages program's Slice 2 the lighting page-follow
-/// trigger the poll can set off adds the four LIGHTS LCDs: 25 + 4 + 17). All
+/// LCD poll sends one request per audio LCD key, all at once, the lighting
+/// page-follow trigger the poll can set off adds the four LIGHTS LCDs, and the
+/// control with the most LCD refreshes sends its own burst on one press
+/// (`exports::deck_worst_instant_requests` counts them). All
 /// of them must fit the workers and the queue together, with
 /// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
 /// of 16 turned the poll's last five requests away every second on the studio

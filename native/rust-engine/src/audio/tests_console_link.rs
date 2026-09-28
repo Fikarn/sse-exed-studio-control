@@ -1164,10 +1164,10 @@ fn recall_plan_orders_mutes_first_and_never_touches_48v_or_pad() {
     );
     let everything: Vec<String> = (0..4).flat_map(addresses).collect();
     assert!(
-        everything
-            .iter()
-            .all(|address| !address.contains("48v") && !address.contains("pad")),
-        "48V and pad are never pushed"
+        everything.iter().all(|address| !address.contains("48v")
+            && !address.contains("pad")
+            && !address.contains("talkback")),
+        "48V and pad are never pushed, and the app sends no talkback"
     );
     let host_main = plan.phases[1]
         .iter()

@@ -215,6 +215,31 @@ describe("SetupSupportPilot light outputs and recent actions", () => {
     await store.dispose();
   });
 
+  it("recent actions prints a source it has no word for as it was saved", async () => {
+    // Saved data of the build before 2026-09-28 can hold rows of talkback's
+    // watchdog, a source this build does not write (D26).
+    const store = await renderPilot((snapshot) => ({
+      ...(snapshot ?? {}),
+      recentEvents: [
+        {
+          id: 12,
+          at: "2026-09-24T11:50:12.000Z",
+          source: "watchdog",
+          domain: "audio",
+          action: "talkback-off",
+          target: "Talkback",
+          detail: "Talkback released: nobody was holding it",
+        },
+      ],
+    }));
+    const rows = screen.getAllByTestId("support-recent-action");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].getAttribute("data-source")).toBe("watchdog");
+    expect(rows[0].textContent).toContain("Talkback released: nobody was holding it");
+    expect(rows[0].textContent).toContain("watchdog");
+    await store.dispose();
+  });
+
   it("recent actions says so when there is nothing yet, and skips rows it cannot read", async () => {
     const store = await renderPilot((snapshot) => ({ ...(snapshot ?? {}), recentEvents: [{ id: "x" }, null, 7] }));
     expect(screen.getByTestId("support-recent-actions-empty").textContent).toContain("Nothing yet");

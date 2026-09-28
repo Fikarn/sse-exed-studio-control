@@ -1639,7 +1639,7 @@ mod tests {
 
     // D5: LIGHTS (page 1) and AUDIO (page 2), chained by the page keys and by
     // the deck following the app. LIGHTS' `AUDIO >>` is the one page key: the
-    // AUDIO page's sixteen places all hold audio controls, so the deck goes
+    // AUDIO page has none, so the deck goes
     // back to LIGHTS by following the app. Setup has no deck page, so nothing
     // follows it and the deck stays where it is.
     #[test]

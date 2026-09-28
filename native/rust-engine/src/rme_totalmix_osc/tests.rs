@@ -1107,6 +1107,13 @@ fn send_totalmix_mix_target_update_uses_output_faderlin_and_control_room() {
         "saw {addresses:?}"
     );
     assert!(addresses.contains(&"/controlroom/dim"), "saw {addresses:?}");
+    // D26: the app sends the desk no talkback.
+    assert!(
+        addresses
+            .iter()
+            .all(|address| !address.contains("talkback")),
+        "saw {addresses:?}"
+    );
 }
 
 #[test]

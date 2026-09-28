@@ -82,6 +82,7 @@ Once the Prompter XL's window is built:
 ## Saved data and recovery
 
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
+- [ ] After that first start, the Console's snapshots are all there by name, and Main Out, Phones 1 and Phones 2 stand where they stood; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.
