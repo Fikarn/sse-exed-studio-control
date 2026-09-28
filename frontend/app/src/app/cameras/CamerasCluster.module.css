@@ -65,13 +65,21 @@
   margin: 0;
 }
 
+/* A row keeps its height whatever it says, so that the keys under the take
+   stand where they stood: one line, as high as a value, and two for what the
+   card's row says. */
 .takeRow {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: baseline;
   column-gap: 12px;
+  min-height: calc(var(--font-size-body) * 1.2);
   color: var(--text-text2);
   font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+}
+
+.takeRow[data-lines="2"] {
+  min-height: calc(var(--font-size-label) * 1.2 * 2);
 }
 
 .takeRow dt {

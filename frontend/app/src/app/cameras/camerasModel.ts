@@ -231,7 +231,9 @@ export function takeReadouts(main: CameraSnapshot | null, nowMs: number): TakeRe
       note: `counted here since ${clockTime(recording.startedAt)}`,
     };
   } else {
-    length = { value: null, note: "not known · the take started before Studio Control looked" };
+    // One line in the cluster, as every other thing this row says: the keys
+    // under the take must not move when it changes (docs/DESIGN.md, section 1).
+    length = { value: null, note: "not known · started before Studio Control looked" };
   }
 
   let timecode: Pick<TakeReadout, "value" | "note" | "doubt">;

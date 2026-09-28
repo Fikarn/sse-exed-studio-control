@@ -515,6 +515,53 @@ test.describe("the Cameras page", () => {
       expect(sizes.plate, `${fixture}: the plate holds everything it shows`).toBe(true);
     }
   });
+
+  // Controls used during a take never move (docs/DESIGN.md, section 1): REC,
+  // the cameras' keys and what stands under them are where they were, whatever
+  // the take's rows and the cameras' keys say.
+  test("the cluster's keys stand where they stood, whatever the cameras' state", async ({ page }) => {
+    const places = () =>
+      page.evaluate(() =>
+        [
+          "cameras-rec",
+          "cameras-take",
+          "cameras-key-1",
+          "cameras-key-2",
+          "cameras-key-3",
+          "cameras-pictures",
+          "cameras-recent",
+          "cameras-read-all",
+        ].map((id) => {
+          const box = document.querySelector(`[data-testid=${id}]`)!.getBoundingClientRect();
+          // The Recent list is as long as its rows; the standing keys under it are at the foot.
+          const height = id === "cameras-recent" ? null : Math.round(box.height * 10) / 10;
+          return [id, Math.round(box.top * 10) / 10, height];
+        })
+      );
+    await openCameras(page, "cameras-held");
+    const held = await places();
+    for (const fixture of [
+      "cameras-recording",
+      "cameras-released",
+      "cameras-unreachable",
+      "cameras-lost-mid-take",
+      "cameras-no-link",
+    ]) {
+      await openCameras(page, fixture);
+      expect(await places(), fixture).toEqual(held);
+    }
+
+    // And through a take on one board: started, armed to stop, stopped.
+    await openCameras(page, "cameras-held");
+    const rec = page.getByTestId("cameras-rec");
+    await rec.click();
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+    await expect(page.getByTestId("cameras-take-length")).toContainText("counted here since");
+    expect(await places(), "recording").toEqual(held);
+    await rec.click();
+    await expect(rec).toHaveAttribute("data-armed", "true");
+    expect(await places(), "stop armed").toEqual(held);
+  });
 });
 
 test.describe("the header with the cameras", () => {

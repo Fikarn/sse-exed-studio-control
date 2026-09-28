@@ -209,7 +209,7 @@ describe("what is known about the take", () => {
     const cam1 = cameraOf(await read(), 1);
     expect(takeReadouts(cam1, NOW)[0]).toMatchObject({
       value: null,
-      note: "not known · the take started before Studio Control looked",
+      note: "not known · started before Studio Control looked",
     });
     expect(recordingWord(cam1, false, NOW)).toBe("CAM 1 · recording · length not known");
   });
