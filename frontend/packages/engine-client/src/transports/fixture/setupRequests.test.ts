@@ -10,7 +10,7 @@ import type { EventName, JsonObject, RequestMethod } from "../../generated/proto
 import type { FixtureScenario } from "../../types";
 import { createFixtureTransport } from "../fixtureTransport";
 import { cloneJson } from "./json";
-import { WORKSPACES, workspaceRefusal } from "./setupRequests";
+import { SETUP_SECTIONS, WORKSPACES, setupSectionRefusal, workspaceRefusal } from "./setupRequests";
 
 // New pages program, Slice 2 (D3): the fixture double's backup replies say what the
 // hardware link says (`native/rust-engine/src/support.rs`). The export's reply counts
@@ -200,10 +200,50 @@ function hardwareLinkWorkspaceRefusal(): string {
   return format.replace("{}", hardwareLinkWorkspaces().join(", "));
 }
 
+function hardwareLinkSetupSections(): string[] {
+  const list = SHELL_SETTINGS_RS.match(/\bpub const SETUP_SECTIONS: &\[&str\] = &\[([^\]]*)\];/)?.[1];
+  if (list === undefined) {
+    throw new Error("SETUP_SECTIONS is not in shell_settings.rs any more; update this test with it");
+  }
+  return [...list.matchAll(/"([^"\\]*)"/g)].map((entry) => entry[1]!);
+}
+
+function hardwareLinkSetupSectionRefusal(): string {
+  const format = SHELL_SETTINGS_RS.match(
+    /\bpub fn setup_section_refusal\(\) -> String \{\s*format!\(\s*"([^"\\]*)",\s*SETUP_SECTIONS\.join\(", "\)\s*\)/
+  )?.[1];
+  if (format === undefined || format.split("{}").length !== 2) {
+    throw new Error(
+      'setup_section_refusal is not format!("…{}", SETUP_SECTIONS.join(", ")) any more; update this test'
+    );
+  }
+  return format.replace("{}", hardwareLinkSetupSections().join(", "));
+}
+
 describe("the fixture double's pages", () => {
   it("knows the hardware link's pages, in its order", () => {
     expect([...WORKSPACES]).toEqual(hardwareLinkWorkspaces());
     expect(workspaceRefusal()).toBe(hardwareLinkWorkspaceRefusal());
+  });
+
+  it("knows Setup / Support's sections, and opens it on the cameras' in one request", async () => {
+    expect([...SETUP_SECTIONS]).toEqual(hardwareLinkSetupSections());
+    expect(setupSectionRefusal()).toBe(hardwareLinkSetupSectionRefusal());
+
+    const { request } = openDouble();
+    const opened = await request("settings.update", { workspace: "setup", setup: { activeSection: "cameras" } });
+    expect(opened.shell).toMatchObject({ workspace: "setup", setup: { activeSection: "cameras" } });
+    const before = await request("app.snapshot");
+    // A section it does not have refuses the whole request, the page it also names included.
+    for (const unknown of ["runner", "Cameras", ""]) {
+      await expect(
+        request("settings.update", { workspace: "audio", setup: { activeSection: unknown } })
+      ).rejects.toThrow(hardwareLinkSetupSectionRefusal());
+    }
+    await expect(request("settings.update", { setup: { activeSection: 3 } })).rejects.toThrow(
+      "setup.activeSection must be a string"
+    );
+    expect(await request("app.snapshot")).toEqual(before);
   });
 
   it("opens the Teleprompter and refuses a page it does not know, changing nothing", async () => {

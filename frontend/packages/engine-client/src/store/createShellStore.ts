@@ -1353,6 +1353,14 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         },
       });
     },
+    async openSetupSection(section) {
+      return performRequest("settings.update", {
+        workspace: "setup",
+        setup: {
+          activeSection: section,
+        },
+      });
+    },
     async setLightingSection(sectionId) {
       return performRequest("settings.update", {
         lighting: {

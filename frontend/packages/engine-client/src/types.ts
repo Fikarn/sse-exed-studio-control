@@ -26,7 +26,8 @@ export type RecoveryState = "healthy" | "degraded" | "recovery";
 export type CommissioningStage = "setup-required" | "in-progress" | "ready";
 export type RunnerStage = "import" | "probe" | "map" | "verify" | "publish";
 export type CommissioningCheckTarget = "control-surface" | "lighting" | "audio";
-export type SetupSection = "commissioning" | "support";
+/** Setup / Support's sections: the runner, Support, and the cameras' setup. */
+export type SetupSection = "commissioning" | "support" | "cameras";
 
 export interface CommissioningCheckRequest {
   target: CommissioningCheckTarget;
@@ -600,6 +601,8 @@ export interface ShellStore {
   subscribeAudioMeters(listener: () => void): () => void;
   setWorkspace(workspaceId: WorkspaceId): Promise<JsonValue>;
   setSetupSection(section: SetupSection): Promise<JsonValue>;
+  /** Opens Setup / Support on one of its sections, in one request (the Cameras page's `Camera setup`). */
+  openSetupSection(section: SetupSection): Promise<JsonValue>;
   setLightingSection(sectionId: string | null): Promise<JsonValue>;
   setLightingSceneThumbs(thumbs: Record<string, string>): Promise<JsonValue>;
   setLightingTalentMarks(marks: readonly ShellTalentMark[]): Promise<JsonValue>;

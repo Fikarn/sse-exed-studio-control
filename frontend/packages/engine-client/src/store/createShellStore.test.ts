@@ -636,6 +636,20 @@ describe("createShellStore scoped refresh", () => {
     expect(await after(() => store.pairCamera(1))).toEqual(cameras);
     expect(await after(() => store.forgetCamera(1))).toEqual(cameras);
     expect(await after(() => store.refreshCamerasSnapshot())).toEqual(cameras);
+    // Setup / Support opened on a section is one request, and reads what Setup shows.
+    answer("app.snapshot", {
+      shell: { workspace: "setup", setup: { activeSection: "cameras" } },
+      startup: { targetSurface: "dashboard" },
+    });
+    expect(await after(() => store.openSetupSection("cameras"))).toEqual([
+      "app.snapshot",
+      "commissioning.snapshot",
+      "controlSurface.snapshot",
+      "health.snapshot",
+      "support.snapshot",
+    ]);
+    expect(calls.filter((call) => call === "request:settings.update")).toHaveLength(1);
+    expect(store.getSnapshot().activeWorkspace).toBe("setup");
     // Opening the Cameras page reads them too (the page comes with the next change).
     expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
     await store.dispose();
