@@ -5,17 +5,26 @@
 //! without a window. The two window commands are here too, with the
 //! sentences the operator reads when one does not finish.
 //!
-//! The window is held on its display while screens come and go (`Held`):
-//! Windows moves windows about when a screen is plugged in or out, and the
-//! Prompter XL is plugged in and out. The display is saved by the window
-//! commands and by the watch over the screens (`shell_display_watch.rs`),
-//! while the screens stand still; until the Prompter XL's window it was
-//! saved at every move of the window, Windows' own among them.
+//! The window is held on its display while screens come and go
+//! (`HeldDisplay`): Windows moves windows about when a screen is plugged in
+//! or out, and the Prompter XL is plugged in and out. A display is known by
+//! its screen's own name (`HP E273q`, which the display route reads:
+//! `shell_displays.rs`), then by its place on the desktop, then by the name
+//! Windows numbers it with. While the window's display is away (switched
+//! off, asleep, unplugged) the window stays where Windows put it and the
+//! display is remembered; when it returns, the window goes back.
+//!
+//! The display is saved by the window commands and by the watch over the
+//! screens (`shell_display_watch.rs`), while the screens stand still; until
+//! the Prompter XL's window it was saved at every move of the window,
+//! Windows' own among them.
 
+use crate::shell_displays::{read_display_paths, DisplayPath};
 use crate::shell_windows::MAIN_WINDOW_LABEL;
 use crate::EngineState;
-use std::fs::{create_dir_all, read_to_string, remove_file, write};
-use std::path::PathBuf;
+use std::fs::{create_dir_all, read_to_string, remove_file, rename, write};
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
@@ -36,7 +45,12 @@ struct LogicalPositionSnapshot {
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct MonitorSnapshot {
+    /// Windows' name for the display, a number: `\\.\DISPLAY2`.
     name: Option<String>,
+    /// The screen's own name, from its EDID: `HP E273q`. A file written
+    /// before the Prompter XL's window has none; nor has a display that two
+    /// screens show, or one whose screen gives no name.
+    screen: Option<String>,
     physical_position: LogicalPositionSnapshot,
     physical_size: LogicalSizeSnapshot,
     logical_size: LogicalSizeSnapshot,
@@ -46,6 +60,7 @@ struct MonitorSnapshot {
 #[derive(Clone)]
 struct AvailableMonitorSnapshot {
     name: Option<String>,
+    screen: Option<String>,
     physical_position: LogicalPositionSnapshot,
     physical_size: LogicalSizeSnapshot,
     scale_factor: f64,
@@ -107,19 +122,31 @@ fn write_window_preferences(
     app: &AppHandle,
     preferences: &ShellWindowPreferences,
 ) -> Result<(), String> {
-    let path = window_preferences_path(app)?;
+    write_window_preferences_to(&window_preferences_path(app)?, preferences)
+}
+
+/// The file is written beside itself and moved into its place, so that it is
+/// whole whenever it is read: the watch over the screens writes it, and the
+/// app can close while it does.
+fn write_window_preferences_to(
+    path: &Path,
+    preferences: &ShellWindowPreferences,
+) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         create_dir_all(parent)
             .map_err(|error| format!("Failed to create shell config directory: {error}"))?;
     }
     let payload = serde_json::to_vec_pretty(preferences)
         .map_err(|error| format!("Failed to serialize shell window preferences: {error}"))?;
-    write(&path, payload).map_err(|error| {
-        format!(
-            "Failed to write shell window preferences {}: {error}",
-            path.display()
-        )
-    })
+    let beside = path.with_extension("json.new");
+    write(&beside, payload)
+        .and_then(|()| rename(&beside, path))
+        .map_err(|error| {
+            format!(
+                "Failed to write shell window preferences {}: {error}",
+                path.display()
+            )
+        })
 }
 
 fn remove_window_preferences(app: &AppHandle) -> Result<(), String> {
@@ -135,33 +162,26 @@ fn remove_window_preferences(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn logical_monitor_size(monitor: &Monitor) -> LogicalSizeSnapshot {
-    let scale_factor = monitor.scale_factor();
-    LogicalSizeSnapshot {
-        width: monitor.size().width as f64 / scale_factor,
-        height: monitor.size().height as f64 / scale_factor,
+/// The screen's own name for the display Windows calls `name`. None when two
+/// screens show the display, each a copy of the other; when its screen gives
+/// no name; and when the screens were not read.
+fn screen_of(paths: &[DisplayPath], name: Option<&String>) -> Option<String> {
+    let name = name?;
+    let mut shown_by = paths.iter().filter(|path| &path.source == name);
+    let screen = shown_by.next()?;
+    if shown_by.next().is_some() || screen.target.is_empty() {
+        return None;
     }
+    Some(screen.target.clone())
 }
 
-fn monitor_snapshot(monitor: &Monitor) -> MonitorSnapshot {
-    MonitorSnapshot {
-        name: monitor.name().cloned(),
-        physical_position: LogicalPositionSnapshot {
-            x: monitor.position().x as f64,
-            y: monitor.position().y as f64,
-        },
-        physical_size: LogicalSizeSnapshot {
-            width: monitor.size().width as f64,
-            height: monitor.size().height as f64,
-        },
-        logical_size: logical_monitor_size(monitor),
-        scale_factor: monitor.scale_factor(),
-    }
-}
-
-fn available_monitor_snapshot(monitor: &Monitor) -> AvailableMonitorSnapshot {
+fn available_monitor_snapshot(
+    monitor: &Monitor,
+    paths: &[DisplayPath],
+) -> AvailableMonitorSnapshot {
     AvailableMonitorSnapshot {
         name: monitor.name().cloned(),
+        screen: screen_of(paths, monitor.name()),
         physical_position: LogicalPositionSnapshot {
             x: monitor.position().x as f64,
             y: monitor.position().y as f64,
@@ -172,6 +192,41 @@ fn available_monitor_snapshot(monitor: &Monitor) -> AvailableMonitorSnapshot {
         },
         scale_factor: monitor.scale_factor(),
     }
+}
+
+/// A monitor as it is held and saved.
+fn saved_from(monitor: &AvailableMonitorSnapshot) -> MonitorSnapshot {
+    let scale = if monitor.scale_factor.is_finite() && monitor.scale_factor > 0.0 {
+        monitor.scale_factor
+    } else {
+        1.0
+    };
+    MonitorSnapshot {
+        name: monitor.name.clone(),
+        screen: monitor.screen.clone(),
+        physical_position: monitor.physical_position.clone(),
+        physical_size: monitor.physical_size.clone(),
+        logical_size: LogicalSizeSnapshot {
+            width: monitor.physical_size.width / scale,
+            height: monitor.physical_size.height / scale,
+        },
+        scale_factor: monitor.scale_factor,
+    }
+}
+
+/// What shell.log calls a display: its screen's name, else Windows' name for
+/// it, else its place.
+fn display_words(display: &MonitorSnapshot) -> String {
+    display
+        .screen
+        .clone()
+        .or_else(|| display.name.clone())
+        .unwrap_or_else(|| {
+            format!(
+                "the display at {},{}",
+                display.physical_position.x, display.physical_position.y
+            )
+        })
 }
 
 fn same_size(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
@@ -199,31 +254,64 @@ fn same_name_and_size(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapsho
         && same_size(monitor, saved)
 }
 
-/// The saved display among the monitors: the one that stands in its place,
-/// else the one with its name and its size. The place comes first because
-/// Windows names a display by a number (`\\.\DISPLAY3`), and at the next
-/// start that number can belong to another display; until 2026-09-28 the name
-/// came first, and the screen could open on the wrong one. A name on a
-/// display of another size is another display.
+/// Whether `monitor` shows the saved display's screen: both are named, and
+/// alike.
+fn same_screen(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
+    saved
+        .screen
+        .as_ref()
+        .zip(monitor.screen.as_ref())
+        .is_some_and(|(saved_screen, screen)| saved_screen == screen)
+}
+
+/// Whether `monitor` can be the saved display by what is known of their
+/// screens. Two screens of two names are two displays, wherever they stand;
+/// where either has no name, nothing is known.
+fn may_be(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
+    saved
+        .screen
+        .as_ref()
+        .zip(monitor.screen.as_ref())
+        .is_none_or(|(saved_screen, screen)| saved_screen == screen)
+}
+
+/// The saved display among the monitors.
+///
+/// - The one that shows its screen, by the screen's own name, when one
+///   monitor does: the screen is what the window belongs on, wherever it
+///   stands on the desktop and whatever Windows numbers it.
+/// - Else the one that stands in its place, else the one with its name and
+///   its size, unless its screen is known to be another. The place comes
+///   before the name because Windows names a display by a number
+///   (`\\.\DISPLAY3`), and at the next start that number can belong to
+///   another display; until 2026-09-28 the name came first, and the screen
+///   could open on the wrong one. A name on a display of another size is
+///   another display.
 fn saved_monitor_index_from_snapshots(
     monitors: &[AvailableMonitorSnapshot],
     saved: Option<&MonitorSnapshot>,
 ) -> Option<usize> {
     let saved = saved?;
+    let mut of_its_screen = monitors
+        .iter()
+        .enumerate()
+        .filter(|(_, monitor)| same_screen(monitor, saved));
+    if let (Some((index, _)), None) = (of_its_screen.next(), of_its_screen.next()) {
+        return Some(index);
+    }
     monitors
         .iter()
-        .position(|monitor| same_place(monitor, saved))
+        .position(|monitor| same_place(monitor, saved) && may_be(monitor, saved))
         .or_else(|| {
             monitors
                 .iter()
-                .position(|monitor| same_name_and_size(monitor, saved))
+                .position(|monitor| same_name_and_size(monitor, saved) && may_be(monitor, saved))
         })
 }
 
 /// The shell's one rule, over snapshots of the monitors so it can be tested
-/// without a window: the saved display when it is there (by its place, else
-/// by its name and size), else the 2560×1440 display, else the display the
-/// window is on.
+/// without a window: the saved display when it is there, else the 2560×1440
+/// display, else the display the window is on.
 fn fullscreen_display(
     monitors: &[AvailableMonitorSnapshot],
     saved: Option<&MonitorSnapshot>,
@@ -254,39 +342,6 @@ pub(crate) fn focus_main_window(app: &AppHandle) {
     }
 }
 
-fn window_scale_factor(window: &WebviewWindow) -> f64 {
-    window
-        .scale_factor()
-        .ok()
-        .filter(|scale| scale.is_finite() && *scale > 0.0)
-        .or_else(|| {
-            window
-                .current_monitor()
-                .ok()
-                .flatten()
-                .map(|monitor| monitor.scale_factor())
-        })
-        .unwrap_or(1.0)
-}
-
-fn capture_current_window_preferences(window: &WebviewWindow) -> ShellWindowPreferences {
-    ShellWindowPreferences {
-        fullscreen: window.is_fullscreen().unwrap_or(false),
-        monitor: window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .map(|monitor| monitor_snapshot(&monitor)),
-        scale_factor: Some(window_scale_factor(window)),
-        updated_at_epoch_seconds: now_epoch_seconds(),
-    }
-}
-
-pub(crate) fn persist_current_window_preferences(app: &AppHandle, window: &WebviewWindow) {
-    let preferences = capture_current_window_preferences(window);
-    let _ = write_window_preferences(app, &preferences);
-}
-
 fn monitor_matches_logical_size(
     monitor: &AvailableMonitorSnapshot,
     target_width: u32,
@@ -300,24 +355,6 @@ fn monitor_matches_logical_size(
     let logical_width = (monitor.physical_size.width / scale_factor).round() as u32;
     let logical_height = (monitor.physical_size.height / scale_factor).round() as u32;
     logical_width == target_width && logical_height == target_height
-}
-
-/// The monitor `fullscreen_display` names — the saved display (`saved`), else
-/// the studio monitor, else the display the window is on. When the system
-/// lists no monitors, only the last is left.
-fn fullscreen_monitor(window: &WebviewWindow, saved: Option<&MonitorSnapshot>) -> Option<Monitor> {
-    let monitors = window.available_monitors().unwrap_or_default();
-    let monitor_snapshots = monitors
-        .iter()
-        .map(available_monitor_snapshot)
-        .collect::<Vec<_>>();
-    let listed = match fullscreen_display(&monitor_snapshots, saved) {
-        FullscreenDisplay::Saved(index) | FullscreenDisplay::Studio(index) => {
-            monitors.get(index).cloned()
-        }
-        FullscreenDisplay::Current => None,
-    };
-    listed.or_else(|| window.current_monitor().ok().flatten())
 }
 
 fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<(), String> {
@@ -339,124 +376,318 @@ fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<
         .map_err(|error| format!("Failed to enter fullscreen: {error}"))
 }
 
-/// Shows the screen fullscreen on the monitor `fullscreen_monitor` picks.
-fn route_window_fullscreen(
-    window: &WebviewWindow,
-    saved: Option<&MonitorSnapshot>,
-) -> Result<(), String> {
-    let monitor = fullscreen_monitor(window, saved)
-        .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
-    route_window_to_monitor(window, &monitor)
-}
-
-/// What the window needs once the screens have changed and stand still.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum AfterTheScreensChanged {
-    /// It stands fullscreen on the display it belongs on.
-    Nothing,
-    /// Windows moved it, or its display is gone: it goes where the shell's
-    /// one rule sends it.
-    Route(FullscreenDisplay),
-}
-
-/// The rule of `Held::put_back`, over snapshots: `on` is the monitor the
-/// window stands on, `belongs_on` the display it stood on while the screens
-/// last stood still.
-fn after_the_screens_changed(
-    monitors: &[AvailableMonitorSnapshot],
-    on: Option<&AvailableMonitorSnapshot>,
+/// The monitors, and where the window stands among them, as one look finds
+/// them. The watch over the screens reads them before it locks the held
+/// display: on its thread each of these calls waits for the main thread,
+/// which must never wait for the watch in turn.
+struct Seen {
+    monitors: Vec<Monitor>,
+    snapshots: Vec<AvailableMonitorSnapshot>,
+    /// The monitor the window stands on: its index among the monitors.
+    on: Option<usize>,
     fullscreen: bool,
-    belongs_on: Option<&MonitorSnapshot>,
-) -> AfterTheScreensChanged {
-    let in_place = fullscreen
-        && on
-            .zip(belongs_on)
-            .is_some_and(|(on, belongs_on)| same_place(on, belongs_on));
-    if in_place {
-        AfterTheScreensChanged::Nothing
-    } else {
-        AfterTheScreensChanged::Route(fullscreen_display(monitors, belongs_on))
+}
+
+fn see(window: &WebviewWindow, paths: &[DisplayPath]) -> Seen {
+    let monitors = window.available_monitors().unwrap_or_default();
+    let snapshots = monitors
+        .iter()
+        .map(|monitor| available_monitor_snapshot(monitor, paths))
+        .collect::<Vec<_>>();
+    let on = window.current_monitor().ok().flatten().and_then(|monitor| {
+        let stands_on = available_monitor_snapshot(&monitor, paths);
+        snapshots
+            .iter()
+            .position(|listed| same_monitor(listed, &stands_on))
+    });
+    Seen {
+        monitors,
+        snapshots,
+        on,
+        fullscreen: window.is_fullscreen().unwrap_or(false),
     }
 }
 
-/// The display the window belongs on, as the watch over the screens keeps
-/// it: the one it stood on while the screens last stood still.
-pub(crate) struct Held {
+/// Whether two snapshots of one look are of one monitor.
+fn same_monitor(one: &AvailableMonitorSnapshot, other: &AvailableMonitorSnapshot) -> bool {
+    one.name == other.name && same_place(one, &saved_from(other))
+}
+
+/// The monitor the rule names, as an index: the display the window stands
+/// on when the rule names that.
+fn index_of(display: FullscreenDisplay, on: Option<usize>) -> Option<usize> {
+    match display {
+        FullscreenDisplay::Saved(index) | FullscreenDisplay::Studio(index) => Some(index),
+        FullscreenDisplay::Current => on,
+    }
+}
+
+/// What the shell does about the window and its display at one look.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Hold {
+    /// The window stands on its display.
+    InPlace,
+    /// Nothing can be said: the window stands on no monitor that is listed.
+    Wait,
+    /// The window was sent to its display, which is there, and does not
+    /// stand on it.
+    NotArrived,
+    /// The window's display is not among the screens: the window stays
+    /// where it is, and its display is remembered.
+    Away,
+    /// The monitor of this index is the window's display from now on: the
+    /// window stands on it.
+    Take(usize),
+    /// The window is sent to the monitor of this index, its display,
+    /// fullscreen.
+    Send(usize),
+}
+
+/// The rule while the screens stand still. The window's display is the one
+/// it stands on: when that is another than before, the operator moved it
+/// with Windows' own keys. Not while its display is away, and not before a
+/// window that was sent to its display has been seen on it.
+fn hold_at_rest(
+    monitors: &[AvailableMonitorSnapshot],
+    on: Option<usize>,
+    held: Option<&MonitorSnapshot>,
+    sent: bool,
+) -> Hold {
+    let Some(on) = on else {
+        return Hold::Wait;
+    };
+    let Some(held) = held else {
+        return Hold::Take(on);
+    };
+    match saved_monitor_index_from_snapshots(monitors, Some(held)) {
+        None => Hold::Away,
+        Some(own) if own == on => in_place_or_moved(monitors, own, held),
+        Some(_) if sent => Hold::NotArrived,
+        Some(_) => Hold::Take(on),
+    }
+}
+
+/// The rule once the screens have changed and stand still again: the window
+/// goes back to its display when Windows moved it, and fullscreen. A window
+/// that stands where it stood is left alone, and so is one whose display is
+/// away.
+fn hold_after_change(
+    monitors: &[AvailableMonitorSnapshot],
+    on: Option<usize>,
+    fullscreen: bool,
+    held: Option<&MonitorSnapshot>,
+) -> Hold {
+    let Some(held) = held else {
+        // No display was ever the window's: the shell's one rule names it.
+        return match index_of(fullscreen_display(monitors, None), on) {
+            Some(index) if on == Some(index) && fullscreen => Hold::Take(index),
+            Some(index) => Hold::Send(index),
+            None => Hold::Wait,
+        };
+    };
+    match saved_monitor_index_from_snapshots(monitors, Some(held)) {
+        None => Hold::Away,
+        Some(own) if on == Some(own) && fullscreen => in_place_or_moved(monitors, own, held),
+        Some(own) => Hold::Send(own),
+    }
+}
+
+/// The window stands on its display. When the display itself stands
+/// elsewhere on the desktop than it did, or at another size or scale, it is
+/// taken again as it is now.
+fn in_place_or_moved(
+    monitors: &[AvailableMonitorSnapshot],
+    own: usize,
+    held: &MonitorSnapshot,
+) -> Hold {
+    let as_it_was = monitors
+        .get(own)
+        .is_some_and(|monitor| same_place(monitor, held) && monitor.name == held.name);
+    if as_it_was {
+        Hold::InPlace
+    } else {
+        Hold::Take(own)
+    }
+}
+
+/// The display the window belongs on: the one it stood on while the screens
+/// last stood still, or the one a window command sent it to. There is one
+/// for the app, kept by the watch over the screens and by the window
+/// commands.
+#[derive(Default)]
+pub(crate) struct HeldDisplay(Mutex<Held>);
+
+impl HeldDisplay {
+    fn lock(&self) -> MutexGuard<'_, Held> {
+        self.0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+#[derive(Default)]
+struct Held {
     display: Option<MonitorSnapshot>,
+    /// The window was sent to its display and has not been seen on it since.
+    sent: bool,
+    /// What shell.log was last told of a window that is not on its display:
+    /// each is said once.
+    said: Option<Hold>,
 }
 
 impl Held {
-    /// The display saved at the start, when the window was shown on it.
-    pub(crate) fn from_saved(app: &AppHandle) -> Self {
-        Self {
-            display: read_window_preferences(app).and_then(|preferences| preferences.monitor),
+    /// `display` is the window's own from now on. It is saved for the next
+    /// start.
+    fn take(&mut self, app: &AppHandle, display: MonitorSnapshot, sent: bool) {
+        self.display = Some(display);
+        self.sent = sent;
+        self.said = None;
+        self.save(app);
+    }
+
+    fn save(&self, app: &AppHandle) {
+        let Some(display) = &self.display else {
+            return;
+        };
+        let preferences = ShellWindowPreferences {
+            fullscreen: true,
+            monitor: Some(display.clone()),
+            scale_factor: Some(display.scale_factor),
+            updated_at_epoch_seconds: now_epoch_seconds(),
+        };
+        if let Err(detail) = write_window_preferences(app, &preferences) {
+            log_shell_line(
+                app,
+                &format!("The window's display was not saved: {detail}"),
+            );
         }
     }
 
-    /// While the screens stand still, the display the window stands on is
-    /// the one it belongs on. When it is another than before, a window
-    /// command put it there, or the operator did with Windows' own keys: it
-    /// is saved for the next start.
-    pub(crate) fn follow(&mut self, app: &AppHandle) {
-        let Ok(window) = main_window(app) else {
-            return;
-        };
-        let Some(monitor) = window.current_monitor().ok().flatten() else {
-            return;
-        };
-        let stands_on = available_monitor_snapshot(&monitor);
-        let as_before = self
-            .display
-            .as_ref()
-            .is_some_and(|display| same_place(&stands_on, display));
-        if !as_before {
-            self.display = Some(monitor_snapshot(&monitor));
-            persist_current_window_preferences(app, &window);
+    fn say_once(&mut self, app: &AppHandle, hold: Hold, line: &str) {
+        if self.said != Some(hold) {
+            self.said = Some(hold);
+            log_shell_line(app, line);
         }
     }
 
-    /// The screens changed and stand still again: the window is put back on
-    /// the display it belongs on when Windows moved it, and fullscreen. A
-    /// window that stands where it stood is left alone.
-    pub(crate) fn put_back(&mut self, app: &AppHandle) {
-        let Ok(window) = main_window(app) else {
-            return;
-        };
-        let monitors = window.available_monitors().unwrap_or_default();
-        let snapshots = monitors
-            .iter()
-            .map(available_monitor_snapshot)
-            .collect::<Vec<_>>();
-        let on = window
-            .current_monitor()
-            .ok()
-            .flatten()
-            .map(|monitor| available_monitor_snapshot(&monitor));
-        let fullscreen = window.is_fullscreen().unwrap_or(false);
-        let needed =
-            after_the_screens_changed(&snapshots, on.as_ref(), fullscreen, self.display.as_ref());
-        if needed == AfterTheScreensChanged::Nothing {
-            return;
-        }
-        match route_window_fullscreen(&window, self.display.as_ref()) {
-            Ok(()) => {
+    /// Does what the rule answered. Called with the held display locked: it
+    /// asks the window nothing, and what it tells the window is posted.
+    fn act(&mut self, app: &AppHandle, window: &WebviewWindow, seen: &Seen, hold: Hold) {
+        match hold {
+            Hold::InPlace => {
+                self.sent = false;
+                self.said = None;
+            }
+            Hold::Wait => {}
+            Hold::NotArrived => self.say_once(
+                app,
+                hold,
+                "The window was sent to its display and does not stand on it. Studio fullscreen, in Setup / Support, sends it again.",
+            ),
+            Hold::Away => {
+                let display = self
+                    .display
+                    .as_ref()
+                    .map(display_words)
+                    .unwrap_or_default();
+                self.say_once(
+                    app,
+                    hold,
+                    &format!(
+                        "The window's display, {display}, is not among the screens. The window stays where it is, and goes back when the display returns."
+                    ),
+                );
+            }
+            Hold::Take(index) => {
+                let Some(display) = seen.snapshots.get(index).map(saved_from) else {
+                    return;
+                };
                 log_shell_line(
                     app,
-                    "The screens changed: the window was put back on its display.",
+                    &format!("The window's display is {}.", display_words(&display)),
                 );
-                persist_current_window_preferences(app, &window);
-                self.display = window
-                    .current_monitor()
-                    .ok()
-                    .flatten()
-                    .map(|monitor| monitor_snapshot(&monitor));
+                self.take(app, display, false);
             }
-            Err(detail) => log_shell_line(
-                app,
-                &format!("The screens changed, and the window was not put back: {detail}"),
-            ),
+            Hold::Send(index) => {
+                let Some((monitor, display)) = seen
+                    .monitors
+                    .get(index)
+                    .zip(seen.snapshots.get(index).map(saved_from))
+                else {
+                    return;
+                };
+                match route_window_to_monitor(window, monitor) {
+                    Ok(()) => {
+                        log_shell_line(
+                            app,
+                            &format!(
+                                "The screens changed: the window was put back on its display, {}.",
+                                display_words(&display)
+                            ),
+                        );
+                        self.take(app, display, true);
+                    }
+                    Err(detail) => log_shell_line(
+                        app,
+                        &format!("The screens changed, and the window was not put back: {detail}"),
+                    ),
+                }
+            }
         }
     }
+}
+
+/// While the screens stand still (`hold_at_rest`).
+pub(crate) fn hold_while_the_screens_stand_still(app: &AppHandle, paths: &[DisplayPath]) {
+    let Ok(window) = main_window(app) else {
+        return;
+    };
+    let seen = see(&window, paths);
+    let held = app.state::<HeldDisplay>();
+    let mut held = held.lock();
+    let hold = hold_at_rest(&seen.snapshots, seen.on, held.display.as_ref(), held.sent);
+    held.act(app, &window, &seen, hold);
+}
+
+/// Once the screens have changed and stand still again
+/// (`hold_after_change`).
+pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPath]) {
+    let Ok(window) = main_window(app) else {
+        return;
+    };
+    let seen = see(&window, paths);
+    let held = app.state::<HeldDisplay>();
+    let mut held = held.lock();
+    let hold = hold_after_change(
+        &seen.snapshots,
+        seen.on,
+        seen.fullscreen,
+        held.display.as_ref(),
+    );
+    held.act(app, &window, &seen, hold);
+}
+
+/// Sends the window to the monitor of `index`, else to the display it says
+/// it is on, fullscreen. It answers the display the window was sent to.
+fn send_window(
+    window: &WebviewWindow,
+    seen: &Seen,
+    index: Option<usize>,
+    paths: &[DisplayPath],
+) -> Result<MonitorSnapshot, String> {
+    let listed = index.and_then(|index| seen.monitors.get(index).zip(seen.snapshots.get(index)));
+    if let Some((monitor, snapshot)) = listed {
+        route_window_to_monitor(window, monitor)?;
+        return Ok(saved_from(snapshot));
+    }
+    // No monitor is listed, or the window stands on none that is.
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .ok_or_else(|| NO_MONITOR_FOR_STUDIO_FULLSCREEN.to_string())?;
+    route_window_to_monitor(window, &monitor)?;
+    Ok(saved_from(&available_monitor_snapshot(&monitor, paths)))
 }
 
 /// New pages program, Slice SW (D22): the shell always shows the screen
@@ -465,15 +696,45 @@ impl Held {
 /// then a saved windowed layout was restored as it was, and a missing display
 /// (or no saved file and neither a 2560×1440 nor a 1920×1080 monitor) opened
 /// the windowed layout, 1600 × 960 and centred.
+///
+/// A saved display that is away (switched off, asleep) stays the window's
+/// display, and its file stays as it is: the window opens where the rule
+/// sends it, and goes to its display when that returns.
 pub(crate) fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewWindow) {
+    // The screens' own names. Without them a display is known by its place.
+    let paths = read_display_paths().unwrap_or_default();
     let saved = read_window_preferences(app).and_then(|preferences| preferences.monitor);
-    match route_window_fullscreen(window, saved.as_ref()) {
-        Ok(()) => persist_current_window_preferences(app, window),
-        Err(detail) => log_shell_line(
-            app,
-            &format!("The window did not go fullscreen at launch: {detail}"),
-        ),
+    let seen = see(window, &paths);
+    let held = app.state::<HeldDisplay>();
+    let mut held = held.lock();
+    let away = saved.is_some()
+        && saved_monitor_index_from_snapshots(&seen.snapshots, saved.as_ref()).is_none();
+    let index = index_of(fullscreen_display(&seen.snapshots, saved.as_ref()), seen.on);
+    match send_window(window, &seen, index, &paths) {
+        Ok(_) if away => held.display = saved,
+        Ok(display) => held.take(app, display, true),
+        Err(detail) => {
+            held.display = saved;
+            log_shell_line(
+                app,
+                &format!("The window did not go fullscreen at launch: {detail}"),
+            );
+        }
     }
+}
+
+/// What both window commands do: the window goes to the 2560×1440 display,
+/// else stays on the display it is on, fullscreen, and that display is the
+/// window's own from now on.
+fn send_to_the_studio_display(app: &AppHandle, window: &WebviewWindow) -> Result<(), String> {
+    let paths = read_display_paths().unwrap_or_default();
+    let seen = see(window, &paths);
+    let held = app.state::<HeldDisplay>();
+    let mut held = held.lock();
+    let index = index_of(fullscreen_display(&seen.snapshots, None), seen.on);
+    let display = send_window(window, &seen, index, &paths)?;
+    held.take(app, display, true);
+    Ok(())
 }
 
 /// The one window-command refusal that is already the operator's sentence.
@@ -541,9 +802,7 @@ pub(crate) fn log_shell_line(app: &AppHandle, message: &str) {
 pub(crate) fn shell_enter_studio_fullscreen(app: AppHandle) -> Result<(), String> {
     run_window_command(&app, WindowCommand::StudioFullscreen, || {
         let window = main_window(&app)?;
-        route_window_fullscreen(&window, None)?;
-        persist_current_window_preferences(&app, &window);
-        Ok(())
+        send_to_the_studio_display(&app, &window)
     })
 }
 
@@ -555,9 +814,7 @@ pub(crate) fn shell_reset_window_layout(app: AppHandle) -> Result<(), String> {
     run_window_command(&app, WindowCommand::ResetLayout, || {
         let window = main_window(&app)?;
         remove_window_preferences(&app)?;
-        route_window_fullscreen(&window, None)?;
-        persist_current_window_preferences(&app, &window);
-        Ok(())
+        send_to_the_studio_display(&app, &window)
     })
 }
 
@@ -639,6 +896,7 @@ mod shell_window_preferences_tests {
     ) -> MonitorSnapshot {
         MonitorSnapshot {
             name: name.map(ToString::to_string),
+            screen: None,
             physical_position: logical_position(position.0, position.1),
             physical_size: logical_size(physical_size.0, physical_size.1),
             logical_size: logical_size(
@@ -657,10 +915,48 @@ mod shell_window_preferences_tests {
     ) -> AvailableMonitorSnapshot {
         AvailableMonitorSnapshot {
             name: name.map(ToString::to_string),
+            screen: None,
             physical_position: logical_position(position.0, position.1),
             physical_size: logical_size(physical_size.0, physical_size.1),
             scale_factor,
         }
+    }
+
+    /// A monitor whose screen's own name the display route gave.
+    fn monitor_of(
+        screen: &str,
+        name: &str,
+        position: (f64, f64),
+        physical_size: (f64, f64),
+        scale_factor: f64,
+    ) -> AvailableMonitorSnapshot {
+        AvailableMonitorSnapshot {
+            screen: Some(screen.to_string()),
+            ..available_monitor(Some(name), position, physical_size, scale_factor)
+        }
+    }
+
+    /// The studio with the Prompter XL plugged in: the primary, which two
+    /// screens show, so that it has no screen's name; the studio display;
+    /// the Prompter XL.
+    fn the_studio_with_the_prompter() -> [AvailableMonitorSnapshot; 3] {
+        [
+            available_monitor(Some(r"\\.\DISPLAY3"), (0.0, 0.0), (2560.0, 1440.0), 1.25),
+            monitor_of(
+                "HP E273q",
+                r"\\.\DISPLAY2",
+                (2560.0, 0.0),
+                (2560.0, 1440.0),
+                1.0,
+            ),
+            monitor_of(
+                "Prompter XL",
+                r"\\.\DISPLAY4",
+                (5120.0, 0.0),
+                (1920.0, 1080.0),
+                1.0,
+            ),
+        ]
     }
 
     fn preferences_with_monitor(monitor: Option<MonitorSnapshot>) -> ShellWindowPreferences {
@@ -840,56 +1136,304 @@ mod shell_window_preferences_tests {
     // screens change; once they stand still the window is put back, and a
     // window that stands where it stood is left alone.
     #[test]
-    fn after_the_screens_changed_the_window_goes_back_to_its_display() {
-        let belongs_on = saved_monitor(Some(r"\\.\DISPLAY2"), (2560.0, 0.0), (2560.0, 1440.0), 1.0);
-        let primary = available_monitor(Some(r"\\.\DISPLAY3"), (0.0, 0.0), (2560.0, 1440.0), 1.25);
-        let studio = available_monitor(Some(r"\\.\DISPLAY2"), (2560.0, 0.0), (2560.0, 1440.0), 1.0);
-        let prompter =
-            available_monitor(Some(r"\\.\DISPLAY4"), (5120.0, 0.0), (1920.0, 1080.0), 1.0);
-        let with_prompter = [primary.clone(), studio.clone(), prompter.clone()];
+    fn once_the_screens_changed_the_window_goes_back_to_its_display() {
+        let screens = the_studio_with_the_prompter();
+        let (primary, studio, prompter) = (0, 1, 2);
+        let its_display = saved_from(&screens[studio]);
 
         // It stands where it stood: nothing is done, and nothing flickers.
         assert_eq!(
-            after_the_screens_changed(&with_prompter, Some(&studio), true, Some(&belongs_on)),
-            AfterTheScreensChanged::Nothing
+            hold_after_change(&screens, Some(studio), true, Some(&its_display)),
+            Hold::InPlace
         );
-        // Windows moved it to the primary, or onto the Prompter XL.
-        for moved_to in [&primary, &prompter] {
+        // Windows moved it to the primary, or onto the Prompter XL; or it
+        // stands on no monitor that is listed.
+        for moved_to in [Some(primary), Some(prompter), None] {
             assert_eq!(
-                after_the_screens_changed(&with_prompter, Some(moved_to), true, Some(&belongs_on)),
-                AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+                hold_after_change(&screens, moved_to, true, Some(&its_display)),
+                Hold::Send(studio),
+                "{moved_to:?}"
             );
         }
         // It stands on its display and is no longer fullscreen.
         assert_eq!(
-            after_the_screens_changed(&with_prompter, Some(&studio), false, Some(&belongs_on)),
-            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+            hold_after_change(&screens, Some(studio), false, Some(&its_display)),
+            Hold::Send(studio)
         );
-        // Windows numbered the screens anew: the place decides.
-        let renumbered = [
-            available_monitor(Some(r"\\.\DISPLAY2"), (0.0, 0.0), (2560.0, 1440.0), 1.25),
-            available_monitor(Some(r"\\.\DISPLAY5"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        // No display was ever the window's: the shell's one rule names the
+        // 2560×1440 display, which the primary at 125 % is not.
+        assert_eq!(
+            hold_after_change(&screens, Some(primary), true, None),
+            Hold::Send(studio)
+        );
+        assert_eq!(
+            hold_after_change(&screens, Some(studio), true, None),
+            Hold::Take(studio)
+        );
+        // Without a 2560×1440 display it is the one the window stands on.
+        let without_studio = [screens[primary].clone(), screens[prompter].clone()];
+        assert_eq!(
+            hold_after_change(&without_studio, Some(0), true, None),
+            Hold::Take(0)
+        );
+        assert_eq!(
+            hold_after_change(&without_studio, Some(0), false, None),
+            Hold::Send(0)
+        );
+        assert_eq!(
+            hold_after_change(&without_studio, None, true, None),
+            Hold::Wait
+        );
+    }
+
+    // The review of 2026-09-28: the studio display is switched off, or
+    // asleep, and Windows takes it from the desktop and moves the window.
+    // The window's display is remembered, not forgotten for the one Windows
+    // chose: when it returns, the window goes back. Until then the window is
+    // left where it is, and nothing is saved.
+    #[test]
+    fn while_its_display_is_away_it_is_remembered() {
+        let screens = the_studio_with_the_prompter();
+        let (primary, studio, prompter) = (0, 1, 2);
+        let its_display = saved_from(&screens[studio]);
+        let without_it = [screens[primary].clone(), screens[prompter].clone()];
+
+        // Windows moved the window to the primary, or onto the Prompter XL.
+        for on in [Some(0), Some(1), None] {
+            for fullscreen in [true, false] {
+                assert_eq!(
+                    hold_after_change(&without_it, on, fullscreen, Some(&its_display)),
+                    Hold::Away,
+                    "{on:?} {fullscreen}"
+                );
+            }
+            for sent in [true, false] {
+                assert_eq!(
+                    hold_at_rest(&without_it, on.or(Some(0)), Some(&its_display), sent),
+                    Hold::Away,
+                    "{on:?} {sent}"
+                );
+            }
+        }
+        // It returns, and the window stands on the primary.
+        assert_eq!(
+            hold_after_change(&screens, Some(primary), true, Some(&its_display)),
+            Hold::Send(studio)
+        );
+        // Until the window is seen on its display, the display it stands on
+        // is not taken for its own.
+        assert_eq!(
+            hold_at_rest(&screens, Some(primary), Some(&its_display), true),
+            Hold::NotArrived
+        );
+        assert_eq!(
+            hold_at_rest(&screens, Some(studio), Some(&its_display), true),
+            Hold::InPlace
+        );
+    }
+
+    // While the screens stand still, the display the window stands on is its
+    // own: the operator moved it there with Windows' own keys.
+    #[test]
+    fn while_the_screens_stand_still_the_window_s_display_is_the_one_it_stands_on() {
+        let screens = the_studio_with_the_prompter();
+        let (primary, studio) = (0, 1);
+        let its_display = saved_from(&screens[studio]);
+
+        assert_eq!(
+            hold_at_rest(&screens, Some(studio), Some(&its_display), false),
+            Hold::InPlace
+        );
+        assert_eq!(
+            hold_at_rest(&screens, Some(primary), Some(&its_display), false),
+            Hold::Take(primary)
+        );
+        // No display was the window's yet.
+        assert_eq!(
+            hold_at_rest(&screens, Some(studio), None, false),
+            Hold::Take(studio)
+        );
+        // The window stands on no monitor that is listed.
+        assert_eq!(
+            hold_at_rest(&screens, None, Some(&its_display), false),
+            Hold::Wait
+        );
+        // Its display stands elsewhere on the desktop than it did, and
+        // Windows numbers it otherwise: it is taken again as it is.
+        let mut moved = screens.clone();
+        moved[studio].physical_position.x = 3840.0;
+        assert_eq!(
+            hold_at_rest(&moved, Some(studio), Some(&its_display), false),
+            Hold::Take(studio)
+        );
+        let mut renumbered = screens.clone();
+        renumbered[studio].name = Some(String::from(r"\\.\DISPLAY7"));
+        assert_eq!(
+            hold_at_rest(&renumbered, Some(studio), Some(&its_display), false),
+            Hold::Take(studio)
+        );
+    }
+
+    // The design's §11: the window is held on its display by the screen's
+    // identity. The screen's own name decides, wherever the screen stands on
+    // the desktop and whatever Windows numbers it; and a screen of another
+    // name is another display, though it stands in the saved one's place
+    // under the saved one's number.
+    #[test]
+    fn a_display_is_known_by_its_screen_s_name() {
+        let its_display = saved_from(&monitor_of(
+            "HP E273q",
+            r"\\.\DISPLAY2",
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        ));
+        let rearranged = [
+            monitor_of(
+                "CS2731",
+                r"\\.\DISPLAY2",
+                (2560.0, 0.0),
+                (2560.0, 1440.0),
+                1.0,
+            ),
+            monitor_of(
+                "HP E273q",
+                r"\\.\DISPLAY3",
+                (0.0, 0.0),
+                (2560.0, 1440.0),
+                1.0,
+            ),
         ];
         assert_eq!(
-            after_the_screens_changed(&renumbered, Some(&renumbered[0]), true, Some(&belongs_on)),
-            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+            saved_monitor_index_from_snapshots(&rearranged, Some(&its_display)),
+            Some(1)
         );
-        // Its display is gone: the shell's one rule sends it on, to the
-        // 2560×1440 display, else to where it stands.
-        let without_it = [primary.clone(), prompter.clone()];
+        // At another size and scale it is the same screen.
+        let mut resized = rearranged.clone();
+        resized[1].physical_size = logical_size(1920.0, 1080.0);
+        resized[1].scale_factor = 1.25;
         assert_eq!(
-            after_the_screens_changed(&without_it, Some(&primary), true, Some(&belongs_on)),
-            AfterTheScreensChanged::Route(FullscreenDisplay::Current)
+            saved_monitor_index_from_snapshots(&resized, Some(&its_display)),
+            Some(1)
         );
-        // No display was ever saved, or the window stands on none.
+        // Without it, the screen in its place is not it.
         assert_eq!(
-            after_the_screens_changed(&with_prompter, Some(&studio), true, None),
-            AfterTheScreensChanged::Route(FullscreenDisplay::Studio(1))
+            saved_monitor_index_from_snapshots(&rearranged[..1], Some(&its_display)),
+            None
         );
         assert_eq!(
-            after_the_screens_changed(&with_prompter, None, true, Some(&belongs_on)),
-            AfterTheScreensChanged::Route(FullscreenDisplay::Saved(1))
+            fullscreen_display(&rearranged[..1], Some(&its_display)),
+            FullscreenDisplay::Studio(0)
         );
+
+        // Where the screens' names were not read, the place decides, as it
+        // does for a file an older build wrote.
+        let unnamed = [
+            available_monitor(Some(r"\\.\DISPLAY3"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
+            available_monitor(Some(r"\\.\DISPLAY1"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&unnamed, Some(&its_display)),
+            Some(1)
+        );
+        let from_an_older_build =
+            saved_monitor(Some(r"\\.\DISPLAY3"), (2560.0, 0.0), (2560.0, 1440.0), 1.0);
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&rearranged, Some(&from_an_older_build)),
+            Some(0)
+        );
+
+        // Two screens of one name: the name cannot tell them apart, and the
+        // place does.
+        let twins = [
+            monitor_of(
+                "HP E273q",
+                r"\\.\DISPLAY1",
+                (0.0, 0.0),
+                (2560.0, 1440.0),
+                1.0,
+            ),
+            monitor_of(
+                "HP E273q",
+                r"\\.\DISPLAY2",
+                (2560.0, 0.0),
+                (2560.0, 1440.0),
+                1.0,
+            ),
+        ];
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&twins, Some(&its_display)),
+            Some(1)
+        );
+    }
+
+    // A display's screen has a name of its own when one screen shows it.
+    #[test]
+    fn a_display_that_two_screens_show_has_no_screen_s_name() {
+        let path = |source: &str, target: &str| DisplayPath {
+            source: source.to_string(),
+            x: 0,
+            y: 0,
+            width: 2560,
+            height: 1440,
+            target: target.to_string(),
+            refresh_hz: None,
+        };
+        let paths = [
+            path(r"\\.\DISPLAY3", "SAMSUNG"),
+            path(r"\\.\DISPLAY3", "CS2731"),
+            path(r"\\.\DISPLAY2", "HP E273q"),
+            path(r"\\.\DISPLAY5", ""),
+        ];
+        let name = |name: &str| name.to_string();
+        assert_eq!(
+            screen_of(&paths, Some(&name(r"\\.\DISPLAY2"))),
+            Some(name("HP E273q"))
+        );
+        assert_eq!(screen_of(&paths, Some(&name(r"\\.\DISPLAY3"))), None);
+        assert_eq!(screen_of(&paths, Some(&name(r"\\.\DISPLAY5"))), None);
+        assert_eq!(screen_of(&paths, Some(&name(r"\\.\DISPLAY9"))), None);
+        assert_eq!(screen_of(&paths, None), None);
+        assert_eq!(screen_of(&[], Some(&name(r"\\.\DISPLAY2"))), None);
+    }
+
+    // The file is whole whenever it is read: it is written beside itself and
+    // moved into its place, over the one that was there.
+    #[test]
+    fn the_saved_display_is_written_whole() {
+        let folder = std::env::temp_dir().join(format!(
+            "sse-shell-window-layout-{}-{}",
+            std::process::id(),
+            now_epoch_seconds()
+        ));
+        let path = folder.join("config").join("shell-window-layout.json");
+        let first = studio_review_saved();
+        write_window_preferences_to(&path, &first).expect("the file is written");
+        let second = preferences_with_monitor(Some(saved_from(&monitor_of(
+            "HP E273q",
+            r"\\.\DISPLAY2",
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        ))));
+        write_window_preferences_to(&path, &second).expect("the file is written over");
+
+        let read = parse_window_preferences(&read_to_string(&path).expect("the file is there"))
+            .expect("the file is whole");
+        assert_eq!(
+            read.monitor.and_then(|monitor| monitor.screen).as_deref(),
+            Some("HP E273q")
+        );
+        let left: Vec<_> = std::fs::read_dir(path.parent().expect("a folder"))
+            .expect("the folder is read")
+            .filter_map(|entry| entry.ok().map(|entry| entry.file_name()))
+            .collect();
+        assert_eq!(
+            left,
+            ["shell-window-layout.json"],
+            "nothing is left beside it"
+        );
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     // Slice SW (D22): a file an older build wrote still loads — the windowed

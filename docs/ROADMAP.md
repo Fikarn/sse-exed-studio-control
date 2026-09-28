@@ -83,7 +83,7 @@ Done so far:
 
 What the work holds to:
 
-- Studio Control's own window is held on its display when screens come and go. The display is saved by the window commands and by the watch over the screens while they stand still, no longer at every move of the window.
+- Studio Control's own window is held on its display when screens come and go. The display is saved by the window commands and by the watch over the screens while they stand still, no longer at every move of the window. It is known by its screen's own name, then by its place, and remembered while it is away.
 - The shell finds the screen through Windows' display configuration (`QueryDisplayConfig`, `DisplayConfigGetDeviceInfo`), polled: Tauri gives no screen names, refresh rates or display-change events. The target's name gives `Prompter XL`, the source's name gives Tauri's monitor, and two targets on one source are `DUPLICATED`.
 - The shell reports the screen (`prompter.screen.report`) at the start, after an engine restart and on every poll, so the next report repairs a lost one. It leaves the refresh rate out when Windows gives none: the engine refuses 0.
 - The window gets a capability of its own, to listen to the engine's events and nothing else, and an entry point of its own with a read-only client that never starts, stops or restarts the engine.

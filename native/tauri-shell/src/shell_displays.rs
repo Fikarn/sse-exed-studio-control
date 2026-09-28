@@ -9,9 +9,11 @@
 //! and it shows a duplicated screen as it is, two screens on one part of the
 //! desktop. It is read once a second (`shell_display_watch.rs`).
 //!
-//! Reading it is two calls of Windows, made in one function,
-//! `read_display_paths`, which answers plain data. Every rule is a function
-//! over that data, so that it is tested without a screen, on any system.
+//! Reading it takes three functions of Windows (the lists' sizes, the
+//! lists, and a name for each end of a path), all called in one function of
+//! the shell, `read_display_paths`, which answers plain data. Every rule is a
+//! function over that data, so that it is tested without a screen, on any
+//! system.
 
 /// A screen that is on, and the part of the desktop it shows: an active path
 /// of Windows' display configuration, from a source (what the desktop draws)
@@ -34,9 +36,30 @@ pub(crate) struct DisplayPath {
     pub(crate) refresh_hz: Option<f64>,
 }
 
+/// A name Windows wrote into a fixed array: up to its first zero, without
+/// the spaces around it. What is no text in it becomes U+FFFD, and matches no
+/// name.
+#[cfg(any(windows, test))]
+fn name_from(letters: &[u16]) -> String {
+    let end = letters
+        .iter()
+        .position(|letter| *letter == 0)
+        .unwrap_or(letters.len());
+    String::from_utf16_lossy(&letters[..end]).trim().to_string()
+}
+
+/// A refresh rate as Windows gives it, a fraction. Either part is 0 when
+/// Windows knows none.
+#[cfg(any(windows, test))]
+fn refresh_rate(numerator: u32, denominator: u32) -> Option<f64> {
+    (numerator > 0 && denominator > 0).then(|| f64::from(numerator) / f64::from(denominator))
+}
+
 /// Every screen that is on, as Windows' display configuration has them now.
-/// It reads, and changes nothing. On another system than Windows there is
-/// nothing to read, and the list is empty.
+/// It reads, and changes nothing. A screen whose part of the desktop cannot
+/// be read fails the whole read, and says so: it could be a copy of any
+/// other. On another system than Windows there is nothing to read, and the
+/// list is empty.
 #[cfg(windows)]
 #[allow(unsafe_code)]
 pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
@@ -50,30 +73,24 @@ pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
     };
     use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS};
 
-    /// A name Windows wrote into a fixed array: up to its first zero.
-    fn name(letters: &[u16]) -> String {
-        let end = letters
-            .iter()
-            .position(|letter| *letter == 0)
-            .unwrap_or(letters.len());
-        String::from_utf16_lossy(&letters[..end]).trim().to_string()
-    }
-
     fn display_path(
         path: &DISPLAYCONFIG_PATH_INFO,
         modes: &[DISPLAYCONFIG_MODE_INFO],
-    ) -> Option<DisplayPath> {
+    ) -> Result<DisplayPath, String> {
         let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME::default();
         source.header.r#type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
         source.header.size = size_of::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>() as u32;
         source.header.adapterId = path.sourceInfo.adapterId;
         source.header.id = path.sourceInfo.id;
-        // SAFETY: the packet is a live `DISPLAYCONFIG_SOURCE_DEVICE_NAME`,
-        // which begins with its header; the header names the packet's kind
-        // and its whole size, and the call writes within that size.
+        // SAFETY: the pointer is made from the whole packet, a live
+        // `DISPLAYCONFIG_SOURCE_DEVICE_NAME`, which begins with its header;
+        // the header names the packet's kind and its whole size, and the
+        // call writes within that size.
         let sourced = unsafe { DisplayConfigGetDeviceInfo(from_mut(&mut source).cast()) };
         if sourced != 0 {
-            return None;
+            return Err(format!(
+                "Windows did not name a screen's part of the desktop (error {sourced})."
+            ));
         }
 
         let mut target = DISPLAYCONFIG_TARGET_DEVICE_NAME::default();
@@ -81,37 +98,48 @@ pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
         target.header.size = size_of::<DISPLAYCONFIG_TARGET_DEVICE_NAME>() as u32;
         target.header.adapterId = path.targetInfo.adapterId;
         target.header.id = path.targetInfo.id;
-        // SAFETY: as above, for a live `DISPLAYCONFIG_TARGET_DEVICE_NAME`.
+        // SAFETY: as above, for the whole of a live
+        // `DISPLAYCONFIG_TARGET_DEVICE_NAME`.
         let targeted = unsafe { DisplayConfigGetDeviceInfo(from_mut(&mut target).cast()) };
         // A screen whose name cannot be read is a screen without a name: it
         // still takes its part of the desktop, and can still be a copy.
         let target = if targeted == 0 {
-            name(&target.monitorFriendlyDeviceName)
+            name_from(&target.monitorFriendlyDeviceName)
         } else {
             String::new()
         };
 
-        // SAFETY: the union's other member splits the same 32 bits in two,
-        // and is filled only when the query asks for virtual modes
+        // SAFETY: both members of the union are 32 plain bits, and any 32
+        // bits are a number. The other member splits them in two, and is
+        // filled only when the query asks for virtual modes
         // (`QDC_VIRTUAL_MODE_AWARE`), which this one does not.
         let index = unsafe { path.sourceInfo.Anonymous.modeInfoIdx } as usize;
         let mode = modes
             .get(index)
-            .filter(|mode| mode.infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)?;
+            .filter(|mode| mode.infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+            .ok_or_else(|| {
+                format!(
+                    "Windows gave no part of the desktop for the screen {}.",
+                    if target.is_empty() {
+                        "without a name"
+                    } else {
+                        target.as_str()
+                    }
+                )
+            })?;
         // SAFETY: the mode's type, checked above, says that the union holds
-        // a source mode.
+        // a source mode, which is plain numbers.
         let mode = unsafe { mode.Anonymous.sourceMode };
 
         let rate = path.targetInfo.refreshRate;
-        Some(DisplayPath {
-            source: name(&source.viewGdiDeviceName),
+        Ok(DisplayPath {
+            source: name_from(&source.viewGdiDeviceName),
             x: mode.position.x,
             y: mode.position.y,
             width: mode.width,
             height: mode.height,
             target,
-            refresh_hz: (rate.Numerator > 0 && rate.Denominator > 0)
-                .then(|| f64::from(rate.Numerator) / f64::from(rate.Denominator)),
+            refresh_hz: refresh_rate(rate.Numerator, rate.Denominator),
         })
     }
 
@@ -158,10 +186,10 @@ pub(crate) fn read_display_paths() -> Result<Vec<DisplayPath>, String> {
         }
         paths.truncate(path_count as usize);
         modes.truncate(mode_count as usize);
-        return Ok(paths
+        return paths
             .iter()
-            .filter_map(|path| display_path(path, &modes))
-            .collect());
+            .map(|path| display_path(path, &modes))
+            .collect();
     }
     Err(String::from(
         "The screens kept changing while Windows' display configuration was read.",
@@ -192,19 +220,36 @@ pub(crate) enum PrompterScreen {
     Connected(DisplayPath),
 }
 
+/// Whether two screens show one part of the desktop, or parts that lie over
+/// each other: they share a source, or their sources stand at one place (a
+/// copy across two graphics adapters has a source on each).
+fn share_the_desktop(one: &DisplayPath, other: &DisplayPath) -> bool {
+    fn overlap(from: i32, length: u32, other_from: i32, other_length: u32) -> bool {
+        i64::from(from) < i64::from(other_from) + i64::from(other_length)
+            && i64::from(other_from) < i64::from(from) + i64::from(length)
+    }
+    one.source == other.source
+        || (overlap(one.x, one.width, other.x, other.width)
+            && overlap(one.y, one.height, other.y, other.height))
+}
+
 /// The Prompter XL among `paths`: the screen of that name and of no other.
 /// A name that only holds it (`Prompter XL 2`, `Not a Prompter XL`) or spells
 /// it otherwise is another screen. Of two screens of the name the first is
 /// taken.
 pub(crate) fn prompter_screen(paths: &[DisplayPath]) -> PrompterScreen {
-    let Some(prompter) = paths.iter().find(|path| path.target == PROMPTER_XL_NAME) else {
+    let Some((place, prompter)) = paths
+        .iter()
+        .enumerate()
+        .find(|(_, path)| path.target == PROMPTER_XL_NAME)
+    else {
         return PrompterScreen::NotConnected;
     };
-    let shown_by = paths
+    let shared = paths
         .iter()
-        .filter(|path| path.source == prompter.source)
-        .count();
-    if shown_by > 1 {
+        .enumerate()
+        .any(|(other, path)| other != place && share_the_desktop(prompter, path));
+    if shared {
         PrompterScreen::Duplicated {
             width: prompter.width,
             height: prompter.height,
@@ -274,9 +319,28 @@ pub(crate) fn screens_line(paths: &[DisplayPath]) -> String {
 }
 
 /// Whether the screens are the same ones, standing where they stood: the
-/// order in which Windows lists them does not count.
+/// order in which Windows lists them does not count, and neither does a
+/// refresh rate, which moves no window (and which a screen may change by
+/// itself). Each screen is counted once: two screens of one kind that copy
+/// each other are alike in all the list holds.
 pub(crate) fn same_screens(before: &[DisplayPath], now: &[DisplayPath]) -> bool {
-    before.len() == now.len() && before.iter().all(|path| now.contains(path))
+    fn stands_as(one: &DisplayPath, other: &DisplayPath) -> bool {
+        one.source == other.source
+            && one.target == other.target
+            && (one.x, one.y, one.width, one.height)
+                == (other.x, other.y, other.width, other.height)
+    }
+    if before.len() != now.len() {
+        return false;
+    }
+    let mut left: Vec<&DisplayPath> = now.iter().collect();
+    before.iter().all(|path| {
+        let found = left.iter().position(|other| stands_as(other, path));
+        if let Some(found) = found {
+            left.swap_remove(found);
+        }
+        found.is_some()
+    })
 }
 
 #[cfg(test)]
@@ -345,6 +409,8 @@ pub(crate) mod tests {
 
     #[test]
     fn the_prompter_xl_is_the_screen_of_its_name_wherever_it_stands() {
+        // Beside the studio's screens. The studio's own copy of its primary
+        // does not make the Prompter XL a copy.
         let beside = prompter(r"\\.\DISPLAY4", (5120, 0));
         let mut screens = the_studio();
         screens.push(beside.clone());
@@ -357,8 +423,7 @@ pub(crate) mod tests {
         screens.extend(the_studio());
         assert_eq!(prompter_screen(&screens), PrompterScreen::Connected(first));
 
-        // The studio's own copy of its primary does not make the Prompter XL
-        // a copy.
+        // The only screen that is on.
         let alone = prompter(r"\\.\DISPLAY7", (0, 1440));
         assert_eq!(
             prompter_screen(std::slice::from_ref(&alone)),
@@ -370,22 +435,59 @@ pub(crate) mod tests {
     // operator's desktop to the presenter, and the script to nobody.
     #[test]
     fn a_prompter_xl_that_shares_its_part_of_the_desktop_is_duplicated() {
+        // It copies the studio display: both show `DISPLAY2`, and the size
+        // is that part of the desktop's.
+        let copy = DisplayPath {
+            refresh_hz: Some(60.0),
+            ..path(r"\\.\DISPLAY2", (2560, 0), PROMPTER_XL_NAME)
+        };
         let duplicated = PrompterScreen::Duplicated {
-            width: 1920,
-            height: 1080,
+            width: 2560,
+            height: 1440,
             refresh_hz: Some(60.0),
         };
-        // It copies the studio display: both show `DISPLAY2`.
         let mut screens = the_studio();
-        screens.push(DisplayPath {
-            x: 2560,
-            y: 0,
-            ..prompter(r"\\.\DISPLAY2", (2560, 0))
-        });
+        screens.push(copy);
         assert_eq!(prompter_screen(&screens), duplicated);
         // Listed first, it is no less a copy.
         screens.rotate_right(1);
         assert_eq!(prompter_screen(&screens), duplicated);
+    }
+
+    // A copy across two graphics adapters has a source on each, at one place
+    // on the desktop. Parts of the desktop that lie over each other are
+    // shared, whatever they are called; parts that only touch are not.
+    #[test]
+    fn a_prompter_xl_that_lies_over_another_screen_is_duplicated() {
+        for place in [(2560, 0), (5119 - 1920, 0), (2560, 1439), (4000, -1079)] {
+            let mut screens = the_studio();
+            screens.push(prompter(r"\\.\DISPLAY4", place));
+            assert_eq!(
+                prompter_screen(&screens),
+                PrompterScreen::Duplicated {
+                    width: 1920,
+                    height: 1080,
+                    refresh_hz: Some(60.0),
+                },
+                "{place:?}"
+            );
+        }
+        for place in [
+            (5120, 0),
+            (-1920, 0),
+            (0, 1440),
+            (2560, -1080),
+            (640, -1080),
+        ] {
+            let beside = prompter(r"\\.\DISPLAY4", place);
+            let mut screens = the_studio();
+            screens.push(beside.clone());
+            assert_eq!(
+                prompter_screen(&screens),
+                PrompterScreen::Connected(beside),
+                "{place:?}"
+            );
+        }
     }
 
     #[test]
@@ -412,6 +514,58 @@ pub(crate) mod tests {
         let mut renumbered = the_studio();
         renumbered[2].source = String::from(r"\\.\DISPLAY1");
         assert!(!same_screens(&studio, &renumbered));
+        let mut renamed = the_studio();
+        renamed[2].target = String::from("HP E273");
+        assert!(!same_screens(&studio, &renamed));
+        // Another refresh rate moves no window.
+        let mut at_another_rate = the_studio();
+        at_another_rate[2].refresh_hz = Some(50.0);
+        at_another_rate[1].refresh_hz = None;
+        assert!(same_screens(&studio, &at_another_rate));
+
+        // Two screens of one kind that copy each other are alike in all the
+        // list holds. One of them gone and another screen come is a change,
+        // whichever way it is looked at.
+        let twin = path(r"\\.\DISPLAY1", (0, 0), "CS2731");
+        let other = path(r"\\.\DISPLAY2", (2560, 0), "HP E273q");
+        let come = prompter(r"\\.\DISPLAY4", (5120, 0));
+        let twins = [twin.clone(), twin.clone(), other.clone()];
+        let one_gone = [twin.clone(), other.clone(), come];
+        assert!(same_screens(&twins, &twins));
+        assert!(!same_screens(&twins, &one_gone));
+        assert!(!same_screens(&one_gone, &twins));
+    }
+
+    #[test]
+    fn a_name_is_read_up_to_its_end() {
+        let letters = |text: &str| text.encode_utf16().collect::<Vec<u16>>();
+        let mut array = letters("Prompter XL");
+        array.extend([0, 0x48, 0x50, 0]);
+        assert_eq!(name_from(&array), "Prompter XL");
+        // No zero at all: the array is full.
+        assert_eq!(name_from(&letters("HP E273q")), "HP E273q");
+        // Spaces around it are not the name's.
+        let mut padded = letters("  CS2731  ");
+        padded.push(0);
+        assert_eq!(name_from(&padded), "CS2731");
+        // Nothing but zeros, and nothing at all.
+        assert_eq!(name_from(&[0, 0, 0, 0]), "");
+        assert_eq!(name_from(&[]), "");
+        // Half a letter is no text, and no name that is looked for.
+        let mut broken = letters("Prompter XL");
+        broken[3] = 0xD800;
+        assert_eq!(name_from(&broken), "Pro\u{FFFD}pter XL");
+        assert_ne!(name_from(&broken), PROMPTER_XL_NAME);
+    }
+
+    #[test]
+    fn a_refresh_rate_is_a_fraction_or_none() {
+        assert_eq!(refresh_rate(60, 1), Some(60.0));
+        let ntsc = refresh_rate(60_000, 1_001).expect("a rate");
+        assert!((ntsc - 59.94).abs() < 0.001, "{ntsc}");
+        assert_eq!(refresh_rate(0, 1), None);
+        assert_eq!(refresh_rate(60, 0), None);
+        assert_eq!(refresh_rate(0, 0), None);
     }
 
     #[test]
@@ -444,12 +598,16 @@ pub(crate) mod tests {
         );
     }
 
-    // On the workstation the list is never empty while a screen is on. It is
-    // read here only to see that the calls answer: what it holds is the
-    // workstation's own. Elsewhere there is nothing to read.
+    // On the workstation a screen is on whenever the tests run, so the list
+    // is never empty: an empty one would mean that every screen was lost in
+    // the reading. What it holds is the workstation's own. Elsewhere there is
+    // nothing to read.
     #[test]
     fn the_screens_can_be_read() {
         let screens = read_display_paths().expect("the display configuration is read");
+        if cfg!(windows) {
+            assert!(!screens.is_empty(), "no screen was read");
+        }
         for screen in &screens {
             assert!(screen.source.starts_with(r"\\.\DISPLAY"), "{screen:?}");
             assert!(screen.width > 0 && screen.height > 0, "{screen:?}");

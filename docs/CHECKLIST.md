@@ -58,6 +58,7 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 - [ ] Replacing the script on the prompter needs the second press.
 - [ ] After a restart the script and the place are still there, paused.
 - [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
+- [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.
 - [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows; `PLAY` is grey and the strip reads `XL NOT CONNECTED`. With nothing on the prompter every control is grey.
 
 Once the Prompter XL's window is built:

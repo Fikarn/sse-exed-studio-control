@@ -228,9 +228,10 @@ test("the words the program keeps are not hits", () => {
 
 // Where the shell may use `unsafe`: a function each, with its reason, and the blocks it holds.
 // Anything else fails the build (`unsafe_code = "deny"`), and a block more fails this test.
+// A file is named by its path in the shell's crate.
 const SHELL_UNSAFE = [
   {
-    file: "shell_browser_keys.rs",
+    file: "src/shell_browser_keys.rs",
     item: "fn set_browser_accelerator_keys_off(",
     blocks: 1,
     reason: "WebView2's settings are COM calls, which the windows bindings mark unsafe (decision 12).",
@@ -238,7 +239,7 @@ const SHELL_UNSAFE = [
     onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod shell_browser_keys;/.test(main),
   },
   {
-    file: "shell_displays.rs",
+    file: "src/shell_displays.rs",
     item: "pub(crate) fn read_display_paths(",
     blocks: 6,
     reason:
@@ -281,12 +282,10 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
           ? [path.join(dir, entry.name)]
           : []
     );
-  const shellSources = [
-    ...rustFiles(path.join(repoRoot, "native/tauri-shell/src")),
-    path.join(repoRoot, "native/tauri-shell/build.rs"),
-  ]
+  const shellCrate = path.join(repoRoot, "native/tauri-shell");
+  const shellSources = [...rustFiles(path.join(shellCrate, "src")), path.join(shellCrate, "build.rs")]
     .filter((file) => existsSync(file))
-    .map((file) => [path.basename(file), readFileSync(file, "utf8")]);
+    .map((file) => [path.relative(shellCrate, file).split(path.sep).join("/"), readFileSync(file, "utf8")]);
   const everySource = shellSources.map(([, source]) => source).join("\n");
   assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
   const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
@@ -314,12 +313,15 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
       `${allowance.file} is a file of the shell`
     );
   }
-  // An unsafe block says why it is sound, in the lines above it.
+  // An unsafe block says why it is sound, in a comment of its own: the comment lines that stand
+  // directly above the block's line, with nothing between them and it.
   for (const [name, source] of shellSources) {
     const lines = source.split("\n");
     lines.forEach((line, index) => {
       if (!/\bunsafe\s*\{/.test(line)) return;
-      const above = lines.slice(Math.max(0, index - 12), index).join("\n");
+      let first = index;
+      while (first > 0 && lines[first - 1].trim().startsWith("//")) first -= 1;
+      const above = lines.slice(first, index).join("\n");
       assert.ok(/\/\/ SAFETY: /.test(above), `${name}:${index + 1} says why its unsafe block is sound`);
     });
   }

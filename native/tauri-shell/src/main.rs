@@ -42,7 +42,7 @@ use engine::EngineBridge;
 use shell_browser_keys::switch_off_browser_keys;
 use shell_display_watch::start_display_watch;
 use shell_smoke::run_smoke_test;
-use shell_window_layout::{focus_main_window, restore_or_route_initial_window};
+use shell_window_layout::{focus_main_window, restore_or_route_initial_window, HeldDisplay};
 use shell_windows::build_main_window;
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -86,6 +86,7 @@ fn main() {
             bridge: Arc::new(EngineBridge::default()),
             close_confirmed: AtomicBool::new(false),
         })
+        .manage(HeldDisplay::default())
         .setup(|app| {
             // Slice 6b: the main window is `"create": false` in tauri.conf.json,
             // so Tauri no longer builds it just before this closure: it is
