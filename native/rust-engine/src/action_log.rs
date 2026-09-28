@@ -7,7 +7,7 @@
 //! shell. The table keeps the design's name, `event_log`.
 //!
 //! **What is a row.** A discrete operator action that reaches a device: power,
-//! recall, mute, 48 V, talkback, arming the light outputs, a patch change. A
+//! recall, mute, 48 V, arming the light outputs, a patch change. A
 //! ride is not — a fader, a gain, an intensity, a colour temperature, the
 //! grand master, a Stream Deck dial detent: a commit waits for the disk
 //! (about 35 ms on the workstation), a dial sends a key per detent, and a row
@@ -20,8 +20,8 @@
 //! **Who knows the source.** The entry points, not the functions they share:
 //! `EngineApp::handle_request` (the screen), the bridge's
 //! `handle_control_surface_http_action` (the Stream Deck), the console flush
-//! on the metering thread (a change made at TotalMix), the talkback watchdog,
-//! and the bootstrap (a safe start, an applied database restore).
+//! on the metering thread (a change made at TotalMix), and the bootstrap (a
+//! safe start, an applied database restore).
 //!
 //! **What a row costs.** The Stream Deck's row rides the transaction that
 //! stamps its last event and the console's rows ride the flush's own write, so
@@ -59,8 +59,6 @@ pub(crate) enum ActionSource {
     Deck,
     /// A change made at TotalMix that the console reported back.
     Console,
-    /// The talkback watchdog releasing a hold nobody released.
-    Watchdog,
     /// The start of the app: a safe start, an applied database restore.
     Launch,
 }
@@ -71,7 +69,6 @@ impl ActionSource {
             Self::Ui => "ui",
             Self::Deck => "deck",
             Self::Console => "console",
-            Self::Watchdog => "watchdog",
             Self::Launch => "launch",
         }
     }
@@ -224,7 +221,6 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "audio.settings.update",
     "audio.snapshot.recall",
     "audio.solo.clearAll",
-    "audio.talkback.hold",
     // The cameras (Slice 8): a take's start and stop, a format and a look
     // change, and who holds a camera.
     "cameras.connect",
@@ -618,7 +614,6 @@ pub(crate) fn ui_actions(
                 ("mute", "mute", "Mute"),
                 ("dim", "dim", "Dim"),
                 ("mono", "mono", "Mono"),
-                ("talkback", "talkback", "Talkback"),
             ]
             .iter()
             .filter_map(|(key, action, label)| flag(params, key).map(|on| (*action, *label, on)))
@@ -695,17 +690,6 @@ pub(crate) fn ui_actions(
                 "console-snapshot-recalled",
                 name,
                 format!("Console mix recalled: {name}"),
-            )]
-        }
-        "audio.talkback.hold" => {
-            if flag(result, "changed") != Some(true) {
-                return Vec::new();
-            }
-            let on = flag(result, "talkback").unwrap_or(false);
-            vec![audio(
-                if on { "talkback-on" } else { "talkback-off" },
-                "Talkback",
-                format!("Talkback {}", on_off(on)),
             )]
         }
         "audio.solo.clearAll" => vec![audio(
@@ -940,19 +924,6 @@ pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<Actio
                 )]
             })
             .unwrap_or_default(),
-        ("/api/deck/audio-action", "talkOn" | "talkOff") => {
-            // Companion repeats `talkOn` while the key is held; only the
-            // press and the release change anything.
-            if flag(reply, "changed") != Some(true) {
-                return Vec::new();
-            }
-            let on = flag(reply, "talkback").unwrap_or(false);
-            vec![audio(
-                if on { "talkback-on" } else { "talkback-off" },
-                "Talkback",
-                format!("Talkback {}", on_off(on)),
-            )]
-        }
         ("/api/deck/audio-action", "soloClearAll") => {
             let cleared = reply
                 .pointer("/cleared")

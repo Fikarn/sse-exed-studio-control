@@ -1091,7 +1091,6 @@ fn send_totalmix_mix_target_update_uses_output_faderlin_and_control_room() {
         mute: None,
         dim: Some(true),
         mono: None,
-        talkback: None,
     };
 
     let report =
@@ -1126,7 +1125,6 @@ fn send_totalmix_mix_target_update_keeps_phones_control_room_functions_local() {
         mute: None,
         dim: Some(true),
         mono: Some(true),
-        talkback: None,
     };
 
     let report = super::send_totalmix_mix_target_update(

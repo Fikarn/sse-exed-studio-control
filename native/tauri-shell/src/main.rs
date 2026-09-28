@@ -694,7 +694,7 @@ async fn engine_stop(state: tauri::State<'_, EngineState>) -> Result<(), String>
 }
 
 /// The operator confirmed "Close Studio Control?": stop the engine gracefully
-/// (its stdin closes, its loop ends and releases any talkback hold, two
+/// (its stdin closes and its loop ends, two
 /// seconds of grace before a kill — waited for off the main thread), mark
 /// the close confirmed so the `CloseRequested` hook lets it through, then
 /// close the window — which also persists the window preferences on the way

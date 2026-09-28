@@ -1,7 +1,6 @@
 use serde_json::Value;
 
 use super::helpers::*;
-use super::talkback::AudioTalkbackHoldRequest;
 use super::types::*;
 
 pub fn parse_audio_snapshot_recall_request(
@@ -158,9 +157,8 @@ pub fn parse_audio_mix_target_update_request(
     let mute = optional_bool(params.get("mute"), "mute")?;
     let dim = optional_bool(params.get("dim"), "dim")?;
     let mono = optional_bool(params.get("mono"), "mono")?;
-    let talkback = optional_bool(params.get("talkback"), "talkback")?;
 
-    if volume.is_none() && mute.is_none() && dim.is_none() && mono.is_none() && talkback.is_none() {
+    if volume.is_none() && mute.is_none() && dim.is_none() && mono.is_none() {
         return Err(String::from(
             "audio.mixTarget.update requires one or more supported fields",
         ));
@@ -172,25 +170,6 @@ pub fn parse_audio_mix_target_update_request(
         mute,
         dim,
         mono,
-        talkback,
-    })
-}
-
-pub fn parse_audio_talkback_hold_request(
-    params: &Value,
-) -> Result<AudioTalkbackHoldRequest, String> {
-    let engaged = params
-        .get("engaged")
-        .and_then(Value::as_bool)
-        .ok_or_else(|| String::from("engaged (boolean) is required"))?;
-    let mix_target_id = match params.get("mixTargetId") {
-        None | Some(Value::Null) => None,
-        Some(Value::String(value)) if !value.trim().is_empty() => Some(String::from(value.trim())),
-        Some(_) => return Err(String::from("mixTargetId must be a non-empty string")),
-    };
-    Ok(AudioTalkbackHoldRequest {
-        mix_target_id,
-        engaged,
     })
 }
 

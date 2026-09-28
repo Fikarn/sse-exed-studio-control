@@ -4,8 +4,7 @@
 //! four phases — mutes that turn on, then every value, then mutes that turn
 //! off, then the main control room — so nothing is ever loud for a moment it
 //! should not be. 48V is never pushed (each difference is listed and needs its
-//! own armed confirm), talkback is momentary and never part of a recall, and
-//! pad has no supported console command. Every command is registered on the
+//! own armed confirm), and pad has no supported console command. Every command is registered on the
 //! console link, whose read-backs decide whether the push was confirmed; app
 //! state is written first and marked `assumed`, and becomes `aligned` only
 //! when the console has confirmed (or adjusted) every pushed value.
@@ -170,7 +169,6 @@ pub(crate) fn build_recall_plan(
         if mix_target.id == MAIN_MIX_TARGET_ID {
             control_room.push((String::from("/controlroom/dim"), flag(target.dim)));
             control_room.push((String::from("/controlroom/mainmono"), flag(target.mono)));
-            // Talkback is momentary and never part of a recall.
         }
     }
 
@@ -195,8 +193,8 @@ pub(crate) fn build_recall_plan(
 }
 
 /// The app state a recall persists: the snapshot's contents, except that
-/// 48V and talkback keep the console's current values because the recall
-/// never pushes them.
+/// 48V keeps the console's current values because the recall never pushes
+/// it.
 pub(crate) fn recalled_state_maps(
     current: &AudioSnapshot,
     contents: &AudioSceneContentsSnapshot,
@@ -210,11 +208,5 @@ pub(crate) fn recalled_state_maps(
             entry.phantom = channel.phantom;
         }
     }
-    let mut mix_targets = contents.mix_targets.clone();
-    for mix_target in &current.mix_targets {
-        if let Some(entry) = mix_targets.get_mut(&mix_target.id) {
-            entry.talkback = mix_target.talkback;
-        }
-    }
-    (channels, mix_targets)
+    (channels, contents.mix_targets.clone())
 }

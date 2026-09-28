@@ -84,7 +84,7 @@ fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
 }
 
 #[test]
-fn audio_key_lcd_reflects_target_bank_and_talk() {
+fn audio_key_lcd_reflects_target_and_bank() {
     let test_dir = ready_audio_test_db("lcd-keys");
     let db_path = test_dir.db_path();
 
@@ -117,18 +117,10 @@ fn audio_key_lcd_reflects_target_bank_and_talk() {
             .expect("lcd text should render"),
         "BANK\\nINPUTS"
     );
-    assert_eq!(
-        read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-            .expect("lcd text should render"),
-        "TALK\\nHOLD"
-    );
-    handle_audio_action(db_path.as_path(), "talkOn", None).expect("talk should engage");
-    assert_eq!(
-        read_control_surface_lcd_text(db_path.as_path(), "audio_key_7")
-            .expect("lcd text should render"),
-        "TALK\\nLIVE"
-    );
-    handle_audio_action(db_path.as_path(), "talkOff", None).expect("talk should release");
+    // Key 7 held TALK until 2026-09-28 (D26): the bridge answers no display
+    // for it, and a deck with the old profile reads an error there.
+    assert!(read_control_surface_lcd_text(db_path.as_path(), "audio_key_7").is_err());
+    assert!(read_control_surface_lcd_text(db_path.as_path(), "audio_state_talk").is_err());
 
     assert_eq!(
         read_control_surface_lcd_text(db_path.as_path(), "audio_key_8")
@@ -789,9 +781,8 @@ fn deck_all_off_records_source_deck() {
     assert_eq!(recent_actions(db_path).len(), 3);
 }
 
-// The audio half: a mute, the dim key and the first and last of a held TALK
-// key are rows; the dial, a strip tap and the repeats Companion sends while
-// TALK is held are not.
+// The audio half: a mute and the dim key are rows; the dial and a strip tap
+// are not.
 #[test]
 fn deck_audio_keys_record_source_deck() {
     let test_dir = ready_audio_test_db("deck-audio-action-log");
@@ -827,20 +818,13 @@ fn deck_audio_keys_record_source_deck() {
         )
     );
 
-    assert_eq!(audio_action("talkOn", None)["changed"], true);
-    assert_eq!(audio_action("talkOn", None)["changed"], false);
-    assert_eq!(audio_action("talkOn", None)["changed"], false);
-    assert_eq!(audio_action("talkOff", None)["changed"], true);
+    assert_eq!(audio_action("dimToggle", None)["dim"], true);
     let rows = recent_actions(db_path);
     assert_eq!(
         rows.iter()
             .map(|(source, action, _)| (source.as_str(), action.as_str()))
             .collect::<Vec<_>>(),
-        vec![
-            ("deck", "talkback-off"),
-            ("deck", "talkback-on"),
-            ("deck", "mute")
-        ],
-        "the press and the release, not the repeats in between"
+        vec![("deck", "dim"), ("deck", "mute")],
+        "newest first"
     );
 }

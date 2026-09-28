@@ -124,11 +124,13 @@ impl ChannelFlag {
     }
 }
 
+/// The control room's switches the app follows. The desk's talkback is not
+/// among them (D26, 2026-09-28): the studio does not use it, the app never
+/// sends it, and a report of it is ignored like any address it does not read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ControlRoomFunction {
     Dim,
     MainMono,
-    Talkback,
 }
 
 impl ControlRoomFunction {
@@ -136,7 +138,6 @@ impl ControlRoomFunction {
         match word {
             "dim" => Some(Self::Dim),
             "mainmono" => Some(Self::MainMono),
-            "talkback" => Some(Self::Talkback),
             _ => None,
         }
     }
@@ -145,7 +146,6 @@ impl ControlRoomFunction {
         match self {
             Self::Dim => "dim",
             Self::MainMono => "mainmono",
-            Self::Talkback => "talkback",
         }
     }
 }
@@ -1350,12 +1350,6 @@ mod tests {
                 ConsoleValue::Flag(false),
             ),
             (
-                "/controlroom/talkback",
-                f(1.0),
-                ParamKey::ControlRoom(ControlRoomFunction::Talkback),
-                ConsoleValue::Flag(true),
-            ),
-            (
                 "/status/connection",
                 f(1.0),
                 ParamKey::StatusConnection,
@@ -1400,6 +1394,7 @@ mod tests {
             "/input/8/dynamics/enable",
             "/input/8/name",
             "/output/8/talkbacksel",
+            "/controlroom/talkback",
             "/controlroom/dimreduction",
             "/mix/pb/6/10/balpan",
             "/sendall",

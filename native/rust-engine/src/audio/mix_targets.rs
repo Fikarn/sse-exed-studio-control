@@ -13,8 +13,8 @@ pub fn update_audio_mix_target(
     let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
-    // Every mix-target field (level, mute, dim, mono, talkback) is a console
-    // write, so the whole request passes the console gate first.
+    // Every mix-target field (level, mute, dim, mono) is a console write, so
+    // the whole request passes the console gate first.
     ensure_audio_action_allowed(db_path, &snapshot)?;
 
     let outcome = update_default_audio_mix_target(
@@ -65,9 +65,6 @@ pub fn update_audio_mix_target(
     if let Some(mono) = request.mono {
         next_state.mono = mono;
     }
-    if let Some(talkback) = request.talkback {
-        next_state.talkback = talkback;
-    }
     mix_target_state.insert(request.mix_target_id.clone(), next_state);
 
     persist_audio_state(
@@ -85,17 +82,6 @@ pub fn update_audio_mix_target(
             (String::from(AUDIO_LAST_ACTION_MESSAGE_KEY), outcome.summary),
         ],
     )?;
-
-    // Talkback is momentary on every surface (2026-09 audit, Slice 6): any
-    // caller that turns it on arms the watchdog, any caller that turns it off
-    // clears it, so nothing can latch talkback by construction.
-    if let Some(talkback) = request.talkback {
-        if talkback {
-            super::talkback::arm_talkback_hold(db_path, &request.mix_target_id);
-        } else {
-            super::talkback::clear_talkback_hold(db_path, &request.mix_target_id);
-        }
-    }
 
     let refreshed = read_audio_snapshot(&load_audio_settings(db_path)?);
     refreshed

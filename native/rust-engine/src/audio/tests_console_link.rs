@@ -805,71 +805,6 @@ fn unconfirmed_sends_downgrade_confidence_to_assumed() {
     assert!(message.contains("Press Sync"), "{message}");
 }
 
-// 2026-09 audit Slice 6, from the live check: TotalMix answers a talkback
-// write with 0 when no talkback input channel is assigned. The app must show
-// the reason and stop holding instead of quietly flipping the button back.
-#[test]
-fn console_refusing_talkback_records_the_reason_and_drops_the_hold() {
-    let test_dir = TestDir::new("talkback-refused");
-    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-    set_settings_owned(
-        test_dir.db_path().as_path(),
-        &[
-            (
-                String::from("app.commissioning.check.audio.status"),
-                String::from("passed"),
-            ),
-            (
-                String::from("app.audio.send_host"),
-                String::from("127.0.0.1"),
-            ),
-            (
-                String::from("app.audio.metering_source"),
-                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
-            ),
-        ],
-    )
-    .expect("ready audio settings should persist");
-
-    let mut request = mix_target_request("audio-mix-main");
-    request.talkback = Some(true);
-    update_audio_mix_target(test_dir.db_path().as_path(), &request).expect("talkback on");
-    assert!(talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main").is_some());
-
-    let refused = crate::rme_console_link::ConsoleUpdate {
-        key: crate::rme_console_link::ParamKey::ControlRoom(
-            crate::rme_console_link::ControlRoomFunction::Talkback,
-        ),
-        value: crate::rme_console_link::ConsoleValue::Flag(false),
-        adjusted: true,
-        confirms_send: false,
-    };
-    let report = apply_console_activity(test_dir.db_path().as_path(), &[refused], &[], false)
-        .expect("refusal should apply");
-    assert_eq!(report.applied, 1);
-
-    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
-        .expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    let main = snapshot
-        .mix_targets
-        .iter()
-        .find(|entry| entry.id == "audio-mix-main")
-        .expect("main mix");
-    assert!(!main.talkback, "the console's off wins");
-    assert_eq!(snapshot.last_action_status, "failed");
-    assert_eq!(
-        snapshot.last_action_code.as_deref(),
-        Some("AUDIO_TALKBACK_REFUSED")
-    );
-    let message = snapshot.last_action_message.unwrap_or_default();
-    assert!(message.contains("talkback input channel"), "{message}");
-    assert!(
-        talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main").is_none(),
-        "a refused talkback drops the hold"
-    );
-}
-
 #[test]
 fn console_disconnect_resets_confidence_to_unknown() {
     let test_dir = TestDir::new("console-disconnect");
@@ -1058,6 +993,8 @@ impl ConsoleModel {
                         send(String::from("/status/dsp"), 8.0);
                     }
                     ["sendsettings"] => {
+                        // The desk reports its talkback with the rest; the app
+                        // reads past it (D26).
                         for function in ["dim", "mainmono", "talkback"] {
                             let address = format!("/controlroom/{function}");
                             let value = values.get(&address).copied().unwrap_or(0.0);
@@ -1146,12 +1083,11 @@ pub(super) fn mix_target_request(mix_target_id: &str) -> AudioMixTargetUpdateReq
         mute: None,
         dim: None,
         mono: None,
-        talkback: None,
     }
 }
 
 #[test]
-fn recall_plan_orders_mutes_first_and_never_touches_48v_talkback_or_pad() {
+fn recall_plan_orders_mutes_first_and_never_touches_48v_or_pad() {
     let current = read_audio_snapshot(&HashMap::new());
     let mut contents = super::helpers::capture_audio_scene_contents(&current, None);
     let host_now = current
@@ -1190,7 +1126,6 @@ fn recall_plan_orders_mutes_first_and_never_touches_48v_talkback_or_pad() {
         main.volume = 0.61;
         main.dim = true;
         main.mono = false;
-        main.talkback = true;
         let phones = contents
             .mix_targets
             .get_mut("audio-mix-phones-a")
@@ -1229,10 +1164,10 @@ fn recall_plan_orders_mutes_first_and_never_touches_48v_talkback_or_pad() {
     );
     let everything: Vec<String> = (0..4).flat_map(addresses).collect();
     assert!(
-        everything.iter().all(|address| !address.contains("48v")
-            && !address.contains("talkback")
-            && !address.contains("pad")),
-        "48V, talkback and pad are never pushed"
+        everything
+            .iter()
+            .all(|address| !address.contains("48v") && !address.contains("pad")),
+        "48V and pad are never pushed"
     );
     let host_main = plan.phases[1]
         .iter()
@@ -1258,10 +1193,6 @@ fn recall_plan_orders_mutes_first_and_never_touches_48v_talkback_or_pad() {
         "48V keeps the console's value in app state"
     );
     assert!(channels["audio-input-9"].mute);
-    assert!(
-        !mix_targets["audio-mix-main"].talkback,
-        "talkback is never recalled"
-    );
     assert!(mix_targets["audio-mix-main"].dim);
 }
 

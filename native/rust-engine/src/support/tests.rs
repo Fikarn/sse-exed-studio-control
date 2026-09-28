@@ -137,7 +137,6 @@ fn restore_support_backup_round_trips_native_archive() {
             mute: None,
             dim: Some(true),
             mono: Some(true),
-            talkback: Some(true),
         },
     )
     .expect("audio mix target should persist before restore");
@@ -311,7 +310,6 @@ fn restore_support_backup_round_trips_native_archive() {
     assert_eq!(restored_main_mix.volume, 0.82);
     assert!(!restored_main_mix.dim);
     assert!(!restored_main_mix.mono);
-    assert!(!restored_main_mix.talkback);
 }
 
 /// Every file in the backups folder, by name.

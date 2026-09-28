@@ -282,7 +282,6 @@ pub struct AudioMixTargetSnapshot {
     pub mute: bool,
     pub dim: bool,
     pub mono: bool,
-    pub talkback: bool,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -355,8 +354,6 @@ pub struct StoredAudioMixTargetState {
     pub dim: bool,
     #[serde(default)]
     pub mono: bool,
-    #[serde(default)]
-    pub talkback: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -551,7 +548,6 @@ pub struct AudioMixTargetUpdateRequest {
     pub mute: Option<bool>,
     pub dim: Option<bool>,
     pub mono: Option<bool>,
-    pub talkback: Option<bool>,
 }
 
 #[derive(Debug, Clone)]

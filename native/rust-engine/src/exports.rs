@@ -478,11 +478,9 @@ pub(crate) struct ControlDef {
     label: &'static str,
     is_rotary: bool,
     down: Vec<Value>,
-    up: Vec<Value>,
     rotate_left: Vec<Value>,
     rotate_right: Vec<Value>,
     text_expression: Option<&'static str>,
-    hold_repeats_down: bool,
     png_asset: Option<&'static str>,
     text_size: Option<&'static str>,
     hide_topbar: bool,
@@ -754,8 +752,6 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         "cycleBank" => String::from("Cycle the dial bank: inputs, playback, outputs."),
         "toggleDialMode" => String::from("Toggle the input dials between fader and gain."),
         "dimToggle" => String::from("Toggle control-room dim on the main out."),
-        "talkOn" => String::from("Hold to talk to the phones mixes."),
-        "talkOff" => String::from("Release talkback."),
         "soloClearAll" => String::from("Clear solo on every audio channel."),
         _ => format!("{interaction} {fallback_label}."),
     }
@@ -821,16 +817,6 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
                 "show_topbar": show_topbar
             })
         };
-        let run_while_held = if control.hold_repeats_down {
-            control
-                .down
-                .iter()
-                .filter_map(|action| action.get("id").and_then(Value::as_str))
-                .map(String::from)
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
         let control_value = json!({
             "type": "button",
             "style": style,
@@ -844,12 +830,14 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
                 "0": {
                     "action_sets": {
                         "down": control.down,
-                        "up": control.up,
+                        // No key acts on its release or while it is held:
+                        // TALK, the one that did, is gone (D26).
+                        "up": [],
                         "rotate_left": control.rotate_left,
                         "rotate_right": control.rotate_right
                     },
                     "options": {
-                        "runWhileHeld": run_while_held
+                        "runWhileHeld": []
                     }
                 }
             },
@@ -999,11 +987,9 @@ pub(crate) fn button(
         label,
         is_rotary: false,
         down,
-        up: Vec::new(),
         rotate_left: Vec::new(),
         rotate_right: Vec::new(),
         text_expression: None,
-        hold_repeats_down: false,
         png_asset: None,
         text_size: None,
         hide_topbar: false,
@@ -1024,22 +1010,6 @@ pub(crate) fn expression_button(
     }
 }
 
-pub(crate) fn momentary_button(
-    row: &'static str,
-    col: &'static str,
-    label: &'static str,
-    text_expression: &'static str,
-    down: Vec<Value>,
-    up: Vec<Value>,
-) -> ControlDef {
-    ControlDef {
-        up,
-        text_expression: Some(text_expression),
-        hold_repeats_down: true,
-        ..button(row, col, label, down)
-    }
-}
-
 pub(crate) fn dial(
     row: &'static str,
     col: &'static str,
@@ -1055,11 +1025,9 @@ pub(crate) fn dial(
         label,
         is_rotary: true,
         down,
-        up: Vec::new(),
         rotate_left,
         rotate_right,
         text_expression,
-        hold_repeats_down: false,
         png_asset: None,
         text_size: None,
         hide_topbar: false,
@@ -1313,11 +1281,12 @@ mod tests {
             .as_object()
             .expect("audio controls should exist");
 
-        for row in ["0", "1", "2", "3"] {
+        // Row 1, column 2 held TALK until 2026-09-28 (D26) and is empty.
+        for (row, columns) in [("0", 4), ("1", 3), ("2", 4), ("3", 4)] {
             assert_eq!(
                 controls[row].as_object().map(|columns| columns.len()),
-                Some(4),
-                "audio row {row} should populate all four columns"
+                Some(columns),
+                "audio row {row}"
             );
         }
 
@@ -1339,18 +1308,8 @@ mod tests {
             .expect("press body should exist");
         assert!(press_body.contains("dialPress"));
 
-        let talk = &controls["1"]["2"];
-        let talk_down_id = talk["steps"]["0"]["action_sets"]["down"][0]["id"]
-            .as_str()
-            .expect("talk down action id");
-        let run_while_held = talk["steps"]["0"]["options"]["runWhileHeld"]
-            .as_array()
-            .expect("runWhileHeld should be an array");
-        assert_eq!(run_while_held[0], talk_down_id);
-        let talk_up_body = talk["steps"]["0"]["action_sets"]["up"][0]["options"]["body"]
-            .as_str()
-            .expect("talk up body should exist");
-        assert!(talk_up_body.contains("talkOff"));
+        // Row 1, column 2 held TALK until 2026-09-28 (D26); nothing is there.
+        assert!(controls["1"].get("2").is_none(), "{}", controls["1"]["2"]);
     }
 
     #[test]
@@ -1374,14 +1333,6 @@ mod tests {
         );
         assert_eq!(main_feedbacks[0]["options"]["value"], "main");
         assert_eq!(main_feedbacks[0]["style"]["bgcolor"], DECK_AMBER_BG);
-
-        let talk_key = &controls["1"]["2"];
-        let talk_feedbacks = talk_key["feedbacks"].as_array().expect("feedbacks");
-        assert_eq!(
-            talk_feedbacks[0]["options"]["variable"],
-            "custom:lcd_audio_state_talk"
-        );
-        assert_eq!(talk_feedbacks[0]["options"]["value"], "live");
 
         let solo_key = &controls["1"]["3"];
         let solo_feedbacks = solo_key["feedbacks"].as_array().expect("feedbacks");
@@ -1490,8 +1441,8 @@ mod tests {
         assert_eq!(audio.label, "AUDIO");
         assert_eq!(
             audio.buttons.len(),
-            12,
-            "audio page should model 8 keys plus 4 touch-strip cells"
+            11,
+            "audio page should model 7 keys plus 4 touch-strip cells"
         );
         assert_eq!(audio.dials.len(), 12);
         assert!(audio.buttons.iter().any(|control| control

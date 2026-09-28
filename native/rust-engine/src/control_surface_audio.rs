@@ -1,11 +1,10 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::fader_curve::fader_lin_to_db;
 use crate::audio::{
-    clear_all_audio_solo, ensure_audio_action_allowed, hold_audio_talkback,
-    parse_audio_snapshot_recall_request, read_audio_snapshot, recall_audio_snapshot,
-    update_audio_channel, update_audio_mix_target, update_audio_settings,
-    AudioChannelUpdateRequest, AudioCommandError, AudioMixTargetUpdateRequest,
-    AudioSettingsUpdateRequest, AudioSnapshot, AudioTalkbackHoldRequest,
+    clear_all_audio_solo, ensure_audio_action_allowed, parse_audio_snapshot_recall_request,
+    read_audio_snapshot, recall_audio_snapshot, update_audio_channel, update_audio_mix_target,
+    update_audio_settings, AudioChannelUpdateRequest, AudioCommandError,
+    AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest, AudioSnapshot,
 };
 use crate::control_surface::{
     clamp_i64, cycle_value, emit_audio_changed, truncate, ControlSurfaceError,
@@ -231,10 +230,6 @@ pub(crate) fn audio_state_value_text(
             .map(|main| if main.dim { "on" } else { "off" })
             .unwrap_or("off")
             .to_string()),
-        "talk" => Ok(audio_main_mix_target(snapshot)
-            .map(|main| if main.talkback { "live" } else { "hold" })
-            .unwrap_or("hold")
-            .to_string()),
         "solo" => Ok(snapshot
             .channels
             .iter()
@@ -284,10 +279,8 @@ pub(crate) fn audio_key_lcd_text(
                 String::from("GAIN\\nN/A")
             }
         }
-        7 => match (gate, main) {
-            (None, Some(main)) => format!("TALK\\n{}", if main.talkback { "LIVE" } else { "HOLD" }),
-            _ => String::from("TALK\\n--"),
-        },
+        // Key 7 held TALK until 2026-09-28 (D26): its place on the deck is
+        // empty, and the keys after it keep their numbers.
         8 => {
             if gate.is_some() {
                 return String::from("SOLO\\n--");
@@ -337,8 +330,6 @@ pub(crate) fn handle_audio_action(
         "cycleBank" => handle_audio_cycle_bank(db_path),
         "toggleDialMode" => handle_audio_toggle_dial_mode(db_path),
         "dimToggle" => handle_audio_dim_toggle(db_path),
-        "talkOn" => handle_audio_talk(db_path, true),
-        "talkOff" => handle_audio_talk(db_path, false),
         "soloClearAll" => handle_audio_solo_clear_all(db_path),
         _ => Err(ControlSurfaceError::Unsupported(format!(
             "Unsupported audio deck action: {action}"
@@ -465,7 +456,6 @@ fn audio_mix_target_update_request(mix_target_id: &str) -> AudioMixTargetUpdateR
         mute: None,
         dim: None,
         mono: None,
-        talkback: None,
     }
 }
 
@@ -750,31 +740,6 @@ fn handle_audio_dim_toggle(db_path: &Path) -> Result<Value, ControlSurfaceError>
     let updated = update_audio_mix_target(db_path, &request).map_err(map_audio_error)?;
     emit_audio_changed();
     Ok(json!({ "mixTargetId": updated.id, "dim": updated.dim }))
-}
-
-/// Deck TALK key: the same momentary hold as the app's button and `T` key
-/// (`audio::hold_audio_talkback`, 2026-09 audit Slice 6). Companion re-sends
-/// `talkOn` while the key is held and `talkOff` on release; the shared
-/// watchdog releases 2 s after the last `talkOn` if the release never comes.
-fn handle_audio_talk(db_path: &Path, engage: bool) -> Result<Value, ControlSurfaceError> {
-    let result = hold_audio_talkback(
-        db_path,
-        &AudioTalkbackHoldRequest {
-            mix_target_id: None,
-            engaged: engage,
-        },
-    )
-    .map_err(map_audio_error)?;
-    if result.changed {
-        emit_audio_changed();
-    }
-    // `changed` tells the press and the release from the repeats Companion
-    // sends while the key is held; only those two are action-log rows.
-    Ok(json!({
-        "mixTargetId": result.mix_target_id,
-        "talkback": result.talkback,
-        "changed": result.changed,
-    }))
 }
 
 fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceError> {
@@ -1146,64 +1111,23 @@ mod tests {
         assert_eq!(result["gain"], AUDIO_PREAMP_GAIN_MAX);
     }
 
+    // D26 (2026-09-28): talkback is gone. The deck's old profile still has
+    // the key, and its presses are refused like any action there is not.
     #[test]
-    fn audio_talk_on_off_drives_main_talkback() {
-        let test_dir = ready_audio_test_db("talkback");
-        let result = handle_audio_action(test_dir.db_path().as_path(), "talkOn", None)
-            .expect("talk on should succeed");
-        assert_eq!(result["talkback"], true);
-        assert!(
-            crate::audio::talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main")
-                .is_some(),
-            "deck talkOn arms the shared watchdog"
-        );
-        assert!(
-            audio_snapshot_for(&test_dir)
-                .mix_targets
-                .iter()
-                .find(|entry| entry.id == "audio-mix-main")
-                .expect("main mix should exist")
-                .talkback
-        );
-
-        let result = handle_audio_action(test_dir.db_path().as_path(), "talkOff", None)
-            .expect("talk off should succeed");
-        assert_eq!(result["talkback"], false);
-        assert!(
-            crate::audio::talkback_hold_deadline(test_dir.db_path().as_path(), "audio-mix-main")
-                .is_none(),
-            "deck talkOff clears the shared watchdog"
-        );
-        assert!(
-            !audio_snapshot_for(&test_dir)
-                .mix_targets
-                .iter()
-                .find(|entry| entry.id == "audio-mix-main")
-                .expect("main mix should exist")
-                .talkback
-        );
-    }
-
-    #[test]
-    fn audio_talk_watchdog_release_clears_live_talkback() {
-        let test_dir = ready_audio_test_db("talk-release");
-        handle_audio_action(test_dir.db_path().as_path(), "talkOn", None)
-            .expect("talk on should succeed");
-
-        // What the shared watchdog does when the deck's talkOff never arrives.
-        assert!(crate::audio::release_talkback_hold(
-            test_dir.db_path().as_path(),
-            "audio-mix-main"
-        )
-        .expect("watchdog release should succeed"));
-        assert!(
-            !audio_snapshot_for(&test_dir)
-                .mix_targets
-                .iter()
-                .find(|entry| entry.id == "audio-mix-main")
-                .expect("main mix should exist")
-                .talkback
-        );
+    fn the_deck_has_no_talk_key() {
+        let test_dir = ready_audio_test_db("no-talk");
+        for action in ["talkOn", "talkOff"] {
+            let error = handle_audio_action(test_dir.db_path().as_path(), action, None)
+                .expect_err("talkback is not an action");
+            assert!(
+                matches!(error, ControlSurfaceError::Unsupported(_)),
+                "{action}: {error:?}"
+            );
+        }
+        let (app_settings, snapshot) =
+            current_audio_snapshot(test_dir.db_path().as_path()).expect("the snapshot");
+        assert!(audio_state_value_text(&app_settings, &snapshot, "talk").is_err());
+        assert_eq!(audio_key_lcd_text(&app_settings, &snapshot, 7), "--");
     }
 
     #[test]

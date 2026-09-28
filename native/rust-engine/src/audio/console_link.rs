@@ -39,9 +39,6 @@ pub struct ConsoleFlushReport {
     /// Sends that timed out without confirmation in this flush.
     pub unconfirmed: usize,
     pub connection_lost: bool,
-    /// The desk refused a talkback the app asked for; the refusal is recorded
-    /// even when a newer talkback send meant nothing else was written.
-    pub talkback_refused: bool,
     /// An earlier flush's write failed and dropped desk reports, so this one
     /// marked the desk unread: the Console asks for a Sync.
     pub desk_unread: bool,
@@ -49,11 +46,7 @@ pub struct ConsoleFlushReport {
 
 impl ConsoleFlushReport {
     pub fn changed(&self) -> bool {
-        self.applied > 0
-            || self.unconfirmed > 0
-            || self.connection_lost
-            || self.talkback_refused
-            || self.desk_unread
+        self.applied > 0 || self.unconfirmed > 0 || self.connection_lost || self.desk_unread
     }
 }
 
@@ -149,8 +142,7 @@ pub(crate) fn apply_console_activity(
 /// The persistence half of `flush_console_link`, for a caller that holds
 /// `AUDIO_STATE_LOCK`. `superseded` are the drained updates a newer send of
 /// the app's replaces: they are not written, but a change made at TotalMix
-/// among them is still a row in Recent actions, and a talkback refusal among
-/// them is still acted on.
+/// among them is still a row in Recent actions.
 fn apply_console_activity_locked(
     db_path: &Path,
     updates: &[ConsoleUpdate],
@@ -159,22 +151,6 @@ fn apply_console_activity_locked(
     connection_lost: bool,
     desk_unread: bool,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
-    // A talkback the app asked for that the console answered with "off" is a
-    // refusal, not a mystery. Live on the studio UFX III (2026-09-04): with
-    // no talkback input channel assigned in TotalMix (`/controlroom/talkchannel
-    // -1`) the desk ignores `/controlroom/talkback 1` from every remote and
-    // reports 0, so the app must say so instead of silently flipping back —
-    // and the hold is dropped so the watchdog has nothing to release. A
-    // talkback the desk refused is a refusal even when the app has sent
-    // talkback again since (a release, or a press right after it).
-    let talkback_refused = updates.iter().chain(superseded).any(|update| {
-        update.adjusted
-            && matches!(
-                update.key,
-                ParamKey::ControlRoom(ControlRoomFunction::Talkback)
-            )
-            && matches!(update.value, ConsoleValue::Flag(false))
-    });
     if updates.is_empty()
         && superseded.is_empty()
         && expired.is_empty()
@@ -264,25 +240,6 @@ fn apply_console_activity_locked(
             ),
         ));
     }
-    if talkback_refused {
-        super::talkback::clear_talkback_hold(db_path, MAIN_MIX_TARGET_ID);
-        writes.push((
-            String::from(AUDIO_LAST_ACTION_STATUS_KEY),
-            String::from("failed"),
-        ));
-        writes.push((
-            String::from(AUDIO_LAST_ACTION_CODE_KEY),
-            String::from("AUDIO_TALKBACK_REFUSED"),
-        ));
-        writes.push((
-            String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
-            String::from(
-                "TotalMix kept talkback off. Assign a talkback input channel in TotalMix \
-                 (Options › Settings › Mixer › Talkback); with none assigned the desk \
-                 ignores talkback from every remote.",
-            ),
-        ));
-    }
     // TotalMix reported the interface gone, or an earlier write failed and
     // dropped what the desk reported: either way the app no longer knows what
     // the desk is set to.
@@ -297,7 +254,6 @@ fn apply_console_activity_locked(
         applied,
         unconfirmed: expired.len(),
         connection_lost,
-        talkback_refused,
         desk_unread,
     })
 }
@@ -518,7 +474,6 @@ pub(crate) fn apply_console_update(
             match function {
                 ControlRoomFunction::Dim => set_if_changed(&mut entry.dim, flag),
                 ControlRoomFunction::MainMono => set_if_changed(&mut entry.mono, flag),
-                ControlRoomFunction::Talkback => set_if_changed(&mut entry.talkback, flag),
             }
         }
         ParamKey::StatusConnection
@@ -582,7 +537,6 @@ pub(crate) fn console_update_action(
             match function {
                 ControlRoomFunction::Dim => ("dim", "Dim", name),
                 ControlRoomFunction::MainMono => ("mono", "Mono", name),
-                ControlRoomFunction::Talkback => ("talkback", "Talkback", name),
             }
         }
         _ => return None,

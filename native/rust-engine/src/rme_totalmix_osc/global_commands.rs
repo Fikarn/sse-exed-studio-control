@@ -178,9 +178,9 @@ pub fn send_totalmix_channel_update(
 
 /// Sends one operator output-mix edit to TotalMix over the Global OSC
 /// namespace. Output level rides `/output/{ch}/faderlin` (linear 0..1) and
-/// mute is absolute; dim, mono, and talkback are control-room functions
-/// that TotalMix exposes only for the main out, so they are sent for
-/// `audio-mix-main` and reported local-only for the phones targets.
+/// mute is absolute; dim and mono are control-room functions that TotalMix
+/// exposes only for the main out, so they are sent for `audio-mix-main` and
+/// reported local-only for the phones targets.
 pub fn send_totalmix_mix_target_update(
     send_host: &str,
     send_port: i64,
@@ -220,13 +220,6 @@ pub fn send_totalmix_mix_target_update(
             messages.push((String::from("/controlroom/mainmono"), osc_bool(mono)));
         } else {
             report.local_only.push("mono (main out only)");
-        }
-    }
-    if let Some(talkback) = request.talkback {
-        if is_main {
-            messages.push((String::from("/controlroom/talkback"), osc_bool(talkback)));
-        } else {
-            report.local_only.push("talkback (main out only)");
         }
     }
 

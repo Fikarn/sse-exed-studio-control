@@ -10,12 +10,11 @@
 
 use super::tests::TestDir;
 use super::tests_console_link::{
-    channel_request, mix_target_request, pull_test_db, serialize_shared_link, ConsoleModel,
-    SETTLE_DEADLINE,
+    channel_request, pull_test_db, serialize_shared_link, ConsoleModel, SETTLE_DEADLINE,
 };
 use super::*;
 use crate::app_state::APP_SETTINGS_PREFIX;
-use crate::storage::{initialize_test_database, list_settings_by_prefix, set_settings_owned};
+use crate::storage::{initialize_test_database, list_settings_by_prefix};
 use std::time::Duration;
 
 /// The metering thread's pump without its flush: the console's replies are
@@ -341,75 +340,6 @@ fn the_desk_confirming_the_apps_own_level_writes_nothing() {
     let stored = stored_channel(&db, "audio-input-9");
     assert_eq!(stored.fader, 0.62);
     assert_eq!(stored.mix_levels["audio-mix-main"], 0.62);
-}
-
-#[test]
-fn a_talkback_refusal_is_acted_on_though_the_hold_has_sent_talkback_again() {
-    use crate::rme_console_link::{
-        link_now_ms, shared_console_link, Classification, READBACK_DELAY_MS,
-    };
-    let _serial = serialize_shared_link();
-    let test_dir = TestDir::new("talkback-refused-resent");
-    let db = test_dir.db_path();
-    initialize_test_database(&db).expect("database should initialize");
-    set_settings_owned(
-        &db,
-        &[
-            (
-                String::from("app.commissioning.check.audio.status"),
-                String::from("passed"),
-            ),
-            (
-                String::from(AUDIO_METERING_SOURCE_KEY),
-                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
-            ),
-        ],
-    )
-    .expect("ready audio settings should persist");
-    let mut request = mix_target_request("audio-mix-main");
-    request.talkback = Some(true);
-    update_audio_mix_target(&db, &request).expect("talkback on");
-    assert!(talkback_hold_deadline(&db, "audio-mix-main").is_some());
-
-    // The desk answers the app's talkback with "off" (no talkback channel
-    // assigned), and before the next flush the hold's heartbeat sends it again.
-    {
-        let link = shared_console_link();
-        let mut link = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let talkback = || {
-            vec![(
-                String::from("/controlroom/talkback"),
-                rosc::OscType::Float(1.0),
-            )]
-        };
-        let sent = link_now_ms();
-        link.register_outgoing(&talkback(), sent);
-        link.due_readbacks(sent + READBACK_DELAY_MS);
-        assert_eq!(
-            link.ingest(
-                &rosc::OscMessage {
-                    addr: String::from("/controlroom/talkback"),
-                    args: vec![rosc::OscType::Float(0.0)],
-                },
-                sent + READBACK_DELAY_MS + 30,
-            ),
-            Classification::Adjusted
-        );
-        link.register_outgoing(&talkback(), sent + READBACK_DELAY_MS + 40);
-    }
-
-    let report = flush_console_link(&db).expect("flush");
-    assert!(report.changed(), "the screen is told");
-    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(
-        snapshot.last_action_code.as_deref(),
-        Some("AUDIO_TALKBACK_REFUSED")
-    );
-    assert!(
-        talkback_hold_deadline(&db, "audio-mix-main").is_none(),
-        "the hold is dropped, so the watchdog has nothing to release"
-    );
 }
 
 #[test]
