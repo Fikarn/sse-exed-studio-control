@@ -2,8 +2,8 @@ name: Setup Tauri Linux build deps
 description: |
   Install the apt packages required to compile the Tauri 2 shell on
   ubuntu-latest. Shared by every CI job that touches `cargo` for the
-  `sse-exed-tauri-shell` crate (rust, native-acceptance, tauri-foundation,
-  qualification) so the dep list stays defined in one place.
+  `sse-exed-tauri-shell` crate (`rust` and `shell`) so the dep list stays
+  defined in one place.
 
   Pairs with `Swatinem/rust-cache@v2`: the action itself only installs system
   libraries — Cargo cache + rust toolchain stay in the caller's workflow.

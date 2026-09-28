@@ -32,7 +32,7 @@ Two rules hold the design together:
 
 1. **Agree.** Ask the owner what only the owner can decide, once, before building, each with a recommendation. Decide everything else and say what was decided.
 2. **Build** on a branch from `main`.
-3. **Check** with `npm run check`. It runs everything, on this machine, in a few minutes.
+3. **Check** with `npm run check`. It runs what CI runs but the two shell lanes, on this machine, in a few minutes.
 4. **Merge.** Push, open a pull request, merge when CI is green. No go-ahead is needed.
 5. **Record.** The pull request says what changed, why, and how it was checked. `CHANGELOG.md` gets a line or two when the operator would notice the change. `docs/ROADMAP.md` is ticked.
 6. **Show.** When the change is something the owner can see or the hardware does, start the app and let the owner try it.
@@ -64,7 +64,7 @@ Two rules hold the design together:
 
 | Command                                | Does                                                                                                    |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests, then the page tests with their captures  |
+| `npm run check`                        | The whole gate: format, lint, types, unit tests, engine tests and lanes, then the page tests            |
 | `npm run check:quick`                  | The same without the page tests (under a minute)                                                        |
 | `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                         |
 | `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)      |

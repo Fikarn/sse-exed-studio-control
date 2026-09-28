@@ -5,13 +5,9 @@ members = ["protocol/rust", "rust-engine", "tauri-shell"]
 [workspace.package]
 edition = "2021"
 rust-version = "1.95"
-# The repository's licence (`LICENSE`, `package.json`). Named here so the
-# licence check and the release SBOMs describe our own three crates instead of
-# reporting them as unlicensed (2026-09 production readiness, Slice 12 — F17).
+# The repository's licence (`LICENSE`, `package.json`).
 license = "MIT"
-# None of the three crates is a crates.io package; refusing `cargo publish`
-# also lets `cargo deny` accept the version-less path dependency on
-# `studio-control-protocol`.
+# None of the three crates is a crates.io package.
 publish = false
 
 [workspace.dependencies]
@@ -37,7 +33,7 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = "warn"
 
-# The studio runs release builds. Arithmetic that overflows stops there as it
+# The studio's builds are release builds. Arithmetic that overflows stops there as it
 # does in a development build, rather than wrap around into a level or an
 # address nobody chose: every test ran with the check on.
 [profile.release]

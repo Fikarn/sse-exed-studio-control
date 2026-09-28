@@ -1,5 +1,5 @@
 import { connect } from "node:net";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,7 @@ import {
   SEEDED_WORKSPACE,
   seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, hardenedLaneEnv, laneEngine, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import { assert, EngineHarness, hardenedLaneEnv, laneEngine } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -224,10 +224,10 @@ async function main() {
     `The ${packaged.label} engine is not at ${packaged.enginePath}. Run \`npm run native:engine:build\` first.`
   );
 
-  const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_BRIDGE_ACCEPTANCE_DIR);
-  const qualificationRoot = explicitRoot ?? mkdtempSync(path.join(os.tmpdir(), "sse-native-bridge-acceptance-"));
-  rmSync(qualificationRoot, { force: true, recursive: true });
-  mkdirSync(qualificationRoot, { recursive: true });
+  // A scratch folder of the lane's own making. Until 2026-09-28
+  // SSE_NATIVE_BRIDGE_ACCEPTANCE_DIR named another, which the lane emptied
+  // first, whatever it held.
+  const qualificationRoot = mkdtempSync(path.join(os.tmpdir(), "sse-native-bridge-acceptance-"));
 
   const runtime = {
     appDataDir: path.join(qualificationRoot, "runtime", "app-data"),

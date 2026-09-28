@@ -565,6 +565,7 @@ fn run_smoke_test(args: &[String]) -> i32 {
                     "appDataPath": app_data_dir.display().to_string(),
                     "logsPath": logs_dir.display().to_string(),
                     "protocol": studio_control_protocol::PROTOCOL_VERSION,
+                    "studioBuild": studio_control_protocol::development::studio_build_commit(),
                 }),
             );
             0
@@ -580,6 +581,7 @@ fn run_smoke_test(args: &[String]) -> i32 {
                     "appDataPath": app_data_dir.display().to_string(),
                     "logsPath": logs_dir.display().to_string(),
                     "protocol": studio_control_protocol::PROTOCOL_VERSION,
+                    "studioBuild": studio_control_protocol::development::studio_build_commit(),
                 }),
             );
             eprintln!("{message}");

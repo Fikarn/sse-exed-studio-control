@@ -37,7 +37,7 @@ A change to the pages shows at once. After a change to the engine or the contrac
 
 | Command                            | Runs                                                                                                            | Takes               |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | under a minute      |
+| `npm run check:quick`              | Contract check, format, lint, script tests, file sizes, Rust format and clippy, types, unit tests, engine tests | about a minute      |
 | `npm run frontend:playwright:test` | Builds the pages and Storybook, then the page tests: behaviour, the layout measures, the captures               | about three minutes |
 | `npm run check`                    | Both                                                                                                            | about four minutes  |
 
@@ -50,6 +50,8 @@ The layers, and what each is for:
 - **Page tests** (Playwright, `frontend/app/tests`): what the operator does on screen, against the test double of the engine (`frontend/packages/engine-client/src/transports/fixture/`).
 - **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.
 - **Captures** (`visual-review.spec.ts`, `storybook.spec.ts`): screenshots at 2560×1440, compared on Windows only.
+- **Lanes** (`native:acceptance`, `native:bridge`, `tauri:smoke`): the engine driven from outside, over its pipe and over its Stream Deck bridge, on scratch data with simulated devices. They are part of `check:quick`. `npm run release` runs the first two against the build it makes.
+- **The two shell lanes** (`tauri:setup-support:qualify`, `tauri:workspaces:qualify`) run in CI only. They open the app's window, and the Setup lane connects to addresses of no network, which on this PC leave by one of its two default routes.
 - **Hardware tests** (`npm run native:test:hardware`): the engine tests marked `#[ignore]`, against the real console. Only when the owner asks and is present, with the studio app closed and `SSE_ENGINE_TEST_ALLOW_CONSOLE_WRITES=1` set (`docs/HARDWARE.md`).
 
 ## Captures

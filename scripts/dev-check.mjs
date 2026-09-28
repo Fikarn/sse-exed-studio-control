@@ -55,6 +55,13 @@ export function devCheckSteps(cacheKey = toolCacheKey()) {
     { id: "protocol:check" },
     { id: "rust:clippy", after: ["protocol:check"] },
     { id: "native:test", after: ["rust:clippy"] },
+    // The engine driven from outside, as CI's `rust` job drives it: over its
+    // pipe, over its Stream Deck bridge, and at its start. Each starts engines
+    // on scratch data with simulated devices. The two shell lanes stay CI's:
+    // they open windows and connect to addresses of no network.
+    { id: "native:acceptance", after: ["native:test"] },
+    { id: "native:bridge", after: ["native:acceptance"] },
+    { id: "tauri:smoke", after: ["native:bridge"] },
     { id: "rust:fmt:check" },
     // Local caches under node_modules/.cache/dev-check, keyed as above; CI
     // runs the same scripts without them. Prettier deletes its default cache

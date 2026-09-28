@@ -58,7 +58,7 @@ async function main() {
 // policy the dev document would need (the HMR websocket, the React refresh
 // preamble) without Tauri 2.11 ever applying it. This check keeps both
 // present and keeps the packaged policy strict; removing either fails
-// `tauri:smoke` and with it the `tauri-foundation` CI job.
+// `tauri:smoke` and with it CI's `rust` job.
 function verifyContentSecurityPolicy(shellConfig) {
   const csp = shellConfig.app?.security?.csp;
   if (typeof csp !== "string" || !csp.trim()) {

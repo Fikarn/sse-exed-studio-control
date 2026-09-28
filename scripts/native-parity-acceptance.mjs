@@ -178,9 +178,8 @@ export async function seedSavedWorkspace(harness, requestIdPrefix, runtimeLabel)
  * Publishes the setup on a host without the studio's hardware, the way the
  * qualification lanes publish: `commissioning.update` to `ready` with the
  * explicit probe override the hardware link requires while a probe has not
- * passed (2026-09 audit Slice 8). The installer and delivery lanes published
- * without it until Slice 2b of the new pages program, which a fresh hardware
- * link refuses (COMMISSIONING_PROBES_INCOMPLETE).
+ * passed (2026-09 audit Slice 8): a fresh hardware link refuses a publish
+ * without it (COMMISSIONING_PROBES_INCOMPLETE).
  */
 export async function publishWithOverride(harness, requestIdPrefix, runtimeLabel) {
   const published = await harness.request(`${requestIdPrefix}-commissioning-ready`, "commissioning.update", {
@@ -242,9 +241,8 @@ export function assertBackupArchiveWithoutPlanning(exportSummary, expectedWorksp
 }
 
 /**
- * The installer and delivery lanes' continuity sentinel: a lighting group,
- * made by the app's own request and kept in the saved data. Until Slice 2 of
- * the new pages program it was a Planning project.
+ * The continuity sentinel: a lighting group, made by the app's own request
+ * and kept in the saved data.
  */
 export async function createContinuitySentinel(harness, requestIdPrefix, name, runtimeLabel) {
   const created = await harness.request(`${requestIdPrefix}-continuity-sentinel-create`, "lighting.group.create", {

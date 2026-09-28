@@ -31,6 +31,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Studio Control is started with `Studio Control.cmd` in the builds folder, which always starts the verified build. Older builds stay beside it, each in a folder named by its day (#237).
 - Studio Control always opens fullscreen, on the display it was last on or else the 2560×1440 one. Reset the window layout is in Setup / Support › Workstation and on the recovery screens (#216, #221).
 - The first start of this build upgrades the saved data to schema 10. An older Studio Control then refuses it, so going back means the older app and the backup copy written before the upgrade (#201, #229).
 - The Stream Deck bridge answers only the exported profile, which carries a token; the meters hear only TotalMix's own address. Export the profile again and import it with Full Reset & Import (#201).

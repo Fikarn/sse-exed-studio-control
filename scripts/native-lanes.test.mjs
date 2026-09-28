@@ -20,6 +20,7 @@ import {
   hardenedLaneEnv,
   isSameOrInside,
   LIVE_APP_CONTROL_SURFACE_PORT,
+  laneEngine,
   laneEnvRefusal,
   laneProcessEnv,
 } from "./native-runtime-harness.mjs";
@@ -1590,4 +1591,35 @@ test("the page a lane seeds can be seen: new saved data opens on another, and th
   assert.equal(NEW_DATA_WORKSPACE, defaultWorkspace, "the lanes' new-data page is the hardware link's default");
   assert.notEqual(SEEDED_WORKSPACE, NEW_DATA_WORKSPACE, "the seeded page must differ from the default page");
   assert.notEqual(MOVED_WORKSPACE, SEEDED_WORKSPACE, "the page saved after the backup must differ from the seeded one");
+});
+
+// Streamlining, 2026-09-28: a lane runs against the development engine or
+// the one `--engine=<path>` names, and takes no other argument. An argument
+// it did not know (`--engine <path>`, the old `--target=windows`) ran the
+// development engine and passed, whatever was meant.
+test("a lane takes --engine=<file> and nothing else", () => {
+  const development = laneEngine(repoRoot, []);
+  assert.equal(development.what, "development");
+  assert.equal(
+    path.relative(repoRoot, development.enginePath).split(path.sep).slice(0, 3).join("/"),
+    "native/target/debug"
+  );
+  assert.match(path.basename(development.enginePath), /^studio-control-engine(\.exe)?$/);
+
+  const file = fileURLToPath(import.meta.url);
+  assert.deepEqual(laneEngine(repoRoot, [`--engine=${file}`]), { enginePath: file, what: "named" });
+
+  for (const refused of [
+    ["--target=windows"],
+    ["--engine", file],
+    ["--Engine=x"],
+    ["--engine="],
+    [`--engine=${file}`, "x"],
+  ]) {
+    assert.throws(() => laneEngine(repoRoot, refused), /is not an argument of this lane/, refused.join(" "));
+  }
+  // A folder is no engine, and neither is a file that is not there.
+  for (const notAFile of [path.dirname(file), path.join(path.dirname(file), "not-there.exe")]) {
+    assert.throws(() => laneEngine(repoRoot, [`--engine=${notAFile}`]), /which is not a file/, notAFile);
+  }
 });

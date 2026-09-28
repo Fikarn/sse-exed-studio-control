@@ -37,7 +37,7 @@
     "check": "npm run dev:check && npm run frontend:playwright:test",
     "check:quick": "npm run dev:check",
     "dev:check": "node scripts/dev-check-cli.mjs",
-    "dev:check:serial": "npm run protocol:check && npm run format:check && npm run lint && npm run scripts:test && npm run file:health && npm run rust:fmt:check && npm run rust:clippy && npm run frontend:typecheck && npm run frontend:test && npm run native:test",
+    "dev:check:serial": "npm run protocol:check && npm run format:check && npm run lint && npm run scripts:test && npm run file:health && npm run rust:fmt:check && npm run rust:clippy && npm run frontend:typecheck && npm run frontend:test && npm run native:test && npm run native:acceptance && npm run native:bridge && npm run tauri:smoke",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",

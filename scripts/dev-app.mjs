@@ -13,8 +13,8 @@
 // folder is refused, here and by every development build
 // (`studio_control_protocol::development`).
 //
-// No other argument is taken. `tauri dev --release` would build the studio's
-// kind of app from development code, and `--config` can change its identity.
+// No other argument is taken: `--config` can change the app's identity, and
+// what `tauri dev` hands on to the app is the app's to refuse.
 
 import { spawn } from "node:child_process";
 import { mkdirSync, realpathSync } from "node:fs";
