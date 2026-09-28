@@ -3350,7 +3350,7 @@ name = "studio-control-engine"
 version = "2.2.1"
 dependencies = [
  "base64 0.22.1",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "miniz_oxide",
  "proptest",
  "quick-xml",
