@@ -68,6 +68,6 @@ Engine (`native/rust-engine/src/`):
 - `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.
 - `health.rs`, `action_log.rs`, `engine_events.rs`: the health the header shows, Recent actions, events.
 
-Shell (`native/tauri-shell/src/`): `main.rs` (commands, the window's rules), `engine.rs` (the engine process and its watcher), `shell_windows.rs` (building windows).
+Shell (`native/tauri-shell/src/`): `main.rs` (the app and its window), `engine.rs` (the engine process and its watcher), `shell_commands.rs` (what the pages ask of the engine), `shell_window_layout.rs` (the display the window is on), `shell_windows.rs` (building windows), `shell_paths.rs` (folders and the diagnostics report), `shell_browser_keys.rs` (WebView2's own keys, off), `shell_smoke.rs` and `shell_test_bridge.rs` (the lanes' ways in).
 
 Pages (`frontend/app/src/app/`): `OperatorShell.tsx` assembles the header, the tabs and the pages. Each page is a chunk of its own (`workspaceChunks.ts`). The shared parts are in `frontend/packages/design-system` and the colours and sizes in `frontend/packages/tokens`.

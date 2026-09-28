@@ -227,17 +227,23 @@ test("the words the program keeps are not hits", () => {
 });
 
 test("the native shell switches the web view's own keys off, with one exception to the unsafe rule (decision 12)", () => {
-  const shell = readFileSync(path.join(repoRoot, "native/tauri-shell/src/main.rs"), "utf8");
+  const shellFile = (name) => readFileSync(path.join(repoRoot, "native/tauri-shell/src", name), "utf8");
+  const main = shellFile("main.rs");
+  const keys = shellFile("shell_browser_keys.rs");
   // The setting itself, false, and never turned back on.
   // (assert.ok, not assert.match: a failure names the rule, not the whole file.)
-  assert.ok(/\.SetAreBrowserAcceleratorKeysEnabled\(false\)/.test(shell), "main.rs sets the browser keys off");
-  assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(shell), "main.rs never sets them on");
+  assert.ok(
+    /\.SetAreBrowserAcceleratorKeysEnabled\(false\)/.test(keys),
+    "shell_browser_keys.rs sets the browser keys off"
+  );
+  // The module is compiled on Windows alone, where WebView2 is.
+  assert.ok(/#\[cfg\(windows\)\]\s*\nmod shell_browser_keys;/.test(main), "main.rs has the module on Windows");
   // Applied to the main window in the builder's setup, before anything else there.
-  const setup = shell.slice(shell.indexOf(".setup(|app| {"));
-  assert.ok(setup.length > 0, "main.rs has a .setup(|app| { … }) block");
+  const setup = main.slice(main.indexOf(".setup(|app| {"));
+  assert.ok(main.includes(".setup(|app| {"), "main.rs has a .setup(|app| { … }) block");
   const firstStatements = setup.slice(0, setup.indexOf("restore_or_route_initial_window"));
   assert.ok(
-    /switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
+    /#\[cfg\(windows\)\]\s*\n\s*switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
     "setup switches the browser keys off before it routes the window"
   );
   // `unsafe` is lifted for the one function that makes the COM calls, and nowhere else in the shell:
@@ -257,12 +263,14 @@ test("the native shell switches the web view's own keys off, with one exception 
   ]
     .filter((file) => existsSync(file))
     .map((file) => readFileSync(file, "utf8"));
-  const lintNames = shellSources.join("\n").match(/\bunsafe_code\b/g) ?? [];
+  const everySource = shellSources.join("\n");
+  assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
+  const lintNames = everySource.match(/\bunsafe_code\b/g) ?? [];
   assert.equal(lintNames.length, 1, "the shell names unsafe_code once");
-  const unsafeItems = shellSources.join("\n").match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? [];
+  const unsafeItems = everySource.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? [];
   assert.equal(unsafeItems.length, 1, "the shell holds one unsafe block");
   assert.ok(
-    /#\[allow\(unsafe_code\)\]\s*\nfn set_browser_accelerator_keys_off\(/.test(shell),
+    /#\[allow\(unsafe_code\)\]\s*\nfn set_browser_accelerator_keys_off\(/.test(keys),
     "the one #[allow(unsafe_code)] sits on set_browser_accelerator_keys_off"
   );
   // The shell's lints are the workspace's, with unsafe_code at deny (a forbid cannot be lifted for one item).

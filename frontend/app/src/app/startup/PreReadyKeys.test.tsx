@@ -32,7 +32,7 @@ const FAILURE: StartupFailure = {
 };
 
 // The one sentence the shell refuses a reset with, whatever went wrong
-// (`window_command_refusal` in native/tauri-shell/src/main.rs, held by its
+// (`window_command_refusal` in native/tauri-shell/src/shell_window_layout.rs, held by its
 // `window_command_refusals_are_the_operators_sentences` test): the detail goes
 // to shell.log, and the missing-monitor sentence is Studio fullscreen's alone.
 const REFUSAL = "The window layout was not reset.";

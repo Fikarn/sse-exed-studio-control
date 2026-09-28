@@ -251,7 +251,7 @@ describe("SetupSupportPilot light outputs and recent actions", () => {
 });
 
 // The sentences the native shell refuses a window command with:
-// `window_command_refusal` in native/tauri-shell/src/main.rs, held by its
+// `window_command_refusal` in native/tauri-shell/src/shell_window_layout.rs, held by its
 // `window_command_refusals_are_the_operators_sentences` test. The detail (the
 // webview's own error, a file path) goes to shell.log, never to the screen; the
 // missing monitor is said as it is, and only by Studio fullscreen.
