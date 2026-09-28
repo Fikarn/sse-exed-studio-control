@@ -115,6 +115,13 @@ The engine:
 - **Health reports changes of state, not attempts:** `health::report(subsystem, state, detail)`.
 - **No file over 2,000 lines.** `npm run file:health` fails on one. Split before a file gets there.
 
+The shell:
+
+- **CI compiles no Windows code.** Its jobs run on Linux, so what stands under `cfg(windows)` (the display calls, WebView2's settings) is compiled and tested by the gate on this PC alone.
+- **`unsafe` has a list.** The shell's crate denies `unsafe`, and lifts it for the functions `SHELL_UNSAFE` names in `scripts/check-no-shortcuts.test.mjs`, each with its reason and its number of blocks. A block says why it is sound in a `// SAFETY:` comment above it. A new block changes the list.
+- **A command of the shell is named by its module** in `main.rs`'s two handler lists (`shell_commands::engine_start`): the macro that registers it lives beside the command.
+- **A rule about screens is a function over plain data.** `shell_displays.rs` reads Windows once and answers a list; everything else (which screen is the Prompter XL, whether the screens changed, where the window goes) takes that list, so it is tested without a screen.
+
 ## Where the pages' code lives
 
 - `frontend/app/src/app/OperatorShell.tsx`: the header, the tabs, the pages.

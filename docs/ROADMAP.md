@@ -75,7 +75,15 @@ Decided while they were built, and kept by the work that follows:
 
 The shell's second window shows the glass (`PrompterGlass`) on the screen Windows names `Prompter XL`, and on no other. `docs/design/teleprompter.md` §7 has how it looks and behaves.
 
-- Studio Control's own window is held on its display when screens come and go.
+Done so far:
+
+- [x] The shell's `main.rs` is split (#249).
+- [x] The display route, and the window held on its display (#250). Found out first, on the workstation and drawing nothing: the route works. It names the studio's three screens and shows the primary's copy as a copy. The Prompter XL was not plugged in, so its name as Windows gives it is still to be read; `shell.log` will say it.
+- [ ] The glass window, its page and the report.
+
+What the work holds to:
+
+- Studio Control's own window is held on its display when screens come and go. The display is saved by the window commands and by the watch over the screens while they stand still, no longer at every move of the window.
 - The shell finds the screen through Windows' display configuration (`QueryDisplayConfig`, `DisplayConfigGetDeviceInfo`), polled: Tauri gives no screen names, refresh rates or display-change events. The target's name gives `Prompter XL`, the source's name gives Tauri's monitor, and two targets on one source are `DUPLICATED`.
 - The shell reports the screen (`prompter.screen.report`) at the start, after an engine restart and on every poll, so the next report repairs a lost one. It leaves the refresh rate out when Windows gives none: the engine refuses 0.
 - The window gets a capability of its own, to listen to the engine's events and nothing else, and an entry point of its own with a read-only client that never starts, stops or restarts the engine.
@@ -86,10 +94,15 @@ Guards:
 
 - "The studio build" is defined in code: a build `npm run release` made (`studio_build()` in `native/protocol/rust/src/development.rs`). Anything else draws the glass into an ordinary window, and a test holds that.
 - A test over plain monitor snapshots, run in CI, proves the window opens only on a screen named `Prompter XL`.
-- The display calls are `unsafe`. The shell's one allowance (`set_browser_accelerator_keys_off`) becomes a named list, each entry with its reason.
-- `native/tauri-shell/src/main.rs` is split first (done: it holds the app and its window, and seven files beside it hold the rest).
+- The display calls are `unsafe`. The shell's allowances are a named list, each entry with its reason (`SHELL_UNSAFE` in `scripts/check-no-shortcuts.test.mjs`).
 
-Find out first, on the workstation and drawing nothing: that the display route works.
+What the map of the shell found, for the glass window's pull request:
+
+- `scripts/tauri-smoke.mjs` allows one window in `tauri.conf.json`. It learns the second.
+- A capability cannot keep the glass window to listening: the shell's own commands are gated by none. The shell refuses the glass window in code, by its label, everything but its reads.
+- `security.capabilities` is a list, and a capability that is not in it is ignored.
+- The hardware link's events go to every window, the meters 30 times a second among them. They go to a window by its name.
+- The shell sends no request of its own yet, and reads no event: it learns of `engine.ready` to report after a restart.
 
 Ask the owner first: WebView2 saves the main window's clipboard answer in the profile that every window shares, and the glass must be kept out of it. Try both ways (`GetNonDefaultPermissionSettings` shows what the profile holds), then ask which:
 
