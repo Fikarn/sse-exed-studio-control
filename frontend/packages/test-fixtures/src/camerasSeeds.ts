@@ -37,13 +37,18 @@ export type FixtureCameraSeedRecord = {
 export type FixtureCamerasSeedRecord = {
   cameras?: FixtureCameraSeedRecord[];
   selected?: FixtureCameraNumber;
+  bank?: FixtureCameraDialBank;
   simulated?: boolean;
 };
+
+/** What the deck's dials set (`CameraDialBank`). */
+export type FixtureCameraDialBank = "exposure" | "colour" | "focus";
 
 /** A scenario's `cameras` as the JSON file holds it: a camera's number is any number. */
 export type RawCamerasRecord = {
   cameras?: Array<Omit<FixtureCameraSeedRecord, "camera"> & { camera: number }>;
   selected?: number;
+  bank?: string;
   simulated?: boolean;
 };
 
@@ -62,6 +67,12 @@ export function expandCamerasRecord(scenario: string, raw: RawCamerasRecord): Fi
     }));
   }
   if (raw.selected !== undefined) seed.selected = cameraNumber(scenario, raw.selected, "selected");
+  if (raw.bank !== undefined) {
+    if (raw.bank !== "exposure" && raw.bank !== "colour" && raw.bank !== "focus") {
+      throw new Error(`Fixture '${scenario}': bank is ${raw.bank}; the banks are exposure, colour and focus.`);
+    }
+    seed.bank = raw.bank;
+  }
   if (raw.simulated !== undefined) seed.simulated = raw.simulated;
   return seed;
 }

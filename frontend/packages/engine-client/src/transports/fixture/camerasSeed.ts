@@ -3,6 +3,7 @@
 import type { FixtureCameraSeed, FixtureCameraValuesSeed, FixtureCamerasSeed } from "../../types";
 import {
   CHOICE_SETTINGS,
+  DIAL_BANKS,
   LEVEL_SETTINGS,
   cameraAddress,
   cameraModel,
@@ -89,7 +90,7 @@ function onlyKeys(object: object, known: readonly string[], where: string) {
   if (unknown.length > 0) throw mistake(`${where} has ${unknown.join(", ")}, which a seed does not have.`);
 }
 
-const SEED_KEYS = ["cameras", "selected", "simulated"] as const;
+const SEED_KEYS = ["cameras", "selected", "bank", "simulated"] as const;
 const CAMERA_SEED_KEYS = [
   "camera",
   "address",
@@ -164,6 +165,11 @@ export function seedFixtureCameras(state: MutableFixtureState, seed: FixtureCame
   if (seed.selected !== undefined) {
     if (seed.selected !== 1 && seed.selected !== 2 && seed.selected !== 3) throw mistake("selected must be 1, 2 or 3.");
     cameras.selected = seed.selected;
+  }
+  if (seed.bank !== undefined) {
+    const bank = DIAL_BANKS.find((known) => known === seed.bank);
+    if (!bank) throw mistake("bank must be exposure, colour or focus.");
+    cameras.bank = bank;
   }
   if (seed.cameras !== undefined && !Array.isArray(seed.cameras)) throw mistake("cameras must be a list.");
   const seen = new Set<number>();

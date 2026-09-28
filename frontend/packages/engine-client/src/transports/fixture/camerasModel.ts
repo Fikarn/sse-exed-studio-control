@@ -1,6 +1,7 @@
 // Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { CameraAutos } from "../../generated/snapshots/CameraAutos";
+import type { CameraDialBank } from "../../generated/snapshots/CameraDialBank";
 import type { CameraLink } from "../../generated/snapshots/CameraLink";
 import type { CameraUnavailable } from "../../generated/snapshots/CameraUnavailable";
 
@@ -47,6 +48,16 @@ export const PRESS_SETTINGS: readonly PressSetting[] = [
 ];
 
 /** The one-shot autos (`cameras.auto`'s `what`). */
+/** What the Stream Deck's four dials set on the selected camera (D14; `CameraDialBank`). */
+export const DIAL_BANKS: readonly CameraDialBank[] = ["exposure", "colour", "focus"];
+
+/** The setting each dial sets in a bank, left to right (`CameraDialBank::dials`). */
+export const DIAL_BANK_SETS: Readonly<Record<CameraDialBank, ReadonlyArray<PressSetting | null>>> = {
+  exposure: ["iso", "shutter", "iris", "nd"],
+  colour: ["whiteBalance", "tint", null, null],
+  focus: ["focus", null, null, null],
+};
+
 export type AutoWhat = keyof CameraAutos;
 export const AUTO_WHATS: readonly AutoWhat[] = ["focus", "whiteBalance", "iris"];
 

@@ -658,12 +658,25 @@ function bridgeRoutes() {
   return new Set([...body.matchAll(/\("(?:GET|POST)",\s*"(\/api\/deck\/[^"]+)"\)/g)].map((match) => match[1]));
 }
 
+/** The string literals of a Rust list of LCD keys: `const NAME: [&str; n] = [ … ];`. */
+function rustLcdKeyList(path, name) {
+  const list = new RegExp(`const ${name}: \\[&str; \\d+\\] = \\[([^\\]]*)\\];`).exec(read(path));
+  assert.ok(list, `${name} not found in ${path}`);
+  return [...list[1].matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
+}
+
+/**
+ * The LCD keys the bridge answers: the LIGHTS and AUDIO pages' by name, where
+ * the bridge matches them, and the CAMERAS and PROMPTER pages' from the lists
+ * their own modules hold.
+ */
 function bridgeLcdKeys() {
-  const body = rustFunctionBody(
-    read("native/rust-engine/src/control_surface.rs"),
-    "pub fn read_control_surface_lcd_text("
-  );
-  return new Set([...body.matchAll(/"([a-z0-9_]+)"\s*(?==>|\|)/g)].map((match) => match[1]));
+  const body = rustFunctionBody(read("native/rust-engine/src/control_surface.rs"), "fn lights_and_audio_lcd_text(");
+  return new Set([
+    ...[...body.matchAll(/"([a-z0-9_]+)"\s*(?==>|\|)/g)].map((match) => match[1]),
+    ...rustLcdKeyList("native/rust-engine/src/cameras/deck.rs", "CAMERA_LCD_KEYS"),
+    ...rustLcdKeyList("native/rust-engine/src/prompter/deck.rs", "PROMPTER_LCD_KEYS"),
+  ]);
 }
 
 test("the contract and the bridge sources parse into methods, routes and LCD keys", () => {
@@ -671,11 +684,30 @@ test("the contract and the bridge sources parse into methods, routes and LCD key
   assert.ok(methods.has("app.snapshot") && methods.has("support.backup.restore"), "contract methods");
   assert.deepEqual(
     [...bridgeRoutes()].sort(),
-    ["/api/deck/audio-action", "/api/deck/context", "/api/deck/lcd", "/api/deck/light-action"],
+    [
+      "/api/deck/audio-action",
+      "/api/deck/camera-action",
+      "/api/deck/context",
+      "/api/deck/lcd",
+      "/api/deck/light-action",
+      "/api/deck/prompter-action",
+    ],
     "bridge routes"
   );
   const lcdKeys = bridgeLcdKeys();
-  for (const key of ["light_nav", "scene_nav", "audio_strip_1", "audio_key_8", "audio_state_gated", "workspace"]) {
+  for (const key of [
+    "light_nav",
+    "scene_nav",
+    "audio_strip_1",
+    "audio_key_8",
+    "audio_state_gated",
+    "workspace",
+    "camera_key_rec",
+    "camera_strip_4",
+    "camera_state_dials",
+    "prompter_speed",
+    "prompter_state_play",
+  ]) {
     assert.ok(lcdKeys.has(key), `LCD key ${key}`);
   }
   assert.deepEqual(requestedMethods('await h.request(`${p}-x`, "a.b", {}); h.request("id", "c.d")'), ["a.b", "c.d"]);
