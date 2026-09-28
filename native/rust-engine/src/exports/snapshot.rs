@@ -217,7 +217,21 @@ fn dial_press_label(control: &ControlDef) -> String {
 
 fn dial_rotation_label(actions: &[Value], direction: &str) -> String {
     if let Some(action) = primary_payload_action(actions) {
+        let value = primary_payload_value(actions).unwrap_or_default();
+        let dial = value.split(':').next().unwrap_or_default().to_string();
         return match (action.as_str(), direction) {
+            // The PROMPTER page's dials.
+            ("speed", "left") => String::from("Speed Down"),
+            ("speed", _) => String::from("Speed Up"),
+            ("line", "left") => String::from("Line Back"),
+            ("line", _) => String::from("Line On"),
+            ("size", "left") => String::from("Size Down"),
+            ("size", _) => String::from("Size Up"),
+            ("paragraph", "left") => String::from("Prev Paragraph"),
+            ("paragraph", _) => String::from("Next Paragraph"),
+            // The CAMERAS page's: what a dial sets is the bank's to say.
+            ("dial", "left") => format!("Dial {dial} Down"),
+            ("dial", _) => format!("Dial {dial} Up"),
             ("selectPrevLight", _) => String::from("Prev Light"),
             ("selectNextLight", _) => String::from("Next Light"),
             ("intensityDown", _) => String::from("Intensity Down"),
@@ -245,15 +259,74 @@ fn dial_rotation_label(actions: &[Value], direction: &str) -> String {
     }
 }
 
+/// What a dial of the CAMERAS page sets, whatever the bank: exposure,
+/// colour, focus (D14).
+fn camera_dial_sets(dial: &str) -> &'static str {
+    match dial {
+        "1" => "ISO, white balance or focus",
+        "2" => "shutter or tint",
+        "3" => "iris",
+        _ => "ND",
+    }
+}
+
 fn control_description(actions: &[Value], fallback_label: &str, interaction: &str) -> String {
     let Some(action) = primary_payload_action(actions) else {
         if let Some(page_target) = extract_page_nav_target(actions) {
             return format!("Navigate to the {page_target} page.");
         }
+        // A control that sends nothing: a strip cell that only shows, or a
+        // dial whose push is not used.
+        if actions.is_empty() {
+            return match interaction {
+                "button" => format!("Shows {}.", fallback_label.to_lowercase()),
+                "press" => format!("A push of {fallback_label} does nothing."),
+                _ => format!("{interaction} {fallback_label}."),
+            };
+        }
         return format!("{interaction} {fallback_label}.");
     };
 
     let value = primary_payload_value(actions);
+    let way = value.as_deref().unwrap_or_default();
+    let (dial, turn) = way.split_once(':').unwrap_or((way, ""));
+    match (action.as_str(), way) {
+        // The PROMPTER page (`docs/design/teleprompter.md` §9).
+        ("playPause", _) => return String::from("Play or pause the prompter."),
+        ("back", _) => return String::from("Go back to the start of the paragraph."),
+        ("top", _) => return String::from("Go to the top, and pause."),
+        ("cue", "previous") => return String::from("Go to the cue before the reading line."),
+        ("cue", _) => return String::from("Go to the cue after the reading line."),
+        ("speed", "down") => return String::from("Slow the prompter by 5 words a minute."),
+        ("speed", _) => return String::from("Speed the prompter up by 5 words a minute."),
+        ("line", "previous") => return String::from("Move the text back by a line."),
+        ("line", _) => return String::from("Move the text on by a line."),
+        ("paragraph", "previous") => return String::from("Go to the paragraph before."),
+        ("paragraph", _) => return String::from("Go to the next paragraph."),
+        ("size", "down") => return String::from("Make the text 4 px smaller."),
+        ("size", "up") => return String::from("Make the text 4 px larger."),
+        ("size", _) => return String::from("Return the text to its standard size."),
+        // The CAMERAS page (D14).
+        ("select", camera) => {
+            return format!("Select CAM {camera}: the dials, the plate and the big picture follow.")
+        }
+        ("bank", _) => return String::from("Put the dials on exposure, colour or focus, in turn."),
+        ("dial", _) => {
+            return format!(
+                "Step {} {} on the selected camera, as the bank says.",
+                camera_dial_sets(dial),
+                if turn == "down" { "down" } else { "up" }
+            )
+        }
+        ("dialPush", "1") => return String::from("Autofocus once, while the dials are on focus."),
+        ("dialPush", _) => return format!("A push of dial {dial} does nothing."),
+        ("rec", _) => {
+            return String::from(
+                "Start recording on CAM 1. While it records: arm the stop, then stop.",
+            )
+        }
+        _ => {}
+    }
     match action.as_str() {
         "toggleLight" => String::from("Toggle the selected light."),
         "allOn" => String::from("Turn all lights on."),

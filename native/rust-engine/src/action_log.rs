@@ -346,6 +346,8 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     // has as many as the Teleprompter's controls — and Setup's addresses,
     // pairing and vMix inputs (Slice 8).
     "cameras.auto",
+    // What the deck's dials set: a choice of the surface, as the selection.
+    "cameras.bank.set",
     "cameras.select",
     "cameras.set",
     "cameras.setup.forget",
@@ -863,7 +865,8 @@ pub(crate) fn ui_actions(
 
 /// The rows a successful Stream Deck key leaves, from the route, the key, its
 /// value and the bridge's reply (which says whether the key was staged in the
-/// preview). Dial detents, selections and the bank leave none.
+/// preview). Dial detents, selections and the bank leave none, and neither
+/// does a take's control on the PROMPTER page, as none does from the screen.
 pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<ActionRecord> {
     let staged = flag(reply, "preview") == Some(true);
     let lighting = |action: &'static str, target: &str, detail: String| {
@@ -945,6 +948,30 @@ pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<Actio
                 )]
             })
             .unwrap_or_default(),
+        // The CAMERAS page's `REC` (D14): a take's start and its stop, in
+        // the sentence the screen's row carries. The armed stop (`STOP?`)
+        // and a press inside the dwell changed nothing, and leave no row.
+        ("/api/deck/camera-action", "rec") => {
+            let action = match text(reply, "/did") {
+                Some("started") => "recording-started",
+                Some("stopped") => "recording-stopped",
+                _ => return Vec::new(),
+            };
+            let (Some(camera), Some(detail)) = (
+                reply.get("camera").and_then(Value::as_u64),
+                text(reply, "/sentence"),
+            ) else {
+                return Vec::new();
+            };
+            vec![ActionRecord::new(
+                ActionSource::Deck,
+                DOMAIN_CAMERAS,
+                action,
+                format!("CAM {camera}"),
+                detail,
+            )]
+        }
+
         ("/api/deck/audio-action", "soloClearAll") => {
             let cleared = reply
                 .pointer("/cleared")

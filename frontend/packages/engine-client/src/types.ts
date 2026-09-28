@@ -7,6 +7,7 @@ import type {
   StartupLifecycleState,
 } from "./generated/protocol";
 import type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
+import type { CameraDialBank } from "./generated/snapshots/CameraDialBank";
 import type { CamerasSnapshot } from "./generated/snapshots/CamerasSnapshot";
 import type { LightingDmxMonitorSnapshot } from "./generated/snapshots/LightingDmxMonitorSnapshot";
 import type { LightingFixtureCatalogSnapshot } from "./generated/snapshots/LightingFixtureCatalogSnapshot";
@@ -467,6 +468,8 @@ export interface FixtureCameraSeed {
 export interface FixtureCamerasSeed {
   cameras?: FixtureCameraSeed[];
   selected?: 1 | 2 | 3;
+  /** What the deck's dials set; `exposure` without it. */
+  bank?: "exposure" | "colour" | "focus";
   simulated?: boolean;
 }
 
@@ -691,6 +694,8 @@ export interface ShellStore {
   // The cameras. Each answers what the hardware link answered, or throws its
   // refusal (`EngineRequestError`), and the cameras' state is read again.
   selectCamera(camera: CameraNumber): Promise<JsonValue>;
+  /** What the Stream Deck's dials set on the selected camera (D14). Nothing reaches a camera. */
+  setCameraDialBank(bank: CameraDialBank): Promise<JsonValue>;
   setCameraValue(request: CameraSetRequest): Promise<JsonValue>;
   stepCameraValue(request: CameraStepRequest): Promise<JsonValue>;
   runCameraAuto(request: CameraAutoRequest): Promise<JsonValue>;

@@ -671,6 +671,7 @@ describe("createShellStore scoped refresh", () => {
     await store.initialize();
     calls.length = 0;
     await store.selectCamera(3);
+    await store.setCameraDialBank("colour");
     await store.setCameraValue({ camera: 1, setting: "whiteBalance", value: 5600 });
     await store.stepCameraValue({ camera: 2, setting: "iso", step: 1 });
     await store.runCameraAuto({ camera: 1, what: "iris" });
@@ -685,6 +686,7 @@ describe("createShellStore scoped refresh", () => {
     await store.forgetCamera(2);
     expect(sent).toEqual([
       ["cameras.select", { camera: 3 }],
+      ["cameras.bank.set", { bank: "colour" }],
       ["cameras.set", { camera: 1, setting: "whiteBalance", value: 5600 }],
       ["cameras.step", { camera: 2, setting: "iso", step: 1 }],
       ["cameras.auto", { camera: 1, what: "iris" }],
@@ -1084,7 +1086,8 @@ describe("createShellStore identify flashes", () => {
 // The cameras' snapshot: read at the start without the start depending on
 // it, again after `cameras.changed`, and kept when a later reply is malformed.
 describe("createShellStore the cameras", () => {
-  const cameras = (selected: number, recent: JsonValue = []) => ({ selected, cameras: [], recent });
+  const dials = { bank: "exposure", sets: ["iso", "shutter", "iris", "nd"] };
+  const cameras = (selected: number, recent: JsonValue = []) => ({ selected, dials, cameras: [], recent });
 
   it("reads the cameras at the start and again when they change", async () => {
     const { answer, calls, emit, snapshotRequests, transport } = supervisedTransport();
@@ -1117,7 +1120,7 @@ describe("createShellStore the cameras", () => {
 
     // A reply that is not the cameras' is refused, and the start goes on.
     const malformed = supervisedTransport();
-    malformed.answer("cameras.snapshot", { selected: 1, cameras: "none", recent: [] });
+    malformed.answer("cameras.snapshot", { selected: 1, dials, cameras: "none", recent: [] });
     const guarded = createShellStore(malformed.transport);
     await guarded.initialize();
     expect(guarded.getSnapshot().lifecycle).toBe("ready");
@@ -1131,7 +1134,7 @@ describe("createShellStore the cameras", () => {
     await guarded.refreshCamerasSnapshot();
     expect(guarded.getSnapshot().camerasSnapshot).toEqual(cameras(1));
     // A malformed reply after that is refused, and the last good one is kept.
-    malformed.answer("cameras.snapshot", { selected: 2, cameras: [], recent: "none" });
+    malformed.answer("cameras.snapshot", { selected: 2, dials, cameras: [], recent: "none" });
     await guarded.refreshCamerasSnapshot();
     expect(guarded.getSnapshot().camerasSnapshot).toEqual(cameras(1));
     expect(guarded.getSnapshot().backgroundFailures.at(-1)).toMatchObject({

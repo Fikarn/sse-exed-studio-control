@@ -43,7 +43,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-type Handled = Result<(Value, Option<&'static str>), PrompterError>;
+pub(super) type Handled = Result<(Value, Option<&'static str>), PrompterError>;
 
 /// Answers one `prompter.*` request.
 pub(crate) fn handle_prompter_request(
@@ -673,7 +673,7 @@ fn bring_back_request(
 // What the glass shows (D11: replacing, updating and clearing are armed)
 // ---------------------------------------------------------------------------
 
-fn nothing_on() -> PrompterError {
+pub(super) fn nothing_on() -> PrompterError {
     PrompterError::Refused(
         "PROMPTER_NOTHING_ON",
         String::from("Nothing is on the prompter. Put a script on first."),
@@ -887,7 +887,11 @@ fn glass_mut(prompter: &mut Prompter) -> Result<&mut GlassClock, PrompterError> 
     prompter.glass.as_mut().ok_or_else(nothing_on)
 }
 
-fn play_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
+pub(super) fn play_request(
+    prompter: &mut Prompter,
+    connection: &mut Connection,
+    now: Instant,
+) -> Handled {
     if prompter.glass.is_none() {
         return Err(nothing_on());
     }
@@ -916,7 +920,11 @@ fn play_request(prompter: &mut Prompter, connection: &mut Connection, now: Insta
     Ok((json!({}), Some("played")))
 }
 
-fn pause_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
+pub(super) fn pause_request(
+    prompter: &mut Prompter,
+    connection: &mut Connection,
+    now: Instant,
+) -> Handled {
     let glass = glass_mut(prompter)?;
     glass.pause(now);
     // Where the 0.3 s ease will stop the text, not where it was at the press
@@ -928,7 +936,7 @@ fn pause_request(prompter: &mut Prompter, connection: &mut Connection, now: Inst
 
 /// `prompter.speed { wpm? | step? }`: the pace in words a minute, 40–300 in
 /// steps of 5; `step` moves it that many steps and stops at the ends.
-fn speed_request(
+pub(super) fn speed_request(
     prompter: &mut Prompter,
     connection: &mut Connection,
     params: &Value,
@@ -969,7 +977,7 @@ fn speed_request(
 /// `previousCue`, `paragraph` (with `paragraph`, from 0) or `place` (with
 /// `paragraph` and `word`). A jump keeps the scroll as it was; only `top`
 /// pauses (§14).
-fn jump_request(
+pub(super) fn jump_request(
     prompter: &mut Prompter,
     connection: &mut Connection,
     params: &Value,
@@ -1066,7 +1074,7 @@ fn jump_request(
 /// `prompter.textSize { sizePx? | step? | standard? }`: the take's size,
 /// 48–160 px in steps of 4; `standard: true` returns to the look's standard.
 /// The words at the reading line stay (§4.1).
-fn text_size_request(
+pub(super) fn text_size_request(
     prompter: &mut Prompter,
     connection: &mut Connection,
     params: &Value,

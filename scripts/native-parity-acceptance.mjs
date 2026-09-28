@@ -78,11 +78,12 @@ export async function awaitConsoleLinkQuiet(harness, requestIdPrefix, { timeoutM
   }
 }
 
-// New pages program, Slice 2 (D5): the Stream Deck's pages follow the app's
-// tabs, LIGHTS (page 1) then AUDIO (page 2); PROJECTS and TASKS left with
-// Planning, and so did the Planning time report (`planning.report.time`)
-// this contract check opened with until then.
-export const DECK_PAGE_LABELS = ["LIGHTS", "AUDIO"];
+// D5: the Stream Deck's pages follow the app's tabs: LIGHTS (page 1), AUDIO
+// (page 2), CAMERAS (page 3) and PROMPTER (page 4), chained by the page keys
+// in a ring. PROJECTS and TASKS left with Planning (new pages program, Slice
+// 2), and so did the Planning time report (`planning.report.time`) this
+// contract check opened with until then.
+export const DECK_PAGE_LABELS = ["LIGHTS", "AUDIO", "CAMERAS", "PROMPTER"];
 
 // New pages program, Slices 2 and 2b: the saved data these lanes follow
 // through a restart, an update or reinstall and a backup's restore is the page
@@ -115,7 +116,7 @@ export async function assertCoreParityContracts(harness, requestIdPrefix, runtim
   const pageLabels = pages.map((page) => page?.label);
   assert(
     JSON.stringify(pageLabels) === JSON.stringify(DECK_PAGE_LABELS),
-    `${runtimeLabel} controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(pageLabels)}.`
+    `${runtimeLabel} controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(", ")} in that order, got ${JSON.stringify(pageLabels)}.`
   );
   for (const page of pages) {
     assert(
@@ -123,11 +124,16 @@ export async function assertCoreParityContracts(harness, requestIdPrefix, runtim
       `${runtimeLabel} controlSurface.snapshot must expose ${page.label} buttons and dials.`
     );
   }
-  const [lightsPage, audioPage] = pages;
-  assert(
-    lightsPage.buttons.some((control) => control.isPageNav === true && control.pageNavTarget === audioPage.label),
-    `${runtimeLabel} controlSurface.snapshot: the LIGHTS page has no page key to the AUDIO page.`
-  );
+  // The page keys make a ring: each page has one, to the page after it, and
+  // the last page's goes round to the first.
+  for (const [index, page] of pages.entries()) {
+    const next = pages[(index + 1) % pages.length];
+    const pageKeys = page.buttons.filter((control) => control.isPageNav === true);
+    assert(
+      pageKeys.length === 1 && pageKeys[0].pageNavTarget === next.label,
+      `${runtimeLabel} controlSurface.snapshot: the ${page.label} page must have one page key, to the ${next.label} page, and has ${JSON.stringify(pageKeys.map((control) => control.pageNavTarget))}.`
+    );
+  }
 
   const lightingDmxMonitor = await harness.request(
     `${requestIdPrefix}-lighting-dmx-monitor`,

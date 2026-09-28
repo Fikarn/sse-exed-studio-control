@@ -175,6 +175,14 @@ pub(super) const DECK_MUTED_BG: u32 = 0x001A_0F0C;
 pub(super) const DECK_MUTED_INK: u32 = 0x00E0_7A63;
 pub(super) const DECK_GREY_INK: u32 = 0x006D_675A;
 pub(super) const DECK_BANK_TINT_BG: u32 = 0x004A_3A12;
+/// Live: running now (the prompter's text scrolls). The screen's green.
+pub(super) const DECK_LIVE_BG: u32 = 0x003D_DC7A;
+pub(super) const DECK_LIVE_INK: u32 = 0x0004_200F;
+/// A hazard that is on (`REC` while CAM 1 records): the word in the screen's
+/// red under a red lamp, on a dark key, never a red fill (D19).
+pub(super) const DECK_HAZARD_INK: u32 = 0x00FF_6B6B;
+/// Doubt: what a device last reported before it stopped answering.
+pub(super) const DECK_DOUBT_INK: u32 = DECK_AMBER_BG;
 
 // Base64 PNG assets rendered by scripts/deck-assets.py and checked in under
 // native/rust-engine/assets/deck/.
@@ -214,6 +222,8 @@ pub(super) fn deck_asset(name: &str) -> &'static str {
         "ico_dim" => include_str!("../../assets/deck/ico_dim.b64"),
         "ico_solo" => include_str!("../../assets/deck/ico_solo.b64"),
         "ico_gain" => include_str!("../../assets/deck/ico_gain.b64"),
+        "lamp_red" => include_str!("../../assets/deck/lamp_red.b64"),
+        "lamp_amber" => include_str!("../../assets/deck/lamp_amber.b64"),
         _ => "",
     };
     encoded.trim_end()

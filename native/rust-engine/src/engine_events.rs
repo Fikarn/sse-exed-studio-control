@@ -23,6 +23,28 @@ pub fn register_engine_event_sender(sender: Sender<Value>) {
     let _ = ENGINE_EVENT_SENDER.set(sender);
 }
 
+/// Emits an event with a payload of the caller's. In the tests, where no
+/// sender is registered, the event is kept for the test that raised it
+/// (`EMITTED`).
+pub(crate) fn emit_event(event: &str, payload: Value) {
+    #[cfg(test)]
+    EMITTED.with(|events| {
+        events
+            .borrow_mut()
+            .push((String::from(event), payload.clone()));
+    });
+    if let Some(sender) = ENGINE_EVENT_SENDER.get() {
+        let _ = sender.send(event_message(event, payload));
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The events `emit_event` raised on this thread.
+    pub(crate) static EMITTED: std::cell::RefCell<Vec<(String, Value)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
 /// Emits `audio.changed { reason }`.
 pub(crate) fn emit_audio_changed(reason: &str) {
     emit_audio_changed_with(json!({ "reason": reason }));

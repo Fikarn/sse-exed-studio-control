@@ -98,6 +98,8 @@ export type { CameraChoice } from "./generated/snapshots/CameraChoice";
 export type { CameraHealthEntry } from "./generated/snapshots/CameraHealthEntry";
 export type { CameraLevel } from "./generated/snapshots/CameraLevel";
 export type { CameraLink } from "./generated/snapshots/CameraLink";
+export type { CameraDialBank } from "./generated/snapshots/CameraDialBank";
+export type { CameraDials } from "./generated/snapshots/CameraDials";
 export type { CameraRecentAction } from "./generated/snapshots/CameraRecentAction";
 export type { CameraRecording } from "./generated/snapshots/CameraRecording";
 export type { CameraSetupSummary } from "./generated/snapshots/CameraSetupSummary";

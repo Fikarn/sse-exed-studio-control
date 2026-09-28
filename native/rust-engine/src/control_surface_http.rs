@@ -7,9 +7,8 @@
 //! method, target, headers and body.
 
 use crate::control_surface::{
-    handle_control_surface_http_action, read_control_surface_context,
-    read_control_surface_lcd_text, ControlSurfaceBridgeInfo, ControlSurfaceError,
-    DEFAULT_CONTROL_SURFACE_HOST,
+    handle_deck_http_action, read_control_surface_context, read_deck_lcd_text,
+    ControlSurfaceBridgeInfo, ControlSurfaceError, DEFAULT_CONTROL_SURFACE_HOST,
 };
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
@@ -41,15 +40,18 @@ const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
 /// Sized for the deck's worst instant: the exported profile's once-a-second
-/// LCD poll sends one request per audio LCD key, all at once, the lighting
+/// LCD poll sends one request per polled LCD key, all at once, the lighting
 /// page-follow trigger the poll can set off adds the four LIGHTS LCDs, and the
 /// control with the most LCD refreshes sends its own burst on one press
 /// (`exports::deck_worst_instant_requests` counts them). All
 /// of them must fit the workers and the queue together, with
 /// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
 /// of 16 turned the poll's last five requests away every second on the studio
-/// workstation. The thread count stays fixed whatever the queue holds.
-const QUEUE_CAPACITY: usize = 64;
+/// workstation. The thread count stays fixed whatever the queue holds. With
+/// the CAMERAS and PROMPTER pages the instant is 62 requests (it was 44), and
+/// the queue went from 64 to 96: a refused key press is lost, since Companion
+/// never sends one again.
+const QUEUE_CAPACITY: usize = 96;
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 
 /// The bearer token the bridge demands on every request (finding F01):
@@ -99,11 +101,14 @@ fn write_bridge_token_file(path: &Path, token: &str) -> std::io::Result<()> {
     Ok(())
 }
 
+/// `cameras_simulated` is `SSE_CAMERAS_SIMULATED`, read at the start: the
+/// CAMERAS page's keys and displays reach the cameras the screen reaches.
 pub fn start_control_surface_bridge(
     db_path: &Path,
     log_file_path: &Path,
     requested_port: u16,
     token: String,
+    cameras_simulated: bool,
 ) -> ControlSurfaceBridgeInfo {
     match bind_control_surface_listener(requested_port) {
         Ok(listener) => {
@@ -127,6 +132,7 @@ pub fn start_control_surface_bridge(
                     token,
                     port,
                 )
+                .with_cameras_simulated(cameras_simulated)
                 .keeping_read_connections(),
             );
             thread::spawn(move || {
@@ -178,6 +184,11 @@ struct BridgeContext {
     /// The engine's bridge does; a test's bridge does not, because its
     /// workers outlive the test and would hold its temporary database open.
     keep_read_connections: bool,
+    /// `SSE_CAMERAS_SIMULATED`, read at the start. A context that was not
+    /// told has none of the simulated cameras: a bridge that forgot to ask
+    /// reads every camera as having no link, and never shows a simulated
+    /// camera as a real one.
+    cameras_simulated: bool,
 }
 
 impl BridgeContext {
@@ -189,7 +200,13 @@ impl BridgeContext {
             port,
             rejection_log: Mutex::new(HashMap::new()),
             keep_read_connections: false,
+            cameras_simulated: false,
         }
+    }
+
+    fn with_cameras_simulated(mut self, cameras_simulated: bool) -> Self {
+        self.cameras_simulated = cameras_simulated;
+        self
     }
 
     fn keeping_read_connections(mut self) -> Self {
@@ -383,7 +400,9 @@ fn respond(
     let authorized = request
         .and_then(|request| authorize(&request, &context.token, context.port).map(|()| request));
     match authorized {
-        Ok(request) => route_control_surface_request(&context.db_path, &request),
+        Ok(request) => {
+            route_control_surface_request(&context.db_path, context.cameras_simulated, &request)
+        }
         Err(error) => {
             context.note_rejection(error.status_code(), error.message());
             HttpResponse::from_error(&error)
@@ -665,7 +684,11 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
     difference == 0
 }
 
-fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpResponse {
+fn route_control_surface_request(
+    db_path: &Path,
+    cameras_simulated: bool,
+    request: &HttpRequest,
+) -> HttpResponse {
     let (path, query) = split_target(&request.target);
 
     let result = match (request.method.as_str(), path) {
@@ -674,14 +697,17 @@ fn route_control_surface_request(db_path: &Path, request: &HttpRequest) -> HttpR
             let key = query_parameter(query, "key").ok_or_else(|| {
                 ControlSurfaceError::InvalidParams(String::from("Missing ?key= parameter"))
             });
-            key.and_then(|key| read_control_surface_lcd_text(db_path, &key).map(Value::String))
+            key.and_then(|key| {
+                read_deck_lcd_text(db_path, cameras_simulated, &key).map(Value::String)
+            })
         }
         // New pages program, Slice 2: `POST /api/deck/action`, the PROJECTS
-        // and TASKS keys' route, left with Planning.
-        ("POST", "/api/deck/light-action") | ("POST", "/api/deck/audio-action") => {
-            parse_json_body(&request.body)
-                .and_then(|body| handle_control_surface_http_action(db_path, path, &body))
-        }
+        // and TASKS keys' route, left with Planning. One route a page (D5).
+        ("POST", "/api/deck/light-action")
+        | ("POST", "/api/deck/audio-action")
+        | ("POST", "/api/deck/camera-action")
+        | ("POST", "/api/deck/prompter-action") => parse_json_body(&request.body)
+            .and_then(|body| handle_deck_http_action(db_path, cameras_simulated, path, &body)),
         _ => Err(ControlSurfaceError::InvalidParams(format!(
             "Unsupported bridge endpoint: {} {}",
             request.method, path
@@ -1230,12 +1256,15 @@ mod tests {
         let listener = TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, 0))
             .expect("an ephemeral loopback port");
         let port = listener.local_addr().expect("local address").port();
-        let context = Arc::new(BridgeContext::new(
-            test_dir.db_path(),
-            test_dir.path().join("engine.log"),
-            TEST_TOKEN.to_string(),
-            port,
-        ));
+        let context = Arc::new(
+            BridgeContext::new(
+                test_dir.db_path(),
+                test_dir.path().join("engine.log"),
+                TEST_TOKEN.to_string(),
+                port,
+            )
+            .with_cameras_simulated(true),
+        );
         thread::spawn(move || run_control_surface_bridge(listener, context, workers, queue));
         port
     }
@@ -1410,44 +1439,141 @@ mod tests {
     // the press that sends the most.
     #[test]
     fn the_pool_holds_the_decks_worst_instant() {
-        let burst = crate::exports::deck_worst_instant_requests();
+        let worst = crate::exports::deck_worst_instant_requests();
+        // The numbers the queue was sized for. A profile that sends more
+        // changes them here, and the queue with them.
+        assert_eq!(
+            (worst.poll, worst.follow, worst.press, worst.total()),
+            (41, 4, 17, 62)
+        );
+        // The instant and the largest press again must fit: a key pressed
+        // while the instant waits is not turned away.
         assert!(
-            burst > crate::exports::AUDIO_LCD_KEYS.len(),
-            "the poll and a press: {burst}"
+            WORKER_COUNT + QUEUE_CAPACITY >= worst.total() + worst.press,
+            "{} requests at the worst instant and a press of {} more do not fit {WORKER_COUNT} workers and a queue of {QUEUE_CAPACITY}",
+            worst.total(),
+            worst.press
         );
         let test_dir = ready_audio_test_db("bridge-deck-burst");
         let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);
         let host = format!("127.0.0.1:{port}");
 
+        // What the instant asks for: every display of the poll, the LIGHTS
+        // displays of the follow, and a press's worth of displays more.
+        let polled = crate::exports::polled_lcd_keys();
+        let keys: Vec<&str> = polled
+            .iter()
+            .copied()
+            .chain(["light_nav", "light_intensity", "light_cct", "scene_nav"])
+            .chain(polled.iter().copied().take(worst.press))
+            .collect();
+        assert_eq!(keys.len(), worst.total());
+
         // Every connection is open before any request is sent, so no worker can
         // finish one and make room: the whole burst waits at once.
-        let mut streams: Vec<TcpStream> = (0..burst)
+        let mut streams: Vec<TcpStream> = keys
+            .iter()
             .map(|_| TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect"))
             .collect();
         thread::sleep(Duration::from_millis(200));
-        for stream in &mut streams {
+        for (stream, key) in streams.iter_mut().zip(&keys) {
             let request = format!(
-                "GET /api/deck/lcd?key=audio_strip_1 HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+                "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
             );
             let _ = stream.write_all(request.as_bytes());
             let _ = stream.shutdown(Shutdown::Write);
         }
-        let statuses: Vec<u16> = streams
+        let statuses: Vec<(&str, u16)> = streams
             .into_iter()
-            .map(|mut stream| {
+            .zip(&keys)
+            .map(|(mut stream, key)| {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(5)))
                     .expect("read timeout");
                 let mut response = Vec::new();
                 let _ = stream.read_to_end(&mut response);
-                status_of(&String::from_utf8_lossy(&response))
+                (*key, status_of(&String::from_utf8_lossy(&response)))
             })
             .collect();
-        let unserved = statuses.iter().filter(|status| **status != 200).count();
-        assert_eq!(
-            unserved, 0,
-            "{unserved} of {burst} requests at the deck's worst instant were not served: {statuses:?}"
+        let unserved: Vec<&(&str, u16)> = statuses
+            .iter()
+            .filter(|(_, status)| *status != 200)
+            .collect();
+        assert!(
+            unserved.is_empty(),
+            "{} of {} requests at the deck's worst instant were not served: {unserved:?}",
+            unserved.len(),
+            keys.len()
         );
+    }
+
+    // The CAMERAS and PROMPTER pages over the wire: a key of each is pressed
+    // as Companion presses it, and answered as the page's own entry point
+    // answers. The cameras are the simulated ones (D15).
+    #[test]
+    fn the_cameras_and_the_prompter_keys_are_pressed_over_the_wire() {
+        let test_dir = ready_audio_test_db("bridge-page-keys");
+        let port = start_test_bridge(&test_dir, 2, 4);
+        let host = format!("127.0.0.1:{port}");
+        let post = |route: &str, body: &str| {
+            raw_request(
+                port,
+                &format!(
+                    "POST {route} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                    body.len()
+                ),
+            )
+        };
+        let get = |key: &str| {
+            raw_request(
+                port,
+                &format!(
+                    "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+                ),
+            )
+        };
+
+        let selected = post(
+            "/api/deck/camera-action",
+            r#"{"action":"select","value":"2"}"#,
+        );
+        assert_eq!(status_of(&selected), 200, "{selected}");
+        assert!(selected.contains(r#""did":"select""#), "{selected}");
+        assert!(selected.contains(r#""selected":2"#), "{selected}");
+        let display = get("camera_state_selected");
+        assert_eq!(status_of(&display), 200, "{display}");
+        assert!(display.ends_with("\"2\""), "{display}");
+
+        let bank = post("/api/deck/camera-action", r#"{"action":"bank"}"#);
+        assert_eq!(status_of(&bank), 200, "{bank}");
+        assert!(bank.contains(r#""bank":"colour""#), "{bank}");
+
+        // New saved data holds no camera: a dial is refused in the cameras'
+        // own words, and nothing is on the prompter.
+        let dial = post(
+            "/api/deck/camera-action",
+            r#"{"action":"dial","value":"1:up"}"#,
+        );
+        assert_eq!(status_of(&dial), 409, "{dial}");
+        let play = post("/api/deck/prompter-action", r#"{"action":"playPause"}"#);
+        assert_eq!(status_of(&play), 409, "{play}");
+        assert!(
+            play.contains("Nothing is on the prompter. Put a script on first."),
+            "{play}"
+        );
+        let unknown = post("/api/deck/prompter-action", r#"{"action":"rec"}"#);
+        assert_eq!(status_of(&unknown), 400, "{unknown}");
+        let display = get("prompter_name");
+        assert_eq!(status_of(&display), 200, "{display}");
+
+        // Without the token a key of the new pages is refused as any other.
+        let anonymous = raw_request(
+            port,
+            &format!(
+                "POST /api/deck/camera-action HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: 16\r\n\r\n{{\"action\":\"rec\"}}"
+            ),
+        );
+        assert_eq!(status_of(&anonymous), 401, "{anonymous}");
     }
 
     #[test]

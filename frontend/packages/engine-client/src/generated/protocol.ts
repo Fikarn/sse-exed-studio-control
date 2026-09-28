@@ -89,6 +89,7 @@ export const REQUEST_METHODS = [
   "support.snapshot",
   "cameras.snapshot",
   "cameras.select",
+  "cameras.bank.set",
   "cameras.set",
   "cameras.step",
   "cameras.auto",

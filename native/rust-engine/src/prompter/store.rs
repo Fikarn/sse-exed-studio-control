@@ -174,6 +174,18 @@ pub(crate) fn read_script(connection: &Connection, id: &str) -> EngineResult<Opt
 /// A new script's id: `script-` and sixteen hex digits from the system's
 /// randomness, so a script restored from another workstation's archive
 /// never takes an id this one has.
+/// A script's name, without its text: the Stream Deck's strip asks for it
+/// once a second.
+pub(crate) fn read_script_name(connection: &Connection, id: &str) -> EngineResult<Option<String>> {
+    Ok(connection
+        .query_row(
+            "SELECT name FROM prompter_scripts WHERE id = ?1",
+            [id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?)
+}
+
 pub(crate) fn new_script_id() -> EngineResult<String> {
     let mut bytes = [0u8; 8];
     getrandom::fill(&mut bytes)

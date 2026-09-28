@@ -1,3 +1,4 @@
+import type { CameraDialBank } from "../generated/snapshots/CameraDialBank";
 import { useSyncExternalStore } from "react";
 
 import {
@@ -1632,6 +1633,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     selectCamera(camera: CameraNumber) {
       return performRequest("cameras.select", { camera });
+    },
+    setCameraDialBank(bank: CameraDialBank) {
+      return performRequest("cameras.bank.set", { bank });
     },
     setCameraValue(request: CameraSetRequest) {
       return performRequest("cameras.set", { ...request });

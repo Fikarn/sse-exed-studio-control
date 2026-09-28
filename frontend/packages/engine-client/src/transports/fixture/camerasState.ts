@@ -1,6 +1,8 @@
 // Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { CameraChoice } from "../../generated/snapshots/CameraChoice";
+import type { CameraDialBank } from "../../generated/snapshots/CameraDialBank";
+import type { CameraDials } from "../../generated/snapshots/CameraDials";
 import type { CameraHealthEntry } from "../../generated/snapshots/CameraHealthEntry";
 import type { CameraLevel } from "../../generated/snapshots/CameraLevel";
 import type { CameraRecentAction } from "../../generated/snapshots/CameraRecentAction";
@@ -13,6 +15,7 @@ import type { CamerasSnapshot } from "../../generated/snapshots/CamerasSnapshot"
 import {
   CAMERA_NUMBERS,
   CHOICE_SETTINGS,
+  DIAL_BANK_SETS,
   LEVEL_SETTINGS,
   cameraModel,
   isReported,
@@ -99,6 +102,8 @@ export interface FixtureCameras {
   /** The simulated link (`SSE_CAMERAS_SIMULATED=1`); without it no camera has a link yet. */
   simulated: boolean;
   selected: CameraNumber;
+  /** What the deck's dials set on the selected camera (D14); `exposure` after a start. */
+  bank: CameraDialBank;
   /** The action log cannot be read (a test hook): `cameras.snapshot` answers `recent: null`. */
   recentUnreadable: boolean;
   held: Record<CameraNumber, HeldCamera>;
@@ -157,6 +162,7 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
     cameras = {
       simulated: true,
       selected: 1,
+      bank: "exposure",
       recentUnreadable: false,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
@@ -412,10 +418,16 @@ export function recentCameraActions(state: MutableFixtureState): CameraRecentAct
   return recent;
 }
 
-/** `cameras.snapshot`: the selection, the three cameras and their newest Recent actions. */
+/** What the deck's dials set, as `cameras.snapshot` and `cameras.bank.set` say it (`Cameras::dials`). */
+export function cameraDials(cameras: FixtureCameras): CameraDials {
+  return { bank: cameras.bank, sets: [...DIAL_BANK_SETS[cameras.bank]] };
+}
+
+/** `cameras.snapshot`: the selection, the dials, the three cameras and their newest Recent actions. */
 export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAction[] | null): CamerasSnapshot {
   return {
     selected: cameras.selected,
+    dials: cameraDials(cameras),
     cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),
     recent,
   };

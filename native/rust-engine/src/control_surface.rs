@@ -26,6 +26,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
 pub const DEFAULT_CONTROL_SURFACE_PORT: u16 = 38201;
@@ -164,10 +165,53 @@ pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurf
     }))
 }
 
+/// What a display of the deck says, whatever its page. `cameras_simulated`
+/// is `SSE_CAMERAS_SIMULATED`, read at the start: when the deck asks before
+/// the screen does, the bridge is the cameras' first caller, and the cameras
+/// it loads must be the ones the screen will get.
+pub fn read_deck_lcd_text(
+    db_path: &Path,
+    cameras_simulated: bool,
+    key: &str,
+) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text_at(db_path, cameras_simulated, key, Instant::now())
+}
+
+/// `read_deck_lcd_text` at a moment of the caller's.
+fn read_deck_lcd_text_at(
+    db_path: &Path,
+    cameras_simulated: bool,
+    key: &str,
+    at: Instant,
+) -> Result<String, ControlSurfaceError> {
+    // The PROMPTER and CAMERAS displays first: they need nothing of the
+    // Console or the rig, and are read once for a whole poll.
+    match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key, at) {
+        Some(text) => text,
+        None => lights_and_audio_lcd_text(db_path, key),
+    }
+}
+
+/// The tests' short form: the simulated cameras, which every test has (D15).
+#[cfg(test)]
 pub fn read_control_surface_lcd_text(
     db_path: &Path,
     key: &str,
 ) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text(db_path, true, key)
+}
+
+/// The tests' short form at a moment of the test's.
+#[cfg(test)]
+pub fn read_control_surface_lcd_text_at(
+    db_path: &Path,
+    key: &str,
+    at: Instant,
+) -> Result<String, ControlSurfaceError> {
+    read_deck_lcd_text_at(db_path, true, key, at)
+}
+
+fn lights_and_audio_lcd_text(db_path: &Path, key: &str) -> Result<String, ControlSurfaceError> {
     let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     let audio_snapshot = read_audio_snapshot(&app_settings);
@@ -330,49 +374,143 @@ fn read_active_workspace(db_path: &Path) -> Result<String, ControlSurfaceError> 
 // Mirrors the operator app's fader curve (normalizedToFaderDb in
 // frontend/app/src/app/audio/audioFormatting.ts) — the deck and the screen
 // must always print the same dB number for the same wire value.
+/// The tests' short form: the simulated cameras, which every test has (D15).
+#[cfg(test)]
 pub fn handle_control_surface_http_action(
     db_path: &Path,
     path: &str,
     body: &Value,
 ) -> Result<Value, ControlSurfaceError> {
-    let action = body
+    handle_deck_http_action(db_path, true, path, body)
+}
+
+/// The tests' short form at a moment of the test's.
+#[cfg(test)]
+pub fn handle_control_surface_http_action_at(
+    db_path: &Path,
+    path: &str,
+    body: &Value,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
+    handle_deck_http_action_at(db_path, true, path, body, at)
+}
+
+/// A key or a dial of the deck, whatever its page. `cameras_simulated` is
+/// `SSE_CAMERAS_SIMULATED`, read at the start (`read_deck_lcd_text`).
+pub fn handle_deck_http_action(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    body: &Value,
+) -> Result<Value, ControlSurfaceError> {
+    handle_deck_http_action_at(db_path, cameras_simulated, path, body, Instant::now())
+}
+
+/// `handle_deck_http_action` at a moment of the caller's: the CAMERAS page's
+/// `REC` counts from it, and the two new pages keep their texts from it.
+fn handle_deck_http_action_at(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    body: &Value,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
+    let (response, events) = deck_key_stamped(db_path, cameras_simulated, path, body, at);
+    // The screen hears of the key now, when the key is stamped and its row
+    // written: a page that reads on the event finds the row.
+    for event in events {
+        match event {
+            KeyEvent::Lighting => crate::engine_events::emit_lighting_changed("control-surface"),
+            KeyEvent::Page(event, payload) => crate::engine_events::emit_event(event, payload),
+        }
+    }
+    response
+}
+
+/// What the screen is to hear of a key of the deck.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum KeyEvent {
+    /// `lighting.changed { reason: "control-surface" }`.
+    Lighting,
+    /// An event of the PROMPTER or the CAMERAS page, with its payload.
+    Page(&'static str, Value),
+}
+
+/// A key of the deck: acted on, stamped as the last event and written to
+/// Recent actions, in that order. It raises no event of the key's: it says
+/// which the screen is to hear, for its caller to raise afterwards. (The
+/// AUDIO page's keys announce themselves inside their action, as they did.)
+pub(crate) fn deck_key_stamped(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    body: &Value,
+    at: Instant,
+) -> (Result<Value, ControlSurfaceError>, Vec<KeyEvent>) {
+    let Some(action) = body
         .get("action")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("action is required")))?;
+    else {
+        return (
+            Err(ControlSurfaceError::InvalidParams(String::from(
+                "action is required",
+            ))),
+            Vec::new(),
+        );
+    };
     let value = body.get("value").and_then(Value::as_str);
 
+    let mut events = Vec::new();
     let response = match path {
         "/api/deck/light-action" => handle_light_action(db_path, action),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
-        _ => Err(ControlSurfaceError::InvalidParams(format!(
-            "Unsupported action route: {path}"
-        ))),
+        _ => match crate::control_surface_pages::handle_page_action(
+            db_path,
+            cameras_simulated,
+            path,
+            action,
+            value,
+            at,
+        ) {
+            Some(Ok(page)) => {
+                events.extend(
+                    page.events
+                        .into_iter()
+                        .map(|(event, payload)| KeyEvent::Page(event, payload)),
+                );
+                Ok(page.answer)
+            }
+            Some(Err(error)) => Err(error),
+            None => Err(ControlSurfaceError::InvalidParams(format!(
+                "Unsupported action route: {path}"
+            ))),
+        },
     };
-    if let Ok(reply) = &response {
-        // The action log (Slice 11 — F30): every key through the bridge is
-        // the Stream Deck's, so this is where a row gets the source `deck`.
-        // The reply says what the key did and whether it was staged in the
-        // preview; the row rides the transaction that stamps the last
-        // event, so a key waits for the disk no more often than before.
-        let actions = crate::action_log::deck_actions(path, action, reply);
-        if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions)
-        {
-            crate::diagnostics::log_event(
-                crate::diagnostics::LogLevel::Warn,
-                &format!(
-                    "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
-                    actions.len(),
-                    error.message()
-                ),
-            );
-        }
-        if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
-            crate::engine_events::emit_lighting_changed("control-surface")
-        }
+    let Ok(reply) = &response else {
+        return (response, Vec::new());
+    };
+    // The action log (Slice 11 — F30): every key through the bridge is
+    // the Stream Deck's, so this is where a row gets the source `deck`.
+    // The reply says what the key did and whether it was staged in the
+    // preview; the row rides the transaction that stamps the last
+    // event, so a key waits for the disk no more often than before.
+    let actions = crate::action_log::deck_actions(path, action, reply);
+    if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions) {
+        crate::diagnostics::log_event(
+            crate::diagnostics::LogLevel::Warn,
+            &format!(
+                "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
+                actions.len(),
+                error.message()
+            ),
+        );
     }
-    response
+    if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
+        events.insert(0, KeyEvent::Lighting);
+    }
+    (response, events)
 }
 
 /// What a deck action changed, as the screen needs to hear it.

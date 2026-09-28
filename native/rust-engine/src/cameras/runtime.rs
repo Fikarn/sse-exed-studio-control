@@ -16,7 +16,7 @@
 use crate::cameras::model::{model, CAMERA_NUMBERS, RECORDING_CAMERA};
 use crate::cameras::real_link::{self, LinkFailure};
 use crate::cameras::simulated::{CameraCommand, CameraReading, SimulatedCameras};
-use crate::cameras::snapshot::{CameraSetupSummary, CameraState};
+use crate::cameras::snapshot::{CameraDialBank, CameraSetupSummary, CameraState};
 use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
@@ -26,7 +26,7 @@ use crate::storage_backups::civil_from_days;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// UTC as `2026-09-27T14:03:22.123Z`, the shape the other times in the
 /// snapshots take.
@@ -165,13 +165,42 @@ impl CameraRuntime {
     }
 }
 
-/// The three cameras and the selection.
+/// The deck's armed stop (D14: `STOP?`). The window and the dwell are
+/// `deck.rs`'s.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct StopArm {
+    /// When the press armed it.
+    pub at: Instant,
+    /// What `take_changes` read then: the arm is about the take that ran,
+    /// and about no other.
+    pub take: u64,
+}
+
+/// The three cameras, the selection and the deck's dials.
 #[derive(Debug, Clone)]
 pub(crate) struct Cameras {
     /// The simulated link (`SSE_CAMERAS_SIMULATED=1`), or the real ones.
     pub simulated: bool,
     /// The camera the big picture, the plate and the deck's dials set (D19).
     pub selected: u8,
+    /// What the deck's dials set on it (D14); exposure after a start. Kept
+    /// in memory only, as the selection is.
+    pub bank: CameraDialBank,
+    /// The deck's armed stop; `None` while it is not armed.
+    pub stop_arm: Option<StopArm>,
+    /// When the deck's `REC` last started or stopped a take: a press sooner
+    /// than the dwell after it is the same press again (`deck.rs`).
+    pub deck_rec_at: Option<Instant>,
+    /// Counts the reads in which CAM 1 reported another state of its take
+    /// than in the read before: a take that began or ended, whoever did it.
+    /// A read that finds CAM 1 again after it did not answer counts too: a
+    /// take may have ended and another begun meanwhile. An armed stop whose
+    /// count is another's is about a take that is over, or may be.
+    ///
+    /// What it cannot see: a take that ends and another that begins on the
+    /// camera itself between two reads. The cameras are read once a second
+    /// while the page is open or the deck polls.
+    pub take_changes: u64,
     /// The last read of the cameras' Recent actions failed: the log says so
     /// once for as long as it lasts.
     pub recent_unread: bool,
@@ -191,6 +220,10 @@ impl Cameras {
         let mut cameras = Self {
             simulated,
             selected: RECORDING_CAMERA,
+            bank: CameraDialBank::default(),
+            stop_arm: None,
+            deck_rec_at: None,
+            take_changes: 0,
             recent_unread: false,
             cameras: setup.map(|setup| CameraRuntime::new(setup, simulated)),
         };
@@ -245,6 +278,12 @@ impl Cameras {
                 let changed = last
                     .as_ref()
                     .is_some_and(|last| !last.same_values(&reading));
+                if camera == RECORDING_CAMERA
+                    && (was_unreachable
+                        || last.as_ref().and_then(|last| last.recording) != reading.recording)
+                {
+                    self.take_changes = self.take_changes.wrapping_add(1);
+                }
                 self.camera_mut(camera).take_reading(reading, now);
                 if was_unreachable {
                     Some(Transition::Reachable)
@@ -495,6 +534,16 @@ pub(crate) fn with_bodies<T>(db_path: &Path, action: impl FnOnce(&mut SimulatedC
         cameras.settle(bodies, SystemTime::now());
     }
     result
+}
+
+/// Does something to the simulated cameras and lets nobody notice: what the
+/// hardware link finds out only when it next reads them.
+#[cfg(test)]
+pub(crate) fn with_bodies_unnoticed<T>(
+    db_path: &Path,
+    action: impl FnOnce(&mut SimulatedCameras) -> T,
+) -> T {
+    action(&mut lock(&entry(db_path)).bodies)
 }
 
 /// Everything the simulated camera `camera` of this saved data was sent,

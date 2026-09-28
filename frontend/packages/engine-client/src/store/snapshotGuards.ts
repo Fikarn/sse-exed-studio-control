@@ -103,6 +103,8 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
     case "cameras":
       return firstProblem(
         listProblem(value, "cameras", { ids: false }),
+        objectProblem(value, "dials"),
+        isRecord(value.dials) ? listProblem(value.dials, "sets", { ids: false }) : null,
         // `null` when the action log could not be read.
         value.recent === null ? null : listProblem(value, "recent", { ids: false })
       );

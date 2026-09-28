@@ -6,6 +6,7 @@
 pub(crate) mod archive;
 pub(crate) mod clock;
 pub(crate) mod commands;
+pub(crate) mod deck;
 pub(crate) mod edits;
 pub(crate) mod import;
 pub(crate) mod look;
@@ -16,6 +17,8 @@ pub(crate) mod snapshot;
 pub(crate) mod store;
 #[cfg(test)]
 pub(crate) mod test_support;
+#[cfg(test)]
+mod tests_deck;
 #[cfg(test)]
 mod tests_glass;
 #[cfg(test)]

@@ -32,7 +32,7 @@ The contract is changed at its source, `native/protocol/v1.contract.json` and `n
 These are part of the design. Do not remove one because it looks like weight.
 
 - **The Stream Deck bridge checks every request.** The engine's HTTP bridge listens on `127.0.0.1:38201`. It refuses a request without the token (`control-surface.token` in the app-data folder), a request from a browser page (any `Origin` header), and a request whose `Host` is not its own address. Any program or web page on the PC can reach that port, and this is what stops it driving the lights and the console.
-- **The bridge takes only what it can afford.** Headers over 8 KiB, bodies over 16 KiB and requests slower than one second are refused. Four workers serve a queue of sixty-four, sized for the deck's busiest second.
+- **The bridge takes only what it can afford.** Headers over 8 KiB, bodies over 16 KiB and requests slower than one second are refused. Four workers serve a queue of ninety-six, sized for the deck's busiest second: a key press that is turned away is lost, since Companion never sends one again.
 - **The console's OSC ports read only TotalMix.** They bind `127.0.0.1` when TotalMix runs on this PC, and datagrams from any other address are dropped.
 - **Lights can be held.** While held, nothing is sent to the rig, and only the switch on screen arms them. A hold is saved across starts, and `SSE_SAFE_START=1` holds them at a start.
 - **One engine for each data folder, one studio app at a time.** The engine locks `engine.lock` in its data folder, and the shell lets only one copy of itself run. Two engines on the rig would both stream to the lights, so a development app, which can run beside the studio's, has the lights' wire cut.
@@ -62,7 +62,7 @@ Engine (`native/rust-engine/src/`):
 - `audio/`, `rme_totalmix_osc.rs`, `rme_console_link.rs`: the console's state, metering, and the link that confirms every send.
 - `prompter/`: scripts, the prompter's clock, the Prompter XL's state, imports.
 - `cameras/`: the three cameras, the simulated cameras, the link guard.
-- `control_surface.rs`, `control_surface_http.rs`: the Stream Deck bridge.
+- `control_surface.rs`, `control_surface_http.rs`, `control_surface_pages.rs`: the Stream Deck bridge. What a key of the PROMPTER or the CAMERAS page does, and what their displays say, is in `prompter/deck.rs` and `cameras/deck.rs`, under the prompter's and the cameras' own locks.
 - `exports/`: the Companion profile and the page model Setup draws. The deck's pages come from one list, `DECK_PAGES` in `pages.rs`; each page has a file of its own.
 - `commissioning.rs`: Setup's steps and probes.
 - `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.

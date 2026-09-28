@@ -457,6 +457,17 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
             "soloClearAll",
             json!({ "cleared": 2 }),
         ),
+        // The CAMERAS page's `REC` (D14): a take's start and its stop.
+        (
+            "/api/deck/camera-action",
+            "rec",
+            json!({ "camera": 1, "recording": true, "sentence": "CAM 1 started recording.", "did": "started" }),
+        ),
+        (
+            "/api/deck/camera-action",
+            "rec",
+            json!({ "camera": 1, "recording": false, "sentence": "CAM 1 stopped recording.", "did": "stopped" }),
+        ),
     ]
 }
 
@@ -647,12 +658,76 @@ fn deck_keys_leave_rows_for_discrete_changes_only() {
             "soloClearAll",
             json!({ "cleared": 0 }),
         ),
+        // The CAMERAS page: the armed stop and a press inside the dwell
+        // changed nothing; a selection, the bank and a detent are no rows.
+        (
+            "/api/deck/camera-action",
+            "rec",
+            json!({ "camera": 1, "recording": true, "did": "armed" }),
+        ),
+        (
+            "/api/deck/camera-action",
+            "rec",
+            json!({ "camera": 1, "recording": true, "did": "kept" }),
+        ),
+        (
+            "/api/deck/camera-action",
+            "select",
+            json!({ "selected": 2, "did": "select" }),
+        ),
+        (
+            "/api/deck/camera-action",
+            "bank",
+            json!({ "bank": "colour", "did": "bank" }),
+        ),
+        (
+            "/api/deck/camera-action",
+            "dial",
+            json!({ "camera": 1, "setting": "iso", "value": "500", "did": "setting" }),
+        ),
+        // The PROMPTER page: a take's controls are no rows, as from the
+        // screen.
+        (
+            "/api/deck/prompter-action",
+            "playPause",
+            json!({ "did": "played" }),
+        ),
+        (
+            "/api/deck/prompter-action",
+            "top",
+            json!({ "did": "jumped" }),
+        ),
+        (
+            "/api/deck/prompter-action",
+            "speed",
+            json!({ "speedWpm": 145, "did": "speed" }),
+        ),
     ] {
         assert!(
             deck_actions(path, action, &reply).is_empty(),
             "{action} should leave no row"
         );
     }
+
+    let started = deck_actions(
+        "/api/deck/camera-action",
+        "rec",
+        &json!({ "camera": 1, "recording": true, "sentence": "CAM 1 started recording.", "did": "started" }),
+    );
+    assert_eq!(
+        (
+            started[0].domain,
+            started[0].action,
+            started[0].target.as_str(),
+            started[0].detail.as_str()
+        ),
+        (
+            "cameras",
+            "recording-started",
+            "CAM 1",
+            "CAM 1 started recording."
+        )
+    );
 }
 
 // "Every hardware-affecting action has a row" holds only while every method

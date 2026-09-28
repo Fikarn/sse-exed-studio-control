@@ -1,13 +1,16 @@
 //! The AUDIO page.
 
 use super::controls::{
-    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, png_feedback,
-    state_feedback, ControlDef, DECK_AMBER_BG, DECK_AMBER_INK, DECK_BANK_TINT_BG, DECK_GREY_INK,
-    DECK_MUTED_BG, DECK_MUTED_INK, DECK_SELECT_BG, DECK_SELECT_INK, DECK_WARN_BG, DECK_WARN_INK,
+    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, page_jump,
+    png_feedback, state_feedback, ControlDef, DECK_AMBER_BG, DECK_AMBER_INK, DECK_BANK_TINT_BG,
+    DECK_GREY_INK, DECK_MUTED_BG, DECK_MUTED_INK, DECK_SELECT_BG, DECK_SELECT_INK, DECK_WARN_BG,
+    DECK_WARN_INK,
 };
+use super::pages::deck_page_number;
 use serde_json::{json, Value};
 
-// Every key the 1 s poll refreshes; each needs a matching custom variable.
+// Every key of the AUDIO page the 1 s poll refreshes, and `workspace`, which
+// the page-follow of every page reads; each needs a matching custom variable.
 // Keys 1-3 carry static labels (state reads through feedbacks), so they are
 // not polled.
 pub(crate) const AUDIO_LCD_KEYS: &[&str] = &[
@@ -223,7 +226,10 @@ pub(super) fn audio_controls() -> Vec<ControlDef> {
             color_feedback("audio_state_mode", "gain", DECK_AMBER_INK, DECK_AMBER_BG),
             gated_grey_feedback(),
         ]),
-        // Row 1, column 2 is empty: it held TALK until 2026-09-28 (D26).
+        // The page key of the ring (D5), in the one free place: row 1,
+        // column 2 held TALK until 2026-09-28 (D26). Every other key is
+        // where it was.
+        button("1", "2", "CAMS >>", page_jump(deck_page_number("cameras"))),
         expression_button(
             "1",
             "3",

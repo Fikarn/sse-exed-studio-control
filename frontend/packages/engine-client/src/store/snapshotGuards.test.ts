@@ -36,12 +36,20 @@ describe("snapshotProblem", () => {
     expect(snapshotProblem("lightingDmxMonitor", {})).toBe("channels is not a list");
   });
 
-  it("checks the cameras' lists, and takes a Recent list that could not be read", () => {
-    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: [] })).toBeNull();
-    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: null })).toBeNull();
-    expect(snapshotProblem("cameras", { selected: 1, recent: [] })).toBe("cameras is not a list");
-    expect(snapshotProblem("cameras", { selected: 1, cameras: [] })).toBe("recent is not a list");
-    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: "none" })).toBe("recent is not a list");
+  it("checks the cameras' lists and the dials, and takes a Recent list that could not be read", () => {
+    const dials = { bank: "exposure", sets: ["iso", "shutter", "iris", "nd"] };
+    expect(snapshotProblem("cameras", { selected: 1, dials, cameras: [], recent: [] })).toBeNull();
+    expect(snapshotProblem("cameras", { selected: 1, dials, cameras: [], recent: null })).toBeNull();
+    expect(snapshotProblem("cameras", { selected: 1, dials, recent: [] })).toBe("cameras is not a list");
+    expect(snapshotProblem("cameras", { selected: 1, dials, cameras: [] })).toBe("recent is not a list");
+    expect(snapshotProblem("cameras", { selected: 1, dials, cameras: [], recent: "none" })).toBe(
+      "recent is not a list"
+    );
+    // The dials the page's bank keys read (the deck's CAMERAS page).
+    expect(snapshotProblem("cameras", { selected: 1, cameras: [], recent: [] })).toBe("dials is not an object");
+    expect(snapshotProblem("cameras", { selected: 1, dials: { bank: "focus" }, cameras: [], recent: [] })).toBe(
+      "sets is not a list"
+    );
     expect(snapshotProblem("cameras", null)).toBeNull();
   });
 

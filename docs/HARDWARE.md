@@ -81,7 +81,9 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - The bridge listens on `127.0.0.1` only and has no fallback port. `SSE_CONTROL_SURFACE_PORT` names another port.
 - Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
 - `401` in Companion's log means the profile's token is missing or wrong: export and import again.
-- The profile asks for every display once a second, a connection each. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
+- The profile asks for every display once a second, a connection each: 41 of them. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
+- A display never reads a camera by itself. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second, and once for a key, whose own read answers its displays.
+- `REC` on the deck starts a take with one press and stops it with two, and with nothing else: a press that arrives twice is one press, an armed stop stops the take it was made for and no other, and a press starts no take while the key can still read `STOP?`.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
 - The bridge writes one refusal line a minute at most for each status, and counts the rest in it.
@@ -94,7 +96,7 @@ To put the profile on the deck:
 3. In Companion's Import / Export page, import it with `Full Reset & Import`, never `Import Preserving Unselected`.
 4. In Setup's Verify step, press each control: its cell pulses.
 
-The pages are `LIGHTS` and `AUDIO`. `CAMERAS` and `PROMPTER` follow once built. The deck follows the app's page. When the pages change, export and import again.
+The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the app's tabs. The deck follows the app's page, and each page has one page key, to the page after it; `PROMPTER`'s goes round to `LIGHTS`. When the pages change, export and import again: the deck has the two new pages only after the next import.
 
 ## Cameras
 

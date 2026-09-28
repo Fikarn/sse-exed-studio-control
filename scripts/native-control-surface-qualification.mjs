@@ -24,9 +24,16 @@ const DECK_ROUTES_CHANGED =
 const REFUSALS_CHANGED =
   "New pages program, Slice 2: the refused requests go to the LIGHTS route (/api/deck/light-action) and the deck's last event and selected light prove nothing got through; until then they went to the PROJECTS and TASKS pages' route and the project count proved it.";
 const PROFILE_CHANGED =
-  "New pages program, Slice 2: the profile has two pages, LIGHTS and AUDIO, a page-follow trigger for each, and every LCD it reads is answered by this bridge; until then it had four pages, PROJECTS and TASKS first.";
-/** The two routes a key of the exported profile may post to. */
-const DECK_ACTION_ROUTES = ["/api/deck/light-action", "/api/deck/audio-action"];
+  "The profile has four pages, LIGHTS, AUDIO, CAMERAS and PROMPTER, a page-follow trigger for each, and every LCD it reads is answered by this bridge; until 2026-09-28 it had two, LIGHTS and AUDIO, and until the new pages program's Slice 2 four, PROJECTS and TASKS first.";
+/** The routes a key of the exported profile may post to: one a page. */
+const DECK_ACTION_ROUTES = [
+  "/api/deck/light-action",
+  "/api/deck/audio-action",
+  "/api/deck/camera-action",
+  "/api/deck/prompter-action",
+];
+/** The page of the app each page-follow trigger waits for, and the deck page it turns to. */
+const FOLLOW_TARGETS = ["audio:2", "cameras:3", "lighting:1", "teleprompter:4"];
 /** Actions the bridge answered once and refuses now: the deck-mode key (Planning) and talkback's (D26). */
 const RETIRED_DECK_ACTIONS = ["switchToDeckMode", "talkOn", "talkOff"];
 const FOLLOW_TRIGGER_PREFIX = "sse-trigger-follow-";
@@ -337,7 +344,7 @@ async function main() {
     );
     assert(
       JSON.stringify(summary.controlSurfacePages) === JSON.stringify(DECK_PAGE_LABELS),
-      `Bridge qualification failed: controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(summary.controlSurfacePages)}.`
+      `Bridge qualification failed: controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(", ")} in that order, got ${JSON.stringify(summary.controlSurfacePages)}.`
     );
 
     summary.steps.push({
@@ -345,7 +352,7 @@ async function main() {
       status: "passed",
       message: `The engine exposed a live bridge and the control-surface page model ${DECK_PAGE_LABELS.join(", ")}.`,
       scopeChanged:
-        "New pages program, Slice 2: the page model is LIGHTS and AUDIO in that order; until then it was four pages, PROJECTS and TASKS included.",
+        "The page model is LIGHTS, AUDIO, CAMERAS and PROMPTER in that order; until 2026-09-28 it was LIGHTS and AUDIO, and until the new pages program's Slice 2 four pages, PROJECTS and TASKS included.",
     });
 
     console.log("Step 2: verify live HTTP bind, LCD, and action endpoints against the bridge.");
@@ -662,7 +669,7 @@ async function main() {
     });
 
     console.log(
-      "Step 4: verify the exported Stream Deck profile carries the bridge token on every request and holds the two-page deck (LIGHTS, AUDIO)."
+      "Step 4: verify the exported Stream Deck profile carries the bridge token on every request and holds the four-page deck (LIGHTS, AUDIO, CAMERAS, PROMPTER)."
     );
 
     const exportSummary = await harness.request("bridge-qualification-export", "exports.companion.export");
@@ -716,10 +723,12 @@ async function main() {
       message: `Exported Stream Deck profile carries the bridge token on all ${bridgeActions.length} bridge requests, the LCD poll included.`,
     });
 
-    // The two-page profile (new pages program, D5): LIGHTS then AUDIO, a
+    // The four-page profile (D5): LIGHTS, AUDIO, CAMERAS and PROMPTER, a
     // page-follow trigger for each, and nothing it sends that this bridge no
     // longer answers. Every LCD the profile reads is asked of the bridge
-    // (reads only); the keys it posts are checked by route, never pressed.
+    // (reads only: a display of the CAMERAS page reads the simulated
+    // cameras, and sends them nothing); the keys it posts are checked by
+    // route, never pressed.
     const profilePages = Object.entries(profile.pages ?? {})
       .sort(([left], [right]) => Number(left) - Number(right))
       .map(([number, page]) => `${number}:${page?.name}`);
@@ -739,12 +748,12 @@ async function main() {
       }));
     const followTargets = followTriggers.map(({ workspace, page }) => `${workspace}:${page}`).sort();
     assert(
-      JSON.stringify(followTargets) === JSON.stringify(["audio:2", "lighting:1"]) &&
+      JSON.stringify(followTargets) === JSON.stringify(FOLLOW_TARGETS) &&
         followTriggers.every(
           ({ workspace, condition }) =>
             condition?.variable === "custom:lcd_workspace" && condition?.op === "eq" && condition?.value === workspace
         ),
-      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of lighting to page 1 and audio to page 2 on custom:lcd_workspace.`
+      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of ${FOLLOW_TARGETS.join(", ")} on custom:lcd_workspace.`
     );
     const savedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
     assert(
@@ -799,7 +808,7 @@ async function main() {
       lcdKeysAnswered: lcdKeys.size,
     };
     summary.steps.push({
-      name: "profile-two-pages",
+      name: "profile-four-pages",
       status: "passed",
       message: `Exported Stream Deck profile holds the pages ${profilePages.join(", ")}, follows the app's page to them, posts only to ${DECK_ACTION_ROUTES.join(" and ")}, and the bridge answered all ${lcdKeys.size} LCDs it reads.`,
       scopeChanged: PROFILE_CHANGED,
@@ -842,7 +851,7 @@ async function main() {
   }
 
   console.log(
-    `Bridge qualification passed: the ${packaged.label} engine's bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a two-page profile that carries the token and reads only LCDs the bridge answers.`
+    `Bridge qualification passed: the ${packaged.label} engine's bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a four-page profile that carries the token and reads only LCDs the bridge answers.`
   );
 }
 

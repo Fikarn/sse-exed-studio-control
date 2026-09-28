@@ -5,6 +5,7 @@ import type { EngineTransport, FixtureCameraValuesSeed } from "../../types";
 import {
   AUTO_WHATS,
   CAMERA_NUMBERS,
+  DIAL_BANKS,
   LEVEL_SETTINGS,
   PRESS_SETTINGS,
   cameraAddress,
@@ -25,6 +26,7 @@ import {
 import { applyBodyValues } from "./camerasSeed";
 import {
   buildCamerasArchive,
+  cameraDials,
   cameraSentence,
   cameraState,
   camerasHealthCheck,
@@ -89,6 +91,7 @@ import { applyCamerasHealth } from "./state";
 /** `cameras.changed`'s reasons. */
 export type CamerasChangedReason =
   | "select"
+  | "bank"
   | "setting"
   | "format"
   | "look"
@@ -531,6 +534,13 @@ function answerRequest(
       cameras.selected = camera;
       return answer({ selected: camera }, "select", camera);
     }
+    case "cameras.bank.set": {
+      // In memory, as the selection; nothing reaches a camera. Not a Recent action.
+      const bank = DIAL_BANKS.find((known) => known === params.bank);
+      if (!bank) throw invalidParams("bank must be exposure, colour or focus.");
+      cameras.bank = bank;
+      return answer({ bank, dials: cameraDials(cameras) as unknown as JsonValue }, "bank", null);
+    }
     case "cameras.set":
       return setRequest(cameras, params, now);
     case "cameras.step":
@@ -560,10 +570,11 @@ function answerRequest(
   }
 }
 
-/** The fourteen methods (`v1.md`'s "Cameras"). */
+/** The fifteen methods (`v1.md`'s "Cameras"). */
 export const CAMERAS_METHODS: ReadonlySet<RequestMethod> = new Set<RequestMethod>([
   "cameras.snapshot",
   "cameras.select",
+  "cameras.bank.set",
   "cameras.set",
   "cameras.step",
   "cameras.auto",

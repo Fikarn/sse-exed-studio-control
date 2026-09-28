@@ -251,7 +251,7 @@ function validatePrompter(scenario, prompter) {
 // checker holds its shape; the double throws, as the scenario loads, for what
 // only the cameras' model knows — an address that is not one machine's, a
 // value a camera does not report or allow.
-const CAMERAS_KEYS = new Set(["cameras", "selected", "simulated"]);
+const CAMERAS_KEYS = new Set(["cameras", "selected", "bank", "simulated"]);
 const CAMERA_KEYS = new Set([
   "camera",
   "address",
@@ -288,6 +288,9 @@ function validateCameras(scenario, cameras) {
     }
   }
   if (cameras.selected !== undefined) requireCameraNumber(scenario, cameras.selected, "cameras.selected");
+  if (cameras.bank !== undefined && !["exposure", "colour", "focus"].includes(cameras.bank)) {
+    fail(scenario, `cameras.bank must be exposure, colour or focus, not ${JSON.stringify(cameras.bank)}`);
+  }
   if (cameras.simulated !== undefined) requireBoolean(scenario, cameras.simulated, "cameras.simulated");
   const list = cameras.cameras ?? [];
   requireArray(scenario, list, "cameras.cameras");

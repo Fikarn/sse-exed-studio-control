@@ -5,7 +5,7 @@
 //! cameras themselves. The values are board 2's
 //! (`docs/design/boards/A-cameras-2.html`).
 
-use crate::cameras::snapshot::{CameraAutos, CameraLink, CameraState, CameraTone};
+use crate::cameras::snapshot::{CameraAutos, CameraDialBank, CameraLink, CameraState, CameraTone};
 
 /// The cameras, by number.
 pub(crate) const CAMERA_NUMBERS: [u8; 3] = [1, 2, 3];
@@ -91,6 +91,47 @@ impl Setting {
     /// A level (a number on a scale) rather than a choice from a list.
     pub(crate) fn is_level(self) -> bool {
         matches!(self, Self::WhiteBalance | Self::Tint | Self::Focus)
+    }
+}
+
+impl CameraDialBank {
+    /// The banks in the order the deck's `BANK` key goes through them.
+    pub(crate) const ALL: [Self; 3] = [Self::Exposure, Self::Colour, Self::Focus];
+
+    /// The name the requests and the snapshot use.
+    pub(crate) fn key(self) -> &'static str {
+        match self {
+            Self::Exposure => "exposure",
+            Self::Colour => "colour",
+            Self::Focus => "focus",
+        }
+    }
+
+    pub(crate) fn from_key(key: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|bank| bank.key() == key)
+    }
+
+    /// The bank after this one; after the last, the first.
+    pub(crate) fn next(self) -> Self {
+        match self {
+            Self::Exposure => Self::Colour,
+            Self::Colour => Self::Focus,
+            Self::Focus => Self::Exposure,
+        }
+    }
+
+    /// The setting each of the deck's four dials sets, left to right (D14).
+    pub(crate) fn dials(self) -> [Option<Setting>; 4] {
+        match self {
+            Self::Exposure => [
+                Some(Setting::Iso),
+                Some(Setting::Shutter),
+                Some(Setting::Iris),
+                Some(Setting::Nd),
+            ],
+            Self::Colour => [Some(Setting::WhiteBalance), Some(Setting::Tint), None, None],
+            Self::Focus => [Some(Setting::Focus), None, None, None],
+        }
     }
 }
 

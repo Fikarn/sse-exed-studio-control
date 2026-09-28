@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { JsonObject, RequestMethod } from "../../generated/protocol";
+import { DIAL_BANKS, DIAL_BANK_SETS } from "./camerasModel";
 import { CAMERAS_RECENT_LIMIT } from "./camerasState";
 import { ALL_SET_UP, CAM2_ADDRESS, openCamerasDouble } from "./camerasTestSupport";
 
@@ -463,6 +464,56 @@ describe("the fixture double's cameras: the selection (D19)", () => {
     });
     expect((await rows()).length).toBe(before);
     expect((await openCamerasDouble({ selected: 2 }).snapshot()).selected).toBe(2);
+  });
+});
+
+describe("the fixture double's cameras: the dials' bank (D14)", () => {
+  it("puts the deck's dials on a bank, in memory, and says what each dial sets", async () => {
+    const { call, refused, seen, snapshot, rows, cameras } = held();
+    expect((await snapshot()).dials).toEqual({ bank: "exposure", sets: ["iso", "shutter", "iris", "nd"] });
+    const before = (await rows()).length;
+    expect(await call("cameras.bank.set", { bank: "colour" })).toEqual({
+      bank: "colour",
+      dials: { bank: "colour", sets: ["whiteBalance", "tint", null, null] },
+    });
+    expect(seen()).toEqual([["cameras.changed", "bank", null]]);
+    expect(await call("cameras.bank.set", { bank: "focus" })).toMatchObject({
+      dials: { sets: ["focus", null, null, null] },
+    });
+    expect((await snapshot()).dials.bank).toBe("focus");
+    for (const bank of ["iris", "", 2, null]) {
+      expect(await refused("cameras.bank.set", { bank })).toEqual({
+        code: "INVALID_PARAMS",
+        sentence: "bank must be exposure, colour or focus.",
+      });
+    }
+    expect(await refused("cameras.bank.set", {})).toMatchObject({ code: "INVALID_PARAMS" });
+    expect((await snapshot()).dials.bank, "a refused request changes nothing").toBe("focus");
+    expect((await rows()).length, "the bank is not a Recent action").toBe(before);
+    expect(
+      ([1, 2, 3] as const).map((camera) => cameras.sent(camera)),
+      "the bank reaches no camera"
+    ).toEqual([0, 0, 0]);
+    expect((await openCamerasDouble({ bank: "colour" }).snapshot()).dials.bank).toBe("colour");
+  });
+
+  // `CameraDialBank::dials` in the hardware link's `model.rs`: the double gives each dial
+  // the same setting, bank by bank.
+  it("gives each dial what the hardware link gives it", () => {
+    const model = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../native/rust-engine/src/cameras/model.rs"),
+      "utf-8"
+    );
+    const body = /fn dials\(self\)[^{]*\{([\s\S]*?)\n {4}\}\n/.exec(model)?.[1];
+    expect(body, "model.rs has no fn dials any more; update this test").toBeDefined();
+    const banks: Record<string, Array<string | null>> = {};
+    for (const [, bank, dials] of body!.matchAll(/Self::(\w+) => \[([^\]]*)\]/g)) {
+      banks[bank!.toLowerCase()] = [...dials!.matchAll(/Some\(Setting::(\w+)\)|None/g)].map(([, setting]) =>
+        setting === undefined ? null : setting[0]!.toLowerCase() + setting.slice(1)
+      );
+    }
+    expect(Object.keys(banks)).toEqual([...DIAL_BANKS]);
+    expect(banks).toEqual(DIAL_BANK_SETS);
   });
 });
 
