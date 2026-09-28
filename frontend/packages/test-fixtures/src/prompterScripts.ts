@@ -1,5 +1,5 @@
 // The Teleprompter's scripts for the fixture double's scenarios (new pages program,
-// Slice 6a): board 1's (`docs/redesign/assets/concepts/A-teleprompter-1.html`) six, as
+// Slice 6a): board 1's (`docs/design/boards/A-teleprompter-1.html`) six, as
 // its scripts list shows them, and two in Removed. "02 Interview intro", "03 Panel
 // questions" and "04 Outro" are the board's own text, word for word, with their cues
 // on a line of their own (a Word heading's cue too) and never read aloud, so their read

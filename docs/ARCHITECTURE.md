@@ -1,97 +1,71 @@
 # Architecture
 
-## Product Shape
+Studio Control is a local app for one trusted workstation. It has no cloud dependency, no accounts and no public network exposure. Its jobs are lighting, the audio console, the Stream Deck, the teleprompter and the cameras.
 
-This application is a local-first studio workstation. The primary jobs are:
+## The parts
 
-- lighting control
-- audio control
-- Stream Deck / Companion control-surface support
+| Part                      | Where                                 | Owns                                                                                          |
+| ------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Engine (Rust)             | `native/rust-engine`                  | State, saved data, migrations, backups, every device, safety rules, diagnostics               |
+| Shell (Tauri 2)           | `native/tauri-shell`                  | The window, starting and watching the engine, the few things only the operating system can do |
+| Pages (React, TypeScript) | `frontend/app`, `frontend/packages/*` | What the operator sees and presses                                                            |
+| Contract                  | `native/protocol`                     | Every request and event between the engine and the pages                                      |
 
-Production planning was a secondary workspace until the new pages program (`docs/plans/new-pages-2026-09.md`) removed it: from the screen in Slice 1, from the engine, the contract and the saved data (schema 8) in Slice 2. The same program later adds two workspaces, Cameras and Teleprompter (its Part C).
+The engine is a separate process. The shell starts it, passes the pages' requests to it over its standard input, and passes its answers and events back.
 
-Everything assumes a single trusted machine with no cloud dependency. Supported hardware assumptions are documented in [HARDWARE_PROFILE.md](HARDWARE_PROFILE.md).
+## The rule
 
-## Runtime Layers
+**When adding a feature, extend the engine and its contract first, then the pages.** If a change would move product state, saved data or device policy into React, it is going the wrong way. The pages show what the engine reports and send what the operator presses. They never show a state the engine has not reported.
 
-### Tauri shell (selected shipping runtime)
+The contract is changed at its source, `native/protocol/v1.contract.json` and `native/protocol/v1.md`, then regenerated with `npm run protocol:generate`. The generated files (`native/protocol/generated/`, `frontend/packages/engine-client/src/generated/`) are never edited by hand.
 
-- owns the native webview shell under `native/tauri-shell/` and `frontend/`
-- owns native windowing, startup routing, recovery presentation, and operator-facing shell chrome when the release runtime selector points at `tauri`
-- preserves the authoritative engine boundary and IPC contract
-- supervises the Rust engine as a child process through the Tauri bridge
-- shipped in `v2.2.0` and satisfied the [FRONTEND_CUTOVER_PLAN.md](./archive/FRONTEND_CUTOVER_PLAN.md) Checkpoint C shipping-switch gate for tag commit `eb166092ad5483a00b6b59137062c86c3193ca53`; `v2.2.1` is the current published operator-rollout build after the durable default app-data path fix
+## How a feature is shaped
 
-### Rust engine
+1. **Model.** Saved values are explicit and serialisable. Saved configuration is kept apart from passing connection state.
+2. **Contract.** One snapshot shape to read, one request for every way to write, one event when the state changes.
+3. **Pages.** They read snapshots through the store (`frontend/packages/engine-client/src/store/`), draw them, and send requests. No business rules.
+4. **Status.** Readiness, failure and recovery are part of what the engine reports, so the operator sees a disconnected device.
+5. **Tests.** Behaviour is tested at the engine first. Page tests cover what the operator does on screen.
 
-- owns persisted state, schema migrations, and backups
-- owns commissioning, dashboard, support, lighting, audio, and control-surface contracts
-- owns device-facing safety rules, diagnostics, and recovery behavior
-- exposes snapshots and commands over the native protocol in `native/protocol/v1.md`
+## What protects the workstation
 
-### Native adapters
+These are part of the design. Do not remove one because it looks like weight.
 
-- lighting adapters stay behind engine-owned health, recall, fixture-catalog, DMX mapping, validation, scene serialization, and failure contracts
-- audio adapters stay behind engine-owned sync, recall, and safety contracts
-- control-surface exports and bridge behavior stay engine-owned
+- **The Stream Deck bridge checks every request.** The engine's HTTP bridge listens on `127.0.0.1:38201`. It refuses a request without the token (`control-surface.token` in the app-data folder), a request from a browser page (any `Origin` header), and a request whose `Host` is not its own address. Any program or web page on the PC can reach that port, and this is what stops it driving the lights and the console.
+- **The bridge takes only what it can afford.** Headers over 8 KiB, bodies over 16 KiB and requests slower than one second are refused. Four workers serve a queue of sixty-four, sized for the deck's busiest second.
+- **The console's OSC ports read only TotalMix.** They bind `127.0.0.1` when TotalMix runs on this PC, and datagrams from any other address are dropped.
+- **Lights can be held.** While held, nothing is sent to the rig, and only the switch on screen arms them. A hold is saved across starts, and `SSE_SAFE_START=1` holds them at a start.
+- **One engine at a time.** The engine locks `engine.lock` in its data folder, and the shell lets only one copy of itself run. Two engines would both stream to the lights.
+- **Saved data is checked and backed up.** The database is integrity-checked at every start. A verified backup is written before a schema upgrade, daily, and at every clean close. Every commit waits for the disk. A build refuses data from a newer schema rather than damage it.
+- **The shell opens and writes only inside its own folders:** the app-data, logs, backups and exports folders. The packaged pages run under a Content Security Policy with no inline or remote scripts.
+- **The parsers of outside bytes have fuzz tests:** the bridge's HTTP reader, the OSC reader and the Word import.
+- **Tests cannot reach a device.** Test builds drop every datagram aimed at TotalMix and refuse any camera address that is not on this PC. The simulated console and the simulated cameras stand in.
 
-## Legacy Import (retired)
+The app is unsigned, by decision: it runs on one workstation its developer controls.
 
-The Electron/Next.js runtime was removed in `v2.1.0`. A one-way import path (`native/rust-engine/src/legacy_import.rs`) stayed so that operators migrating from a pre-`v2.0.0` installation could bring their old `db.json` forward on first native launch; since the new pages program's Slice 2 it carried only whether setup was complete and the page to open.
+## The shell
 
-Slice 2b of that program (2026-09-25) retired it: `storage.importLegacyDb`, the start-up auto-import, `SSE_LEGACY_DB_PATH` and `SSE_DISABLE_AUTO_IMPORT` are gone, and no pre-`v2.0.0` code is left in the repository. A `db.json` offered to Verify or Restore is refused by name before anything is written, and a start that finds a left-over one (`SSE_LEGACY_DB_PATH`, or `<app-data>/import/db.json`) names it in one warning line of the log and reads nothing (`native/protocol/v1.md`, "A left-over `db.json`"). The lanes and the development parity fixtures seed their saved data through the app's own requests or write it directly.
+- **One window, always fullscreen.** It opens on the display it was last on, else on the 2560×1440 display, else where it is. **Studio fullscreen** and **Reset the window layout** in Setup / Support put it back.
+- **The engine sits beside the shell.** A release build starts `studio-control-engine.exe` from its own folder. `SSE_ENGINE_BIN` names another one.
+- **Commands never block the window.** Every command that can wait runs on the blocking pool.
+- **The shell watches the engine.** It polls the process every 250 ms. When the engine is gone, every waiting request is answered `ENGINE_EXITED` and the pages are told, so they can offer a restart.
+- **A second launch brings the first window forward** and exits.
+- **Only the main window may read the clipboard.** The Teleprompter page reads pasted text itself, so the main window is built in code with that permission (`shell_windows.rs`). Any other window, the Prompter XL's included, must be built without it.
+- **The browser's own keys are off** (reload, find, print), so no key moves the screen.
 
-## Studio Module Pattern
+## Where things live
 
-Any native studio domain should follow the same shape:
+Engine (`native/rust-engine/src/`):
 
-### 1. Domain model
+- `lighting/`, `lighting_sacn_output.rs`: scenes, fixtures, the one lighting lock, held outputs, the sACN output.
+- `audio/`, `rme_totalmix_osc.rs`, `rme_console_link.rs`: the console's state, metering, and the link that confirms every send.
+- `prompter/`: scripts, the prompter's clock, the Prompter XL's state, imports.
+- `cameras/`: the three cameras, the simulated cameras, the link guard.
+- `control_surface.rs`, `control_surface_http.rs`, `exports.rs`: the Stream Deck bridge and the Companion profile. The deck's pages come from one list, `DECK_PAGES`.
+- `commissioning.rs`: Setup's steps and probes.
+- `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.
+- `health.rs`, `action_log.rs`, `engine_events.rs`: the health the header shows, Recent actions, events.
 
-- keep persisted values explicit and serializable
-- separate persisted configuration from transient connection or probe state
-- keep storage ownership in the Rust engine
+Shell (`native/tauri-shell/src/`): `main.rs` (commands, the window's rules), `engine.rs` (the engine process and its watcher), `shell_windows.rs` (building windows).
 
-### 2. Engine contract
-
-- expose a clear snapshot shape
-- expose command handlers for every write path
-- emit explicit change events when authoritative state mutates
-
-### 3. Shell integration
-
-- request snapshots through the engine controller
-- render operator-visible state without owning business logic
-- avoid recreating server-style fetch layers inside shell code
-- keep React surfaces derived from engine snapshots and explicit commands
-
-### 4. Operational status
-
-- expose readiness, failure, and recovery state through engine snapshots
-- keep hardware disconnect and recovery behavior visible to the operator
-- keep device I/O policy in the engine, not in React
-
-### 5. Tests
-
-- validate storage and command behavior at the engine boundary first
-- add smoke or acceptance coverage for packaged startup, failure, and lifecycle behavior
-
-## Current Module Ownership
-
-- `native/rust-engine/src/commissioning.rs`: commissioning state and probe flows
-- `native/rust-engine/src/lighting/`: lighting snapshot, recall, fixture catalog, DMX mapping/validation, scene serialization, and simulated backend boundary
-- `native/rust-engine/src/audio/`: audio snapshot, sync, recall, and simulated backend boundary
-- `native/rust-engine/src/support.rs`: backup, restore, and diagnostics support flows
-- `native/rust-engine/src/control_surface.rs`, `exports.rs`: Stream Deck bridge and Companion export generation (the deck's pages, their order and the page-follow triggers come from one list, `DECK_PAGES` in `exports.rs`)
-- `native/rust-engine/src/control_surface_http.rs`: the bridge's HTTP reader, bearer-token authorization and worker pool (2026-09 production readiness, Slice 2)
-- `native/rust-engine/src/storage.rs`, `storage_backups.rs`: SQLite storage, schema migrations, the integrity check at start and the verified database backups (Slice 3)
-- `native/rust-engine/src/health.rs`: the health registry `health.snapshot` derives its status from (Slice 8)
-- `native/rust-engine/src/lighting/state_lock.rs`, `lighting/output_arming.rs`, `lighting_sacn_output.rs`: the one lighting lock, preview and render generation; held light outputs; the sACN output (Slices 10, 11)
-- `native/rust-engine/src/action_log.rs`: the action log with sources (Slice 11); `engine_events.rs` sends protocol events
-- `native/rust-engine/src/rme_totalmix_osc.rs`, `rme_console_link.rs`, `audio/console_link.rs`: TotalMix metering and its ingress rule, the console link that confirms every send
-- `native/tauri-shell/src/engine.rs`, `shell_log.rs`: the engine process, its exit watcher and restart hand-off, the shell's copy of its stderr (Slices 5, 8)
-- `frontend/packages/engine-client/src/store/`: the shell store, the domain-scoped refresh (`domainRefresh.ts`) and the reply guards (`snapshotGuards.ts`) (Slice 9)
-- `frontend/app/src/app/OperatorShell.tsx`: Tauri operator shell surface derived from engine state; each workspace is a chunk of its own (`workspaceChunks.ts`, Slice 14) — the map is in `docs/DEVELOPMENT.md` §2c, "Front-end map"
-
-## Refactor Rule
-
-When adding a feature, define or extend the engine contract first. Only then wire the shell and adapter layers. If a change would move product state or device policy into React, it is probably going in the wrong direction.
+Pages (`frontend/app/src/app/`): `OperatorShell.tsx` assembles the header, the tabs and the pages. Each page is a chunk of its own (`workspaceChunks.ts`). The shared parts are in `frontend/packages/design-system` and the colours and sizes in `frontend/packages/tokens`.

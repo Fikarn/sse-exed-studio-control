@@ -33,8 +33,8 @@ import {
 import styles from "./TeleprompterWorkspace.module.css";
 
 // The Teleprompter page (new pages program, Slice 6a; board 1, "Live mirror",
-// `docs/redesign/assets/concepts/A-teleprompter-1.html`, and the proposal,
-// `docs/redesign/teleprompter-2026-09.md`). The cluster runs the take, the bay
+// `docs/design/boards/A-teleprompter-1.html`, and the proposal,
+// `docs/design/teleprompter.md`). The cluster runs the take, the bay
 // shows the page's copy of the glass with the whole script under it, and the
 // plate holds the scripts and the look. Everything it shows is the hardware
 // link's (`teleprompterModel.ts`); it holds only what the operator is looking

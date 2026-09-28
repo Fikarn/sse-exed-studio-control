@@ -882,7 +882,7 @@
     }
   },
   "prompterGlass": {
-    "$description": "New pages program, Slice 5a: the Prompter XL's screen, the glass the presenter reads (docs/redesign/teleprompter-2026-09.md 4.1). A picture, never themed: black gives off no light, so the glass shows only the words.",
+    "$description": "New pages program, Slice 5a: the Prompter XL's screen, the glass the presenter reads (docs/design/teleprompter.md 4.1). A picture, never themed: black gives off no light, so the glass shows only the words.",
     "floor": {
       "$value": "#000000",
       "$description": "the glass's background, black in every look"

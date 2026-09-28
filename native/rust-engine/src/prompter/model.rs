@@ -1,5 +1,5 @@
 //! The prompter's script model (new pages program, Slice 4; the Teleprompter
-//! proposal, `docs/redesign/teleprompter-2026-09.md`, §3 and §4.2).
+//! proposal, `docs/design/teleprompter.md`, §3 and §4.2).
 //!
 //! A script is a list of paragraphs, and a paragraph a list of runs that keep
 //! the presenter's emphasis — bold, italic, underline — and nothing else of a

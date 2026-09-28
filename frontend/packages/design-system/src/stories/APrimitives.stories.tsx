@@ -19,7 +19,7 @@ import { Toast } from "../components/Toast";
 import { Field, Readout, Screen } from "../components/Well";
 
 // Visual overhaul A, Slice 3: every primitive per theme, as
-// docs/redesign/assets/concepts/A-system-sheet.html draws them. Each story
+// `docs/DESIGN.md` section 7 lists them. Each story
 // declares its theme through `parameters.theme`; the Storybook lane measures
 // these pages with the UI contract's light and target checks.
 

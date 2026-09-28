@@ -12,12 +12,9 @@ const MAX_TRACKED_FILE_BYTES = 1_500_000;
 // Slice 14; a source file over the limit is split, not excused.
 // `scripts/file-health.test.mjs` holds the guard to that.
 
-const largeFileAllowlist = new Map([
-  [
-    "docs/redesign/assets/dashboard-header/directions-composite.png",
-    "historical dashboard design comparison image retained as a design-reference artifact",
-  ],
-]);
+// Tracked files over the size limit that are allowed, each with its reason.
+// None today.
+const largeFileAllowlist = new Map([]);
 
 const sourceExtensions = new Set([".css", ".mjs", ".rs", ".ts", ".tsx"]);
 
