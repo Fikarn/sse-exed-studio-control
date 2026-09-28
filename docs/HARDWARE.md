@@ -102,7 +102,7 @@ The pages are `LIGHTS` and `AUDIO`. `CAMERAS` and `PROMPTER` follow once built. 
 - **`CAM 2` and `CAM 3`** are Panasonic LUMIX BGH1s on the office network, powered over Ethernet (`172.16.16.85` and `172.16.16.30` when last read). Their link is Panasonic's LUMIX SDK, to the address typed into Setup. Two checks come first: the SDK's licence, and that a BGH1 goes back to LUMIX Tether without a settings reset.
 - `Release` hands a camera to the iPad (Bluetooth+) or LUMIX Tether. `Connect` takes it back.
 - **Pictures.** Each camera's HDMI goes to vMix: `CAM 1` into the DeckLink 8K Pro, one BGH1 through an SDI converter into the DeckLink, the other into a Cam Link 4K. The app gets pictures only as NDI from vMix on this PC. vMix's NDI option for cameras (`Settings › Outputs`) must be on, and Setup holds each camera's vMix input. There is no OBS path.
-- **Not built yet:** the Cameras page, Setup's camera fields, the links and the pictures.
+- **Not built yet:** the links and the pictures. Until a camera's link is built, the Cameras page reads it `NOT SET UP`, and Setup takes its vMix input and neither its pairing nor its address. The page's pictures are test pictures.
 
 What limits the design:
 

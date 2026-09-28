@@ -289,6 +289,8 @@ export interface CameraKeyView {
   values: string;
   /** How the line is printed: as values, as doubt (last read), or as a plain sentence. */
   valuesKind: "values" | "doubt" | "plain";
+  /** What stands at the line's end: `last read` on the values of a camera that does not answer. */
+  valuesTag: string | null;
   /** `REC` while CAM 1 reports recording; `last known REC` when it does not answer. */
   rec: "recording" | "last-known" | null;
   selected: boolean;
@@ -310,14 +312,17 @@ export function valuesLine(camera: CameraSnapshot): string {
 export function cameraKeyView(camera: CameraSnapshot, selected: number): CameraKeyView {
   let values: string;
   let valuesKind: CameraKeyView["valuesKind"];
+  let valuesTag: string | null = null;
   if (camera.state === "held") {
     values = valuesLine(camera) || "nothing read yet";
     valuesKind = values === "nothing read yet" ? "plain" : "values";
   } else if (camera.state === "unreachable") {
-    const last = clockTime(camera.readAt);
+    // The key has room for the longest line a camera reports and the tag, and
+    // not for when it was read: the state display and the plate say when.
     const line = valuesLine(camera);
-    values = line ? `last read${last ? ` ${last}` : ""} · ${line}` : "never read since the start";
+    values = line || "never read since the start";
     valuesKind = line ? "doubt" : "plain";
+    valuesTag = line ? "last read" : null;
   } else if (camera.state === "released") {
     values = "not read while released";
     valuesKind = "plain";
@@ -335,6 +340,7 @@ export function cameraKeyView(camera: CameraSnapshot, selected: number): CameraK
     tone: camera.tone,
     values,
     valuesKind,
+    valuesTag,
     rec: !recording ? null : camera.state === "unreachable" ? "last-known" : "recording",
     selected: camera.camera === selected,
   };

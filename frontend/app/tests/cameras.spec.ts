@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
+import { STOP_WINDOW_MS } from "../src/app/cameras/perform";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
 
 // The Cameras page against the fixture double (board 2, "Hero and two", as
 // D10, D11 and D19 amend it). The double answers every cameras request as the
@@ -13,15 +16,22 @@ async function openCameras(page: Page, fixture = "cameras-held") {
   await expectWorkspaceMounted(page, "cameras");
 }
 
-/** Longer than the arm's dwell (350 ms): a second press before it is a bounce, and applies nothing. */
-const DWELL_MS = 450;
+/** Past the arm's dwell: a second press before it is a bounce, and applies nothing. */
+const PAST_THE_DWELL_MS = ARM_DWELL_MS + 50;
 
-/** Presses an armed key's two presses. */
+/**
+ * Presses an armed key's two presses. The page's clock stands still from the
+ * first press to the second and is moved past the dwell between them
+ * (helpers/pageClock.ts), so the second is the confirm on any runner, inside
+ * every arm window. The test installs the clock before the page opens.
+ */
 async function pressTwice(page: Page, testId: string) {
+  await pausePageClock(page);
   await page.getByTestId(testId).click();
   await expect(page.getByTestId(testId)).toHaveAttribute("data-armed", "true");
-  await page.waitForTimeout(DWELL_MS);
+  await page.clock.fastForward(PAST_THE_DWELL_MS);
   await page.getByTestId(testId).click();
+  await page.clock.resume();
 }
 
 const state = (page: Page) => page.getByTestId("cameras-state-display");
@@ -78,6 +88,7 @@ test.describe("the Cameras page", () => {
   });
 
   test("REC starts with one press and stops with two, and its chip stands on every page", async ({ page }) => {
+    await page.clock.install();
     await openCameras(page);
     const rec = page.getByTestId("cameras-rec");
     await expect(rec).toHaveAttribute("data-rec", "stopped");
@@ -104,14 +115,18 @@ test.describe("the Cameras page", () => {
     await recChip(page).click();
     await expectWorkspaceMounted(page, "cameras");
 
-    // One press arms the stop, and says what the second press does.
+    // One press arms the stop, and says what the second press does. The
+    // page's clock stands still meanwhile: the second press is inside the
+    // stop's 3 s on any runner.
+    await pausePageClock(page);
     await rec.click();
     await expect(rec).toHaveAttribute("data-armed", "true");
     await expect(rec).toContainText("Stop?");
     await expect(state(page)).toContainText("Stop recording on CAM 1 · press again");
     await expect(page.getByTestId("cameras-footer")).toContainText("recording · stop armed");
-    await page.waitForTimeout(DWELL_MS);
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
     await rec.click();
+    await page.clock.resume();
     await expect(rec).toHaveAttribute("data-rec", "stopped");
     await expect(recChip(page)).toHaveCount(0);
     await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1 stopped recording.");
@@ -119,15 +134,23 @@ test.describe("the Cameras page", () => {
   });
 
   test("an armed stop that is not pressed again within 3 s is dropped, and the take goes on", async ({ page }) => {
+    await page.clock.install();
     await openCameras(page, "cameras-recording");
     const rec = page.getByTestId("cameras-rec");
     await expect(rec).toHaveAttribute("data-rec", "recording");
     // The take ran before Studio Control looked, so its length is not known.
     await expect(page.getByTestId("cameras-take-length")).toContainText("not known");
+    expect(STOP_WINDOW_MS, "the deck's window (D14)").toBe(3000);
+    await pausePageClock(page);
     await rec.click();
     await expect(rec).toHaveAttribute("data-armed", "true");
     await expect(page.getByTestId("cameras-stop-countdown")).toHaveAttribute("style", /--arm-duration: 3000ms/);
-    await expect(rec).toHaveAttribute("data-armed", "false", { timeout: 4000 });
+    // Short of the 3 s the arm stands; past them it is dropped.
+    await page.clock.fastForward(STOP_WINDOW_MS - 100);
+    await expect(rec).toHaveAttribute("data-armed", "true");
+    await page.clock.fastForward(200);
+    await expect(rec).toHaveAttribute("data-armed", "false");
+    await page.clock.resume();
     await expect(rec).toHaveAttribute("data-rec", "recording");
     await expect(recChip(page)).toHaveAttribute("data-tone", "error");
   });
@@ -189,6 +212,7 @@ test.describe("the Cameras page", () => {
   });
 
   test("the format and the look are press twice, and a rate the camera does not allow is locked", async ({ page }) => {
+    await page.clock.install();
     await openCameras(page);
     const fifty = page.getByTestId("cameras-frameRate-50");
     await expect(page.getByTestId("cameras-frameRate-25")).toHaveAttribute("aria-pressed", "true");
@@ -227,6 +251,7 @@ test.describe("the Cameras page", () => {
   });
 
   test("Release is press twice and hands the camera over; Connect takes it back", async ({ page }) => {
+    await page.clock.install();
     await openCameras(page);
     await page.getByTestId("cameras-key-2").click();
     await expect(page.getByTestId("cameras-release")).toContainText("Release to LUMIX Tether · press twice");
@@ -249,15 +274,18 @@ test.describe("the Cameras page", () => {
   });
 
   test("CAM 1 released: REC is locked and the chip says that it is not read", async ({ page }) => {
+    await page.clock.install();
     await openCameras(page);
     await page.getByTestId("cameras-rec").click();
     await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+    await pausePageClock(page);
     await page.getByTestId("cameras-release").click();
     await expect(page.getByTestId("cameras-connection-note")).toHaveText(
       "CAM 1 is recording: after Release, REC stops only on the camera or the iPad."
     );
-    await page.waitForTimeout(DWELL_MS);
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
     await page.getByTestId("cameras-release").click();
+    await page.clock.resume();
 
     const rec = page.getByTestId("cameras-rec");
     await expect(rec).toHaveAttribute("data-rec", "locked");
@@ -417,6 +445,47 @@ test.describe("the Cameras page", () => {
     await expect(state(page)).toContainText("HELD");
     await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.actionLogUnreadable(false));
     await expect(page.getByTestId("cameras-recent-row")).toHaveCount(5, { timeout: 3000 });
+  });
+
+  test("no line is cut: a key holds the longest line its camera reports, as doubt too", async ({ page }) => {
+    await openCameras(page);
+    // The longest value of each of the cameras' lists (the unit test beside
+    // the page's model holds that none is longer): 36 characters a line.
+    await page.evaluate(() => {
+      const cameras = window.__SSE_TEST_CAMERAS__!;
+      cameras.changeOnBody(1, { iso: "25600", shutter: "172.8°", iris: "f/5.6", whiteBalance: 10000 });
+      cameras.changeOnBody(2, { iso: "51200", shutter: "1/1000", iris: "f/5.6", whiteBalance: 10000 });
+      cameras.changeOnBody(3, { iso: "51200", shutter: "1/1000", iris: "f/5.6", whiteBalance: 10000 });
+    });
+    await expect(page.getByTestId("cameras-key-1")).toContainText("ISO 25600 · 172.8° · f/5.6 · 10000 K", {
+      timeout: 3000,
+    });
+    await expect(page.getByTestId("cameras-key-3")).toContainText("ISO 51200 · 1/1000 · f/5.6 · 10000 K");
+
+    /** The lines that are cut, of every text the page may cut with an ellipsis. */
+    const cut = () =>
+      page.evaluate(() =>
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            "[data-region=cluster] *, [data-region=bay] *, [data-region=plate] *"
+          ),
+        ]
+          .filter((element) => getComputedStyle(element).textOverflow === "ellipsis")
+          .filter((element) => element.scrollWidth > element.clientWidth)
+          .map((element) => element.textContent)
+      );
+    expect(await cut(), "held").toEqual([]);
+
+    await page.evaluate(() => {
+      for (const camera of [1, 2, 3] as const) window.__SSE_TEST_CAMERAS__!.stopAnswering(camera);
+    });
+    for (const camera of [1, 2, 3]) {
+      const key = page.getByTestId(`cameras-key-${camera}`);
+      await expect(key).toHaveAttribute("data-state", "unreachable", { timeout: 3000 });
+      await expect(key).toContainText("10000 K");
+      await expect(key).toContainText("last read");
+    }
+    expect(await cut(), "unreachable").toEqual([]);
   });
 
   test("nothing scrolls, and the regions keep their sizes", async ({ page }) => {

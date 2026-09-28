@@ -58,7 +58,7 @@ The layers, and what each is for:
 
 The committed captures are under `frontend/app/tests/__visual__/`. CI compares none of them, so the local run is the one that counts.
 
-A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (six headers, four footers). A change to the header moves the strips and no page.
+A page's capture is its workspace: the header and the footer are masked, and captured once, as strips of their own (nine headers, five footers). A change to the header moves the strips and no page.
 
 When a change moves a page:
 
@@ -85,6 +85,9 @@ Pages and their tests:
 - **Port `4173` belongs to the page tests.** A preview server left on it after a run makes the next run fail or lie. End it first. The app's development run has `4174`, so the two can run at once.
 - **A page is on screen later than its shell.** Each page is a chunk fetched after the shell has drawn. A test whose first step is a key or a one-off read calls `expectWorkspaceMounted(page, workspace)` first.
 - **Time is driven, never waited out.** Use `page.clock` and `helpers/pageClock.ts`. A second press inside an arm's dwell, a meter tick, a countdown: none of them is tested with a real wait.
+- **A page test reaches the simulated cameras through `window.__SSE_TEST_CAMERAS__`:** a value changed on a camera, a camera that stops answering and answers again, how many commands a camera was sent. The page drives everything else.
+- **No line is cut.** The layout measures do not see a text cut with an ellipsis. Where a line may be cut, a page test fills it with the longest value and compares `scrollWidth` with `clientWidth` (`cameras.spec.ts`, "no line is cut").
+- **The app's unit tests run from the app's folder:** `npm run test --workspace frontend/app -- <file>`. Started from the repository's root with `--root`, Vitest refuses the glass's font files and `PrompterGlass.test.tsx` fails.
 - **A test that fails now and then has a cause.** Every one so far was the test: a click sent before the page had drawn the state it needed. Find it; do not retry it away.
 - **A test reported as flaky passed on its second try.** The workstation allows one retry, because Windows now and then refuses the browser a socket (`net::ERR_NO_BUFFER_SPACE`) and the page draws without a file. Read why the first try failed. If it was anything else, find the cause.
 - **Raising a type size breaks layouts** written for the old one, and only measurement finds it. After a type change, run the layout measures.
@@ -109,8 +112,9 @@ The engine:
 ## Where the pages' code lives
 
 - `frontend/app/src/app/OperatorShell.tsx`: the header, the tabs, the pages.
-- `lighting/`, `audio/`, `setup/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
+- `lighting/`, `audio/`, `setup/`, `cameras/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
 - `teleprompter/glass/`: the prompter's glass, drawn both on the page and on the Prompter XL.
+- `cameras/pictures/`: the pictures' geometry (whole frame, 1:1, the loupe), the aids worked out from a picture's pixels, and the test pictures that stand in until the cameras' pictures are built.
 - `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double). The double has an entry of its own, `@sse/engine-client/fixture`, and the pages load it on request (`fixtureDouble.ts`): in a browser, never in the app's window.
 - `frontend/packages/design-system`, `frontend/packages/tokens`: the shared components, and the sizes and colours. Tokens are built with `npm run frontend:tokens:build`.
 

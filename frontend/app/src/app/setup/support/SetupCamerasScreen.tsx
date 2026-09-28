@@ -161,7 +161,8 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
                       className={pilotStyles.textField}
                       disabled={busy || locked !== null}
                       inputMode="decimal"
-                      placeholder="172.16.16.85"
+                      // What Setup holds, not an example: an example here reads as a camera's address.
+                      placeholder="no address"
                       value={address}
                       data-testid={`setup-camera-${camera.camera}-address`}
                       onChange={(event) => setAddresses((held) => ({ ...held, [number]: event.target.value }))}

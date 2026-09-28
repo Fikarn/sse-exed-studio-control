@@ -178,7 +178,8 @@ export function CamerasCluster({
                 </span>
                 <span className={styles.cameraMeta}>{camera.meta}</span>
                 <span className={styles.cameraValues} data-kind={camera.valuesKind}>
-                  {camera.values}
+                  <span className={styles.cameraLine}>{camera.values}</span>
+                  {camera.valuesTag ? <span className={styles.cameraValuesTag}>{camera.valuesTag}</span> : null}
                 </span>
               </button>
             );

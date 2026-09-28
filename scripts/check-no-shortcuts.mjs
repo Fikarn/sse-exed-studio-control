@@ -66,6 +66,8 @@ export const KEY_LISTENERS = {
     "Esc closes the shell's dialog (Close Studio Control?, Restart the hardware link?) wherever focus is, first in the capture phase so an armed key under it stays armed, and Tab stays inside it (D6)",
   "frontend/app/src/app/audio/hooks/useAudioArming.ts":
     "Esc cancels the Console's armed key (48 V, snapshot recall and save), and a held Enter's repeats never confirm it, registered only while one is armed (D6)",
+  "frontend/app/src/app/cameras/CamerasValuesList.tsx":
+    "Esc closes the list of the values a camera allows, a popup beside the plate, without a change; registered only while the list is open (D6)",
 };
 
 // Where a JSX key handler is plain keyboard operation on the focused control.

@@ -268,6 +268,7 @@ describe("the three cameras' keys", () => {
         tone: "ok",
         values: "ISO 400 · 180° · f/2.8 · 5600 K",
         valuesKind: "values",
+        valuesTag: null,
         rec: null,
         selected: true,
       },
@@ -280,6 +281,7 @@ describe("the three cameras' keys", () => {
         tone: "ok",
         values: "ISO 800 · 1/50 · f/4.0 · 5600 K",
         valuesKind: "values",
+        valuesTag: null,
         rec: null,
         selected: false,
       },
@@ -292,10 +294,30 @@ describe("the three cameras' keys", () => {
         tone: "ok",
         values: "ISO 1600 · 1/50 · f/2.8 · 4300 K",
         valuesKind: "values",
+        valuesTag: null,
         rec: null,
         selected: false,
       },
     ]);
+  });
+
+  // The key prints the line whole, with `last read` at its end when the camera
+  // does not answer. The page test "no line is cut" measures the key with a
+  // line of 36 characters: a longer value in a camera's lists is a key to
+  // measure again, not a line to cut.
+  it("has room for the longest line a camera reports", async () => {
+    const snapshot = await openCameras().read();
+    const longest = (options: string[]) => options.reduce((a, b) => (b.length > a.length ? b : a), "");
+    for (const camera of snapshot.cameras) {
+      const { iso, shutter, iris, whiteBalance } = camera.values;
+      const line = [
+        `ISO ${longest(iso.options)}`,
+        longest(shutter.options),
+        longest(iris.options),
+        `${whiteBalance.max} ${whiteBalance.unit}`,
+      ].join(" · ");
+      expect(line.length, `${camera.tag}: ${line}`).toBeLessThanOrEqual(36);
+    }
   });
 
   it("shows an unreachable camera's last values as doubt, and none for one not read", async () => {
@@ -312,8 +334,9 @@ describe("the three cameras' keys", () => {
     expect(cam1).toMatchObject({
       word: "unreachable",
       tone: "error",
-      values: "last read 09:11 · ISO 400 · 180° · f/2.8 · 5600 K",
+      values: "ISO 400 · 180° · f/2.8 · 5600 K",
       valuesKind: "doubt",
+      valuesTag: "last read",
       rec: "last-known",
       selected: false,
     });
@@ -321,6 +344,7 @@ describe("the three cameras' keys", () => {
       word: "released",
       values: "not read while released",
       valuesKind: "plain",
+      valuesTag: null,
       selected: true,
     });
     expect(cam3).toMatchObject({
