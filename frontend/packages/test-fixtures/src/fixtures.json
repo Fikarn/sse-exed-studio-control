@@ -410,8 +410,7 @@
         "logsDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs",
         "logFilePath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs\\studio-control.log",
         "dbPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\studio-control.sqlite3",
-        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
-        "updateRepositoryPath": "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
+        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups"
       }
     }
   },
@@ -434,8 +433,7 @@
         "logsDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs",
         "logFilePath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\logs\\studio-control.log",
         "dbPath": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\studio-control.sqlite3",
-        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups",
-        "updateRepositoryPath": "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip"
+        "backupDir": "C:\\Users\\Studio\\AppData\\Roaming\\ExEd Studio Control Native\\backups"
       }
     }
   },

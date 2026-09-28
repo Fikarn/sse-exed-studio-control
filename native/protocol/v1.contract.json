@@ -15,7 +15,6 @@
     "ready",
     "failed"
   ],
-  "devParityFixtures": ["lighting-populated", "audio-populated", "setup-required", "setup-ready"],
   "snapshotShapes": {
     "lightingFixtureVisual": {
       "additiveFields": ["symbolKind", "symbolVariant", "emitterLayout", "output", "visualConfidence"],
@@ -44,7 +43,6 @@
     "commissioning.snapshot",
     "commissioning.update",
     "controlSurface.snapshot",
-    "dev.parityFixture.load",
     "engine.ping",
     "exports.companion.export",
     "health.snapshot",

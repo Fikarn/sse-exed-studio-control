@@ -66,6 +66,8 @@ When a change moves a page:
 2. `cd frontend/app && npx playwright test visual-review.spec.ts storybook.spec.ts --update-snapshots=changed`
 3. Look at every changed picture before `git add`.
 
+The comparison allows a hundred differing pixels, so a change of a digit or a letter can pass as no change. After a change of words or numbers, write the boards concerned again with `--update-snapshots=all`, keep the pictures that differ in more than noise, and put the others back with `git checkout`.
+
 ## The layout measures
 
 `ui-contract.spec.ts` renders every fixture at 2560×1440 and measures it: type sizes and families, contrast sampled from the screenshot, target sizes, radii, shadows, gradients, idle animations, chrome sizes, scroll, and forbidden words.

@@ -38,28 +38,6 @@ struct EngineState {
 /// close still needs confirming; the frontend answers with the dialog and
 /// `shell_confirm_close`.
 const SHELL_CLOSE_REQUESTED_EVENT: &str = "shell://close-requested";
-/// Automation that must close the shell without a dialog sets this to `1`.
-const SHELL_SKIP_CLOSE_CONFIRM_ENV: &str = "SSE_SHELL_SKIP_CLOSE_CONFIRM";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ClosePolicy {
-    /// Keep the window, ask the operator.
-    Prevent,
-    /// Let the close through.
-    Allow,
-}
-
-/// Pure close policy: a close goes through once the operator confirmed it or
-/// when automation opted out of the dialog; anything else is prevented and
-/// turned into a `shell://close-requested` event.
-fn close_policy(confirmed: bool, skip_confirm_env: Option<&str>) -> ClosePolicy {
-    if confirmed || skip_confirm_env.map(str::trim) == Some("1") {
-        ClosePolicy::Allow
-    } else {
-        ClosePolicy::Prevent
-    }
-}
-
 #[cfg(feature = "test-bridge")]
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -611,7 +589,7 @@ fn current_runtime_paths() -> BTreeMap<String, String> {
     let db_path = app_data_dir.join("studio-control.sqlite3");
     let log_file_path = logs_dir.join("engine.log");
 
-    let mut paths = BTreeMap::from([
+    BTreeMap::from([
         ("appDataDir".to_string(), app_data_dir.display().to_string()),
         ("backupDir".to_string(), backup_dir.display().to_string()),
         ("dbPath".to_string(), db_path.display().to_string()),
@@ -620,13 +598,7 @@ fn current_runtime_paths() -> BTreeMap<String, String> {
             log_file_path.display().to_string(),
         ),
         ("logsDir".to_string(), logs_dir.display().to_string()),
-    ]);
-
-    if let Some(update_repository_path) = optional_env_path("SSE_UPDATE_REPOSITORY_PATH") {
-        paths.insert("updateRepositoryPath".to_string(), update_repository_path);
-    }
-
-    paths
+    ])
 }
 
 /// Every shell command that can wait — for the engine's reply, for its exit,
@@ -729,18 +701,13 @@ const PATH_OUTSIDE_APP_DATA_CODE: &str = "PATH_OUTSIDE_APP_DATA";
 const PATH_NOT_FOUND_CODE: &str = "PATH_NOT_FOUND";
 
 /// The folders the shell opens for the operator: the app-data directory
-/// (which holds `backups` and `exports`), the logs directory (which may live
-/// elsewhere through `SSE_LOG_DIR`) and the update repository when the
-/// launcher configured one. Everything else is refused (2026-09 production
+/// (which holds `backups` and `exports`) and the logs directory (which may
+/// live elsewhere through `SSE_LOG_DIR`). Everything else is refused (2026-09 production
 /// readiness, Slice 4 — finding F15): the command took any path the webview
 /// named and handed it to Explorer.
 fn allowed_open_roots() -> Result<Vec<PathBuf>, String> {
     let (app_data_dir, logs_dir) = engine::resolve_runtime_directories()?;
-    let mut roots = vec![app_data_dir, logs_dir];
-    if let Some(update_repository) = optional_env_path("SSE_UPDATE_REPOSITORY_PATH") {
-        roots.push(PathBuf::from(update_repository));
-    }
-    Ok(roots)
+    Ok(vec![app_data_dir, logs_dir])
 }
 
 /// `target` must exist and, once every symlink, junction and `..` is
@@ -762,7 +729,7 @@ fn resolve_open_path(target: &Path, roots: &[PathBuf]) -> Result<PathBuf, String
         Ok(canonical)
     } else {
         Err(format!(
-            "{PATH_OUTSIDE_APP_DATA_CODE}: {} is outside the app data, logs and update folders, so it was not opened.",
+            "{PATH_OUTSIDE_APP_DATA_CODE}: {} is outside the app data and logs folders, so it was not opened.",
             target.display()
         ))
     }
@@ -1252,15 +1219,14 @@ fn main() {
             let window_for_events = window.clone();
             window.on_window_event(move |event| {
                 // 2026-09 audit Slice 11: closing asks first. Until the
-                // operator confirms (or automation opts out), keep the
-                // window and let the frontend raise the dialog.
+                // operator confirms, keep the window and let the frontend
+                // raise the dialog.
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     let confirmed = app_handle
                         .state::<EngineState>()
                         .close_confirmed
                         .load(Ordering::SeqCst);
-                    let skip = env::var(SHELL_SKIP_CLOSE_CONFIRM_ENV).ok();
-                    if close_policy(confirmed, skip.as_deref()) == ClosePolicy::Prevent {
+                    if !confirmed {
                         api.prevent_close();
                         let _ = window_for_events.emit(SHELL_CLOSE_REQUESTED_EVENT, ());
                         return;
@@ -1379,25 +1345,6 @@ mod shell_only_method_tests {
 }
 
 #[cfg(test)]
-mod shell_close_policy_tests {
-    use super::*;
-
-    // 2026-09 audit Slice 11: the only two ways past the close dialog are the
-    // operator's confirmation and the explicit automation opt-out.
-    #[test]
-    fn close_is_prevented_until_confirmed_or_opted_out() {
-        assert_eq!(close_policy(false, None), ClosePolicy::Prevent);
-        assert_eq!(close_policy(false, Some("0")), ClosePolicy::Prevent);
-        assert_eq!(close_policy(false, Some("")), ClosePolicy::Prevent);
-        assert_eq!(close_policy(false, Some("true")), ClosePolicy::Prevent);
-        assert_eq!(close_policy(true, None), ClosePolicy::Allow);
-        assert_eq!(close_policy(false, Some("1")), ClosePolicy::Allow);
-        assert_eq!(close_policy(false, Some(" 1 ")), ClosePolicy::Allow);
-        assert_eq!(close_policy(true, Some("0")), ClosePolicy::Allow);
-    }
-}
-
-#[cfg(test)]
 mod shell_window_command_tests {
     use super::*;
 
@@ -1504,7 +1451,6 @@ mod shell_path_policy_tests {
         let tree = TempTree::new("open-path");
         let app_data = tree.path("app-data");
         let logs = tree.path("elsewhere/logs");
-        let update_repository = tree.path("updates");
         let backup = app_data
             .join("backups")
             .join("db-2026-09-10T00-00-00-000Z-daily.sqlite3");
@@ -1518,13 +1464,7 @@ mod shell_path_policy_tests {
         touch(&export);
         touch(&engine_log);
         touch(&sibling);
-        touch(&update_repository.join("Updates.xml"));
-        let roots = vec![
-            app_data.clone(),
-            logs.clone(),
-            update_repository.clone(),
-            missing_root,
-        ];
+        let roots = vec![app_data.clone(), logs.clone(), missing_root];
 
         // Inside a root: the roots themselves, and files beneath them.
         for allowed in [
@@ -1534,8 +1474,6 @@ mod shell_path_policy_tests {
             export.clone(),
             logs.clone(),
             engine_log.clone(),
-            update_repository.clone(),
-            update_repository.join("Updates.xml"),
         ] {
             let resolved = resolve_open_path(&allowed, &roots)
                 .unwrap_or_else(|error| panic!("{} should open: {error}", allowed.display()));

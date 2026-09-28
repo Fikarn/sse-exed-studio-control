@@ -53,6 +53,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Removed
 
+- The recovery screen has no `Install & Update` card, and no page has an `Update folder` key: they belonged to the installer, which is gone (#240).
 - Talkback is gone: the Console has no Talkback key and the Stream Deck's AUDIO page no TALK key, whose place is empty. Export the profile again and import it with Full Reset & Import (#239).
 - The Graphite and Bone themes are gone, with their keys in Setup / Support: Studio Control has one look, Studio (#238).
 - The Planning page is gone, and the first start of this build drops its saved data (projects and tasks) after a backup copy. An older backup restores without its Planning part (#211, #213).

@@ -220,7 +220,7 @@ export function SetupRecoverySurface({
         </div>
       ) : null}
 
-      <div className={styles.setupIncidentGrid}>
+      <div className={styles.setupIncidentGrid} data-testid="setup-recovery-cards">
         <div className={`${styles.setupIncidentHero} ${recoveryStyles.card}`} data-material="plate">
           <div className={styles.setupIncidentPrompt}>What went wrong?</div>
 
@@ -343,18 +343,6 @@ export function SetupRecoverySurface({
               </button>
               <button
                 className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.updateRepositoryPath ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-update-repo", () =>
-                    openReferencePath("Update folder", String(runtimePaths.updateRepositoryPath ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Update folder
-              </button>
-              <button
-                className={styles.setupIncidentRailButton}
                 disabled={!String(runtimePaths.appDataDir ?? "").trim()}
                 onClick={() => {
                   void performAction("open-app-data", () =>
@@ -462,23 +450,6 @@ export function SetupRecoverySurface({
                 </li>
               )}
             </ul>
-          </div>
-        </div>
-
-        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
-          <div className={styles.setupIncidentSectionLabel}>Install & Update</div>
-          <div className={styles.setupIncidentInfoList}>
-            <div>
-              <strong>Windows</strong>
-              <span>If SmartScreen intervenes, choose More info, then Run anyway.</span>
-            </div>
-            <div>
-              <strong>Update posture</strong>
-              <span>
-                Keep the workstation on the packaged installer and maintenance-tool path rather than ad hoc local
-                binaries while incident recovery is in progress.
-              </span>
-            </div>
           </div>
         </div>
       </div>

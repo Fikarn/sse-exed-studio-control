@@ -72,27 +72,6 @@ fn a_level_that_is_not_a_number_is_not_a_level() {
 }
 
 #[test]
-fn clamps_configured_poll_interval() {
-    assert_eq!(poll_interval_from_value(None), Duration::from_millis(16));
-    assert_eq!(
-        poll_interval_from_value(Some("1")),
-        Duration::from_millis(5)
-    );
-    assert_eq!(
-        poll_interval_from_value(Some("40")),
-        Duration::from_millis(40)
-    );
-    assert_eq!(
-        poll_interval_from_value(Some("250")),
-        Duration::from_millis(100)
-    );
-    assert_eq!(
-        poll_interval_from_value(Some("bad")),
-        Duration::from_millis(16)
-    );
-}
-
-#[test]
 fn builds_totalmix_page_two_eq_messages_for_rme_model() {
     assert_eq!(
         totalmix_channel_target("audio-input-9"),
@@ -1222,14 +1201,14 @@ fn accept_source_rejects_foreign_ip() {
 #[test]
 fn receive_policy_binds_loopback_for_a_loopback_console_and_every_interface_otherwise() {
     assert_eq!(
-        ReceivePolicy::for_console(LOOPBACK, None),
+        ReceivePolicy::for_console(LOOPBACK),
         ReceivePolicy {
             console: LOOPBACK,
             bind_host: LOOPBACK,
         }
     );
     assert_eq!(
-        ReceivePolicy::for_console(LAN_CONSOLE, None),
+        ReceivePolicy::for_console(LAN_CONSOLE),
         ReceivePolicy {
             console: LAN_CONSOLE,
             bind_host: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
@@ -1237,43 +1216,21 @@ fn receive_policy_binds_loopback_for_a_loopback_console_and_every_interface_othe
     );
     let v6_loopback = IpAddr::V6(Ipv6Addr::LOCALHOST);
     assert_eq!(
-        ReceivePolicy::for_console(v6_loopback, None).bind_host,
+        ReceivePolicy::for_console(v6_loopback).bind_host,
         v6_loopback
     );
-    // The lab override wins over the rule, whatever the console address.
-    let lab = IpAddr::V4(Ipv4Addr::new(10, 1, 79, 224));
-    assert_eq!(
-        ReceivePolicy::for_console(LOOPBACK, Some(lab)),
-        ReceivePolicy {
-            console: LOOPBACK,
-            bind_host: lab,
-        }
-    );
-
     assert_eq!(resolve_console_address("localhost"), Some(LOOPBACK));
     assert_eq!(resolve_console_address("LOCALHOST"), Some(LOOPBACK));
     assert_eq!(resolve_console_address(" 127.0.0.1 "), Some(LOOPBACK));
     assert_eq!(resolve_console_address("10.1.0.50"), Some(LAN_CONSOLE));
     assert_eq!(resolve_console_address(""), None);
     assert_eq!(resolve_console_address("   "), None);
-
-    assert_eq!(parse_bind_override(None), Ok(None));
-    assert_eq!(parse_bind_override(Some("")), Ok(None));
-    assert_eq!(parse_bind_override(Some("  ")), Ok(None));
-    assert_eq!(
-        parse_bind_override(Some("0.0.0.0")),
-        Ok(Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)))
-    );
-    assert_eq!(parse_bind_override(Some(" 10.1.79.224 ")), Ok(Some(lab)));
-    let refused = parse_bind_override(Some("desk")).expect_err("a name is not an address");
-    assert!(refused.contains("SSE_OSC_BIND_HOST"), "{refused}");
-    assert!(refused.contains("\"desk\""), "{refused}");
 }
 
 #[test]
 fn receive_sockets_bind_loopback_for_loopback_console() {
     let console = resolve_console_address("localhost").expect("localhost resolves");
-    let policy = ReceivePolicy::for_console(console, None);
+    let policy = ReceivePolicy::for_console(console);
     let (slots, global, base) = bind_loopback_slot_set(policy);
 
     let ports: Vec<u16> = slots

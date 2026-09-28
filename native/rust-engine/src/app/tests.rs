@@ -46,7 +46,6 @@ pub(super) fn app_for(test_dir: &TestDir) -> EngineApp {
         logs_dir: test_dir.path().join("logs"),
         log_file_path: test_dir.path().join("logs").join("engine.log"),
         db_path: test_dir.path().join("native.sqlite3"),
-        update_repository_path: None,
         storage_ready: true,
         storage_bootstrap: StorageBootstrap {
             schema_version: 4,
@@ -67,77 +66,6 @@ pub(super) fn app_for(test_dir: &TestDir) -> EngineApp {
     };
     initialize_test_database(&runtime.db_path).expect("database should initialize");
     EngineApp { runtime }
-}
-
-fn parity_fixture_request(params: Value) -> RequestEnvelope {
-    RequestEnvelope {
-        kind: String::from("request"),
-        id: json!("parity-1"),
-        method: String::from("dev.parityFixture.load"),
-        params,
-    }
-}
-
-// 2026-09 production readiness, Slice 1 (finding F04): a release engine
-// keeps the method in the contract but does not carry the handler or
-// the bundled fixture payloads; it answers METHOD_UNAVAILABLE and
-// touches nothing.
-#[cfg(not(feature = "dev-fixtures"))]
-#[test]
-fn parity_fixture_unavailable_without_feature() {
-    let test_dir = TestDir::new("parity-unavailable");
-    let app = app_for(&test_dir);
-
-    let reply = app.handle_request(parity_fixture_request(
-        json!({ "fixtureId": "setup-ready" }),
-    ));
-
-    assert!(!reply.response.ok, "release engines must refuse the method");
-    assert_eq!(
-        reply
-            .response
-            .error
-            .as_ref()
-            .and_then(|error| error.get("code"))
-            .and_then(Value::as_str),
-        Some("METHOD_UNAVAILABLE")
-    );
-    assert!(reply.events.is_empty(), "a refused load emits no events");
-    assert!(
-        !test_dir
-            .path()
-            .join("parity-fixture-setup-ready.json")
-            .exists(),
-        "a refused load writes no fixture file"
-    );
-}
-
-#[cfg(feature = "dev-fixtures")]
-#[test]
-fn parity_fixture_loads_with_feature() {
-    let test_dir = TestDir::new("parity-available");
-    let app = app_for(&test_dir);
-
-    let reply = app.handle_request(parity_fixture_request(
-        json!({ "fixtureId": "setup-ready" }),
-    ));
-
-    assert!(
-        reply.response.ok,
-        "a dev-fixtures engine loads the fixture (got {:?})",
-        reply.response.error
-    );
-    assert_eq!(
-        reply
-            .response
-            .result
-            .as_ref()
-            .and_then(|result| result.get("fixtureId"))
-            .and_then(Value::as_str),
-        Some("setup-ready")
-    );
-    // New pages program, Slice 2: planning.changed left the contract.
-    assert_eq!(reply.events.len(), 2, "app and commissioning change events");
 }
 
 // New pages program, Slice 2: Planning left the hardware link. Its requests

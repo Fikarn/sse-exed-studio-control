@@ -1,12 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { InspectorSection } from "../InspectorPanel";
+import { InspectorSection } from "../InspectorSection";
 
-// plan PR 6 / workstream D2: InspectorSection is a layout sub-primitive
-// of InspectorPanel (2 imports, re-exported from InspectorPanel.tsx).
-// Pure layout — no interactivity. Tests cover render with + without
-// title, custom className merge, and arbitrary attribute pass-through.
+// InspectorSection is layout only. The tests cover it with and without a
+// title, a class of the caller's, and attributes passed through.
 
 describe("InspectorSection", () => {
   it("renders children inside a <section>", () => {

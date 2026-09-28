@@ -148,10 +148,6 @@ pub fn build_app_snapshot(
                 "dbPath": runtime.db_path.display().to_string(),
                 "backupDir": runtime.backups_dir.display().to_string(),
                 "exportsDir": runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
-                "updateRepositoryPath": runtime
-                    .update_repository_path
-                    .as_ref()
-                    .map(|path| path.display().to_string()),
             },
             "controlSurface": {
                 "available": runtime.control_surface_bridge.available,
@@ -436,7 +432,6 @@ mod tests {
             db_path: PathBuf::from("/tmp/studio-control.sqlite3"),
             log_file_path: PathBuf::from("/tmp/logs/engine.log"),
             backups_dir: PathBuf::from("/tmp/backups"),
-            update_repository_path: None,
             protocol_version: String::from("2"),
             storage_ready: true,
             storage_bootstrap: StorageBootstrap {

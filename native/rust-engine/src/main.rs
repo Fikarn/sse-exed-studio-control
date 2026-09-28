@@ -19,8 +19,6 @@ mod health;
 mod lighting;
 mod lighting_backend;
 mod lighting_sacn_output;
-#[cfg(feature = "dev-fixtures")]
-mod parity_fixtures;
 mod prompter;
 mod protocol;
 mod rme_console_link;
@@ -481,11 +479,7 @@ fn main() -> io::Result<()> {
                     "logFilePath": planned_paths.log_file_path.display().to_string(),
                     "dbPath": planned_paths.db_path.display().to_string(),
                     "backupDir": planned_paths.backups_dir.display().to_string(),
-                    "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
-                    "updateRepositoryPath": planned_paths
-                        .update_repository_path
-                        .as_ref()
-                        .map(|path| path.display().to_string())
+                    "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string()
                 }
             }),
         );
@@ -515,11 +509,7 @@ fn main() -> io::Result<()> {
                         "logFilePath": planned_paths.log_file_path.display().to_string(),
                         "dbPath": planned_paths.db_path.display().to_string(),
                         "backupDir": planned_paths.backups_dir.display().to_string(),
-                        "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
-                        "updateRepositoryPath": planned_paths
-                            .update_repository_path
-                            .as_ref()
-                            .map(|path| path.display().to_string())
+                        "exportsDir": planned_paths.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string()
                     }
                 }),
             );

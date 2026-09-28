@@ -333,7 +333,6 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "cameras.step",
     // The shell's own settings, files.
     "commissioning.update",
-    "dev.parityFixture.load",
     "exports.companion.export",
     "settings.update",
     "support.backup.export",

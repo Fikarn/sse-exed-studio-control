@@ -60,8 +60,7 @@ impl EngineProcess {
     /// Slice 2b (2026-09-25): hardened as the lanes are — a Stream Deck
     /// bridge port the system picks (never the live app's 38201), the light
     /// outputs held (`SSE_SAFE_START`) and the simulated console
-    /// (`SSE_AUDIO_SIMULATED_INPUT_MODE`). `SSE_DISABLE_AUTO_IMPORT`, which
-    /// every spawn set until then, went with the db.json import. Slice 8:
+    /// (`SSE_AUDIO_SIMULATED_INPUT_MODE`). Slice 8:
     /// the simulated cameras too (`SSE_CAMERAS_SIMULATED`), so no spawn can
     /// reach a camera. Streamlining, 2026-09-28: and the simulated lights
     /// (`SSE_LIGHTS_SIMULATED`).
@@ -268,110 +267,6 @@ fn wait_for_ready(engine: &mut EngineProcess) {
         value.get("type").and_then(Value::as_str) == Some("event")
             && value.get("event").and_then(Value::as_str) == Some("engine.ready")
     });
-}
-
-fn has_completed_setup(engine: &mut EngineProcess, id: &'static str) -> bool {
-    engine.send(&json!({
-        "type": "request",
-        "id": id,
-        "method": "commissioning.snapshot",
-        "params": {}
-    }));
-    let snapshot = engine.wait_for("commissioning snapshot", response_with_id(id));
-    snapshot
-        .pointer("/result/hasCompletedSetup")
-        .and_then(Value::as_bool)
-        .unwrap_or_else(|| {
-            panic!("commissioning.snapshot must report hasCompletedSetup ({snapshot})")
-        })
-}
-
-/// An export from the old Studio Control whose setup was completed and
-/// whose page was Lighting: what the retired import would have written is
-/// plain to see on new saved data (setup not completed, the Console).
-const OLD_STUDIO_CONTROL_EXPORT: &str = r#"{"schemaVersion":8,"projects":[],"settings":{"dashboardView":"lighting","hasCompletedSetup":true}}"#;
-
-// New pages program, Slice 2b (D3): the db.json import is retired. A start
-// with a db.json staged at `<app-data>/import/db.json`, another named by
-// `SSE_LEGACY_DB_PATH` and a third under its working directory (the old
-// repo-local `data/db.json`, never a source since 2026-09 production
-// readiness, Slice 1 — finding F23) imports none of them: setup stays not
-// completed and the page stays the Console, each file is byte for byte as it
-// was, and the log names the two where the retired import looked, the
-// variable's first, in one warning line (2026-09-25; it named only the
-// variable's until then). Until the slice such a start imported the variable's
-// file (the staged one without it); these replace `auto_import_ignores_cwd`
-// and `auto_import_reads_the_staged_app_data_file`.
-#[test]
-fn a_left_over_db_json_is_named_in_the_log_and_never_imported() {
-    let elsewhere = unique_runtime_dir("left-over-db-json-elsewhere");
-    let named = elsewhere.join("db.json");
-    fs::write(&named, OLD_STUDIO_CONTROL_EXPORT).expect("the named db.json should be written");
-    fs::create_dir_all(elsewhere.join("data")).expect("cwd data dir");
-    let in_working_dir = elsewhere.join("data").join("db.json");
-    fs::write(&in_working_dir, OLD_STUDIO_CONTROL_EXPORT)
-        .expect("the working directory's db.json should be written");
-    let mut staged = PathBuf::new();
-
-    let mut engine = EngineProcess::spawn_with("left-over-db-json", |command, runtime_dir| {
-        let import_dir = runtime_dir.join("import");
-        fs::create_dir_all(&import_dir).expect("app-data import dir");
-        staged = import_dir.join("db.json");
-        fs::write(&staged, OLD_STUDIO_CONTROL_EXPORT)
-            .expect("the staged db.json should be written");
-        command
-            .current_dir(&elsewhere)
-            .env("SSE_LEGACY_DB_PATH", &named);
-    });
-    wait_for_ready(&mut engine);
-
-    assert!(
-        !has_completed_setup(&mut engine, "left-over-snapshot"),
-        "no db.json may be imported"
-    );
-    engine.send(&json!({
-        "type": "request",
-        "id": "left-over-settings",
-        "method": "settings.get",
-        "params": {}
-    }));
-    let settings = engine.wait_for("settings.get", response_with_id("left-over-settings"));
-    assert_eq!(
-        settings
-            .pointer("/result/shell/workspace")
-            .and_then(Value::as_str),
-        Some("audio"),
-        "new saved data opens on the Console ({settings})"
-    );
-
-    for path in [&named, &staged, &in_working_dir] {
-        assert_eq!(
-            fs::read_to_string(path).expect("the db.json is still there"),
-            OLD_STUDIO_CONTROL_EXPORT,
-            "{} was changed",
-            path.display()
-        );
-    }
-    let log = fs::read_to_string(engine.runtime_dir.join("logs").join("engine.log"))
-        .expect("the engine log");
-    let lines = log
-        .lines()
-        .filter(|line| line.contains("db.json"))
-        .collect::<Vec<_>>();
-    assert_eq!(lines.len(), 1, "{log}");
-    assert!(lines[0].contains("WARN"), "{}", lines[0]);
-    assert!(
-        lines[0].ends_with(&format!(
-            "A db.json at {} and at {} was left alone: Studio Control no longer imports db.json files.",
-            named.display(),
-            staged.display()
-        )),
-        "{}",
-        lines[0]
-    );
-
-    engine.shutdown();
-    let _ = fs::remove_dir_all(&elsewhere);
 }
 
 #[test]

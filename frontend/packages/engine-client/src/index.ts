@@ -59,13 +59,7 @@ export type {
   StartupFailure,
   WorkspaceId,
 } from "./types";
-export {
-  DEV_PARITY_FIXTURES,
-  EVENT_NAMES,
-  PROTOCOL_VERSION,
-  REQUEST_METHODS,
-  STARTUP_LIFECYCLE_STATES,
-} from "./generated/protocol";
+export { EVENT_NAMES, PROTOCOL_VERSION, REQUEST_METHODS, STARTUP_LIFECYCLE_STATES } from "./generated/protocol";
 export type {
   EventEnvelope,
   EventName,

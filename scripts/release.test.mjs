@@ -151,8 +151,8 @@ test("a lane starts with no variable of the app's left in its environment", () =
     laneEnv({
       PATH: "/bin",
       SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE: "1",
-      SSE_COMPANION_URL: "http://elsewhere",
-      sse_control_surface_token: "x",
+      SSE_ENGINE_LOG_LEVEL: "debug",
+      sse_control_surface_port: "1",
       SSE_APP_DATA_DIR: "C:/somewhere",
       SSEX: "kept",
     }),

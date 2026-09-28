@@ -226,10 +226,6 @@ button.lightingDmxDrawerCell {
   gap: var(--space-4);
 }
 
-.setupIncidentHero {
-  grid-row: span 2;
-}
-
 .setupIncidentPrompt {
   /* Visual overhaul A, Slice 7: the chassis ink, which clears 4.5:1 on the
      plate in every theme (the retired subtle ink did not). */
@@ -294,8 +290,6 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentHint,
-.setupIncidentInfoList,
-.setupIncidentInfoList span,
 .setupIncidentBackupRow small {
   color: var(--color-text-muted);
   font: var(--font-weight-regular) var(--font-size-tick) / 1.5 var(--font-family-ui);
@@ -334,7 +328,6 @@ button.lightingDmxDrawerCell {
 .setupIncidentBackupList,
 .setupIncidentCheckGrid,
 .setupIncidentDetailList,
-.setupIncidentInfoList,
 .setupIncidentReferencePanel {
   display: grid;
   gap: var(--space-3);
@@ -412,11 +405,6 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentDetailList li {
-  display: grid;
-  gap: 6px;
-}
-
-.setupIncidentInfoList div {
   display: grid;
   gap: 6px;
 }

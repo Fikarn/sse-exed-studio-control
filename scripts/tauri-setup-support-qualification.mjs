@@ -78,12 +78,10 @@ function createRuntimeDirs(prefix) {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
   const appDataDir = path.join(root, "app-data");
   const logsDir = path.join(root, "logs");
-  const updateRepoDir = path.join(root, "update-repository");
   const diagnosticsDir = path.join(root, "diagnostics");
 
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
-  mkdirSync(updateRepoDir, { recursive: true });
   mkdirSync(diagnosticsDir, { recursive: true });
 
   return {
@@ -94,7 +92,6 @@ function createRuntimeDirs(prefix) {
     diagnosticsDir,
     logsDir,
     root,
-    updateRepoDir,
   };
 }
 
@@ -157,15 +154,7 @@ function readJson(pathname) {
 // program, Slice 2b): a bridge port of its own, the light outputs held and the
 // simulated console. `envCheck` names the one launch that may leave the safe
 // start out (step 8).
-async function launchTauriShell({
-  appDataDir,
-  commandPath,
-  envCheck = {},
-  extraEnv = {},
-  logsDir,
-  statusPath,
-  updateRepoDir,
-}) {
+async function launchTauriShell({ appDataDir, commandPath, envCheck = {}, extraEnv = {}, logsDir, statusPath }) {
   const env = laneProcessEnv(
     await hardenedLaneEnv(),
     {
@@ -173,7 +162,6 @@ async function launchTauriShell({
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
-      SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
       ...extraEnv,
     },
     { label: "The Setup/Support qualification's shell", ...envCheck }
@@ -408,7 +396,7 @@ function debugShellBinaryPath() {
 // Vite serves. `tauri dev` itself cannot be the second copy — its Vite
 // would refuse port 4174 before the shell ever ran, proving nothing about
 // the shell.
-async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
+async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, statusPath }) {
   const binaryPath = debugShellBinaryPath();
   assert(existsSync(binaryPath), `Expected the debug shell binary at ${binaryPath} after the first tauri dev run.`);
   const env = laneProcessEnv(
@@ -418,7 +406,6 @@ async function launchSecondShellInstance({ appDataDir, commandPath, logsDir, sta
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
-      SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
     },
     { label: "The Setup/Support qualification's second shell" }
   );
@@ -508,7 +495,6 @@ async function runSetupSupportQualification() {
     commandPath: firstSession.commandPath,
     logsDir: runtime.logsDir,
     statusPath: firstSession.statusPath,
-    updateRepoDir: runtime.updateRepoDir,
   });
 
   try {
@@ -523,10 +509,6 @@ async function runSetupSupportQualification() {
     assert(
       initialStatus.shellState.appSnapshot?.startup?.targetSurface === "commissioning",
       `Expected clean Tauri startup targetSurface 'commissioning', got '${initialStatus.shellState.appSnapshot?.startup?.targetSurface}'.`
-    );
-    assert(
-      initialStatus.shellState.appSnapshot?.runtime?.paths?.updateRepositoryPath === runtime.updateRepoDir,
-      "Expected update repository path to flow through the live Tauri shell."
     );
     assert(
       initialStatus.shellState.commissioningSnapshot?.runnerStage === "import",
@@ -702,7 +684,6 @@ async function runSetupSupportQualification() {
     commandPath: secondSession.commandPath,
     logsDir: runtime.logsDir,
     statusPath: secondSession.statusPath,
-    updateRepoDir: runtime.updateRepoDir,
   });
 
   try {
@@ -948,7 +929,6 @@ async function runSetupSupportQualification() {
     commandPath: corruptSession.commandPath,
     logsDir: corruptRuntime.logsDir,
     statusPath: corruptSession.statusPath,
-    updateRepoDir: corruptRuntime.updateRepoDir,
   });
 
   try {
@@ -1070,7 +1050,6 @@ async function runSetupSupportQualification() {
     commandPath: crashSession.commandPath,
     logsDir: crashRuntime.logsDir,
     statusPath: crashSession.statusPath,
-    updateRepoDir: crashRuntime.updateRepoDir,
   });
 
   try {
@@ -1152,7 +1131,6 @@ async function runSetupSupportQualification() {
       commandPath: secondSession.commandPath,
       logsDir: crashRuntime.logsDir,
       statusPath: secondSession.statusPath,
-      updateRepoDir: crashRuntime.updateRepoDir,
     });
     const launchedAt = Date.now();
 
@@ -1244,7 +1222,6 @@ async function runSetupSupportQualification() {
     extraEnv: { SSE_CONTROL_SURFACE_PORT: String(takenPort) },
     logsDir: portRuntime.logsDir,
     statusPath: portSession.statusPath,
-    updateRepoDir: portRuntime.updateRepoDir,
   });
 
   try {
@@ -1333,7 +1310,6 @@ async function runSetupSupportQualification() {
     extraEnv: { SSE_SAFE_START: "1" },
     logsDir: safeRuntime.logsDir,
     statusPath: safeSession.statusPath,
-    updateRepoDir: safeRuntime.updateRepoDir,
   });
   try {
     const held = await waitForStatus({
@@ -1371,7 +1347,6 @@ async function runSetupSupportQualification() {
     extraEnv: { SSE_SAFE_START: "0" },
     logsDir: safeRuntime.logsDir,
     statusPath: armSession.statusPath,
-    updateRepoDir: safeRuntime.updateRepoDir,
   });
   try {
     const stillHeld = await waitForStatus({

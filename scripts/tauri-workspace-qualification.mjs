@@ -96,11 +96,9 @@ function createRuntimeDirs(prefix) {
   const root = mkdtempSync(path.join(tmpdir(), prefix));
   const appDataDir = path.join(root, "app-data");
   const logsDir = path.join(root, "logs");
-  const updateRepoDir = path.join(root, "update-repository");
 
   mkdirSync(appDataDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
-  mkdirSync(updateRepoDir, { recursive: true });
 
   return {
     appDataDir,
@@ -109,7 +107,6 @@ function createRuntimeDirs(prefix) {
     },
     logsDir,
     root,
-    updateRepoDir,
   };
 }
 
@@ -140,7 +137,7 @@ function readJson(pathname) {
 // Every shell gets the lanes' hardening (native-runtime-harness.mjs, new pages
 // program, Slice 2b): a bridge port of its own, the light outputs held and the
 // simulated console.
-async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, updateRepoDir }) {
+async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath }) {
   const env = laneProcessEnv(
     await hardenedLaneEnv(),
     {
@@ -148,7 +145,6 @@ async function launchTauriShell({ appDataDir, commandPath, logsDir, statusPath, 
       SSE_LOG_DIR: logsDir,
       SSE_TAURI_TEST_COMMAND_PATH: commandPath,
       SSE_TAURI_TEST_STATUS_PATH: statusPath,
-      SSE_UPDATE_REPOSITORY_PATH: updateRepoDir ?? "",
     },
     { label: "The workspace qualification's shell" }
   );
@@ -323,7 +319,6 @@ async function launchRestartReadySession(runtime) {
       commandPath: session.commandPath,
       logsDir: runtime.logsDir,
       statusPath: session.statusPath,
-      updateRepoDir: runtime.updateRepoDir,
     });
 
     try {
@@ -375,7 +370,6 @@ async function runWorkspaceQualification() {
     commandPath: firstSession.commandPath,
     logsDir: runtime.logsDir,
     statusPath: firstSession.statusPath,
-    updateRepoDir: runtime.updateRepoDir,
   });
 
   try {

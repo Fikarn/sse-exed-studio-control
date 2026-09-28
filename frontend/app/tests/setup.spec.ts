@@ -122,8 +122,8 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
   await plate.getByRole("button", { name: "Export backup" }).click();
   await expect(page.getByText(/Exported support backup to/)).toBeVisible();
 
-  await page.getByRole("button", { name: "Update folder" }).click();
-  await expect(page.getByText(/Update folder opened at/)).toBeVisible();
+  await page.getByRole("button", { name: "App data" }).click();
+  await expect(page.getByText(/App data opened at/)).toBeVisible();
 
   await plate.getByRole("button", { name: "Restore latest" }).click();
   await expect(page.getByText(/Restored native-support-backup/)).toBeVisible();

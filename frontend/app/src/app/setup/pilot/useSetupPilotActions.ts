@@ -61,7 +61,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
           message:
             error instanceof Error
               ? error.message
-              : "That setup step did not finish. Try it again, or export diagnostics for the support ticket.",
+              : "That setup step did not finish. Try it again, or export diagnostics.",
           tone: "error",
         });
       } finally {
@@ -254,7 +254,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     };
     const path = await exportShellDiagnostics(report);
     return {
-      message: `Diagnostics exported to ${path}. Attach it to the support ticket.`,
+      message: `Diagnostics exported to ${path}.`,
       tone: "ok" as const,
     };
   };

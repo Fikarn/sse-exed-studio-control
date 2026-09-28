@@ -1,18 +1,6 @@
 {
-  "app/src/app/audio/components/AudioArmCountdown.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 1,
-    "shadow": 0
-  },
   "app/src/app/audio/components/AudioDialog.module.css": {
     "colour": 0,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 1
-  },
-  "app/src/app/audio/components/AudioHardwareReadout.module.css": {
-    "colour": 2,
     "fontSize": 0,
     "radius": 0,
     "shadow": 1
@@ -125,12 +113,6 @@
     "radius": 0,
     "shadow": 0
   },
-  "packages/design-system/src/components/HealthBar.module.css": {
-    "colour": 0,
-    "fontSize": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "packages/design-system/src/components/InlineRename.module.css": {
     "colour": 0,
     "fontSize": 0,
@@ -142,12 +124,6 @@
     "fontSize": 0,
     "radius": 0,
     "shadow": 1
-  },
-  "packages/design-system/src/components/NavItem.module.css": {
-    "colour": 0,
-    "fontSize": 1,
-    "radius": 0,
-    "shadow": 0
   },
   "packages/design-system/src/components/NumberEntryDialog.module.css": {
     "colour": 0,

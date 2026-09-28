@@ -142,10 +142,6 @@ export function ensurePaths(state: MutableFixtureState) {
     logFilePath:
       typeof paths.logFilePath === "string" ? paths.logFilePath : `${FIXTURE_APP_DATA_DIR}\\logs\\studio-control.log`,
     logsDir: typeof paths.logsDir === "string" ? paths.logsDir : `${FIXTURE_APP_DATA_DIR}\\logs`,
-    updateRepositoryPath:
-      typeof paths.updateRepositoryPath === "string"
-        ? paths.updateRepositoryPath
-        : "C:\\Users\\Studio\\Downloads\\SSE-ExEd-Studio-Control-Native-windows-UpdateRepository.zip",
   };
   state.appSnapshot.runtime = runtime;
 }

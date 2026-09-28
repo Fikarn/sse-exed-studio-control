@@ -28,8 +28,8 @@ test("renders startup and recovery fixture states", async ({ page }) => {
   await expect(page.getByText("What went wrong?")).toBeVisible();
   await expect(page.getByText("Reference paths")).toBeVisible();
   await expect(page.getByText("Requested protocol")).toBeVisible();
-  await page.getByRole("button", { name: "Update folder" }).click();
-  await expect(page.getByText(/Update folder opened at/)).toBeVisible();
+  await page.getByRole("button", { name: "App data" }).click();
+  await expect(page.getByText(/App data opened at/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
 
   await openFixture(page, "bootstrap-failed");
@@ -37,7 +37,6 @@ test("renders startup and recovery fixture states", async ({ page }) => {
     timeout: 10000,
   });
   await expect(page.getByText("What went wrong?")).toBeVisible();
-  await expect(page.getByText("Install & Update")).toBeVisible();
   await expect(page.getByText("File paths")).toBeVisible();
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
 });
@@ -75,7 +74,6 @@ test("bootstrap-failed fixture surfaces archive + recovery affordances", async (
   // hand-off + the runtime paths block to know where to look.
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
   await expect(page.getByText("File paths")).toBeVisible();
-  await expect(page.getByText("Install & Update")).toBeVisible();
 });
 
 test("startup-loading fixture hides every operator workspace surface", async ({ page }) => {
@@ -116,10 +114,16 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
     timeout: 10000,
   });
 
-  const box = await page.getByText("Update posture").boundingBox();
-  expect(box, "the last reference block should have a box").not.toBeNull();
-  expect(box!.y).toBeGreaterThanOrEqual(0);
-  expect(box!.y + box!.height).toBeLessThanOrEqual(1440);
+  // Both cards, whole: the grid that holds them ends on the screen, and so
+  // does the last row of the list of file paths, the lowest text there is.
+  const cards = await page.getByTestId("setup-recovery-cards").boundingBox();
+  expect(cards, "the cards should have a box").not.toBeNull();
+  expect(cards!.y).toBeGreaterThanOrEqual(0);
+  expect(cards!.y + cards!.height).toBeLessThanOrEqual(1440);
+  const lastPath = page.getByText("File paths").locator("xpath=following-sibling::ul/li[last()]");
+  const box = await lastPath.boundingBox();
+  expect(box, "the last file path should have a box").not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(cards!.y + cards!.height);
   await expectNoDocumentScroll(page);
 });
 
@@ -137,7 +141,6 @@ test("every recovery band names a next step", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Archive" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Logs" })).toBeVisible();
   await expect(page.getByText("File paths")).toBeVisible();
-  await expect(page.getByText("Install & Update")).toBeVisible();
   await expect(page.getByRole("button", { name: /Export diagnostics/ }).first()).toBeVisible();
 });
 

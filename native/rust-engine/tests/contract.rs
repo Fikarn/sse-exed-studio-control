@@ -159,11 +159,10 @@ fn every_protocol_event_constant_appears_in_the_contract() {
 }
 
 /// The contract's names that belong to Planning, which left the hardware link
-/// in the new pages program (Slice 2): a method, an event or a parity fixture
-/// id that starts with `planning`, or a name that carries it
-/// (`commissioning.seedPlanningDemo`).
+/// in the new pages program (Slice 2): a method or an event that starts with
+/// `planning`, or a name that carries it (`commissioning.seedPlanningDemo`).
 fn planning_names(contract: &Value) -> Vec<String> {
-    ["methods", "events", "devParityFixtures"]
+    ["methods", "events"]
         .iter()
         .flat_map(|section| contract[*section].as_array().into_iter().flatten())
         .filter_map(Value::as_str)
@@ -173,7 +172,7 @@ fn planning_names(contract: &Value) -> Vec<String> {
 }
 
 #[test]
-fn the_contract_has_no_planning_method_event_or_fixture() {
+fn the_contract_has_no_planning_method_or_event() {
     let contract: Value = serde_json::from_str(CONTRACT_JSON).expect("contract JSON must parse");
     let planning = planning_names(&contract);
 
@@ -188,11 +187,10 @@ fn the_contract_has_no_planning_method_event_or_fixture() {
 // The guard above passes on a contract without Planning; this proves it would
 // fail on one that has any.
 #[test]
-fn the_planning_guard_finds_a_method_an_event_and_a_fixture() {
+fn the_planning_guard_finds_a_method_and_an_event() {
     let planted = serde_json::json!({
         "methods": ["engine.ping", "planning.snapshot", "commissioning.seedPlanningDemo"],
         "events": ["app.changed", "planning.changed"],
-        "devParityFixtures": ["setup-ready", "planning-empty"],
     });
 
     assert_eq!(
@@ -200,8 +198,7 @@ fn the_planning_guard_finds_a_method_an_event_and_a_fixture() {
         vec![
             "planning.snapshot",
             "commissioning.seedPlanningDemo",
-            "planning.changed",
-            "planning-empty"
+            "planning.changed"
         ]
     );
 }

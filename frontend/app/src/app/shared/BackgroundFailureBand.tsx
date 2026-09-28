@@ -10,7 +10,7 @@ import styles from "./BackgroundFailureBand.module.css";
 // refused, an error nothing caught — used to be visible only in a diagnostics
 // export. One band at the foot of the bay now says that it happened, how often
 // and since when. It names no cause: the ring in the diagnostics export does
-// that, for whoever reads the support ticket.
+// that, for whoever reads the export.
 //
 // It is absent while nothing has failed, so no surface moves, and Dismiss puts
 // it away until the next failure.

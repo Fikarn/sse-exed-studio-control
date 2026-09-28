@@ -1,32 +1,19 @@
 import { useState } from "react";
-import { Bell, Check, Download, Mic, Plus, Sliders, SlidersHorizontal, Sun, WandSparkles } from "lucide-react";
+import { Plus, Sun } from "lucide-react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "../components/Button";
 import { ChipStrip, type ChipStripChip } from "../components/ChipStrip";
 import { ColorPicker, type ColorPickerSwatch } from "../components/ColorPicker";
 import { Crest } from "../components/Crest";
-import { DenseList, DenseListRow, DenseTable } from "../components/DenseRows";
-import { EmptyState, DegradedState } from "../components/OperationalState";
+import { EmptyState } from "../components/OperationalState";
 import { Footer } from "../components/Footer";
 import { Lamp } from "../components/Lamp";
 import { LampChip } from "../components/LampChip";
 import { Tab } from "../components/Tab";
-import { HealthBar } from "../components/HealthBar";
-import { IconButton } from "../components/IconButton";
-import { InspectorPanel, InspectorSection } from "../components/InspectorPanel";
-import { MeterBridge } from "../components/MeterBridge";
-import { MetricCard } from "../components/MetricCard";
-import { NavItem } from "../components/NavItem";
 import { PlotMeta } from "../components/PlotMeta";
 import { PlotPill } from "../components/PlotPill";
-import { SegmentedControl } from "../components/SegmentedControl";
-import { StatusBadge } from "../components/StatusBadge";
-import { StatusBand } from "../components/StatusBand";
 import { StatusDot } from "../components/StatusDot";
-import { Surface } from "../components/Surface";
-import { ToggleButton } from "../components/ToggleButton";
-import { Toolbar, ToolbarGroup } from "../components/Toolbar";
 
 const dStage: React.CSSProperties = {
   background: "var(--color-bg-deep)",
@@ -74,156 +61,6 @@ const dModYellow: React.CSSProperties = {
   fontWeight: 600,
 };
 
-function PrimitiveConsoleBoard() {
-  const [mode, setMode] = useState("program");
-  const [armed, setArmed] = useState(true);
-
-  return (
-    <main
-      style={{
-        display: "grid",
-        gap: "16px",
-        gridTemplateColumns: "1.2fr 0.8fr",
-        minHeight: "100vh",
-        padding: "24px",
-      }}
-    >
-      <section aria-labelledby="console-primitives-title" className="console-grid">
-        <Surface>
-          <div className="console-grid">
-            <div>
-              <span className="console-eyebrow">Shared Controls</span>
-              <h1 className="console-sectionTitle" id="console-primitives-title">
-                Operator Console Primitives
-              </h1>
-            </div>
-            <Toolbar label="Operator workspace actions">
-              <ToolbarGroup label="Mode">
-                <SegmentedControl
-                  label="Workspace mode"
-                  onChange={setMode}
-                  options={[
-                    { label: "Program", value: "program" },
-                    { label: "Preview", value: "preview" },
-                    { label: "Safe", value: "safe" },
-                  ]}
-                  value={mode}
-                />
-              </ToolbarGroup>
-              <ToolbarGroup label="Tools">
-                <IconButton icon={SlidersHorizontal} label="Open mixer inspector" />
-                <IconButton badge="2" icon={Bell} label="Show operator alerts" tone="primary" />
-                <IconButton icon={Download} label="Export diagnostics" tone="ghost" />
-              </ToolbarGroup>
-              <ToolbarGroup label="State">
-                <ToggleButton
-                  description="Local UI gate only"
-                  onClick={() => setArmed((value) => !value)}
-                  pressed={armed}
-                >
-                  Armed
-                </ToggleButton>
-              </ToolbarGroup>
-            </Toolbar>
-          </div>
-        </Surface>
-
-        <StatusBand
-          actions={<Button size="compact">Review</Button>}
-          summary="Engine snapshot current, Companion profile export available."
-          title="Studio control ready"
-          tone="ready"
-        />
-
-        <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-          <MetricCard caption="Protocol" tone="ok" value="v1" />
-          <MetricCard caption="Audio" tone="ok" value="OSC live" />
-          <MetricCard caption="Lighting" tone="attention" value="2 notes" />
-        </div>
-
-        <MeterBridge
-          channels={[
-            { id: "pgm-l", label: "L", level: 72, peak: 80, state: "signal" },
-            { id: "pgm-r", label: "R", level: 69, peak: 77, state: "signal" },
-            { id: "mic-1", label: "Mic 1", level: 84, peak: 90, state: "hot" },
-            { id: "zoom", label: "Zoom", level: 24, peak: 41, state: "signal" },
-            { id: "usb", label: "USB", level: 0, peak: 3, state: "idle" },
-          ]}
-          label="Program audio meter bridge"
-        />
-
-        <DenseTable
-          caption="Patch diagnostics"
-          columns={[
-            { key: "fixture", label: "Fixture" },
-            { key: "address", label: "Address" },
-            { align: "end", key: "state", label: "State" },
-          ]}
-          rows={[
-            {
-              cells: { address: "1-6", fixture: "Key Astra", state: <StatusBadge label="ready" tone="ok" /> },
-              id: "fixture-key",
-              tone: "ready",
-            },
-            {
-              cells: {
-                address: "7-18",
-                fixture: "Infinibar PB12",
-                state: <StatusBadge label="warning" tone="attention" />,
-              },
-              id: "fixture-bar",
-              tone: "warning",
-            },
-            {
-              cells: { address: "19-26", fixture: "Apollo Bridge", state: <StatusBadge label="idle" tone="neutral" /> },
-              id: "fixture-bridge",
-              tone: "muted",
-            },
-          ]}
-        />
-      </section>
-
-      <InspectorPanel
-        actions={<IconButton icon={WandSparkles} label="Run local preview" />}
-        eyebrow="Inspector"
-        status={<StatusBadge label="degraded" tone="attention" />}
-        title="Selected workspace"
-      >
-        <InspectorSection title="Dense list rows">
-          <DenseList aria-label="Workspace health rows">
-            <DenseListRow
-              detail="Local gate active"
-              leading={<Check aria-hidden="true" size={16} />}
-              meta="Ready"
-              title="Setup runner"
-              tone="ready"
-            />
-            <DenseListRow detail="Engine diagnostic available" meta="2 notes" title="Lighting patch" tone="warning" />
-            <DenseListRow detail="No channel selected" meta="Idle" title="Audio console" tone="muted" />
-          </DenseList>
-        </InspectorSection>
-
-        <InspectorSection title="State surfaces">
-          <EmptyState
-            actions={<Button size="compact">Create placeholder</Button>}
-            message="The operator can continue; no engine state is synthesized here."
-            title="No channel selected"
-          />
-          <DegradedState
-            actions={
-              <Button size="compact" variant="secondary">
-                Open diagnostics
-              </Button>
-            }
-            message="The bridge is reachable, but one configured action is stale."
-            title="Control surface needs review"
-          />
-        </InspectorSection>
-      </InspectorPanel>
-    </main>
-  );
-}
-
 const meta = {
   title: "Design System/Primitives",
   parameters: {
@@ -232,15 +69,12 @@ const meta = {
     },
     layout: "fullscreen",
   },
-  render: () => <PrimitiveConsoleBoard />,
 } satisfies Meta;
 
 export default meta;
 
-export const Overview: StoryObj<typeof meta> = {};
-
-export const DirectionDCrest: StoryObj<typeof meta> = {
-  name: "Direction D · Crest sizes",
+export const CrestSizes: StoryObj<typeof meta> = {
+  name: "Crest sizes",
   render: () => (
     <div style={dStage}>
       <div style={dRow}>
@@ -252,21 +86,8 @@ export const DirectionDCrest: StoryObj<typeof meta> = {
   ),
 };
 
-export const DirectionDNavItem: StoryObj<typeof meta> = {
-  name: "Direction D · NavItem rail",
-  render: () => (
-    <div style={dStage}>
-      <div style={{ ...dRow, gap: "4px" }}>
-        <NavItem id="setup" label="Setup" icon={<Sliders size={16} />} />
-        <NavItem id="lighting" label="Lighting" icon={<Sun size={16} />} active />
-        <NavItem id="audio" label="Audio" icon={<Mic size={16} />} />
-      </div>
-    </div>
-  ),
-};
-
-export const DirectionDStatusDot: StoryObj<typeof meta> = {
-  name: "Direction D · StatusDot matrix",
+export const StatusDots: StoryObj<typeof meta> = {
+  name: "Status dots",
   render: () => (
     <div style={dStage}>
       <div style={dColumn}>
@@ -296,46 +117,8 @@ export const DirectionDStatusDot: StoryObj<typeof meta> = {
   ),
 };
 
-export const DirectionDHealthBar: StoryObj<typeof meta> = {
-  name: "Direction D · HealthBar (clean)",
-  render: () => (
-    <div style={{ ...dStage, padding: 0 }}>
-      <div style={{ height: "320px" }} />
-      <HealthBar
-        items={[
-          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
-          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
-          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
-          { label: "Auto-save", dot: "ok", value: "Saved", suffix: "· last 19:38 UTC" },
-          { label: "Session", value: "2h 47m" },
-          { label: "App", value: "v2.2.2" },
-        ]}
-      />
-    </div>
-  ),
-};
-
-export const DirectionDHealthBarDirty: StoryObj<typeof meta> = {
-  name: "Direction D · HealthBar (drift)",
-  render: () => (
-    <div style={{ ...dStage, padding: 0 }}>
-      <div style={{ height: "320px" }} />
-      <HealthBar
-        items={[
-          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
-          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
-          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
-          { label: "Auto-save", dot: "attn", value: "Unsaved changes" },
-          { label: "Session", value: "2h 47m" },
-          { label: "App", value: "v2.2.2" },
-        ]}
-      />
-    </div>
-  ),
-};
-
-export const DirectionDPlotPill: StoryObj<typeof meta> = {
-  name: "Direction D · PlotPill states",
+export const PlotPills: StoryObj<typeof meta> = {
+  name: "Plot pills",
   render: () => (
     <div style={dStage}>
       <div style={dColumn}>
@@ -363,8 +146,8 @@ export const DirectionDPlotPill: StoryObj<typeof meta> = {
   ),
 };
 
-export const DirectionDPlotMeta: StoryObj<typeof meta> = {
-  name: "Direction D · PlotMeta tones",
+export const PlotMetaTones: StoryObj<typeof meta> = {
+  name: "Plot meta tones",
   render: () => (
     <div style={dStage}>
       <div style={dRow}>
@@ -415,13 +198,13 @@ function ColorPickerStoryHarness({ initial }: { initial: number | null }) {
   );
 }
 
-export const DirectionDColorPicker: StoryObj<typeof meta> = {
-  name: "Direction D · ColorPicker (selected)",
+export const ColorPickerSelected: StoryObj<typeof meta> = {
+  name: "Colour picker, one chosen",
   render: () => <ColorPickerStoryHarness initial={2} />,
 };
 
-export const DirectionDColorPickerCleared: StoryObj<typeof meta> = {
-  name: "Direction D · ColorPicker (cleared)",
+export const ColorPickerCleared: StoryObj<typeof meta> = {
+  name: "Colour picker, none chosen",
   render: () => <ColorPickerStoryHarness initial={null} />,
 };
 
@@ -433,8 +216,8 @@ const chipStripDemoChips: readonly ChipStripChip[] = [
   { id: "e", label: "Infinimat", accentColor: "#fb923c", leadingBadge: 5 },
 ];
 
-export const DirectionDChipStrip: StoryObj<typeof meta> = {
-  name: "Direction D · ChipStrip (selection-style)",
+export const ChipStripSelection: StoryObj<typeof meta> = {
+  name: "Chip strip",
   render: () => (
     <div style={dStage}>
       <div style={{ ...dColumn, maxWidth: 720 }}>
@@ -444,32 +227,8 @@ export const DirectionDChipStrip: StoryObj<typeof meta> = {
   ),
 };
 
-export const DirectionDHealthBarActions: StoryObj<typeof meta> = {
-  name: "Direction D · HealthBar (with actions slot)",
-  render: () => (
-    <div style={{ ...dStage, padding: 0 }}>
-      <div style={{ height: "320px" }} />
-      <HealthBar
-        items={[
-          { label: "Bridge", dot: "ok", value: "DMX U1 · reachable" },
-          { label: "Universe", dot: "ok", value: "12 / 512 ch" },
-          { label: "Fixtures", dot: "ok", value: "6 / 6 patched" },
-          { label: "Auto-save", dot: "ok", value: "Saved", suffix: "· last 19:38 UTC" },
-          { label: "Session", value: "2h 47m" },
-          { label: "App", value: "v2.2.2" },
-        ]}
-        actions={
-          <Button size="compact" variant="ghost">
-            DMX strip
-          </Button>
-        }
-      />
-    </div>
-  ),
-};
-
-export const DirectionDEmptyStateAction: StoryObj<typeof meta> = {
-  name: "Direction D · EmptyState (hasAction)",
+export const EmptyStateWithAction: StoryObj<typeof meta> = {
+  name: "Empty state with an action",
   render: () => (
     <div style={dStage}>
       <div style={dColumn}>
@@ -492,8 +251,8 @@ export const DirectionDEmptyStateAction: StoryObj<typeof meta> = {
 
 // Visual overhaul A, Slice 2: the shell primitives — the tab, the lamp, the
 // header chip and the footer — as the A-system-sheet specimen draws them.
-export const AShellTabs: StoryObj<typeof meta> = {
-  name: "A · Tab row",
+export const TabRow: StoryObj<typeof meta> = {
+  name: "Tab row",
   render: () => (
     <div style={{ display: "flex", gap: 4 }}>
       <Tab id="setup" label="Setup / Support" />
@@ -503,8 +262,8 @@ export const AShellTabs: StoryObj<typeof meta> = {
   ),
 };
 
-export const AShellLamps: StoryObj<typeof meta> = {
-  name: "A · Lamps and lamp chips",
+export const Lamps: StoryObj<typeof meta> = {
+  name: "Lamps and lamp chips",
   render: () => (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 12 }}>
@@ -524,8 +283,8 @@ export const AShellLamps: StoryObj<typeof meta> = {
   ),
 };
 
-export const AShellFooter: StoryObj<typeof meta> = {
-  name: "A · Footer",
+export const FooterBar: StoryObj<typeof meta> = {
+  name: "Footer",
   render: () => (
     <Footer
       items={[

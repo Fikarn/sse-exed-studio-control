@@ -309,36 +309,36 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const KeysStudio: Story = {
-  name: "Keys · Studio",
+export const KeysBoard: Story = {
+  name: "Keys",
   render: () => (
     <div style={board}>
       <Keys />
     </div>
   ),
 };
-export const StatesStudio: Story = {
-  name: "State displays · Studio",
+export const StateDisplaysBoard: Story = {
+  name: "State displays",
   render: () => (
     <div style={board}>
       <States />
     </div>
   ),
 };
-export const WellsStudio: Story = {
-  name: "Wells · Studio",
+export const WellsBoard: Story = {
+  name: "Wells",
   render: () => (
     <div style={board}>
       <Wells />
     </div>
   ),
 };
-export const PlateStudio: Story = {
-  name: "Plate and overlays · Studio",
+export const PlateAndOverlaysBoard: Story = {
+  name: "Plate and overlays",
   render: () => (
     <div style={board}>
       <PlateAndOverlays />
     </div>
   ),
 };
-export const SheetStudio: Story = { name: "Sheet · Studio", render: () => <Sheet /> };
+export const WholeSheet: Story = { name: "Sheet", render: () => <Sheet /> };

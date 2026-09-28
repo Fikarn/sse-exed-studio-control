@@ -31,16 +31,6 @@ use studio_control_protocol::development::{
 
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "2";
 
-/// Where a legacy `db.json` was staged for the start-up import, relative to
-/// the app-data directory, and the variable that named one. New pages
-/// program, Slice 2b (D3): the import is retired, and a file left at either
-/// is only named in the log (`warn_about_a_left_over_db_json`); nothing reads
-/// it. The process working directory was never a source (2026-09 production
-/// readiness, Slice 1 — finding F23).
-const LEGACY_IMPORT_DIR_NAME: &str = "import";
-const LEGACY_IMPORT_FILE_NAME: &str = "db.json";
-const LEGACY_DB_PATH_ENV: &str = "SSE_LEGACY_DB_PATH";
-
 #[derive(Debug)]
 pub struct RuntimePaths {
     pub protocol_version: String,
@@ -50,7 +40,6 @@ pub struct RuntimePaths {
     pub logs_dir: PathBuf,
     pub log_file_path: PathBuf,
     pub db_path: PathBuf,
-    pub update_repository_path: Option<PathBuf>,
     /// `SSE_SAFE_START` asked for a safe start (Slice 11 — F31): the light
     /// outputs are held before anything could stream.
     pub safe_start: bool,
@@ -67,7 +56,6 @@ pub struct RuntimeContext {
     pub logs_dir: PathBuf,
     pub log_file_path: PathBuf,
     pub db_path: PathBuf,
-    pub update_repository_path: Option<PathBuf>,
     pub storage_ready: bool,
     pub storage_bootstrap: StorageBootstrap,
     pub control_surface_bridge: ControlSurfaceBridgeInfo,
@@ -184,8 +172,6 @@ where
     let backups_dir = app_data_dir.join("backups");
     let log_file_path = logs_dir.join("engine.log");
     let db_path = app_data_dir.join("studio-control.sqlite3");
-    let update_repository_path =
-        env_string("SSE_UPDATE_REPOSITORY_PATH", &mut get_env).map(PathBuf::from);
     let safe_start = env_string("SSE_SAFE_START", &mut get_env)
         .is_some_and(|value| safe_start_requested(&value));
     let cameras_simulated = env_string("SSE_CAMERAS_SIMULATED", &mut get_env)
@@ -199,7 +185,6 @@ where
         logs_dir,
         log_file_path,
         db_path,
-        update_repository_path,
         safe_start,
         cameras_simulated,
     })
@@ -356,13 +341,6 @@ pub(crate) fn bootstrap_runtime_from_paths(
         )?,
     }
 
-    // New pages program, Slice 2b (D3): no db.json is imported any more; one
-    // left where the retired start-up import looked is named, not read.
-    warn_about_a_left_over_db_json(
-        &runtime_paths,
-        &left_over_db_json_from(&runtime_paths.app_data_dir, |name| env::var_os(name)),
-    )?;
-
     let control_surface_token =
         load_or_create_bridge_token(&runtime_paths.app_data_dir).map_err(std::io::Error::other)?;
     let control_surface_bridge = start_logged_control_surface_bridge(
@@ -379,7 +357,6 @@ pub(crate) fn bootstrap_runtime_from_paths(
         logs_dir: runtime_paths.logs_dir,
         log_file_path: runtime_paths.log_file_path,
         db_path: runtime_paths.db_path,
-        update_repository_path: runtime_paths.update_repository_path,
         storage_ready: true,
         storage_bootstrap,
         control_surface_bridge,
@@ -417,7 +394,6 @@ pub(crate) fn recovery_runtime_context(runtime_paths: &RuntimePaths) -> RuntimeC
         logs_dir: runtime_paths.logs_dir.clone(),
         log_file_path: runtime_paths.log_file_path.clone(),
         db_path: runtime_paths.db_path.clone(),
-        update_repository_path: runtime_paths.update_repository_path.clone(),
         storage_ready: false,
         storage_bootstrap: StorageBootstrap {
             schema_version: 0,
@@ -726,76 +702,15 @@ fn storage_startup_failure(
     Box::new(failure)
 }
 
-/// The db.json files left where the retired start-up import looked for one
-/// (new pages program, Slice 2b — D3): the file `SSE_LEGACY_DB_PATH` names,
-/// then `<app-data>/import/db.json` — the import's own order — each only
-/// when a file is there, and one file once. `SSE_DISABLE_AUTO_IMPORT`, which
-/// turned the import off, means nothing any more and is not read.
-///
-/// 2026-09-25: both places are looked at, and a place counts only when a
-/// file is there. Until then a set variable was named whether or not
-/// anything was at its path, and the staged file went unmentioned while it
-/// was set — the import's order, though nothing is read any more.
-fn left_over_db_json_from<F>(app_data_dir: &Path, mut get_env: F) -> Vec<PathBuf>
-where
-    F: FnMut(&str) -> Option<OsString>,
-{
-    let named = env_string(LEGACY_DB_PATH_ENV, &mut get_env).map(PathBuf::from);
-    let staged = app_data_dir
-        .join(LEGACY_IMPORT_DIR_NAME)
-        .join(LEGACY_IMPORT_FILE_NAME);
-    let mut left_over: Vec<PathBuf> = Vec::new();
-    for path in named.into_iter().chain([staged]) {
-        let same_file = |other: &PathBuf| {
-            *other == path
-                || matches!(
-                    (fs::canonicalize(other), fs::canonicalize(&path)),
-                    (Ok(left), Ok(right)) if left == right
-                )
-        };
-        if path.is_file() && !left_over.iter().any(same_file) {
-            left_over.push(path);
-        }
-    }
-    left_over
-}
-
-/// The one line a start writes about the left-over db.json files, naming
-/// each: "A db.json at <a> was left alone: …", or "A db.json at <a> and at
-/// <b> was left alone: …" when both places hold one. No file is read, moved
-/// or imported, and the start goes on; the operator's data holds what it
-/// held.
-fn warn_about_a_left_over_db_json(
-    runtime_paths: &RuntimePaths,
-    left_over: &[PathBuf],
-) -> EngineResult<()> {
-    let Some((first, others)) = left_over.split_first() else {
-        return Ok(());
-    };
-    let places = others
-        .iter()
-        .fold(first.display().to_string(), |places, path| {
-            format!("{places} and at {}", path.display())
-        });
-    append_log(
-        &runtime_paths.log_file_path,
-        "WARN",
-        &format!(
-            "A db.json at {places} was left alone: Studio Control no longer imports db.json files."
-        ),
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
-        left_over_db_json_from, resolve_runtime_paths_from, safe_start_requested,
-        startup_failure_code, storage_startup_failure, validate_protocol_version,
-        warn_about_a_left_over_db_json, RuntimePaths, StartupFailure, INSTANCE_LOCK_FILE_NAME,
-        STARTUP_CODE_BOOTSTRAP_FAILED, STARTUP_CODE_ENGINE_ALREADY_RUNNING,
-        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
-        SUPPORTED_PROTOCOL_VERSION,
+        resolve_runtime_paths_from, safe_start_requested, startup_failure_code,
+        storage_startup_failure, validate_protocol_version, RuntimePaths, StartupFailure,
+        INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
+        STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
+        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
@@ -927,7 +842,6 @@ mod tests {
         assert_eq!(paths.logs_dir, paths.app_data_dir.join("logs"));
         assert_eq!(paths.backups_dir, paths.app_data_dir.join("backups"));
         assert_eq!(paths.requested_protocol_version, SUPPORTED_PROTOCOL_VERSION);
-        assert!(paths.update_repository_path.is_none());
     }
 
     #[test]
@@ -947,7 +861,6 @@ mod tests {
                 ("SSE_APP_DATA_DIR", "/tmp/sse-app-data"),
                 ("SSE_LOG_DIR", "/tmp/sse-logs"),
                 ("SSE_PROTOCOL_VERSION", "1"),
-                ("SSE_UPDATE_REPOSITORY_PATH", "  /tmp/sse-updates  "),
             ]),
         )
         .expect("explicit overrides should resolve");
@@ -962,121 +875,6 @@ mod tests {
             paths.db_path,
             PathBuf::from("/tmp/sse-app-data").join("studio-control.sqlite3")
         );
-        assert_eq!(
-            paths.update_repository_path,
-            Some(PathBuf::from("/tmp/sse-updates"))
-        );
-    }
-
-    // New pages program, Slice 2b (D3): the start-up db.json import is
-    // retired. A db.json left where it looked — `SSE_LEGACY_DB_PATH`'s file,
-    // then the staged `<app-data>/import/db.json` — is named in one warning
-    // line and never read: the saved data keeps its setup and its page, and
-    // the file stays as it was. `SSE_DISABLE_AUTO_IMPORT` no longer hides it.
-    // A `data/db.json` beside the app-data (the old repo-local convention)
-    // was never a source (F23). Until the slice, new saved data took the
-    // staged file's setup flag and page at the start. 2026-09-25: a place
-    // counts only when a file is there, and one line names both when both
-    // hold one; until then a set variable was named with nothing at its path,
-    // and it hid the staged file.
-    #[test]
-    fn a_left_over_db_json_is_named_once_and_never_read() {
-        let test_dir = TestDir::new("left-over-db-json");
-        let paths = runtime_paths_for(&test_dir);
-        fs::create_dir_all(&paths.logs_dir).expect("logs dir");
-        initialize_database(&paths.db_path, &paths.backups_dir).expect("database");
-        let settings_before = list_settings_by_prefix(&paths.db_path, "").expect("settings");
-
-        let decoy = test_dir.path().join("data");
-        fs::create_dir_all(&decoy).expect("decoy dir");
-        fs::write(decoy.join("db.json"), "{}").expect("decoy file");
-        let missing = test_dir.path().join("deleted").join("db.json");
-        let missing_env = [(
-            "SSE_LEGACY_DB_PATH",
-            missing.to_str().expect("a UTF-8 path"),
-        )];
-        assert!(
-            left_over_db_json_from(test_dir.path(), env_fixture(&[])).is_empty(),
-            "nothing is left over without the variable or a staged file"
-        );
-        assert!(
-            left_over_db_json_from(test_dir.path(), env_fixture(&missing_env)).is_empty(),
-            "a variable naming no file names nothing"
-        );
-
-        let staged = test_dir.path().join("import").join("db.json");
-        fs::create_dir_all(staged.parent().expect("a parent")).expect("import dir");
-        fs::write(
-            &staged,
-            r#"{"schemaVersion":8,"projects":[],"settings":{"dashboardView":"lighting","hasCompletedSetup":true}}"#,
-        )
-        .expect("the staged db.json should be written");
-        let staged_bytes = fs::read(&staged).expect("the staged db.json reads");
-        let named = test_dir.path().join("elsewhere-db.json");
-        fs::write(&named, "{}").expect("the named db.json should be written");
-        let named_env = [("SSE_LEGACY_DB_PATH", named.to_str().expect("a UTF-8 path"))];
-        assert_eq!(
-            left_over_db_json_from(
-                test_dir.path(),
-                env_fixture(&[("SSE_DISABLE_AUTO_IMPORT", "1")]),
-            ),
-            vec![staged.clone()]
-        );
-        assert_eq!(
-            left_over_db_json_from(test_dir.path(), env_fixture(&missing_env)),
-            vec![staged.clone()],
-            "a variable naming no file does not hide the staged one"
-        );
-        assert_eq!(
-            left_over_db_json_from(test_dir.path(), env_fixture(&named_env)),
-            vec![named.clone(), staged.clone()],
-            "both files, the variable's first"
-        );
-        assert_eq!(
-            left_over_db_json_from(
-                test_dir.path(),
-                env_fixture(&[("SSE_LEGACY_DB_PATH", staged.to_str().expect("a UTF-8 path"))]),
-            ),
-            vec![staged.clone()],
-            "the staged file named by the variable is one file"
-        );
-
-        // Two starts: one with the staged file alone, one with both.
-        for env in [&missing_env, &named_env] {
-            warn_about_a_left_over_db_json(
-                &paths,
-                &left_over_db_json_from(test_dir.path(), env_fixture(env)),
-            )
-            .expect("the start goes on");
-        }
-        warn_about_a_left_over_db_json(&paths, &[]).expect("nothing to say");
-
-        let log = fs::read_to_string(&paths.log_file_path).expect("the engine log");
-        let lines = log
-            .lines()
-            .filter(|line| line.contains("db.json"))
-            .collect::<Vec<_>>();
-        assert_eq!(lines.len(), 2, "one line a start: {log}");
-        for (line, places) in lines.iter().zip([
-            staged.display().to_string(),
-            format!("{} and at {}", named.display(), staged.display()),
-        ]) {
-            assert!(line.contains(" WARN "), "{line}");
-            assert!(
-                line.ends_with(&format!(
-                    "A db.json at {places} was left alone: Studio Control no longer imports db.json files."
-                )),
-                "{line}"
-            );
-        }
-        assert!(!log.contains(&missing.display().to_string()), "{log}");
-        assert_eq!(
-            list_settings_by_prefix(&paths.db_path, "").expect("settings"),
-            settings_before,
-            "nothing was imported"
-        );
-        assert_eq!(fs::read(&staged).expect("the staged db.json"), staged_bytes);
-        assert_eq!(fs::read(&named).expect("the named db.json"), b"{}");
     }
 
     fn runtime_paths_for(test_dir: &TestDir) -> RuntimePaths {
@@ -1088,7 +886,6 @@ mod tests {
             logs_dir: app_data_dir.join("logs"),
             log_file_path: app_data_dir.join("logs").join("engine.log"),
             db_path: app_data_dir.join("studio-control.sqlite3"),
-            update_repository_path: None,
             safe_start: false,
             cameras_simulated: true,
             app_data_dir,

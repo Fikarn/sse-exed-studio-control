@@ -25,11 +25,6 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
           ),
           tone: backups.length > 0 ? "ok" : "attention",
         },
-        {
-          id: "install",
-          text: "Keep the workstation on the packaged installer and update-repository path rather than ad hoc local binaries. If SmartScreen intervenes, choose More info, then Run anyway.",
-          tone: "off",
-        },
       ]}
       facts={
         <>
@@ -125,18 +120,6 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
               type="button"
             >
               Archive
-            </button>
-            <button
-              className={styles.railButton}
-              disabled={!String(runtimePaths?.updateRepositoryPath ?? "").trim()}
-              onClick={() =>
-                void performAction("open-update-repo", () =>
-                  openReferencePath("Update folder", String(runtimePaths?.updateRepositoryPath ?? ""))
-                )
-              }
-              type="button"
-            >
-              Update folder
             </button>
             <button
               className={styles.railButton}

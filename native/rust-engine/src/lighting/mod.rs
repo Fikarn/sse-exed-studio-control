@@ -34,11 +34,6 @@ mod helpers;
 mod identify;
 mod output_arming;
 mod palettes;
-// The lighting part of the dev parity fixtures, compiled only with them
-// (2026-09 production readiness, Slice 1 — finding F04). New pages program,
-// Slice 2b: renamed from `legacy_import` when the db.json import was retired.
-#[cfg(feature = "dev-fixtures")]
-mod parity_lighting;
 mod parse;
 mod preview;
 mod scenes;
@@ -56,8 +51,6 @@ pub use groups::*;
 pub use identify::*;
 pub use output_arming::*;
 pub use palettes::*;
-#[cfg(feature = "dev-fixtures")]
-pub use parity_lighting::*;
 pub use parse::*;
 pub use preview::*;
 pub use scenes::*;

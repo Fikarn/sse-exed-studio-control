@@ -15,7 +15,6 @@ use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
@@ -58,34 +57,7 @@ const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 /// created on the first launch of an install and reused afterwards. The
 /// exported Stream Deck profile embeds it, which is why a profile exported
 /// before this landed stops working and must be exported and imported again.
-/// Lanes override it with `SSE_CONTROL_SURFACE_TOKEN`, which then leaves the
-/// file alone.
 pub fn load_or_create_bridge_token(app_data_dir: &Path) -> Result<String, String> {
-    load_or_create_bridge_token_from(app_data_dir, |name| std::env::var_os(name))
-}
-
-fn load_or_create_bridge_token_from<F>(
-    app_data_dir: &Path,
-    mut get_env: F,
-) -> Result<String, String>
-where
-    F: FnMut(&str) -> Option<OsString>,
-{
-    if let Some(value) = get_env("SSE_CONTROL_SURFACE_TOKEN") {
-        let value = value
-            .into_string()
-            .map_err(|_| String::from("SSE_CONTROL_SURFACE_TOKEN is not valid UTF-8."))?;
-        let value = value.trim();
-        if !value.is_empty() {
-            if value.chars().any(|c| c.is_whitespace() || c.is_control()) {
-                return Err(String::from(
-                    "SSE_CONTROL_SURFACE_TOKEN must not contain whitespace or control characters.",
-                ));
-            }
-            return Ok(value.to_string());
-        }
-    }
-
     let path = app_data_dir.join(CONTROL_SURFACE_TOKEN_FILE_NAME);
     if let Ok(existing) = fs::read_to_string(&path) {
         let existing = existing.trim();
@@ -1222,7 +1194,7 @@ mod tests {
     #[test]
     fn token_file_is_created_once_and_reused() {
         let test_dir = TestDir::new("token-file");
-        let first = load_or_create_bridge_token_from(test_dir.path(), |_| None)
+        let first = load_or_create_bridge_token(test_dir.path())
             .expect("the first launch creates the token");
         assert!(is_bridge_token(&first), "{first}");
         let token_path = test_dir.path().join(CONTROL_SURFACE_TOKEN_FILE_NAME);
@@ -1231,12 +1203,11 @@ mod tests {
             first
         );
 
-        let second = load_or_create_bridge_token_from(test_dir.path(), |_| None)
-            .expect("later launches reuse it");
+        let second = load_or_create_bridge_token(test_dir.path()).expect("later launches reuse it");
         assert_eq!(second, first);
 
         let other_install = TestDir::new("token-file-other");
-        let other = load_or_create_bridge_token_from(other_install.path(), |_| None)
+        let other = load_or_create_bridge_token(other_install.path())
             .expect("another install gets its own token");
         assert_ne!(other, first);
     }
@@ -1246,38 +1217,13 @@ mod tests {
         let test_dir = TestDir::new("token-junk");
         let token_path = test_dir.path().join(CONTROL_SURFACE_TOKEN_FILE_NAME);
         fs::write(&token_path, "not a token\n").expect("junk file");
-        let token = load_or_create_bridge_token_from(test_dir.path(), |_| None)
-            .expect("a damaged file is replaced");
+        let token =
+            load_or_create_bridge_token(test_dir.path()).expect("a damaged file is replaced");
         assert!(is_bridge_token(&token), "{token}");
         assert_eq!(
             fs::read_to_string(&token_path).expect("token file").trim(),
             token
         );
-    }
-
-    #[test]
-    fn token_env_override_wins_and_leaves_the_file_alone() {
-        let test_dir = TestDir::new("token-env");
-        let token = load_or_create_bridge_token_from(test_dir.path(), |name| {
-            (name == "SSE_CONTROL_SURFACE_TOKEN").then(|| OsString::from("  lane-token-123  "))
-        })
-        .expect("the override is used");
-        assert_eq!(token, "lane-token-123");
-        assert!(!test_dir
-            .path()
-            .join(CONTROL_SURFACE_TOKEN_FILE_NAME)
-            .exists());
-
-        let error = load_or_create_bridge_token_from(test_dir.path(), |_| {
-            Some(OsString::from("two words"))
-        })
-        .expect_err("whitespace inside the override is refused");
-        assert!(error.contains("whitespace"), "{error}");
-
-        let generated =
-            load_or_create_bridge_token_from(test_dir.path(), |_| Some(OsString::from("   ")))
-                .expect("an empty override is no override");
-        assert!(is_bridge_token(&generated), "{generated}");
     }
 
     fn start_test_bridge(test_dir: &TestDir, workers: usize, queue: usize) -> u16 {
