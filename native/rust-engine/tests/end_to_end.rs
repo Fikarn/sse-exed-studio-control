@@ -20,6 +20,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use studio_control_protocol::development::development_build;
 use studio_control_protocol::PROTOCOL_VERSION;
 
 fn engine_binary_path() -> PathBuf {
@@ -553,17 +554,16 @@ fn second_engine_on_the_same_app_data_dir_is_refused() {
     let _ = fs::remove_dir_all(&shared_dir);
 }
 
-// Streamlining, 2026-09-28: a development build (one with debug assertions,
-// which `cargo test` builds) is refused the studio's folders: the platform's
+// Streamlining, 2026-09-28: a development build (every build but the one
+// `npm run release` makes) is refused the studio's folders: the platform's
 // default app-data folder and everything in it. Started with no
 // SSE_APP_DATA_DIR, with the folder named, or with only its logs sent there,
 // it reports BOOTSTRAP_FAILED and ends, and creates nothing. The platform's
 // base is a scratch folder here, so the default is never this machine's own.
 #[test]
 fn a_development_build_is_refused_the_studios_folders() {
-    if !cfg!(debug_assertions) {
-        // `cargo test --release` builds the studio's kind of engine, which
-        // opens the default folder: nothing to refuse.
+    if !development_build() {
+        // A studio build opens the default folder: nothing to refuse.
         return;
     }
     let host = unique_runtime_dir("refused-studio-folders");
@@ -648,7 +648,7 @@ fn a_development_build_is_refused_the_studios_folders() {
 // `development.rs` tests the port's default.
 #[test]
 fn a_development_build_sets_its_own_switches() {
-    if !cfg!(debug_assertions) {
+    if !development_build() {
         return;
     }
     let runtime_dir = unique_runtime_dir("development-defaults");

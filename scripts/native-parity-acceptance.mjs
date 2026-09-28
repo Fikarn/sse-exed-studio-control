@@ -2,12 +2,10 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { assert, hardenedLaneEnv, LIVE_CONSOLE } from "./native-runtime-harness.mjs";
 
-// "Parity" here means dev-engine vs packaged-engine parity: this module holds
-// the shared contract assertions that `native-acceptance.mjs` (dev-built
-// engine) and `native-packaged-acceptance.mjs` (packaged engine) both run, so
-// the two runtime forms cannot drift apart. It is unrelated to the retired
-// Electron parity oracle (removed in v2.1.0) — audited and deliberately kept
-// under this name, 2026-08-12.
+// The assertions the acceptance lane and the bridge lane share. Both run
+// against the development engine, and against a studio build's engine when
+// `npm run release` names it (`--engine=<path>`), so the two cannot drift
+// apart: that is the parity in the name.
 
 // 2026-09 audit remediation, Slice 2 — the acceptance lanes and the studio
 // console. By default the harness runs the engine in simulated audio input

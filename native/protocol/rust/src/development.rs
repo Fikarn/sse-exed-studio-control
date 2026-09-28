@@ -1,7 +1,7 @@
 //! What the engine and the shell agree on about the build they are and the
 //! folder the studio's saved data lives in.
 //!
-//! The studio runs a release build on the platform's default app-data folder.
+//! The studio runs a studio build on the platform's default app-data folder.
 //! Every other build is a development build, and a development build never
 //! opens that folder: a newer build would upgrade the saved data at its first
 //! start, after which the studio's own build refuses it, and the addresses
@@ -19,10 +19,26 @@ use std::path::{Component, Path, PathBuf};
 /// The studio's folder in the platform's app-data folder.
 pub const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 
-/// Whether this is a development build: one with debug assertions, which is
-/// what `cargo build`, `cargo test` and `tauri dev` make.
+/// The variable `npm run release` sets for the compiler, to `1`.
+pub const STUDIO_BUILD_ENV: &str = "SSE_STUDIO_BUILD";
+
+/// Whether this is a studio build: a release build that `npm run release`
+/// made. The command sets `SSE_STUDIO_BUILD=1` while it compiles, and the
+/// answer is compiled in: nothing at run time makes a studio build of
+/// another. A release build made any other way (`cargo build --release`,
+/// `tauri build`) is development code the owner has not walked, and it is a
+/// development build like the rest.
+pub fn studio_build() -> bool {
+    studio_build_from(cfg!(debug_assertions), option_env!("SSE_STUDIO_BUILD"))
+}
+
+fn studio_build_from(debug_assertions: bool, marker: Option<&str>) -> bool {
+    !debug_assertions && marker == Some("1")
+}
+
+/// Whether this is a development build: every build but the studio's.
 pub fn development_build() -> bool {
-    cfg!(debug_assertions)
+    !studio_build()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -233,6 +249,31 @@ mod tests {
             HostPlatform::Windows => "APPDATA",
             HostPlatform::Unix => "XDG_DATA_HOME",
         }
+    }
+
+    // Streamlining, 2026-09-28: the studio's build is the one the release
+    // command marked. Until then every build without debug assertions
+    // counted, so `tauri build` on a branch made an app that opened the
+    // studio's saved data.
+    #[test]
+    fn only_a_marked_release_build_is_the_studios() {
+        assert!(studio_build_from(false, Some("1")));
+        for (debug_assertions, marker) in [
+            (false, None),
+            (false, Some("")),
+            (false, Some("0")),
+            (false, Some("true")),
+            (true, Some("1")),
+            (true, None),
+        ] {
+            assert!(
+                !studio_build_from(debug_assertions, marker),
+                "{debug_assertions} {marker:?}"
+            );
+        }
+        // Tests are built with debug assertions.
+        assert!(development_build());
+        assert_eq!(STUDIO_BUILD_ENV, "SSE_STUDIO_BUILD");
     }
 
     #[test]

@@ -10,7 +10,7 @@ import {
   SEEDED_WORKSPACE,
   seedSavedWorkspace,
 } from "./native-parity-acceptance.mjs";
-import { assert, EngineHarness, hardenedLaneEnv, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import { assert, EngineHarness, hardenedLaneEnv, laneEngine, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,34 +36,6 @@ const bridgeTokenFileName = "control-surface.token";
 const bridgeTokenPattern = /^[0-9a-f]{64}$/;
 let bridgeAuthorization = null;
 
-function readFlag(name) {
-  const prefix = `${name}=`;
-  const entry = process.argv.slice(2).find((value) => value.startsWith(prefix));
-  return entry ? entry.slice(prefix.length) : null;
-}
-
-function parseTarget(value) {
-  if (value === "windows") {
-    return value;
-  }
-
-  throw new Error(`Unsupported control-surface qualification target '${value}'. Use --target=windows.`);
-}
-
-function resolvePackagedRuntime() {
-  return {
-    label: "Windows",
-    enginePath: path.join(
-      rootDir,
-      "release",
-      "native",
-      "windows",
-      "SSE ExEd Studio Control Native",
-      "studio-control-engine.exe"
-    ),
-  };
-}
-
 async function fetchJson(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
@@ -81,16 +53,15 @@ async function fetchJson(url, options = {}) {
     const text = await response.text();
     assert(
       response.ok,
-      `Packaged control-surface bridge qualification failed: ${method} ${url} returned ${response.status} ${response.statusText}: ${text}`
+      `Bridge qualification failed: ${method} ${url} returned ${response.status} ${response.statusText}: ${text}`
     );
 
     try {
       return JSON.parse(text);
     } catch (error) {
-      throw new Error(
-        `Packaged control-surface bridge qualification failed: ${method} ${url} did not return JSON: ${error.message}`,
-        { cause: error }
-      );
+      throw new Error(`Bridge qualification failed: ${method} ${url} did not return JSON: ${error.message}`, {
+        cause: error,
+      });
     }
   } finally {
     clearTimeout(timeout);
@@ -123,7 +94,7 @@ async function postJsonExpectingStatus(url, body, expectedStatus) {
     const text = await response.text();
     assert(
       response.status === expectedStatus,
-      `Packaged control-surface bridge qualification failed: POST ${url} returned ${response.status} but the qualification expected ${expectedStatus}: ${text}`
+      `Bridge qualification failed: POST ${url} returned ${response.status} but the qualification expected ${expectedStatus}: ${text}`
     );
     try {
       return JSON.parse(text);
@@ -175,11 +146,7 @@ function rawHttp(port, request, timeoutMs = 5000) {
     const socket = connect({ host: controlSurfaceHost, port });
     const timer = setTimeout(() => {
       socket.destroy();
-      reject(
-        new Error(
-          `Packaged control-surface bridge qualification failed: no response within ${timeoutMs} ms to a raw request.`
-        )
-      );
+      reject(new Error(`Bridge qualification failed: no response within ${timeoutMs} ms to a raw request.`));
     }, timeoutMs);
     socket.on("connect", () => {
       socket.write(request);
@@ -246,17 +213,15 @@ function writeSummary(qualificationRoot, summary) {
 }
 
 async function main() {
-  const target = parseTarget(readFlag("--target"));
-  if (process.platform !== "win32") {
-    throw new Error(
-      `native-control-surface-qualification.mjs target '${target}' must run on a matching host platform.`
-    );
-  }
-
-  const packaged = resolvePackagedRuntime();
+  // Streamlining, 2026-09-28: the lane runs against the development build,
+  // or the engine `--engine=<path>` names (`npm run release` names the
+  // build's). Until then it ran only against the package under
+  // release/native, on Windows.
+  const engine = laneEngine(rootDir);
+  const packaged = { label: engine.what, enginePath: engine.enginePath };
   assert(
     existsSync(packaged.enginePath),
-    `Packaged native ${packaged.label} engine not found at ${packaged.enginePath}. Run the matching package smoke command first.`
+    `The ${packaged.label} engine is not at ${packaged.enginePath}. Run \`npm run native:engine:build\` first.`
   );
 
   const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_BRIDGE_ACCEPTANCE_DIR);
@@ -272,7 +237,6 @@ async function main() {
   mkdirSync(runtime.logsDir, { recursive: true });
 
   const summary = {
-    target,
     label: packaged.label,
     qualificationRoot,
     enginePath: packaged.enginePath,
@@ -295,9 +259,9 @@ async function main() {
     summary.requestedPort = reservedPort;
     summary.expectedBaseUrl = expectedBaseUrl;
 
-    console.log(`Packaged control-surface bridge qualification root: ${qualificationRoot}`);
+    console.log(`Bridge qualification root: ${qualificationRoot}`);
     console.log(
-      "Step 1: start the packaged engine on fresh saved data on a dedicated localhost bridge port and save the page it opens on."
+      "Step 1: start the engine on fresh saved data on a dedicated localhost bridge port and save the page it opens on."
     );
 
     harness = new EngineHarness({
@@ -309,37 +273,37 @@ async function main() {
     });
 
     await harness.start();
-    await seedSavedWorkspace(harness, "bridge-qualification", `Packaged native ${packaged.label} engine`);
+    await seedSavedWorkspace(harness, "bridge-qualification", `The ${packaged.label} engine`);
     summary.steps.push({
-      name: "packaged-engine-start",
+      name: "engine-start",
       status: "passed",
       message:
-        "Packaged engine started on fresh saved data with the light outputs held and the simulated console, and saved Lighting as the page it opens on.",
+        "The engine started on fresh saved data with the light outputs held and the simulated console, and saved Lighting as the page it opens on.",
       scopeChanged: SAVED_DATA_MARKER_CHANGED,
     });
 
     const bridgeTokenPath = path.join(runtime.appDataDir, bridgeTokenFileName);
     assert(
       existsSync(bridgeTokenPath),
-      `Packaged control-surface bridge qualification failed: the engine did not write its bridge token to ${bridgeTokenPath}.`
+      `Bridge qualification failed: the engine did not write its bridge token to ${bridgeTokenPath}.`
     );
     const bridgeToken = readFileSync(bridgeTokenPath, "utf8").trim();
     assert(
       bridgeTokenPattern.test(bridgeToken),
-      `Packaged control-surface bridge qualification failed: ${bridgeTokenPath} does not hold a 64-character hex token.`
+      `Bridge qualification failed: ${bridgeTokenPath} does not hold a 64-character hex token.`
     );
     bridgeAuthorization = `Bearer ${bridgeToken}`;
     summary.bridgeTokenPath = bridgeTokenPath;
     summary.steps.push({
       name: "bridge-token-file",
       status: "passed",
-      message: "Packaged engine wrote a per-install bridge token; the positive checks below send it.",
+      message: "The engine wrote a per-install bridge token; the positive checks below send it.",
     });
 
     summary.sqliteVersion = await assertSafeBundledSqlite(
       harness,
       "native-bridge-qualification",
-      `Packaged native ${packaged.label} engine`
+      `The ${packaged.label} engine`
     );
 
     const healthSnapshot = await harness.request("bridge-qualification-health", "health.snapshot");
@@ -355,34 +319,34 @@ async function main() {
 
     assert(
       healthSnapshot?.checks?.controlSurface?.ok === true,
-      `Packaged control-surface bridge qualification failed: health.snapshot reports the bridge as unavailable (${healthSnapshot?.checks?.controlSurface?.error ?? "no error detail"}).`
+      `Bridge qualification failed: health.snapshot reports the bridge as unavailable (${healthSnapshot?.checks?.controlSurface?.error ?? "no error detail"}).`
     );
     assert(
       healthSnapshot?.checks?.controlSurface?.baseUrl === expectedBaseUrl,
-      `Packaged control-surface bridge qualification failed: health.snapshot reported baseUrl '${healthSnapshot?.checks?.controlSurface?.baseUrl}' instead of '${expectedBaseUrl}'.`
+      `Bridge qualification failed: health.snapshot reported baseUrl '${healthSnapshot?.checks?.controlSurface?.baseUrl}' instead of '${expectedBaseUrl}'.`
     );
     assert(
       appSnapshot?.runtime?.controlSurface?.available === true,
-      `Packaged control-surface bridge qualification failed: app.snapshot reports the bridge as unavailable (${appSnapshot?.runtime?.controlSurface?.error ?? "no error detail"}).`
+      `Bridge qualification failed: app.snapshot reports the bridge as unavailable (${appSnapshot?.runtime?.controlSurface?.error ?? "no error detail"}).`
     );
     assert(
       appSnapshot?.runtime?.controlSurface?.baseUrl === expectedBaseUrl,
-      `Packaged control-surface bridge qualification failed: app.snapshot reported baseUrl '${appSnapshot?.runtime?.controlSurface?.baseUrl}' instead of '${expectedBaseUrl}'.`
+      `Bridge qualification failed: app.snapshot reported baseUrl '${appSnapshot?.runtime?.controlSurface?.baseUrl}' instead of '${expectedBaseUrl}'.`
     );
     assert(
       JSON.stringify(summary.controlSurfacePages) === JSON.stringify(DECK_PAGE_LABELS),
-      `Packaged control-surface bridge qualification failed: controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(summary.controlSurfacePages)}.`
+      `Bridge qualification failed: controlSurface.snapshot must expose the deck pages ${DECK_PAGE_LABELS.join(" and ")} in that order, got ${JSON.stringify(summary.controlSurfacePages)}.`
     );
 
     summary.steps.push({
       name: "bridge-snapshot-contract",
       status: "passed",
-      message: `Packaged engine exposed a live bridge and the control-surface page model ${DECK_PAGE_LABELS.join(", ")}.`,
+      message: `The engine exposed a live bridge and the control-surface page model ${DECK_PAGE_LABELS.join(", ")}.`,
       scopeChanged:
         "New pages program, Slice 2: the page model is LIGHTS and AUDIO in that order; until then it was four pages, PROJECTS and TASKS included.",
     });
 
-    console.log("Step 2: verify live HTTP bind, LCD, and action endpoints against the packaged bridge.");
+    console.log("Step 2: verify live HTTP bind, LCD, and action endpoints against the bridge.");
 
     const contextBefore = await fetchJson(`${expectedBaseUrl}/api/deck/context`);
     const lcdAudioBefore = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
@@ -395,15 +359,15 @@ async function main() {
         typeof contextBefore.audio?.bank === "string" &&
         Array.isArray(contextBefore.audio?.strips) &&
         contextBefore.audio.strips.length === 4,
-      `Packaged control-surface bridge qualification failed: GET /api/deck/context is missing the saved page '${SEEDED_WORKSPACE}' (got '${contextBefore.workspace}') or the audio deck block.`
+      `Bridge qualification failed: GET /api/deck/context is missing the saved page '${SEEDED_WORKSPACE}' (got '${contextBefore.workspace}') or the audio deck block.`
     );
     assert(
       typeof lcdAudioBefore === "string" && lcdAudioBefore.length > 0,
-      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio_strip_1 did not return audio strip text."
+      "Bridge qualification failed: GET /api/deck/lcd?key=audio_strip_1 did not return audio strip text."
     );
     assert(
       lcdWorkspace === SEEDED_WORKSPACE,
-      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the saved page '${SEEDED_WORKSPACE}'.`
+      `Bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the saved page '${SEEDED_WORKSPACE}'.`
     );
 
     // New saved data holds no lights, so the lane adds two through the app's
@@ -418,7 +382,7 @@ async function main() {
       });
       assert(
         typeof created?.fixture?.id === "string",
-        `Packaged control-surface bridge qualification failed: lighting.fixture.create did not add qualification light ${index + 1}.`
+        `Bridge qualification failed: lighting.fixture.create did not add qualification light ${index + 1}.`
       );
       qualificationLights.push(created.fixture.id);
     }
@@ -428,7 +392,7 @@ async function main() {
       typeof lcdLightNavBefore === "string" &&
         lcdLightNavBefore.startsWith("LIGHT") &&
         lcdLightNavBefore.includes("1/2"),
-      `Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=light_nav did not show the first of the two lights: ${JSON.stringify(lcdLightNavBefore)}.`
+      `Bridge qualification failed: GET /api/deck/lcd?key=light_nav did not show the first of the two lights: ${JSON.stringify(lcdLightNavBefore)}.`
     );
 
     const lightResponse = await postJson(`${expectedBaseUrl}/api/deck/light-action`, {
@@ -436,7 +400,7 @@ async function main() {
     });
     assert(
       lightResponse?.selectedLightId === qualificationLights[1],
-      `Packaged control-surface bridge qualification failed: POST /api/deck/light-action selectNextLight selected '${lightResponse?.selectedLightId}' instead of the second light '${qualificationLights[1]}'.`
+      `Bridge qualification failed: POST /api/deck/light-action selectNextLight selected '${lightResponse?.selectedLightId}' instead of the second light '${qualificationLights[1]}'.`
     );
 
     const lightingAfterKey = await harness.request("bridge-qualification-lighting-select", "lighting.snapshot");
@@ -445,7 +409,7 @@ async function main() {
       lightingAfterKey?.selectedFixtureId === qualificationLights[1] &&
         typeof lcdLightNavAfter === "string" &&
         lcdLightNavAfter.includes("2/2"),
-      "Packaged control-surface bridge qualification failed: the deck's next-light key did not round-trip through the bridge LCD and lighting.snapshot."
+      "Bridge qualification failed: the deck's next-light key did not round-trip through the bridge LCD and lighting.snapshot."
     );
 
     const mixTargetResponse = await postJson(`${expectedBaseUrl}/api/deck/audio-action`, {
@@ -454,13 +418,13 @@ async function main() {
     });
     assert(
       mixTargetResponse?.selectedMixTargetId === "audio-mix-phones-a",
-      "Packaged control-surface bridge qualification failed: POST /api/deck/audio-action setMixTarget did not select Phones 1."
+      "Bridge qualification failed: POST /api/deck/audio-action setMixTarget did not select Phones 1."
     );
 
     const audioAfterMixTarget = await harness.request("bridge-qualification-audio-mix-target", "audio.snapshot");
     assert(
       audioAfterMixTarget?.selectedMixTargetId === "audio-mix-phones-a",
-      "Packaged control-surface bridge qualification failed: the deck mix-target selection did not round-trip into audio.snapshot."
+      "Bridge qualification failed: the deck mix-target selection did not round-trip into audio.snapshot."
     );
 
     const audioVerified = audioAfterMixTarget?.status === "ready";
@@ -473,24 +437,24 @@ async function main() {
       });
       assert(
         typeof audioResponse?.mute === "boolean",
-        "Packaged control-surface bridge qualification failed: POST /api/deck/audio-action dialPress did not return the channel mute state."
+        "Bridge qualification failed: POST /api/deck/audio-action dialPress did not return the channel mute state."
       );
 
       const audioAfterPress = await harness.request("bridge-qualification-audio-mute", "audio.snapshot");
       const pressedChannel = audioAfterPress?.channels?.find((channel) => channel.id === audioResponse.channelId);
       assert(
         pressedChannel?.mute === audioResponse.mute,
-        "Packaged control-surface bridge qualification failed: the deck mute did not land in the real audio.snapshot channel state."
+        "Bridge qualification failed: the deck mute did not land in the real audio.snapshot channel state."
       );
 
       lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
       assert(
         typeof lcdAudioAfter === "string" && (!audioResponse.mute || lcdAudioAfter.includes("MUTED")),
-        "Packaged control-surface bridge qualification failed: audio strip LCD did not reflect the mute action."
+        "Bridge qualification failed: audio strip LCD did not reflect the mute action."
       );
       assert(
         lcdAudioAfter !== lcdAudioBefore,
-        "Packaged control-surface bridge qualification failed: audio strip LCD did not change after the mute action."
+        "Bridge qualification failed: audio strip LCD did not change after the mute action."
       );
     } else {
       audioResponse = await postJsonExpectingStatus(
@@ -503,12 +467,12 @@ async function main() {
       );
       assert(
         typeof audioResponse?.error === "string" && audioResponse.error.length > 0,
-        "Packaged control-surface bridge qualification failed: gated audio dialTurn did not return the rejection reason."
+        "Bridge qualification failed: gated audio dialTurn did not return the rejection reason."
       );
       lcdAudioAfter = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio_strip_1`);
       assert(
         typeof lcdAudioAfter === "string" && lcdAudioAfter.startsWith("AUDIO"),
-        "Packaged control-surface bridge qualification failed: gated audio strips must render the gate reason."
+        "Bridge qualification failed: gated audio strips must render the gate reason."
       );
     }
 
@@ -532,7 +496,7 @@ async function main() {
       name: "bridge-http-routes",
       status: "passed",
       message:
-        "Packaged bridge accepted live HTTP requests, showed the saved page to the deck, and round-tripped lighting and audio actions.",
+        "The bridge accepted live HTTP requests, showed the saved page to the deck, and round-tripped lighting and audio actions.",
       scopeChanged: DECK_ROUTES_CHANGED,
     });
 
@@ -550,7 +514,7 @@ async function main() {
     const deckStateBefore = await readDeckState("bridge-qualification-refusals-before");
     assert(
       deckStateBefore.lastEvent !== null && deckStateBefore.selectedLightId === qualificationLights[1],
-      "Packaged control-surface bridge qualification failed: the deck state before the refusals holds no last event or not the selected second light."
+      "Bridge qualification failed: the deck state before the refusals holds no last event or not the selected second light."
     );
     const refusedKeyBody = JSON.stringify({ action: "selectNextLight" });
     const jsonHeaders = { "Content-Type": "application/json" };
@@ -563,11 +527,11 @@ async function main() {
     });
     assert(
       noToken.status === 401,
-      `Packaged control-surface bridge qualification failed: a POST without the bridge token returned ${noToken.status} instead of 401: ${noToken.text}`
+      `Bridge qualification failed: a POST without the bridge token returned ${noToken.status} instead of 401: ${noToken.text}`
     );
     assert(
       (noToken.headers.get("www-authenticate") ?? "").startsWith("Bearer"),
-      "Packaged control-surface bridge qualification failed: the 401 did not carry a WWW-Authenticate: Bearer challenge."
+      "Bridge qualification failed: the 401 did not carry a WWW-Authenticate: Bearer challenge."
     );
 
     const wrongToken = await fetchStatus(`${expectedBaseUrl}/api/deck/light-action`, {
@@ -578,7 +542,7 @@ async function main() {
     });
     assert(
       wrongToken.status === 401,
-      `Packaged control-surface bridge qualification failed: a POST with a wrong token returned ${wrongToken.status} instead of 401: ${wrongToken.text}`
+      `Bridge qualification failed: a POST with a wrong token returned ${wrongToken.status} instead of 401: ${wrongToken.text}`
     );
 
     const browserOrigin = await rawHttp(
@@ -590,7 +554,7 @@ async function main() {
     );
     assert(
       browserOrigin.status === 403,
-      `Packaged control-surface bridge qualification failed: a request with a browser Origin returned ${browserOrigin.status} instead of 403: ${browserOrigin.text}`
+      `Bridge qualification failed: a request with a browser Origin returned ${browserOrigin.status} instead of 403: ${browserOrigin.text}`
     );
 
     const foreignHost = await rawHttp(
@@ -599,7 +563,7 @@ async function main() {
     );
     assert(
       foreignHost.status === 400,
-      `Packaged control-surface bridge qualification failed: a request with a foreign Host returned ${foreignHost.status} instead of 400: ${foreignHost.text}`
+      `Bridge qualification failed: a request with a foreign Host returned ${foreignHost.status} instead of 400: ${foreignHost.text}`
     );
 
     const oversizedBody = `{"action":"selectNextLight","value":"${"x".repeat(17 * 1024)}"}`;
@@ -619,7 +583,7 @@ async function main() {
     );
     assert(
       oversized.status === 413,
-      `Packaged control-surface bridge qualification failed: a 17 KiB body returned ${oversized.status} instead of 413: ${oversized.text}`
+      `Bridge qualification failed: a 17 KiB body returned ${oversized.status} instead of 413: ${oversized.text}`
     );
 
     const absurdLength = await rawHttp(
@@ -634,7 +598,7 @@ async function main() {
     );
     assert(
       absurdLength.status === 413,
-      `Packaged control-surface bridge qualification failed: a declared 99999999-byte body returned ${absurdLength.status} instead of 413: ${absurdLength.text}`
+      `Bridge qualification failed: a declared 99999999-byte body returned ${absurdLength.status} instead of 413: ${absurdLength.text}`
     );
 
     const stalled = await rawHttp(
@@ -649,11 +613,11 @@ async function main() {
     );
     assert(
       stalled.status === 408,
-      `Packaged control-surface bridge qualification failed: a body that never finished returned ${stalled.status} instead of 408: ${stalled.text}`
+      `Bridge qualification failed: a body that never finished returned ${stalled.status} instead of 408: ${stalled.text}`
     );
     assert(
       stalled.firstByteMs !== null && stalled.firstByteMs <= 1500,
-      `Packaged control-surface bridge qualification failed: the 408 took ${stalled.firstByteMs} ms; the bridge deadline is 1 s.`
+      `Bridge qualification failed: the 408 took ${stalled.firstByteMs} ms; the bridge deadline is 1 s.`
     );
 
     const decodedKey = await fetchStatus(`${expectedBaseUrl}/api/deck/lcd?key=audio%2Fstrip_1`);
@@ -661,18 +625,18 @@ async function main() {
       decodedKey.status === 400 &&
         typeof decodedKey.body?.error === "string" &&
         decodedKey.body.error.includes("audio/strip_1"),
-      `Packaged control-surface bridge qualification failed: a percent-encoded LCD key was not decoded before lookup: ${decodedKey.status} ${decodedKey.text}`
+      `Bridge qualification failed: a percent-encoded LCD key was not decoded before lookup: ${decodedKey.status} ${decodedKey.text}`
     );
     const encodedKnownKey = await fetchJson(`${expectedBaseUrl}/api/deck/lcd?key=audio%5Fstrip%5F1`);
     assert(
       encodedKnownKey === lcdAudioAfter,
-      "Packaged control-surface bridge qualification failed: GET /api/deck/lcd?key=audio%5Fstrip%5F1 did not decode to the audio_strip_1 text."
+      "Bridge qualification failed: GET /api/deck/lcd?key=audio%5Fstrip%5F1 did not decode to the audio_strip_1 text."
     );
 
     const deckStateAfter = await readDeckState("bridge-qualification-refusals-after");
     assert(
       JSON.stringify(deckStateAfter) === JSON.stringify(deckStateBefore),
-      `Packaged control-surface bridge qualification failed: a refused request changed the deck state (${JSON.stringify(deckStateBefore)} → ${JSON.stringify(deckStateAfter)}).`
+      `Bridge qualification failed: a refused request changed the deck state (${JSON.stringify(deckStateBefore)} → ${JSON.stringify(deckStateAfter)}).`
     );
 
     summary.refusalChecks = {
@@ -691,7 +655,7 @@ async function main() {
       name: "bridge-request-refusals",
       status: "passed",
       message:
-        "Packaged bridge refused requests without the token (401), with a browser Origin (403), with a foreign Host (400), with an oversized body (413) and with a stalled body (408), none of them changed the deck state, and it decoded percent-encoded LCD keys.",
+        "The bridge refused requests without the token (401), with a browser Origin (403), with a foreign Host (400), with an oversized body (413) and with a stalled body (408), none of them changed the deck state, and it decoded percent-encoded LCD keys.",
       markerChanged: REFUSALS_CHANGED,
     });
 
@@ -702,7 +666,7 @@ async function main() {
     const exportSummary = await harness.request("bridge-qualification-export", "exports.companion.export");
     assert(
       typeof exportSummary?.path === "string" && existsSync(exportSummary.path),
-      "Packaged control-surface bridge qualification failed: exports.companion.export did not write a profile."
+      "Bridge qualification failed: exports.companion.export did not write a profile."
     );
     const profile = JSON.parse(readFileSync(exportSummary.path, "utf8"));
     const bridgeConnectionId = Object.entries(profile.instances ?? {}).find(
@@ -710,12 +674,12 @@ async function main() {
     )?.[0];
     assert(
       typeof bridgeConnectionId === "string",
-      "Packaged control-surface bridge qualification failed: the exported profile has no generic-http connection."
+      "Bridge qualification failed: the exported profile has no generic-http connection."
     );
     const bridgeActions = collectBridgeActions(profile, bridgeConnectionId);
     assert(
       bridgeActions.length > 50,
-      `Packaged control-surface bridge qualification failed: the exported profile holds only ${bridgeActions.length} bridge requests.`
+      `Bridge qualification failed: the exported profile holds only ${bridgeActions.length} bridge requests.`
     );
     for (const action of bridgeActions) {
       let header = null;
@@ -726,7 +690,7 @@ async function main() {
       }
       assert(
         header?.Authorization === bridgeAuthorization,
-        `Packaged control-surface bridge qualification failed: a profile request to ${action.options.url} does not carry the bridge token.`
+        `Bridge qualification failed: a profile request to ${action.options.url} does not carry the bridge token.`
       );
     }
     const pollActions = profile.triggers?.["sse-trigger-lcd-poll"]?.actions ?? [];
@@ -735,7 +699,7 @@ async function main() {
         pollActions.every(
           (action) => typeof action.options?.header === "string" && action.options.header.includes(bridgeToken)
         ),
-      "Packaged control-surface bridge qualification failed: the 1 s LCD poll trigger does not carry the bridge token."
+      "Bridge qualification failed: the 1 s LCD poll trigger does not carry the bridge token."
     );
 
     summary.profileCheck = {
@@ -761,7 +725,7 @@ async function main() {
     assert(
       exportSummary.pageCount === DECK_PAGE_LABELS.length &&
         JSON.stringify(profilePages) === JSON.stringify(expectedProfilePages),
-      `Packaged control-surface bridge qualification failed: the exported profile's pages are ${JSON.stringify(profilePages)} (pageCount ${exportSummary.pageCount}) instead of ${JSON.stringify(expectedProfilePages)}.`
+      `Bridge qualification failed: the exported profile's pages are ${JSON.stringify(profilePages)} (pageCount ${exportSummary.pageCount}) instead of ${JSON.stringify(expectedProfilePages)}.`
     );
 
     const followTriggers = Object.entries(profile.triggers ?? {})
@@ -778,12 +742,12 @@ async function main() {
           ({ workspace, condition }) =>
             condition?.variable === "custom:lcd_workspace" && condition?.op === "eq" && condition?.value === workspace
         ),
-      `Packaged control-surface bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of lighting to page 1 and audio to page 2 on custom:lcd_workspace.`
+      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of lighting to page 1 and audio to page 2 on custom:lcd_workspace.`
     );
     const savedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
     assert(
       savedFollow && profile.pages?.[String(savedFollow.page)]?.name === "LIGHTS",
-      `Packaged control-surface bridge qualification failed: the saved page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
+      `Bridge qualification failed: the saved page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
     );
 
     const lcdKeys = new Set();
@@ -811,7 +775,7 @@ async function main() {
     }
     assert(
       strayRequests.length === 0,
-      `Packaged control-surface bridge qualification failed: the exported profile sends requests this bridge no longer answers: ${strayRequests.join("; ")}.`
+      `Bridge qualification failed: the exported profile sends requests this bridge no longer answers: ${strayRequests.join("; ")}.`
     );
     const unansweredLcds = [];
     for (const key of [...lcdKeys].sort()) {
@@ -822,7 +786,7 @@ async function main() {
     }
     assert(
       lcdKeys.size > 0 && unansweredLcds.length === 0,
-      `Packaged control-surface bridge qualification failed: the bridge did not answer the profile's LCDs: ${unansweredLcds.join(", ") || "none read"}.`
+      `Bridge qualification failed: the bridge did not answer the profile's LCDs: ${unansweredLcds.join(", ") || "none read"}.`
     );
 
     summary.profilePages = {
@@ -876,13 +840,13 @@ async function main() {
   }
 
   console.log(
-    `Packaged control-surface bridge qualification passed: ${packaged.label} bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a two-page profile that carries the token and reads only LCDs the bridge answers.`
+    `Bridge qualification passed: the ${packaged.label} engine's bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a two-page profile that carries the token and reads only LCDs the bridge answers.`
   );
 }
 
 // Runs only as `node scripts/native-control-surface-qualification.mjs …`: an
-// import does nothing (2026-09-26; the run starts the packaged engine from
-// release/native and its bridge). The two paths are compared as real paths —
+// import does nothing (2026-09-26; the run starts an engine on scratch data
+// and its bridge). The two paths are compared as real paths —
 // through a directory junction or a short 8.3 name, `process.argv[1]` and
 // `import.meta.url` spell the same file differently, and a plain comparison
 // would skip the run without a word (scripts/dev-check-cli.mjs).

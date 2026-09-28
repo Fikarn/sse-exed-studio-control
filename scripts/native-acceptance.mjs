@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { assert, EngineHarness, resolvePathFromRoot } from "./native-runtime-harness.mjs";
+import { assert, EngineHarness, laneEngine, resolvePathFromRoot } from "./native-runtime-harness.mjs";
 import {
   acceptanceEngineEnv,
   assertAudioWorkflowParity,
@@ -25,6 +25,7 @@ import { assertSafeBundledSqlite } from "./native-release-safety.mjs";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 async function main() {
+  const { enginePath: engineExecutable } = laneEngine(rootDir);
   const explicitRoot = resolvePathFromRoot(rootDir, process.env.SSE_NATIVE_ACCEPTANCE_DIR);
   const acceptanceRoot = explicitRoot ?? mkdtempSync(path.join(os.tmpdir(), "sse-native-acceptance-"));
   rmSync(acceptanceRoot, { force: true, recursive: true });
@@ -43,6 +44,7 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
+    engineExecutable,
     env: await acceptanceEngineEnv(),
   });
 
@@ -98,6 +100,7 @@ async function main() {
     rootDir,
     appDataDir,
     logsDir,
+    engineExecutable,
     env: await acceptanceEngineEnv(),
   });
 

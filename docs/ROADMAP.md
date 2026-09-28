@@ -12,7 +12,7 @@ One pull request each, in this order. Then the Cameras page.
 - [x] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
 - [ ] Step 4: builds, in two pull requests.
   - [x] Development runs. `npm run app` starts the app on its own saved data with simulated devices; a development build refuses the studio's data and is an app of its own; the shell starts the engine beside it and no other; a release build keeps the overflow checks.
-  - [ ] Studio builds. One release command; the builds kept outside the repository, each with a release-profile engine; the release machinery nobody uses removed.
+  - [x] Studio builds. `npm run release` makes one from `main`, keeps it in `builds\` beside the repository and tries it on scratch data; only that command makes a build the studio's kind; `npm run release:verified` names the build the studio starts. The installer, update, signing, evidence and release scripts are removed.
 - [ ] Step 5: screenshots and the layout gate. Header and footer captured once; absolute thresholds instead of per-page ratchets.
 - [ ] Step 6: product code. Talkback out (D26), Graphite and Bone out (D25), update-folder leftovers, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
 - [ ] Step 7: local cleanup.
@@ -91,7 +91,7 @@ The shell's second window shows the glass (`PrompterGlass`) on the screen Window
 
 Guards:
 
-- "The studio build" is defined in code: a release build started with no `SSE_*` variable and without the test bridge. Anything else draws the glass into an ordinary window, and a test holds that.
+- "The studio build" is defined in code: a build `npm run release` made (`studio_build()` in `native/protocol/rust/src/development.rs`). Anything else draws the glass into an ordinary window, and a test holds that.
 - A test over plain monitor snapshots, run in CI, proves the window opens only on a screen named `Prompter XL`.
 - The display calls are `unsafe`. The shell's one allowance (`set_browser_accelerator_keys_off`) becomes a named list, each entry with its reason.
 - `native/tauri-shell/src/main.rs` is split first.
@@ -245,3 +245,4 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D24** (2026-09-28) The lean workflow. `main` is the development line. The studio runs the latest verified build: a release build the owner has walked through `docs/CHECKLIST.md` on the real hardware. Merges to `main` need no go-ahead. No ledgers, run ids or archive tags.
 - **D25** (2026-09-28) Studio, the dark theme, is the only theme. Graphite and Bone are removed.
 - **D26** (2026-09-28) Talkback is removed from the app entirely.
+- **D27** (2026-09-28) Studio builds. Only `npm run release` makes one, from a commit on `main`, marked while it compiles. Every other build is a development build: it refuses the studio's folders, takes the safe value of every switch that is not set, and is an app of its own. Builds are kept in `builds\` beside the repository and never deleted by a script. `npm run release:verified` names the one the studio starts and tags its commit.

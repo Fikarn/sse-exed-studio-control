@@ -106,7 +106,7 @@ What limits the design:
 
 ## Safety rules
 
-The studio build is the release build the owner starts on the real saved data.
+The studio build is a build `npm run release` made, which the owner starts on the real saved data. Every other build is a development build.
 
 Always:
 

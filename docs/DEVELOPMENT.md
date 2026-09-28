@@ -118,4 +118,18 @@ The engine:
 
 ## Studio builds
 
-A studio build is a folder that holds a release build of the shell and a release build of the engine. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.
+A studio build is a folder that holds the shell and the engine, both release builds that `npm run release` marked as the studio's, and `build.json`, which names the commit and the hash of each file. Every other build is a development build and keeps off the studio, a release build made by hand included.
+
+```bash
+npm run release
+```
+
+It needs a clean working tree and a commit that is on `origin/main`. It builds, copies the two files into `builds\<day>_<commit>\` beside the repository, and then tries the copy on scratch data with simulated devices: the shell starts the engine beside it, and the acceptance lane and the bridge lane run against that engine. It takes about ten minutes. A build is never overwritten and never deleted by a script.
+
+To make a build the studio's:
+
+1. Close the studio app and start the new build's `sse-exed-tauri-shell.exe`. If its saved-data schema is newer, this start upgrades the studio's data, after a backup. An older build then refuses that data: going back means restoring the backup.
+2. Walk `docs/CHECKLIST.md`.
+3. `npm run release:verified -- <the build's name>`. It checks the folder against `build.json`, points `builds\Studio Control.cmd` at the build, adds a line to `builds\verified.txt` and tags the commit `verified/<name>`.
+
+`builds\Studio Control.cmd` always starts the verified build. `STUDIO_BUILDS_DIR` names another builds folder.

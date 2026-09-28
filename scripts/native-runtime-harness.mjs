@@ -292,6 +292,24 @@ export function resolveDebugEngineExecutable(rootDir) {
     : path.join(rootDir, "native", "target", "debug", "studio-control-engine");
 }
 
+/**
+ * The engine a lane runs against: the one `--engine=<path>` names, which is
+ * how `npm run release` points a lane at the build it has made, or the
+ * development build in the repository. `what` says which, for the lane's
+ * messages.
+ */
+export function laneEngine(rootDir, args = process.argv.slice(2)) {
+  const named = args.find((value) => value.startsWith("--engine="));
+  if (named === undefined) {
+    return { enginePath: resolveDebugEngineExecutable(rootDir), what: "development" };
+  }
+  const enginePath = path.resolve(named.slice("--engine=".length));
+  if (!existsSync(enginePath)) {
+    throw new Error(`--engine names ${enginePath}, which is not there.`);
+  }
+  return { enginePath, what: "named" };
+}
+
 export function wait(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
