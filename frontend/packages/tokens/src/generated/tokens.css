@@ -297,7 +297,6 @@
   --target-take-studio: 32px; /** take-time controls at 2560x1440 */
   --font-family-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --font-family-ui: "Inter Variable", "Inter", system-ui, sans-serif;
-  --font-family-display: "Fraunces Variable", "Fraunces", "Source Serif 4", Georgia, serif;
   --font-size-5xs: 7px;
   --font-size-4xs: 8px;
   --font-size-4xs-plus: 8.5px;

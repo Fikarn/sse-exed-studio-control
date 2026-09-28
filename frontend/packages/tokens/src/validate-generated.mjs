@@ -77,6 +77,9 @@ for (const gone of [
   "--radius-tight-xs:",
   "--radius-tight-md:",
   "--motion-duration-fast:",
+  // 2026-09-28: Fraunces, the display face of the design before A. The design
+  // names two families, Inter and JetBrains Mono (DESIGN.md §3).
+  "--font-family-display:",
 ]) {
   if (css.includes(gone)) {
     throw new Error(`Generated tokens.css re-introduces the retired alias ${gone.slice(0, -1)}`);

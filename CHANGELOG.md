@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Lighting's scene names, the plot's pill, the scene's title and figures, the fixture's name, the recovery screen's check titles and the shell's dialog titles are printed in Inter, as the rest of the app is: Fraunces, the old display face, is gone (#256).
 - Lighting reads `HELD` while the light outputs are held; it read `REACHABLE`, "the rig is following it" (#255).
 - `DIM` and `MONO` are `Main Out`'s whichever output is the mix target, and the phones' strips no longer show them: nothing was ever sent for the phones (#255).
 - The header shows a `Backup` chip while the automatic backup failed or is overdue, and the Lighting lamp reads `no output` when the light output could not open its port. Both went unseen (#255).

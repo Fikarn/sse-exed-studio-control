@@ -39,7 +39,7 @@
 
 .cardTitle {
   margin: 0 0 6px;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -161,7 +161,7 @@ button.lightingDmxDrawerCell {
 
 .setupUtilityTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -246,7 +246,7 @@ button.lightingDmxDrawerCell {
 
 .setupIncidentTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -391,9 +391,9 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentCheckTitle {
-  /* SET-12: aligned with the support pilot's .checkTitle (display family,
-     strong text). */
-  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-display);
+  /* SET-12: aligned with the support pilot's .checkTitle (strong text; Inter
+     since 2026-09-28, when Fraunces went). */
+  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-ui);
   color: var(--color-text-strong);
   letter-spacing: 0;
 }
@@ -469,7 +469,7 @@ button.lightingDmxDrawerCell {
 
 .stateTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -567,7 +567,7 @@ button.lightingDmxDrawerCell {
 
 .dialogTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-display);
+  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 

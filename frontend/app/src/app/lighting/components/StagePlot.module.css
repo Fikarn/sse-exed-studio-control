@@ -115,8 +115,7 @@
 }
 
 .plotPillName {
-  font-family: var(--font-family-display);
-  font-variation-settings: "opsz" 24;
+  font-family: var(--font-family-ui);
   font-weight: 600;
   font-size: var(--operator-font-size-lg, 13px);
 }

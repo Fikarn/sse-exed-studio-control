@@ -111,18 +111,11 @@ export const LIMITS = {
 
 // The boards that differ, each with its reason. A number here is a limit like
 // the others: the board may do better and may not do worse.
-const FRAUNCES = "Fraunces, the display face of the design before A, still prints";
 export const EXCEPTIONS = {
   // No workspace is on these screens: a header and a state display.
   "startup-loading": { regionsPresent: 2 },
-  "bootstrap-failed": {
-    regionsPresent: 2,
-    offFamilyText: [3, `${FRAUNCES} the three check titles of the recovery screen`],
-  },
-  "protocol-mismatch": {
-    regionsPresent: 2,
-    offFamilyText: [3, `${FRAUNCES} the three check titles of the recovery screen`],
-  },
+  "bootstrap-failed": { regionsPresent: 2 },
+  "protocol-mismatch": { regionsPresent: 2 },
   // The Console's loading surface stands in for its cluster, plate and display.
   "audio-loading": { regionsPresent: 2 },
   // Setup has no cluster: its runner takes the bay's whole width.
@@ -132,14 +125,6 @@ export const EXCEPTIONS = {
   "setup-cameras": { regionsPresent: 4 },
   "setup-map-cameras": { regionsPresent: 4 },
   "setup-map-prompter": { regionsPresent: 4 },
-  "lighting-empty": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
-  "lighting-loading": { offFamilyText: [1, `${FRAUNCES} the scene's name`] },
-  "lighting-populated": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
-  "lighting-patch-overlap": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
-  "lighting-dmx-unreachable": { offFamilyText: [4, `${FRAUNCES} the scenes' names and the plot's pill`] },
-  "lighting-populated-noselect": {
-    offFamilyText: [8, `${FRAUNCES} the scenes' names, the plot's pill and the scene's four figures`],
-  },
 };
 
 /** The limits of one board: the common ones, with the board's own in their place. */
