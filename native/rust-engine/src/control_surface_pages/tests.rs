@@ -13,9 +13,9 @@ use crate::cameras::runtime::with_bodies_unnoticed;
 use crate::cameras::simulated::CameraValue;
 use crate::cameras::test_support::TestCameras;
 use crate::control_surface::{
-    control_surface_last_event, handle_control_surface_http_action,
+    control_surface_last_event, deck_key_stamped, handle_control_surface_http_action,
     handle_control_surface_http_action_at, read_control_surface_lcd_text,
-    read_control_surface_lcd_text_at, ControlSurfaceError,
+    read_control_surface_lcd_text_at, ControlSurfaceError, KeyEvent,
 };
 use crate::engine_events::EMITTED;
 use crate::prompter::test_support::TestPrompter;
@@ -202,38 +202,58 @@ fn the_decks_rec_leaves_rows_with_the_deck_as_their_source() {
 }
 
 // The screen hears of a key once the key is stamped and its row written: a
-// page that reads on the event finds the row. The page's own entry point
-// says what is to be heard and raises nothing; the bridge's raises it, after
-// the stamp.
+// page that reads on the event finds the row. The bridge's entry point is two
+// steps in that order: the key is acted on, stamped and written, and says
+// which events are due (`deck_key_stamped`, which raises none); then they
+// are raised.
 #[test]
-fn the_screen_hears_of_a_key_after_its_row_is_written() {
+fn a_key_is_stamped_and_written_before_the_screen_hears_of_it() {
     let cameras = TestCameras::set_up("bridge-cameras-events");
     let start = Instant::now();
+    let rec = json!({ "action": "rec" });
     said();
-    let page = handle_page_action(cameras.path(), true, CAMERA_ROUTE, "rec", None, start)
-        .expect("the CAMERAS page's route")
-        .expect("REC should be taken");
-    assert_eq!(page.answer["did"], "started");
-    assert_eq!(
-        page.events
-            .iter()
-            .map(|(event, payload)| (event.to_string(), payload.clone()))
-            .collect::<Vec<_>>(),
-        a_take_changed()
-    );
-    assert_eq!(said(), Vec::new(), "the page's entry point raises nothing");
-    assert!(
-        control_surface_last_event(cameras.path()).is_null(),
-        "and stamps nothing: the bridge does both, in its order"
-    );
 
-    let rec = |at: Instant| key_at(cameras.path(), CAMERA_ROUTE, json!({ "action": "rec" }), at);
-    assert_eq!(rec(start + STOP_ARM_DWELL)["did"], "armed");
+    let (answer, events) = deck_key_stamped(cameras.path(), true, CAMERA_ROUTE, &rec, start);
+    assert_eq!(answer.expect("REC should be taken")["did"], "started");
+    assert_eq!(
+        events,
+        vec![
+            KeyEvent::Page(
+                "cameras.changed",
+                json!({ "reason": "record", "camera": 1 })
+            ),
+            KeyEvent::Page("app.changed", json!({ "reason": "health" })),
+        ]
+    );
+    // Stamped and written, and nothing said yet.
+    assert_eq!(control_surface_last_event(cameras.path())["action"], "rec");
+    assert_eq!(rows(cameras.path())[0].2, "recording-started");
+    assert_eq!(cameras.snapshot()["recent"][0]["source"], "deck");
     assert_eq!(said(), Vec::new());
-    assert_eq!(rec(start + STOP_ARM_DWELL * 2)["did"], "stopped");
+
+    // The entry point raises what the first step said is due.
+    let rec_at = |at: Instant| key_at(cameras.path(), CAMERA_ROUTE, rec.clone(), at);
+    assert_eq!(rec_at(start + STOP_ARM_DWELL)["did"], "armed");
+    assert_eq!(said(), Vec::new());
+    assert_eq!(rec_at(start + STOP_ARM_DWELL * 2)["did"], "stopped");
     assert_eq!(said(), a_take_changed());
     assert_eq!(rows(cameras.path())[0].2, "recording-stopped");
 
+    // A key that is refused is no event, no stamp and no row.
+    let stamped = control_surface_last_event(cameras.path());
+    let (answer, events) = deck_key_stamped(
+        cameras.path(),
+        true,
+        CAMERA_ROUTE,
+        &json!({ "action": "dialPush", "value": "2" }),
+        start + Duration::from_secs(10),
+    );
+    assert_eq!(answer.expect_err("refused").status_code(), 409);
+    assert_eq!(events, Vec::new());
+    assert_eq!(control_surface_last_event(cameras.path()), stamped);
+    assert_eq!(rows(cameras.path()).len(), 2);
+
+    // The page's own entry point says the events and raises none.
     let prompter = TestPrompter::new("bridge-prompter-events");
     let script = prompter.script("Talk", &["one two three four"]);
     prompter.call("prompter.putOn", json!({ "scriptId": script }));

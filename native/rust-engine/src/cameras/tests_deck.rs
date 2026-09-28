@@ -3,7 +3,7 @@
 
 use crate::cameras::deck::{
     deck_texts, deck_texts_at, handle_deck_action, handle_deck_action_at, CAMERA_LCD_KEYS,
-    STOP_ARM_DWELL, STOP_ARM_WINDOW,
+    STOP_ARM_DWELL, STOP_ARM_WINDOW, STOP_SHOWN_FOR,
 };
 use crate::cameras::model::Setting;
 use crate::cameras::simulated::{CameraCommand, CameraValue};
@@ -530,6 +530,129 @@ fn an_arm_stops_no_other_take_than_its_own() {
         cameras.sent(1),
         vec![CameraCommand::RecordStart, CameraCommand::RecordStop]
     );
+}
+
+// The screen stops the take while the deck's stop is armed. The deck's next
+// press within the 3 s was the stop's second, its key perhaps still reading
+// `STOP?`: there is nothing left for it to stop, and it starts no take.
+#[test]
+fn the_second_press_of_a_stop_starts_no_take_when_the_screen_stopped_it() {
+    let cameras = TestCameras::set_up("deck-rec-screen-stopped");
+    let start = Instant::now();
+    let seconds = |seconds: u64| start + Duration::from_secs(seconds);
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, seconds(10)), "armed");
+
+    cameras.call("cameras.record.stop", json!({ "confirm": true }));
+    let sent = vec![CameraCommand::RecordStart, CameraCommand::RecordStop];
+    assert_eq!(cameras.sent(1), sent);
+    assert_eq!(
+        rec_key_at(&cameras, seconds(11)),
+        (String::from("REC"), String::from("ready"))
+    );
+    assert_eq!(rec_at(&cameras, seconds(11)), "kept");
+    assert_eq!(cameras.sent(1), sent, "nothing was sent");
+    assert_eq!(cameras.camera(1)["recording"]["recording"], false);
+
+    // The arm ended with that press: the next one starts a take.
+    assert_eq!(rec_at(&cameras, seconds(12)), "started");
+}
+
+// The key's display follows the deck's poll, so it can read `STOP?` for a
+// moment after the 3 s. For as long as it can, a press starts no take; the
+// stop's own window stays 3 s.
+#[test]
+fn a_press_starts_no_take_while_the_key_can_still_read_stop() {
+    let cameras = TestCameras::set_up("deck-rec-stale-stop");
+    let start = Instant::now();
+    assert_eq!(rec_at(&cameras, start), "started");
+    let armed_at = start + Duration::from_secs(10);
+    assert_eq!(rec_at(&cameras, armed_at), "armed");
+    cameras.body_records(1, false);
+
+    assert_eq!(rec_at(&cameras, armed_at + STOP_SHOWN_FOR), "kept");
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+    // That press ended the arm.
+    assert_eq!(
+        rec_at(
+            &cameras,
+            armed_at + STOP_SHOWN_FOR + Duration::from_millis(1)
+        ),
+        "started"
+    );
+
+    // Once the key cannot read `STOP?` any more, one press starts, as ever.
+    let armed_at = armed_at + Duration::from_secs(20);
+    assert_eq!(rec_at(&cameras, armed_at), "armed");
+    cameras.body_records(1, false);
+    assert_eq!(
+        rec_at(
+            &cameras,
+            armed_at + STOP_SHOWN_FOR + Duration::from_millis(1)
+        ),
+        "started"
+    );
+
+    // A take that still runs after the 3 s is armed again, not stopped.
+    let armed_at = armed_at + Duration::from_secs(20);
+    assert_eq!(rec_at(&cameras, armed_at), "armed");
+    assert_eq!(
+        rec_at(
+            &cameras,
+            armed_at + STOP_ARM_WINDOW + Duration::from_millis(1)
+        ),
+        "armed"
+    );
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+}
+
+// CAM 1 does not answer for a while under an armed stop. When it answers
+// again a take may have ended and another begun: the arm is not trusted.
+#[test]
+fn an_arm_does_not_outlive_a_camera_that_was_lost_or_released() {
+    let cameras = TestCameras::set_up("deck-rec-lost");
+    let start = Instant::now();
+    let at = |millis: u64| start + Duration::from_millis(millis);
+    assert_eq!(rec_at(&cameras, start), "started");
+    assert_eq!(rec_at(&cameras, at(10_000)), "armed");
+
+    cameras.answering(1, false);
+    assert_eq!(refused(&cameras, "rec", None).0, "CAMERA_UNREACHABLE");
+    cameras.answering(1, true);
+    assert_eq!(
+        rec_key_at(&cameras, at(11_000)),
+        (String::from("REC"), String::from("recording")),
+        "the key reads STOP? for the take it was armed for, and for no other"
+    );
+    assert_eq!(rec_at(&cameras, at(11_000)), "kept");
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+    assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
+
+    // Released and connected again: the same.
+    assert_eq!(rec_at(&cameras, at(20_000)), "armed");
+    cameras.call("cameras.release", json!({ "camera": 1, "confirm": true }));
+    assert_eq!(refused(&cameras, "rec", None).0, "CAMERA_RELEASED");
+    cameras.call("cameras.connect", json!({ "camera": 1 }));
+    assert_eq!(rec_at(&cameras, at(21_000)), "kept");
+    assert_eq!(cameras.camera(1)["recording"]["recording"], true);
+
+    // The take is stopped as any take: a press arms, a second stops.
+    assert_eq!(rec_at(&cameras, at(22_000)), "armed");
+    assert_eq!(rec_at(&cameras, at(23_000)), "stopped");
+    assert_eq!(
+        cameras.sent(1),
+        vec![CameraCommand::RecordStart, CameraCommand::RecordStop]
+    );
+
+    // A restart forgets the arm and the dwell.
+    assert_eq!(rec_at(&cameras, at(30_000)), "started");
+    assert_eq!(rec_at(&cameras, at(40_000)), "armed");
+    cameras.restart();
+    assert_eq!(
+        rec_key_at(&cameras, at(40_500)),
+        (String::from("REC"), String::from("recording"))
+    );
+    assert_eq!(rec_at(&cameras, at(40_500)), "armed");
 }
 
 // D13, D19: a camera that is released or does not answer takes nothing from

@@ -193,7 +193,13 @@ pub(crate) struct Cameras {
     pub deck_rec_at: Option<Instant>,
     /// Counts the reads in which CAM 1 reported another state of its take
     /// than in the read before: a take that began or ended, whoever did it.
-    /// An armed stop whose count is another's is about a take that is over.
+    /// A read that finds CAM 1 again after it did not answer counts too: a
+    /// take may have ended and another begun meanwhile. An armed stop whose
+    /// count is another's is about a take that is over, or may be.
+    ///
+    /// What it cannot see: a take that ends and another that begins on the
+    /// camera itself between two reads. The cameras are read once a second
+    /// while the page is open or the deck polls.
     pub take_changes: u64,
     /// The last read of the cameras' Recent actions failed: the log says so
     /// once for as long as it lasts.
@@ -273,7 +279,8 @@ impl Cameras {
                     .as_ref()
                     .is_some_and(|last| !last.same_values(&reading));
                 if camera == RECORDING_CAMERA
-                    && last.as_ref().and_then(|last| last.recording) != reading.recording
+                    && (was_unreachable
+                        || last.as_ref().and_then(|last| last.recording) != reading.recording)
                 {
                     self.take_changes = self.take_changes.wrapping_add(1);
                 }

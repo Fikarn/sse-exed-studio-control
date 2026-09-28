@@ -657,9 +657,14 @@ pub(super) fn record_request(
         CameraCommand::RecordStop
     };
     let after = press(cameras, bodies, camera, &[command], now)?;
-    // A take that starts or stops, from the screen or the deck, ends the
-    // deck's armed stop: `STOP?` is about the take that was running.
-    cameras.stop_arm = None;
+    // A take that starts ends the deck's armed stop: nobody armed the stop
+    // of the new take. A take that stops leaves the arm, and spends it (the
+    // read after the press counts the change, `take_changes`): the deck's
+    // next press within its 3 s was the stop's second, and starts no take
+    // (`deck::rec`).
+    if start {
+        cameras.stop_arm = None;
+    }
     let sentence = if start {
         STARTED_RECORDING
     } else {

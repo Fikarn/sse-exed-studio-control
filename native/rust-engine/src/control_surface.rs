@@ -415,18 +415,54 @@ fn handle_deck_http_action_at(
     body: &Value,
     at: Instant,
 ) -> Result<Value, ControlSurfaceError> {
-    let action = body
+    let (response, events) = deck_key_stamped(db_path, cameras_simulated, path, body, at);
+    // The screen hears of the key now, when the key is stamped and its row
+    // written: a page that reads on the event finds the row.
+    for event in events {
+        match event {
+            KeyEvent::Lighting => crate::engine_events::emit_lighting_changed("control-surface"),
+            KeyEvent::Page(event, payload) => crate::engine_events::emit_event(event, payload),
+        }
+    }
+    response
+}
+
+/// What the screen is to hear of a key of the deck.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum KeyEvent {
+    /// `lighting.changed { reason: "control-surface" }`.
+    Lighting,
+    /// An event of the PROMPTER or the CAMERAS page, with its payload.
+    Page(&'static str, Value),
+}
+
+/// A key of the deck: acted on, stamped as the last event and written to
+/// Recent actions, in that order. It raises no event of the key's: it says
+/// which the screen is to hear, for its caller to raise afterwards. (The
+/// AUDIO page's keys announce themselves inside their action, as they did.)
+pub(crate) fn deck_key_stamped(
+    db_path: &Path,
+    cameras_simulated: bool,
+    path: &str,
+    body: &Value,
+    at: Instant,
+) -> (Result<Value, ControlSurfaceError>, Vec<KeyEvent>) {
+    let Some(action) = body
         .get("action")
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| ControlSurfaceError::InvalidParams(String::from("action is required")))?;
+    else {
+        return (
+            Err(ControlSurfaceError::InvalidParams(String::from(
+                "action is required",
+            ))),
+            Vec::new(),
+        );
+    };
     let value = body.get("value").and_then(Value::as_str);
 
-    // What the screen is to hear of a key of the PROMPTER or the CAMERAS
-    // page. It hears it below, once the key is stamped and its row written:
-    // a page that reads on the event finds the row.
-    let mut page_events = Vec::new();
+    let mut events = Vec::new();
     let response = match path {
         "/api/deck/light-action" => handle_light_action(db_path, action),
         "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
@@ -439,7 +475,11 @@ fn handle_deck_http_action_at(
             at,
         ) {
             Some(Ok(page)) => {
-                page_events = page.events;
+                events.extend(
+                    page.events
+                        .into_iter()
+                        .map(|(event, payload)| KeyEvent::Page(event, payload)),
+                );
                 Ok(page.answer)
             }
             Some(Err(error)) => Err(error),
@@ -448,32 +488,29 @@ fn handle_deck_http_action_at(
             ))),
         },
     };
-    if let Ok(reply) = &response {
-        // The action log (Slice 11 — F30): every key through the bridge is
-        // the Stream Deck's, so this is where a row gets the source `deck`.
-        // The reply says what the key did and whether it was staged in the
-        // preview; the row rides the transaction that stamps the last
-        // event, so a key waits for the disk no more often than before.
-        let actions = crate::action_log::deck_actions(path, action, reply);
-        if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions)
-        {
-            crate::diagnostics::log_event(
-                crate::diagnostics::LogLevel::Warn,
-                &format!(
-                    "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
-                    actions.len(),
-                    error.message()
-                ),
-            );
-        }
-        if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
-            crate::engine_events::emit_lighting_changed("control-surface")
-        }
-        for (event, payload) in page_events {
-            crate::engine_events::emit_event(event, payload);
-        }
+    let Ok(reply) = &response else {
+        return (response, Vec::new());
+    };
+    // The action log (Slice 11 — F30): every key through the bridge is
+    // the Stream Deck's, so this is where a row gets the source `deck`.
+    // The reply says what the key did and whether it was staged in the
+    // preview; the row rides the transaction that stamps the last
+    // event, so a key waits for the disk no more often than before.
+    let actions = crate::action_log::deck_actions(path, action, reply);
+    if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions) {
+        crate::diagnostics::log_event(
+            crate::diagnostics::LogLevel::Warn,
+            &format!(
+                "Stream Deck key {action}: the last event and {} action-log row(s) could not be written: {}",
+                actions.len(),
+                error.message()
+            ),
+        );
     }
-    response
+    if let Some(DeckChange::Lighting) = deck_change_event(path, action) {
+        events.insert(0, KeyEvent::Lighting);
+    }
+    (response, events)
 }
 
 /// What a deck action changed, as the screen needs to hear it.

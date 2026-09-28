@@ -14,8 +14,8 @@
 //!   While CAM 1 records, a press arms the stop and the key reads `STOP?`;
 //!   a second press within 3 s stops. Nothing but these two starts or stops
 //!   a take (`rec`): a press sooner than the dwell after the one before is
-//!   the same press again, and a press that finds the armed take over
-//!   starts no other.
+//!   the same press again, an arm stops the take it was made for and no
+//!   other, and a press starts no take while the key can read `STOP?`.
 //!
 //! A display never reads a camera by itself. The cameras are read once for
 //! all the displays of a poll, as the open page reads them once a second,
@@ -40,6 +40,12 @@ pub(crate) const STOP_ARM_WINDOW: Duration = Duration::from_secs(3);
 /// take or stopped one is the same press again, and changes nothing: the
 /// dwell of every armed key on the screen.
 pub(crate) const STOP_ARM_DWELL: Duration = Duration::from_millis(350);
+
+/// The longest the key can read `STOP?` after the press that armed it: the
+/// 3 s, and the time its display takes to follow (the deck polls once a
+/// second, and a page's texts are kept for 250 ms). For as long, a press
+/// starts no take.
+pub(crate) const STOP_SHOWN_FOR: Duration = Duration::from_millis(4_250);
 
 /// What the page's displays say, by their LCD keys.
 pub(crate) type DeckTexts = Vec<(&'static str, String)>;
@@ -180,22 +186,17 @@ fn dial_setting(cameras: &Cameras, dial: usize) -> Result<Setting, CameraError> 
     })
 }
 
-/// The arm while its 3 s last, whatever became of the take it was about.
-fn arm_in_window(cameras: &Cameras, at: Instant) -> Option<StopArm> {
-    cameras
-        .stop_arm
-        .filter(|arm| at.saturating_duration_since(arm.at) <= STOP_ARM_WINDOW)
-}
-
 /// Whether the deck's stop is armed at `at`: armed for the take that runs,
 /// and the 3 s not over.
 fn stop_armed(cameras: &Cameras, at: Instant) -> bool {
-    arm_in_window(cameras, at).is_some_and(|arm| arm.take == cameras.take_changes)
+    cameras.stop_arm.is_some_and(|arm| {
+        at.saturating_duration_since(arm.at) <= STOP_ARM_WINDOW && arm.take == cameras.take_changes
+    })
 }
 
 /// The deck's `REC` (D14). The answer's `did` says what the press did:
-/// `started`, `armed`, `stopped`, or `kept` for a press that changed nothing
-/// and sent nothing.
+/// `started`, `armed`, `stopped`, or `kept` for a press that sent nothing
+/// and changed no take.
 ///
 /// A take is started by one press and stopped by two, and by nothing else:
 ///
@@ -203,10 +204,15 @@ fn stop_armed(cameras: &Cameras, at: Instant) -> bool {
 ///   a take is the same press again. Without this the second of a double
 ///   press would arm the stop of the take the first began, or begin a take
 ///   after the one the first ended.
-/// - A press within the 3 s of an armed stop is the stop's second press, and
-///   starts nothing. When the take the arm was about is over (it ended on
-///   the camera itself, or another began there), there is nothing for it to
-///   stop: it ends the arm and sends nothing.
+/// - A press within the 3 s of an armed stop is the stop's second press. It
+///   stops the take the arm was made for, and no other: when that take is
+///   over, or may be (the screen stopped it, it ended on the camera itself,
+///   another began, CAM 1 did not answer for a while), the press ends the
+///   arm and sends nothing.
+/// - For as long as the key can still read `STOP?` a press starts no take.
+///
+/// The deck's own stop ends the arm, so that one press after the dwell
+/// starts the next take (D11).
 fn rec(
     cameras: &mut Cameras,
     bodies: &mut SimulatedCameras,
@@ -235,17 +241,26 @@ fn rec(
     {
         return kept(recording);
     }
-    if let Some(arm) = arm_in_window(cameras, at) {
-        if arm.take != cameras.take_changes || !recording {
+    if let Some(arm) = cameras.stop_arm {
+        let since = at.saturating_duration_since(arm.at);
+        let its_take_runs = recording && arm.take == cameras.take_changes;
+        if since <= STOP_ARM_WINDOW {
+            if !its_take_runs {
+                cameras.stop_arm = None;
+                return kept(recording);
+            }
+            if since < STOP_ARM_DWELL {
+                return kept(true);
+            }
+            let stopped = record_request(cameras, bodies, &json!({ "confirm": true }), now, false)?;
             cameras.stop_arm = None;
-            return kept(recording);
+            cameras.deck_rec_at = Some(at);
+            return Ok(did("stopped", stopped));
         }
-        if at.saturating_duration_since(arm.at) < STOP_ARM_DWELL {
-            return kept(true);
+        if since <= STOP_SHOWN_FOR && !recording {
+            cameras.stop_arm = None;
+            return kept(false);
         }
-        let stopped = record_request(cameras, bodies, &json!({ "confirm": true }), now, false)?;
-        cameras.deck_rec_at = Some(at);
-        return Ok(did("stopped", stopped));
     }
     if !recording {
         let started = record_request(cameras, bodies, &json!({}), now, true)?;
