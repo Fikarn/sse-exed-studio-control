@@ -62,7 +62,8 @@ impl EngineProcess {
     /// (`SSE_AUDIO_SIMULATED_INPUT_MODE`). `SSE_DISABLE_AUTO_IMPORT`, which
     /// every spawn set until then, went with the db.json import. Slice 8:
     /// the simulated cameras too (`SSE_CAMERAS_SIMULATED`), so no spawn can
-    /// reach a camera.
+    /// reach a camera. Streamlining, 2026-09-28: and the simulated lights
+    /// (`SSE_LIGHTS_SIMULATED`).
     fn spawn_with<F: FnOnce(&mut Command, &PathBuf)>(label: &str, configure: F) -> Self {
         let runtime_dir = unique_runtime_dir(label);
         let mut command = Command::new(engine_binary_path());
@@ -71,6 +72,7 @@ impl EngineProcess {
             .env("SSE_LOG_DIR", runtime_dir.join("logs"))
             .env("SSE_CONTROL_SURFACE_PORT", "0")
             .env("SSE_SAFE_START", "1")
+            .env("SSE_LIGHTS_SIMULATED", "1")
             .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
             .env("SSE_CAMERAS_SIMULATED", "1")
             .stdin(Stdio::piped())
@@ -549,4 +551,173 @@ fn second_engine_on_the_same_app_data_dir_is_refused() {
     let _ = fs::remove_dir_all(&third.runtime_dir);
     third.shutdown();
     let _ = fs::remove_dir_all(&shared_dir);
+}
+
+// Streamlining, 2026-09-28: a development build (one with debug assertions,
+// which `cargo test` builds) is refused the studio's folders: the platform's
+// default app-data folder and everything in it. Started with no
+// SSE_APP_DATA_DIR, with the folder named, or with only its logs sent there,
+// it reports BOOTSTRAP_FAILED and ends, and creates nothing. The platform's
+// base is a scratch folder here, so the default is never this machine's own.
+#[test]
+fn a_development_build_is_refused_the_studios_folders() {
+    if !cfg!(debug_assertions) {
+        // `cargo test --release` builds the studio's kind of engine, which
+        // opens the default folder: nothing to refuse.
+        return;
+    }
+    let host = unique_runtime_dir("refused-studio-folders");
+    let base = host.join("base");
+    fs::create_dir_all(&base).expect("the platform's base");
+    let studio = base.join("ExEd Studio Control Native");
+    let scratch = host.join("scratch");
+    let refused = |label: &str, data_dir: Option<&PathBuf>, logs_dir: Option<PathBuf>| {
+        let mut command = Command::new(engine_binary_path());
+        command
+            .env_remove("SSE_APP_DATA_DIR")
+            .env_remove("SSE_LOG_DIR")
+            .env("APPDATA", &base)
+            .env("LOCALAPPDATA", &base)
+            .env("XDG_DATA_HOME", &base)
+            .env("HOME", &base)
+            .env("SSE_CONTROL_SURFACE_PORT", "0")
+            .env("SSE_SAFE_START", "1")
+            .env("SSE_LIGHTS_SIMULATED", "1")
+            .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
+            .env("SSE_CAMERAS_SIMULATED", "1")
+            .stdin(Stdio::null());
+        if let Some(data_dir) = data_dir {
+            command.env("SSE_APP_DATA_DIR", data_dir);
+        }
+        if let Some(logs_dir) = logs_dir {
+            command.env("SSE_LOG_DIR", logs_dir);
+        }
+        let output = command.output().expect("engine binary should run");
+        assert!(
+            !output.status.success(),
+            "{label}: a refused engine exits with an error status (got {:?})",
+            output.status
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let failure: Value = stdout
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok())
+            .find(|value| {
+                value.get("event").and_then(Value::as_str) == Some("engine.startupFailed")
+            })
+            .unwrap_or_else(|| panic!("{label}: no engine.startupFailed event in {stdout:?}"));
+        assert_eq!(failure["payload"]["code"], json!("BOOTSTRAP_FAILED"));
+        let message = failure["payload"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(message.contains("development build"), "{label}: {message}");
+        assert!(message.contains("npm run app"), "{label}: {message}");
+        let left_behind: Vec<_> = fs::read_dir(&host)
+            .expect("the scratch host reads")
+            .chain(fs::read_dir(&base).expect("the base reads"))
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path != &base)
+            .collect();
+        assert!(
+            left_behind.is_empty(),
+            "{label}: the refused start created {left_behind:?}"
+        );
+    };
+
+    refused("no folder named", None, None);
+    refused("the default folder named", Some(&studio), None);
+    refused(
+        "a folder inside the default folder",
+        Some(&studio.join("development")),
+        None,
+    );
+    refused(
+        "only the logs in the default folder",
+        Some(&scratch),
+        Some(studio.join("logs")),
+    );
+
+    let _ = fs::remove_dir_all(&host);
+}
+
+// Streamlining, 2026-09-28: a development build started with no switch set
+// takes the safe value of each by itself and says so in its log. The bridge
+// port is given here (0: the system picks), so the test binds no fixed port;
+// `development.rs` tests the port's default.
+#[test]
+fn a_development_build_sets_its_own_switches() {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    let runtime_dir = unique_runtime_dir("development-defaults");
+    let mut command = Command::new(engine_binary_path());
+    command
+        .env("SSE_APP_DATA_DIR", &runtime_dir)
+        .env("SSE_LOG_DIR", runtime_dir.join("logs"))
+        .env("SSE_CONTROL_SURFACE_PORT", "0")
+        .env_remove("SSE_SAFE_START")
+        .env_remove("SSE_LIGHTS_SIMULATED")
+        .env_remove("SSE_AUDIO_SIMULATED_INPUT_MODE")
+        .env_remove("SSE_CAMERAS_SIMULATED")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = command.spawn().expect("engine binary should spawn");
+    let stdin = child.stdin.take().expect("stdin pipe");
+    let stdout = BufReader::new(child.stdout.take().expect("stdout pipe"));
+    let mut engine = EngineProcess {
+        child,
+        stdin,
+        stdout,
+        runtime_dir: runtime_dir.clone(),
+    };
+    wait_for_ready(&mut engine);
+
+    engine.send(&json!({
+        "type": "request",
+        "id": "development-health",
+        "method": "health.snapshot",
+        "params": {}
+    }));
+    let health = engine.wait_for("health.snapshot", response_with_id("development-health"));
+    let health_text = health.to_string();
+    assert!(
+        health_text.contains("Light outputs held"),
+        "the lights start held: {health_text}"
+    );
+
+    // The lighting output's thread writes its line once it runs, which can be
+    // after the engine has said it is ready: the log is read until it is
+    // there.
+    let log_path = runtime_dir.join("logs").join("engine.log");
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let log = loop {
+        let log = fs::read_to_string(&log_path).expect("the engine log should exist");
+        if log.contains("Lights simulated (SSE_LIGHTS_SIMULATED)") || Instant::now() >= deadline {
+            break log;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    let line = log
+        .lines()
+        .find(|line| line.contains("Development build: set by itself"))
+        .unwrap_or_else(|| panic!("no development line in {log}"));
+    for switch in [
+        "SSE_SAFE_START=1",
+        "SSE_LIGHTS_SIMULATED=1",
+        "SSE_AUDIO_SIMULATED_INPUT_MODE=1",
+        "SSE_CAMERAS_SIMULATED=1",
+    ] {
+        assert!(line.contains(switch), "{switch}: {line}");
+    }
+    assert!(!line.contains("SSE_CONTROL_SURFACE_PORT"), "{line}");
+    assert!(log.contains("Safe start (SSE_SAFE_START)"), "{log}");
+    assert!(
+        log.contains("Lights simulated (SSE_LIGHTS_SIMULATED)"),
+        "{log}"
+    );
+
+    engine.shutdown();
 }

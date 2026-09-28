@@ -151,24 +151,29 @@ export async function reserveLocalPort(host = "127.0.0.1") {
 
 /**
  * The variables that harden a process a lane starts: a reserved bridge port,
- * a safe start, the simulated cameras (every lane, the live console lane too:
- * new pages program, Slice 8 — D15 rules 1–2) and, unless `simulatedAudio` is
- * false (the live console lane only), the simulated console.
+ * a safe start, the simulated lights and cameras (every lane, the live
+ * console lane too: new pages program, Slice 8 — D15 rules 1–2) and, unless
+ * `simulatedAudio` is false (the live console lane only), the simulated
+ * console. The live console lane names the real console (`0`): a development
+ * build takes the simulated one when nothing is set (the engine's
+ * development.rs).
  */
 export async function hardenedLaneEnv({ simulatedAudio = true } = {}) {
   return {
     SSE_CONTROL_SURFACE_PORT: String(await reserveLocalPort()),
     SSE_SAFE_START: "1",
+    SSE_LIGHTS_SIMULATED: "1",
     SSE_CAMERAS_SIMULATED: "1",
-    ...(simulatedAudio ? { SSE_AUDIO_SIMULATED_INPUT_MODE: "1" } : {}),
+    SSE_AUDIO_SIMULATED_INPUT_MODE: simulatedAudio ? "1" : "0",
   };
 }
 
-// The engine's own readings of the four variables (control_surface.rs
+// The engine's own readings of the five variables (control_surface.rs
 // `resolve_control_surface_port`, bootstrap.rs `safe_start_requested`,
 // audio/helpers.rs `resolve_audio_config`, cameras.rs
-// `simulated_cameras_requested`): a port the engine cannot parse falls back
-// to the live app's.
+// `simulated_cameras_requested`, lighting_sacn_output.rs
+// `simulated_lights_requested`): a port a studio build cannot parse falls
+// back to the live app's.
 function bridgePortOf(value) {
   const text = String(value ?? "").trim();
   if (!/^\d{1,5}$/.test(text)) {
@@ -195,6 +200,11 @@ function simulatedCamerasRequested(value) {
   return String(value ?? "").trim() === "1";
 }
 
+// The simulated lights are asked for the same way.
+function simulatedLightsRequested(value) {
+  return String(value ?? "").trim() === "1";
+}
+
 /**
  * Why a lane process's environment is not hardened, or null when it is.
  * `safeStart: false` is for the one launch that proves a hold outlives the
@@ -218,6 +228,11 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
   }
   if (safeStart && !safeStartRequested(env.SSE_SAFE_START)) {
     return "SSE_SAFE_START must hold the light outputs.";
+  }
+  // Held or armed, a lane puts nothing on the rig's wire: the one launch
+  // without the safe start as well.
+  if (!simulatedLightsRequested(env.SSE_LIGHTS_SIMULATED)) {
+    return "SSE_LIGHTS_SIMULATED must be 1: a lane sends nothing to the rig.";
   }
   if (!liveConsole && !simulatedConsoleRequested(env.SSE_AUDIO_SIMULATED_INPUT_MODE)) {
     return "SSE_AUDIO_SIMULATED_INPUT_MODE must be 1 outside the live console lane.";

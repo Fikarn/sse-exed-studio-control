@@ -43,7 +43,7 @@ Two rules hold the design together:
 
 ## Safety
 
-- **Tests and development runs never reach a real device and never open the real saved data.** Until `npm run app` does this by itself, a development run (`npm run tauri:dev`, or an engine started by hand) is given its own `SSE_APP_DATA_DIR`, `SSE_SAFE_START=1`, `SSE_AUDIO_SIMULATED_INPUT_MODE=1`, `SSE_CAMERAS_SIMULATED=1` and a `SSE_CONTROL_SURFACE_PORT` other than `38201`.
+- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console and the cameras, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes and the Companion export ask the address they are given.
 - **Real devices are driven only by a release build,** or by a hardware test the owner asked for and is present at.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.
@@ -68,7 +68,7 @@ Two rules hold the design together:
 | `npm run check:quick`                  | The same without the page tests (under a minute)                                                       |
 | `npm run frontend:playwright:test`     | The page tests alone; it builds the pages first                                                        |
 | `npm run dev --workspace frontend/app` | The pages in a browser, against test data (add `?fixture=<name>&transport=fixture` to the address)     |
-| `npm run tauri:dev`                    | The real app. Set the variables under Safety first                                                     |
+| `npm run app`                          | The app as a development run: its own saved data, simulated devices. It can run beside the studio app  |
 | `npm run protocol:generate`            | Regenerate the contract's generated files                                                              |
 | `npm run format`                       | Format everything with Prettier                                                                        |
 

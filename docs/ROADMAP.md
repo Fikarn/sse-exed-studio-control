@@ -10,7 +10,9 @@ One pull request each, in this order. Then the Cameras page.
 - [x] Step 1: the catch-up pull request merged (#230).
 - [x] Step 2: rulebook and docs. A short `AGENTS.md`, this roadmap, `docs/CHECKLIST.md`; the ledgers deleted.
 - [x] Step 3: CI from ten jobs to four; the ceremony gates out; one local command, `npm run check`.
-- [ ] Step 4: builds. One release command; studio builds kept outside the repository; a release-profile engine; the shell never falls back to the repository's engine; development runs get their own data and simulated devices by default; a simulated lighting output.
+- [ ] Step 4: builds, in two pull requests.
+  - [x] Development runs. `npm run app` starts the app on its own saved data with simulated devices; a development build refuses the studio's data and is an app of its own; the shell starts the engine beside it and no other; a release build keeps the overflow checks.
+  - [ ] Studio builds. One release command; the builds kept outside the repository, each with a release-profile engine; the release machinery nobody uses removed.
 - [ ] Step 5: screenshots and the layout gate. Header and footer captured once; absolute thresholds instead of per-page ratchets.
 - [ ] Step 6: product code. Talkback out (D26), Graphite and Bone out (D25), update-folder leftovers, dead settings, unused components, one recovery screen. Two faults found on the way: the shell finds its saved display by Windows' display number first, and those numbers can swap; and the test double of the engine is bundled into the studio build.
 - [ ] Step 7: local cleanup.
@@ -202,7 +204,7 @@ Nothing imports `fuzzysort` any more, so #193 is settled by removing it. `glib` 
 
 Four larger changes, each decided on its own:
 
-- **Replace the fixture double** with recorded data for the layout tests and the real engine for the behaviour tests. It ends writing every engine feature twice. It needs the simulated lighting output (step 4) and a way for a page test to reach a real engine. Try one page first.
+- **Replace the fixture double** with recorded data for the layout tests and the real engine for the behaviour tests. It ends writing every engine feature twice. It needs a simulated lighting output, which shows what the rig would be sent while the lights are held, and a way for a page test to reach a real engine. Try one page first.
 - **Replace the JSON backup archive** with the database backup the engine already makes. It removes the archive's code and a new format with every page. It needs the owner's word on what is lost: an archive restore adds scripts and never removes one.
 - **Collapse migrations 1–10 into one baseline.** It removes the upgrade chain and the code that only explains retired features. It needs the studio data at schema 10, and a decision on whether older database backups must still restore.
 - **Move CI to a Windows runner.** CI would then compile and test the Windows-only code, and the Linux-only leftovers could go. It needs the four-job CI (step 3) and a measure of a Windows runner's time and cost.

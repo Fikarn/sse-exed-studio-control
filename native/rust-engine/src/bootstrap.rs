@@ -25,13 +25,11 @@ use std::fs::{self, File, OpenOptions, TryLockError};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
+use studio_control_protocol::development::{
+    default_app_data_dir, development_build, host_platform, refuse_studio_folders, HostPlatform,
+};
 
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "2";
-
-/// The directory name the Tauri shell uses under the platform app-data base
-/// (`native/tauri-shell/src/engine.rs`), so a bare engine launch and a
-/// shell-started engine agree on where the operator's data lives.
-const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 
 /// Where a legacy `db.json` was staged for the start-up import, relative to
 /// the app-data directory, and the variable that named one. New pages
@@ -133,22 +131,6 @@ pub fn startup_failure_code(error: &(dyn Error + Send + Sync + 'static)) -> &'st
         .unwrap_or(STARTUP_CODE_BOOTSTRAP_FAILED)
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum RuntimePlatform {
-    /// The Linux CI runners, which build and test the engine (new pages
-    /// program, Slice SW, D22: Studio Control itself runs on Windows only).
-    Unix,
-    Windows,
-}
-
-fn current_runtime_platform() -> RuntimePlatform {
-    if cfg!(target_os = "windows") {
-        RuntimePlatform::Windows
-    } else {
-        RuntimePlatform::Unix
-    }
-}
-
 fn env_path<F>(name: &str, get_env: &mut F) -> Option<PathBuf>
 where
     F: FnMut(&str) -> Option<OsString>,
@@ -168,39 +150,24 @@ where
         .filter(|value| !value.is_empty())
 }
 
-/// Mirror of the shell's `default_app_data_dir_for_platform`: the durable
-/// per-user application-data directory of the platform, never a path
-/// relative to the working directory (2026-09 production readiness, Slice 1
-/// — finding F22).
-fn default_app_data_dir_for_platform<F>(
-    platform: RuntimePlatform,
-    get_env: &mut F,
-) -> Result<PathBuf, String>
-where
-    F: FnMut(&str) -> Option<OsString>,
-{
-    let base = match platform {
-        RuntimePlatform::Windows => {
-            env_path("APPDATA", get_env).or_else(|| env_path("LOCALAPPDATA", get_env))
-        }
-        RuntimePlatform::Unix => env_path("XDG_DATA_HOME", get_env)
-            .or_else(|| env_path("HOME", get_env).map(|home| home.join(".local").join("share"))),
-    };
-
-    base.map(|path| path.join(DEFAULT_APP_DATA_DIR_NAME))
-        .ok_or_else(|| {
-            String::from(
-                "Unable to resolve a durable app-data directory. Set SSE_APP_DATA_DIR to an absolute path.",
-            )
-        })
-}
-
+/// The folders and switches of this start, read from the environment. A
+/// development build is refused the studio's folders here
+/// (`studio_control_protocol::development`), so every start passes the
+/// refusal before it creates or opens anything, the log included.
 pub fn resolve_runtime_paths() -> Result<RuntimePaths, String> {
-    resolve_runtime_paths_from(current_runtime_platform(), |name| env::var_os(name))
+    let platform = host_platform();
+    let paths = resolve_runtime_paths_from(platform, |name| env::var_os(name))?;
+    refuse_studio_folders(
+        development_build(),
+        platform,
+        &[&paths.app_data_dir, &paths.logs_dir],
+        |name| env::var_os(name),
+    )?;
+    Ok(paths)
 }
 
 fn resolve_runtime_paths_from<F>(
-    platform: RuntimePlatform,
+    platform: HostPlatform,
     mut get_env: F,
 ) -> Result<RuntimePaths, String>
 where
@@ -210,7 +177,7 @@ where
         .unwrap_or_else(|| String::from(SUPPORTED_PROTOCOL_VERSION));
     let app_data_dir = match env_path("SSE_APP_DATA_DIR", &mut get_env) {
         Some(path) => path,
-        None => default_app_data_dir_for_platform(platform, &mut get_env)?,
+        None => default_app_data_dir(platform, &mut get_env)?,
     };
     let logs_dir =
         env_path("SSE_LOG_DIR", &mut get_env).unwrap_or_else(|| app_data_dir.join("logs"));
@@ -242,7 +209,7 @@ where
 /// outputs, so anything that is not plainly a "no" counts as asking for it:
 /// an operator who wrote `yes` wanted a hold, and a stream is the one thing a
 /// safe start must not answer with.
-fn safe_start_requested(value: &str) -> bool {
+pub(crate) fn safe_start_requested(value: &str) -> bool {
     !matches!(
         value.trim().to_ascii_lowercase().as_str(),
         "" | "0" | "false" | "off" | "no"
@@ -822,13 +789,12 @@ fn warn_about_a_left_over_db_json(
 mod tests {
     use super::{
         acquire_instance_lock, apply_pending_restore, bootstrap_runtime_from_paths,
-        current_runtime_platform, default_app_data_dir_for_platform, left_over_db_json_from,
-        resolve_runtime_paths_from, safe_start_requested, startup_failure_code,
-        storage_startup_failure, validate_protocol_version, warn_about_a_left_over_db_json,
-        RuntimePaths, RuntimePlatform, StartupFailure, DEFAULT_APP_DATA_DIR_NAME,
-        INSTANCE_LOCK_FILE_NAME, STARTUP_CODE_BOOTSTRAP_FAILED,
-        STARTUP_CODE_ENGINE_ALREADY_RUNNING, STARTUP_CODE_STORAGE_CORRUPT,
-        STARTUP_CODE_STORAGE_MIGRATION_FAILED, SUPPORTED_PROTOCOL_VERSION,
+        left_over_db_json_from, resolve_runtime_paths_from, safe_start_requested,
+        startup_failure_code, storage_startup_failure, validate_protocol_version,
+        warn_about_a_left_over_db_json, RuntimePaths, StartupFailure, INSTANCE_LOCK_FILE_NAME,
+        STARTUP_CODE_BOOTSTRAP_FAILED, STARTUP_CODE_ENGINE_ALREADY_RUNNING,
+        STARTUP_CODE_STORAGE_CORRUPT, STARTUP_CODE_STORAGE_MIGRATION_FAILED,
+        SUPPORTED_PROTOCOL_VERSION,
     };
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
@@ -843,6 +809,10 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use studio_control_protocol::development::{
+        host_platform as current_runtime_platform, HostPlatform as RuntimePlatform,
+        DEFAULT_APP_DATA_DIR_NAME,
+    };
 
     struct TestDir {
         path: PathBuf,
@@ -949,39 +919,6 @@ mod tests {
         assert_eq!(paths.backups_dir, paths.app_data_dir.join("backups"));
         assert_eq!(paths.requested_protocol_version, SUPPORTED_PROTOCOL_VERSION);
         assert!(paths.update_repository_path.is_none());
-    }
-
-    #[test]
-    fn every_platform_default_mirrors_the_shell_layout() {
-        let mut windows = env_fixture(&[("APPDATA", "C:/Users/operator/AppData/Roaming")]);
-        assert_eq!(
-            default_app_data_dir_for_platform(RuntimePlatform::Windows, &mut windows)
-                .expect("windows base"),
-            PathBuf::from("C:/Users/operator/AppData/Roaming").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-
-        let mut windows_local = env_fixture(&[("LOCALAPPDATA", "C:/Users/operator/AppData/Local")]);
-        assert_eq!(
-            default_app_data_dir_for_platform(RuntimePlatform::Windows, &mut windows_local)
-                .expect("windows local base"),
-            PathBuf::from("C:/Users/operator/AppData/Local").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-
-        let mut unix = env_fixture(&[("XDG_DATA_HOME", "/home/operator/.local/data")]);
-        assert_eq!(
-            default_app_data_dir_for_platform(RuntimePlatform::Unix, &mut unix).expect("xdg base"),
-            PathBuf::from("/home/operator/.local/data").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-
-        let mut unix_home = env_fixture(&[("HOME", "/home/operator")]);
-        assert_eq!(
-            default_app_data_dir_for_platform(RuntimePlatform::Unix, &mut unix_home)
-                .expect("home base"),
-            PathBuf::from("/home/operator")
-                .join(".local")
-                .join("share")
-                .join(DEFAULT_APP_DATA_DIR_NAME)
-        );
     }
 
     #[test]

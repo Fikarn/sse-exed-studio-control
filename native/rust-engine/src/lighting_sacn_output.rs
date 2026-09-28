@@ -19,6 +19,11 @@
 //!
 //! The slot values come from the same renderer as the operator-facing DMX
 //! monitor, so the wire always matches what the UI shows.
+//!
+//! `SSE_LIGHTS_SIMULATED=1` cuts the wire: the output runs as it does, armed
+//! or held, and no packet leaves. Every test lane and development run has
+//! it, and a development build sets it by itself (`development.rs`), so only
+//! the studio's build reaches the rig.
 
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::diagnostics::append_log;
@@ -50,8 +55,17 @@ const SOURCE_CID: [u8; 16] = [
     0xa3, 0x7d, 0x5e, 0x21, 0x9b, 0x04, 0x4a, 0x6f, 0x8c, 0x2e, 0xd1, 0x57, 0x33, 0x90, 0x41, 0xbe,
 ];
 
+pub const LIGHTS_SIMULATED_ENV: &str = "SSE_LIGHTS_SIMULATED";
+
+/// Only `1` asks for the simulated lights; the value is trimmed first.
+pub(crate) fn simulated_lights_requested(value: &str) -> bool {
+    value.trim() == "1"
+}
+
 pub fn spawn_lighting_sacn_output(db_path: PathBuf, log_file_path: PathBuf) {
-    thread::spawn(move || run_output_loop(&db_path, &log_file_path));
+    let simulated =
+        std::env::var(LIGHTS_SIMULATED_ENV).is_ok_and(|value| simulated_lights_requested(&value));
+    thread::spawn(move || run_output_loop(&db_path, &log_file_path, simulated));
 }
 
 struct UniverseTx {
@@ -103,7 +117,7 @@ impl RenderSettingsCache {
     }
 }
 
-fn run_output_loop(db_path: &Path, log_file_path: &Path) {
+fn run_output_loop(db_path: &Path, log_file_path: &Path, simulated: bool) {
     let socket = match UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)) {
         Ok(socket) => socket,
         Err(error) => {
@@ -116,6 +130,7 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
 
     enable_thread_read_connection();
     let mut output = SacnOutput::new(socket, SACN_PORT);
+    output.simulated = simulated;
     // The output starts from what the saved data says, so a launch that
     // starts held never reports `ready` first (the bootstrap has already
     // said held; this keeps it). A flag that cannot be read yet is the
@@ -123,15 +138,14 @@ fn run_output_loop(db_path: &Path, log_file_path: &Path) {
     output.held = list_settings_by_prefix(db_path, LIGHTING_OUTPUT_ARMED_KEY)
         .map(|settings| !lighting_output_armed(&settings))
         .unwrap_or(false);
-    report_health(
-        SUBSYSTEM_SACN,
-        SubsystemState::Ok,
-        if output.held {
-            HELD_DETAIL
-        } else {
-            SOCKET_READY_DETAIL
-        },
-    );
+    report_health(SUBSYSTEM_SACN, SubsystemState::Ok, output.detail());
+    if output.simulated {
+        let _ = append_log(
+            log_file_path,
+            "INFO",
+            "Lights simulated (SSE_LIGHTS_SIMULATED): the sACN output puts nothing on the wire, armed or held.",
+        );
+    }
     if output.held {
         let _ = append_log(
             log_file_path,
@@ -163,6 +177,9 @@ pub(crate) const SOCKET_READY_DETAIL: &str = "Light output socket ready (sACN ov
 /// turn the shell's recovery state to `degraded` — and says so in its detail.
 pub(crate) const HELD_DETAIL: &str =
     "Light outputs held: nothing is sent to the rig until they are armed in Setup / Support";
+/// Armed with the wire cut: what a development run and a test lane report.
+pub(crate) const SIMULATED_DETAIL: &str =
+    "Lights simulated: nothing is sent to the rig (SSE_LIGHTS_SIMULATED)";
 
 /// One sACN source: the socket, where it sends, and what it has on the wire.
 struct SacnOutput {
@@ -172,6 +189,8 @@ struct SacnOutput {
     active_bridge: Option<Ipv4Addr>,
     universes: HashMap<u16, UniverseTx>,
     held: bool,
+    /// `SSE_LIGHTS_SIMULATED`: everything runs, and no packet leaves.
+    simulated: bool,
 }
 
 impl SacnOutput {
@@ -182,6 +201,18 @@ impl SacnOutput {
             active_bridge: None,
             universes: HashMap::new(),
             held: false,
+            simulated: false,
+        }
+    }
+
+    /// What the health entry says of the output as it is.
+    fn detail(&self) -> &'static str {
+        if self.held {
+            HELD_DETAIL
+        } else if self.simulated {
+            SIMULATED_DETAIL
+        } else {
+            SOCKET_READY_DETAIL
         }
     }
 
@@ -190,15 +221,7 @@ impl SacnOutput {
         let held = !lighting_output_armed(settings);
         if held != self.held {
             self.held = held;
-            report_health(
-                SUBSYSTEM_SACN,
-                SubsystemState::Ok,
-                if held {
-                    HELD_DETAIL
-                } else {
-                    SOCKET_READY_DETAIL
-                },
-            );
+            report_health(SUBSYSTEM_SACN, SubsystemState::Ok, self.detail());
             // The registry announces a change of state, and this is `ok` to
             // `ok`: the thread that owns the entry says that its detail
             // moved, after it has moved, so the screen never reads the entry
@@ -288,7 +311,9 @@ impl SacnOutput {
         }
 
         let packet = build_e131_data_packet(frame.universe, entry.sequence, false, &frame.slots);
-        if self.socket.send_to(&packet, target).is_ok() {
+        // The simulated lights count every packet as sent, so sequences and
+        // keep-alives run as they do on the rig.
+        if self.simulated || self.socket.send_to(&packet, target).is_ok() {
             entry.sequence = entry.sequence.wrapping_add(1);
             entry.last_slots = frame.slots;
             entry.last_sent_at = Instant::now();
@@ -304,7 +329,9 @@ impl SacnOutput {
             for _ in 0..STREAM_TERMINATED_SENDS {
                 let packet =
                     build_e131_data_packet(universe, entry.sequence, true, &entry.last_slots);
-                let _ = self.socket.send_to(&packet, target_addr);
+                if !self.simulated {
+                    let _ = self.socket.send_to(&packet, target_addr);
+                }
                 entry.sequence = entry.sequence.wrapping_add(1);
             }
         }
@@ -779,6 +806,57 @@ mod tests {
         let logged = std::fs::read_to_string(&log).expect("the log should exist");
         assert!(logged.contains("Light outputs held"), "{logged}");
         assert!(logged.contains("Light outputs armed"), "{logged}");
+    }
+
+    // Streamlining, 2026-09-28: the simulated lights. Armed, streaming, held
+    // again: the output goes through every state it has on the rig, and not
+    // one packet leaves, a terminate included. Until then a development run
+    // that was armed on screen streamed to the address in its saved data,
+    // the real rig's when the data was a copy of the studio's.
+    #[test]
+    fn simulated_lights_put_nothing_on_the_wire() {
+        use crate::control_surface::test_support::TestDir;
+
+        for (value, asked) in [
+            ("1", true),
+            (" 1 ", true),
+            ("0", false),
+            ("true", false),
+            ("", false),
+        ] {
+            assert_eq!(simulated_lights_requested(value), asked, "{value:?}");
+        }
+
+        let test_dir = TestDir::new("sacn-simulated");
+        let log = test_dir.path().join("engine.log");
+        let (wire, port) = Wire::open();
+        let mut output = test_output(port);
+        output.simulated = true;
+        let armed = output_settings(Some(true));
+        let held = output_settings(Some(false));
+        assert_eq!(output.detail(), SIMULATED_DETAIL);
+
+        for _ in 0..50 {
+            output.tick(&armed, &log);
+        }
+        wire.assert_silent("while armed and simulated");
+        assert_eq!(
+            output.active_bridge,
+            Some(Ipv4Addr::LOCALHOST),
+            "the output itself is streaming"
+        );
+        assert_eq!(output.universes.len(), 1);
+
+        output.tick(&held, &log);
+        wire.assert_silent("when the simulated stream ends");
+        assert!(output.universes.is_empty() && output.active_bridge.is_none());
+        assert_eq!(output.detail(), HELD_DETAIL);
+
+        // The same output with the wire back sends at once: the switch is
+        // what kept it silent.
+        output.simulated = false;
+        output.tick(&armed, &log);
+        assert_eq!(wire.next()[112], 0x00);
     }
 
     // The switch reaches the wire on the next tick: `lighting.output.setArmed`

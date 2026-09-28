@@ -19,9 +19,19 @@ npm run check:quick
 npm run dev --workspace frontend/app -- --port 4180 --strictPort --host 127.0.0.1
 ```
 
-Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`. Every state is a name in `frontend/packages/test-fixtures/src/fixtures.json`. Use any port but `4173`: the page tests bind that one.
+Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`. Every state is a name in `frontend/packages/test-fixtures/src/fixtures.json`. Use any port but `4173` and `4174`: the page tests bind the first, the app's development run the second.
 
-**The real app.** `npm run tauri:dev` starts the pages and the shell. It opens the real saved data and the real devices unless told otherwise, so set the variables in AGENTS.md's Safety section first. It does not rebuild the engine: after a change to the engine or the contract, run `npm run native:engine:build` and start it again. If the app opens on its recovery screen straight after such a change, that is why.
+**The app.** `npm run app` builds the engine and the shell and starts them as a development run:
+
+- its saved data is `.dev/app-data` in the repository, which git ignores, and it stays between runs. The first start opens Setup: publish it once, over the probes that cannot pass;
+- the lights are held and their wire is cut, the console and the cameras are simulated, and the Stream Deck bridge is on port `38211`, which Companion does not talk to. Arming the lights on screen sends nothing. Setup's probes and the Companion export still ask the address they are given;
+- it is an app of its own, with `.dev` at the end of its identifier: its own saved display and browser profile, and it runs while the studio app is open.
+
+To work on the studio's data, copy its folder and name the copy: `npm run app -- --data=<the copy>`. The studio's own folder, and any folder inside it, is refused by the command and by every development build.
+
+A development build started any other way is as careful: where a switch is not set it takes the safe value (`native/rust-engine/src/development.rs`), and says so in its log.
+
+A change to the pages shows at once. After a change to the engine or the contract, close the app and start it again.
 
 ## Checking a change
 
@@ -74,7 +84,7 @@ Pages and their tests:
 
 - **The page tests serve the built pages.** Build before running Playwright by hand, or you test the previous build. `npm run frontend:playwright:test` builds first.
 - **Never build Storybook while the page tests run.** Its pages vanish mid-run and unrelated tests fail.
-- **Port `4173` belongs to the page tests.** A preview server left on it after a run makes the next run fail or lie. End it first.
+- **Port `4173` belongs to the page tests.** A preview server left on it after a run makes the next run fail or lie. End it first. The app's development run has `4174`, so the two can run at once.
 - **A page is on screen later than its shell.** Each page is a chunk fetched after the shell has drawn. A test whose first step is a key or a one-off read calls `expectWorkspaceMounted(page, workspace)` first.
 - **Time is driven, never waited out.** Use `page.clock` and `helpers/pageClock.ts`. A second press inside an arm's dwell, a meter tick, a countdown: none of them is tested with a real wait.
 - **A test that fails now and then has a cause.** Every one so far was the test: a click sent before the page had drawn the state it needed. Find it; do not retry it away.
@@ -108,4 +118,4 @@ The engine:
 
 ## Studio builds
 
-A studio build is a release build of the shell with the engine beside it. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.
+A studio build is a folder that holds a release build of the shell and a release build of the engine. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.

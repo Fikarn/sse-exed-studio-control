@@ -96,8 +96,12 @@ function normalizeForOutputComparison(value) {
   return value.replaceAll("\\", "/");
 }
 
+// The release build of the engine, which `npm run tauri:build` makes beside
+// the shell's (scripts/tauri-before-command.mjs). Until 2026-09-28 the
+// package took the development build from target/debug; a development build
+// now refuses the studio's saved data.
 function resolveEngineExecutablePath() {
-  return path.join(rootDir, "native", "target", "debug", "studio-control-engine.exe");
+  return path.join(rootDir, "native", "target", "release", "studio-control-engine.exe");
 }
 
 function resolveTauriShellPath(target) {
@@ -261,7 +265,7 @@ async function packageWindowsLocal() {
   assertExists(sourceShellPath, `Tauri shell executable not found at ${sourceShellPath}. Run \`npm run tauri:build\`.`);
   assertExists(
     engineExecutablePath,
-    `Native engine executable not found at ${engineExecutablePath}. Run \`npm run native:engine:build\`.`
+    `Native engine executable not found at ${engineExecutablePath}. Run \`npm run tauri:build\`.`
   );
 
   await refuseToReplaceARunningApp(outputRoot);

@@ -35,3 +35,5 @@ test-results/
 /audio-page-seed-preview.png
 /seed-audio-prototype.mjs
 native/native-runtime/
+# The saved data of `npm run app`, a development run's own.
+/.dev/
