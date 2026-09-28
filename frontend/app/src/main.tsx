@@ -5,7 +5,7 @@ import "@fontsource-variable/inter/index.css";
 import "@fontsource-variable/fraunces/full.css";
 import "@fontsource-variable/jetbrains-mono/index.css";
 
-import { OperatorShell } from "./app/OperatorShell";
+import { OperatorShell, type ShellEnvironment } from "./app/OperatorShell";
 import { createShellEnvironment } from "./app/createShellEnvironment";
 import { reportUiFailure } from "./app/startup/reportUiFailure";
 import { ShellErrorBoundary } from "./app/startup/ShellErrorBoundary";
@@ -24,22 +24,32 @@ if (!rootElement) {
 // per-workspace one inside the shell. Both record through `reportUiFailure`,
 // as these listeners do, so an error React also reports to the window is
 // kept once.
-const environment = createShellEnvironment();
-window.addEventListener("error", (event) => {
-  reportUiFailure(environment.store, event.error ?? event.message, "window error");
-});
-window.addEventListener("unhandledrejection", (event) => {
-  reportUiFailure(environment.store, event.reason, "unhandled rejection");
-});
+function start(environment: ShellEnvironment, root: HTMLElement) {
+  window.addEventListener("error", (event) => {
+    reportUiFailure(environment.store, event.error ?? event.message, "window error");
+  });
+  window.addEventListener("unhandledrejection", (event) => {
+    reportUiFailure(environment.store, event.reason, "unhandled rejection");
+  });
 
-const app = (
-  <ShellErrorBoundary
-    onError={(error) => reportUiFailure(environment.store, error, "screen error")}
-    collectDiagnostics={() => JSON.parse(JSON.stringify(environment.store.getSnapshot()))}
-  >
-    <OperatorShell environment={environment} />
-  </ShellErrorBoundary>
+  const app = (
+    <ShellErrorBoundary
+      onError={(error) => reportUiFailure(environment.store, error, "screen error")}
+      collectDiagnostics={() => JSON.parse(JSON.stringify(environment.store.getSnapshot()))}
+    >
+      <OperatorShell environment={environment} />
+    </ShellErrorBoundary>
+  );
+  const tauriRuntime = "__TAURI_INTERNALS__" in window;
+
+  createRoot(root).render(tauriRuntime ? app : <StrictMode>{app}</StrictMode>);
+}
+
+// In the app's window the environment is there at once. In a browser the
+// engine's test double is loaded first; if that fails, the page says so.
+createShellEnvironment().then(
+  (environment) => start(environment, rootElement),
+  (error: unknown) => {
+    rootElement.textContent = `Studio Control could not start: ${error instanceof Error ? error.message : String(error)}`;
+  }
 );
-const tauriRuntime = "__TAURI_INTERNALS__" in window;
-
-createRoot(rootElement).render(tauriRuntime ? app : <StrictMode>{app}</StrictMode>);

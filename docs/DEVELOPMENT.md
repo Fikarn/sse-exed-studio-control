@@ -111,7 +111,7 @@ The engine:
 - `frontend/app/src/app/OperatorShell.tsx`: the header, the tabs, the pages.
 - `lighting/`, `audio/`, `setup/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
 - `teleprompter/glass/`: the prompter's glass, drawn both on the page and on the Prompter XL.
-- `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double).
+- `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double). The double has an entry of its own, `@sse/engine-client/fixture`, and the pages load it on request (`fixtureDouble.ts`): in a browser, never in the app's window.
 - `frontend/packages/design-system`, `frontend/packages/tokens`: the shared components, and the sizes and colours. Tokens are built with `npm run frontend:tokens:build`.
 
 ## Studio builds

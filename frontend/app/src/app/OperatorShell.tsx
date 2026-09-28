@@ -5,7 +5,7 @@ import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
 
 import styles from "./OperatorShell.module.css";
-import { createShellEnvironment } from "./createShellEnvironment";
+import type { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider } from "./OperatorLayoutProvider";
 import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone } from "./shellData";
 import { describeAudioStatus } from "./audio/audioFormatting";
@@ -19,9 +19,7 @@ import { BackgroundFailureBand } from "./shared/BackgroundFailureBand";
 import { ShellDialog } from "./shared/ShellDialog";
 import { ToastProvider } from "./shared/toastContext";
 import { useLiveCallback } from "./shared/useLiveCallback";
-import { RecoverySurface } from "./startup/RecoverySurface";
 import { reportUiFailure } from "./startup/reportUiFailure";
-import { SetupStartupSurface } from "./startup/SetupStartupSurface";
 import { StartupSurface } from "./startup/StartupSurface";
 import { deriveShellExperience } from "./startup/startupHelpers";
 import { WorkspaceCrashProbe } from "./startup/WorkspaceCrashProbe";
@@ -41,7 +39,7 @@ declare global {
 const CLOSE_DIALOG_BODY =
   "Closing ends Studio Control's link to the desk, the rig and the deck. TotalMix keeps its current state, sACN output stops and fixtures hold their last levels, and the Stream Deck goes idle.";
 
-export type ShellEnvironment = ReturnType<typeof createShellEnvironment>;
+export type ShellEnvironment = Awaited<ReturnType<typeof createShellEnvironment>>;
 
 // New pages program, Slice 3 (D4, D6): the header tabs are the way between the
 // workspaces. They print no key hint — Studio Control binds no key of its own.
@@ -53,7 +51,7 @@ const WORKSPACES = [
   { id: "teleprompter", label: "Teleprompter", meta: "primary", icon: <ScrollText size={16} /> },
 ] as const;
 
-export function OperatorShell({ environment }: { environment?: ShellEnvironment }) {
+export function OperatorShell({ environment }: { environment: ShellEnvironment }) {
   // The toast portal hosts cross-workspace bottom-right notifications. It
   // mounts once at the shell root so every workspace (and any startup /
   // recovery surface) inherits the same stack. New pages program, Slice 3
@@ -67,11 +65,9 @@ export function OperatorShell({ environment }: { environment?: ShellEnvironment 
   );
 }
 
-function OperatorShellInner({ environment: providedEnvironment }: { environment?: ShellEnvironment }) {
-  // 2026-09 production readiness, Slice 5: `main.tsx` creates the environment
-  // so it can forward uncaught window errors to the store; tests and stories
-  // render the shell without one.
-  const environment = useMemo(() => providedEnvironment ?? createShellEnvironment(), [providedEnvironment]);
+function OperatorShellInner({ environment }: { environment: ShellEnvironment }) {
+  // `main.tsx` creates the environment, so it can forward uncaught window
+  // errors to the store; a test makes one of its own.
   const shellState = useShellSnapshot(environment.store);
   useTauriShellTestBridge(shellState, environment.store);
   const activeWorkspace = shellState.activeWorkspace;
@@ -307,10 +303,8 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
   const TeleprompterSurface = workspaceChunks.teleprompter.Surface;
 
   let surface: ReactNode;
-  if (setupModalActive && shellExperience === "startup") {
-    surface = <SetupStartupSurface appSnapshot={shellState.appSnapshot} lifecycle={shellState.lifecycle} />;
-  } else if (shellExperience === "startup") {
-    surface = <StartupSurface lifecycle={shellState.lifecycle} />;
+  if (shellExperience === "startup") {
+    surface = <StartupSurface lifecycle={shellState.lifecycle} opensSetup={setupModalActive} />;
   } else if (setupModalActive && shellExperience === "ready") {
     surface = (
       <SetupSurface
@@ -325,7 +319,8 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         supportSnapshot={deferredSupportSnapshot}
       />
     );
-  } else if (setupModalActive && shellExperience === "recovery") {
+  } else if (shellExperience === "recovery") {
+    // One recovery screen, whichever page was open.
     surface = (
       <SetupRecoverySurface
         appSnapshot={shellState.appSnapshot}
@@ -335,14 +330,6 @@ function OperatorShellInner({ environment: providedEnvironment }: { environment?
         onRequestRestart={requestRestart}
         store={environment.store}
         supportSnapshot={deferredSupportSnapshot}
-      />
-    );
-  } else if (shellExperience === "recovery") {
-    surface = (
-      <RecoverySurface
-        failure={shellState.startupFailure}
-        healthSnapshot={shellState.healthSnapshot}
-        onRequestRestart={requestRestart}
       />
     );
   } else if (activeWorkspace === "lighting") {

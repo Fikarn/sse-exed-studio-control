@@ -5,8 +5,8 @@ The studio's devices, how Studio Control reaches each one, and the rules that ke
 ## The room
 
 - **Workstation.** One PC, Windows 11, for development and for the studio.
-- **Display.** The app runs fullscreen on the studio display: 2560×1440 at 100 % Windows scaling. It opens on the display it was last on, else on that one. `Reset the window layout` in Setup / Support › Workstation puts it back.
-- **Keep that display at 100 %.** The primary display is the same size at 125 %, and the scaling tells them apart. Windows' display numbers can change.
+- **Display.** The app runs fullscreen on the studio display: 2560×1440 at 100 % Windows scaling. It opens on the display it was last on, found by its place on the desktop, else on that one. `Reset the window layout` in Setup / Support › Workstation puts it back.
+- **Keep that display at 100 %.** The primary display is the same size at 125 %, and the scaling tells them apart. Windows' display numbers can change, so the app goes by a display's place, size and scaling before its number.
 - **Networks.** `Ethernet 2` is the office network (`172.16.16.0/21`), with the BGH1s. `Ethernet 3` is the lighting network (`10.1.0.0/16`), with the Apollo Bridge.
 - **Beside the app** run TotalMix FX, Bitfocus Companion and vMix.
 

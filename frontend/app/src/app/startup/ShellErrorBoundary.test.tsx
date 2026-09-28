@@ -12,7 +12,7 @@ import {
 } from "@sse/engine-client";
 
 import { BackgroundFailureBand, describeBackgroundFailures } from "../shared/BackgroundFailureBand";
-import { readLogExcerpt } from "./RecoverySurface";
+import { readLogExcerpt } from "./startupHelpers";
 import { reportUiFailure } from "./reportUiFailure";
 import { ShellErrorBoundary } from "./ShellErrorBoundary";
 import { WorkspaceErrorBoundary } from "./WorkspaceErrorBoundary";

@@ -18,7 +18,7 @@ One pull request each, in this order. Then the Cameras page.
   - [x] Graphite and Bone out (D25).
   - [x] Talkback out (D26).
   - [x] Dead code out: the engine's `dev-fixtures` feature and its method, the update folder, eight unused components of the design system and three of the app, the unused `shared-graphics` package, five environment switches nothing set, and the warning about a `db.json`.
-  - [ ] Three changes of behaviour: one recovery screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine leaves the studio build's bundle.
+  - [x] Three changes of behaviour: one recovery screen and one startup screen; the shell finds its saved display by its place before its name, since Windows' display numbers can swap; the test double of the engine is a chunk of its own, which the app's window never loads.
 - [ ] Step 7: local cleanup.
 
 ## Next: the Cameras and Teleprompter pages
@@ -179,14 +179,13 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **`Save · press twice` saves at the first press.** No key on the Lighting page arms.
 - [ ] **In Preview, `Save to the rig` does not change the rig.** It saves into the scene.
 - [ ] **`DIM` and `MONO` light on screen for `Phones 1` and `Phones 2`** but nothing is sent to the desk.
-- [ ] **A stop during a session shows the smaller recovery screen,** with no `Export diagnostics` and no restore keys. The streamlining's step 6 makes the two recovery screens one.
 - [ ] **A failed or overdue automatic backup lights no lamp,** and neither does a light-output port that could not open.
 - [ ] **Lighting's `Undo` forgets its steps** when the page is left.
 - [ ] **The deck's `LIGHTS` strip refreshes only on arriving at the page** and on a push of the `LIGHT` dial.
 - [ ] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine".
 - [ ] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions.
 - [ ] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`.
-- [ ] **A shell test timed out once under load** (2026-09-28): `exit_watcher_fails_pending_and_emits_event` waited its ten seconds for a process that exits at once, while the whole gate ran beside it. It passes alone. If it comes back, find why.
+- [ ] **Tests with a deadline failed in two slow runs of the gate** (2026-09-28): the shell's `exit_watcher_fails_pending_and_emits_event`, then the engine's `recall_pushes_the_snapshot_and_the_console_confirms_it` and `a_glass_that_goes_pauses_the_scroll_and_its_return_leaves_it_paused`, in a run where the engine's tests took 120 s (11 s alone). Each passed on the next run. The gate runs below normal priority, so whatever is busy beside it takes its time; what was busy was not found.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [ ] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong.
 

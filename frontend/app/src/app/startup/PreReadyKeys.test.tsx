@@ -1,13 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createFixtureTransport, createShellStore, type StartupFailure } from "@sse/engine-client";
+import { createShellStore, type StartupFailure } from "@sse/engine-client";
+import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import { SetupRecoverySurface } from "../setup/SetupRecoverySurface";
 import { resetWindowLayout } from "../shellCommands";
-import { RecoverySurface } from "./RecoverySurface";
-import { SetupStartupSurface } from "./SetupStartupSurface";
 import { StartupSurface } from "./StartupSurface";
 
 // New pages program, Slice 3 (D6, decision 2; the inventory's §7 note 8). The
@@ -48,60 +47,21 @@ afterEach(() => {
   vi.mocked(resetWindowLayout).mockClear();
 });
 
-describe("the startup screens have no key", () => {
-  it("Startup: the display carries the state and no key", () => {
-    render(<StartupSurface lifecycle="waiting-for-ready-event" />);
-    expect(screen.getByTestId("startup-surface-state-display").textContent).toContain("STARTING UP…");
+describe("the startup screen has no key", () => {
+  it("carries the state and no key, and names the page that opens", () => {
+    const { rerender } = render(<StartupSurface lifecycle="waiting-for-ready-event" />);
+    const display = () => screen.getByTestId("startup-surface-state-display");
+    expect(display().textContent).toContain("STARTING UP…");
+    expect(display().textContent).toContain("The Console opens once Studio Control is ready.");
     expect(keysOn("startup-surface-state-display")).toEqual([]);
-  });
 
-  it("Setup's startup: the display carries the state and no key", () => {
-    render(<SetupStartupSurface appSnapshot={null} lifecycle="waiting-for-ready-event" />);
-    expect(screen.getByTestId("setup-startup-surface-state-display").textContent).toContain("STARTING UP…");
-    expect(keysOn("setup-startup-surface-state-display")).toEqual([]);
+    rerender(<StartupSurface lifecycle="waiting-for-ready-event" opensSetup />);
+    expect(display().textContent).toContain("Setup opens once Studio Control is ready.");
+    expect(keysOn("startup-surface-state-display")).toEqual([]);
   });
 });
 
 describe("the recovery screen: Reset the window layout beside Retry startup", () => {
-  it("offers the key after Retry startup; a reset that works says nothing", async () => {
-    const onRequestRestart = vi.fn();
-    render(<RecoverySurface failure={FAILURE} healthSnapshot={null} onRequestRestart={onRequestRestart} />);
-    expect(keysOn("recovery-surface-state-display")).toEqual(["Retry startup", "Reset the window layout"]);
-
-    fireEvent.click(screen.getByTestId("recovery-window-reset"));
-    await waitFor(() => expect(resetWindowLayout).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect((screen.getByTestId("recovery-window-reset") as HTMLButtonElement).disabled).toBe(false)
-    );
-    expect(screen.queryByTestId("recovery-window-refusal")).toBeNull();
-    expect(onRequestRestart).not.toHaveBeenCalled();
-  });
-
-  it("shows a refusal as a band of its own with the shell's sentence and the next step", async () => {
-    vi.mocked(resetWindowLayout).mockRejectedValueOnce(new Error(REFUSAL));
-    render(<RecoverySurface failure={FAILURE} healthSnapshot={null} onRequestRestart={() => {}} />);
-
-    fireEvent.click(screen.getByTestId("recovery-window-reset"));
-    const band = await screen.findByTestId("recovery-window-refusal");
-    expect(band.textContent).toContain(REFUSAL);
-    expect(within(band).getByRole("status").textContent).toContain(REFUSAL);
-    // What did not happen is said once (review finding 23: the band's detail
-    // said "the layout was not reset" above the same sentence), and the way on
-    // names where the key is (review finding 22). Slice SW (D22): no "press
-    // Support" — the key is on the plate, whichever mode the bay is in.
-    expect(band.textContent?.match(/not reset/gi)).toHaveLength(1);
-    expect(band.textContent).toContain(
-      "Next: retry startup, then open Setup / Support: Reset the window layout is under Workstation."
-    );
-
-    // A reset that works clears the band.
-    fireEvent.click(screen.getByTestId("recovery-window-reset"));
-    await waitFor(() => expect(screen.queryByTestId("recovery-window-refusal")).toBeNull());
-    expect(resetWindowLayout).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("Setup's recovery screen: Reset the window layout beside Retry startup", () => {
   function renderSetupRecovery() {
     // The store only answers the backup keys, which these tests do not press.
     const store = createShellStore(createFixtureTransport(getFixtureScenario("bootstrap-failed")));

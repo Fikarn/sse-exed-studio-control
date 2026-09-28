@@ -216,28 +216,37 @@ fn available_monitor_snapshot(monitor: &Monitor) -> AvailableMonitorSnapshot {
     }
 }
 
-fn available_monitor_matches_snapshot(
-    monitor: &AvailableMonitorSnapshot,
-    saved: &MonitorSnapshot,
-) -> bool {
-    if saved
-        .name
-        .as_ref()
-        .zip(monitor.name.as_ref())
-        .is_some_and(|(saved_name, monitor_name)| saved_name == monitor_name)
-    {
-        return true;
-    }
+fn same_size(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
+    (saved.physical_size.width - monitor.physical_size.width).abs() < 1.0
+        && (saved.physical_size.height - monitor.physical_size.height).abs() < 1.0
+}
 
-    let size_matches = (saved.physical_size.width - monitor.physical_size.width).abs() < 1.0
-        && (saved.physical_size.height - monitor.physical_size.height).abs() < 1.0;
+/// Whether `monitor` stands where the saved display stood: the same place on
+/// the desktop, the same size and the same scale.
+fn same_place(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
     let position_matches = (saved.physical_position.x - monitor.physical_position.x).abs() < 1.0
         && (saved.physical_position.y - monitor.physical_position.y).abs() < 1.0;
     let scale_matches = (saved.scale_factor - monitor.scale_factor).abs() < 0.01;
 
-    size_matches && position_matches && scale_matches
+    same_size(monitor, saved) && position_matches && scale_matches
 }
 
+/// Whether `monitor` has the saved display's name and its size.
+fn same_name_and_size(monitor: &AvailableMonitorSnapshot, saved: &MonitorSnapshot) -> bool {
+    saved
+        .name
+        .as_ref()
+        .zip(monitor.name.as_ref())
+        .is_some_and(|(saved_name, monitor_name)| saved_name == monitor_name)
+        && same_size(monitor, saved)
+}
+
+/// The saved display among the monitors: the one that stands in its place,
+/// else the one with its name and its size. The place comes first because
+/// Windows names a display by a number (`\\.\DISPLAY3`), and at the next
+/// start that number can belong to another display; until 2026-09-28 the name
+/// came first, and the screen could open on the wrong one. A name on a
+/// display of another size is another display.
 fn saved_monitor_index_from_snapshots(
     monitors: &[AvailableMonitorSnapshot],
     saved: Option<&MonitorSnapshot>,
@@ -245,13 +254,18 @@ fn saved_monitor_index_from_snapshots(
     let saved = saved?;
     monitors
         .iter()
-        .position(|monitor| available_monitor_matches_snapshot(monitor, saved))
+        .position(|monitor| same_place(monitor, saved))
+        .or_else(|| {
+            monitors
+                .iter()
+                .position(|monitor| same_name_and_size(monitor, saved))
+        })
 }
 
 /// The shell's one rule, over snapshots of the monitors so it can be tested
-/// without a window: the saved display when it is there (matched by name, else
-/// by its geometry), else the 2560×1440 display, else the display the window
-/// is on.
+/// without a window: the saved display when it is there (by its place, else
+/// by its name and size), else the 2560×1440 display, else the display the
+/// window is on.
 fn fullscreen_display(
     monitors: &[AvailableMonitorSnapshot],
     saved: Option<&MonitorSnapshot>,
@@ -1651,11 +1665,13 @@ mod shell_window_preferences_tests {
     // missing display opened the windowed layout, and a 1920×1080 monitor
     // stood in for the studio one.
     #[test]
-    fn shell_window_preferences_saved_monitor_matches_by_name() {
+    fn shell_window_preferences_saved_monitor_matches_by_name_when_it_moved() {
+        // The display keeps its name and its size and stands elsewhere on the
+        // desktop: another display was put beside it.
         let preferences = studio_review_saved();
         let available = [
             available_monitor(Some("Studio"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
-            available_monitor(Some("Studio Review"), (100.0, 100.0), (1920.0, 1080.0), 1.0),
+            available_monitor(Some("Studio Review"), (5120.0, 0.0), (2560.0, 1440.0), 1.0),
         ];
 
         assert_eq!(
@@ -1666,6 +1682,55 @@ mod shell_window_preferences_tests {
         assert_eq!(
             fullscreen_display(&available, preferences.monitor.as_ref()),
             FullscreenDisplay::Saved(1)
+        );
+    }
+
+    // 2026-09-28: Windows numbers the displays, and the numbers can swap from
+    // one start to the next. The studio has two 2560×1440 displays side by
+    // side; the screen was saved on the right-hand one, `DISPLAY3`. After a
+    // swap the left-hand one is `DISPLAY3`. The place decides, so the screen
+    // opens where it was; until then the name decided, and it opened on the
+    // other display.
+    #[test]
+    fn shell_window_preferences_saved_monitor_is_found_by_its_place_when_the_numbers_swapped() {
+        let preferences = preferences_with_monitor(Some(saved_monitor(
+            Some(r"\\.\DISPLAY3"),
+            (2560.0, 0.0),
+            (2560.0, 1440.0),
+            1.0,
+        )));
+        let swapped = [
+            available_monitor(Some(r"\\.\DISPLAY3"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
+            available_monitor(Some(r"\\.\DISPLAY1"), (2560.0, 0.0), (2560.0, 1440.0), 1.0),
+        ];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&swapped, preferences.monitor.as_ref()),
+            Some(1)
+        );
+        assert_eq!(
+            fullscreen_display(&swapped, preferences.monitor.as_ref()),
+            FullscreenDisplay::Saved(1)
+        );
+    }
+
+    // A name on a display of another size is another display: the screen goes
+    // to the studio display.
+    #[test]
+    fn shell_window_preferences_a_name_on_a_display_of_another_size_does_not_count() {
+        let preferences = studio_review_saved();
+        let available = [
+            available_monitor(Some("Studio"), (0.0, 0.0), (2560.0, 1440.0), 1.0),
+            available_monitor(Some("Studio Review"), (100.0, 100.0), (1920.0, 1080.0), 1.0),
+        ];
+
+        assert_eq!(
+            saved_monitor_index_from_snapshots(&available, preferences.monitor.as_ref()),
+            None
+        );
+        assert_eq!(
+            fullscreen_display(&available, preferences.monitor.as_ref()),
+            FullscreenDisplay::Studio(0)
         );
     }
 

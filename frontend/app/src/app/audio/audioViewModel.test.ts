@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { createFixtureTransport, type AudioSnapshot } from "@sse/engine-client";
+import { type AudioSnapshot } from "@sse/engine-client";
+import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 import {

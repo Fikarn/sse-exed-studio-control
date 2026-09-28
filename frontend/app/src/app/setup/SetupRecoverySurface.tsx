@@ -26,6 +26,7 @@ import {
   formatFileSize,
   formatPathLabel,
   getFailureTitle,
+  readLogExcerpt,
 } from "../startup/startupHelpers";
 
 // Local helper. Round-trips an `unknown` through JSON so it can be embedded
@@ -77,6 +78,7 @@ export function SetupRecoverySurface({
     );
   const detailEntries = Object.entries(asRecord(healthSnapshot?.details) ?? {});
   const pathEntries = Object.entries(runtimePaths);
+  const recentLogExcerpt = readLogExcerpt(healthSnapshot?.recentLogExcerpt);
   // The hardware link answers the backup requests here only in recovery
   // mode — after a storage failure it stays up for exactly that (2026-09
   // production readiness, Slice 7 — F20); after any other failure it is gone.
@@ -167,12 +169,13 @@ export function SetupRecoverySurface({
   };
 
   return (
-    // Visual overhaul A, Slice 7: the incident on the same skeleton as every
-    // workspace — the word, the engine's sentence, its code in the display's
-    // own slot, and the ways out as keys on the display. New pages program,
-    // Slice 3 (decision 2): Reset the window layout sits beside Retry startup;
-    // it says nothing when the window moves, and a refusal lands in the
-    // message line below the display.
+    // The one recovery screen, whichever page was open (2026-09-28: a stop
+    // during a session showed a smaller one, without Export diagnostics and
+    // without the restore keys). The word, the hardware link's sentence, its
+    // code in the display's own slot, and the ways out as keys on the display.
+    // Reset the window layout sits beside Retry startup; it says nothing when
+    // the window moves, and a refusal lands in the message line below the
+    // display.
     <PreReadyState
       tone="error"
       word={getFailureTitle(failure).toUpperCase()}
@@ -451,6 +454,13 @@ export function SetupRecoverySurface({
               )}
             </ul>
           </div>
+
+          {recentLogExcerpt.length > 0 ? (
+            <div className={styles.setupIncidentSubsection} data-testid="setup-recovery-log">
+              <div className={styles.setupIncidentMetaLabel}>The log's last lines</div>
+              <pre className={recoveryStyles.log}>{recentLogExcerpt.join("\n")}</pre>
+            </div>
+          ) : null}
         </div>
       </div>
     </PreReadyState>
