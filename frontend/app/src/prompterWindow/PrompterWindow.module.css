@@ -1,0 +1,19 @@
+/* The prompter's window: the Prompter XL's whole screen. Black where the glass
+   is not (a black screen gives off no light), the glass in the middle, and
+   no pointer: it is the presenter's screen, and nothing on it is pressed. */
+
+.window {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--prompter-glass-floor);
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.window * {
+  cursor: none;
+}

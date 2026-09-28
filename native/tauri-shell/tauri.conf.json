@@ -19,10 +19,31 @@
         "height": 1440,
         "resizable": true,
         "dragDropEnabled": false
+      },
+      {
+        "label": "prompter",
+        "create": false,
+        "url": "prompter.html",
+        "title": "SSE ExEd Studio Control: the prompter",
+        "width": 1920,
+        "height": 1080,
+        "visible": false,
+        "focus": false,
+        "focusable": false,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "dragDropEnabled": false,
+        "incognito": true
       }
     ],
     "security": {
-      "capabilities": ["default"],
+      "capabilities": ["default", "prompter"],
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
       "devCsp": "default-src 'self' http://127.0.0.1:4174; script-src 'self' 'unsafe-inline' http://127.0.0.1:4174; style-src 'self' 'unsafe-inline' http://127.0.0.1:4174; img-src 'self' data: blob: asset: http://asset.localhost; font-src 'self' data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:4174 ws://127.0.0.1:4174"
     }

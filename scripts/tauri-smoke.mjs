@@ -10,7 +10,9 @@ const requiredPaths = [
   "native/tauri-shell/Cargo.toml",
   "native/tauri-shell/tauri.conf.json",
   "native/tauri-shell/capabilities/default.json",
+  "native/tauri-shell/capabilities/prompter.json",
   "frontend/app/package.json",
+  "frontend/app/prompter.html",
   "frontend/packages/test-fixtures/package.json",
   "native/protocol/v1.contract.json",
   "native/protocol/generated/v1.schema.json",
@@ -31,9 +33,7 @@ async function main() {
   const config = JSON.parse(readFileSync(path.join(rootDir, "native", "tauri-shell", "tauri.conf.json"), "utf8"));
   protocolContract = JSON.parse(readFileSync(path.join(rootDir, "native", "protocol", "v1.contract.json"), "utf8"));
 
-  if (!config.app?.windows?.length || config.app.windows.length !== 1) {
-    throw new Error("Tauri shell must remain single-window during the migration foundation phase.");
-  }
+  verifyWindows(config);
 
   verifyContentSecurityPolicy(config);
 
@@ -44,6 +44,61 @@ async function main() {
   await verifyBootstrapFailure(engineBinary);
 
   console.log("Tauri foundation smoke checks passed.");
+}
+
+// The shell has two windows and no third: the operator's (`main`) and the
+// prompter's (`prompter`), which shows the glass on the Prompter XL. The shell
+// builds both itself (`"create": false`): the first for its clipboard
+// permission, the second when the Prompter XL is there. The prompter's has a
+// profile of its own (`incognito`), so it never sees the clipboard answer
+// WebView2 saves for the operator's window, and it is hidden until the shell
+// has put it in its place. Each has its capability, named in the config: one
+// that is not named there is ignored.
+function verifyWindows(shellConfig) {
+  const windows = shellConfig.app?.windows ?? [];
+  const labels = windows.map((window) => window.label);
+  if (labels.length !== 2 || labels[0] !== "main" || labels[1] !== "prompter") {
+    throw new Error(
+      `The shell has two windows, main and prompter, and no other; tauri.conf.json lists ${JSON.stringify(labels)}.`
+    );
+  }
+  for (const window of windows) {
+    if (window.create !== false) {
+      throw new Error(`The shell builds its windows itself: ${window.label} must be "create": false.`);
+    }
+  }
+  const [main, prompter] = windows;
+  if (main.incognito === true) {
+    throw new Error("The operator's window keeps its settings: main must not be incognito.");
+  }
+  if (prompter.incognito !== true) {
+    throw new Error("The prompter's window has a profile of its own: prompter must be incognito.");
+  }
+  if (prompter.visible !== false) {
+    throw new Error('The prompter\'s window is shown once it stands in its place: prompter must be "visible": false.');
+  }
+  if (prompter.url !== "prompter.html") {
+    throw new Error("The prompter's window has a page of its own: prompter.html.");
+  }
+  const capabilities = shellConfig.app?.security?.capabilities;
+  if (JSON.stringify(capabilities) !== JSON.stringify(["default", "prompter"])) {
+    throw new Error(
+      `tauri.conf.json names the two capabilities, default and prompter; it names ${JSON.stringify(capabilities)}.`
+    );
+  }
+  const capability = (name) =>
+    JSON.parse(readFileSync(path.join(rootDir, "native", "tauri-shell", "capabilities", `${name}.json`), "utf8"));
+  if (JSON.stringify(capability("default").windows) !== JSON.stringify(["main"])) {
+    throw new Error("The default capability is the operator's window's alone.");
+  }
+  const prompterCapability = capability("prompter");
+  if (
+    JSON.stringify(prompterCapability.windows) !== JSON.stringify(["prompter"]) ||
+    JSON.stringify(prompterCapability.permissions) !==
+      JSON.stringify(["core:event:allow-listen", "core:event:allow-unlisten"])
+  ) {
+    throw new Error("The prompter's window may listen to events, and nothing else of Tauri's.");
+  }
 }
 
 // 2026-09 production readiness, Slice 4 (finding F15): the shell ships a

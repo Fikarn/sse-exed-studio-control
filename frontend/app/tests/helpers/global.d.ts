@@ -18,4 +18,11 @@ interface Window {
     confirm: number;
     prompt: number;
   };
+  /**
+   * The prompter's window's page (`prompter.html`): a request to the engine's
+   * test double behind it, as the operator's window would send it.
+   */
+  __SSE_TEST_GLASS__?: {
+    request: (method: string, params?: Record<string, never>) => Promise<unknown>;
+  };
 }

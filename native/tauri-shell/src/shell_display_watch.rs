@@ -8,16 +8,25 @@
 //! the same screens before it puts anything back, and saves the window's
 //! display only while the screens stand still.
 //!
+//! The watch keeps the prompter's window too (`shell_prompter_window.rs`):
+//! at every look it says what the Prompter XL is among the screens. That
+//! window closes at the look that does not find the Prompter XL, and opens
+//! once the screens stand still.
+//!
 //! shell.log says which screens the shell sees, by the names Windows gives
 //! them, at the start and whenever they have changed; and it says when they
 //! do not stand still, when they cannot be read, and when a look fails.
 
-use crate::shell_displays::{read_display_paths, same_screens, screens_line, DisplayPath};
+use crate::shell_displays::{
+    prompter_screen, read_display_paths, same_screens, screens_line, DisplayPath,
+};
+use crate::shell_prompter_window::PrompterWindow;
 use crate::shell_window_layout::{
     hold_once_the_screens_changed, hold_while_the_screens_stand_still, log_shell_line,
 };
 use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::thread;
 use std::time::Duration;
 use tauri::AppHandle;
@@ -89,12 +98,13 @@ impl DisplayWatch {
 }
 
 /// Starts the watch, on a thread of its own for as long as the shell runs.
-/// Called once the window stands on its display.
-pub(crate) fn start_display_watch(app: &AppHandle) {
+/// Called once the window stands on its display. `woken` wakes it before its
+/// second is over (`shell_prompter_window::WatchWake`).
+pub(crate) fn start_display_watch(app: &AppHandle, woken: Receiver<()>) {
     let watched = app.clone();
     let started = thread::Builder::new()
         .name(String::from("display-watch"))
-        .spawn(move || watch(&watched));
+        .spawn(move || watch(&watched, &woken));
     if let Err(error) = started {
         log_shell_line(
             app,
@@ -103,8 +113,9 @@ pub(crate) fn start_display_watch(app: &AppHandle) {
     }
 }
 
-fn watch(app: &AppHandle) {
+fn watch(app: &AppHandle, woken: &Receiver<()>) {
     let mut displays = DisplayWatch::default();
+    let mut prompter = PrompterWindow::start(app);
     // A read that fails is said when it begins to fail, not once a second;
     // and so is a look that fails.
     let mut unread = false;
@@ -113,7 +124,9 @@ fn watch(app: &AppHandle) {
         // A studio build has no console: a look that panicked would end the
         // watch without a word. It is said in shell.log, and the watch goes
         // on.
-        let looked = catch_unwind(AssertUnwindSafe(|| look(app, &mut displays, &mut unread)));
+        let looked = catch_unwind(AssertUnwindSafe(|| {
+            look(app, &mut displays, &mut prompter, &mut unread)
+        }));
         if let Err(reason) = &looked {
             if !failed {
                 log_shell_line(
@@ -126,7 +139,11 @@ fn watch(app: &AppHandle) {
             }
         }
         failed = looked.is_err();
-        thread::sleep(LOOK_EVERY);
+        // The next look comes in a second, or when the watch is woken. With
+        // nobody left to wake it, it looks once a second as before.
+        if woken.recv_timeout(LOOK_EVERY) == Err(RecvTimeoutError::Disconnected) {
+            thread::sleep(LOOK_EVERY);
+        }
     }
 }
 
@@ -139,7 +156,12 @@ fn panic_words(reason: &(dyn Any + Send)) -> String {
         .unwrap_or_else(|| String::from("no reason was given"))
 }
 
-fn look(app: &AppHandle, displays: &mut DisplayWatch, unread: &mut bool) {
+fn look(
+    app: &AppHandle,
+    displays: &mut DisplayWatch,
+    prompter: &mut PrompterWindow,
+    unread: &mut bool,
+) {
     match read_display_paths() {
         Ok(screens) => {
             if *unread {
@@ -148,7 +170,15 @@ fn look(app: &AppHandle, displays: &mut DisplayWatch, unread: &mut bool) {
             *unread = false;
             let first = !displays.has_looked();
             let line = screens_line(&screens);
-            match displays.look(screens) {
+            let looked = displays.look(screens);
+            // The prompter's window first: it closes at this look when the
+            // Prompter XL is not there, before anything else is done.
+            prompter.look(
+                app,
+                Some(&prompter_screen(displays.screens())),
+                looked != Screens::Changing,
+            );
+            match looked {
                 Screens::Still => {
                     if first {
                         log_shell_line(app, &line);
@@ -176,6 +206,8 @@ fn look(app: &AppHandle, displays: &mut DisplayWatch, unread: &mut bool) {
                 log_shell_line(app, &format!("The screens were not read: {error}"));
             }
             *unread = true;
+            // Nothing is known of the Prompter XL: nothing is drawn on it.
+            prompter.look(app, None, false);
         }
     }
 }
