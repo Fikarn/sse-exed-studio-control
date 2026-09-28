@@ -22,7 +22,8 @@ import {
   buildAudioSnapshotPreview,
   refreshAudioCapabilities,
 } from "./audioConsole";
-import deckPages from "./deckPages.json";
+// The attribute is for Node, which loads this file as it is for the page tests.
+import deckPages from "./deckPages.json" with { type: "json" };
 import type { IdentifyBursts } from "./lightingOverlay";
 import { camerasHealthCheck, camerasStatusPart, fixtureCameras } from "./camerasState";
 import { prompterCheck, prompterStatusPart } from "./prompterReads";

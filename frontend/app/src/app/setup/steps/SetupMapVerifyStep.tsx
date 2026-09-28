@@ -1,3 +1,5 @@
+import { Key, Segmented } from "@sse/design-system";
+
 import { SetupStepScreen, SetupRecordHeading, SetupRecordRow } from "../components/SetupStepScreen";
 import styles from "../SetupSupportPilot.module.css";
 import { deckKeySlots, runnerStepOrder } from "../setupPilotModel";
@@ -59,24 +61,27 @@ export function SetupMapVerifyStep({ editor }: { editor: SetupPilot }) {
             selectedPage ? (
               <div className={styles.deckPreview}>
                 {/* New pages program, Slice 3 (D6): a page is chosen by its
-                    tab; the tab no longer prints the number key that chose it. */}
-                <div className={styles.pageTabs}>
+                    tab; the tab no longer prints the number key that chose it.
+                    The tabs are the system's segmented keys: the lit one is
+                    the page shown. */}
+                <Segmented label="The deck's pages" className={styles.pageTabs} testId="setup-deck-pages">
                   {pages.map((page) => (
-                    <button
+                    <Key
                       key={page.id}
-                      className={styles.pageTab}
+                      mode="segmented"
+                      size="small"
+                      cap={page.label}
+                      engaged={page.id === selectedPage?.id}
+                      aria-pressed={page.id === selectedPage?.id}
                       data-active={page.id === selectedPage?.id}
-                      data-testid={`setup-deck-page-${page.id}`}
+                      testId={`setup-deck-page-${page.id}`}
                       onClick={() => {
                         setSelectedPageId(page.id);
                         setSelectedControlId(page.buttons[0]?.id ?? page.dials[0]?.id ?? null);
                       }}
-                      type="button"
-                    >
-                      {page.label}
-                    </button>
+                    />
                   ))}
-                </div>
+                </Segmented>
                 <div className={styles.buttonMatrix} data-testid="setup-deck-keys">
                   {deckKeySlots(selectedPage.buttons).map((control, index) =>
                     control ? (
