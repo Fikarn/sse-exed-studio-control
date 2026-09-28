@@ -248,11 +248,25 @@ fn request(app: &EngineApp, method: &str, params: Value) -> Value {
     reply.response.result.unwrap_or(Value::Null)
 }
 
+/// A deck key a second after the last one of this thread, so that two keys
+/// are never the same press again (`Toggle`'s dwell, 2026-09-28).
 fn deck_light_action(app: &EngineApp, action: &str) -> Value {
-    crate::control_surface::handle_control_surface_http_action(
+    thread_local! {
+        static LAST: std::cell::Cell<Option<std::time::Instant>> =
+            const { std::cell::Cell::new(None) };
+    }
+    let at = LAST.with(|last| {
+        let at = last.get().map_or_else(std::time::Instant::now, |last| {
+            last + std::time::Duration::from_secs(1)
+        });
+        last.set(Some(at));
+        at
+    });
+    crate::control_surface::handle_control_surface_http_action_at(
         &app.runtime.db_path,
         "/api/deck/light-action",
         &json!({ "action": action }),
+        at,
     )
     .unwrap_or_else(|error| panic!("{action} should succeed: {}", error.message()))
 }

@@ -540,3 +540,41 @@ fn a_prompter_key_is_answered_said_and_stamped() {
         )
     );
 }
+
+// `PLAY` switches at one press, and a press that arrives twice within the
+// dwell (a bounce, a double press) is one press: it sends nothing, says
+// nothing and changes nothing (the owner's decision, 2026-09-28). The speed
+// dial's push posts the same, and is the same press.
+#[test]
+fn play_drops_a_second_press_within_the_dwell() {
+    let prompter = TestPrompter::new("bridge-play-dwell");
+    let script = prompter.script("Talk", &["one two three four", "five six seven eight"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.lay_out(2, 100.0);
+    said();
+    let start = Instant::now();
+    let play = |at: Instant| {
+        key_at(
+            prompter.path(),
+            PROMPTER_ROUTE,
+            json!({ "action": "playPause" }),
+            at,
+        )
+    };
+
+    assert_eq!(play(start), json!({ "ok": true, "did": "played" }));
+    assert_eq!(said().len(), 1);
+    assert_eq!(
+        play(start + Duration::from_millis(150)),
+        json!({ "ok": true, "did": "kept" })
+    );
+    assert!(said().is_empty(), "the same press says nothing");
+    assert_eq!(display(prompter.path(), "prompter_state_play"), "playing");
+
+    // After the dwell a press is a press of its own.
+    assert_eq!(
+        play(start + Duration::from_millis(500)),
+        json!({ "ok": true, "did": "paused" })
+    );
+    assert_ne!(display(prompter.path(), "prompter_state_play"), "playing");
+}

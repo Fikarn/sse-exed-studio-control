@@ -45,6 +45,8 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, its displays read `PREVIEW` and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
+- [ ] `All Off` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `All Off` again within about a second. `Del Scene` does the same with `DEL?`, and deletes nothing if the scene dial was turned in between.
+- [ ] A quick double press on `PLAY`, `DIM`, a mute (a dial's push) or `Toggle` switches once.
 
 - [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
 

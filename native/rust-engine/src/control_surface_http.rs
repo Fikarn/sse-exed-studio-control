@@ -401,13 +401,67 @@ fn respond(
         .and_then(|request| authorize(&request, &context.token, context.port).map(|()| request));
     match authorized {
         Ok(request) => {
-            route_control_surface_request(&context.db_path, context.cameras_simulated, &request)
+            let response = route_control_surface_request(
+                &context.db_path,
+                context.cameras_simulated,
+                &request,
+            );
+            note_refused_key(context, &request, &response);
+            response
         }
         Err(error) => {
             context.note_rejection(error.status_code(), error.message());
             HttpResponse::from_error(&error)
         }
     }
+}
+
+/// The routes a key or a dial of the deck posts to, one a page (D5).
+const KEY_ROUTES: [&str; 4] = [
+    "/api/deck/light-action",
+    "/api/deck/audio-action",
+    "/api/deck/camera-action",
+    "/api/deck/prompter-action",
+];
+
+/// A key the deck was refused leaves a line in the log (2026-09-28): the
+/// route, the key and its value as the profile sent them, the status and the
+/// sentence. Companion never sends a refused press again, so without it the
+/// press was lost without a trace (`REC` while CAM 1 is released). One line
+/// a refused press: a press comes from a person, and needs the token. The
+/// displays' reads are left out, since the poll asks for 43 of them a second,
+/// and so are the bridge's own refusals, which `note_rejection` counts.
+fn note_refused_key(context: &BridgeContext, request: &HttpRequest, response: &HttpResponse) {
+    let (path, _) = split_target(&request.target);
+    if request.method != "POST" || !KEY_ROUTES.contains(&path) || response.status_code == 200 {
+        return;
+    }
+    let body = serde_json::from_slice::<Value>(&request.body).unwrap_or(Value::Null);
+    let key = [body.get("action"), body.get("value")]
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let sentence = serde_json::from_slice::<Value>(&response.body)
+        .ok()
+        .and_then(|answer| {
+            answer
+                .get("error")
+                .and_then(Value::as_str)
+                .map(String::from)
+        })
+        .unwrap_or_default();
+    let route = path.trim_start_matches("/api/deck/");
+    let _ = append_log(
+        &context.log_file_path,
+        "WARN",
+        &format!(
+            "Stream Deck key {route} {} was refused ({}): {sentence}",
+            if key.is_empty() { "(no action)" } else { &key },
+            response.status_code
+        ),
+    );
 }
 
 /// Closes without resetting: the response is written, so signal the end of
@@ -1444,7 +1498,7 @@ mod tests {
         // changes them here, and the queue with them.
         assert_eq!(
             (worst.poll, worst.follow, worst.press, worst.total()),
-            (41, 4, 17, 62)
+            (43, 4, 17, 64)
         );
         // The instant and the largest press again must fit: a key pressed
         // while the instant waits is not turned away.
@@ -1574,6 +1628,32 @@ mod tests {
             ),
         );
         assert_eq!(status_of(&anonymous), 401, "{anonymous}");
+
+        // A key a page refused is one line in the log, with the key and the
+        // page's sentence (2026-09-28); a key that acted, a display's read
+        // and the bridge's own refusal (the token) are none.
+        let log = fs::read_to_string(test_dir.path().join("engine.log")).unwrap_or_default();
+        let refused = log
+            .lines()
+            .filter(|line| line.contains("Stream Deck key"))
+            .collect::<Vec<_>>();
+        assert_eq!(refused.len(), 3, "{log}");
+        assert!(
+            refused[0].contains("WARN")
+                && refused[0]
+                    .contains("Stream Deck key camera-action dial 1:up was refused (409): "),
+            "{log}"
+        );
+        assert!(
+            refused[1].contains(
+                "Stream Deck key prompter-action playPause was refused (409): Nothing is on the prompter. Put a script on first."
+            ),
+            "{log}"
+        );
+        assert!(
+            refused[2].contains("Stream Deck key prompter-action rec was refused (400): "),
+            "{log}"
+        );
     }
 
     #[test]

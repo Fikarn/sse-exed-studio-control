@@ -110,7 +110,7 @@ The engine:
 - **Checkpoint before moving the database.** The long-lived threads keep a read connection open, so anything that moves, copies or replaces the database file calls `storage::checkpoint_database` first.
 - **A commit waits for the disk,** about 35 ms here. A test that loops over writes stays in the tens.
 - **Tests that share the console link wait on its state** (`settle_console_link`), never on a sleep.
-- **The deck's tests give the moment themselves.** The cameras' keys and displays take the moment of a press from their caller (`handle_deck_action_at`, the bridge's `*_at` forms), so the dwell, the 3 s of `STOP?` and the 250 ms a page's texts are kept are tested without a wait. The prompter reads its own clock.
+- **The deck's tests give the moment themselves.** The cameras' keys and displays take the moment of a press from their caller (`handle_deck_action_at`, the bridge's `*_at` forms), so the dwell, the 3 s of `STOP?` and the 250 ms a page's texts are kept are tested without a wait. So do `OFF?`, `DEL?` and the bridge's dwell for `PLAY`, `DIM`, the mutes and `Toggle` (`control_surface_presses.rs`): two presses of one of those keys from one test are a second apart, or the second is the same press again. The prompter reads its own clock.
 - **A take's start or stop changes the Cameras lamp,** so its key raises `app.changed` after `cameras.changed`.
 - **Tests never bind the real ports.** TotalMix's `7001` to `7010` and sACN's `5568` are never bound or sent to by a test; test builds drop datagrams aimed at TotalMix.
 - **One log writer.** `diagnostics::log_event` writes `<logs>/engine.log`, which rotates at 5 MiB. `SSE_ENGINE_LOG_LEVEL=DEBUG` adds one line per request. The shell keeps the engine's stderr in `<logs>/shell.log`.

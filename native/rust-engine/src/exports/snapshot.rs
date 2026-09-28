@@ -337,10 +337,12 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
     match action.as_str() {
         "toggleLight" => String::from("Toggle the selected light."),
         "allOn" => String::from("Turn all lights on."),
-        "allOff" => String::from("Turn all lights off."),
+        "allOff" => String::from("Turn all lights off: press, and press again within 3 s."),
         "saveScene" => String::from("Save the current lighting scene."),
         "recallScene" => String::from("Recall the selected lighting scene."),
-        "deleteScene" => String::from("Delete the selected lighting scene."),
+        "deleteScene" => {
+            String::from("Delete the selected lighting scene: press, and press again within 3 s.")
+        }
         "selectPrevLight" => String::from("Select the previous light."),
         "selectNextLight" => String::from("Select the next light."),
         "selectPrevScene" => String::from("Select the previous scene."),

@@ -30,9 +30,11 @@
           "body": {
             "action": "allOff"
           },
-          "description": "Turn all lights off.",
+          "description": "Turn all lights off: press, and press again within 3 s.",
           "id": "lights-btn-4",
           "label": "All Off",
+          "lcdKey": "light_key_off",
+          "lcdRefreshKeys": ["light_key_off"],
           "method": "POST",
           "position": 4,
           "type": "button",
@@ -66,9 +68,11 @@
           "body": {
             "action": "deleteScene"
           },
-          "description": "Delete the selected lighting scene.",
+          "description": "Delete the selected lighting scene: press, and press again within 3 s.",
           "id": "lights-btn-7",
           "label": "Del Scene",
+          "lcdKey": "light_key_del",
+          "lcdRefreshKeys": ["light_key_del"],
           "method": "POST",
           "position": 7,
           "type": "button",

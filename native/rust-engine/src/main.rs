@@ -11,6 +11,7 @@ mod control_surface;
 mod control_surface_audio;
 mod control_surface_http;
 mod control_surface_pages;
+mod control_surface_presses;
 mod development;
 mod diagnostics;
 mod engine_events;

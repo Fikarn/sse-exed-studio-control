@@ -40,6 +40,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- On the deck, `All Off` and `Del Scene` ask first: the key reads `OFF?` or `DEL?` in amber, and a second press within 3 s acts. `Save` stays one press. They reach the deck with the next import of the profile (#254).
+- On the deck, a press of `PLAY`, `DIM`, a mute or `Toggle` that arrives twice within a third of a second switches once (#254).
 - Every restore comes back with the light outputs held, a database backup's and an archive's alike; arm them in Setup / Support when the rig should follow. A restore from the recovery screen could arm a rig that was held (#253).
 - On a published setup, a step, `Back to …` or `Run all probes` in Setup arms first and says what would lock; a second press within 3 s unpublishes it. They unpublished it at one press (#252).
 - `Restore latest` and `Restore path` ask first and say what the restore replaces, in Setup / Support and on the recovery screen (#252).
