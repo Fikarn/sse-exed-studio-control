@@ -40,6 +40,10 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- On a published setup, a step, `Back to …` or `Run all probes` in Setup arms first and says what would lock; a second press within 3 s unpublishes it. They unpublished it at one press (#252).
+- `Restore latest` and `Restore path` ask first and say what the restore replaces, in Setup / Support and on the recovery screen (#252).
+- Lighting's `Save · press twice` arms at the first press and saves the new scene at the second, as it says; it saved at the first (#252).
+- In Lighting's Preview the key reads `Save into the scene`: it saves the preview into the scene, and the rig takes it when the scene is recalled. It read `Save to the rig` (#252).
 - The Prompter XL shows the script: Studio Control opens a window of its own on it when it is plugged in, and closes it when it is unplugged. `PLAY` unlocks while the script is on the glass (#251).
 - Until the links to the cameras are built, a restore leaves a camera's address out and says which (#243).
 - Setup's `Map bindings` shows each dial's three controls under its cell of the strip, and its page tabs are keys like any other. In `Verify live echo` a key of another page turns the screen to its page (#248).

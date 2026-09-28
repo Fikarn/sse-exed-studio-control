@@ -128,6 +128,7 @@ describe("SetupSupportPilot backup verification", () => {
       });
 
     fireEvent.click(screen.getByTestId("support-restore-latest"));
+    confirmRestore();
     await waitFor(() => {
       expect(screen.getByTestId("setup-feedback").textContent).toContain(
         `Restored native-support-backup from C:/app-data/backups/native-backup-2026-04.json. ${note}`
@@ -136,6 +137,7 @@ describe("SetupSupportPilot backup verification", () => {
     expect(screen.getByTestId("setup-feedback").getAttribute("data-tone")).toBe("ok");
 
     fireEvent.click(screen.getByTestId("support-restore-latest"));
+    confirmRestore();
     await waitFor(() => {
       expect(screen.getByTestId("setup-feedback").textContent).toContain("native-backup-2026-09.json.");
     });
@@ -143,7 +145,32 @@ describe("SetupSupportPilot backup verification", () => {
     expect(restore).toHaveBeenCalledTimes(2);
     await store.dispose();
   });
+
+  // Found, to check (2026-09-28): `Restore latest` replaced the saved data at
+  // one press. It asks first now, and the question names the backup and what
+  // it replaces; Cancel restores nothing.
+  it("Restore latest asks first, says what it replaces, and Cancel restores nothing", async () => {
+    const store = await renderPilot();
+    const restore = vi.spyOn(store, "restoreSupportBackup");
+
+    fireEvent.click(screen.getByTestId("support-restore-latest"));
+    const dialog = screen.getByRole("dialog", { name: "Restore this backup?" });
+    expect(dialog.textContent).toContain("It replaces");
+    expect(restore).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Restore this backup?" })).toBeNull();
+    });
+    expect(restore).not.toHaveBeenCalled();
+    await store.dispose();
+  });
 });
+
+function confirmRestore() {
+  const dialog = screen.getByRole("dialog", { name: "Restore this backup?" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
+}
 
 // 2026-09 production readiness, Slice 11 (F30, F31): the Armed / Held switch
 // asks the hardware link, shows what it answered, and never promises a dark

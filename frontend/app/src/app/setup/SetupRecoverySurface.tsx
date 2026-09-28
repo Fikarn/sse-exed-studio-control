@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button, Key, StatusBadge } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
@@ -15,6 +15,7 @@ import {
   withRestoreDetail,
 } from "../shellData";
 import { exportShellDiagnostics, openShellPath, resetWindowLayout } from "../shellCommands";
+import { RestoreConfirmDialog, type RestorePrompt } from "./components/RestoreConfirmDialog";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { PreReadyState } from "../startup/PreReadyState";
 import recoveryStyles from "../startup/RecoveryBands.module.css";
@@ -70,6 +71,9 @@ export function SetupRecoverySurface({
   const [restorePath, setRestorePath] = useState("");
   const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  // A restore asks first, and says what it replaces (2026-09-28).
+  const [restorePrompt, setRestorePrompt] = useState<RestorePrompt | null>(null);
+  const cancelRestore = useCallback(() => setRestorePrompt(null), []);
   const lastBackup = backups[0] ?? null;
   const summary =
     failure?.message ??
@@ -285,7 +289,7 @@ export function SetupRecoverySurface({
                 if (!lastBackup) {
                   return;
                 }
-                void performAction("restore-latest", () => restoreBackup(lastBackup.path));
+                setRestorePrompt({ actionId: "restore-latest", path: lastBackup.path });
               }}
               variant="secondary"
             >
@@ -294,7 +298,7 @@ export function SetupRecoverySurface({
             <Button
               disabled={!engineRequestsAvailable || !restorePath.trim() || busyAction !== null}
               onClick={() => {
-                void performAction("restore-path", () => restoreBackup(restorePath.trim()));
+                setRestorePrompt({ actionId: "restore-path", path: restorePath.trim() });
               }}
               variant="ghost"
             >
@@ -463,6 +467,19 @@ export function SetupRecoverySurface({
           ) : null}
         </div>
       </div>
+
+      {restorePrompt ? (
+        <RestoreConfirmDialog
+          backups={backups}
+          busy={busyAction !== null}
+          prompt={restorePrompt}
+          onCancel={cancelRestore}
+          onConfirm={() => {
+            setRestorePrompt(null);
+            void performAction(restorePrompt.actionId, () => restoreBackup(restorePrompt.path));
+          }}
+        />
+      ) : null}
     </PreReadyState>
   );
 }

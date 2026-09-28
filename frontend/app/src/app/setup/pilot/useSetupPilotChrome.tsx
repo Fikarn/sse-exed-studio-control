@@ -1,7 +1,7 @@
 import type { SetupClusterStep } from "../components/SetupCluster";
 import { deriveSetupState } from "../setupState";
 import { formatBackupTimestamp } from "../../shellData";
-import { Key } from "@sse/design-system";
+import { ArmKey, Key } from "@sse/design-system";
 import styles from "../SetupSupportPilot.module.css";
 import { probeChecks, runnerStepOrder, type SetupSupportPilotProps } from "../setupPilotModel";
 import type { SetupPilotState } from "./useSetupPilotState";
@@ -33,6 +33,7 @@ export function useSetupPilotChrome({
     runtimePaths,
     busyAction,
     mode,
+    arm,
   } = state;
   const { performAction, openReferencePath, invokePrimaryAction, primaryActionLabel, moveStepSelection } = actions;
   // Visual overhaul A, Slice 7: the runner's steps as the cluster prints them —
@@ -81,11 +82,26 @@ export function useSetupPilotChrome({
     </Key>
   );
 
+  // On a published setup the key arms first: going back unpublishes it.
+  const backLabel = `Back to ${runnerSteps[stepIndex - 1]?.label ?? "the previous step"}`;
   const backKey =
     stepIndex > 0 ? (
-      <Key take testId="setup-step-back" onClick={() => moveStepSelection(-1)}>
-        Back to {runnerSteps[stepIndex - 1]?.label ?? "the previous step"}
-      </Key>
+      arm.armed?.key === "back" ? (
+        <ArmKey
+          armed
+          timeoutMs={arm.armed.timeoutMs}
+          take
+          countdownTestId="setup-step-back-countdown"
+          testId="setup-step-back"
+          onClick={() => moveStepSelection(-1)}
+        >
+          {backLabel}
+        </ArmKey>
+      ) : (
+        <Key take testId="setup-step-back" onClick={() => moveStepSelection(-1)}>
+          {backLabel}
+        </Key>
+      )
     ) : null;
 
   const bayHead = (

@@ -69,9 +69,13 @@ export function deriveLightingState({
     return {
       word: "PREVIEW",
       tone: "info",
-      sentence: previewDirty
-        ? "You are editing offline. The rig is unchanged until you save this to it."
-        : "You are editing offline. The rig is unchanged.",
+      // Saving puts the preview into the scene, never onto the rig: the rig
+      // takes it when the scene is recalled (until 2026-09-28 this sentence
+      // said the save would reach the rig).
+      sentence:
+        previewDirty && sceneName
+          ? `You are editing offline. Save puts the edits into ${sceneName}; the rig takes them when it is recalled.`
+          : "You are editing offline. The rig is unchanged.",
       meta,
       locked: false,
       lockNote: null,

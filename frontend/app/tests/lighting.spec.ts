@@ -1,8 +1,10 @@
 import { expect, test, type Locator } from "@playwright/test";
 
+import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
 import { expectNoDocumentScroll } from "./helpers/geometry";
 import { expectToolbarPrimaryControlsFit } from "./helpers/lighting";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
 
 // plan PR 4 / workstream D4: lighting workspace specs split out of
 // operator-shell.spec.ts. Covers the snapshot loading posture, fixture
@@ -251,9 +253,32 @@ test("preview: the plot carries the blue keyline and the state display offers sa
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("PREVIEW");
   await expect(stateDisplay).toHaveAttribute("data-tone", "info");
-  await expect(page.getByTestId("lighting-state-preview-save")).toBeVisible();
+  // Found, to check (2026-09-28): the key read `Save to the rig`, and it saves
+  // into the scene: the rig takes the edits when the scene is recalled.
+  await expect(page.getByTestId("lighting-state-preview-save")).toHaveText("Save into the scene");
   await expect(page.getByTestId("lighting-state-preview-discard")).toBeVisible();
   await expect(page.getByTestId("lighting-stage")).toHaveAttribute("data-preview", "");
+});
+
+// Found, to check (2026-09-28): `Save · press twice` saved at the first press.
+// It arms now, as its label says, and saves the new scene at the second.
+test("Save · press twice arms at the first press and saves at the second", async ({ page }) => {
+  await page.clock.install();
+  await openFixture(page, "lighting-populated");
+  await expectWorkspaceMounted(page, "lighting");
+  await pausePageClock(page);
+
+  const save = page.getByTestId("lighting-save-scene");
+  await save.click();
+  await expect(save).toHaveAttribute("data-armed", "true");
+  await expect(page.getByTestId("lighting-state-display")).toContainText("Save as a new scene · press again");
+  await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toHaveCount(0);
+
+  await page.clock.fastForward(ARM_DWELL_MS + 50);
+  await save.click();
+  await page.clock.resume();
+  await expect(page.getByRole("button", { name: "Recall scene Scene 3" })).toBeVisible();
+  await expect(save).toHaveAttribute("data-armed", "false");
 });
 
 // Visual overhaul A, Slice 5b (plan Slice 5, the plate): the selected fixture's
@@ -292,7 +317,7 @@ test("supports lighting preview mode without driving live scene state", async ({
 
   await page.getByRole("button", { name: /Preview/ }).click();
   // Visual overhaul A, Slice 5. Old: a preview banner across the canvas. New:
-  // the state display says PREVIEW and offers Save to the rig / Discard.
+  // the state display says PREVIEW and offers Save into the scene / Discard.
   // Reason: a state is a state display, in the same place every time.
   await expect(page.getByTestId("lighting-state-display")).toContainText("PREVIEW");
   await expect(page.getByText("Editing offline")).toBeVisible();

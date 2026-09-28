@@ -13,6 +13,8 @@ import {
   toJsonValue,
   runnerStepOrder,
   type SetupSupportPilotProps,
+  UNPUBLISH_ARM_LABEL,
+  UNPUBLISH_WINDOW_MS,
 } from "../setupPilotModel";
 import type { SetupPilotState } from "./useSetupPilotState";
 
@@ -46,6 +48,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     setPublishOverridePrompt,
     stepIndex,
     setPendingStepId,
+    arm,
   } = state;
   const performAction = useLiveCallback(
     async (actionId: string, onRun: () => Promise<ActionFeedback | null | void>) => {
@@ -74,6 +77,20 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
   const activateStep = useLiveCallback(async (stepId: RunnerStepId) => {
     startTransition(() => setActiveStepId(stepId));
     await store.updateCommissioning({ runnerStage: stepId });
+  });
+
+  // Found, to check (2026-09-28): a step key, `Back to …` and `Run all probes`
+  // each move the runner, and a move unpublishes a published setup and locks
+  // Lighting, Audio, Cameras and Teleprompter. The owner's decision: while the
+  // setup is published such a press arms first, and a second press within 3 s
+  // (the Cameras stop's window, the deck's `STOP?`) applies it. The state
+  // display says what gets locked. An unpublished setup moves at one press.
+  const askBeforeUnpublishing = useLiveCallback((key: string, apply: () => void) => {
+    if (!isReady) {
+      apply();
+      return;
+    }
+    arm.armOrApply(key, UNPUBLISH_ARM_LABEL, apply, UNPUBLISH_WINDOW_MS);
   });
 
   const persistMode = useLiveCallback((nextMode: SetupMode) => {
@@ -324,7 +341,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
 
   const moveStepSelection = useLiveCallback((direction: -1 | 1) => {
     const nextIndex = Math.min(Math.max(stepIndex + direction, 0), runnerStepOrder.length - 1);
-    void activateStep(runnerStepOrder[nextIndex]!);
+    askBeforeUnpublishing("back", () => void activateStep(runnerStepOrder[nextIndex]!));
   });
 
   const requestStepSelection = useLiveCallback((stepId: RunnerStepId) => {
@@ -334,8 +351,23 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
       setPendingStepId(stepId);
       return;
     }
+    // The step a published setup stands on is Publish: pressing it again goes
+    // nowhere, and sent to the hardware link it would unpublish the setup.
+    if (isReady && stepId === activeStepId) {
+      return;
+    }
 
-    void activateStep(stepId);
+    askBeforeUnpublishing(`step:${stepId}`, () => void activateStep(stepId));
+  });
+
+  // Both `Run all probes` keys of the cluster: the runner goes to Probe
+  // hardware, and on to Map bindings when all three pass.
+  const runAllProbesFromCluster = useLiveCallback(() => {
+    askBeforeUnpublishing("run-all-probes", () => {
+      persistMode("runner");
+      void activateStep("probe");
+      void performAction("run-all-probes", () => runAllProbes(true));
+    });
   });
   return {
     performAction,
@@ -355,6 +387,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     invokePrimaryAction,
     moveStepSelection,
     requestStepSelection,
+    runAllProbesFromCluster,
   };
 }
 

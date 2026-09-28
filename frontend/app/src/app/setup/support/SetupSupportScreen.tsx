@@ -9,8 +9,8 @@ import type { SetupPilot } from "../useSetupPilot";
 export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
   const { supportSnapshot } = editor.props;
   const { bayHead } = editor.chrome;
-  const { backups, lastBackup, setRestorePath, runtimePaths, restorePath, busyAction } = editor.state;
-  const { performAction, exportSupportBackup, verifyBackup, restoreBackup, openReferencePath } = editor.actions;
+  const { backups, lastBackup, setRestorePath, runtimePaths, restorePath, busyAction, setRestorePrompt } = editor.state;
+  const { performAction, exportSupportBackup, verifyBackup, openReferencePath } = editor.actions;
   return (
     <SetupStepScreen
       head={bayHead}
@@ -73,7 +73,7 @@ export function SetupSupportScreen({ editor }: { editor: SetupPilot }) {
             take
             disabled={!restorePath.trim() || busyAction !== null}
             testId="support-restore-path"
-            onClick={() => void performAction("restore-path", () => restoreBackup(restorePath.trim()))}
+            onClick={() => setRestorePrompt({ actionId: "restore-path", path: restorePath.trim() })}
           >
             Restore path
           </Key>

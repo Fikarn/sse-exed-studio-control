@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect } from "react";
+import { useArm } from "@sse/design-system";
 import {
   getCommissioningChecks,
   getSupportBackups,
@@ -9,6 +10,7 @@ import {
 import { getRecentActions } from "../components/RecentActions";
 import { useOperatorLayout } from "../../OperatorLayoutProvider";
 import { parseControlSurfaceLastEvent, findEcho } from "../setupControlEcho";
+import type { RestorePrompt } from "../components/RestoreConfirmDialog";
 import {
   parseControlSurfacePages,
   normalizeSetupMode,
@@ -45,6 +47,13 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
   // 2026-09 audit Slice 8: probes that are not green when the operator asks
   // to publish; non-null opens the "Publish with failing probes?" confirm.
   const [publishOverridePrompt, setPublishOverridePrompt] = useState<string[] | null>(null);
+  // Found, to check (2026-09-28): a restore asks first; non-null opens the
+  // "Restore this backup?" confirm.
+  const [restorePrompt, setRestorePrompt] = useState<RestorePrompt | null>(null);
+  // A press that would unpublish a published setup arms first (owner's
+  // decision, 2026-09-28): one arm for the pilot, since the cluster, the bay's
+  // back key and the step keys all read it.
+  const arm = useArm();
   const [selectedPageId, setSelectedPageId] = useState("");
   const [selectedControlId, setSelectedControlId] = useState<string | null>(null);
   const [echoControlId, setEchoControlId] = useState<string | null>(null);
@@ -171,6 +180,13 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
       ? String(healthSnapshot?.summary ?? "The desk or the bridge needs attention. Run all probes to see which.")
       : null;
   const isReady = commissioningSnapshot?.hasCompletedSetup === true;
+  // An arm to unpublish is for the setup as it stood at the press: it goes
+  // when the setup is published or unpublished some other way (a restore),
+  // or when the screen changes under it.
+  const clearArm = arm.clear;
+  useEffect(() => {
+    clearArm();
+  }, [clearArm, isReady, mode]);
   const lastBackup = backups[0];
   const stepIndex = runnerStepOrder.indexOf(activeStepId);
   const totalControlCount = pages.reduce((count, page) => count + page.buttons.length + page.dials.length, 0);
@@ -233,6 +249,9 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     setFeedback,
     publishOverridePrompt,
     setPublishOverridePrompt,
+    restorePrompt,
+    setRestorePrompt,
+    arm,
     setSelectedPageId,
     selectedControlId,
     setSelectedControlId,

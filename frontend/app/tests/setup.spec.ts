@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
+import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
@@ -125,8 +126,107 @@ test("opens support mode and exercises backup workflows", async ({ page }) => {
   await page.getByRole("button", { name: "App data" }).click();
   await expect(page.getByText(/App data opened at/)).toBeVisible();
 
+  // Found, to check (2026-09-28): a restore asks first, and says what it replaces.
   await plate.getByRole("button", { name: "Restore latest" }).click();
+  const restoreDialog = page.getByRole("dialog", { name: "Restore this backup?" });
+  await expect(restoreDialog).toContainText("It replaces");
+  await restoreDialog.getByRole("button", { name: "Restore" }).click();
   await expect(page.getByText(/Restored native-support-backup/)).toBeVisible();
+
+  await page.getByTestId("support-restore-path").click();
+  await page.getByRole("dialog", { name: "Restore this backup?" }).getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByRole("dialog", { name: "Restore this backup?" })).toHaveCount(0);
+});
+
+// Found, to check (2026-09-28): on a published setup a step key, `Back to …`
+// and `Run all probes` each unpublished it at one press, and locked Lighting,
+// Audio, Cameras and Teleprompter until it was published again. The owner's
+// decision: the first press arms and says what gets locked, and a second press
+// within 3 s unpublishes. The page's clock stands still between the presses
+// (helpers/pageClock.ts), so the dwell and the window are true on any runner.
+test.describe("a published setup unpublishes only at a second press", () => {
+  const PAST_THE_DWELL_MS = ARM_DWELL_MS + 50;
+  /** `UNPUBLISH_WINDOW_MS` in setupPilotModel.ts, which a test cannot import. */
+  const UNPUBLISH_WINDOW_MS = 3_000;
+  const audioNav = (page: Page) =>
+    page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button", { name: "Audio", exact: true });
+  /** The page's clock is installed first and paused only once Setup has drawn:
+   *  a paused clock holds the page's own chunk, and its keys never come. */
+  async function openSetup(page: Page, fixture: string) {
+    await page.clock.install();
+    await openFixture(page, fixture);
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-step-publish")).toBeVisible();
+  }
+
+  test("a step key arms, says what locks, and unpublishes at the second press", async ({ page }) => {
+    await openSetup(page, "setup-ready");
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+
+    await pausePageClock(page);
+    const step = page.getByTestId("setup-step-probe");
+    await step.click();
+    await expect(step).toHaveAttribute("data-armed", "true");
+    const display = page.getByTestId("setup-state-display");
+    await expect(display).toContainText("Unpublish the setup · press again");
+    await expect(display).toContainText("Lighting, Audio, Cameras and Teleprompter lock");
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await step.click();
+    await page.clock.resume();
+    await expect(audioNav(page)).toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("the arm lapses after 3 s and nothing is unpublished", async ({ page }) => {
+    await openSetup(page, "setup-ready");
+
+    await pausePageClock(page);
+    await page.getByTestId("setup-step-map").click();
+    await expect(page.getByTestId("setup-step-map")).toHaveAttribute("data-armed", "true");
+    await page.clock.fastForward(UNPUBLISH_WINDOW_MS + 100);
+    await expect(page.getByTestId("setup-step-map")).toHaveAttribute("data-armed", "false");
+    await expect(page.getByTestId("setup-state-display")).not.toContainText("press again");
+    await page.clock.resume();
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("Publish sends nothing; Back and Run all probes arm first", async ({ page }) => {
+    await openSetup(page, "setup-ready");
+    await pausePageClock(page);
+
+    // The step a published setup stands on goes nowhere, however often it is pressed.
+    await page.getByTestId("setup-step-publish").click();
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await page.getByTestId("setup-step-publish").click();
+    await expect(page.getByTestId("setup-step-publish")).toHaveAttribute("data-armed", "false");
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+
+    await page.getByTestId("setup-step-back").click();
+    await expect(page.getByTestId("setup-step-back")).toHaveAttribute("data-armed", "true");
+    // A press on another key arms that one instead.
+    await page.getByTestId("setup-run-all-probes").click();
+    await expect(page.getByTestId("setup-run-all-probes")).toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("setup-step-back")).not.toHaveAttribute("data-armed", "true");
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await page.getByTestId("setup-run-all-probes").click();
+    await page.clock.resume();
+    await expect(audioNav(page)).toHaveAttribute("aria-disabled", "true");
+  });
+
+  test("DEGRADED's Run all probes arms on the display, which says what locks", async ({ page }) => {
+    await openSetup(page, "setup-degraded");
+    await pausePageClock(page);
+
+    await page.getByTestId("setup-state-run-probes").click();
+    await expect(page.getByTestId("setup-state-run-probes")).toHaveAttribute("data-armed", "true");
+    const display = page.getByTestId("setup-state-display");
+    await expect(display).toContainText("Lighting, Audio, Cameras and Teleprompter lock");
+    await expect(audioNav(page)).not.toHaveAttribute("aria-disabled", "true");
+    await page.clock.resume();
+  });
 });
 
 test("shows degraded setup posture from fixtures", async ({ page }) => {
