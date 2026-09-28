@@ -14,8 +14,12 @@
 //   1. the working tree is clean and the commit is on `origin/main`;
 //   2. `tauri build` builds the pages, the engine and the shell;
 //   3. the two files are copied into `<builds>/<day>_<commit>/`;
-//   4. the copied shell starts the copied engine on scratch data and reads a
-//      snapshot (the shell's own `--smoke-test`);
+//   4. the copied shell starts the copied engine and reads a snapshot (the
+//      shell's own `--smoke-test`), with the platform's app-data folder moved
+//      to a scratch folder and no data folder named: the build opens its
+//      default folder there as it will open the studio's, which a
+//      development build refuses, so the start also proves the build is the
+//      studio's kind;
 //   5. the acceptance lane and the bridge lane run against the copied engine,
 //      on scratch data with simulated devices: every other test runs a
 //      development build.
@@ -39,7 +43,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { hardenedLaneEnv, isSameOrInside, laneProcessEnv } from "./native-runtime-harness.mjs";
+import { hardenedLaneEnv, isSameOrInside } from "./native-runtime-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -171,23 +175,51 @@ function say(line = "") {
   process.stdout.write(`${line}\n`);
 }
 
-async function hardenedScratchEnv(scratch, label) {
-  return laneProcessEnv(
-    await hardenedLaneEnv(),
-    { SSE_APP_DATA_DIR: path.join(scratch, "app-data"), SSE_LOG_DIR: path.join(scratch, "app-data", "logs") },
-    { label }
-  );
+/**
+ * The environment of the build's trial start: `env` without any `SSE_`
+ * variable, the lanes' hardening, and the platform's app-data folder moved to
+ * `base`. No data folder is named, so the build opens its default folder
+ * under `base`.
+ */
+export function trialEnv(env, base, hardened) {
+  const kept = Object.entries(env).filter(([name]) => !/^(SSE_.*|APPDATA|LOCALAPPDATA)$/i.test(name));
+  return { ...Object.fromEntries(kept), ...hardened, APPDATA: base, LOCALAPPDATA: base };
 }
 
-async function smokeTest(folder) {
-  const scratch = mkdtempSync(path.join(os.tmpdir(), "sse-release-smoke-"));
+/** Why the trial start's status is not the one a studio build writes, or null. */
+export function trialProblem(status, { base, enginePath }) {
+  if (status.exitCode !== 0 || status.finished !== true) {
+    return `it did not start: ${status.error ?? JSON.stringify(status)}`;
+  }
+  if (typeof status.appDataPath !== "string" || !isSameOrInside(status.appDataPath, base)) {
+    return `it opened ${status.appDataPath}, not its default folder under the scratch base`;
+  }
+  if (typeof status.startedEnginePath !== "string" || !samePath(status.startedEnginePath, enginePath)) {
+    return `its shell started ${status.startedEnginePath}, not the engine beside it`;
+  }
+  return null;
+}
+
+function samePath(left, right) {
+  return isSameOrInside(left, right) && isSameOrInside(right, left);
+}
+
+export async function trialStart(folder) {
+  const scratch = mkdtempSync(path.join(os.tmpdir(), "sse-release-trial-"));
+  const base = path.join(scratch, "app-data-base");
+  mkdirSync(base);
   const statusPath = path.join(scratch, "status.json");
-  const env = await hardenedScratchEnv(scratch, "The build's smoke test");
-  run(path.join(folder, SHELL_FILE), ["--smoke-test", `--smoke-status-path=${statusPath}`], { env });
-  const status = JSON.parse(readFileSync(statusPath, "utf8"));
-  const started = status.startedEnginePath ? realpathSync.native(status.startedEnginePath) : null;
-  if (status.exitCode !== 0 || started !== realpathSync.native(path.join(folder, ENGINE_FILE))) {
-    throw new Error(`The build's shell did not start the engine beside it: ${JSON.stringify(status)}`);
+  const result = spawnSync(path.join(folder, SHELL_FILE), ["--smoke-test", `--smoke-status-path=${statusPath}`], {
+    env: trialEnv(process.env, base, await hardenedLaneEnv()),
+    stdio: "inherit",
+  });
+  if (result.error) {
+    throw result.error;
+  }
+  const status = existsSync(statusPath) ? JSON.parse(readFileSync(statusPath, "utf8")) : { exitCode: result.status };
+  const problem = trialProblem(status, { base, enginePath: path.join(folder, ENGINE_FILE) });
+  if (problem) {
+    throw new Error(`The build in ${folder} is not a studio build that works: ${problem.replace(/\.$/, "")}.`);
   }
 }
 
@@ -244,8 +276,9 @@ async function makeBuild() {
   });
 
   say();
-  say("The build's shell starts the engine beside it, on scratch data:");
-  await smokeTest(folder);
+  say("The build's shell starts the engine beside it, on its default folder under a scratch base:");
+  await trialStart(folder);
+  say("  passed");
   // Each lane is started as a script of its own: importing one runs nothing.
   for (const [lane, script] of [
     ["The acceptance lane", "native-acceptance.mjs"],

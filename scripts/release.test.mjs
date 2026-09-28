@@ -15,6 +15,8 @@ import {
   releaseRefusal,
   schemaVersionOf,
   SHELL_FILE,
+  trialEnv,
+  trialProblem,
   writeBuildRecord,
 } from "./release.mjs";
 
@@ -113,4 +115,57 @@ test("a build's record describes its folder, and a changed file is found", () =>
   } finally {
     rmSync(builds, { force: true, recursive: true });
   }
+});
+
+test("the trial start names no data folder and moves the platform's base", () => {
+  const hardened = { SSE_CONTROL_SURFACE_PORT: "45123", SSE_SAFE_START: "1", SSE_LIGHTS_SIMULATED: "1" };
+  const base = path.resolve("/scratch/app-data-base");
+  const env = trialEnv(
+    {
+      PATH: "/bin",
+      APPDATA: "C:/Users/operator/AppData/Roaming",
+      LocalAppData: "C:/Users/operator/AppData/Local",
+      SSE_APP_DATA_DIR: "C:/somewhere",
+      sse_log_dir: "C:/somewhere/logs",
+      SSE_SAFE_START: "0",
+      SSE_STUDIO_BUILD: "1",
+    },
+    base,
+    hardened
+  );
+  assert.deepEqual(env, { PATH: "/bin", ...hardened, APPDATA: base, LOCALAPPDATA: base });
+});
+
+test("the trial start is read: the default folder under the base, the engine beside the shell", () => {
+  const base = path.resolve("/scratch/app-data-base");
+  const enginePath = path.resolve("/builds/2026-09-28_d65b3a1", ENGINE_FILE);
+  const good = {
+    finished: true,
+    exitCode: 0,
+    appDataPath: path.join(base, "ExEd Studio Control Native"),
+    startedEnginePath: enginePath,
+  };
+  assert.equal(trialProblem(good, { base, enginePath }), null);
+
+  // A development build refuses its default folder: the shell's sentence.
+  assert.match(
+    trialProblem({ finished: true, exitCode: 1, error: "This is a development build" }, { base, enginePath }),
+    /did not start: This is a development build/
+  );
+  assert.match(trialProblem({ exitCode: 1 }, { base, enginePath }), /did not start/);
+  assert.match(
+    trialProblem({ ...good, appDataPath: path.resolve("/elsewhere/ExEd Studio Control Native") }, { base, enginePath }),
+    /not its default folder under the scratch base/
+  );
+  assert.match(
+    trialProblem(
+      { ...good, startedEnginePath: path.resolve("/repo/native/target/debug", ENGINE_FILE) },
+      { base, enginePath }
+    ),
+    /not the engine beside it/
+  );
+  assert.match(
+    trialProblem({ ...good, startedEnginePath: path.dirname(enginePath) }, { base, enginePath }),
+    /not the engine beside it/
+  );
 });
