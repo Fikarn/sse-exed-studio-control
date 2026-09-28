@@ -37,9 +37,9 @@ windows = "0.61"
 # difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
 # cannot be lifted even for one item. WebView2's settings are COM calls, which
 # are `unsafe` in the `windows` bindings, so `set_browser_accelerator_keys_off`
-# in main.rs (Windows only, called by `switch_off_browser_keys`, decision 12)
-# carries the one `#[allow(unsafe_code)]` in this crate; anything else that
-# uses `unsafe` still fails the build.
+# in shell_browser_keys.rs (Windows only, called by `switch_off_browser_keys`,
+# decision 12) carries the one `#[allow(unsafe_code)]` in this crate; anything
+# else that uses `unsafe` still fails the build.
 [lints.rust]
 unsafe_code = "deny"
 

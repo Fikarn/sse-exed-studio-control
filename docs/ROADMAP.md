@@ -87,7 +87,7 @@ Guards:
 - "The studio build" is defined in code: a build `npm run release` made (`studio_build()` in `native/protocol/rust/src/development.rs`). Anything else draws the glass into an ordinary window, and a test holds that.
 - A test over plain monitor snapshots, run in CI, proves the window opens only on a screen named `Prompter XL`.
 - The display calls are `unsafe`. The shell's one allowance (`set_browser_accelerator_keys_off`) becomes a named list, each entry with its reason.
-- `native/tauri-shell/src/main.rs` is split first.
+- `native/tauri-shell/src/main.rs` is split first (done: it holds the app and its window, and seven files beside it hold the rest).
 
 Find out first, on the workstation and drawing nothing: that the display route works.
 
