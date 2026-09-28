@@ -1243,8 +1243,8 @@ async function runSetupSupportQualification() {
       `Expected checks.engine.bridge.state 'attention', got ${JSON.stringify(bridgeEntry)}.`
     );
     assert(
-      typeof bridgeEntry?.detail === "string" && bridgeEntry.detail.includes("could not bind"),
-      `Expected the bridge entry to say the listener could not bind, got '${bridgeEntry?.detail}'.`
+      typeof bridgeEntry?.detail === "string" && bridgeEntry.detail.includes("could not open its port"),
+      `Expected the bridge entry to say its port could not open, got '${bridgeEntry?.detail}'.`
     );
     assert(
       controlSurface?.available === false && controlSurface?.port === takenPort,

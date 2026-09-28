@@ -251,11 +251,13 @@ pub fn read_commissioning_snapshot(db_path: &Path) -> EngineResult<Commissioning
             .filter(|value| is_valid_port(*value))
             .unwrap_or(DEFAULT_AUDIO_RECEIVE_PORT),
     };
-    let summary = format!(
-        "Stage '{}', {} probe records.",
-        commissioning.runner_stage,
-        checks.len()
-    );
+    // Setup's state sentence, printed as it is (2026-09-28: it read "Stage
+    // 'publish', 3 probe records.").
+    let summary = String::from(if commissioning.has_completed_setup {
+        "Setup is published: Lighting, Audio, Cameras and Teleprompter are open."
+    } else {
+        "Setup is not published yet: Lighting, Audio, Cameras and Teleprompter stay locked until it is."
+    });
     let config_summary = format!(
         "Profile '{}'. Lighting bridge '{}' on universe {}. Audio send {}:{} and receive {}.",
         commissioning.hardware_profile,
@@ -440,17 +442,17 @@ pub fn run_commissioning_check(
 
             if bridge_ip.trim().is_empty() {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "bridgeIp is required for the lighting probe",
+                    "Enter the lighting bridge's IP address for the lighting probe.",
                 )));
             }
             if !is_valid_ipv4(&bridge_ip) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "bridgeIp must be a valid IPv4 address",
+                    "The lighting bridge IP must be four numbers, like 10.1.0.1.",
                 )));
             }
             if !(1..=63999).contains(&universe) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "universe must be between 1 and 63999",
+                    "The universe must be between 1 and 63999.",
                 )));
             }
 
@@ -467,7 +469,7 @@ pub fn run_commissioning_check(
                 },
                 if reachable {
                     format!(
-                        "Bridge probe reached {} on universe {}. Native DMX adapter wiring can build on this endpoint.",
+                        "The bridge at {} answered on universe {}.",
                         bridge_ip, universe
                     )
                 } else {
@@ -503,22 +505,22 @@ pub fn run_commissioning_check(
 
             if send_host.trim().is_empty() {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "sendHost is required for the audio probe",
+                    "Enter TotalMix's send host for the audio probe.",
                 )));
             }
             if !is_valid_osc_host(&send_host) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "sendHost must be localhost or a valid IPv4 address",
+                    "TotalMix's send host must be localhost or four numbers, like 127.0.0.1.",
                 )));
             }
             if !is_valid_port(send_port) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "sendPort must be between 1 and 65535",
+                    "TotalMix's send port must be between 1 and 65535.",
                 )));
             }
             if !is_valid_port(receive_port) {
                 return Err(CommissioningCommandError::InvalidParams(String::from(
-                    "receivePort must be between 1 and 65535",
+                    "TotalMix's receive port must be between 1 and 65535.",
                 )));
             }
 
@@ -563,7 +565,7 @@ pub fn run_commissioning_check(
 /// The deck's pages as the exported profile maps them (the fixture double
 /// says the same sentence); Planning's selection, which it used to describe,
 /// left with the page (new pages program, Slice 2).
-fn summarize_control_surface_probe() -> String {
+pub(crate) fn summarize_control_surface_probe() -> String {
     let snapshot = crate::exports::build_control_surface_snapshot();
     let controls = snapshot
         .pages
@@ -571,7 +573,7 @@ fn summarize_control_surface_probe() -> String {
         .map(|page| page.buttons.len() + page.dials.len())
         .sum::<usize>();
     format!(
-        "Control surface bridge exposes {controls} mapped controls across {} pages.",
+        "The deck's bridge serves {controls} controls on {} pages.",
         snapshot.pages.len()
     )
 }
@@ -718,16 +720,13 @@ fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Resul
 
     let send_socket = UdpSocket::bind(("0.0.0.0", 0)).map_err(|error| {
         format!(
-            "Audio OSC probe could not allocate a send socket: {}",
+            "The audio probe could not open a port to send from: {}",
             error
         )
     })?;
-    send_socket.connect(&send_target).map_err(|error| {
-        format!(
-            "Audio OSC probe could not target {}: {}",
-            send_target, error
-        )
-    })?;
+    send_socket
+        .connect(&send_target)
+        .map_err(|error| format!("The audio probe could not reach {}: {}", send_target, error))?;
     let _ = send_socket.send(b"/native/probe");
 
     if rme_totalmix_osc::wait_for_live_metering(Duration::from_millis(1_500)) {
@@ -845,7 +844,7 @@ mod tests {
 
         let snapshot = read_commissioning_snapshot(&runtime.db_path).expect("snapshot should read");
 
-        assert_eq!(snapshot.summary, "Stage 'import', 3 probe records.");
+        assert_eq!(snapshot.summary, "Setup is not published yet: Lighting, Audio, Cameras and Teleprompter stay locked until it is.");
         assert_eq!(
             snapshot
                 .steps
@@ -1007,7 +1006,7 @@ mod tests {
             .map(|check| check.message.as_str())
             .unwrap_or_default();
         assert!(
-            message.starts_with("Control surface bridge exposes "),
+            message.starts_with("The deck's bridge serves "),
             "{message}"
         );
         assert!(!message.to_lowercase().contains("planning"), "{message}");
@@ -1022,7 +1021,7 @@ mod tests {
     fn the_control_surface_probe_counts_the_decks_controls() {
         assert_eq!(
             summarize_control_surface_probe(),
-            "Control surface bridge exposes 87 mapped controls across 4 pages."
+            "The deck's bridge serves 87 controls on 4 pages."
         );
     }
 
@@ -1049,7 +1048,7 @@ mod tests {
             CommissioningCommandError::InvalidParams(message) => {
                 assert_eq!(
                     message,
-                    "sendHost must be localhost or a valid IPv4 address"
+                    "TotalMix's send host must be localhost or four numbers, like 127.0.0.1."
                 );
             }
             other => panic!("unexpected error: {other:?}"),

@@ -15,11 +15,12 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 **Header.** The tabs are `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Then comes one lamp for each subsystem, with its worst state as a word: green is fine, amber wants attention, red is a fault. Pressing a lamp opens Setup / Support.
 
-- `Lighting`. `ready`: the bridge passed its last probe; the app never checks the bridge by itself. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed.
+- `Lighting`. `ready`: the bridge passed its last probe; the app never checks the bridge by itself. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
 - `Prompter`. `ready`: the Prompter XL shows Studio Control's window. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`.
 - `Surface`. `ready`: the app listens for the Stream Deck. `unavailable`: it could not open its port.
+- `Backup`, amber, after the five, only while something is wrong: `failed` when the automatic backup could not be written, `overdue` when none has been written for two days. Pressing it opens Setup / Support, where the backups are.
 
 A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`, `REC CAM 1`. Pressing it opens its page. The clock comes last.
 
@@ -31,9 +32,10 @@ A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Pro
 
 ## Lighting
 
-The state display reads one of four words.
+The state display reads one of five words.
 
-- `REACHABLE`: the bridge passed its last probe. It reads so while the outputs are held too: only the header's lamp says `held`.
+- `REACHABLE`: the bridge passed its last probe.
+- `HELD`: the light outputs are held, and nothing is sent to the rig. `Open Setup` goes to the `Light outputs` switch.
 - `UNSAVED`: the rig differs from the recalled scene. `Save changes` writes the rig into the scene. `Recall it again` puts the scene back.
 - `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
 - `UNREACHABLE`: the bridge has not passed its probe, and the rig's controls are locked. `Open Setup`, run the bridge probe, publish again.
@@ -52,7 +54,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 ## Audio (the Console)
 
 - **Rows.** `Inputs` in banks of four, turned with the arrows on the heading; `Playback`; `Outputs`: `Main Out`, `Phones 1`, `Phones 2`.
-- **Mix target.** The faders set what each strip sends into the chosen output. `DIM` and `MONO` reach the desk only for `Main Out`.
+- **Mix target.** The faders set what each strip sends into the chosen output. `DIM` and `MONO` are `Main Out`'s, whichever output is the mix target: TotalMix has neither for the phones, so their strips show neither.
 - **Strip.** A fader, `M` for mute, `S` for solo. Press a strip to open it in the plate.
 - **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on.
 - **Gain.** `GAIN` on a preamp's strip opens typed entry, 0 to 75 dB. The plate's knob rides it.
@@ -163,7 +165,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 
 **Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
 
-**Diagnostics.** `Export diagnostics` writes a report. `Engine log` opens the log.
+**Diagnostics.** `Export diagnostics` writes a report. `Open the log` opens the log.
 
 **Recent actions** lists the last eight actions that changed what a device receives, and who did each: `Screen`, `Stream Deck`, `Console` (a switch thrown at TotalMix) or `Start-up`. Faders and dials are not listed.
 
@@ -179,6 +181,8 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | `AUDIO STOPPED` and the like | A page failed to draw       | `Reload this area`                    |
 | A device does not follow     | The link may be stuck       | `Restart the hardware link…`          |
 | Lighting `held`              | Nothing reaches the rig     | `Light outputs` to `ARMED`            |
+| Lighting `no output`         | The output's port is taken  | `Restart the hardware link…`          |
+| `Backup failed` or `overdue` | No automatic backup written | `Export backup`; check disk space     |
 | Lighting `no bridge`         | Its probe has not passed    | Run it in Setup, then publish         |
 | Rig dark, Lighting `ready`   | The probe may be old        | Check the bridge's power and cable    |
 | Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |

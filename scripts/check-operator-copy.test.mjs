@@ -36,8 +36,8 @@ test("ignores identifiers, module specifiers, object keys and test ids", () => {
   assert.deepEqual(hits, []);
 });
 
-test("keeps 'Engine log' and the Console's own snapshots", () => {
-  assert.deepEqual(scanSource(`const t = "Open the Engine log";`, "frontend/app/src/app/z.ts"), []);
+test("keeps the Console's own snapshots, and 'Engine log' is a hit (2026-09-28)", () => {
+  assert.equal(scanSource(`const t = "Open the Engine log";`, "frontend/app/src/app/z.ts").length, 1);
   assert.deepEqual(scanSource(`const t = "Recall snapshot 3";`, "frontend/app/src/app/audio/AudioWorkspace.tsx"), []);
   assert.equal(scanSource(`const t = "Recall snapshot 3";`, "frontend/app/src/app/lighting/L.tsx").length, 1);
 });

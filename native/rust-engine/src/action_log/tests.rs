@@ -50,8 +50,8 @@ fn record_list_prune() {
             ActionSource::Console,
             DOMAIN_AUDIO,
             "dim",
-            "Main out",
-            "Dim on at TotalMix: Main out",
+            "Main Out",
+            "Dim on at TotalMix: Main Out",
         )],
     )
     .expect("a row should be written");
@@ -63,7 +63,7 @@ fn record_list_prune() {
             .map(|entry| (entry.source.as_str(), entry.detail.as_str()))
             .collect::<Vec<_>>(),
         vec![
-            ("console", "Dim on at TotalMix: Main out"),
+            ("console", "Dim on at TotalMix: Main Out"),
             ("deck", "Mute on: Host mic"),
             ("ui", "first"),
         ],
@@ -76,7 +76,7 @@ fn record_list_prune() {
             newest.action.as_str(),
             newest.target.as_str()
         ),
-        ("audio", "dim", "Main out")
+        ("audio", "dim", "Main Out")
     );
     assert!(
         newest.at.len() == 24 && newest.at.ends_with('Z') && newest.at.contains('T'),
@@ -199,7 +199,7 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
         (
             "audio.mixTarget.update",
             json!({ "mixTargetId": "audio-mix-main", "dim": true, "volume": 0.4 }),
-            json!({ "id": "audio-mix-main", "name": "Main out" }),
+            json!({ "id": "audio-mix-main", "name": "Main Out" }),
         ),
         (
             "audio.channel.eq.update",
@@ -450,7 +450,7 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
         (
             "/api/deck/audio-action",
             "dimToggle",
-            json!({ "mixTargetId": "audio-mix-main", "dim": true }),
+            json!({ "mixTargetId": "audio-mix-main", "name": "Main Out", "dim": true }),
         ),
         (
             "/api/deck/audio-action",

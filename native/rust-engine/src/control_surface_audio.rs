@@ -739,7 +739,9 @@ fn handle_audio_dim_toggle(db_path: &Path) -> Result<Value, ControlSurfaceError>
     request.dim = Some(!main.dim);
     let updated = update_audio_mix_target(db_path, &request).map_err(map_audio_error)?;
     emit_audio_changed();
-    Ok(json!({ "mixTargetId": updated.id, "dim": updated.dim }))
+    // The name the screen's row gives the output, so Recent actions names the
+    // main output one way, from the deck as from the screen (2026-09-28).
+    Ok(json!({ "mixTargetId": updated.id, "name": updated.name, "dim": updated.dim }))
 }
 
 fn handle_audio_solo_clear_all(db_path: &Path) -> Result<Value, ControlSurfaceError> {

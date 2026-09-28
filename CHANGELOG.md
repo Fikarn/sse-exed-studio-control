@@ -40,6 +40,11 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Lighting reads `HELD` while the light outputs are held; it read `REACHABLE`, "the rig is following it" (#255).
+- `DIM` and `MONO` are `Main Out`'s whichever output is the mix target, and the phones' strips no longer show them: nothing was ever sent for the phones (#255).
+- The header shows a `Backup` chip while the automatic backup failed or is overdue, and the Lighting lamp reads `no output` when the light output could not open its port. Both went unseen (#255).
+- `Engine log` is `Open the log`, and the sentences from the hardware link on Setup, the Console, Lighting and the recovery screen are in plain words (#255).
+- Recent actions names the main output `Main Out` for the deck's `DIM` too (#255).
 - On the deck, `All Off` and `Del Scene` ask first: the key reads `OFF?` or `DEL?` in amber, and a second press within 3 s acts. `Save` stays one press. They reach the deck with the next import of the profile (#254).
 - On the deck, a press of `PLAY`, `DIM`, a mute or `Toggle` that arrives twice within a third of a second switches once (#254).
 - Every restore comes back with the light outputs held, a database backup's and an archive's alike; arm them in Setup / Support when the rig should follow. A restore from the recovery screen could arm a rig that was held (#253).

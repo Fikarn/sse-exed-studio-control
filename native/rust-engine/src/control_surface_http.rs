@@ -121,9 +121,7 @@ pub fn start_control_surface_bridge(
                 .map(|address| address.port())
                 .unwrap_or(requested_port);
             let base_url = format!("http://{DEFAULT_CONTROL_SURFACE_HOST}:{port}");
-            let summary = format!(
-                "Native control-surface bridge is serving deck actions and LCD payloads at {base_url}."
-            );
+            let summary = format!("The deck's bridge is ready at {base_url}.");
 
             // The bootstrap writes the one log line about this start, serving
             // or not (`start_logged_control_surface_bridge`).
@@ -154,7 +152,7 @@ pub fn start_control_surface_bridge(
         }
         Err(message) => {
             let summary = format!(
-                "Native control-surface bridge is unavailable because the listener could not bind: {message}"
+                "The deck's bridge could not open its port: {message}. Close what holds it, then restart the hardware link."
             );
             // Health `attention` (Slice 8 — F14): the deck cannot reach the
             // app until the port is free or SSE_CONTROL_SURFACE_PORT names

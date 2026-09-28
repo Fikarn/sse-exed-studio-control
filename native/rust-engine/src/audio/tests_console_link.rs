@@ -490,7 +490,7 @@ fn audio_sync_refuses_when_the_global_slot_is_unbound() {
     match error {
         AudioCommandError::Rejected(code, message) => {
             assert_eq!(code, "AUDIO_GLOBAL_OSC_UNBOUND");
-            assert!(message.contains("Global OSC receive port"), "{message}");
+            assert!(message.contains("Global OSC port"), "{message}");
         }
         other => panic!("unexpected error: {other:?}"),
     }

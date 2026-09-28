@@ -946,15 +946,14 @@ pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<Actio
                 .map(|on| vec![audio("mute", name, format!("Mute {}: {name}", on_off(on)))])
                 .unwrap_or_default()
         }
-        ("/api/deck/audio-action", "dimToggle") => flag(reply, "dim")
-            .map(|on| {
-                vec![audio(
-                    "dim",
-                    "Main out",
-                    format!("Dim {}: main out", on_off(on)),
-                )]
-            })
-            .unwrap_or_default(),
+        // The output as the screen names it (`Main Out`): it read `main out`
+        // here, and `Main Out` in the screen's row and TotalMix's.
+        ("/api/deck/audio-action", "dimToggle") => {
+            let name = text(reply, "/name").unwrap_or("Main Out");
+            flag(reply, "dim")
+                .map(|on| vec![audio("dim", name, format!("Dim {}: {name}", on_off(on)))])
+                .unwrap_or_default()
+        }
         // The CAMERAS page's `REC` (D14): a take's start and its stop, in
         // the sentence the screen's row carries. The armed stop (`STOP?`)
         // and a press inside the dwell changed nothing, and leave no row.

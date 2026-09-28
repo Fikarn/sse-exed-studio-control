@@ -8,9 +8,9 @@
 //
 // Operator-facing strings are JSX text and string / template literals that
 // read as language (they contain a space), minus module specifiers, object
-// keys, class names, test ids and other identifiers. "Engine log" stays until
-// the engine copy pass renames the feature (system §9); a "snapshot" that names
-// audio or the Console is that scene primitive and allowed.
+// keys, class names, test ids and other identifiers. A "snapshot" that names
+// audio or the Console is that scene primitive and allowed. ("Engine log" was
+// allowed until the key became `Open the log`, 2026-09-28.)
 //
 // Slice 8 took the program to 0 and tightened the gate to the rule it enforces:
 // the live client (`engine-client/src/store`) is scanned, because its
@@ -30,7 +30,7 @@ import ts from "typescript";
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export const FORBIDDEN = [
-  { word: "engine", re: /\bengine\b/i, exempt: /\bengine log\b/i },
+  { word: "engine", re: /\bengine\b/i },
   { word: "backend", re: /\bbackend\b/i },
   { word: "transport", re: /\btransport\b/i },
   { word: "IPC", re: /\bIPC\b/ },

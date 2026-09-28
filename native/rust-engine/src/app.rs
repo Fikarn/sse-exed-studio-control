@@ -108,7 +108,7 @@ fn support_error_response(id: serde_json::Value, error: SupportCommandError) -> 
 impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
-        append_log(&runtime.log_file_path, "INFO", "Engine bootstrap completed")?;
+        append_log(&runtime.log_file_path, "INFO", "Hardware link started")?;
         Ok(Self { runtime })
     }
 

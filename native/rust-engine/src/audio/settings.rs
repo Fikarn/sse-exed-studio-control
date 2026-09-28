@@ -177,9 +177,7 @@ pub fn update_audio_settings(
         ));
         updates.push((
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.message"),
-            String::from(
-                "Audio transport settings changed in the native audio workspace. Rerun the audio probe.",
-            ),
+            String::from("The TotalMix address or ports changed. Run the audio probe again."),
         ));
         updates.push((
             format!("app.commissioning.check.{AUDIO_CHECK_ID}.checked_at"),

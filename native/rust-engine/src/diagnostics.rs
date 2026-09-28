@@ -294,12 +294,12 @@ pub fn request_log_line(
 /// one (finding F11).
 pub fn read_log_tail(log_file_path: &Path, max_bytes: u64, max_lines: usize) -> String {
     if !log_file_path.exists() {
-        return format!("Engine log not found yet at {}", log_file_path.display());
+        return format!("No log yet at {}.", log_file_path.display());
     }
 
     let window = match read_tail_window(log_file_path, max_bytes) {
         Ok(window) => window,
-        Err(error) => return format!("Failed to read engine log: {error}"),
+        Err(error) => return format!("The log could not be read: {error}"),
     };
 
     let lines = window.lines().collect::<Vec<_>>();
@@ -307,7 +307,7 @@ pub fn read_log_tail(log_file_path: &Path, max_bytes: u64, max_lines: usize) -> 
     let excerpt = lines[start_index..].join("\n").trim().to_string();
 
     if excerpt.is_empty() {
-        return String::from("Engine log exists but is currently empty.");
+        return String::from("The log is empty.");
     }
 
     excerpt
@@ -360,7 +360,7 @@ mod tests {
         let log_path = temp_dir.join("missing.log");
 
         let excerpt = read_log_tail(&log_path, LOG_TAIL_MAX_BYTES, 12);
-        assert!(excerpt.contains("Engine log not found yet"));
+        assert!(excerpt.contains("No log yet at"));
     }
 
     #[test]
