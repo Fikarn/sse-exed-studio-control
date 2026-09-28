@@ -12,8 +12,10 @@
 //!
 //! The flag is persisted, so a hold outlives the launch that made it:
 //! `SSE_SAFE_START=1` writes `false` at the bootstrap, and only the operator
-//! writes `true` again. A restore never changes it (`support.rs`, and the
-//! bootstrap's pending database restore).
+//! writes `true` again. Every restore writes `false` (the owner's decision,
+//! 2026-09-28): an archive restore in its own transaction (`support.rs`), a
+//! database restore at the start that applies it (`bootstrap.rs`). No backup
+//! brings its own flag back.
 
 use std::collections::HashMap;
 use std::path::Path;

@@ -11,6 +11,7 @@ import {
   getSupportBackups,
   healthCheckTone,
   statusToneLabel,
+  RESTORE_HOLD_SENTENCE,
   type SnapshotRecord,
   withRestoreDetail,
 } from "../shellData";
@@ -164,7 +165,7 @@ export function SetupRecoverySurface({
     return {
       message: withRestoreDetail(
         result?.requiresRestart === true
-          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it. ${RESTORE_HOLD_SENTENCE}`
           : `Restore requested from ${String(result?.sourcePath ?? path)}.`,
         result
       ),

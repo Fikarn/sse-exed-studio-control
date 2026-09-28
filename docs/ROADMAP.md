@@ -186,7 +186,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 
 - [x] **Setup unpublishes at one press.** A press on any runner step, or on `Run all probes`, unpublishes a published setup at once and locks Lighting, Audio, Cameras and Teleprompter until `Publish setup`. Fixed in #252: such a press arms first and a second within 3 s applies; `Back to …` did the same and arms too, and a press on `Publish` itself sends nothing.
 - [x] **`Restore latest` and `Restore path` act at one press.** A database restore replaces all saved data and restarts the hardware link. Fixed in #252: they ask first, in Setup and on the recovery screen, and say what the restore replaces.
-- [ ] **A restore from the recovery screen can arm the lights.** The light outputs take the backup's own setting, so the restart can stream to a rig that was held.
+- [x] **A restore from the recovery screen can arm the lights.** The light outputs take the backup's own setting, so the restart can stream to a rig that was held. Fixed in #253: every restore comes back held, a database backup's at the start that applies it (a refused one too) and an archive's in its transaction.
 - [ ] **The deck's `Del Scene`, `Save` and `All Off` act at one press,** and the screen's `Undo` cannot bring a deleted scene back. On screen, `CUT ALL` asks first.
 - [ ] **Lighting never checks the bridge during a session.** `REACHABLE` and the lamp's `ready` come from the last probe, and the probe counts a refused connection as reachable.
 - [ ] **The deck's probe always passes.** It counts the pages the app holds and never reaches Companion or the deck.
@@ -210,6 +210,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **A key the deck was refused leaves no line in the log.** The bridge logs what it refuses itself (a token, a full queue), not what a page refuses (`REC` while CAM 1 is released).
 - [ ] **`PLAY`, `DIM`, a mute and `Toggle` on the deck have no dwell.** A press that arrives twice switches twice. `REC` has one.
 - [ ] **Setup's runner offers `Start with Import profile` on every step,** also when the first steps are done.
+- [ ] **An archive restore raises no `audio.changed`.** It rewrites the Console's settings, and the pages read the audio again only when something else asks. Found in #253, not tried; the lighting's event was added there.
 - [ ] **The recovery screen's `Restore latest` can pick a backup archive.** It takes the newest backup of either kind, and the recovery screen restores only a database backup, so the restore is refused with a sentence. Found in #252.
 
 ## Waiting on the owner

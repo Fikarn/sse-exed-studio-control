@@ -205,7 +205,14 @@ describe("the fixture double's action log", () => {
       "support.backup.restore",
       { path: "native-backup.json" },
       { formatVersion: 4 },
-      [row("setup", "backup-restored", "Saved data", "Backup archive restored: lighting and audio state replaced")],
+      [
+        row(
+          "setup",
+          "backup-restored",
+          "Saved data",
+          "Backup archive restored: lighting and audio state replaced; light outputs held"
+        ),
+      ],
     ],
     ["support.backup.restore", { path: "db-shutdown.sqlite3" }, { requiresRestart: true }, []],
     // The Teleprompter (Slice 4): the result's sentence without its full stop, on the result's name.

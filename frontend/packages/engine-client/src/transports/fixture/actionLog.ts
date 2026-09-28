@@ -380,7 +380,7 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
           domain: "setup",
           action: "backup-restored",
           target: "Saved data",
-          detail: "Backup archive restored: lighting and audio state replaced",
+          detail: "Backup archive restored: lighting and audio state replaced; light outputs held",
         },
       ];
 

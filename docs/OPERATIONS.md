@@ -161,7 +161,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 
 **Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing, CAM 2's and CAM 3's addresses, and the vMix input that carries each picture. Saving sends nothing to a camera. `Forget` removes a pairing or an address and keeps the vMix input. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked, and the vMix input can be set.
 
-**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. The light outputs stay armed or held as they were.
+**Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
 
 **Diagnostics.** `Export diagnostics` writes a report. `Engine log` opens the log.
 
@@ -189,7 +189,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
 | Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
 
-The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs armed or held as that backup had them.
+The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
 
 Closing asks first. It resets and recalls nothing: TotalMix keeps its state, the light output stops and the fixtures hold their last levels.
 

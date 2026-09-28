@@ -19,6 +19,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Lighting
 
 - [ ] Started with `SSE_SAFE_START=1`, the header's Lighting lamp reads `held`, a recalled scene does not reach the rig, and the DMX monitor shows what would be sent.
+- [ ] With the light outputs armed, a restore of a backup (Setup / Support › Support) comes back with them held: the lamp reads `held`, and the rig keeps its look until `Light outputs` is armed.
 - [ ] `Light outputs` set to `Armed` in Setup / Support › Workstation: the rig follows at once.
 - [ ] Set to `Held` while the rig is lit: the rig keeps its last look.
 - [ ] A light selected in the list, then on the plot: the plate follows both, and the footer's values are complete.

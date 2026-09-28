@@ -1,6 +1,6 @@
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import { startTransition, useMemo } from "react";
-import { asRecord, getCommissioningChecks, withRestoreDetail } from "../../shellData";
+import { asRecord, getCommissioningChecks, RESTORE_HOLD_SENTENCE, withRestoreDetail } from "../../shellData";
 import { openShellPath, exportShellDiagnostics } from "../../shellCommands";
 import type { JsonValue } from "@sse/engine-client";
 import {
@@ -217,8 +217,8 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
     return {
       message: withRestoreDetail(
         result?.requiresRestart === true
-          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it.`
-          : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}.`,
+          ? `Database backup restored from ${String(result?.sourcePath ?? path)}; the hardware link restarted into it. ${RESTORE_HOLD_SENTENCE}`
+          : `Restored ${String(result?.sourceFormat ?? "backup")} from ${String(result?.sourcePath ?? path)}. ${RESTORE_HOLD_SENTENCE}`,
         result
       ),
       tone: "ok" as const,

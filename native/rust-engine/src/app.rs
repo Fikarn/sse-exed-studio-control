@@ -651,6 +651,13 @@ impl EngineApp {
                                         response,
                                         "backup-restored",
                                     );
+                                    // The archive rewrote the lighting and held
+                                    // the light outputs (2026-09-28): the pages
+                                    // read the lighting again.
+                                    reply.events.push(event_message(
+                                        EVENT_LIGHTING_CHANGED,
+                                        json!({ "reason": "backup-restored" }),
+                                    ));
                                     // Slice 4: a restore leaves the prompter paused
                                     // where it was (D12) and may bring the look back.
                                     match after_archive_restore(&self.runtime.db_path) {

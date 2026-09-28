@@ -797,7 +797,9 @@ pub(crate) fn ui_actions(
                 DOMAIN_SETUP,
                 "backup-restored",
                 "Saved data",
-                String::from("Backup archive restored: lighting and audio state replaced"),
+                String::from(
+                    "Backup archive restored: lighting and audio state replaced; light outputs held",
+                ),
             )]
         }
 

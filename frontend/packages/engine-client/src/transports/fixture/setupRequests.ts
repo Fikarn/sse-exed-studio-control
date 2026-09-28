@@ -346,6 +346,12 @@ export function handleFixtureSetupRequest(
       );
       updateFixtureCheck(state, "lighting", "passed", "Lighting bridge settings were restored from support backup.");
       updateFixtureCheck(state, "audio", "passed", "Audio transport settings were restored from support backup.");
+      // A restore always comes back with the light outputs held (the owner's
+      // decision, 2026-09-28): an archive holds them at once, a database
+      // backup at the start that applies it.
+      const lightingSnapshot = asRecord(state.lightingSnapshot) ?? {};
+      lightingSnapshot.outputArmed = false;
+      state.lightingSnapshot = lightingSnapshot;
       synchronizeFixtureState(state);
       let detail: string | null = null;
       if (databaseRestore) {
@@ -354,6 +360,7 @@ export function handleFixtureSetupRequest(
         emit("support.changed", { reason: "backup-restored" });
         emit("commissioning.changed", { reason: "backup-restored" });
         emit("app.changed", { reason: "backup-restored" });
+        emit("lighting.changed", { reason: "backup-restored" });
         // Format 6 (Slice 4): the scripts come back — added, never removed or overwritten
         // — with the look, and the prompter stays paused where it was (D12).
         const archive = exportedArchives.get(state)?.get(path) ?? null;

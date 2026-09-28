@@ -6,7 +6,8 @@ import { formatBackupTimestamp, type SupportBackupEntry, type SupportBackupKind 
 // saved data at one press. They ask first now, as `CUT ALL` does, and the
 // question says what the restore replaces. The answer is the kind of backup:
 // a database backup replaces the whole file and restarts the hardware link, an
-// archive rewrites the settings in place and adds scripts.
+// archive rewrites the settings in place and adds scripts. Either way the light
+// outputs come back held (the owner's decision, 2026-09-28).
 
 export interface RestorePrompt {
   /** The file the restore reads. */
@@ -28,12 +29,12 @@ export function restoreKindOf(path: string, backups: readonly SupportBackupEntry
 
 function restoreBody(kind: SupportBackupKind | null) {
   if (kind === "database") {
-    return "It replaces all the saved data: Setup, the lights and scenes, the Console, the deck, the scripts and the cameras' setup. The hardware link restarts into it. The saved data it replaces is kept in the backups folder.";
+    return "It replaces all the saved data: Setup, the lights and scenes, the Console, the deck, the scripts and the cameras' setup. The hardware link restarts into it with the light outputs held. The saved data it replaces is kept in the backups folder.";
   }
   if (kind === "archive") {
-    return "It replaces Setup, the lights and scenes, the Console's settings, the deck's settings and the cameras' setup. Scripts in it are added; none is removed. A copy of the settings it replaces is written to the backups folder first.";
+    return "It replaces Setup, the lights and scenes, the Console's settings, the deck's settings and the cameras' setup, and holds the light outputs. Scripts in it are added; none is removed. A copy of the settings it replaces is written to the backups folder first.";
   }
-  return "A database backup replaces all the saved data and restarts the hardware link. A backup archive replaces Setup, the lights and scenes, the Console's and the deck's settings, and adds its scripts.";
+  return "A database backup replaces all the saved data and restarts the hardware link. A backup archive replaces Setup, the lights and scenes, the Console's and the deck's settings, and adds its scripts. Either way the light outputs come back held.";
 }
 
 export function RestoreConfirmDialog({
