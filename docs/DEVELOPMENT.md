@@ -24,10 +24,12 @@ Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`.
 **The app.** `npm run app` builds the engine and the shell and starts them as a development run:
 
 - its saved data is `.dev/app-data` in the repository, which git ignores, and it stays between runs. The first start opens Setup: publish it once, over the probes that cannot pass;
-- the lights are held, the console and the cameras are simulated, and the Stream Deck bridge is on port `38211`, so nothing reaches a device or Companion;
+- the lights are held and their wire is cut, the console and the cameras are simulated, and the Stream Deck bridge is on port `38211`, which Companion does not talk to. Arming the lights on screen sends nothing. Setup's probes and the Companion export still ask the address they are given;
 - it is an app of its own, with `.dev` at the end of its identifier: its own saved display and browser profile, and it runs while the studio app is open.
 
-To work on the studio's data, copy its folder and name the copy: `SSE_APP_DATA_DIR=<the copy> npm run app`. The studio's own folder is refused, by the command and by every development build.
+To work on the studio's data, copy its folder and name the copy: `npm run app -- --data=<the copy>`. The studio's own folder, and any folder inside it, is refused by the command and by every development build.
+
+A development build started any other way is as careful: where a switch is not set it takes the safe value (`native/rust-engine/src/development.rs`), and says so in its log.
 
 A change to the pages shows at once. After a change to the engine or the contract, close the app and start it again.
 
@@ -116,4 +118,4 @@ The engine:
 
 ## Studio builds
 
-A studio build is a release build of the shell with the engine beside it. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.
+A studio build is a folder that holds a release build of the shell and a release build of the engine. How one is made and kept is being rebuilt (`docs/ROADMAP.md`, the streamlining's builds step); until then the builds the studio has run are under `release\native\`.

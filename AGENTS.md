@@ -43,7 +43,7 @@ Two rules hold the design together:
 
 ## Safety
 
-- **Tests and development runs never reach a real device and never open the real saved data.** `npm run app` sees to it: saved data of its own, the lights held, the console and the cameras simulated, a bridge port of its own. A development build refuses the studio's data folder whoever starts it. An engine started by hand is given the same variables (`docs/HARDWARE.md`).
+- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console and the cameras, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes and the Companion export ask the address they are given.
 - **Real devices are driven only by a release build,** or by a hardware test the owner asked for and is present at.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.

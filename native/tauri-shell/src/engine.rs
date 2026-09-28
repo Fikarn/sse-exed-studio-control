@@ -2,7 +2,6 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::ffi::OsString;
 use std::fs::create_dir_all;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -14,13 +13,15 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
+use studio_control_protocol::development::{
+    default_app_data_dir, development_build, host_platform, refuse_studio_folders,
+};
 use studio_control_protocol::{
     error_response, RequestEnvelope, ResponseEnvelope, EVENT_ENGINE_EXITED, PROTOCOL_VERSION,
 };
 use tauri::{AppHandle, Emitter};
 
 const ENGINE_EVENT_CHANNEL: &str = "engine://event";
-const DEFAULT_APP_DATA_DIR_NAME: &str = "ExEd Studio Control Native";
 /// Sub-directory of the app-data directory that receives the shell's
 /// diagnostics exports (2026-09 production readiness, Slice 4 — finding F15).
 pub(crate) const EXPORTS_DIR_NAME: &str = "exports";
@@ -554,130 +555,35 @@ pub(crate) fn exports_dir_for(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(EXPORTS_DIR_NAME)
 }
 
+/// The folders of this start. A development build is refused the studio's
+/// folders here (`studio_control_protocol::development`): every folder the
+/// shell creates, writes or opens comes from this function, so a development
+/// shell stops before it writes as much as a line of `shell.log` there.
 pub(crate) fn resolve_runtime_directories() -> Result<(PathBuf, PathBuf), String> {
+    let platform = host_platform();
     let app_data_dir = match env_path("SSE_APP_DATA_DIR") {
         Some(path) => path,
-        None => default_app_data_dir()?,
+        None => default_app_data_dir(platform, |name| std::env::var_os(name))?,
     };
     let logs_dir = env_path("SSE_LOG_DIR").unwrap_or_else(|| app_data_dir.join("logs"));
 
     if !app_data_dir.is_absolute() || !logs_dir.is_absolute() {
         return Err("Runtime paths must resolve to absolute directories.".to_string());
     }
-    refuse_studio_data_in_development(
-        cfg!(debug_assertions),
-        current_runtime_platform(),
-        &app_data_dir,
+    refuse_studio_folders(
+        development_build(),
+        platform,
+        &[&app_data_dir, &logs_dir],
         |name| std::env::var_os(name),
     )?;
 
     Ok((app_data_dir, logs_dir))
 }
 
-/// A development build never opens the studio's saved data: the twin of the
-/// engine's `refuse_studio_data_in_development` (bootstrap.rs), which says
-/// why. Every folder the shell creates, writes or opens comes from
-/// `resolve_runtime_directories`, so a development shell stops here before
-/// it writes as much as a line of `shell.log` into the studio's folder.
-fn refuse_studio_data_in_development<F>(
-    development_build: bool,
-    platform: RuntimePlatform,
-    app_data_dir: &Path,
-    get_env: F,
-) -> Result<(), String>
-where
-    F: FnMut(&str) -> Option<OsString>,
-{
-    if !development_build {
-        return Ok(());
-    }
-    let Ok(studio_data_dir) = default_app_data_dir_for_platform(platform, get_env) else {
-        // No default folder on this host: there is no studio data to open.
-        return Ok(());
-    };
-    if !same_folder(app_data_dir, &studio_data_dir) {
-        return Ok(());
-    }
-    Err(format!(
-        "This is a development build, and {} holds the studio's saved data. Start it with `npm run app`, which gives it a folder of its own, or name another folder in SSE_APP_DATA_DIR.",
-        studio_data_dir.display()
-    ))
-}
-
-/// Whether two paths name one folder: as the file system resolves them when
-/// they exist, as written otherwise; part by part, so a trailing separator
-/// or the other separator changes nothing, and without regard to case on
-/// Windows.
-fn same_folder(left: &Path, right: &Path) -> bool {
-    let parts = |path: &Path| -> Vec<String> {
-        std::fs::canonicalize(path)
-            .unwrap_or_else(|_| path.to_path_buf())
-            .components()
-            .map(|part| {
-                let part = part.as_os_str().to_string_lossy();
-                if cfg!(target_os = "windows") {
-                    part.to_lowercase()
-                } else {
-                    part.into_owned()
-                }
-            })
-            .collect()
-    };
-    parts(left) == parts(right)
-}
-
 fn env_path(name: &str) -> Option<PathBuf> {
     std::env::var_os(name)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-}
-
-#[derive(Clone, Copy)]
-enum RuntimePlatform {
-    /// The Linux CI runners, which build and test the shell (new pages
-    /// program, Slice SW, D22: Studio Control itself runs on Windows only).
-    Unix,
-    Windows,
-}
-
-fn current_runtime_platform() -> RuntimePlatform {
-    if cfg!(target_os = "windows") {
-        RuntimePlatform::Windows
-    } else {
-        RuntimePlatform::Unix
-    }
-}
-
-fn default_app_data_dir() -> Result<PathBuf, String> {
-    default_app_data_dir_for_platform(current_runtime_platform(), |name| std::env::var_os(name))
-}
-
-fn default_app_data_dir_for_platform<F>(
-    platform: RuntimePlatform,
-    mut get_env: F,
-) -> Result<PathBuf, String>
-where
-    F: FnMut(&str) -> Option<OsString>,
-{
-    let env_path = |name: &str, get_env: &mut F| -> Option<PathBuf> {
-        get_env(name)
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-    };
-
-    let base = match platform {
-        RuntimePlatform::Windows => {
-            env_path("APPDATA", &mut get_env).or_else(|| env_path("LOCALAPPDATA", &mut get_env))
-        }
-        RuntimePlatform::Unix => env_path("XDG_DATA_HOME", &mut get_env).or_else(|| {
-            env_path("HOME", &mut get_env).map(|home| home.join(".local").join("share"))
-        }),
-    };
-
-    base.map(|path| path.join(DEFAULT_APP_DATA_DIR_NAME)).ok_or_else(|| {
-        "Unable to resolve a durable app-data directory. Set SSE_APP_DATA_DIR to an absolute path."
-            .to_string()
-    })
 }
 
 /// The engine this shell starts: the one in the shell's own folder, and no
@@ -768,16 +674,6 @@ mod tests {
         fs::create_dir_all(path.parent().expect("test path should have a parent"))
             .expect("test parent directory should be creatable");
         File::create(path).expect("test file should be creatable");
-    }
-
-    fn env_fixture<'a>(
-        entries: &'a [(&'a str, &'a str)],
-    ) -> impl FnMut(&str) -> Option<OsString> + 'a {
-        move |name| {
-            entries
-                .iter()
-                .find_map(|(key, value)| (*key == name).then(|| OsString::from(value)))
-        }
     }
 
     /// A process that exits on its own right away.
@@ -1028,34 +924,6 @@ mod tests {
         assert!(events.try_recv().is_err(), "the exit is reported once");
     }
 
-    #[test]
-    fn windows_default_app_data_matches_durable_qt_style_location() {
-        let resolved = default_app_data_dir_for_platform(
-            RuntimePlatform::Windows,
-            env_fixture(&[("APPDATA", "C:/Users/operator/AppData/Roaming")]),
-        )
-        .expect("windows app data should resolve");
-
-        assert_eq!(
-            resolved,
-            PathBuf::from("C:/Users/operator/AppData/Roaming").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-    }
-
-    #[test]
-    fn unix_default_app_data_honors_xdg_data_home() {
-        let resolved = default_app_data_dir_for_platform(
-            RuntimePlatform::Unix,
-            env_fixture(&[("XDG_DATA_HOME", "/home/operator/.local/data")]),
-        )
-        .expect("unix app data should resolve");
-
-        assert_eq!(
-            resolved,
-            PathBuf::from("/home/operator/.local/data").join(DEFAULT_APP_DATA_DIR_NAME)
-        );
-    }
-
     // Streamlining, 2026-09-28: the shell starts the engine in its own folder
     // and no other. Until then a shell with none beside it took the
     // repository's `target/debug`, then its `target/release`, and
@@ -1103,74 +971,6 @@ mod tests {
         let error = resolve_engine_binary_from(None, binary_name)
             .expect_err("a shell that cannot read its own path starts nothing");
         assert!(error.contains(binary_name), "{error}");
-    }
-
-    // Streamlining, 2026-09-28: a development build (one with debug
-    // assertions) is refused the studio's saved data; the engine's test of
-    // the same name says why (bootstrap.rs).
-    #[test]
-    fn a_development_build_is_refused_the_studios_saved_data() {
-        let platform = current_runtime_platform();
-        let host: &[(&str, &str)] = if cfg!(target_os = "windows") {
-            &[("APPDATA", "C:\\Users\\operator\\AppData\\Roaming")]
-        } else {
-            &[("HOME", "/home/operator")]
-        };
-        let studio = default_app_data_dir_for_platform(platform, env_fixture(host))
-            .expect("the platform base resolves");
-
-        let error = refuse_studio_data_in_development(true, platform, &studio, env_fixture(host))
-            .expect_err("the default folder is the studio's");
-        assert!(error.contains("npm run app"), "{error}");
-        assert!(error.contains("SSE_APP_DATA_DIR"), "{error}");
-        assert!(error.contains(&studio.display().to_string()), "{error}");
-        let with_separator =
-            PathBuf::from(format!("{}{}", studio.display(), std::path::MAIN_SEPARATOR));
-        refuse_studio_data_in_development(true, platform, &with_separator, env_fixture(host))
-            .expect_err("a separator at its end names the same folder");
-
-        // The studio's build, a release build, opens it.
-        refuse_studio_data_in_development(false, platform, &studio, env_fixture(host))
-            .expect("a release build opens the studio's data");
-
-        // A folder of the run's own: a scratch folder, one beside the
-        // studio's, one inside it.
-        let tree = TempTree::new("development-data");
-        for own in [
-            tree.path("app-data"),
-            studio.with_file_name(format!("{DEFAULT_APP_DATA_DIR_NAME} Dev")),
-            studio.join("development"),
-        ] {
-            refuse_studio_data_in_development(true, platform, &own, env_fixture(host))
-                .unwrap_or_else(|error| panic!("{} is not the studio's: {error}", own.display()));
-        }
-        // A host with no platform base has no studio data to open.
-        refuse_studio_data_in_development(true, platform, &tree.path("app-data"), env_fixture(&[]))
-            .expect("nothing to refuse without a default folder");
-    }
-
-    #[test]
-    fn one_folder_is_recognised_however_it_is_written() {
-        let tree = TempTree::new("same-folder");
-        let folder = tree.path("Studio Data");
-        fs::create_dir_all(folder.join("logs")).expect("folders");
-
-        assert!(same_folder(&folder, &folder));
-        assert!(same_folder(&folder.join("logs").join(".."), &folder));
-        assert!(!same_folder(&folder, &folder.join("logs")));
-        let missing = tree.path("missing");
-        assert!(same_folder(&missing, &missing));
-        assert!(!same_folder(&missing, &tree.path("other")));
-        // Windows does not tell `Studio Data` from `STUDIO DATA`; the Linux
-        // CI runners do.
-        assert_eq!(
-            same_folder(&folder, &tree.path("STUDIO DATA")),
-            cfg!(target_os = "windows")
-        );
-        assert_eq!(
-            same_folder(&missing, &tree.path("MISSING")),
-            cfg!(target_os = "windows")
-        );
     }
 
     // 2026-09 production readiness, Slice 4 (finding F08): an id that is

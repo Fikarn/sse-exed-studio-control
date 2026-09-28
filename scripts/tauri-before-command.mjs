@@ -41,7 +41,10 @@ function main() {
     process.exit(1);
   }
 
-  const engineBuild = spawnSync(cargo, ["build", "--package", "studio-control-engine"], {
+  // `tauri build` makes the studio's kind of app, a release build, and its
+  // engine is one too; `tauri dev` runs the development builds of both.
+  const engineArgs = ["build", "--package", "studio-control-engine", ...(command === "build" ? ["--release"] : [])];
+  const engineBuild = spawnSync(cargo, engineArgs, {
     cwd: path.join(rootDirectory, "native"),
     stdio: "inherit",
     shell: process.platform === "win32",

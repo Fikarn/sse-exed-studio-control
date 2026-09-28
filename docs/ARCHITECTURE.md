@@ -35,12 +35,12 @@ These are part of the design. Do not remove one because it looks like weight.
 - **The bridge takes only what it can afford.** Headers over 8 KiB, bodies over 16 KiB and requests slower than one second are refused. Four workers serve a queue of sixty-four, sized for the deck's busiest second.
 - **The console's OSC ports read only TotalMix.** They bind `127.0.0.1` when TotalMix runs on this PC, and datagrams from any other address are dropped.
 - **Lights can be held.** While held, nothing is sent to the rig, and only the switch on screen arms them. A hold is saved across starts, and `SSE_SAFE_START=1` holds them at a start.
-- **One engine at a time.** The engine locks `engine.lock` in its data folder, and the shell lets only one copy of itself run. Two engines would both stream to the lights.
+- **One engine for each data folder, one studio app at a time.** The engine locks `engine.lock` in its data folder, and the shell lets only one copy of itself run. Two engines on the rig would both stream to the lights, so a development app, which can run beside the studio's, has the lights' wire cut.
 - **Saved data is checked and backed up.** The database is integrity-checked at every start. A verified backup is written before a schema upgrade, daily, and at every clean close. Every commit waits for the disk. A build refuses data from a newer schema rather than damage it.
 - **The shell opens and writes only inside its own folders:** the app-data, logs, backups and exports folders. The packaged pages run under a Content Security Policy with no inline or remote scripts.
 - **The parsers of outside bytes have fuzz tests:** the bridge's HTTP reader, the OSC reader and the Word import.
 - **Tests cannot reach a device.** Test builds drop every datagram aimed at TotalMix and refuse any camera address that is not on this PC. The simulated console and the simulated cameras stand in.
-- **A development build cannot open the studio's data.** A build with debug assertions refuses `%APPDATA%\ExEd Studio Control Native` before it creates or opens anything there, in the engine and in the shell. It is also an app of its own (`.dev` at the end of its identifier), so the studio's saved display and browser profile are not its to write.
+- **A development build keeps off the studio.** A build with debug assertions refuses `%APPDATA%\ExEd Studio Control Native`, and any folder inside it, for its saved data and its logs, before it creates or opens anything; the engine and the shell ask the same code (`native/protocol/rust/src/development.rs`). Where a switch is not set it takes the safe value: the lights held and their wire cut, the console and the cameras simulated, a bridge port of its own. It is also an app of its own (`.dev` at the end of its identifier), so the studio's saved display and browser profile are not its to write.
 
 The app is unsigned, by decision: it runs on one workstation its developer controls.
 

@@ -211,31 +211,6 @@ export function useLightingSceneEditor({
     };
   }, []);
 
-  // Title-bar drift indicator: append " · ●" while the active scene has
-  // unsaved drift. Reset on cleanup so other workspaces / unmount restore
-  // the plain product name. Tauri-only — gated on __TAURI_INTERNALS__ so
-  // the same code is harmless when the frontend runs in a plain browser
-  // (e.g. visual-review / Storybook contexts).
-  useEffect(() => {
-    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
-    const baseTitle = "SSE ExEd Studio Control";
-    let cancelled = false;
-    void (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      if (cancelled) return;
-      const win = getCurrentWindow();
-      void win.setTitle(effectiveSceneModified ? `${baseTitle} · ●` : baseTitle);
-    })();
-    return () => {
-      cancelled = true;
-      void (async () => {
-        const { getCurrentWindow } = await import("@tauri-apps/api/window");
-        const win = getCurrentWindow();
-        void win.setTitle(baseTitle);
-      })();
-    };
-  }, [effectiveSceneModified]);
-
   const sceneRenderPreview = useMemo(
     () => (sceneRenderPreviewId ? (scenes.find((scene) => scene.id === sceneRenderPreviewId) ?? null) : null),
     [scenes, sceneRenderPreviewId]

@@ -813,14 +813,18 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   assert.match(env.SSE_CONTROL_SURFACE_PORT, /^\d{1,5}$/);
   assert.notEqual(Number(env.SSE_CONTROL_SURFACE_PORT), LIVE_APP_CONTROL_SURFACE_PORT);
   assert.equal(env.SSE_SAFE_START, "1");
+  assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...env, ...folders }, { liveConsole: false }), null);
 
   // The live console lane keeps the real console and nothing else: its
-  // cameras are the simulated ones too.
+  // lights and cameras are the simulated ones too. It names the real console
+  // (streamlining, 2026-09-28): a development build takes the simulated one
+  // when the variable is not set.
   const live = { ...(await hardenedLaneEnv({ simulatedAudio: false })), ...folders };
-  assert.equal(Object.hasOwn(live, "SSE_AUDIO_SIMULATED_INPUT_MODE"), false);
+  assert.equal(live.SSE_AUDIO_SIMULATED_INPUT_MODE, "0");
+  assert.equal(live.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(live.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal(live, { liveConsole: true }), null);
   assert.match(laneEnvRefusal(live, { liveConsole: false }), /SSE_AUDIO_SIMULATED_INPUT_MODE/);
@@ -831,7 +835,8 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   const acceptance = await acceptanceEngineEnv({ SSE_LANE_MARKER: "kept" });
   assert.equal(acceptance.SSE_LANE_MARKER, "kept");
   assert.equal(acceptance.SSE_SAFE_START, "1");
-  assert.equal(acceptance.SSE_AUDIO_SIMULATED_INPUT_MODE, LIVE_CONSOLE ? undefined : "1");
+  assert.equal(acceptance.SSE_AUDIO_SIMULATED_INPUT_MODE, LIVE_CONSOLE ? "0" : "1");
+  assert.equal(acceptance.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(acceptance.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(laneEnvRefusal({ ...acceptance, ...folders }), null);
 
@@ -839,6 +844,7 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     ...folders,
     SSE_CONTROL_SURFACE_PORT: "45123",
     SSE_SAFE_START: "1",
+    SSE_LIGHTS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
     SSE_CAMERAS_SIMULATED: "1",
   };
@@ -853,6 +859,9 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
     "a port out of range": { ...hardened, SSE_CONTROL_SURFACE_PORT: "70000" },
     "no safe start": { ...hardened, SSE_SAFE_START: undefined },
     "a safe start switched off": { ...hardened, SSE_SAFE_START: "off" },
+    "the real rig": { ...hardened, SSE_LIGHTS_SIMULATED: undefined },
+    "the real rig, asked for by name": { ...hardened, SSE_LIGHTS_SIMULATED: "0" },
+    "simulated lights the engine does not read": { ...hardened, SSE_LIGHTS_SIMULATED: "true" },
     "the real console": { ...hardened, SSE_AUDIO_SIMULATED_INPUT_MODE: undefined },
     "a simulated console the engine does not read": { ...hardened, SSE_AUDIO_SIMULATED_INPUT_MODE: "on" },
     "the real cameras": { ...hardened, SSE_CAMERAS_SIMULATED: undefined },
@@ -865,6 +874,10 @@ test("the lanes' hardening: a bridge port of their own, the light outputs held, 
   // The waiver leaves out the safe start and nothing else.
   const armedStart = { ...hardened, SSE_SAFE_START: "0" };
   assert.equal(laneEnvRefusal(armedStart, { safeStart: false, liveConsole: false }), null);
+  assert.match(
+    laneEnvRefusal({ ...armedStart, SSE_LIGHTS_SIMULATED: undefined }, { safeStart: false, liveConsole: false }),
+    /SSE_LIGHTS_SIMULATED must be 1/
+  );
   assert.notEqual(
     laneEnvRefusal({ ...armedStart, SSE_CONTROL_SURFACE_PORT: "38201" }, { safeStart: false, liveConsole: false }),
     null

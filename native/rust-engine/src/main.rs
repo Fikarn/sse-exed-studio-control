@@ -10,6 +10,7 @@ mod commissioning;
 mod control_surface;
 mod control_surface_audio;
 mod control_surface_http;
+mod development;
 mod diagnostics;
 mod engine_events;
 mod exports;
@@ -416,6 +417,14 @@ fn main() -> io::Result<()> {
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = stdout.lock();
+    // A development build takes the safe value of every switch nothing set
+    // (`development.rs`), here, before anything reads one and while this is
+    // the only thread.
+    let development_defaults = studio_control_protocol::development::development_build()
+        .then(|| development::development_defaults(|name| std::env::var_os(name)));
+    for (name, value) in development_defaults.iter().flatten() {
+        std::env::set_var(name, value);
+    }
     // The app-data directory defaults to the platform's durable location
     // (2026-09 production readiness, Slice 1 — finding F22); a host with no
     // APPDATA / HOME cannot start without SSE_APP_DATA_DIR.
@@ -446,6 +455,12 @@ fn main() -> io::Result<()> {
     init_log(&planned_paths.log_file_path, log_level);
     if let Some(warning) = log_level_warning {
         log_event(LogLevel::Warn, &warning);
+    }
+    if let Some(defaults) = development_defaults.as_deref() {
+        log_event(
+            LogLevel::Info,
+            &development::development_defaults_line(defaults),
+        );
     }
 
     if let Err(message) = validate_protocol_version(&planned_paths.requested_protocol_version) {

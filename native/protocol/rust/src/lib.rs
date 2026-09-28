@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+/// The build the engine and the shell are, and the studio's data folder.
+pub mod development;
+
 pub const PROTOCOL_VERSION: &str = "2";
 
 pub const EVENT_APP_CHANGED: &str = "app.changed";
