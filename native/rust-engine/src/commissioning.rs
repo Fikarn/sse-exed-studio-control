@@ -815,7 +815,6 @@ mod tests {
             logs_dir: test_dir.path().join("logs"),
             log_file_path: test_dir.path().join("logs").join("engine.log"),
             db_path: test_dir.path().join("native.sqlite3"),
-            update_repository_path: None,
             storage_ready: true,
             storage_bootstrap: crate::storage::StorageBootstrap {
                 schema_version: 4,

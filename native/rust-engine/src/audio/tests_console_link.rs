@@ -903,7 +903,6 @@ fn console_confidence_has_one_writer() {
         "audio/snapshots.rs",
         "audio/settings.rs",
         "audio/console_link.rs",
-        "parity_fixtures.rs",
     ];
     let mut offenders = Vec::new();
     let mut writers_seen = Vec::new();

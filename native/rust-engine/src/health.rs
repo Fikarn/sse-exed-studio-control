@@ -333,11 +333,7 @@ pub(crate) fn read_health_snapshot(runtime: &RuntimeContext) -> EngineResult<Val
             "logFilePath": runtime.log_file_path.display().to_string(),
             "dbPath": runtime.db_path.display().to_string(),
             "backupDir": runtime.backups_dir.display().to_string(),
-            "exportsDir": runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string(),
-            "updateRepositoryPath": runtime
-                .update_repository_path
-                .as_ref()
-                .map(|path| path.display().to_string())
+            "exportsDir": runtime.app_data_dir.join(EXPORTS_DIR_NAME).display().to_string()
         },
         "details": {
             "storage": storage_summary,
@@ -650,7 +646,6 @@ mod tests {
             logs_dir: test_dir.path().join("logs"),
             log_file_path: test_dir.path().join("logs").join("engine.log"),
             db_path: test_dir.path().join("native.sqlite3"),
-            update_repository_path: None,
             storage_ready,
             storage_bootstrap: StorageBootstrap {
                 schema_version: 6,

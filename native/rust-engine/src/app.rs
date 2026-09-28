@@ -60,10 +60,6 @@ use crate::lighting::{
     update_lighting_scene_with_preview, update_lighting_settings, with_lighting_state,
     with_lighting_state_and_preview, LightingCommandError, LightingPreviewRuntimeState,
 };
-#[cfg(feature = "dev-fixtures")]
-use crate::parity_fixtures::{
-    load_parity_fixture, parse_parity_fixture_request, ParityFixtureError,
-};
 use crate::prompter::{after_archive_restore, handle_prompter_request, PrompterError};
 use crate::protocol::{
     error_response, event_message, invalid_params, ok_response, RequestEnvelope, ResponseEnvelope,
@@ -142,11 +138,7 @@ impl EngineApp {
                 "engineVersion": env!("CARGO_PKG_VERSION"),
                 "appDataDir": self.runtime.app_data_dir.display().to_string(),
                 "logsDir": self.runtime.logs_dir.display().to_string(),
-                "logFilePath": self.runtime.log_file_path.display().to_string(),
-                "updateRepositoryPath": self.runtime
-                    .update_repository_path
-                    .as_ref()
-                    .map(|path| path.display().to_string())
+                "logFilePath": self.runtime.log_file_path.display().to_string()
             }),
         )
     }
@@ -557,29 +549,6 @@ impl EngineApp {
             }
 
             // -------------------------------------------------------------
-            // Dev parity fixture (M-multievent). Compiled only with the
-            // `dev-fixtures` feature; a release engine keeps the method in
-            // the contract and answers METHOD_UNAVAILABLE (2026-09
-            // production readiness, Slice 1 — finding F04). Both arms stay
-            // literal on one line for tests/contract.rs.
-            // -------------------------------------------------------------
-            #[cfg(feature = "dev-fixtures")]
-            "dev.parityFixture.load" => self.dispatch_parity_fixture(
-                request,
-                parse_parity_fixture_request,
-                load_parity_fixture,
-                "parity-fixture-loaded",
-            ),
-            #[cfg(not(feature = "dev-fixtures"))]
-            "dev.parityFixture.load" => Self::reply(error_response(
-                request.id,
-                "METHOD_UNAVAILABLE",
-                String::from(
-                    "dev.parityFixture.load is only available in an engine built with the dev-fixtures feature.",
-                ),
-            )),
-
-            // -------------------------------------------------------------
             // The Teleprompter (new pages program, Slice 4): every method
             // runs under the prompter's own lock (`prompter::runtime`).
             // -------------------------------------------------------------
@@ -645,56 +614,67 @@ impl EngineApp {
                 ),
                 Err(error) => Self::reply(support_error_response(request.id, error)),
             },
-            "support.backup.verify" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
-                Ok(verify_request) => Self::reply(ok_response(
-                    request.id,
-                    serde_json::to_value(verify_support_backup(&verify_request))
-                        .unwrap_or_else(|_| json!({})),
-                )),
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
-            "support.backup.restore" => match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
-                Ok(restore_request) => {
-                    // The archive restore rewrites every lighting setting in
-                    // one transaction; under the lighting state lock a deck
-                    // key cannot write its older copy back over it (Slice 10).
-                    match with_lighting_state(|| restore_support_backup(&self.runtime, &restore_request)) {
-                        Ok(result) => {
-                            let response = ok_response(
-                                request.id,
-                                serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                            );
-                            if result.requires_restart {
-                                // Nothing changed yet: the database backup is
-                                // applied at the next start (Slice 7 — F20).
-                                Self::reply_with_support_change(response, "backup-restore-staged")
-                            } else {
-                                let mut reply =
-                                    Self::reply_with_support_restore_change(response, "backup-restored");
-                                // Slice 4: a restore leaves the prompter paused
-                                // where it was (D12) and may bring the look back.
-                                match after_archive_restore(&self.runtime.db_path) {
-                                    Ok(anchor) => reply.events.push(event_message(
-                                        EVENT_PROMPTER_CHANGED,
-                                        prompter_changed_payload("backup-restored", anchor),
-                                    )),
-                                    Err(error) => {
-                                        let _ = append_log(
+            "support.backup.verify" => {
+                match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
+                    Ok(verify_request) => Self::reply(ok_response(
+                        request.id,
+                        serde_json::to_value(verify_support_backup(&verify_request))
+                            .unwrap_or_else(|_| json!({})),
+                    )),
+                    Err(message) => Self::reply(invalid_params(request.id, message)),
+                }
+            }
+            "support.backup.restore" => {
+                match parse_support_restore_request(&request.params, &self.runtime.backups_dir) {
+                    Ok(restore_request) => {
+                        // The archive restore rewrites every lighting setting in
+                        // one transaction; under the lighting state lock a deck
+                        // key cannot write its older copy back over it (Slice 10).
+                        match with_lighting_state(|| {
+                            restore_support_backup(&self.runtime, &restore_request)
+                        }) {
+                            Ok(result) => {
+                                let response = ok_response(
+                                    request.id,
+                                    serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
+                                );
+                                if result.requires_restart {
+                                    // Nothing changed yet: the database backup is
+                                    // applied at the next start (Slice 7 — F20).
+                                    Self::reply_with_support_change(
+                                        response,
+                                        "backup-restore-staged",
+                                    )
+                                } else {
+                                    let mut reply = Self::reply_with_support_restore_change(
+                                        response,
+                                        "backup-restored",
+                                    );
+                                    // Slice 4: a restore leaves the prompter paused
+                                    // where it was (D12) and may bring the look back.
+                                    match after_archive_restore(&self.runtime.db_path) {
+                                        Ok(anchor) => reply.events.push(event_message(
+                                            EVENT_PROMPTER_CHANGED,
+                                            prompter_changed_payload("backup-restored", anchor),
+                                        )),
+                                        Err(error) => {
+                                            let _ = append_log(
                                             &self.runtime.log_file_path,
                                             "WARN",
                                             &format!("The prompter could not settle after the restore: {error:?}"),
                                         );
+                                        }
                                     }
+                                    self.after_restore_cameras(&mut reply);
+                                    reply
                                 }
-                                self.after_restore_cameras(&mut reply);
-                                reply
                             }
+                            Err(error) => Self::reply(support_error_response(request.id, error)),
                         }
-                        Err(error) => Self::reply(support_error_response(request.id, error)),
                     }
+                    Err(message) => Self::reply(invalid_params(request.id, message)),
                 }
-                Err(message) => Self::reply(invalid_params(request.id, message)),
-            },
+            }
             "exports.companion.export" => {
                 let base_url_override = request
                     .params
@@ -1169,39 +1149,6 @@ impl EngineApp {
                     Self::reply(invalid_params(request.id, message))
                 }
                 Err(CommissioningCommandError::Storage(message)) => {
-                    Self::reply(error_response(request.id, "STORAGE_ERROR", message))
-                }
-            },
-            Err(message) => Self::reply(invalid_params(request.id, message)),
-        }
-    }
-
-    #[cfg(feature = "dev-fixtures")]
-    fn dispatch_parity_fixture<P, R, F, H>(
-        &self,
-        request: RequestEnvelope,
-        parse: F,
-        handler: H,
-        reason: &str,
-    ) -> EngineReply
-    where
-        R: serde::Serialize,
-        F: FnOnce(&serde_json::Value) -> Result<P, String>,
-        H: FnOnce(&RuntimeContext, &P) -> Result<R, ParityFixtureError>,
-    {
-        match parse(&request.params) {
-            Ok(parsed) => match with_lighting_state(|| handler(&self.runtime, &parsed)) {
-                Ok(result) => Self::reply_with_app_and_commissioning_change(
-                    ok_response(
-                        request.id,
-                        serde_json::to_value(&result).unwrap_or_else(|_| json!({})),
-                    ),
-                    reason,
-                ),
-                Err(ParityFixtureError::InvalidParams(message)) => {
-                    Self::reply(invalid_params(request.id, message))
-                }
-                Err(ParityFixtureError::Storage(message)) => {
                     Self::reply(error_response(request.id, "STORAGE_ERROR", message))
                 }
             },

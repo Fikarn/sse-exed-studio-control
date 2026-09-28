@@ -53,20 +53,14 @@ const KEEPALIVE_INTERVAL: Duration = Duration::from_millis(1_000);
 // controller 4 in Global OSC mode; /sendall re-primes it when levels stop.
 const GLOBAL_OSC_PORT_OFFSET: u16 = 3;
 const GLOBAL_OSC_REFRESH_STALE: Duration = Duration::from_millis(3_000);
-/// Lab override for the local address the metering receive ports bind (an IP
-/// address). Unset, the ports bind loopback for a loopback console and every
-/// interface for a console on another host (2026-09 production readiness,
-/// Slice 6 — finding F05).
-pub(crate) const OSC_BIND_HOST_ENV: &str = "SSE_OSC_BIND_HOST";
 /// A datagram from a host other than the console is dropped and noted in the
 /// engine log at most this often per source address.
 const DROPPED_SOURCE_LOG_INTERVAL: Duration = Duration::from_secs(60);
 /// Source addresses remembered for that rate limit; past this a flood of new
 /// sources is dropped without further log lines until old entries expire.
 const MAX_TRACKED_DROP_SOURCES: usize = 256;
-const DEFAULT_POLL_INTERVAL_MS: u64 = 16;
-const MIN_POLL_INTERVAL_MS: u64 = 5;
-const MAX_POLL_INTERVAL_MS: u64 = 100;
+/// How often the metering thread reads its sockets.
+const POLL_INTERVAL: Duration = Duration::from_millis(16);
 const RECEIVE_BUFFER_BYTES: usize = 2048;
 const AUDIO_METER_FLOOR_DBFS: f64 = -60.0;
 const CONSOLE_METER_POINT_INPUT: &str = "input";
@@ -76,18 +70,6 @@ const CONSOLE_PEAK_HOLD_MS: u64 = 1_500;
 const CONSOLE_PEAK_FALL_DB_PER_SECOND: f64 = 20.0;
 const CONSOLE_PEAK_WARNING_DBFS: f64 = -3.0;
 const CONSOLE_OVER_DBFS: f64 = 0.0;
-
-fn poll_interval_from_value(value: Option<&str>) -> Duration {
-    let milliseconds = value
-        .and_then(|raw| raw.trim().parse::<u64>().ok())
-        .unwrap_or(DEFAULT_POLL_INTERVAL_MS)
-        .clamp(MIN_POLL_INTERVAL_MS, MAX_POLL_INTERVAL_MS);
-    Duration::from_millis(milliseconds)
-}
-
-fn configured_poll_interval() -> Duration {
-    poll_interval_from_value(std::env::var("SSE_AUDIO_METER_POLL_MS").ok().as_deref())
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RmeTotalMixBus {
@@ -713,15 +695,7 @@ pub fn spawn_rme_totalmix_audio_metering(
         // One kept read connection for this thread's settings reads
         // (2026-09 production readiness, Slice 10 — F18).
         enable_thread_read_connection();
-        let poll_interval = configured_poll_interval();
-        let bind_override =
-            match parse_bind_override(std::env::var(OSC_BIND_HOST_ENV).ok().as_deref()) {
-                Ok(value) => value,
-                Err(message) => {
-                    let _ = append_log(&log_file_path, "WARN", &message);
-                    None
-                }
-            };
+        let poll_interval = POLL_INTERVAL;
         let mut drops = DroppedSourceLog::new(Some(log_file_path.clone()));
         let metering_started_at = Instant::now();
         let mut sequence = 0_u64;
@@ -765,7 +739,7 @@ pub fn spawn_rme_totalmix_audio_metering(
                 {
                     match resolve_console_address(&snapshot.send_host) {
                         Some(console) => {
-                            let policy = ReceivePolicy::for_console(console, bind_override);
+                            let policy = ReceivePolicy::for_console(console);
                             let (bound, failures) = bind_slots_reporting(
                                 policy,
                                 snapshot.send_port,
@@ -921,15 +895,12 @@ pub(crate) struct ReceivePolicy {
 }
 
 impl ReceivePolicy {
-    pub(crate) fn for_console(console: IpAddr, bind_override: Option<IpAddr>) -> Self {
-        let bind_host = match bind_override {
-            Some(host) => host,
-            None => match console {
-                IpAddr::V4(address) if address.is_loopback() => IpAddr::V4(Ipv4Addr::LOCALHOST),
-                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                IpAddr::V6(address) if address.is_loopback() => IpAddr::V6(Ipv6Addr::LOCALHOST),
-                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-            },
+    pub(crate) fn for_console(console: IpAddr) -> Self {
+        let bind_host = match console {
+            IpAddr::V4(address) if address.is_loopback() => IpAddr::V4(Ipv4Addr::LOCALHOST),
+            IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            IpAddr::V6(address) if address.is_loopback() => IpAddr::V6(Ipv6Addr::LOCALHOST),
+            IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
         };
         Self { console, bind_host }
     }
@@ -955,20 +926,6 @@ pub(crate) fn resolve_console_address(send_host: &str) -> Option<IpAddr> {
         .ok()?
         .next()
         .map(|address| address.ip())
-}
-
-/// `SSE_OSC_BIND_HOST`: unset or empty → no override; an IP address → that
-/// address; anything else is refused with the sentence the caller logs.
-pub(crate) fn parse_bind_override(raw: Option<&str>) -> Result<Option<IpAddr>, String> {
-    match raw.map(str::trim) {
-        None | Some("") => Ok(None),
-        Some(value) => value.parse::<IpAddr>().map(Some).map_err(|_| {
-            format!(
-                "{}={value:?} is not an IP address; the metering receive ports bind by the TotalMix address instead",
-                OSC_BIND_HOST_ENV
-            )
-        }),
-    }
 }
 
 /// Whether a datagram from `source` is read: only one from the console's own
@@ -1539,15 +1496,13 @@ impl GlobalOscSlot {
 /// The real Global OSC slot (`send_port`, `receive_port` already +3) for the
 /// hardware-lane pull test, bound by the engine's own rule: the studio
 /// TotalMix is at 127.0.0.1, so the slot binds loopback and reads loopback
-/// only, unless `SSE_OSC_BIND_HOST` names another local address.
+/// only.
 #[cfg(test)]
 pub(crate) fn bind_live_global_slot_for_test(
     send_port: u16,
     receive_port: u16,
 ) -> Option<GlobalOscSlot> {
-    let bind_override =
-        parse_bind_override(std::env::var(OSC_BIND_HOST_ENV).ok().as_deref()).unwrap_or(None);
-    let policy = ReceivePolicy::for_console(IpAddr::V4(Ipv4Addr::LOCALHOST), bind_override);
+    let policy = ReceivePolicy::for_console(IpAddr::V4(Ipv4Addr::LOCALHOST));
     let socket = bind_receive_socket(policy.bind_host, receive_port).ok()?;
     Some(GlobalOscSlot {
         send_port,

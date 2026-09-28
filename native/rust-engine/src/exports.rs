@@ -191,9 +191,7 @@ pub fn export_companion_config(
 // the export then targets "self" and the operator re-exports with Companion
 // running to get surface-bound follow.
 fn discover_streamdeck_surface_id() -> Option<String> {
-    let companion_url =
-        std::env::var("SSE_COMPANION_URL").unwrap_or_else(|_| String::from(DEFAULT_COMPANION_URL));
-    let body = fetch_companion_export_json(&companion_url)?;
+    let body = fetch_companion_export_json(DEFAULT_COMPANION_URL)?;
     let parsed = serde_json::from_str::<Value>(&body).ok()?;
     parsed
         .get("surfaces")

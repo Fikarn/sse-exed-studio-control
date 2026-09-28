@@ -40,12 +40,6 @@
         ]
       }
     },
-    "devParityFixtures": {
-      "type": "array",
-      "items": {
-        "enum": ["lighting-populated", "audio-populated", "setup-required", "setup-ready"]
-      }
-    },
     "snapshotShapes": {
       "const": {
         "lightingFixtureVisual": {
@@ -79,7 +73,6 @@
           "commissioning.snapshot",
           "commissioning.update",
           "controlSurface.snapshot",
-          "dev.parityFixture.load",
           "engine.ping",
           "exports.companion.export",
           "health.snapshot",
@@ -181,14 +174,6 @@
       }
     }
   },
-  "required": [
-    "version",
-    "transport",
-    "startupLifecycleStates",
-    "devParityFixtures",
-    "snapshotShapes",
-    "methods",
-    "events"
-  ],
+  "required": ["version", "transport", "startupLifecycleStates", "snapshotShapes", "methods", "events"],
   "additionalProperties": false
 }
