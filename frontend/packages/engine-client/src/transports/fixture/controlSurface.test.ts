@@ -7,7 +7,7 @@ import { createFixtureTransport } from "../fixtureTransport";
 
 // New pages program, Slice 2 (D5): the Stream Deck's PROJECTS and TASKS pages left with
 // Planning. The fixture double's deck mirrors the hardware link's page model
-// (`build_control_surface_snapshot` in `native/rust-engine/src/exports.rs`, pinned there by
+// (`build_control_surface_snapshot` in `native/rust-engine/src/exports/snapshot.rs`, pinned by
 // `control_surface_snapshot_matches_the_deck_page_model`): LIGHTS is page 1 with seven keys
 // (its first place held `<< PROJ`), AUDIO page 2 with seven keys and four touch-strip cells
 // (its seventh place held `TALK`), and each page four dials that are pressed and turned either

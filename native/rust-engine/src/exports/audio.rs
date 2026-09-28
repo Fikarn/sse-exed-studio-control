@@ -1,7 +1,11 @@
-use crate::exports::{
-    audio_action_with_refreshes, button, dial, expression_button, next_action_id, ControlDef,
+//! The AUDIO page.
+
+use super::controls::{
+    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, png_feedback,
+    state_feedback, ControlDef, DECK_AMBER_BG, DECK_AMBER_INK, DECK_BANK_TINT_BG, DECK_GREY_INK,
+    DECK_MUTED_BG, DECK_MUTED_INK, DECK_SELECT_BG, DECK_SELECT_INK, DECK_WARN_BG, DECK_WARN_INK,
 };
-use serde_json::{json, Map, Value};
+use serde_json::{json, Value};
 
 // Every key the 1 s poll refreshes; each needs a matching custom variable.
 // Keys 1-3 carry static labels (state reads through feedbacks), so they are
@@ -32,17 +36,7 @@ pub(crate) const AUDIO_LCD_KEYS: &[&str] = &[
     "workspace",
 ];
 
-// The LIGHTS page's LCD keys: not polled. The lighting page-follow trigger
-// refreshes all four as the deck arrives on LIGHTS, and the Light dial's press
-// refreshes `light_nav`, `light_intensity` and `light_cct`; the dial turns and
-// the scene keys refresh none of them. (New pages program, Slice 2: the
-// Planning keys `project_nav`, `project_status`, `project_priority`,
-// `sort_mode` and `task_nav` left with the PROJECTS and TASKS pages; the list
-// was called `LEGACY_LCD_KEYS` until then.)
-pub(crate) const LIGHT_LCD_KEYS: &[&str] =
-    &["light_nav", "light_intensity", "light_cct", "scene_nav"];
-
-pub(crate) const AUDIO_STRIP_TEXT_KEYS: &[&str] = &[
+const AUDIO_STRIP_TEXT_KEYS: &[&str] = &[
     "audio_strip_1",
     "audio_strip_2",
     "audio_strip_3",
@@ -60,96 +54,6 @@ const AUDIO_STRIP_LEVEL_KEYS: &[&str] = &[
     "audio_strip_3_level",
     "audio_strip_4_level",
 ];
-
-// Deck palette: the app's Console vocabulary, mirrored on the hardware.
-pub(crate) const DECK_AMBER_BG: u32 = 0x00E8_B13D;
-pub(crate) const DECK_AMBER_INK: u32 = 0x0024_1D0B;
-pub(crate) const DECK_WARN_BG: u32 = 0x00FF_D33D;
-pub(crate) const DECK_WARN_INK: u32 = 0x002A_2206;
-pub(crate) const DECK_SELECT_BG: u32 = 0x0024_1C08;
-pub(crate) const DECK_SELECT_INK: u32 = 0x00E8_B13D;
-pub(crate) const DECK_MUTED_BG: u32 = 0x001A_0F0C;
-pub(crate) const DECK_MUTED_INK: u32 = 0x00E0_7A63;
-pub(crate) const DECK_GREY_INK: u32 = 0x006D_675A;
-pub(crate) const DECK_BANK_TINT_BG: u32 = 0x004A_3A12;
-
-// Base64 PNG assets rendered by scripts/deck-assets.py and checked in under
-// native/rust-engine/assets/deck/.
-pub(crate) fn deck_asset(name: &str) -> &'static str {
-    let encoded = match name {
-        "bar_f0" => include_str!("../assets/deck/bar_f0.b64"),
-        "bar_f1" => include_str!("../assets/deck/bar_f1.b64"),
-        "bar_f2" => include_str!("../assets/deck/bar_f2.b64"),
-        "bar_f3" => include_str!("../assets/deck/bar_f3.b64"),
-        "bar_f4" => include_str!("../assets/deck/bar_f4.b64"),
-        "bar_f5" => include_str!("../assets/deck/bar_f5.b64"),
-        "bar_f6" => include_str!("../assets/deck/bar_f6.b64"),
-        "bar_f7" => include_str!("../assets/deck/bar_f7.b64"),
-        "bar_f8" => include_str!("../assets/deck/bar_f8.b64"),
-        "bar_f9" => include_str!("../assets/deck/bar_f9.b64"),
-        "bar_f10" => include_str!("../assets/deck/bar_f10.b64"),
-        "bar_f11" => include_str!("../assets/deck/bar_f11.b64"),
-        "bar_f12" => include_str!("../assets/deck/bar_f12.b64"),
-        "bar_m0" => include_str!("../assets/deck/bar_m0.b64"),
-        "bar_m1" => include_str!("../assets/deck/bar_m1.b64"),
-        "bar_m2" => include_str!("../assets/deck/bar_m2.b64"),
-        "bar_m3" => include_str!("../assets/deck/bar_m3.b64"),
-        "bar_m4" => include_str!("../assets/deck/bar_m4.b64"),
-        "bar_m5" => include_str!("../assets/deck/bar_m5.b64"),
-        "bar_m6" => include_str!("../assets/deck/bar_m6.b64"),
-        "bar_m7" => include_str!("../assets/deck/bar_m7.b64"),
-        "bar_m8" => include_str!("../assets/deck/bar_m8.b64"),
-        "bar_m9" => include_str!("../assets/deck/bar_m9.b64"),
-        "bar_m10" => include_str!("../assets/deck/bar_m10.b64"),
-        "bar_m11" => include_str!("../assets/deck/bar_m11.b64"),
-        "bar_m12" => include_str!("../assets/deck/bar_m12.b64"),
-        "strip_off" => include_str!("../assets/deck/strip_off.b64"),
-        "strip_empty" => include_str!("../assets/deck/strip_empty.b64"),
-        "ico_main" => include_str!("../assets/deck/ico_main.b64"),
-        "ico_phones" => include_str!("../assets/deck/ico_phones.b64"),
-        "ico_bank" => include_str!("../assets/deck/ico_bank.b64"),
-        "ico_dim" => include_str!("../assets/deck/ico_dim.b64"),
-        "ico_solo" => include_str!("../assets/deck/ico_solo.b64"),
-        "ico_gain" => include_str!("../assets/deck/ico_gain.b64"),
-        _ => "",
-    };
-    encoded.trim_end()
-}
-
-fn state_feedback(variable_key: &str, value: &str, inverted: bool, style: Value) -> Value {
-    json!({
-        "id": next_action_id(),
-        "definitionId": "variable_value",
-        "connectionId": "internal",
-        "options": {
-            "variable": format!("custom:lcd_{variable_key}"),
-            "op": "eq",
-            "value": value
-        },
-        "type": "feedback",
-        "isInverted": inverted,
-        "children": {},
-        "style": style
-    })
-}
-
-fn color_feedback(variable_key: &str, value: &str, color: u32, bgcolor: u32) -> Value {
-    state_feedback(
-        variable_key,
-        value,
-        false,
-        json!({ "color": color, "bgcolor": bgcolor }),
-    )
-}
-
-fn png_feedback(variable_key: &str, value: &str, asset: &str) -> Value {
-    state_feedback(
-        variable_key,
-        value,
-        false,
-        json!({ "png64": deck_asset(asset) }),
-    )
-}
 
 fn audio_strip_feedbacks(strip: usize) -> Vec<Value> {
     let level_key = AUDIO_STRIP_LEVEL_KEYS[strip - 1];
@@ -199,29 +103,11 @@ fn gated_grey_feedback() -> Value {
     )
 }
 
-// generic-http's jsonResultDataVariable stores into a pre-existing CUSTOM
-// variable (referenced as $(custom:name)); a missing variable makes the store a
-// silent no-op, so the profile must ship every LCD variable it polls into.
-pub(crate) fn generate_companion_custom_variables() -> Value {
-    let mut variables = Map::new();
-    for (sort_order, key) in AUDIO_LCD_KEYS
-        .iter()
-        .chain(LIGHT_LCD_KEYS.iter())
-        .enumerate()
-    {
-        variables.insert(
-            format!("lcd_{key}"),
-            json!({
-                // Companion shows this to whoever opens its variables, so it
-                // names the hardware link, not the engine (new pages program).
-                "description": "SSE deck LCD text (kept by the Studio Control hardware link)",
-                "defaultValue": "",
-                "persistCurrentValue": false,
-                "sortOrder": sort_order
-            }),
-        );
-    }
-    Value::Object(variables)
+fn audio_action_with_refreshes(body: Value, refresh_keys: &[&str]) -> Vec<Value> {
+    http_post("/api/deck/audio-action", body)
+        .into_iter()
+        .chain(lcd_refreshes(refresh_keys))
+        .collect()
 }
 
 fn audio_strip_refresh_keys() -> Vec<&'static str> {
@@ -264,7 +150,7 @@ fn audio_target_key(
     ])
 }
 
-pub(crate) fn audio_controls() -> Vec<ControlDef> {
+pub(super) fn audio_controls() -> Vec<ControlDef> {
     let strip_refreshes = audio_strip_refresh_keys();
 
     let mut bank_refreshes: Vec<&str> = vec![

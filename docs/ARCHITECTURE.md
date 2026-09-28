@@ -62,7 +62,8 @@ Engine (`native/rust-engine/src/`):
 - `audio/`, `rme_totalmix_osc.rs`, `rme_console_link.rs`: the console's state, metering, and the link that confirms every send.
 - `prompter/`: scripts, the prompter's clock, the Prompter XL's state, imports.
 - `cameras/`: the three cameras, the simulated cameras, the link guard.
-- `control_surface.rs`, `control_surface_http.rs`, `exports.rs`: the Stream Deck bridge and the Companion profile. The deck's pages come from one list, `DECK_PAGES`.
+- `control_surface.rs`, `control_surface_http.rs`: the Stream Deck bridge.
+- `exports/`: the Companion profile and the page model Setup draws. The deck's pages come from one list, `DECK_PAGES` in `pages.rs`; each page has a file of its own.
 - `commissioning.rs`: Setup's steps and probes.
 - `storage.rs`, `storage_backups.rs`, `support.rs`: the database, migrations, backups, restore, diagnostics.
 - `health.rs`, `action_log.rs`, `engine_events.rs`: the health the header shows, Recent actions, events.
