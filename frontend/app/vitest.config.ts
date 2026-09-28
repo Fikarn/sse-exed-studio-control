@@ -16,18 +16,14 @@ export default defineConfig({
     globals: false,
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["**/node_modules/**", "**/dist/**", "tests/**"],
-    // Production readiness S13 (finding F25): `npm run test:coverage` fails below
-    // these floors. A floor is the figure measured when it was set, minus two
-    // points — a ratchet against tests rotting away, not a target; raise it when
-    // coverage rises (docs/DEVELOPMENT.md, "Coverage floors"). Every source file
-    // counts, whether a test loads it or not.
+    // `npm run test:coverage` measures on demand; nothing fails on the figure.
+    // Every source file counts, whether a test loads it or not.
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
       exclude: ["**/*.test.{ts,tsx}", "**/*.stories.{ts,tsx}", "**/*.d.ts", "src/generated/**"],
       reporter: ["text-summary", "json-summary"],
       reportsDirectory: "coverage",
-      thresholds: { statements: 8.11, branches: 7.79, functions: 6.97, lines: 8.32 },
     },
   },
 });

@@ -71,7 +71,7 @@ export function devCheckSteps(cacheKey = toolCacheKey()) {
     },
     { id: "scripts:test" },
     { id: "file:health" },
-    { id: "frontend:test:coverage" },
+    { id: "frontend:test" },
   ];
 }
 

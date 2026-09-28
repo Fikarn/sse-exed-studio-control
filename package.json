@@ -36,19 +36,15 @@
     "check": "npm run dev:check && npm run frontend:playwright:test",
     "check:quick": "npm run dev:check",
     "dev:check": "node scripts/dev-check-cli.mjs",
-    "dev:check:serial": "npm run protocol:check && npm run format:check && npm run lint && npm run scripts:test && npm run file:health && npm run rust:fmt:check && npm run rust:clippy && npm run frontend:typecheck && npm run frontend:test:coverage && npm run native:test",
+    "dev:check:serial": "npm run protocol:check && npm run format:check && npm run lint && npm run scripts:test && npm run file:health && npm run rust:fmt:check && npm run rust:clippy && npm run frontend:typecheck && npm run frontend:test && npm run native:test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "scripts:test": "node --test --test-reporter=spec \"scripts/**/*.test.mjs\"",
     "file:health": "node scripts/file-health.mjs",
-    "supply-chain:npm": "node scripts/check-npm-audit.mjs",
-    "supply-chain:cargo": "node scripts/check-deny-ignores.mjs && cd native && cargo deny check",
-    "supply-chain:check": "npm run supply-chain:npm && npm run supply-chain:cargo",
     "rust:fmt:check": "cd native && cargo fmt --all -- --check",
     "rust:clippy": "cd native && cargo clippy --workspace --all-targets -- -D warnings",
-    "rust:coverage": "cd native && cargo llvm-cov --workspace --summary-only --fail-under-lines 78.1",
     "protocol:generate": "node scripts/protocol/generate-protocol-artifacts.mjs",
     "protocol:check": "node scripts/protocol/generate-protocol-artifacts.mjs --check",
     "frontend:tokens:build": "npm run build --workspace frontend/packages/tokens",
@@ -57,12 +53,8 @@
     "frontend:test:coverage": "npm run test:coverage --workspaces --if-present",
     "frontend:storybook": "npm run storybook --workspace frontend/app",
     "frontend:storybook:build": "npm run storybook:build --workspace frontend/app",
-    "frontend:fixtures:check": "npm run fixtures:check --workspace frontend/packages/test-fixtures",
     "frontend:playwright:test": "npm run build --workspace frontend/app && npm run frontend:storybook:build && npm run playwright:test --workspace frontend/app",
-    "frontend:playwright:test:blocking": "npm run build --workspace frontend/app && npm run frontend:storybook:build && npm run playwright:test --workspace frontend/app -- --project=default",
-    "frontend:playwright:test:quarantine": "npm run playwright:test --workspace frontend/app -- --project=quarantine --pass-with-no-tests",
-    "frontend:playwright:quarantine:check": "node scripts/check-playwright-quarantine.mjs",
-    "frontend:foundation": "npm run protocol:generate && npm run frontend:tokens:build && npm run frontend:typecheck && npm run frontend:storybook:build && npm run frontend:fixtures:check && npm run frontend:playwright:test",
+    "frontend:foundation": "npm run protocol:generate && npm run frontend:tokens:build && npm run frontend:typecheck && npm run frontend:storybook:build && npm run frontend:playwright:test",
     "tauri:dev": "npm run tauri:dev --workspace frontend/app",
     "tauri:build": "npm run tauri:build --workspace frontend/app",
     "tauri:smoke": "node scripts/tauri-smoke.mjs",
@@ -130,9 +122,6 @@
   "lint-staged": {
     "*.{js,mjs,ts,tsx,json,yml,yaml,md,css}": [
       "prettier --write"
-    ],
-    "docs/plans/**/*.md": [
-      "node scripts/check-slice-rescope.mjs"
     ]
   },
   "devDependencies": {

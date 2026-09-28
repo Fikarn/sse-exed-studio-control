@@ -1,67 +1,24 @@
 import { defineConfig } from "@playwright/test";
-import { readFileSync } from "node:fs";
 
 if (process.env.FORCE_COLOR && process.env.NO_COLOR) {
   delete process.env.NO_COLOR;
 }
 
-// Production readiness S13 (findings F25, F03). Two projects share this suite:
+// A case that fails now and then has a cause: find it. There is no quarantine
+// list.
 //
-// - `default` is everything except the quarantine list. It is what the
-//   `frontend-e2e` CI job fails on (`npm run frontend:playwright:test:blocking`).
-// - `quarantine` is the cases named in `tests/quarantine.json`: assertions that
-//   are wall-clock measurements, which a loaded runner can fail with no defect
-//   behind the failure. They run one at a time with two retries, and on CI in a
-//   step of their own that reports and never fails the job.
-//
-// The list is the membership — there is no tag to add in a spec — and every
-// entry carries its reason, where it was seen and the list's one exit date,
-// which `scripts/check-playwright-quarantine.mjs` enforces on CI. A case that
-// fails for a reason that can be found is fixed, not listed.
-// `npm run frontend:playwright:test` runs both projects, as the workstation
-// lane always has. See docs/DEVELOPMENT.md, "Quarantined Playwright cases".
-interface QuarantinedCase {
-  file: string;
-  title: string;
-}
-
-// Production readiness S15: `SSE_PLAYWRIGHT_QUARANTINE_LIST` reads another list,
-// so scripts/check-playwright-quarantine.test.mjs can list the two projects an
-// empty list and a one-case list make.
-const quarantined = (
-  JSON.parse(
-    readFileSync(
-      process.env.SSE_PLAYWRIGHT_QUARANTINE_LIST ?? new URL("./tests/quarantine.json", import.meta.url),
-      "utf-8"
-    )
-  ) as {
-    cases: QuarantinedCase[];
-  }
-).cases;
-
-function escapeForRegExp(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// Playwright matches `grep` against "<project> <file> <describe titles> <title> <tags>".
-// An empty list quarantines nothing (S15 emptied it): `new RegExp("")` matches
-// every title, which would leave `default` with no case at all and run the
-// whole suite as advisory, so the empty list is `(?!)`, which matches nothing.
-const QUARANTINE =
-  quarantined.length === 0
-    ? /(?!)/
-    : new RegExp(
-        quarantined
-          .map((entry) => `(?:^| )${escapeForRegExp(entry.file)} (?:.+ )?${escapeForRegExp(entry.title)}(?: |$)`)
-          .join("|")
-      );
-
+// One retry on the workstation, none on CI. On this PC Windows now and then
+// refuses Chromium a socket (`net::ERR_NO_BUFFER_SPACE`, about one request in
+// ten thousand), and the page then draws without a stylesheet or a chunk. A
+// case that passed on its retry is reported as flaky, by name: read why its
+// first run failed, and if it was anything but that, find the cause.
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
-  // Faster checks, 2026-09-25: eight on the studio workstation (32 threads;
-  // the full lane 188 s -> about 94 s), at below-normal priority
-  // (scripts/frontend/run-playwright.mjs); CI's four-core runner keeps 3.
+  retries: process.env.CI ? 0 : 1,
+  // Eight workers on the studio workstation (32 threads), at below-normal
+  // priority (scripts/frontend/run-playwright.mjs); CI's four-core runner
+  // keeps 3.
   workers: process.env.CI ? 3 : 8,
   use: {
     baseURL: "http://127.0.0.1:4173",
@@ -78,26 +35,13 @@ export default defineConfig({
       threshold: 0.01,
     },
   },
-  // New pages program, Slice SW (D22): Studio Control runs on Windows at
-  // 2560×1440 and nowhere else, so the committed captures are the win32 ones
-  // (`{platform}` names them) and only Windows compares them. CI's Linux runner
-  // runs every case but skips every screenshot expectation.
-  // See frontend/app/tests/__visual__/README.md.
+  // Studio Control runs on Windows at 2560×1440 and nowhere else, so the
+  // committed captures are the win32 ones (`{platform}` names them) and only
+  // Windows compares them. CI's Linux runner runs every case but skips every
+  // screenshot expectation. See frontend/app/tests/__visual__/README.md.
   ignoreSnapshots: process.platform !== "win32",
   snapshotPathTemplate: "{testDir}/__visual__/{testFilePath}-snapshots/{arg}-{platform}{ext}",
   reporter: [["html", { outputFolder: "playwright-report" }]],
-  projects: [
-    { name: "default", grepInvert: QUARANTINE },
-    {
-      name: "quarantine",
-      grep: QUARANTINE,
-      workers: 1,
-      retries: 2,
-      // Its own folder, so the advisory CI step leaves the blocking step's
-      // traces and snapshot diffs in `test-results/` for the artifact upload.
-      outputDir: "test-results-quarantine",
-    },
-  ],
   webServer: [
     {
       command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
@@ -106,12 +50,9 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      // plan PR 5 / workstream D5: Storybook static server for the
-      // storybook.spec.ts visual lane. The `storybook-static/` build is
-      // produced by `npm run frontend:storybook:build` (chained into
-      // `frontend:playwright:test`). Slice SW (D22): off Windows that lane is
-      // skipped, and the server is there for the UI contract's A-primitive
-      // pages, which are measured on every platform.
+      // The Storybook static server, for storybook.spec.ts and the layout
+      // measures of the primitives' pages. `npm run frontend:storybook:build`
+      // makes `storybook-static/` (chained into `frontend:playwright:test`).
       command: "npm run storybook:serve-static",
       port: 6007,
       reuseExistingServer: !process.env.CI,
