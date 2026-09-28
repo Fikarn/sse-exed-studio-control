@@ -7,6 +7,7 @@ import {
   type ActionFeedback,
   type RunnerStepId,
   type SetupMode,
+  SETUP_MODE_SECTIONS,
   probeChecks,
   type FeedbackTone,
   toJsonValue,
@@ -77,7 +78,7 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
 
   const persistMode = useLiveCallback((nextMode: SetupMode) => {
     setMode(nextMode);
-    void store.setSetupSection(nextMode === "runner" ? "commissioning" : "support");
+    void store.setSetupSection(SETUP_MODE_SECTIONS[nextMode]);
   });
 
   const saveImportProfile = async (advance = false) => {

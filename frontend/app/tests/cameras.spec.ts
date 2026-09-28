@@ -1,0 +1,668 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
+import { STOP_WINDOW_MS } from "../src/app/cameras/perform";
+import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
+import { pausePageClock } from "./helpers/pageClock";
+
+// The Cameras page against the fixture double (board 2, "Hero and two", as
+// D10, D11 and D19 amend it). The double answers every cameras request as the
+// hardware link does; its simulated cameras are reached through
+// `window.__SSE_TEST_CAMERAS__`: a value changed on a camera's body, a camera
+// that stops answering and answers again.
+
+async function openCameras(page: Page, fixture = "cameras-held") {
+  await openFixture(page, fixture);
+  await expectWorkspaceMounted(page, "cameras");
+}
+
+/** Past the arm's dwell: a second press before it is a bounce, and applies nothing. */
+const PAST_THE_DWELL_MS = ARM_DWELL_MS + 50;
+
+/**
+ * Presses an armed key's two presses. The page's clock stands still from the
+ * first press to the second and is moved past the dwell between them
+ * (helpers/pageClock.ts), so the second is the confirm on any runner, inside
+ * every arm window. The test installs the clock before the page opens.
+ */
+async function pressTwice(page: Page, testId: string) {
+  await pausePageClock(page);
+  await page.getByTestId(testId).click();
+  await expect(page.getByTestId(testId)).toHaveAttribute("data-armed", "true");
+  await page.clock.fastForward(PAST_THE_DWELL_MS);
+  await page.getByTestId(testId).click();
+  await page.clock.resume();
+}
+
+const state = (page: Page) => page.getByTestId("cameras-state-display");
+const recChip = (page: Page) => page.getByTestId("shell-lamp-latched-rec");
+const toast = (page: Page) => page.getByRole("status").filter({ hasText: /\S/ }).last();
+
+test.describe("the Cameras page", () => {
+  test("sits between Audio and the Teleprompter, and shows the selected camera big and the other two small", async ({
+    page,
+  }) => {
+    await openCameras(page);
+    const tabs = page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button");
+    await expect(tabs).toHaveText(["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"]);
+    await expect(state(page)).toContainText("HELD");
+    await expect(state(page)).toContainText("CAM 1 is held: Studio Control reads it and sends only what you press.");
+    await expect(state(page)).toContainText("3 of 3 held · CAM 1 not recording");
+
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "1");
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-picture", "");
+    await expect(page.getByTestId("cameras-tile-2")).toBeVisible();
+    await expect(page.getByTestId("cameras-tile-3")).toBeVisible();
+    await expect(page.getByTestId("cameras-tile-1")).toHaveCount(0);
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "1");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("400");
+    await expect(page.getByTestId("cameras-shutter-value")).toContainText("180°");
+
+    // The header: the cameras' lamp between the Console's and the prompter's (D19).
+    const lamps = page.locator('[data-region="header"] [data-testid^="shell-lamp-"]:not([data-latch])');
+    await expect(lamps).toHaveText([/^Lighting/, /^Audio/, /^Cameras/, /^Prompter/, /^Surface/]);
+    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("ready");
+    await expect(recChip(page)).toHaveCount(0);
+  });
+
+  test("has one selection: a camera's key and a small picture both select, and everything follows", async ({
+    page,
+  }) => {
+    await openCameras(page);
+    await page.getByTestId("cameras-key-2").click();
+    await expect(page.getByTestId("cameras-key-2")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("cameras-key-1")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "2");
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "2");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("800");
+    await expect(page.getByTestId("cameras-tile-1")).toBeVisible();
+    await expect(page.getByTestId("cameras-tile-2")).toHaveCount(0);
+    await expect(state(page)).toContainText("CAM 2 is held");
+
+    await page.getByTestId("cameras-tile-3").click();
+    await expect(page.getByTestId("cameras-key-3")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "3");
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "3");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("1600");
+    await expect(page.getByTestId("cameras-footer")).toContainText("Big picture CAM 3 · 87.5 %");
+  });
+
+  test("REC starts with one press and stops with two, and its chip stands on every page", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page);
+    const rec = page.getByTestId("cameras-rec");
+    await expect(rec).toHaveAttribute("data-rec", "stopped");
+    await rec.click();
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+    await expect(rec).toHaveAttribute("data-key-mode", "hazard");
+    await expect(rec.locator("[data-lamp='error']")).toHaveCount(1);
+    await expect(page.getByTestId("cameras-take-length")).toContainText("counted here since");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1 started recording.");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("Screen");
+    await expect(recChip(page)).toContainText("REC");
+    await expect(recChip(page)).toContainText("CAM 1");
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+
+    // REC is CAM 1's whichever camera is selected (D14).
+    await page.getByTestId("cameras-key-2").click();
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "2");
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+
+    // The chip opens the page from any other.
+    await page.getByRole("button", { name: "Audio", exact: true }).click();
+    await expectWorkspaceMounted(page, "audio");
+    await expect(recChip(page)).toBeVisible();
+    await recChip(page).click();
+    await expectWorkspaceMounted(page, "cameras");
+
+    // One press arms the stop, and says what the second press does. The
+    // page's clock stands still meanwhile: the second press is inside the
+    // stop's 3 s on any runner.
+    await pausePageClock(page);
+    await rec.click();
+    await expect(rec).toHaveAttribute("data-armed", "true");
+    await expect(rec).toContainText("Stop?");
+    await expect(state(page)).toContainText("Stop recording on CAM 1 · press again");
+    await expect(page.getByTestId("cameras-footer")).toContainText("recording · stop armed");
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await rec.click();
+    await page.clock.resume();
+    await expect(rec).toHaveAttribute("data-rec", "stopped");
+    await expect(recChip(page)).toHaveCount(0);
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1 stopped recording.");
+    await expect(page.getByTestId("cameras-take-length")).toContainText("not recording");
+  });
+
+  test("an armed stop that is not pressed again within 3 s is dropped, and the take goes on", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page, "cameras-recording");
+    const rec = page.getByTestId("cameras-rec");
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+    // The take ran before Studio Control looked, so its length is not known.
+    await expect(page.getByTestId("cameras-take-length")).toContainText("not known");
+    expect(STOP_WINDOW_MS, "the deck's window (D14)").toBe(3000);
+    await pausePageClock(page);
+    await rec.click();
+    await expect(rec).toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("cameras-stop-countdown")).toHaveAttribute("style", /--arm-duration: 3000ms/);
+    // Short of the 3 s the arm stands; past them it is dropped.
+    await page.clock.fastForward(STOP_WINDOW_MS - 100);
+    await expect(rec).toHaveAttribute("data-armed", "true");
+    await page.clock.fastForward(200);
+    await expect(rec).toHaveAttribute("data-armed", "false");
+    await page.clock.resume();
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+  });
+
+  test("one press steps a value, picks one from the list the camera allows, or runs an auto", async ({ page }) => {
+    await openCameras(page);
+    const iso = page.getByTestId("cameras-iso-value");
+    await page.getByTestId("cameras-iso-up").click();
+    await expect(iso).toContainText("500");
+    await page.getByTestId("cameras-iso-down").click();
+    await page.getByTestId("cameras-iso-down").click();
+    await expect(iso).toContainText("320");
+
+    await iso.click();
+    const list = page.getByTestId("cameras-values-list");
+    await expect(list).toBeVisible();
+    await expect(list.getByRole("button", { pressed: true })).toHaveText("320");
+    await expect(list.locator("[data-testid^='cameras-value-']")).toHaveCount(25);
+    await list.getByTestId("cameras-value-1600").click();
+    await expect(list).toHaveCount(0);
+    await expect(iso).toContainText("1600");
+
+    // Esc and Close leave the list without a change.
+    await page.getByTestId("cameras-shutter-value").click();
+    await expect(list).toContainText("Shutter");
+    await page.keyboard.press("Escape");
+    await expect(list).toHaveCount(0);
+    await expect(page.getByTestId("cameras-shutter-value")).toContainText("180°");
+
+    await page.getByTestId("cameras-auto-iris").click();
+    await expect(page.getByTestId("cameras-iris-value")).toContainText("f/4.0");
+    await page.getByTestId("cameras-auto-focus").click();
+    await expect(page.getByTestId("cameras-focus-value")).toHaveText("0.50");
+
+    // A step at the end of the camera's own values is locked, with the reason.
+    await page.getByTestId("cameras-iso-value").click();
+    await list.getByTestId("cameras-value-100").click();
+    await expect(page.getByTestId("cameras-iso-down")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-iso-down")).toHaveAttribute(
+      "title",
+      "ISO is at the lowest value CAM 1 allows."
+    );
+  });
+
+  test("a level takes a typed value, in the camera's range and on its step", async ({ page }) => {
+    await openCameras(page);
+    const balance = page.getByTestId("cameras-whiteBalance-value");
+    await expect(balance).toContainText("5600 K");
+    await page.getByTestId("cameras-whiteBalance-up").click();
+    await expect(balance).toContainText("5650 K");
+    await balance.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Set white balance on CAM 1");
+    await dialog.getByRole("spinbutton").fill("4320");
+    await dialog.getByRole("button", { name: "Set value" }).click();
+    await expect(dialog).toHaveCount(0);
+    // 4320 is not on CAM 1's step of 50: the nearest that is.
+    await expect(balance).toContainText("4300 K");
+  });
+
+  test("the format and the look are press twice, and a rate the camera does not allow is locked", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page);
+    const fifty = page.getByTestId("cameras-frameRate-50");
+    await expect(page.getByTestId("cameras-frameRate-25")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("cameras-frameRate-60")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-frameRate-60")).toHaveAttribute("title", "60p: not at 6K");
+
+    await fifty.click();
+    await expect(fifty).toHaveAttribute("data-armed", "true");
+    await expect(state(page)).toContainText("Frame rate 25p → 50p on CAM 1 · press again");
+    await expect(page.getByTestId("cameras-frameRate-25")).toHaveAttribute("aria-pressed", "true");
+    // Another key takes the arm; the first is dropped and nothing was set.
+    await page.getByTestId("cameras-resolution-UHD").click();
+    await expect(fifty).not.toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("cameras-resolution-UHD")).toHaveAttribute("data-armed", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("cameras-resolution-UHD")).not.toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("cameras-resolution-6K")).toHaveAttribute("aria-pressed", "true");
+
+    await pressTwice(page, "cameras-frameRate-50");
+    await expect(page.getByTestId("cameras-frameRate-50")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1: 25p → 50p.");
+
+    await pressTwice(page, "cameras-dynamicRange-Video");
+    await expect(page.getByTestId("cameras-dynamicRange-Video")).toHaveAttribute("aria-pressed", "true");
+    await pressTwice(page, "cameras-displayLutOn-off");
+    await expect(page.getByTestId("cameras-displayLutOn-off")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1: display LUT off.");
+
+    // The BGH1s report neither a profile nor a LUT, and say so.
+    await page.getByTestId("cameras-key-2").click();
+    await expect(page.getByTestId("cameras-dynamicRange-not-reported")).toHaveText(
+      "CAM 2 does not report its dynamic range."
+    );
+    await expect(page.getByTestId("cameras-nd-not-reported")).toHaveText("The BGH1 has no ND filter.");
+    await expect(page.getByTestId("cameras-focus-nearer")).toBeVisible();
+  });
+
+  test("Release is press twice and hands the camera over; Connect takes it back", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page);
+    await page.getByTestId("cameras-key-2").click();
+    await expect(page.getByTestId("cameras-release")).toContainText("Release to LUMIX Tether · press twice");
+    await pressTwice(page, "cameras-release");
+    await expect(state(page)).toContainText("RELEASED");
+    await expect(state(page)).toContainText("CAM 2 is released to LUMIX Tether.");
+    await expect(page.getByTestId("cameras-connection-word")).toContainText("RELEASED");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("not read");
+    await expect(page.getByTestId("cameras-iso-up")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-release")).toHaveCount(0);
+    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("released");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 2 released to LUMIX Tether.");
+
+    // The state display's way out and the plate's key are the same Connect.
+    await expect(page.getByTestId("cameras-state-connect")).toHaveText("Connect CAM 2");
+    await page.getByTestId("cameras-connect").click();
+    await expect(state(page)).toContainText("HELD");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("800");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 2 held again.");
+  });
+
+  test("CAM 1 released: REC is locked and the chip says that it is not read", async ({ page }) => {
+    await page.clock.install();
+    await openCameras(page);
+    await page.getByTestId("cameras-rec").click();
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+    await pausePageClock(page);
+    await page.getByTestId("cameras-release").click();
+    await expect(page.getByTestId("cameras-connection-note")).toHaveText(
+      "CAM 1 is recording: after Release, REC stops only on the camera or the iPad."
+    );
+    await page.clock.fastForward(PAST_THE_DWELL_MS);
+    await page.getByTestId("cameras-release").click();
+    await page.clock.resume();
+
+    const rec = page.getByTestId("cameras-rec");
+    await expect(rec).toHaveAttribute("data-rec", "locked");
+    await expect(rec).toHaveAttribute("aria-disabled", "true");
+    await expect(rec).toContainText("locked · CAM 1 is released to the iPad");
+    await expect(recChip(page)).toContainText("not read while released");
+    await expect(recChip(page)).toHaveAttribute("data-tone", "attention");
+    await expect(page.getByTestId("cameras-take-timecode")).toContainText("not read while released");
+
+    // Connect reads it again: the take it found running started before it looked.
+    await page.getByTestId("cameras-connect").click();
+    await expect(rec).toHaveAttribute("data-rec", "recording");
+    await expect(page.getByTestId("cameras-take-length")).toContainText("not known");
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+  });
+
+  test("a camera that stops answering reads UNREACHABLE, keeps its last values as doubt, and has no Release", async ({
+    page,
+  }) => {
+    await openCameras(page);
+    await page.getByTestId("cameras-key-3").click();
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.stopAnswering(3));
+    await expect(state(page)).toContainText("UNREACHABLE");
+    await expect(state(page)).toContainText("CAM 3 does not answer at 172.16.16.30.");
+    await expect(page.getByTestId("shell-lamp-cameras")).toHaveAttribute("data-tone", "error");
+    await expect(page.getByTestId("cameras-iso-value")).toHaveAttribute("data-doubt", "");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("1600");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("last read");
+    await expect(page.getByTestId("cameras-iso-up")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-release")).toHaveCount(0);
+    await expect(page.getByTestId("cameras-footer")).toContainText("2 / 3 held · CAM 3 unreachable");
+
+    // Try again is one read, which sends nothing: the page says that it tried.
+    await page.getByTestId("cameras-state-read-again").click();
+    await expect(toast(page)).toContainText("Read again: nothing has changed. CAM 3 does not answer");
+    expect(await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.sent(3))).toBe(0);
+
+    // It answers again: the page reads the cameras once a second, and shows it.
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.answerAgain(3));
+    await expect(state(page)).toContainText("HELD", { timeout: 3000 });
+    await expect(page.getByTestId("cameras-iso-value")).not.toHaveAttribute("data-doubt", "");
+  });
+
+  test("a value changed on the camera shows on the page, and the camera wins", async ({ page }) => {
+    await openCameras(page);
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.changeOnBody(1, { iso: "3200", whiteBalance: 4300 }));
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("3200", { timeout: 3000 });
+    await expect(page.getByTestId("cameras-whiteBalance-value")).toContainText("4300 K");
+    await expect(page.getByTestId("cameras-key-1")).toContainText("ISO 3200");
+    // A take started on the camera itself is a take the page saw start.
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.changeOnBody(1, { recording: true }));
+    await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "recording", { timeout: 3000 });
+    await expect(recChip(page)).toBeVisible();
+  });
+
+  test("CAM 1 lost mid-take: the last report as doubt, STOP locked, the chip amber", async ({ page }) => {
+    await openCameras(page, "cameras-lost-mid-take");
+    const rec = page.getByTestId("cameras-rec");
+    await expect(rec).toHaveAttribute("data-rec", "last-known");
+    await expect(rec).toHaveAttribute("aria-disabled", "true");
+    await expect(rec).toContainText("last known: recording");
+    await expect(rec).toContainText("STOP is locked until CAM 1 answers");
+    await expect(recChip(page)).toContainText("last known");
+    await expect(recChip(page)).toHaveAttribute("data-tone", "attention");
+    await expect(page.getByTestId("cameras-take-timecode").locator("b")).toHaveAttribute("data-doubt", "");
+    await expect(page.getByTestId("cameras-take-timecode")).toContainText("last read");
+    await expect(page.getByTestId("cameras-take-length")).toContainText("not counted · CAM 1 does not answer");
+    await rec.click({ force: true });
+    await expect(rec).toHaveAttribute("data-rec", "last-known");
+  });
+
+  test("without a link every camera is NOT SET UP and says why, and REC is locked", async ({ page }) => {
+    await openCameras(page, "cameras-no-link");
+    await expect(state(page)).toContainText("NOT SET UP");
+    await expect(state(page)).toContainText("Studio Control has no link to CAM 1 yet: it comes with a later version.");
+    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("not set up");
+    await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "locked");
+    await expect(page.getByTestId("cameras-rec")).toContainText("locked · CAM 1 is not set up");
+    await expect(page.getByTestId("cameras-recent-empty")).toBeVisible();
+    await expect(recChip(page)).toHaveCount(0);
+  });
+
+  test("the aids, the view and the loupe are this screen's own, and off again at every start", async ({ page }) => {
+    await openCameras(page);
+    const hero = page.getByTestId("cameras-hero-picture");
+    const loupe = page.getByTestId("cameras-loupe-picture");
+    await expect(hero).toHaveAttribute("data-aids", "");
+    await expect(hero).toHaveAttribute("data-part", "0,0,1920,1080");
+    await expect(loupe).toHaveAttribute("data-part", "818,472,284,136");
+
+    for (const aid of ["guides", "peaking", "zebras"]) {
+      await page.getByTestId(`cameras-aid-${aid}`).click();
+      await expect(page.getByTestId(`cameras-aid-${aid}`)).toHaveAttribute("aria-pressed", "true");
+    }
+    await expect(hero).toHaveAttribute("data-aids", "guides zebras peaking");
+    // The loupe takes the zebras and the peaking, never the guides.
+    await expect(loupe).toHaveAttribute("data-aids", "zebras peaking");
+    // Nothing of it reaches a camera.
+    expect(
+      await page.evaluate(() => [1, 2, 3].map((camera) => window.__SSE_TEST_CAMERAS__!.sent(camera as 1 | 2 | 3)))
+    ).toEqual([0, 0, 0]);
+
+    await page.getByTestId("cameras-zoom-4").click();
+    await expect(loupe).toHaveAttribute("data-part", "889,506,142,68");
+    // A press on the big picture moves the loupe there: 420 of 1680 across is
+    // 480 of the picture's 1920, 700 of 945 down is 800 of its 1080.
+    const box = (await page.getByTestId("cameras-hero").boundingBox())!;
+    await page.mouse.click(box.x + 420, box.y + 700);
+    await expect(loupe).toHaveAttribute("data-part", "409,766,142,68");
+    await page.getByTestId("cameras-view-one-to-one").click();
+    await expect(hero).toHaveAttribute("data-part", "0,135,1680,945");
+    await expect(page.getByTestId("cameras-caption-detail")).toContainText("1:1 · 1680 × 945 of 1920 × 1080");
+    await expect(page.getByTestId("cameras-footer")).toContainText("CAM 1 · 1:1");
+
+    // Each camera keeps its own point; the aids and the view are the page's.
+    await page.getByTestId("cameras-key-2").click();
+    await expect(hero).toHaveAttribute("data-part", "120,68,1680,945");
+    await expect(hero).toHaveAttribute("data-aids", "guides zebras peaking");
+
+    await page.reload();
+    await expectWorkspaceMounted(page, "cameras");
+    await expect(hero).toHaveAttribute("data-aids", "");
+    await expect(hero).toHaveAttribute("data-part", "0,0,1920,1080");
+    await expect(page.getByTestId("cameras-zoom-2")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("the pictures are drawn, and the aids change what is drawn", async ({ page }) => {
+    await openCameras(page);
+    const inks = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=cameras-hero-picture]")!;
+        const context = canvas.getContext("2d")!;
+        const at = (x: number, y: number) => Array.from(context.getImageData(x, y, 1, 1).data);
+        // The first bar, the white patch, and a point on the first third's line.
+        return { bar: at(200, 300), white: at(950, 800), third: at(560, 300) };
+      });
+    const plain = await inks();
+    expect(plain.bar.slice(0, 3)).toEqual([191, 191, 191]);
+    expect(plain.white.slice(0, 3)).toEqual([255, 255, 255]);
+
+    await page.getByTestId("cameras-aid-zebras").click();
+    const zebras = await inks();
+    expect(zebras.bar, "75 % is under the zebras' 95 %").toEqual(plain.bar);
+    expect(zebras.white, "full white is striped").not.toEqual(plain.white);
+
+    await page.getByTestId("cameras-aid-guides").click();
+    expect((await inks()).third, "a guide runs down the first third").not.toEqual(plain.third);
+  });
+
+  test("the Recent list says when it cannot be read, and the cameras' state stays", async ({ page }) => {
+    await openCameras(page);
+    await expect(page.getByTestId("cameras-recent-row")).toHaveCount(5);
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("09:08");
+    await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 2 held again.");
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.actionLogUnreadable(true));
+    await expect(page.getByTestId("cameras-recent-unread")).toBeVisible({ timeout: 3000 });
+    await expect(state(page)).toContainText("HELD");
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.actionLogUnreadable(false));
+    await expect(page.getByTestId("cameras-recent-row")).toHaveCount(5, { timeout: 3000 });
+  });
+
+  test("no line is cut: a key holds the longest line its camera reports, as doubt too", async ({ page }) => {
+    await openCameras(page);
+    // The longest value of each of the cameras' lists (the unit test beside
+    // the page's model holds that none is longer): 36 characters a line.
+    await page.evaluate(() => {
+      const cameras = window.__SSE_TEST_CAMERAS__!;
+      cameras.changeOnBody(1, { iso: "25600", shutter: "172.8°", iris: "f/5.6", whiteBalance: 10000 });
+      cameras.changeOnBody(2, { iso: "51200", shutter: "1/1000", iris: "f/5.6", whiteBalance: 10000 });
+      cameras.changeOnBody(3, { iso: "51200", shutter: "1/1000", iris: "f/5.6", whiteBalance: 10000 });
+    });
+    await expect(page.getByTestId("cameras-key-1")).toContainText("ISO 25600 · 172.8° · f/5.6 · 10000 K", {
+      timeout: 3000,
+    });
+    await expect(page.getByTestId("cameras-key-3")).toContainText("ISO 51200 · 1/1000 · f/5.6 · 10000 K");
+
+    /** The lines that are cut, of every text the page may cut with an ellipsis. */
+    const cut = () =>
+      page.evaluate(() =>
+        [
+          ...document.querySelectorAll<HTMLElement>(
+            "[data-region=cluster] *, [data-region=bay] *, [data-region=plate] *"
+          ),
+        ]
+          .filter((element) => getComputedStyle(element).textOverflow === "ellipsis")
+          .filter((element) => element.scrollWidth > element.clientWidth)
+          .map((element) => element.textContent)
+      );
+    expect(await cut(), "held").toEqual([]);
+
+    await page.evaluate(() => {
+      for (const camera of [1, 2, 3] as const) window.__SSE_TEST_CAMERAS__!.stopAnswering(camera);
+    });
+    for (const camera of [1, 2, 3]) {
+      const key = page.getByTestId(`cameras-key-${camera}`);
+      await expect(key).toHaveAttribute("data-state", "unreachable", { timeout: 3000 });
+      await expect(key).toContainText("10000 K");
+      await expect(key).toContainText("last read");
+    }
+    expect(await cut(), "unreachable").toEqual([]);
+  });
+
+  test("nothing scrolls, and the regions keep their sizes", async ({ page }) => {
+    for (const fixture of ["cameras-held", "cameras-lost-mid-take", "cameras-no-link"]) {
+      await openCameras(page, fixture);
+      const sizes = await page.evaluate(() => {
+        const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+        const inside = (selector: string) => {
+          const element = document.querySelector(selector)!;
+          return element.scrollHeight <= element.clientHeight + 1;
+        };
+        return {
+          page: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
+          hero: [box("[data-testid=cameras-hero]").width, box("[data-testid=cameras-hero]").height],
+          rowBottom: box("[data-testid=cameras-loupe]").bottom,
+          footerTop: box("[data-region=footer]").top,
+          cluster: inside("[data-testid=cameras-cluster]"),
+          plate: inside("[data-testid=cameras-plate]"),
+        };
+      });
+      expect(sizes.page, fixture).toEqual([2560, 1440]);
+      expect(sizes.hero, `${fixture}: the big picture is exactly 1680 × 945`).toEqual([1680, 945]);
+      expect(sizes.rowBottom, `${fixture}: the small pictures end above the footer`).toBeLessThanOrEqual(
+        sizes.footerTop
+      );
+      expect(sizes.cluster, `${fixture}: the cluster holds everything it shows`).toBe(true);
+      expect(sizes.plate, `${fixture}: the plate holds everything it shows`).toBe(true);
+    }
+  });
+});
+
+test.describe("the header with the cameras", () => {
+  test("its fullest row fits: Scene drift, Solo, Prompter playing and REC together", async ({ page }) => {
+    await openFixture(page, "every-page");
+    await expectWorkspaceMounted(page, "cameras");
+    await page.getByTestId("cameras-rec").click();
+    await expect(recChip(page)).toBeVisible();
+
+    await page.getByRole("button", { name: "Lighting", exact: true }).click();
+    await expectWorkspaceMounted(page, "lighting");
+    await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
+    await expect(page.getByTestId("shell-lamp-latched-scene-drift")).toBeVisible();
+
+    await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
+    // The lighting page asks before it is left with a scene that drifted.
+    const leave = page.getByRole("button", { name: /Leave|Discard|Continue/ });
+    if (await leave.count()) await leave.first().click();
+    await expectWorkspaceMounted(page, "teleprompter");
+    await expect(page.getByTestId("teleprompter-play")).not.toHaveAttribute("data-locked", "", { timeout: 10_000 });
+    await page.getByTestId("teleprompter-play").click();
+    await expect(page.getByTestId("shell-lamp-latched-prompter-playing")).toBeVisible();
+    await expect(page.getByTestId("shell-lamp-latched-solo")).toBeVisible();
+
+    const row = await page.evaluate(() => {
+      const header = document.querySelector('[data-region="header"]')!;
+      const health = header.querySelector('[data-testid^="shell-lamp-"]')!.parentElement!;
+      const chips = [...health.querySelectorAll('[data-testid^="shell-lamp-"]')].map((chip) => {
+        const box = chip.getBoundingClientRect();
+        return { id: chip.getAttribute("data-testid"), left: box.left, right: box.right };
+      });
+      const tabs = header.querySelector("nav")!.getBoundingClientRect();
+      const clock = header.querySelector('[data-testid="shell-clock"]')!.getBoundingClientRect();
+      return {
+        chips,
+        tabsRight: tabs.right,
+        clockLeft: clock.left,
+        clockRight: clock.right,
+        clipped: health.scrollWidth > health.clientWidth,
+        width: header.getBoundingClientRect().width,
+      };
+    });
+    expect(row.chips.map((chip) => chip.id)).toEqual([
+      "shell-lamp-lighting",
+      "shell-lamp-audio",
+      "shell-lamp-cameras",
+      "shell-lamp-prompter",
+      "shell-lamp-surface",
+      "shell-lamp-latched-scene-drift",
+      "shell-lamp-latched-solo",
+      "shell-lamp-latched-prompter-playing",
+      "shell-lamp-latched-rec",
+    ]);
+    expect(row.clipped, "no chip is cut").toBe(false);
+    expect(row.chips[0]!.left, "the lamps start after the tabs").toBeGreaterThan(row.tabsRight);
+    expect(row.chips.at(-1)!.right, "the last chip ends before the clock").toBeLessThanOrEqual(row.clockLeft);
+    expect(row.clockRight).toBeLessThanOrEqual(row.width);
+    for (let index = 1; index < row.chips.length; index += 1) {
+      expect(row.chips[index]!.left, `${row.chips[index]!.id} stands after the chip before it`).toBeGreaterThanOrEqual(
+        row.chips[index - 1]!.right
+      );
+    }
+  });
+});
+
+test.describe("Setup / Support's camera section", () => {
+  test("Camera setup opens it from the page, and it is no step of the runner", async ({ page }) => {
+    await openCameras(page);
+    await page.getByTestId("cameras-open-setup").click();
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-mode-cameras")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("setup-screen-cameras")).toContainText("Camera setup");
+    await expect(page.locator('[data-testid^="setup-step-"][role="tab"]')).toHaveCount(5);
+    for (const camera of [1, 2, 3]) {
+      await expect(page.getByTestId(`setup-camera-${camera}-state`)).toHaveText("HELD");
+    }
+    // It is a mode of Setup / Support, beside the runner and Support.
+    await page.getByTestId("setup-mode-runner").click();
+    await expect(page.getByTestId("setup-screen-cameras")).toHaveCount(0);
+    await expect(page.getByTestId("setup-mode-cameras")).toHaveAttribute("aria-pressed", "false");
+    await page.getByTestId("setup-mode-cameras").click();
+    await expect(page.getByTestId("setup-screen-cameras")).toBeVisible();
+  });
+
+  test("takes an address, a pairing and a vMix input, and forgets a camera", async ({ page }) => {
+    await openFixture(page, "setup-cameras");
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-camera-3-state")).toHaveText("NOT SET UP");
+    await expect(page.getByTestId("setup-camera-record-3")).toContainText("not set up");
+    await expect(page.getByTestId("setup-camera-3-save-address")).toHaveAttribute("aria-disabled", "true");
+
+    await page.getByTestId("setup-camera-3-address").fill("172.16.16.30");
+    await page.getByTestId("setup-camera-3-save-address").click();
+    await expect(page.getByTestId("setup-camera-3-state")).toHaveText("HELD");
+    await expect(page.getByTestId("setup-feedback")).toContainText(
+      "CAM 3's address is saved. Studio Control holds CAM 3 now; nothing was sent to it."
+    );
+    expect(await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.sent(3))).toBe(0);
+    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("ready");
+
+    // What is not the address of one machine is refused in the hardware link's words.
+    await page.getByTestId("setup-camera-2-address").fill("172.16.16");
+    await page.getByTestId("setup-camera-2-save-address").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("172.16.16 is not the address of one machine.");
+    await expect(page.getByTestId("setup-camera-2-state")).toHaveText("HELD");
+
+    await page.getByTestId("setup-camera-1-input").fill("7");
+    await page.getByTestId("setup-camera-1-save-input").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 1's picture is vMix input 7.");
+    await page.getByTestId("setup-camera-1-input").fill("1001");
+    await expect(page.getByTestId("setup-camera-1-save-input")).toHaveAttribute(
+      "title",
+      "A vMix input is a whole number from 1 to 1000."
+    );
+    await page.getByTestId("setup-camera-1-input").fill("7");
+    await expect(page.getByTestId("setup-camera-1-save-input")).toHaveAttribute(
+      "title",
+      "This is the vMix input Setup holds for CAM 1."
+    );
+
+    await page.getByTestId("setup-camera-1-forget").click();
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
+    await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
+    await expect(page.getByTestId("setup-camera-1-input")).toHaveValue("7");
+    await page.getByTestId("setup-camera-1-pair").click();
+    await expect(page.getByTestId("setup-camera-1-state")).toHaveText("HELD");
+    await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("paired");
+  });
+
+  test("without a link it takes no pairing and no address, and says why", async ({ page }) => {
+    await openCameras(page, "cameras-no-link");
+    await page.getByTestId("cameras-state-setup").click();
+    await expectWorkspaceMounted(page, "setup");
+    await expect(page.getByTestId("setup-screen-cameras")).toContainText(
+      "This version has no link to the cameras yet, so it takes no pairing and no address."
+    );
+    await expect(page.getByTestId("setup-camera-1-pair")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("setup-camera-1-no-link")).toHaveText(
+      "Studio Control cannot pair CAM 1 yet: its Bluetooth link comes with a later version."
+    );
+    await expect(page.getByTestId("setup-camera-2-address")).toBeDisabled();
+    await expect(page.getByTestId("setup-camera-2-save-address")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("setup-camera-2-no-link")).toHaveText(
+      "Studio Control cannot take CAM 2's address yet: its network link comes with a later version."
+    );
+    // The vMix input stays.
+    await page.getByTestId("setup-camera-2-input").fill("12");
+    await page.getByTestId("setup-camera-2-save-input").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 2's picture is vMix input 12.");
+  });
+});

@@ -44,6 +44,7 @@ const WORKSPACE_MARKS = {
   audio: "audio-monitor-bar",
   // New pages program, Slice 6a.
   teleprompter: "teleprompter-bay",
+  cameras: "cameras-bay",
 } as const;
 
 export async function expectWorkspaceMounted(

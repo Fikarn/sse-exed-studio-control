@@ -205,7 +205,7 @@ function deriveWorkspace(appSnapshot: JsonObject | null): WorkspaceId {
   const value =
     typeof workspace === "object" && workspace && "workspace" in workspace ? (workspace.workspace as string) : "setup";
 
-  if (value === "lighting" || value === "audio" || value === "teleprompter") {
+  if (value === "lighting" || value === "audio" || value === "cameras" || value === "teleprompter") {
     return value;
   }
 

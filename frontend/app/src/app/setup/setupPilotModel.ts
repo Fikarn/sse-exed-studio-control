@@ -1,9 +1,17 @@
 import { type SnapshotRecord, type StatusToneLike, asRecord, getCommissioningChecks } from "../shellData";
-import type { ShellStore, JsonValue } from "@sse/engine-client";
+import type { CamerasSnapshot, JsonValue, SetupSection, ShellStore } from "@sse/engine-client";
 
 export const APP_VERSION = `v${__APP_VERSION__}`;
 
-export type SetupMode = "runner" | "support";
+/** Setup / Support's screens: the runner's steps, Support, and the cameras' setup. */
+export type SetupMode = "runner" | "support" | "cameras";
+
+/** The section the hardware link saves for each mode (`setup.activeSection`). */
+export const SETUP_MODE_SECTIONS: Record<SetupMode, SetupSection> = {
+  runner: "commissioning",
+  support: "support",
+  cameras: "cameras",
+};
 export type RunnerStepId = "import" | "probe" | "map" | "verify" | "publish";
 
 // The three engine commissioning probes. Fixture snapshots may carry extra
@@ -40,6 +48,8 @@ export interface ActionFeedback {
 
 export interface SetupSupportPilotProps {
   appSnapshot: SnapshotRecord | null;
+  /** The cameras, for their setup; `null` until they were read. */
+  camerasSnapshot: CamerasSnapshot | null;
   commissioningSnapshot: SnapshotRecord | null;
   controlSurfaceSnapshot: SnapshotRecord | null;
   healthSnapshot: SnapshotRecord | null;
@@ -134,7 +144,7 @@ export function deckKeySlots(buttons: ControlSurfaceControl[]): (ControlSurfaceC
 export function normalizeSetupMode(appSnapshot: SnapshotRecord | null): SetupMode {
   const shell = asRecord(appSnapshot?.shell);
   const setup = asRecord(shell?.setup);
-  return setup?.activeSection === "support" ? "support" : "runner";
+  return setup?.activeSection === "support" ? "support" : setup?.activeSection === "cameras" ? "cameras" : "runner";
 }
 
 export function normalizeRunnerStage(snapshot: SnapshotRecord | null): RunnerStepId | null {

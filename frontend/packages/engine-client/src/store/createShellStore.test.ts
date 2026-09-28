@@ -650,7 +650,10 @@ describe("createShellStore scoped refresh", () => {
     ]);
     expect(calls.filter((call) => call === "request:settings.update")).toHaveLength(1);
     expect(store.getSnapshot().activeWorkspace).toBe("setup");
-    // Opening the Cameras page reads them too (the page comes with the next change).
+    // Opening the Cameras page reads them too.
+    answer("app.snapshot", { shell: { workspace: "cameras" }, startup: { targetSurface: "dashboard" } });
+    expect(await after(() => store.setWorkspace("cameras"))).toEqual(["app.snapshot", "cameras.snapshot"]);
+    expect(store.getSnapshot().activeWorkspace).toBe("cameras");
     expect(domainsForMethod("settings.update", { workspace: "cameras" })).toEqual(["app", "cameras"]);
     await store.dispose();
   });

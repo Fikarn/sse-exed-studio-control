@@ -5,9 +5,9 @@ The ledgers this file replaces are in git history at the tag `archive/records-20
 
 ## Now: the Cameras and Teleprompter pages
 
-Built so far: the Teleprompter page and its editor, the prompter and the cameras' model in the engine, and the simulated cameras. What is left, in the agreed order:
+Built so far: the Teleprompter page and its editor, the prompter and the cameras' model in the engine, the simulated cameras, and the Cameras page with Setup's camera section. What is left, in the agreed order:
 
-- [ ] The Cameras page
+- [x] The Cameras page (#243, #244)
 - [ ] The two Stream Deck pages, PROMPTER and CAMERAS
 - [ ] The Prompter XL's window
 - [ ] The camera pictures
@@ -19,23 +19,14 @@ A schema change brings a migration test that starts from schema 7, the studio da
 
 ### The Cameras page (was Slice 9)
 
-Two pull requests, built against the simulated cameras from board 2 (`docs/design/boards/A-cameras-2.html`), as D10, D11 and D19 amend it.
+Built, in two pull requests, against the simulated cameras and from board 2 (`docs/design/boards/A-cameras-2.html`), as D10, D11 and D19 amend it.
 
 - [x] What the page needs from the hardware link (#243): the Recent list in `cameras.snapshot`, Setup and a restore that take no address without a link, and the store's read of the cameras with the requests the page sends.
-- [ ] The page, with Setup's camera section, its test data and its page tests.
+- [x] The page, with Setup's camera section, its test data and its page tests (#244).
 
-Build:
+The pictures are still test pictures in a canvas (`data-picture`), and the studio's build reads every camera `NOT SET UP` until its link is built. The page tests reach the simulated cameras through `window.__SSE_TEST_CAMERAS__`: a camera changes a value, stops answering, answers again.
 
-- the Cameras tab, the header's Cameras lamp, and a `REC` chip while CAM 1 records, which opens the page;
-- the selected camera big (the whole frame at 1680 × 945, or 1:1) and the other two small, with one selection for picture, plate and dials;
-- the aids as the page's own switches, off at every start: framing guides, zebras, focus peaking, the 2:1 / 4:1 loupe beside the small pictures, the 1:1 view;
-- still test pictures in a canvas (`data-picture`) until the camera pictures are built;
-- a camera section in Setup / Support, not a sixth setup step: the BGH1s' addresses, the Pocket's pairing (`CAMERA_NO_LINK` until its link is built), each camera's vMix input;
-- the store's read of `cameras.snapshot`, a mapping for `cameras.changed`, and `cameras` seeds in `fixtures.json`;
-- a test hook on the fixture double (the engine's test double in TypeScript): a camera changes a value, stops answering, answers again;
-- the page's cases in `no-shortcuts.spec.ts`.
-
-Decided:
+Decided while it was built, and kept by the work that follows:
 
 - Whenever CAM 1 is released, the `REC` chip is amber and reads "not read while released". It reads CAM 1's state in `checks.cameras`; the contract does not change.
 - The page's Recent list is a camera-only read of the action log, new in the engine, `v1.md` and the fixture double: `cameras.snapshot` carries the five newest rows as `recent`. It shows the log's camera rows in the log's sentences, with `Screen` as their source until the deck pages exist. A log that cannot be read is `null` there and never fails the read.
@@ -47,8 +38,12 @@ Decided:
 - Other pages' test data stays unseeded, so their Cameras lamp reads amber, "not set up", as the studio build's will until the real links exist.
 - What the board draws and nothing backs goes: the look-only state, false colour, the waveform, the "Proposal" marks, rows and times that nothing records. Its bank section waits for the deck pages.
 - The header's worst case (Scene drift, Solo, Prompter playing and `REC` together) fits at 2560.
-
-Ask the owner first: nothing is open.
+- The stop's arm window is 3 s, the deck's (D14); every other armed key keeps 4.5 s.
+- The state display speaks of the camera that is worst off, and of the selected one among equals.
+- A camera's key prints what the camera reports on one line, whole: a page test measures the longest line of each camera's lists. Of a camera that does not answer the line is amber and ends in `last read`; when it was read stands in the state display and the plate.
+- The test pictures are test cards without words, one to three squares naming the camera. The aids are worked out from the picture's pixels, as they will be from a camera's.
+- Also gone from the board, since nothing backs them: the cameras' names (Main, Wide, Operator), the time a camera was released, and the BGH1's warning of a settings reset (D18's check is not made).
+- Setup's address field shows `no address` when Setup holds none, never an example.
 
 ### The two Stream Deck pages, PROMPTER and CAMERAS (were Slices 7 and 12)
 
@@ -155,7 +150,7 @@ Ask the owner first: does taking a BGH1 back at a start disturb LUMIX Tether?
 
 Found while the operator's manual was rewritten from the code (2026-09-28). Each was read in the code and none has been tried on the app yet. Check each, then fix it or drop it. The ones most likely to hurt a live session come first.
 
-- [ ] **Setup unpublishes at one press.** A press on any runner step, or on `Run all probes`, unpublishes a published setup at once and locks Lighting, Audio and Teleprompter until `Publish setup`.
+- [ ] **Setup unpublishes at one press.** A press on any runner step, or on `Run all probes`, unpublishes a published setup at once and locks Lighting, Audio, Cameras and Teleprompter until `Publish setup`.
 - [ ] **`Restore latest` and `Restore path` act at one press.** A database restore replaces all saved data and restarts the hardware link.
 - [ ] **A restore from the recovery screen can arm the lights.** The light outputs take the backup's own setting, so the restart can stream to a rig that was held.
 - [ ] **The deck's `Del Scene`, `Save` and `All Off` act at one press,** and the screen's `Undo` cannot bring a deleted scene back. On screen, `CUT ALL` asks first.

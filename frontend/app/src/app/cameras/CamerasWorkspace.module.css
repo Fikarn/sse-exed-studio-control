@@ -1,0 +1,22 @@
+/* The Cameras page: the bay's own content fills the shell's bay; the
+   cluster, the plate and the footer portal into the shell's regions. */
+
+.workspace {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Only when the start could not read the cameras: the page reads them again
+   once a second until they answer. */
+.waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.waitingText {
+  margin: 0;
+  color: var(--text-text2);
+  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+}

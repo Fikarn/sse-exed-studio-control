@@ -5,6 +5,7 @@ import { SetupImportStep } from "./steps/SetupImportStep";
 import { SetupProbeStep } from "./steps/SetupProbeStep";
 import { SetupMapVerifyStep } from "./steps/SetupMapVerifyStep";
 import { SetupPublishStep } from "./steps/SetupPublishStep";
+import { SetupCamerasScreen } from "./support/SetupCamerasScreen";
 import { SetupSupportScreen } from "./support/SetupSupportScreen";
 import { SetupWorkstationPlate } from "./support/SetupWorkstationPlate";
 import { SetupFooter } from "./components/SetupFooter";
@@ -20,8 +21,8 @@ import {
 import { useSetupPilot } from "./useSetupPilot";
 
 /** Setup / Support. It assembles; it owns nothing. State and handlers live in
- *  `useSetupPilot`; the runner's steps are under `steps/`, the support surfaces
- *  under `support/`. */
+ *  `useSetupPilot`; the runner's steps are under `steps/`, Support's and the
+ *  cameras' screens under `support/`. */
 export function SetupSupportPilot(props: SetupSupportPilotProps) {
   const editor = useSetupPilot(props);
   const { store } = props;
@@ -57,7 +58,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
       </ShellRegion>
 
       <div className={styles.body}>
-        <main className={styles.bay} data-region={mode === "runner" ? "runner" : "support"}>
+        <main className={styles.bay} data-region={mode === "runner" ? "runner" : "support"} data-mode={mode}>
           {mode === "runner" ? (
             <>
               <SetupImportStep editor={editor} />
@@ -65,6 +66,8 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
               <SetupMapVerifyStep editor={editor} />
               <SetupPublishStep editor={editor} />
             </>
+          ) : mode === "cameras" ? (
+            <SetupCamerasScreen editor={editor} camerasSnapshot={props.camerasSnapshot} />
           ) : (
             <SetupSupportScreen editor={editor} />
           )}

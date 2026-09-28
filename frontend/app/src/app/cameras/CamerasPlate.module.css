@@ -1,0 +1,244 @@
+/* The Cameras page's plate: board 2's right column. The selected camera:
+   who holds it, then every value it reports, section by section. Nothing
+   scrolls, and every section is in view at once. */
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+.connectionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.connection {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 10px;
+  min-height: 60px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  box-shadow: var(--elevation-well);
+}
+
+.connectionWords {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.connectionDetail {
+  overflow: hidden;
+  color: var(--display-text2);
+  font: 500 var(--font-size-tick) / 1.25 var(--font-family-ui);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.fine {
+  margin: 0;
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+}
+
+.fine[data-warn] {
+  color: var(--role-amber-text);
+}
+
+.foot {
+  margin-top: auto;
+}
+
+/* A setting: its name, its readout, a step down and a step up. */
+.set {
+  display: grid;
+  grid-template-columns: 100px 1fr 40px 40px;
+  align-items: center;
+  gap: 8px;
+}
+
+.setLabel {
+  color: var(--text-text);
+  font: 500 var(--font-size-body) / 1.2 var(--font-family-ui);
+}
+
+.readout {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  box-shadow: var(--elevation-well);
+  color: var(--display-text);
+  text-align: left;
+}
+
+button.readout {
+  cursor: pointer;
+}
+
+button.readout:hover {
+  border-color: var(--material-line2);
+}
+
+button.readout:focus-visible,
+.readout[data-open] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.readout b {
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.readout b[data-dim] {
+  color: var(--display-text2);
+}
+
+.readout span {
+  color: var(--display-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  white-space: nowrap;
+}
+
+/* Doubt: what the camera last reported, not a fact now. */
+.readout[data-doubt] {
+  border: 1px dashed var(--display-amber);
+}
+
+.readout[data-doubt] b {
+  color: var(--display-amber);
+}
+
+/* A value the camera does not report: its own sentence, across the row. */
+.none {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px dashed var(--material-line2);
+  border-radius: var(--radius-key);
+  background: var(--material-well);
+  color: var(--display-text2);
+  font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
+}
+
+.step {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+}
+
+.keys {
+  display: flex;
+  gap: 8px;
+}
+
+.keys > * {
+  flex: 1 1 0;
+}
+
+.keys:empty {
+  display: none;
+}
+
+.focus {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  align-items: center;
+  gap: 12px;
+}
+
+.focusValue {
+  color: var(--text-text);
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.focusValue[data-doubt] {
+  color: var(--role-amber-text);
+}
+
+.nearFar {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+}
+
+.choiceLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 16px;
+  color: var(--text-text);
+  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+}
+
+.choiceValue {
+  margin-left: auto;
+  color: var(--text-text2);
+  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+}
+
+.choices > * {
+  min-width: 0;
+  padding: 0 6px;
+}
+
+/* The display LUT's four choices: the long ones take two lines. */
+.lut > * {
+  min-height: 48px;
+  white-space: normal;
+  text-align: center;
+  font: 600 var(--font-size-label) / 1.15 var(--font-family-ui);
+}
+
+/* A small pair in a label's row: On and Off. */
+.onOff {
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--radius-key);
+}
+
+.onOff > * {
+  flex: none;
+  min-height: 28px;
+}
+
+/* An armed choice in a segmented well: the armed key's keyline and bar, in
+   the room the choice had. */
+.armedChoice {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px 8px;
+  white-space: normal;
+  text-align: center;
+}

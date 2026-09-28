@@ -10,7 +10,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] F5, Ctrl+R, Ctrl+Shift+R, Ctrl+P and Ctrl+F do nothing.
 - [ ] Esc closes a dialog and cancels an armed key.
 - [ ] Alt+F4 asks first; Cancel keeps the session, and Confirm leaves no `studio-control-engine.exe` in Task Manager.
-- [ ] The tabs are Setup / Support, Lighting, Audio, Cameras (once built) and Teleprompter, and nothing says Planning.
+- [ ] The tabs are Setup / Support, Lighting, Audio, Cameras and Teleprompter, and nothing says Planning.
 - [ ] Setup's `CONSOLE` key opens the Console.
 - [ ] `Studio fullscreen` and `Reset the window layout`, in Setup / Support › Workstation, each put the window back fullscreen.
 - [ ] From the chair, the header is one row and every lamp can be read, in Setup too.
@@ -62,9 +62,18 @@ Once the Prompter XL's window is built:
 - [ ] Unplugged: the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", and no other screen shows the script.
 - [ ] Plugged back in: the script returns at the same place, paused.
 - [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page (once built).
-- [ ] The scroll is smooth at the speeds you use, also with the Cameras page open (once built).
+- [ ] The scroll is smooth at the speeds you use, also with the Cameras page open.
 
-## Cameras (once built)
+## Cameras
+
+Until the links to the cameras are built:
+
+- [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
+- [ ] The pictures are test pictures, and the page says so. Guides, peaking, zebras, 1:1 and the loupe change the pictures on the screen.
+- [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and a vMix input is saved and still there after a restart.
+- [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
+
+Once the links and the pictures are built:
 
 - [ ] All three cameras show; the selected one is big enough to judge framing and exposure, and the 1:1 view sharp enough to judge focus.
 - [ ] A hand waved at a camera moves on the page with no delay you can see beside vMix's own preview.

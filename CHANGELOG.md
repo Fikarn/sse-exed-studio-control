@@ -13,7 +13,13 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - Scripts come from a Word file (.docx), a text file or pasted text, read on this PC without Word. Each script keeps its last 20 versions, and a removed script can be restored (#225, #227).
 - Edit script opens the editor: Bold, Italic, Underline, Add cue, Undo, Redo and Paste, saved as it is typed. New script and Paste as a new script sit beside Open file…; Rename opens a dialog (#228).
 - The header has a Prompter lamp and, while the text scrolls, a green latch with the time left on every page, which opens the Teleprompter (#227).
-- The hardware link keeps the three cameras (Pocket 6K Pro, two BGH1) and their setup; the Cameras page and the links to the real cameras come later. A start or a restore sends nothing to a camera (#229).
+- A Cameras page shows the selected camera big and the other two small, and sets it: exposure, colour and focus at one press, format and look at two. A value a camera does not report says so (#244).
+- `REC` starts CAM 1 at one press and stops it at two, the second within 3 s, whichever camera is selected. While it records the header shows `REC CAM 1` on every page, which opens Cameras (#244).
+- `Release`, press twice, hands a camera to the iPad or LUMIX Tether, and `Connect` takes it back. A camera that does not answer reads `UNREACHABLE`, with its last values in amber (#244).
+- Guides, peaking, zebras, a 1:1 view and a loupe are drawn on this screen only and are off at every start. Until the cameras' pictures are built, the pictures are test pictures (#244).
+- Setup / Support has a `CAMERAS` screen: CAM 1's pairing, the BGH1s' addresses and each camera's vMix input. Saving sends nothing to a camera (#244).
+- The header has a Cameras lamp. Until the links to the real cameras are built it reads `not set up`, every camera says that its link comes with a later version, and `REC` is locked (#244).
+- The hardware link keeps the three cameras (Pocket 6K Pro, two BGH1) and their setup; the links to the real cameras come later. A start or a restore sends nothing to a camera (#229).
 - The saved data holds the Teleprompter's scripts and look (schema 9) and the cameras' setup (schema 10); backups carry both (formats 6 and 7). A restore adds scripts and never removes one (#225, #229).
 - Light outputs: Armed / Held, in Setup / Support › Workstation. Held, nothing is sent to the rig, which is not a blackout; the hold is remembered, and no start or restore arms the rig (#201).
 - Recent actions, in Setup / Support, lists every switch that reached a device and who made it: Screen, Stream Deck, Console (a switch at TotalMix) or Start-up (#201, #239).

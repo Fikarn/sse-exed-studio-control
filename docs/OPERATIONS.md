@@ -6,25 +6,26 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 1. Start TotalMix FX and Companion, and vMix when the cameras are used.
 2. Start the verified build: `Studio Control.cmd` in the builds folder. It opens fullscreen on the studio display, on the page last used. (Until the first build is verified there, the studio's build is the one in `release\native\windows\` in the repository.)
-3. Read the header's lamps. `Lighting`, `Audio` and `Surface` should be green and read `ready`. `Prompter` reads `not connected` until the Prompter XL's window is built.
+3. Read the header's lamps. `Lighting`, `Audio` and `Surface` should be green and read `ready`. `Cameras` reads `not set up` until the links to the cameras are built, and `Prompter` reads `not connected` until the Prompter XL's window is built.
 4. Look up any other word under [When something goes wrong](#when-something-goes-wrong).
 5. If `Lighting` reads `held`, nothing reaches the rig. Look at the Lighting page and its `DMX monitor`: that is what the rig will get. Then set `Light outputs` to `ARMED` in Setup / Support.
 6. Press a key on the Stream Deck and watch the screen follow. No lamp shows whether the deck answers.
 
 ## The screen
 
-**Header.** The tabs are `Setup / Support`, `Lighting`, `Audio` and `Teleprompter`. Then comes one lamp for each subsystem, with its worst state as a word: green is fine, amber wants attention, red is a fault. Pressing a lamp opens Setup / Support.
+**Header.** The tabs are `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Then comes one lamp for each subsystem, with its worst state as a word: green is fine, amber wants attention, red is a fault. Pressing a lamp opens Setup / Support.
 
 - `Lighting`. `ready`: the bridge passed its last probe; the app never checks the bridge by itself. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
+- `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
 - `Prompter`. `ready`, or the Teleprompter's state in small letters. Today that is `not connected`.
 - `Surface`. `ready`: the app listens for the Stream Deck. `unavailable`: it could not open its port.
 
-A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`. Pressing it opens its page. The clock comes last.
+A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`, `REC CAM 1`. Pressing it opens its page. The clock comes last.
 
 **Page.** The cluster on the left, the bay in the middle, the plate on the right. The state display, top left, says what is true in one word and one sentence, and offers the way out as a key. The footer holds the page's facts, such as `Metering TotalMix · live`.
 
-**Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s. A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
+**Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s (3 s for the cameras' stop). A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
 
 **Keyboard.** No shortcuts. Tab, Enter and Space, typing, the arrows on a slider or a list, and `Esc` do what they do in any program.
 
@@ -91,7 +92,30 @@ The Prompter XL's own window is not built yet, so the page reads `NOT CONNECTED`
 
 ## Cameras
 
-Not built yet.
+The links to the real cameras and their pictures are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, every control and `REC` are locked, and the pictures are test pictures. This is how the page works with a camera that is held.
+
+- **Select** a camera with its key on the left or its small picture. The big picture and the plate follow. `REC` does not: it is always CAM 1's.
+- **Pictures.** The selected camera is big, the other two small. `Whole frame` shows all of it, at 87.5 %; `1:1` shows a part pixel for pixel. The loupe shows a part at `2:1` or `4:1`. Press the big picture to move the part.
+- **Aids.** `Guides`, `Peaking` and `Zebras 95 %` are drawn on this screen only and never reach a camera, vMix or a recording. They are off at every start.
+- **Values.** An arrow steps a value at one press. A press on the value opens the list the camera allows, or typed entry for white balance and tint. `Auto iris once`, `Auto white balance once` and `Autofocus once` run once. A value a camera does not report says so.
+- **Format and look.** Resolution, frame rate, dynamic range and the display LUT are press twice: the picture drops while the camera changes. A value the camera does not allow now is locked and says why.
+- **Record.** `REC` starts CAM 1 at one press. While CAM 1 records the key has a red lamp, and the header shows `REC CAM 1` on every page. Stopping is press twice, the second within 3 s.
+- **The take.** The length is Studio Control's own count, from a start it saw; of a take that ran before it looked, the length is not known. The timecode is CAM 1's. CAM 1 does not report its card time over Bluetooth.
+- **Release**, press twice, hands the camera to the iPad (CAM 1) or to LUMIX Tether (CAM 2, CAM 3). Studio Control then neither reads it nor sends to it, and a take it records goes on. `Connect` takes it back.
+- **The camera wins.** A change made on the camera shows on the page within about a second.
+- **Recent** lists the five newest camera actions and who did each. `All actions…` opens Setup / Support, which lists the actions of every page.
+- **`Read all cameras again`** reads the three once and sends nothing. **`Camera setup`** opens Setup / Support's `CAMERAS`.
+
+The state display speaks of the camera that is worst off, and of the selected one among equals.
+
+| State         | It means                                                       | Way out                                       |
+| ------------- | -------------------------------------------------------------- | --------------------------------------------- |
+| `HELD`        | Studio Control reads the camera and sends only what you press  | None is needed                                |
+| `RELEASED`    | It is handed over, and not read                                | `Connect`                                     |
+| `NOT SET UP`  | No pairing or no address, or no link in this version           | `Camera setup`                                |
+| `UNREACHABLE` | It does not answer; its last values are amber, its keys locked | Check that it is on and in reach; `Try again` |
+
+While CAM 1 is `UNREACHABLE` after it reported recording, `REC` reads `last known: recording` and the stop is locked until it answers: the take is left as it was. Stop it on the camera if it must end.
 
 ## Stream Deck
 
@@ -107,7 +131,7 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`. T
 
 ## Setup / Support
 
-`RUNNER` and `SUPPORT` choose what the bay shows. The plate on the right is always Support. `CONSOLE` opens the Console.
+`RUNNER`, `SUPPORT` and `CAMERAS` choose what the bay shows. The plate on the right is always Support. `CONSOLE` opens the Console.
 
 **The runner's steps**
 
@@ -117,9 +141,11 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`. T
 4. `Verify live echo`: a control pressed on the deck pulses on screen.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
 
-A press on a step or on `Run all probes` unpublishes the setup at once: `Lighting`, `Audio` and `Teleprompter` lock until `Publish setup` is pressed again. The devices and the deck keep working. Leave the runner alone during a session; the Console has its own `Run audio probe`.
+A press on a step or on `Run all probes` unpublishes the setup at once: `Lighting`, `Audio`, `Cameras` and `Teleprompter` lock until `Publish setup` is pressed again. The devices and the deck keep working. Leave the runner alone during a session; the Console has its own `Run audio probe`.
 
 **Workstation.** `UI scale` is 90, 100, 110 or 125 %. `Studio fullscreen` puts the window fullscreen on the studio display; `Reset the window layout` also forgets where it was last. `Light outputs` is `ARMED` or `HELD`; arming sends the current state at once. `Prompter XL` shows what Windows reports.
+
+**Cameras.** `CAMERAS` holds what Studio Control needs for each camera: CAM 1's pairing, CAM 2's and CAM 3's addresses, and the vMix input that carries each picture. Saving sends nothing to a camera. `Forget` removes a pairing or an address and keeps the vMix input. Studio Control contacts only an address entered here. Until a camera's link is built its pairing and its address are locked, and the vMix input can be set.
 
 **Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it, at one press. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore replaces the saved data and keeps a copy of what it replaced. A database backup restarts the hardware link. The light outputs stay armed or held as they were.
 
@@ -142,6 +168,7 @@ A press on a step or on `Run all probes` unpublishes the setup at once: `Lightin
 | Lighting `no bridge`         | Its probe has not passed    | Run it in Setup, then publish         |
 | Rig dark, Lighting `ready`   | The probe may be old        | Check the bridge's power and cable    |
 | Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
+| Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |
 | Surface `unavailable`        | The deck's port is taken    | Close what holds it, restart the link |
 | The deck does nothing        | Companion is closed         | Start Companion                       |
 | `401` in Companion's log     | The profile is refused      | Import the profile again              |
