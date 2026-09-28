@@ -1076,12 +1076,14 @@ fn exports_older_than_thirty_days_are_pruned() {
 // 2026-09 production readiness, Slice 11 (F31): whether the light outputs
 // are armed is the state of this workstation now, not part of a backup. The
 // key sits under `app.lighting.`, which an archive restore deletes and writes
-// back as a whole — so without its exception, restoring a backup made while
-// armed would arm a rig the operator is holding. The archive leaves the key
-// out, the restore neither clears nor writes it, and an archive from
-// elsewhere that names it is not believed.
+// back as a whole. The archive leaves the key out, and an archive from
+// elsewhere that names it — in its lighting, its audio or its verbatim
+// settings — is not believed. The owner's decision (2026-09-28): a restore
+// always comes back with the light outputs held. An archive rewrites the
+// lighting the rig is driven from, and armed, its look reached the rig at
+// once.
 #[test]
-fn restore_never_changes_whether_the_light_outputs_are_armed() {
+fn an_archive_restore_holds_the_light_outputs_and_takes_no_flag_from_the_archive() {
     use crate::lighting::{
         lighting_output_armed, lighting_output_armed_setting, LIGHTING_OUTPUT_ARMED_KEY,
     };
@@ -1168,18 +1170,54 @@ fn restore_never_changes_whether_the_light_outputs_are_armed() {
         .expect("restore should succeed");
     assert!(!armed_now(&runtime));
 
-    // And the other way round: an armed rig stays armed.
+    // An armed rig comes back held, from the workstation's own archive...
     set_settings_owned(&runtime.db_path, &[lighting_output_armed_setting(true)])
         .expect("arming should persist");
-    forged["commissioning"]["lighting"]["settings"][LIGHTING_OUTPUT_ARMED_KEY] = json!("false");
-    fs::write(
-        &forged_path,
-        serde_json::to_vec(&forged).expect("archive should serialize"),
-    )
-    .expect("forged archive should write");
-    restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
+    restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
         .expect("restore should succeed");
-    assert!(armed_now(&runtime));
+    assert!(
+        !armed_now(&runtime),
+        "an archive restore holds an armed rig"
+    );
+
+    // ...and from one that names the flag anywhere it could be written. The
+    // flag is never written from the archive: the count of settings the
+    // restore wrote is the genuine archive's, whatever the forged one names
+    // (the hold at the end would hide a key written on the way).
+    let genuine = restore_support_backup(&runtime, &request_for(&runtime, Path::new(&export.path)))
+        .expect("restore should succeed")
+        .settings_restored;
+    for place in ["lighting", "audio", "settings"] {
+        let mut forged: Value =
+            serde_json::from_slice(&fs::read(&export.path).expect("archive should read"))
+                .expect("archive should parse");
+        match place {
+            "lighting" => {
+                forged["commissioning"]["lighting"]["settings"][LIGHTING_OUTPUT_ARMED_KEY] =
+                    json!("true")
+            }
+            "audio" => {
+                forged["commissioning"]["audio"]["settings"][LIGHTING_OUTPUT_ARMED_KEY] =
+                    json!("true")
+            }
+            _ => forged["settings"][LIGHTING_OUTPUT_ARMED_KEY] = json!("true"),
+        }
+        fs::write(
+            &forged_path,
+            serde_json::to_vec(&forged).expect("archive should serialize"),
+        )
+        .expect("forged archive should write");
+        set_settings_owned(&runtime.db_path, &[lighting_output_armed_setting(true)])
+            .expect("arming should persist");
+        let written = restore_support_backup(&runtime, &request_for(&runtime, &forged_path))
+            .expect("restore should succeed")
+            .settings_restored;
+        assert!(
+            !armed_now(&runtime),
+            "an archive naming the flag in its {place} does not arm the rig"
+        );
+        assert_eq!(written, genuine, "the flag in its {place} is not written");
+    }
 }
 
 // Slice 11 (F30): `support.snapshot` carries the newest fifty rows of the

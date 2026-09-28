@@ -186,7 +186,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 
 - [x] **Setup unpublishes at one press.** A press on any runner step, or on `Run all probes`, unpublishes a published setup at once and locks Lighting, Audio, Cameras and Teleprompter until `Publish setup`. Fixed in #252: such a press arms first and a second within 3 s applies; `Back to …` did the same and arms too, and a press on `Publish` itself sends nothing.
 - [x] **`Restore latest` and `Restore path` act at one press.** A database restore replaces all saved data and restarts the hardware link. Fixed in #252: they ask first, in Setup and on the recovery screen, and say what the restore replaces.
-- [ ] **A restore from the recovery screen can arm the lights.** The light outputs take the backup's own setting, so the restart can stream to a rig that was held.
+- [x] **A restore from the recovery screen can arm the lights.** The light outputs take the backup's own setting, so the restart can stream to a rig that was held. Fixed in #253: every restore comes back held, a database backup's at the start that applies it (a refused one too) and an archive's in its transaction.
 - [ ] **The deck's `Del Scene`, `Save` and `All Off` act at one press,** and the screen's `Undo` cannot bring a deleted scene back. On screen, `CUT ALL` asks first.
 - [ ] **Lighting never checks the bridge during a session.** `REACHABLE` and the lamp's `ready` come from the last probe, and the probe counts a refused connection as reachable.
 - [ ] **The deck's probe always passes.** It counts the pages the app holds and never reaches Companion or the deck.

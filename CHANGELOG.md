@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Every restore comes back with the light outputs held, a database backup's and an archive's alike; arm them in Setup / Support when the rig should follow. A restore from the recovery screen could arm a rig that was held (#253).
 - On a published setup, a step, `Back to …` or `Run all probes` in Setup arms first and says what would lock; a second press within 3 s unpublishes it. They unpublished it at one press (#252).
 - `Restore latest` and `Restore path` ask first and say what the restore replaces, in Setup / Support and on the recovery screen (#252).
 - Lighting's `Save · press twice` arms at the first press and saves the new scene at the second, as it says; it saved at the first (#252).

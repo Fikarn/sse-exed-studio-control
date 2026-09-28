@@ -131,7 +131,7 @@ describe("SetupSupportPilot backup verification", () => {
     confirmRestore();
     await waitFor(() => {
       expect(screen.getByTestId("setup-feedback").textContent).toContain(
-        `Restored native-support-backup from C:/app-data/backups/native-backup-2026-04.json. ${note}`
+        `Restored native-support-backup from C:/app-data/backups/native-backup-2026-04.json. ${note} The light outputs are held until they are armed in Setup / Support.`
       );
     });
     expect(screen.getByTestId("setup-feedback").getAttribute("data-tone")).toBe("ok");

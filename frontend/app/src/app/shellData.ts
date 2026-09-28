@@ -51,6 +51,10 @@ export function describeBackupKind(kind: SupportBackupKind) {
   return kind === "database" ? "database backup" : "backup archive";
 }
 
+/** Every restore comes back with the light outputs held (the owner's decision,
+ *  2026-09-28); the restore's sentence says so. */
+export const RESTORE_HOLD_SENTENCE = "The light outputs are held until they are armed in Setup / Support.";
+
 // New pages program, Slice 2 (D3): a restore's reply carries `detail` only when
 // the backup held something the hardware link did not restore — the Planning
 // data of a backup written before Planning left. It follows the shell's own

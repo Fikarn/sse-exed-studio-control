@@ -573,6 +573,58 @@ fn set_armed_holds_and_arms_the_light_outputs() {
     assert!(!invalid.response.ok);
 }
 
+// The owner's decision (2026-09-28): a restore always comes back with the
+// light outputs held. An archive restore applies at once, without a restart:
+// it holds an armed rig, says so in its row, and says that the lighting
+// changed.
+#[test]
+fn an_archive_restore_holds_the_light_outputs_and_the_screen_hears_of_it() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = TestDir::new("archive-restore-holds");
+    let app = lighting_app_for(&test_dir);
+    assert_eq!(
+        request(&app, "lighting.snapshot", json!({}))["outputArmed"],
+        true
+    );
+    let exported = request(&app, "support.backup.export", json!({}));
+    let path = exported["path"].as_str().expect("a path").to_owned();
+    let generation_before = crate::lighting::lighting_render_generation();
+
+    let reply = app.handle_request(RequestEnvelope {
+        kind: String::from("request"),
+        id: json!("restore"),
+        method: String::from("support.backup.restore"),
+        params: json!({ "path": path }),
+    });
+    assert!(reply.response.ok, "{:?}", reply.response.error);
+    assert!(
+        reply
+            .events
+            .iter()
+            .any(|event| event["event"] == "lighting.changed"
+                && event["payload"]["reason"] == "backup-restored"),
+        "the screen hears of it: {:?}",
+        reply.events
+    );
+    assert_ne!(
+        crate::lighting::lighting_render_generation(),
+        generation_before,
+        "the sACN thread reads the hold on its next tick"
+    );
+    assert_eq!(
+        request(&app, "lighting.snapshot", json!({}))["outputArmed"],
+        false
+    );
+    assert!(
+        recent_events(&app)
+            .into_iter()
+            .any(|(source, action, detail)| source == "ui"
+                && action == "backup-restored"
+                && detail.ends_with("; light outputs held")),
+        "the row says the outputs are held"
+    );
+}
+
 // Recovery mode answers `support.snapshot` with no database at all: the list
 // is empty and nothing is queried (a query would create a database file).
 #[test]

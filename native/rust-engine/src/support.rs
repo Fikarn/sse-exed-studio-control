@@ -963,9 +963,9 @@ fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<Suppor
     let commissioning_snapshot = read_commissioning_snapshot(&runtime.db_path)?;
     let shell_settings_map = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)?;
     // Whether the light outputs are armed is the state of this workstation
-    // now, not part of a backup: the archive leaves it out and a restore
-    // neither clears nor writes it, so restoring a backup made while armed
-    // can never arm a rig the operator is holding (Slice 11 — F31).
+    // now, not part of a backup: the archive leaves it out, and a restore
+    // takes none from an archive and holds the outputs itself (Slice 11 —
+    // F31; the owner's decision, 2026-09-28).
     let mut lighting_settings =
         list_settings_by_prefix(&runtime.db_path, LIGHTING_SETTINGS_PREFIX)?;
     lighting_settings.remove(LIGHTING_OUTPUT_ARMED_KEY);
@@ -1063,6 +1063,12 @@ fn restore_native_support_archive(
         Some(cameras) => restore_cameras_archive(&transaction, cameras, cameras_simulated)?,
         None => Vec::new(),
     };
+    // A restore always comes back with the light outputs held (the owner's
+    // decision, 2026-09-28). The archive has just rewritten the lighting the
+    // rig is driven from: armed, its look would reach the rig at the sACN
+    // thread's next tick. In the same transaction, so the thread never reads
+    // the one without the other.
+    upsert_setting(&transaction, LIGHTING_OUTPUT_ARMED_KEY, "false")?;
 
     transaction.commit()?;
 
@@ -1235,6 +1241,10 @@ fn write_support_settings(
     audio_setting_keys.sort();
 
     for key in audio_setting_keys {
+        // No archive names this workstation's hold: the restore writes it.
+        if key == LIGHTING_OUTPUT_ARMED_KEY {
+            continue;
+        }
         if let Some(value) = commissioning.audio.settings.get(&key) {
             upsert_setting(transaction, &key, value)?;
             settings_restored += 1;
@@ -1291,6 +1301,10 @@ fn write_support_settings(
     let mut raw_keys = settings.keys().cloned().collect::<Vec<_>>();
     raw_keys.sort();
     for key in raw_keys {
+        // No archive names this workstation's hold: the restore writes it.
+        if key == LIGHTING_OUTPUT_ARMED_KEY {
+            continue;
+        }
         if let Some(value) = settings.get(&key) {
             let value = if key == WORKSPACE_KEY {
                 restored_workspace(value)

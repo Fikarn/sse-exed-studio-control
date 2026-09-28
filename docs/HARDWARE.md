@@ -72,7 +72,7 @@ The engine streams to the Litepanels Apollo Bridge as unicast sACN (E1.31) on UD
 
 `Armed` means the rig follows the app. Arming sends the current state within 40 ms.
 
-The switch is `Light outputs` in Setup / Support › Workstation. A start with `SSE_SAFE_START=1` holds the outputs before anything is sent. Set for the Windows account (`setx SSE_SAFE_START 1`), it holds every start. A hold is saved, so later starts are held until the switch arms. Saved data that has never been held is armed.
+The switch is `Light outputs` in Setup / Support › Workstation. A start with `SSE_SAFE_START=1` holds the outputs before anything is sent. Set for the Windows account (`setx SSE_SAFE_START 1`), it holds every start. A hold is saved, so later starts are held until the switch arms. Saved data that has never been held is armed. Every restore comes back held, a database backup's and an archive's alike: no backup brings its own setting back.
 
 ## Stream Deck
 

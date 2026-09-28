@@ -73,6 +73,25 @@ describe("the fixture double's backup replies", () => {
     expect(restored).toMatchObject({ requiresRestart: false, sourceFormat: "native-support-backup" });
   });
 
+  // The owner's decision (2026-09-28), as the hardware link's
+  // `an_archive_restore_holds_the_light_outputs_and_the_screen_hears_of_it`: a
+  // restore comes back with the light outputs held, and the screen reads the
+  // lighting again.
+  it("a restore holds the light outputs, and an archive's says so to the lighting", async () => {
+    const { request, transport } = openDouble();
+    const events: string[] = [];
+    transport.subscribe((envelope) => {
+      events.push(`${envelope.event} ${String((envelope.payload as JsonObject | null)?.reason)}`);
+    });
+    const exported = await request("support.backup.export");
+    await request("lighting.output.setArmed", { armed: true });
+    expect((await request("lighting.snapshot")).outputArmed).toBe(true);
+
+    await request("support.backup.restore", { path: exported.path as string });
+    expect((await request("lighting.snapshot")).outputArmed).toBe(false);
+    expect(events).toContain("lighting.changed backup-restored");
+  });
+
   // Format 6 (Slice 4; the hardware link's `a_format_6_archive_adds_scripts_and_never_removes_one`):
   // a restore adds the scripts the double lacks and never removes or overwrites one — a
   // differing text comes back as an earlier version — brings the look back, and leaves
@@ -121,12 +140,14 @@ describe("the fixture double's backup replies", () => {
       "support.changed",
       "commissioning.changed",
       "app.changed",
+      // 2026-09-28: the archive held the light outputs, and the lighting is read again.
+      "lighting.changed",
       "prompter.changed",
       // Slice 8: the cameras take their setup again (`after_restore_cameras`).
       "cameras.changed",
     ]);
-    expect(events[3]).toMatchObject({ reason: "backup-restored", anchor: { playing: false } });
-    expect(events[4]).toEqual({ event: "cameras.changed", reason: "restore", camera: null });
+    expect(events[4]).toMatchObject({ reason: "backup-restored", anchor: { playing: false } });
+    expect(events[5]).toEqual({ event: "cameras.changed", reason: "restore", camera: null });
 
     const snapshot = await request("prompter.snapshot");
     expect((snapshot.look as JsonObject).textColour).toBe("yellow");

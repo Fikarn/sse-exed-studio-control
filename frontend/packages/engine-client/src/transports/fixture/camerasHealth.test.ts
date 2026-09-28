@@ -233,6 +233,7 @@ describe("the fixture double's cameras: the backup (format 7)", () => {
     await call("support.backup.restore", { path });
     expect(seen().filter(([event]) => event !== "support.changed" && event !== "commissioning.changed")).toEqual([
       ["app.changed", "backup-restored"],
+      ["lighting.changed", "backup-restored"],
       ["prompter.changed", "backup-restored"],
       ["cameras.changed", "restore", null],
       ["app.changed", "health"],
