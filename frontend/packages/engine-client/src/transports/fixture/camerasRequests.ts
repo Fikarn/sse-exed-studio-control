@@ -674,7 +674,7 @@ export interface SimulatedCameraHooks {
   actionLogUnreadable(unreadable: boolean): void;
   /** How many times the page said it shows the pictures (`cameras.pictures.showing`). */
   picturesShowingSaid(): number;
-  /** How many times the page took a picture. */
+  /** How many takes the page made, each for the three cameras. */
   picturesPulled(): number;
 }
 

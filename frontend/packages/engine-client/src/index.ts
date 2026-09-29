@@ -22,7 +22,7 @@ export {
   FRAME_HEADER_LEN,
   FULL_PICTURE,
   SMALL_PICTURE,
-  readFrame,
+  readFrames,
   testCardUyvy,
   uyvyToRgba,
   writeFrame,

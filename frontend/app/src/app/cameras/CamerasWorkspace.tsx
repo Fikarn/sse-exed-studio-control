@@ -47,9 +47,9 @@ import styles from "./CamerasWorkspace.module.css";
 //
 // The page reads the cameras once a second while it is open: a camera says
 // nothing by itself until its link is built, and a read sends nothing (D12).
-// It also says once a second that it shows the pictures, and takes each
-// camera's newest frame from the shell while it is open (the camera
-// pictures, D28): frames come while it says so and a while after.
+// It also says once a second that it shows the pictures, and takes the three
+// cameras' newest frames from the shell while it is open, one take at a time
+// (the camera pictures, D28): frames come while it says so and a while after.
 
 export interface CamerasWorkspaceProps {
   camerasSnapshot: CamerasSnapshot | null;

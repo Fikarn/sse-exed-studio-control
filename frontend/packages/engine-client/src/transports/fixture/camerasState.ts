@@ -121,7 +121,7 @@ export interface FixtureCameras {
   recentUnreadable: boolean;
   /** How many times the page said it shows the pictures (`cameras.pictures.showing`), for the tests. */
   showingSaid: number;
-  /** How many times the page took a picture (`picturesDouble.ts`), for the tests. */
+  /** How many takes the page made, each for the three cameras (`picturesDouble.ts`), for the tests. */
   picturesPulled: number;
   held: Record<CameraNumber, HeldCamera>;
   bodies: Record<CameraNumber, SimulatedCamera>;

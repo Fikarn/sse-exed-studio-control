@@ -8,7 +8,7 @@ import {
   FRAME_HEADER_LEN,
   FULL_PICTURE,
   SMALL_PICTURE,
-  readFrame,
+  readFrames,
   testCardUyvy,
   uyvyToRgba,
   writeFrame,
@@ -20,15 +20,51 @@ import {
 // source, so a change on one side only fails here.
 
 const NATIVE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../native");
+/** Frames back to back, as one take of the shell's answers them. */
+const concat = (frames: ArrayBuffer[]): ArrayBuffer => {
+  const answer = new Uint8Array(frames.reduce((sum, frame) => sum + frame.byteLength, 0));
+  let at = 0;
+  for (const frame of frames) {
+    answer.set(new Uint8Array(frame), at);
+    at += frame.byteLength;
+  }
+  return answer.buffer;
+};
 const rust = (path: string) => readFileSync(resolve(NATIVE, path), "utf-8");
 
 describe("a picture's frame", () => {
   it("reads back what the helper writes", () => {
     const pixels = new Uint8Array(544 * 306 * 2).map((_, index) => index % 251);
-    const frame = readFrame(writeFrame(2, "uyvy", 544, 306, 77, pixels))!;
-    expect(frame).toMatchObject({ camera: 2, format: "uyvy", width: 544, height: 306, sequence: 77 });
-    expect(frame.pixels).toEqual(pixels);
-    expect(readFrame(new ArrayBuffer(0)), "an empty answer: no new frame").toBeNull();
+    const frames = readFrames(writeFrame(2, "uyvy", 544, 306, 77, pixels));
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ camera: 2, format: "uyvy", width: 544, height: 306, sequence: 77 });
+    expect(frames[0]!.pixels).toEqual(pixels);
+    expect(readFrames(new ArrayBuffer(0)), "an empty answer: no new frame").toEqual([]);
+  });
+
+  // 2026-09-29: one take brings the three cameras' newest frames, back to back.
+  it("reads the frames of one answer back to back, each picture where it lies", () => {
+    const small = (seed: number) => new Uint8Array(544 * 306 * 2).map((_, index) => (index + seed) % 251);
+    const big = new Uint8Array(1920 * 1080 * 2).map((_, index) => index % 241);
+    const answer = concat([
+      writeFrame(1, "uyvy", 1920, 1080, 5, big),
+      writeFrame(2, "uyvy", 544, 306, 6, small(2)),
+      writeFrame(3, "uyvy", 544, 306, 7, small(3)),
+    ]);
+    const frames = readFrames(answer);
+    expect(frames.map(({ camera, width, sequence }) => [camera, width, sequence])).toEqual([
+      [1, 1920, 5],
+      [2, 544, 6],
+      [3, 544, 7],
+    ]);
+    // Compared as buffers: toEqual walks 4 MB byte by byte, past the test's time.
+    const same = (view: Uint8Array, expected: Uint8Array) =>
+      Buffer.from(view.buffer, view.byteOffset, view.byteLength).equals(Buffer.from(expected));
+    expect(same(frames[0]!.pixels, big), "CAM 1's picture").toBe(true);
+    expect(same(frames[1]!.pixels, small(2)), "CAM 2's picture").toBe(true);
+    expect(same(frames[2]!.pixels, small(3)), "CAM 3's picture").toBe(true);
+    // Views into the one answer: nothing copied.
+    for (const frame of frames) expect(frame.pixels.buffer).toBe(answer);
   });
 
   it("refuses what is not a frame before it looks at the picture", () => {
@@ -38,20 +74,28 @@ describe("a picture's frame", () => {
       new DataView(copy).setUint8(at, value);
       return copy;
     };
-    expect(() => readFrame(changed(0, 0x58)), "the magic").toThrow("not a frame");
-    expect(() => readFrame(changed(4, 2)), "the version").toThrow("version");
-    expect(() => readFrame(changed(5, 4)), "camera 4").toThrow("camera 4");
-    expect(() => readFrame(changed(6, 9)), "a format").toThrow("format 9");
+    // Each refusal, alone and as the second frame of an answer: the whole answer is refused.
+    const second = writeFrame(2, "uyvy", 16, 2, 1, new Uint8Array(16 * 2 * 2));
+    const refused = (why: string, bad: ArrayBuffer, message?: string) => {
+      expect(() => readFrames(bad), why).toThrow(message);
+      expect(() => readFrames(concat([second, bad])), `${why}, second`).toThrow(message);
+    };
+    refused("the magic", changed(0, 0x58), "not a frame");
+    refused("the version", changed(4, 2), "version");
+    refused("camera 4", changed(5, 4), "camera 4");
+    refused("a format", changed(6, 9), "format 9");
     // An odd width with the length that fits it: only UYVY's pairs of pixels refuse it.
     const odd = (format: "uyvy" | "rgba8", size: number) =>
-      readFrame(writeFrame(1, format, 17, 2, 1, new Uint8Array(17 * 2 * size)));
-    expect(() => odd("uyvy", 2), "an odd UYVY width").toThrow("17 × 2");
-    expect(odd("rgba8", 4), "an odd RGBA width").not.toBeNull();
-    expect(() => readFrame(good.slice(0, good.byteLength - 1)), "a picture cut short").toThrow();
-    expect(() => readFrame(new ArrayBuffer(10)), "a header cut short").toThrow("too short");
+      writeFrame(1, format, 17, 2, 1, new Uint8Array(17 * 2 * size));
+    refused("an odd UYVY width", odd("uyvy", 2), "17 × 2");
+    expect(readFrames(odd("rgba8", 4)), "an odd RGBA width").toHaveLength(1);
+    refused("a picture cut short", good.slice(0, good.byteLength - 1));
+    refused("a header cut short", new ArrayBuffer(10), "too short");
     const huge = writeFrame(1, "rgba8", 1, 1, 1, new Uint8Array(4));
     new DataView(huge).setUint16(8, 1921, true);
-    expect(() => readFrame(huge), "wider than the picture").toThrow("1921");
+    refused("wider than the picture", huge, "1921");
+    // An answer holds each camera once.
+    expect(() => readFrames(concat([good, good])), "a camera twice").toThrow("camera 1 twice");
   });
 
   it("has the protocol crate's header, word for word", () => {

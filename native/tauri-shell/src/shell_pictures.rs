@@ -5,11 +5,17 @@
 //! and puts both into the engine's environment (`engine.rs`); the engine
 //! hands them to the pictures helper alone. The helper connects, says the
 //! secret, and sends frames: a header (`FrameHeader`), then the picture. The
-//! shell keeps the newest frame of each camera, and the page takes it with
-//! `pictures_next`, a raw answer that is an `ArrayBuffer` in the page, over
-//! the IPC protocol the page's connection policy already allows. Only the
-//! main window may call it (`shell_commands::window_may_call`). The engine
-//! never holds a picture.
+//! shell keeps the newest frame of each camera, and the page takes them
+//! with `pictures_next`, a raw answer that is an `ArrayBuffer` in the page,
+//! over the IPC protocol the page's connection policy already allows. Only
+//! the main window may call it (`shell_commands::window_may_call`). The
+//! engine never holds a picture.
+//!
+//! One take brings the three cameras' newest frames, back to back, and waits
+//! in the shell for the next when none is new: about one take a frame of the
+//! helper's, where a take for each camera and a short rest between them made
+//! about 140 a second, and the pages' requests to the hardware link waited
+//! behind them (the measurement of 2026-09-29).
 //!
 //! What guards it:
 //!
@@ -29,11 +35,12 @@
 //!   frames and never queues them; the counts go to `shell.log` once a
 //!   minute while frames arrive.
 
+use crate::shell_commands::off_main_thread;
 use crate::EngineState;
 use std::io::{self, ErrorKind, Read};
 use std::net::{Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::pictures::{
@@ -51,6 +58,14 @@ const COUNT_INTERVAL: Duration = Duration::from_secs(60);
 const MAX_HANDSHAKES: usize = 8;
 /// The rest after an accept that failed (the system out of sockets).
 const ACCEPT_FAILED_REST: Duration = Duration::from_millis(50);
+/// How long a take waits for a frame when none is new: also how long the
+/// page's last take outlives the page, and how often a page with no
+/// pictures asks.
+const TAKE_WAIT: Duration = Duration::from_millis(250);
+/// After a take's first new frame, how long it waits for the others of the
+/// helper's tick, which the helper writes back to back: well under a frame
+/// (33 ms), so none is replaced while it waits.
+const TAKE_GATHER: Duration = Duration::from_millis(8);
 
 /// Where the frame route's lines go: `shell.log`, or a test's list.
 pub(crate) type PicturesLog = Arc<dyn Fn(&str) + Send + Sync>;
@@ -75,6 +90,8 @@ struct Frame {
 #[derive(Default)]
 pub(crate) struct PicturesStore {
     newest: Mutex<[Option<Frame>; 3]>,
+    /// Told of each frame kept, for a take that waits.
+    arrived: Condvar,
     counts: Mutex<Counts>,
 }
 
@@ -82,6 +99,31 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Waits on `arrived` for at most `left`, poisoning set aside as `lock` does.
+fn wait_for<'a, T>(
+    arrived: &Condvar,
+    guard: MutexGuard<'a, T>,
+    left: Duration,
+) -> MutexGuard<'a, T> {
+    match arrived.wait_timeout(guard, left) {
+        Ok((guard, _)) => guard,
+        Err(poisoned) => poisoned.into_inner().0,
+    }
+}
+
+/// Frames as one answer, back to back in camera order: each is its header
+/// and its picture, so the page reads where the next begins.
+fn back_to_back(mut frames: Vec<Frame>) -> Vec<u8> {
+    if frames.len() == 1 {
+        return frames.remove(0).bytes;
+    }
+    let mut answer = Vec::with_capacity(frames.iter().map(|frame| frame.bytes.len()).sum());
+    for frame in frames {
+        answer.extend_from_slice(&frame.bytes);
+    }
+    answer
 }
 
 impl PicturesStore {
@@ -102,6 +144,7 @@ impl PicturesStore {
             }
             newest[index].replace(Frame { bytes }).is_some()
         };
+        self.arrived.notify_all();
         let mut counts = lock(&self.counts);
         counts.received += 1;
         if replaced {
@@ -109,14 +152,33 @@ impl PicturesStore {
         }
     }
 
-    /// Camera `camera`'s newest frame, once: the next take has the next.
-    pub(crate) fn take(&self, camera: u8) -> Option<Vec<u8>> {
-        let index = usize::from(camera)
-            .checked_sub(1)
-            .filter(|index| *index < 3)?;
-        let frame = lock(&self.newest)[index].take()?;
-        lock(&self.counts).taken += 1;
-        Some(frame.bytes)
+    /// The cameras' newest frames, each once, back to back in camera order:
+    /// empty when none is new after `wait`. After the first new frame it
+    /// waits up to `gather` for the others of the helper's tick, and no
+    /// longer once all three are there. Blocking: the command runs it off the
+    /// async runtime.
+    pub(crate) fn take(&self, wait: Duration, gather: Duration) -> Vec<u8> {
+        let deadline = Instant::now() + wait;
+        let mut newest = lock(&self.newest);
+        while newest.iter().all(Option::is_none) {
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Vec::new();
+            }
+            newest = wait_for(&self.arrived, newest, left);
+        }
+        let gathered = Instant::now() + gather;
+        while newest.iter().any(Option::is_none) {
+            let left = gathered.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                break;
+            }
+            newest = wait_for(&self.arrived, newest, left);
+        }
+        let frames: Vec<Frame> = newest.iter_mut().filter_map(Option::take).collect();
+        drop(newest);
+        lock(&self.counts).taken += frames.len() as u64;
+        back_to_back(frames)
     }
 
     fn refused(&self) {
@@ -382,15 +444,19 @@ fn log_counts(store: &PicturesStore, closed: &AtomicBool, log: &PicturesLog) {
     }
 }
 
-/// The page takes camera `camera`'s newest frame: its header and picture as
-/// one `ArrayBuffer`, empty when no frame came since the last take.
+/// The page takes the cameras' newest frames: each its header and picture,
+/// back to back, as one `ArrayBuffer`; empty when none came within
+/// `TAKE_WAIT`. The wait runs on the blocking pool, so it holds neither the
+/// async runtime nor the window's thread, and the pages' other requests go
+/// on meanwhile.
 #[tauri::command]
 pub(crate) async fn pictures_next(
     state: tauri::State<'_, EngineState>,
-    camera: u8,
 ) -> Result<tauri::ipc::Response, String> {
-    let frame = state.bridge.pictures().take(camera).unwrap_or_default();
-    Ok(tauri::ipc::Response::new(frame))
+    let bridge = Arc::clone(&state.bridge);
+    let frames =
+        off_main_thread(move || Ok(bridge.pictures().take(TAKE_WAIT, TAKE_GATHER))).await?;
+    Ok(tauri::ipc::Response::new(frames))
 }
 
 /// Says `secret` on a new connection to `address`: the helper's side, for

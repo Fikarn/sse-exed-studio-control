@@ -34,6 +34,28 @@ fn wait_until(what: &str, ready: impl Fn() -> bool) {
     }
 }
 
+/// A take that does not wait: what is there now.
+fn taken_now(store: &PicturesStore) -> Vec<u8> {
+    store.take(Duration::ZERO, Duration::ZERO)
+}
+
+/// The cameras and sequences of an answer, in its order, each frame whole:
+/// the answer walks from header to header to its very end.
+fn cameras_in(answer: &[u8]) -> Vec<(u8, u64)> {
+    let mut found = Vec::new();
+    let mut at = 0;
+    while at < answer.len() {
+        let header: [u8; FRAME_HEADER_LEN] = answer[at..at + FRAME_HEADER_LEN]
+            .try_into()
+            .expect("a whole header");
+        let header = FrameHeader::decode(&header).expect("a frame");
+        found.push((header.camera, header.sequence));
+        at += FRAME_HEADER_LEN + header.length as usize;
+        assert!(at <= answer.len(), "a whole picture");
+    }
+    found
+}
+
 fn open() -> (Arc<PicturesStore>, PicturesLink, Arc<Mutex<Vec<String>>>) {
     let store = Arc::new(PicturesStore::default());
     let (log, lines) = recorded_log();
@@ -68,19 +90,15 @@ fn frames_arrive_the_newest_wins_and_each_is_taken_once() {
     helper.write_all(&frame(1, 1, 1920, 1080)).expect("writes");
     wait_until("CAM 1's frame", || lock(&store.newest)[0].is_some());
 
-    let taken = store.take(2).expect("CAM 2's newest");
+    // One answer holds each camera's newest, in camera order though CAM 2's
+    // came first; nothing came for CAM 3.
+    let answer = taken_now(&store);
+    assert_eq!(cameras_in(&answer), [(1, 1), (2, 2)]);
     assert_eq!(
-        FrameHeader::decode(&taken[..FRAME_HEADER_LEN].try_into().expect("a header"))
-            .expect("reads")
-            .sequence,
-        2
+        answer.len(),
+        2 * FRAME_HEADER_LEN + 1920 * 1080 * 2 + 544 * 306 * 2
     );
-    assert_eq!(taken.len(), FRAME_HEADER_LEN + 544 * 306 * 2);
-    assert_eq!(store.take(2), None, "taken once");
-    assert_eq!(store.take(3), None, "nothing came for CAM 3");
-    assert_eq!(store.take(0), None);
-    assert_eq!(store.take(9), None);
-    assert!(store.take(1).is_some());
+    assert!(taken_now(&store).is_empty(), "each is taken once");
 
     let counts = store.take_counts();
     assert_eq!(counts.received, 3);
@@ -92,6 +110,72 @@ fn frames_arrive_the_newest_wins_and_each_is_taken_once() {
     assert!(lock(&lines)
         .iter()
         .any(|line| line == "The pictures helper is connected."));
+}
+
+// 2026-09-29: one take brings the three cameras and waits in the shell for
+// the next frame; a take for each camera made about 140 requests a second,
+// and the pages' requests to the hardware link waited behind them.
+#[test]
+fn a_take_waits_for_the_next_frame_and_no_longer_than_its_bound() {
+    let (store, link, _) = open();
+    // Nothing sent: the take waits its bound, then answers empty.
+    let started = Instant::now();
+    assert!(store
+        .take(Duration::from_millis(300), Duration::ZERO)
+        .is_empty());
+    assert!(started.elapsed() >= Duration::from_millis(300));
+
+    // A frame that comes while a take waits reaches it at once, and the
+    // listener keeps frames while the take waits.
+    let waiter = {
+        let store = Arc::clone(&store);
+        thread::spawn(move || {
+            let started = Instant::now();
+            (store.take(PATIENCE, Duration::ZERO), started.elapsed())
+        })
+    };
+    thread::sleep(Duration::from_millis(200));
+    let mut helper = connect_saying(link.address(), link.secret()).expect("connects");
+    helper.write_all(&frame(3, 1, 544, 306)).expect("writes");
+    let (answer, waited) = waiter.join().expect("the waiting take ends");
+    assert_eq!(cameras_in(&answer), [(3, 1)]);
+    assert!(waited < PATIENCE, "it answered when the frame came");
+}
+
+#[test]
+fn a_take_gathers_the_frames_of_a_tick_into_one_answer() {
+    let store = Arc::new(PicturesStore::default());
+    let put = |camera: u8, sequence: u64| {
+        store.put(camera, frame(camera, sequence, 544, 306), &|| true);
+    };
+    // Three cameras 200 ms apart: the take waits for the first, gathers the
+    // others, and answers as soon as all three are there.
+    let waiter = {
+        let store = Arc::clone(&store);
+        thread::spawn(move || {
+            let started = Instant::now();
+            (store.take(PATIENCE, PATIENCE), started.elapsed())
+        })
+    };
+    for camera in [2, 3, 1] {
+        thread::sleep(Duration::from_millis(200));
+        put(camera, 1);
+    }
+    let (answer, waited) = waiter.join().expect("the take ends");
+    assert_eq!(cameras_in(&answer), [(1, 1), (2, 1), (3, 1)]);
+    assert!(waited < PATIENCE, "it answered once the third came");
+
+    // Two cameras alone: the gather ends at its bound.
+    put(1, 2);
+    put(3, 2);
+    let started = Instant::now();
+    let answer = store.take(PATIENCE, Duration::from_millis(300));
+    assert!(started.elapsed() >= Duration::from_millis(300));
+    assert_eq!(cameras_in(&answer), [(1, 2), (3, 2)]);
+    assert!(taken_now(&store).is_empty());
+
+    let counts = store.take_counts();
+    assert_eq!((counts.received, counts.taken, counts.skipped), (5, 5, 0));
 }
 
 #[test]
@@ -126,7 +210,7 @@ fn a_connection_without_the_secret_is_closed_and_counted() {
     let mut byte = [0_u8; 1];
     assert!(matches!(silent.read(&mut byte), Ok(0) | Err(_)));
 
-    assert_eq!(store.take(1), None, "nothing it sent was kept");
+    assert!(taken_now(&store).is_empty(), "nothing it sent was kept");
     assert_eq!(store.take_counts().refused, 5);
 }
 
@@ -186,7 +270,7 @@ fn a_frame_that_is_not_one_closes_the_connection() {
     helper.set_read_timeout(Some(PATIENCE)).expect("a timeout");
     let mut byte = [0_u8; 1];
     assert!(matches!(helper.read(&mut byte), Ok(0) | Err(_)));
-    assert_eq!(store.take(1), None);
+    assert!(taken_now(&store).is_empty());
     wait_until("the reason is logged", || {
         lock(&lines)
             .iter()
@@ -202,20 +286,20 @@ fn a_new_connection_with_the_secret_takes_the_old_one_s_place() {
     wait_until("the first helper's frame", || {
         lock(&store.newest)[2].is_some()
     });
-    assert!(store.take(3).is_some());
+    assert_eq!(cameras_in(&taken_now(&store)), [(3, 1)]);
 
     let mut second = connect_saying(link.address(), link.secret()).expect("connects");
     second.write_all(&frame(3, 1, 544, 306)).expect("writes");
     wait_until("the second helper's frame", || {
         lock(&store.newest)[2].is_some()
     });
-    assert!(store.take(3).is_some());
+    assert_eq!(cameras_in(&taken_now(&store)), [(3, 1)]);
 
     // The first one's next frame is not kept: its place is taken.
     let _ = first.write_all(&frame(3, 2, 544, 306));
     let _ = first.write_all(&frame(3, 3, 544, 306));
     thread::sleep(Duration::from_millis(300));
-    assert_eq!(store.take(3), None);
+    assert!(taken_now(&store).is_empty());
 }
 
 #[test]
@@ -234,7 +318,7 @@ fn a_new_start_refuses_the_old_secret_and_the_old_listener_closes() {
     late.set_read_timeout(Some(PATIENCE)).expect("a timeout");
     let mut byte = [0_u8; 1];
     assert!(matches!(late.read(&mut byte), Ok(0) | Err(_)));
-    assert_eq!(store.take(1), None);
+    assert!(taken_now(&store).is_empty());
 }
 
 #[test]
@@ -296,14 +380,8 @@ fn the_frame_reader_takes_any_bytes_without_a_panic() {
             result.is_err(),
             "round {round}: every input here ends in an error"
         );
-        for camera in 1..=3 {
-            if let Some(kept) = store.take(camera) {
-                let header: [u8; FRAME_HEADER_LEN] =
-                    kept[..FRAME_HEADER_LEN].try_into().expect("a header");
-                let header = FrameHeader::decode(&header).expect("a kept frame is one");
-                assert_eq!(kept.len(), FRAME_HEADER_LEN + header.length as usize);
-            }
-        }
+        // Every kept frame is whole: the answer walks from header to header.
+        cameras_in(&taken_now(&store));
     }
 }
 

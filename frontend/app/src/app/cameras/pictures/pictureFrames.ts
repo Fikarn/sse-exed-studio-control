@@ -3,18 +3,17 @@ import { useEffect, useMemo } from "react";
 import type { PictureCamera, PictureFrame, PicturesLink } from "@sse/engine-client";
 
 // The cameras' newest frames while the Cameras page is open (the camera pictures, D28):
-// the page takes each camera's newest from the shell, one take a camera at a time, so a
-// slow page skips frames and never queues them. A view that shows a camera hears of each
-// new frame and draws it at once; nothing is drawn on a timer. What arrives is the
-// shell's to say: the page never concludes from frames that a picture is missing (the
-// hardware link says that, `picture`).
+// the page takes the three cameras' newest from the shell, one take at a time, so a slow
+// page skips frames and never queues them. The shell's take waits for the next frame
+// when none is new, so the page asks about once a frame. A view that shows a camera
+// hears of each new frame and draws it at once; nothing is drawn on a timer. What
+// arrives is the shell's to say: the page never concludes from frames that a picture is
+// missing (the hardware link says that, `picture`).
 
-/** How long a take waits before it asks again when no new frame came: a frame at 29.97 a second comes every 33 ms. */
+/** The rest after a take that brought nothing new: only a link that answers at once (the double) would spin without it; the shell's take has waited already. */
 const PULL_REST_MS = 8;
 /** After a take that failed (the hardware link starting again), a longer rest. */
 const PULL_FAILED_REST_MS = 500;
-
-const CAMERAS: readonly PictureCamera[] = [1, 2, 3];
 
 export class PictureFrames {
   private readonly newest = new Map<PictureCamera, PictureFrame>();
@@ -46,33 +45,38 @@ export class PictureFrames {
 const rest = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 /**
+ * Takes the three cameras' frames through `link` into `frames`, one take at a time, until
+ * the function it returns is called; a take that answers after that is not kept.
+ */
+export function takePictures(link: PicturesLink, frames: PictureFrames): () => void {
+  let running = true;
+  void (async () => {
+    while (running) {
+      let taken: PictureFrame[];
+      try {
+        taken = await link.next();
+      } catch {
+        await rest(PULL_FAILED_REST_MS);
+        continue;
+      }
+      if (!running) return;
+      // A new frame: ask again at once, for the shell waits for the next. Otherwise rest.
+      let anyNew = false;
+      for (const frame of taken) anyNew = frames.put(frame) || anyNew;
+      if (!anyNew) await rest(PULL_REST_MS);
+    }
+  })();
+  return () => {
+    running = false;
+  };
+}
+
+/**
  * The frames of the three cameras, taken through `link` for as long as the calling page
  * is mounted; nothing is taken without a link (a window that has none).
  */
 export function usePictureFrames(link: PicturesLink | null): PictureFrames {
   const frames = useMemo(() => new PictureFrames(), []);
-  useEffect(() => {
-    if (!link) return undefined;
-    let running = true;
-    for (const camera of CAMERAS) {
-      void (async () => {
-        while (running) {
-          let frame: PictureFrame | null;
-          try {
-            frame = await link.next(camera);
-          } catch {
-            await rest(PULL_FAILED_REST_MS);
-            continue;
-          }
-          if (!running) return;
-          // A new frame: ask again at once, for the next may be there. Otherwise rest.
-          if (!frame || !frames.put(frame)) await rest(PULL_REST_MS);
-        }
-      })();
-    }
-    return () => {
-      running = false;
-    };
-  }, [link, frames]);
+  useEffect(() => (link ? takePictures(link, frames) : undefined), [link, frames]);
   return frames;
 }

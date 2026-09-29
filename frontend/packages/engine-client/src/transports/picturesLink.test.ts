@@ -8,7 +8,7 @@ import { writeFrame } from "./pictureFrame";
 import { createTauriPicturesLink } from "./picturesLink";
 
 // The Cameras page's link to the shell's pictures: one command, `pictures_next`, whose raw
-// answer is a frame or nothing. The shell gives it to the operator's window alone
+// answer is the three cameras' newest frames back to back, or nothing. The shell gives it to the operator's window alone
 // (`shell_commands.rs`); this file holds the page to that one command.
 
 const { invoked, answers } = vi.hoisted(() => ({
@@ -29,15 +29,25 @@ beforeEach(() => {
 });
 
 describe("the pictures link", () => {
-  it("takes a camera's newest frame with pictures_next, and nothing when none came", async () => {
+  it("takes the cameras' newest frames with one pictures_next, and none when none came", async () => {
     const link = createTauriPicturesLink();
-    answers.push(writeFrame(3, "uyvy", 544, 306, 9, new Uint8Array(544 * 306 * 2)));
-    const frame = await link.next(3);
-    expect(frame).toMatchObject({ camera: 3, format: "uyvy", width: 544, height: 306, sequence: 9 });
-    expect(await link.next(1)).toBeNull();
+    const small = (camera: 1 | 2 | 3, sequence: number) =>
+      new Uint8Array(writeFrame(camera, "uyvy", 544, 306, sequence, new Uint8Array(544 * 306 * 2)));
+    const three = new Uint8Array(3 * small(1, 1).byteLength);
+    [small(1, 4), small(2, 5), small(3, 9)].forEach((frame, index) => three.set(frame, index * frame.byteLength));
+    answers.push(three.buffer);
+    const frames = await link.next();
+    expect(frames.map(({ camera, sequence }) => [camera, sequence])).toEqual([
+      [1, 4],
+      [2, 5],
+      [3, 9],
+    ]);
+    expect(frames[2]).toMatchObject({ camera: 3, format: "uyvy", width: 544, height: 306, sequence: 9 });
+    expect(await link.next()).toEqual([]);
+    // The page chooses neither the cameras nor the wait: the take names nothing.
     expect(invoked).toEqual([
-      { command: "pictures_next", args: { camera: 3 } },
-      { command: "pictures_next", args: { camera: 1 } },
+      { command: "pictures_next", args: undefined },
+      { command: "pictures_next", args: undefined },
     ]);
   });
 
@@ -45,7 +55,7 @@ describe("the pictures link", () => {
     answers.push(
       new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]).buffer
     );
-    await expect(createTauriPicturesLink().next(2)).rejects.toThrow("not a frame");
+    await expect(createTauriPicturesLink().next()).rejects.toThrow("not a frame");
   });
 
   it("names no command of the shell's but pictures_next", () => {
