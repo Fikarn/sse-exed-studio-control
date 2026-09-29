@@ -209,3 +209,56 @@ export function addressesNotRestoredSentence(models: readonly CameraModel[]): st
   const [what, which] = models.length === 1 ? ["address was", "it"] : ["addresses were", "them"];
   return `${whose} ${what} not restored: Studio Control has no link to ${which} yet.`;
 }
+
+// ---------------------------------------------------------------------------
+// The pictures (`pictures.rs`; D17, D28)
+// ---------------------------------------------------------------------------
+
+/** The vMix inputs the simulated cameras' test pictures stand in for (`SIMULATED_VMIX_INPUTS`). */
+export const SIMULATED_VMIX_INPUTS = { first: 1, last: 4 } as const;
+
+/** A picture that arrives, one that does not, and the three together when not every one does. */
+export const PICTURE_WORDS = {
+  live: "LIVE",
+  noPicture: "NO PICTURE",
+  missing: "PICTURE MISSING",
+  noPictures: "NO PICTURES",
+} as const;
+
+/** What arrives, as the Pictures rows say it after the vMix input. */
+export const PICTURE_SHOWING_DETAIL = "test picture";
+export const PICTURE_MISSING_DETAIL = "nothing received";
+
+/** Where the pictures come from (`PictureSource::words`): the simulated cameras' test pictures, or none yet. */
+export function pictureSourceWords(simulated: boolean): string {
+  return simulated ? "test pictures" : "not built yet";
+}
+
+/** The Pictures section's fine print (`PictureSource::note`). */
+export function picturesNote(simulated: boolean): string {
+  return simulated
+    ? `Test pictures stand in for vMix inputs ${SIMULATED_VMIX_INPUTS.first} to ${SIMULATED_VMIX_INPUTS.last}. The cameras' own come with a later version, over NDI from vMix on this PC.`
+    : "The cameras' own pictures come with a later version, over NDI from vMix on this PC.";
+}
+
+/** A camera whose input the source does not send, in the picture's place. */
+export function pictureMissingSentence(model: CameraModel): string {
+  return `vMix is not sending ${model.tag} over NDI.`;
+}
+
+/** What to check under it. */
+export function pictureMissingAdvice(vmixInput: number): string {
+  return `vMix sends other inputs: check that vMix input ${vmixInput} is still there and live.`;
+}
+
+/** A build that receives no pictures yet, in each picture's place. */
+export const NO_PICTURE_YET_SENTENCE = "No picture yet: the cameras' pictures come with a later version.";
+
+/** The state display when no picture arrives at all, in a build that receives none yet. */
+export const NO_PICTURES_SENTENCE =
+  "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.";
+
+/** The state display when a camera's picture is missing. */
+export function picturesMissingSentence(model: CameraModel, vmixInput: number): string {
+  return `vMix sends no picture for ${model.tag}. Check that vMix input ${vmixInput} is still there and live.`;
+}

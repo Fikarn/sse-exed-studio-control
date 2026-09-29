@@ -111,7 +111,7 @@ Every state word is the engine's. Its sentence is printed as the engine gives it
 | Lighting     | `REACHABLE` · `HELD` · `UNSAVED` · `UNREACHABLE` · `PREVIEW`                                             |
 | Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                   |
 | Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`    |
-| Cameras      | `HELD` · `RELEASED`, `NOT SET UP` · `UNREACHABLE`                                                        |
+| Cameras      | `HELD` · `RELEASED`, `NOT SET UP`, `PICTURE MISSING`, `NO PICTURES` · `UNREACHABLE`                      |
 
 ## 9. Copy
 

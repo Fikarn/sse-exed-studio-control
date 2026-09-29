@@ -91,7 +91,9 @@ export function worstCamera(snapshot: CamerasSnapshot): CameraSnapshot | null {
 export type CamerasWayOut =
   | { kind: "connect"; camera: CameraNumber; label: string }
   | { kind: "read-again"; camera: CameraNumber; label: string }
-  | { kind: "setup"; label: string };
+  | { kind: "setup"; label: string }
+  /** The pictures: one more look at what arrives. */
+  | { kind: "look-again"; label: string };
 
 export interface CamerasStateView {
   camera: CameraNumber;
@@ -121,10 +123,34 @@ function metaLine(snapshot: CamerasSnapshot, spoken: CameraSnapshot): string {
   return parts.join(" · ");
 }
 
-/** The state display: the worst camera's word and sentence, as the hardware link gives them, and the way out. */
+/**
+ * The camera the pictures speak of when not every one arrives: the selected one when its
+ * picture is missing, otherwise the first whose picture is (the hardware link's rule).
+ */
+function pictureSpoken(snapshot: CamerasSnapshot): CameraSnapshot | null {
+  const missing = snapshot.cameras.filter((camera) => camera.picture.state !== "showing");
+  return missing.find((camera) => camera.camera === snapshot.selected) ?? missing[0] ?? null;
+}
+
+/**
+ * The state display: the worst camera's word and sentence, as the hardware link gives them,
+ * and the way out. While every camera is held the pictures speak instead when not every one
+ * arrives (board 2's `no-pictures` and `one-picture`): the camera controls still work.
+ */
 export function camerasStateView(snapshot: CamerasSnapshot): CamerasStateView | null {
   const spoken = worstCamera(snapshot);
   if (!spoken) return null;
+  const pictures = snapshot.pictures;
+  if (spoken.state === "held" && pictures.state !== "showing" && pictures.word && pictures.sentence) {
+    return {
+      camera: cameraNumber(pictureSpoken(snapshot) ?? spoken),
+      tone: pictures.tone,
+      word: pictures.word,
+      sentence: pictures.sentence,
+      meta: `The camera controls still work · ${snapshot.cameras.length} of ${snapshot.cameras.length} held`,
+      wayOut: { kind: "look-again", label: "Look again" },
+    };
+  }
   const camera = cameraNumber(spoken);
   const wayOut: CamerasWayOut | null =
     spoken.state === "released"
@@ -550,8 +576,57 @@ export function camerasFingerprint(snapshot: CamerasSnapshot | null | undefined)
       values: Object.entries(camera.values).map(([setting, entry]) => [setting, entry.value]),
       recording: camera.recording.recording,
       startedAt: camera.recording.startedAt,
+      picture: camera.picture,
     }))
   );
+}
+
+// ---------------------------------------------------------------------------
+// The pictures (D17, D28): vMix's, not the cameras' links'
+// ---------------------------------------------------------------------------
+
+/** The camera's picture arrives: the page draws it, and its view, aids and loupe work. */
+export function pictureShows(camera: CameraSnapshot): boolean {
+  return camera.picture.state === "showing";
+}
+
+/** Why the view, the aids and the loupe are locked; `null` while the picture arrives. */
+export function pictureLock(camera: CameraSnapshot): string | null {
+  return pictureShows(camera) ? null : `${camera.tag} has no picture to show.`;
+}
+
+export interface PictureRowView {
+  camera: CameraNumber;
+  tag: string;
+  /** `vMix input 2 · nothing received`. */
+  detail: string;
+  /** The lamp's word in the row's lower case: `live`, `no picture`. */
+  word: string;
+  tone: CameraTone;
+}
+
+/** The Pictures section's rows: each camera's vMix input and what arrives from it. */
+export function pictureRows(snapshot: CamerasSnapshot): PictureRowView[] {
+  return snapshot.cameras.map((camera) => ({
+    camera: cameraNumber(camera),
+    tag: camera.tag,
+    detail: `vMix input ${camera.setup.vmixInput} · ${camera.picture.detail}`,
+    word: camera.picture.word.toLowerCase(),
+    tone: camera.picture.tone,
+  }));
+}
+
+/**
+ * The footer's words for the pictures: `test pictures · 3 / 3`, `test pictures · 2 / 3 ·
+ * CAM 2 missing`, or `none · not built yet` when none arrives.
+ */
+export function picturesWord(snapshot: CamerasSnapshot): string {
+  const { source, state } = snapshot.pictures;
+  if (state === "no-pictures") return `none · ${source}`;
+  const total = snapshot.cameras.length;
+  const missing = snapshot.cameras.filter((camera) => !pictureShows(camera));
+  const count = `${source} · ${total - missing.length} / ${total}`;
+  return missing.length === 0 ? count : `${count} · ${missing.map((camera) => camera.tag).join(", ")} missing`;
 }
 
 /** `3 / 3 held`, or the first camera that is not: `2 / 3 held · CAM 3 unreachable`. */

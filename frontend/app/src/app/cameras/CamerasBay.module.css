@@ -194,3 +194,51 @@
   background: var(--material-well);
   overflow: hidden;
 }
+
+/* A picture that does not arrive (board 2's `no-pictures` and
+   `one-picture`): its place stays, with the hardware link's words in the
+   middle of it. Small on a tile, and in the loupe only what it cannot do. */
+.noPicture {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--display-text);
+  white-space: normal;
+}
+
+.loupeBody .noPicture {
+  position: static;
+  height: 100%;
+}
+
+.noPictureWord {
+  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+}
+
+.noPictureSentence {
+  font: 600 var(--font-size-value) / 1.3 var(--font-family-ui);
+}
+
+.noPictureDetail {
+  max-width: 680px;
+  color: var(--display-text2);
+  font: 400 var(--font-size-body) / 1.4 var(--font-family-ui);
+}
+
+.noPictureSmall {
+  gap: 8px;
+}
+
+.noPictureSmall .noPictureWord {
+  font-size: var(--font-size-body);
+}
+
+.noPictureSmall .noPictureDetail {
+  font-size: var(--font-size-label);
+}

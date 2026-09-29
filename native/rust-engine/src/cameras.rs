@@ -8,12 +8,14 @@
 //! The hardware link is the only thing that talks to the cameras; the page
 //! (Slice 9) and the deck (Slices 7 and 12) draw and send what it answers.
 //! Until Slices 11 and 13 bring the real links, a set-up camera is read only
-//! through the simulated link (`SSE_CAMERAS_SIMULATED=1`).
+//! through the simulated link (`SSE_CAMERAS_SIMULATED=1`). Each camera's
+//! picture, which comes from vMix and not from the camera, is `pictures.rs`'s.
 
 pub(crate) mod archive;
 pub(crate) mod commands;
 pub(crate) mod deck;
 pub(crate) mod model;
+pub(crate) mod pictures;
 pub(crate) mod real_link;
 pub(crate) mod report;
 pub(crate) mod runtime;
@@ -28,6 +30,8 @@ mod tests_controls;
 mod tests_deck;
 #[cfg(test)]
 mod tests_link;
+#[cfg(test)]
+mod tests_pictures;
 #[cfg(test)]
 mod tests_setup;
 

@@ -24,7 +24,7 @@ Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`.
 **The app.** `npm run app` builds the engine and the shell and starts them as a development run:
 
 - its saved data is `.dev/app-data` in the repository, which git ignores, and it stays between runs. The first start opens Setup: publish it once, over the probes that cannot pass;
-- the lights are held and their wire is cut, the console and the cameras are simulated, and the Stream Deck bridge is on port `38211`, which Companion does not talk to. Arming the lights on screen sends nothing. Setup's probes still ask the address they are given, and the Companion export asks nobody;
+- the lights are held and their wire is cut, the console and the cameras are simulated, and the Stream Deck bridge is on port `38211`, which Companion does not talk to. The cameras' test pictures stand in for vMix inputs 1 to 4: set a camera's vMix input to another in Setup to see `PICTURE MISSING`. Arming the lights on screen sends nothing. Setup's probes still ask the address they are given, and the Companion export asks nobody;
 - it is an app of its own, with `.dev` at the end of its identifier: its own saved display and browser profile, and it runs while the studio app is open.
 
 To work on the studio's data, copy its folder and name the copy: `npm run app -- --data=<the copy>`. The studio's own folder, and any folder inside it, is refused by the command and by every development build.
@@ -138,7 +138,7 @@ The shell:
 - `lighting/`, `audio/`, `setup/`, `cameras/`, `teleprompter/`: one folder per page. Lighting and Setup are assembled from hooks (`lighting/editor/`, `setup/pilot/`) and regions (`lighting/regions/`, `setup/steps/`, `setup/support/`).
 - `teleprompter/glass/`: the prompter's glass, drawn both on the page and on the Prompter XL.
 - `frontend/app/src/prompterWindow/`, with `frontend/app/prompter.html`: the prompter's window's page, a page of its own with a build of its own. It follows the hardware link through `GlassLink` (`engine-client`), which sends two requests and starts nothing.
-- `cameras/pictures/`: the pictures' geometry (whole frame, 1:1, the loupe), the aids worked out from a picture's pixels, and the test pictures that stand in until the cameras' pictures are built.
+- `cameras/pictures/`: the pictures' geometry (whole frame, 1:1, the loupe), the aids worked out from a picture's pixels, and the test pictures that stand in until the cameras' pictures are built. Whether a picture arrives is the hardware link's (`native/rust-engine/src/cameras/pictures.rs`): the page draws a test picture only where it says one arrives.
 - `frontend/packages/engine-client`: the store, the two transports (the shell's, and the test double). The double has an entry of its own, `@sse/engine-client/fixture`, and the pages load it on request (`fixtureDouble.ts`): in a browser, never in the app's window.
 - `frontend/packages/design-system`, `frontend/packages/tokens`: the shared components, and the sizes and colours. Tokens are built with `npm run frontend:tokens:build`.
 

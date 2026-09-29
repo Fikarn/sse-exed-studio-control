@@ -6,6 +6,7 @@ import {
   cameraOf,
   DIAL_BANKS,
   dialsView,
+  pictureRows,
   recentRows,
   recKeyView,
   takeReadouts,
@@ -17,8 +18,8 @@ import styles from "./CamerasCluster.module.css";
 // The Cameras page's cluster (board 2's left column): the state display with
 // its armed row, the take — REC, which is CAM 1's whichever camera is
 // selected (D14), and what is known about the take —, the three cameras,
-// what the Stream Deck's dials set, where the pictures come from, who changed
-// what, and the standing actions.
+// what the Stream Deck's dials set, where the pictures come from and whether
+// each arrives, who changed what, and the standing actions.
 
 /** The rows the Recent list has room for: what the hardware link sends. */
 const RECENT_ROOM = 5;
@@ -83,6 +84,10 @@ export function CamerasCluster({
             </Key>
           ) : wayOut?.kind === "setup" ? (
             <Key size="small" testId="cameras-state-setup" onClick={onOpenSetup}>
+              {wayOut.label}
+            </Key>
+          ) : wayOut?.kind === "look-again" ? (
+            <Key size="small" mode="primary" testId="cameras-state-look-again" onClick={() => onReadAgain(null)}>
               {wayOut.label}
             </Key>
           ) : undefined
@@ -228,19 +233,19 @@ export function CamerasCluster({
         </Section>
       ) : null}
 
-      <Section title="Pictures" detail="test pictures" testId="cameras-pictures">
+      <Section title="Pictures" detail={snapshot.pictures.source} testId="cameras-pictures">
         <ul className={styles.pictures}>
-          {snapshot.cameras.map((camera) => (
-            <li key={camera.camera} className={styles.pictureRow}>
-              <span className={styles.pictureTag}>{camera.tag}</span>
-              <span className={styles.pictureDetail}>vMix input {camera.setup.vmixInput} · test picture</span>
+          {pictureRows(snapshot).map((row) => (
+            <li key={row.camera} className={styles.pictureRow} data-testid={`cameras-picture-row-${row.camera}`}>
+              <span className={styles.pictureTag}>{row.tag}</span>
+              <span className={styles.pictureDetail}>{row.detail}</span>
+              <LampWord tone={row.tone} cap={false} className={styles.pictureWord}>
+                {row.word}
+              </LampWord>
             </li>
           ))}
         </ul>
-        <p className={styles.fine}>
-          The cameras' own pictures come with a later version, over NDI from vMix on this PC. Until then these are test
-          pictures.
-        </p>
+        <p className={styles.fine}>{snapshot.pictures.note}</p>
       </Section>
 
       <Section

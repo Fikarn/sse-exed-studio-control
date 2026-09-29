@@ -3,7 +3,7 @@ import type { MouseEvent } from "react";
 import { Key, LampWord, Segmented } from "@sse/design-system";
 import type { CameraNumber, CameraSnapshot, CamerasSnapshot } from "@sse/engine-client";
 
-import { cameraNumber, releasedTo } from "./camerasModel";
+import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
 import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
 import {
   CENTRE,
@@ -29,6 +29,11 @@ import styles from "./CamerasBay.module.css";
 //
 // The aids are this screen's own: they are drawn on Studio Control's copy of
 // the picture and reach neither the camera nor vMix.
+//
+// A picture that does not arrive (the hardware link's `picture`) leaves its
+// place empty with the hardware link's words in it (board 2's `no-pictures`
+// and `one-picture`), and while the selected camera's does not, the view, the
+// aids and the loupe are locked. The camera's own controls still work.
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
@@ -43,6 +48,35 @@ export interface CamerasBayProps {
   onZoom: (zoom: LoupeZoom) => void;
   onMoveLoupe: (point: Point) => void;
   onSelect: (camera: CameraNumber) => void;
+}
+
+/**
+ * A picture's place when it does not arrive: its word and, big, why and what to check;
+ * small, its vMix input and what arrives from it.
+ */
+function NoPicture({ camera, big }: { camera: CameraSnapshot; big: boolean }) {
+  const { picture } = camera;
+  return (
+    <span
+      className={[styles.noPicture, big ? "" : styles.noPictureSmall].filter(Boolean).join(" ")}
+      data-no-picture={picture.state}
+      data-testid={big ? "cameras-no-picture" : `cameras-no-picture-${camera.camera}`}
+    >
+      <LampWord tone={picture.tone} className={styles.noPictureWord}>
+        {picture.word}
+      </LampWord>
+      {big && picture.sentence ? <span className={styles.noPictureSentence}>{picture.sentence}</span> : null}
+      {big ? (
+        picture.advice ? (
+          <span className={styles.noPictureDetail}>{picture.advice}</span>
+        ) : null
+      ) : (
+        <span className={styles.noPictureDetail}>
+          vMix input {camera.setup.vmixInput} · {picture.detail}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /** The REC tag beside a camera's name, where it is CAM 1 and it records. */
@@ -71,6 +105,8 @@ export function CamerasBay({
   onSelect,
 }: CamerasBayProps) {
   const camera = cameraNumber(selected);
+  const shows = pictureShows(selected);
+  const lock = pictureLock(selected) ?? undefined;
   const part = bigRect(view, point);
   const loupe = loupeRect(point, zoom);
   const others = snapshot.cameras.filter((entry) => entry.camera !== selected.camera);
@@ -99,7 +135,15 @@ export function CamerasBay({
   };
 
   const aidKey = (aid: keyof PictureAids, label: string) => (
-    <Key mode="toggle" size="small" engaged={aids[aid]} testId={`cameras-aid-${aid}`} onClick={() => onToggleAid(aid)}>
+    <Key
+      mode="toggle"
+      size="small"
+      engaged={aids[aid]}
+      locked={!shows}
+      reason={lock}
+      testId={`cameras-aid-${aid}`}
+      onClick={() => onToggleAid(aid)}
+    >
       {label}
     </Key>
   );
@@ -115,10 +159,12 @@ export function CamerasBay({
         </LampWord>
         <RecTag camera={selected} />
         <span className={styles.detail} data-testid="cameras-caption-detail">
-          vMix input {selected.setup.vmixInput} · test picture ·{" "}
-          {view === "one-to-one"
-            ? `1:1 · ${HERO.width} × ${HERO.height} of ${WHOLE.width} × ${WHOLE.height}`
-            : `shown at ${bigViewWord(view)}`}
+          vMix input {selected.setup.vmixInput} · {selected.picture.detail}
+          {shows
+            ? view === "one-to-one"
+              ? ` · 1:1 · ${HERO.width} × ${HERO.height} of ${WHOLE.width} × ${WHOLE.height}`
+              : ` · shown at ${bigViewWord(view)}`
+            : null}
         </span>
         {lockNote ? (
           <span className={styles.lockNote} data-tone={selected.tone} data-testid="cameras-caption-lock">
@@ -132,6 +178,8 @@ export function CamerasBay({
               size="small"
               engaged={view === "whole"}
               aria-pressed={view === "whole"}
+              locked={!shows}
+              reason={lock}
               testId="cameras-view-whole"
               onClick={() => onView("whole")}
             >
@@ -142,6 +190,8 @@ export function CamerasBay({
               size="small"
               engaged={view === "one-to-one"}
               aria-pressed={view === "one-to-one"}
+              locked={!shows}
+              reason={lock}
               testId="cameras-view-one-to-one"
               onClick={() => onView("one-to-one")}
             >
@@ -159,20 +209,29 @@ export function CamerasBay({
         type="button"
         className={styles.hero}
         data-well=""
-        aria-label={`${selected.tag}, the big picture. Press it to move the loupe.`}
+        aria-label={
+          shows
+            ? `${selected.tag}, the big picture. Press it to move the loupe.`
+            : `${selected.tag}: no picture from vMix`
+        }
+        aria-disabled={shows ? undefined : "true"}
         data-testid="cameras-hero"
-        onClick={press}
+        onClick={shows ? press : undefined}
       >
-        <CameraPicture
-          camera={camera}
-          part={part}
-          width={HERO.width}
-          height={HERO.height}
-          aids={aids}
-          marker={view === "whole" ? loupe : null}
-          label={`${selected.tag}, a test picture`}
-          testId="cameras-hero-picture"
-        />
+        {shows ? (
+          <CameraPicture
+            camera={camera}
+            part={part}
+            width={HERO.width}
+            height={HERO.height}
+            aids={aids}
+            marker={view === "whole" ? loupe : null}
+            label={`${selected.tag}, ${selected.picture.detail}`}
+            testId="cameras-hero-picture"
+          />
+        ) : (
+          <NoPicture camera={selected} big />
+        )}
       </button>
 
       <div className={styles.row}>
@@ -186,13 +245,17 @@ export function CamerasBay({
             data-testid={`cameras-tile-${entry.camera}`}
             onClick={() => onSelect(cameraNumber(entry))}
           >
-            <CameraPicture
-              camera={cameraNumber(entry)}
-              part={WHOLE}
-              width={TILE.width}
-              height={TILE.height}
-              label={`${entry.tag}, a test picture`}
-            />
+            {pictureShows(entry) ? (
+              <CameraPicture
+                camera={cameraNumber(entry)}
+                part={WHOLE}
+                width={TILE.width}
+                height={TILE.height}
+                label={`${entry.tag}, ${entry.picture.detail}`}
+              />
+            ) : (
+              <NoPicture camera={entry} big={false} />
+            )}
             <span className={styles.chip}>
               <b>{entry.tag}</b>
               <LampWord tone={entry.tone} cap={false}>
@@ -206,7 +269,9 @@ export function CamerasBay({
         <section className={styles.loupe} aria-label="Loupe" data-testid="cameras-loupe">
           <div className={styles.loupeHead}>
             <span className={styles.loupeTitle}>Loupe</span>
-            <span className={styles.loupeNote}>press the big picture to move it</span>
+            <span className={styles.loupeNote}>
+              {shows ? "press the big picture to move it" : "no picture to check"}
+            </span>
             <Segmented label="Loupe" className={styles.zoom} testId="cameras-zoom">
               <Key
                 mode="segmented"
@@ -214,6 +279,8 @@ export function CamerasBay({
                 cap="2:1"
                 engaged={zoom === 2}
                 aria-pressed={zoom === 2}
+                locked={!shows}
+                reason={lock}
                 testId="cameras-zoom-2"
                 onClick={() => onZoom(2)}
               />
@@ -223,22 +290,30 @@ export function CamerasBay({
                 cap="4:1"
                 engaged={zoom === 4}
                 aria-pressed={zoom === 4}
+                locked={!shows}
+                reason={lock}
                 testId="cameras-zoom-4"
                 onClick={() => onZoom(4)}
               />
             </Segmented>
           </div>
           <div className={styles.loupeBody} data-well="">
-            <CameraPicture
-              camera={camera}
-              part={loupe}
-              width={LOUPE.width}
-              height={LOUPE.height}
-              aids={{ guides: false, zebras: aids.zebras, peaking: aids.peaking }}
-              pixels
-              label={`${selected.tag} at ${zoom}:1`}
-              testId="cameras-loupe-picture"
-            />
+            {shows ? (
+              <CameraPicture
+                camera={camera}
+                part={loupe}
+                width={LOUPE.width}
+                height={LOUPE.height}
+                aids={{ guides: false, zebras: aids.zebras, peaking: aids.peaking }}
+                pixels
+                label={`${selected.tag} at ${zoom}:1`}
+                testId="cameras-loupe-picture"
+              />
+            ) : (
+              <span className={styles.noPicture} data-testid="cameras-loupe-empty">
+                <span className={styles.noPictureDetail}>No picture to check</span>
+              </span>
+            )}
           </div>
         </section>
       </div>

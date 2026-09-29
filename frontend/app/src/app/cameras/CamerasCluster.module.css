@@ -230,7 +230,7 @@
 
 .pictureRow {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 56px 1fr auto;
   align-items: baseline;
   column-gap: 8px;
   font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
@@ -243,6 +243,11 @@
 
 .pictureDetail {
   color: var(--text-text2);
+}
+
+/* Whether it arrives: `live`, or `no picture` in amber. */
+.pictureWord {
+  font-size: var(--font-size-label);
 }
 
 /* The Recent list takes what room is left, and never scrolls: it holds the

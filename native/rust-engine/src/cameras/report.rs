@@ -6,9 +6,9 @@ use crate::cameras::model::{model, CameraModel, Setting, CAMERA_NUMBERS, RECORDI
 use crate::cameras::runtime::{CameraRuntime, Cameras};
 use crate::cameras::simulated::CameraReading;
 use crate::cameras::snapshot::{
-    CameraChoice, CameraDials, CameraHealthEntry, CameraLevel, CameraRecentAction, CameraRecording,
-    CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable, CameraValues,
-    CamerasHealthCheck, CamerasSnapshot,
+    CameraChoice, CameraDials, CameraHealthEntry, CameraLevel, CameraPicture, CameraRecentAction,
+    CameraRecording, CameraSnapshot, CameraState, CameraSwitch, CameraTone, CameraUnavailable,
+    CameraValues, CamerasHealthCheck, CamerasSnapshot, PictureState,
 };
 
 fn choice(model: &CameraModel, reading: &CameraReading, setting: Setting) -> CameraChoice {
@@ -94,10 +94,10 @@ fn values(model: &CameraModel, reading: &CameraReading) -> CameraValues {
     }
 }
 
-/// One camera as `cameras.snapshot` shows it. A camera never read since the
-/// start, or released, shows no value; an unreachable one keeps what it last
-/// reported, and when.
-pub(crate) fn camera_snapshot(runtime: &CameraRuntime) -> CameraSnapshot {
+/// One camera as `cameras.snapshot` shows it, with its picture. A camera
+/// never read since the start, or released, shows no value; an unreachable
+/// one keeps what it last reported, and when.
+pub(crate) fn camera_snapshot(runtime: &CameraRuntime, picture: CameraPicture) -> CameraSnapshot {
     let model = model(runtime.camera());
     let state = runtime.state();
     let shown = matches!(state, CameraState::Held | CameraState::Unreachable);
@@ -133,6 +133,7 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime) -> CameraSnapshot {
             card_time_left: None,
             card_time_not_reported: model.card_time_not_reported(),
         },
+        picture,
     }
 }
 
@@ -143,7 +144,12 @@ impl Cameras {
         CamerasSnapshot {
             selected: self.selected,
             dials: self.dials(),
-            cameras: self.all().iter().map(camera_snapshot).collect(),
+            cameras: self
+                .all()
+                .iter()
+                .map(|runtime| camera_snapshot(runtime, self.picture(runtime.camera())))
+                .collect(),
+            pictures: self.pictures(),
             recent,
         }
     }
@@ -163,7 +169,9 @@ impl Cameras {
 
     /// `checks.cameras`: the worst camera's state and sentence (the state
     /// latest in `CameraState`'s order; among equals, the lowest number), and
-    /// whether CAM 1 records.
+    /// whether CAM 1 records. While every camera is held, the pictures speak
+    /// instead when not every one arrives (board 2's `no-pictures`): the
+    /// Cameras lamp reads `no pictures` or `picture missing`.
     pub(crate) fn health_check(&self) -> CamerasHealthCheck {
         let cameras: Vec<CameraHealthEntry> = self
             .all()
@@ -188,16 +196,29 @@ impl Cameras {
             })
             .cloned()
             .expect("three cameras");
-        let recording = camera_snapshot(self.camera(RECORDING_CAMERA))
-            .recording
-            .recording
+        let recording = camera_snapshot(
+            self.camera(RECORDING_CAMERA),
+            self.picture(RECORDING_CAMERA),
+        )
+        .recording
+        .recording
             == Some(true);
         debug_assert_eq!(cameras.len(), CAMERA_NUMBERS.len());
+        let pictures = self.pictures();
+        let (status, word, summary) =
+            match (worst.tone, pictures.state, pictures.word, pictures.sentence) {
+                (CameraTone::Ok, state, Some(word), Some(sentence))
+                    if state != PictureState::Showing =>
+                {
+                    (pictures.tone, word, sentence)
+                }
+                _ => (worst.tone, worst.word, worst.sentence),
+            };
         CamerasHealthCheck {
-            ok: worst.tone == CameraTone::Ok,
-            status: worst.tone,
-            word: worst.word,
-            summary: worst.sentence,
+            ok: status == CameraTone::Ok,
+            status,
+            word,
+            summary,
             recording,
             cameras,
         }

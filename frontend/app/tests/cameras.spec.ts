@@ -422,6 +422,89 @@ test.describe("the Cameras page", () => {
     await expect(recChip(page)).toHaveCount(0);
   });
 
+  // The studio's build before the pictures are built: each picture's place
+  // says so, and the view, the aids and the loupe are locked.
+  test("without the pictures every picture's place says they come with a later version", async ({ page }) => {
+    await openCameras(page, "cameras-no-link");
+    const empty = page.getByTestId("cameras-no-picture");
+    await expect(empty).toHaveAttribute("data-no-picture", "no-pictures");
+    await expect(empty).toContainText("NO PICTURE");
+    await expect(empty).toContainText("No picture yet: the cameras' pictures come with a later version.");
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveCount(0);
+    for (const camera of [2, 3]) {
+      const small = page.getByTestId(`cameras-no-picture-${camera}`);
+      await expect(small).toContainText("NO PICTURE");
+      await expect(small).toContainText(`vMix input ${camera} · not built yet`);
+    }
+    await expect(page.getByTestId("cameras-loupe-empty")).toHaveText("No picture to check");
+    for (const key of [
+      "view-whole",
+      "view-one-to-one",
+      "aid-guides",
+      "aid-peaking",
+      "aid-zebras",
+      "zoom-2",
+      "zoom-4",
+    ]) {
+      await expect(page.getByTestId(`cameras-${key}`), key).toHaveAttribute("aria-disabled", "true");
+    }
+    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("vMix input 1 · not built yet");
+    const pictures = page.getByTestId("cameras-pictures");
+    await expect(pictures).toContainText("not built yet");
+    await expect(pictures).toContainText(
+      "The cameras' own pictures come with a later version, over NDI from vMix on this PC."
+    );
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("vMix input 1 · not built yet");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("no picture");
+    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures none · not built yet");
+  });
+
+  // Board 2's `one-picture`: vMix sends pictures, and none for CAM 2's input.
+  test("a picture that does not arrive says why in its place, and the camera's controls still work", async ({
+    page,
+  }) => {
+    await openCameras(page, "cameras-picture-missing");
+    await expect(state(page)).toContainText("PICTURE MISSING");
+    await expect(state(page)).toContainText(
+      "vMix sends no picture for CAM 2. Check that vMix input 7 is still there and live."
+    );
+    await expect(state(page)).toContainText("The camera controls still work · 3 of 3 held");
+    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("picture missing");
+    await expect(page.getByTestId("cameras-no-picture-2")).toContainText("NO PICTURE");
+    await expect(page.getByTestId("cameras-no-picture-2")).toContainText("vMix input 7 · nothing received");
+    await expect(page.getByTestId("cameras-picture-row-2")).toContainText("vMix input 7 · nothing received");
+    await expect(page.getByTestId("cameras-picture-row-2")).toContainText("no picture");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("vMix input 1 · test picture");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("live");
+    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures test pictures · 2 / 3 · CAM 2 missing");
+    // CAM 1's picture arrives, and its aids work.
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-camera", "1");
+    await page.getByTestId("cameras-aid-zebras").click();
+    await expect(page.getByTestId("cameras-aid-zebras")).toHaveAttribute("aria-pressed", "true");
+
+    // Look again reads once more: nothing has changed.
+    await page.getByTestId("cameras-state-look-again").click();
+    await expect(toast(page)).toContainText("Read again: nothing has changed.");
+
+    // CAM 2 selected: its place says why, the picture's keys are locked, and
+    // its own controls still set it.
+    await page.getByTestId("cameras-key-2").click();
+    const empty = page.getByTestId("cameras-no-picture");
+    await expect(empty).toHaveAttribute("data-no-picture", "missing");
+    await expect(empty).toContainText("vMix is not sending CAM 2 over NDI.");
+    await expect(empty).toContainText("vMix sends other inputs: check that vMix input 7 is still there and live.");
+    await expect(page.getByTestId("cameras-hero")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-aid-zebras")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-aid-zebras")).toHaveAttribute("title", "CAM 2 has no picture to show.");
+    await expect(page.getByTestId("cameras-view-one-to-one")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-zoom-4")).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByTestId("cameras-loupe-empty")).toHaveText("No picture to check");
+    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("vMix input 7 · nothing received");
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("800");
+    await page.getByTestId("cameras-iso-up").click();
+    await expect(page.getByTestId("cameras-iso-value")).toContainText("1000");
+  });
+
   test("the aids, the view and the loupe are this screen's own, and off again at every start", async ({ page }) => {
     await openCameras(page);
     const hero = page.getByTestId("cameras-hero-picture");
@@ -543,7 +626,7 @@ test.describe("the Cameras page", () => {
   });
 
   test("nothing scrolls, and the regions keep their sizes", async ({ page }) => {
-    for (const fixture of ["cameras-held", "cameras-lost-mid-take", "cameras-no-link"]) {
+    for (const fixture of ["cameras-held", "cameras-lost-mid-take", "cameras-no-link", "cameras-picture-missing"]) {
       await openCameras(page, fixture);
       const sizes = await page.evaluate(() => {
         const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
@@ -631,6 +714,7 @@ test.describe("the Cameras page", () => {
       "cameras-unreachable",
       "cameras-lost-mid-take",
       "cameras-no-link",
+      "cameras-picture-missing",
     ]) {
       await openCameras(page, fixture);
       expect(await places(), fixture).toEqual(held);
