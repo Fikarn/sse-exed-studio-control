@@ -182,6 +182,36 @@ fn a_take_gathers_the_frames_of_a_tick_into_one_answer() {
     assert_eq!((counts.received, counts.taken, counts.skipped), (5, 5, 0));
 }
 
+// The gather's bound is kept while frames keep coming for a camera already
+// there: each wakes the take, and a wait that began again at every wake would
+// never end while they come.
+#[test]
+fn a_gather_ends_at_its_bound_while_frames_keep_coming() {
+    let store = Arc::new(PicturesStore::default());
+    store.put(1, frame(1, 1, 544, 306), &|| true);
+    let coming = Arc::new(AtomicBool::new(true));
+    let sender = {
+        let (store, coming) = (Arc::clone(&store), Arc::clone(&coming));
+        thread::spawn(move || {
+            let started = Instant::now();
+            let mut sequence = 1;
+            while coming.load(Ordering::SeqCst) && started.elapsed() < PATIENCE {
+                sequence += 1;
+                store.put(1, frame(1, sequence, 544, 306), &|| true);
+                thread::sleep(Duration::from_millis(20));
+            }
+        })
+    };
+    let started = Instant::now();
+    let answer = store.take(PATIENCE, Duration::from_millis(300));
+    let gathered = started.elapsed();
+    coming.store(false, Ordering::SeqCst);
+    sender.join().expect("the sender ends");
+    assert_eq!(cameras_in(&answer).len(), 1, "CAM 1's newest, once");
+    assert!(gathered >= Duration::from_millis(300), "{gathered:?}");
+    assert!(gathered < Duration::from_secs(5), "no longer: {gathered:?}");
+}
+
 #[test]
 fn a_connection_without_the_secret_is_closed_and_counted() {
     let (store, link, _) = open();

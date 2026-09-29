@@ -12,7 +12,7 @@ import type { PictureCamera, PictureFrame, PicturesLink } from "@sse/engine-clie
 
 /** The rest after a take that brought nothing new: only a link that answers at once (the double) would spin without it; the shell's take has waited already. */
 const PULL_REST_MS = 8;
-/** After a take that failed (the shell's route not there yet, or a view that could not draw), a longer rest. */
+/** After a take that failed (an answer that is not frames, or the call refused), a longer rest. */
 const PULL_FAILED_REST_MS = 500;
 
 export class PictureFrames {
@@ -67,7 +67,9 @@ export function takePictures(link: PicturesLink, frames: PictureFrames): () => v
       for (const frame of taken) {
         try {
           anyNew = frames.put(frame) || anyNew;
-        } catch {
+        } catch (error) {
+          // The frame was kept before its view threw; the console still says why.
+          console.error(`CAM ${frame.camera}'s picture could not be drawn:`, error);
           anyNew = true;
         }
       }

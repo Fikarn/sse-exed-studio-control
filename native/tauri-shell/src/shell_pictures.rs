@@ -66,8 +66,9 @@ const TAKE_WAIT: Duration = Duration::from_millis(250);
 /// helper's tick, which the helper writes back to back: well under a frame
 /// (33 ms), so none is replaced while it waits. It waits for all three, so
 /// with a camera that sends nothing every answer waits it out; and a
-/// Condvar's wait on Windows ends on the system's timer tick, so it is
-/// nearer 16 ms there. Latency only, still under a frame.
+/// Condvar's wait on Windows ends on the system's timer tick, so at the
+/// default tick it is nearer 16 ms there. Latency only, still under a
+/// frame.
 const TAKE_GATHER: Duration = Duration::from_millis(8);
 
 /// Where the frame route's lines go: `shell.log`, or a test's list.
