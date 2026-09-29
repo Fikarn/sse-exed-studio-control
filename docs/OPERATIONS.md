@@ -153,7 +153,7 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 **The runner's steps**
 
 1. `Import profile` exports the Stream Deck's profile for Companion.
-2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed, and Setup `DEGRADED`, until the probes run again, even after the lamp turns `ready`.
+2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed until the probes run again, even after the lamp turns `ready`: Setup reads `SETUP REQUIRED` before a publish, `DEGRADED` after one with the override. On a published setup, running the probes again unpublishes it first (below).
 3. `Map bindings` shows the deck's four pages as the app holds them: the keys and the strip where the deck has them, each dial under its cell of the strip.
 4. `Verify live echo`: a control pressed on the deck pulses on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
