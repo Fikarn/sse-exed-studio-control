@@ -642,11 +642,16 @@ const TONE_RANK: Record<StatusToneLike, number> = { error: 3, attention: 2, info
  *  hold, as on the hardware link, and it outranks an unsaved scene because
  *  nothing reaches the rig at all), then an unsaved scene. */
 export function deriveLightingWorkspaceTone(
-  lightingSnapshot: { outputArmed?: boolean; reachable?: boolean } | null | undefined,
+  lightingSnapshot: { bridgeAnswering?: boolean | null; outputArmed?: boolean; reachable?: boolean } | null | undefined,
   sceneDrift: boolean
 ): WorkspaceStateTone | null {
   if (lightingSnapshot?.reachable === false) {
     return { tone: "error", word: "no bridge" };
+  }
+  // The bridge watch (2026-09-29): a bridge that stopped answering during the
+  // session is amber and locks nothing, and it outranks a hold, as on the page.
+  if (lightingSnapshot?.bridgeAnswering === false) {
+    return { tone: "attention", winsTies: true, word: "not answering" };
   }
   if (lightingSnapshot?.outputArmed === false) {
     return { tone: "attention", winsTies: true, word: "held" };

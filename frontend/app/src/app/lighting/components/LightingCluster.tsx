@@ -28,6 +28,10 @@ import { deriveLightingState, type LightingState } from "../lightingState";
 export interface LightingClusterProps {
   bridgeIp: string;
   bridgeReachable: boolean;
+  /** The bridge watch's word (the snapshot's `bridgeAnswering`); it locks nothing. */
+  bridgeAnswering?: boolean | null;
+  /** When the bridge went silent, on the studio's clock (`10:42`). */
+  bridgeSilentLabel?: string | null;
   bridgeUniverse: number;
   /** The light outputs are held (the lighting snapshot's `outputArmed === false`). */
   outputsHeld?: boolean;
@@ -98,6 +102,8 @@ export function LightingCluster(props: LightingClusterProps) {
   const {
     bridgeIp,
     bridgeReachable,
+    bridgeAnswering = null,
+    bridgeSilentLabel = null,
     outputsHeld = false,
     bridgeUniverse,
     channelCount,
@@ -156,6 +162,8 @@ export function LightingCluster(props: LightingClusterProps) {
   const state: LightingState = deriveLightingState({
     bridgeIp,
     bridgeReachable,
+    bridgeAnswering,
+    bridgeSilentLabel,
     channelCount,
     fixtureOnCount,
     fixtureTotal,
@@ -185,8 +193,11 @@ export function LightingCluster(props: LightingClusterProps) {
   const stateActions = (
     <>
       {/* The bridge probe lives in Setup / Support, so the way out of an
-          unreachable bridge is the key that takes the operator there. */}
-      {state.word === "UNREACHABLE" || state.word === "HELD" ? (
+          unreachable bridge is the key that takes the operator there, as it is
+          the way to the Light outputs switch. A bridge that is not answering
+          gets none of its own: a probe run mid-session that fails locks the
+          rig (the review of #260). Held as well, the key is the way to arm. */}
+      {state.word === "UNREACHABLE" || state.word === "HELD" || (state.word === "NOT ANSWERING" && outputsHeld) ? (
         <Key size="small" testId="lighting-state-setup" onClick={onOpenSetup}>
           Open Setup
         </Key>

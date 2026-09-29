@@ -227,6 +227,44 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   );
 });
 
+// Found, to check (2026-09-28): nothing looked at the bridge during a session.
+// The hardware link's watch says when it stops answering, and the owner's
+// decision (2026-09-29) is to say it and lock nothing: the rig's keys stay
+// live, the plot is not locked, and the header lamp is amber.
+test("not answering: the watch's word is amber, and nothing is locked", async ({ page }) => {
+  await openFixture(page, "lighting-bridge-silent");
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("NOT ANSWERING");
+  await expect(stateDisplay).toHaveAttribute("data-tone", "attention");
+  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Nothing is locked; this clears/);
+  // No key to Setup: a probe run mid-session that fails would lock the rig
+  // (the review of #260).
+  await expect(page.getByTestId("lighting-state-setup")).toHaveCount(0);
+
+  const lamp = page.getByTestId("shell-lamp-lighting");
+  await expect(lamp).toHaveAttribute("data-tone", "attention");
+  await expect(lamp).toContainText("not answering");
+
+  for (const testId of ["lighting-power-toggle", "lighting-emergency-cut", "lighting-grand-master"]) {
+    await expect(page.getByTestId(testId), `${testId} stays live`).not.toHaveAttribute("aria-disabled", "true");
+  }
+  await expect(page.getByTestId("lighting-stage")).not.toHaveAttribute("data-locked", "");
+  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveCount(0);
+});
+
+// The review of #260: a silent bridge outranks a hold, so its sentence names
+// the hold, and `Open Setup` is the way to the switch, as it is for HELD.
+test("not answering while held: the sentence names the hold, and Open Setup goes to the switch", async ({ page }) => {
+  await openFixture(page, "lighting-bridge-silent-held");
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("NOT ANSWERING");
+  await expect(stateDisplay).toContainText(/and the outputs are held until armed in Setup \/ Support/);
+  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-lighting")).toContainText("not answering");
+});
+
 // Visual overhaul A, Slice 5: the rig has drifted from the scene it was
 // recalled from — the state display says so and offers both ways back.
 test("unsaved: the state display says the rig no longer matches the scene and offers both ways back", async ({

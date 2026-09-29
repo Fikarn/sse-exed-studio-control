@@ -16,6 +16,18 @@ export type LightingSnapshot = {
   connected: boolean;
   reachable: boolean;
   /**
+   * What the bridge watch says during the session
+   * (`lighting_bridge_watch.rs`): `false` once the bridge has not answered
+   * two looks in a row, `true` once it answers; `null` while the watch has
+   * no word (lighting off, the simulated lights, the first look not yet
+   * made). It locks nothing: `reachable` and `status` stay Setup's probe's.
+   */
+  bridgeAnswering: boolean | null;
+  /**
+   * When the bridge's silence began, UTC; `null` while it answers.
+   */
+  bridgeSilentSince: string | null;
+  /**
    * False while the light outputs are held (Slice 11 — F31): the sACN
    * output sends nothing, and everything else in this snapshot — the
    * fixtures, the DMX monitor built from it — is what would be sent.

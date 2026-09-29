@@ -19,6 +19,7 @@ mod exports;
 mod health;
 mod lighting;
 mod lighting_backend;
+mod lighting_bridge_watch;
 mod lighting_sacn_output;
 #[cfg(test)]
 mod operator_words;
@@ -550,6 +551,10 @@ fn main() -> io::Result<()> {
     control_surface::register_control_surface_event_sender(output_sender.clone());
     send_output(&output_sender, app.ready_event())?;
     lighting_sacn_output::spawn_lighting_sacn_output(
+        planned_paths.db_path.clone(),
+        planned_paths.log_file_path.clone(),
+    );
+    lighting_bridge_watch::spawn_lighting_bridge_watch(
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
     );

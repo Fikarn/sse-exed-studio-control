@@ -1,10 +1,11 @@
 use crate::app_state::{CommissioningSnapshot, APP_SETTINGS_PREFIX};
+use crate::lighting_bridge_watch::{look_at_bridge, BRIDGE_LOOK_TIMEOUT, BRIDGE_PORT};
 use crate::rme_totalmix_osc;
 use crate::storage::{list_settings_by_prefix, open_connection, set_settings_owned, EngineResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddr, TcpStream, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
@@ -696,19 +697,18 @@ fn check_checked_at_key(check_id: &str) -> String {
     format!("app.commissioning.check.{check_id}.checked_at")
 }
 
+/// The probe looks as the bridge watch does (`look_at_bridge`): a connection
+/// taken or refused is an answer from the address.
 fn probe_bridge_reachable(ip: &str) -> bool {
     let Some(parsed_ip) = parse_ipv4(ip) else {
         return false;
     };
 
-    let address = SocketAddr::from((parsed_ip, 80));
-    match TcpStream::connect_timeout(&address, Duration::from_millis(1500)) {
-        Ok(stream) => {
-            let _ = stream.shutdown(std::net::Shutdown::Both);
-            true
-        }
-        Err(error) => error.kind() == std::io::ErrorKind::ConnectionRefused,
-    }
+    look_at_bridge(
+        SocketAddr::from((parsed_ip, BRIDGE_PORT)),
+        BRIDGE_LOOK_TIMEOUT,
+    )
+    .answers()
 }
 
 fn probe_audio_transport(host: &str, send_port: u16, receive_port: u16) -> Result<String, String> {

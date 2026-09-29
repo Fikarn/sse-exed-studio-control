@@ -67,6 +67,9 @@ export function buildDefaultLightingSnapshot(): JsonObject {
     grandMaster: 100,
     connected: false,
     reachable: false,
+    // The bridge watch has no word in the double, as in every development run.
+    bridgeAnswering: null,
+    bridgeSilentSince: null,
     outputArmed: true,
     lastActionStatus: "idle",
     fixtures: [],

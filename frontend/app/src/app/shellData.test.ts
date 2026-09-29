@@ -65,6 +65,16 @@ describe("the Lighting lamp and held light outputs", () => {
     expect(lightingLamp("attention", unsaved).detail).not.toBe("unsaved");
   });
 
+  // 2026-09-29: the bridge watch's word, amber, outranks a hold.
+  it("says not answering when the watch says the bridge went silent, and only then", () => {
+    const silent = deriveLightingWorkspaceTone({ bridgeAnswering: false, outputArmed: false, reachable: true }, true);
+    expect(silent).toEqual({ tone: "attention", winsTies: true, word: "not answering" });
+    expect(lightingLamp("ok", silent)).toEqual({ detail: "not answering", status: "attention" });
+    expect(deriveLightingWorkspaceTone({ bridgeAnswering: false, reachable: false }, false)?.word).toBe("no bridge");
+    expect(deriveLightingWorkspaceTone({ bridgeAnswering: null, reachable: true }, false)).toBeNull();
+    expect(deriveLightingWorkspaceTone({ bridgeAnswering: true, reachable: true }, false)).toBeNull();
+  });
+
   it("leaves an error to the health check", () => {
     const held = deriveLightingWorkspaceTone({ outputArmed: false, reachable: true }, false);
     const lamp = lightingLamp("error", held);

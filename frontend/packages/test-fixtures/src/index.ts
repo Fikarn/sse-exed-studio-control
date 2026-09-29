@@ -236,6 +236,23 @@ function buildEveryPageFixture(): FixtureScenarioRecord {
   } as FixtureScenarioRecord;
 }
 
+// 2026-09-29: the rig as `lighting-populated`, with the bridge watch saying
+// the bridge stopped answering at 10:42 UTC. Setup's probe passed, so nothing
+// is locked. Built here, not in `fixtures.json`, so it adds no UI-contract
+// board.
+function buildLightingBridgeSilentFixture(outputsHeld = false): FixtureScenarioRecord {
+  const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
+    lightingSnapshot: Record<string, unknown>;
+  };
+  scenario.lightingSnapshot = {
+    ...scenario.lightingSnapshot,
+    bridgeAnswering: false,
+    bridgeSilentSince: "2026-09-29T10:42:05.000Z",
+    ...(outputsHeld ? { outputArmed: false } : {}),
+  };
+  return scenario;
+}
+
 /** Every scenario of `fixtures.json`, its `prompter` (the scripts by name) and its `cameras` made the double's seeds. */
 function expandedFixtureMap(): FixtureMap {
   return Object.fromEntries(
@@ -271,6 +288,8 @@ const derivedFixtureMap: FixtureMap = {
   "audio-probe-passed-unsynced": buildAudioProbePassedUnsyncedFixture(),
   "audio-no-send": buildAudioNoSendFixture(),
   "every-page": buildEveryPageFixture(),
+  "lighting-bridge-silent": buildLightingBridgeSilentFixture(),
+  "lighting-bridge-silent-held": buildLightingBridgeSilentFixture(true),
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
   "lighting-palettes-preview-active": buildLightingPalettePreviewFixture(),

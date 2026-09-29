@@ -51,6 +51,9 @@ export function useLightingRig({ props }: { props: LightingWorkspaceSurfaceProps
   const bridgeReachable = lightingSnapshot?.reachable === true;
   // Only an explicit false is a hold, as on the hardware link and the header's lamp.
   const outputsHeld = lightingSnapshot?.outputArmed === false;
+  // The bridge watch's word during the session (2026-09-29); it locks nothing.
+  const bridgeAnswering = lightingSnapshot?.bridgeAnswering ?? null;
+  const bridgeSilentSince = lightingSnapshot?.bridgeSilentSince ?? null;
   const bridgeUniverse = lightingSnapshot?.universe ?? 1;
   const bridgeIp = String(lightingSnapshot?.bridgeIp ?? "");
 
@@ -90,6 +93,8 @@ export function useLightingRig({ props }: { props: LightingWorkspaceSurfaceProps
     selectedFixture,
     fixturesPatched,
     bridgeReachable,
+    bridgeAnswering,
+    bridgeSilentSince,
     bridgeUniverse,
     bridgeIp,
     outputsHeld,

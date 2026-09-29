@@ -126,6 +126,14 @@ function validateFixture(scenario, entry) {
     if (entry.lightingSnapshot.reachable !== undefined) {
       requireBoolean(scenario, entry.lightingSnapshot.outputArmed, "lightingSnapshot.outputArmed");
     }
+    // 2026-09-29: the bridge watch's word is a boolean or null, and a silent
+    // bridge says since when.
+    if (entry.lightingSnapshot.bridgeAnswering !== undefined && entry.lightingSnapshot.bridgeAnswering !== null) {
+      requireBoolean(scenario, entry.lightingSnapshot.bridgeAnswering, "lightingSnapshot.bridgeAnswering");
+      if (entry.lightingSnapshot.bridgeAnswering === false) {
+        requireString(scenario, entry.lightingSnapshot.bridgeSilentSince, "lightingSnapshot.bridgeSilentSince");
+      }
+    }
     requireWord(scenario, entry.lightingSnapshot.status, LIGHTING_STATE_WORDS, "lightingSnapshot.status");
   }
 
