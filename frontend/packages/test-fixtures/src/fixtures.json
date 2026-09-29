@@ -2537,6 +2537,119 @@
       "simulated": false
     }
   },
+  "cameras-picture-missing": {
+    "appSnapshot": {
+      "shell": {
+        "workspace": "cameras"
+      },
+      "summary": "Cameras workspace active; vMix sends no picture for CAM 2's input (board 2's one-picture)."
+    },
+    "commissioningSnapshot": {
+      "hasCompletedSetup": true,
+      "stage": "ready",
+      "runnerStage": "publish",
+      "checks": [
+        {
+          "id": "control-surface",
+          "label": "Control Surface Probe",
+          "status": "passed",
+          "message": "Control surface bridge verified."
+        },
+        {
+          "id": "lighting",
+          "label": "Lighting Bridge Probe",
+          "status": "passed",
+          "message": "Lighting bridge verified."
+        },
+        {
+          "id": "audio",
+          "label": "Audio OSC Probe",
+          "status": "passed",
+          "message": "OSC connection synchronized."
+        }
+      ]
+    },
+    "audioSnapshot": {
+      "consoleStateConfidence": "aligned",
+      "lastActionMessage": "Sync succeeded",
+      "lastActionStatus": "succeeded"
+    },
+    "supportSnapshot": {
+      "recentEvents": [
+        {
+          "id": 14,
+          "at": "2026-04-23T07:08:41.250Z",
+          "source": "ui",
+          "domain": "cameras",
+          "action": "held-again",
+          "target": "CAM 2",
+          "detail": "CAM 2 held again."
+        },
+        {
+          "id": 13,
+          "at": "2026-04-23T07:04:12.804Z",
+          "source": "ui",
+          "domain": "cameras",
+          "action": "released",
+          "target": "CAM 2",
+          "detail": "CAM 2 released to LUMIX Tether."
+        },
+        {
+          "id": 12,
+          "at": "2026-04-23T06:58:03.118Z",
+          "source": "ui",
+          "domain": "cameras",
+          "action": "recording-stopped",
+          "target": "CAM 1",
+          "detail": "CAM 1 stopped recording."
+        },
+        {
+          "id": 11,
+          "at": "2026-04-23T06:45:22.377Z",
+          "source": "ui",
+          "domain": "cameras",
+          "action": "recording-started",
+          "target": "CAM 1",
+          "detail": "CAM 1 started recording."
+        },
+        {
+          "id": 10,
+          "at": "2026-04-23T06:41:09.640Z",
+          "source": "ui",
+          "domain": "cameras",
+          "action": "format-changed",
+          "target": "CAM 1",
+          "detail": "CAM 1: 50p → 25p."
+        },
+        {
+          "id": 9,
+          "at": "2026-04-23T06:40:03.118Z",
+          "source": "deck",
+          "domain": "lighting",
+          "action": "scene-recalled",
+          "target": "Interview wide",
+          "detail": "Scene recalled: Interview wide"
+        }
+      ]
+    },
+    "cameras": {
+      "cameras": [
+        {
+          "camera": 1,
+          "paired": true
+        },
+        {
+          "camera": 2,
+          "address": "172.16.16.85",
+          "vmixInput": 7
+        },
+        {
+          "camera": 3,
+          "address": "172.16.16.30"
+        }
+      ]
+    }
+  },
   "setup-cameras": {
     "appSnapshot": {
       "shell": {

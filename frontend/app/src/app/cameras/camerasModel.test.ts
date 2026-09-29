@@ -17,6 +17,10 @@ import {
   levelStepLock,
   levelText,
   linkLabel,
+  pictureLock,
+  pictureRows,
+  picturesWord,
+  pictureShows,
   recentRows,
   recKeyView,
   recordingWord,
@@ -561,5 +565,84 @@ describe("the Recent list and the footer", () => {
     expect(heldWord(await read())).toBe("3 / 3 held");
     hooks.stopAnswering(3);
     expect(heldWord(await read())).toBe("2 / 3 held · CAM 3 unreachable");
+  });
+});
+
+describe("the pictures", () => {
+  it("shows every picture on vMix inputs 1 to 4, and says where they come from", async () => {
+    const { read } = openCameras();
+    const snapshot = await read();
+    expect(snapshot.cameras.every(pictureShows)).toBe(true);
+    expect(pictureRows(snapshot)).toEqual([
+      { camera: 1, tag: "CAM 1", detail: "vMix input 1 · test picture", word: "live", tone: "ok" },
+      { camera: 2, tag: "CAM 2", detail: "vMix input 2 · test picture", word: "live", tone: "ok" },
+      { camera: 3, tag: "CAM 3", detail: "vMix input 3 · test picture", word: "live", tone: "ok" },
+    ]);
+    expect(picturesWord(snapshot)).toBe("test pictures · 3 / 3");
+    expect(pictureLock(snapshot.cameras[0]!)).toBeNull();
+    expect(camerasStateView(snapshot)?.word).toBe("HELD");
+  });
+
+  it("speaks of a missing picture while every camera is held, and the controls still work", async () => {
+    const { transport, read } = openCameras();
+    await transport.request("cameras.setup.update", { camera: 2, vmixInput: 7 });
+    const snapshot = await read();
+    expect(camerasStateView(snapshot)).toEqual({
+      camera: 2,
+      tone: "attention",
+      word: "PICTURE MISSING",
+      sentence: "vMix sends no picture for CAM 2. Check that vMix input 7 is still there and live.",
+      meta: "The camera controls still work · 3 of 3 held",
+      wayOut: { kind: "look-again", label: "Look again" },
+    });
+    expect(pictureRows(snapshot)[1]).toEqual({
+      camera: 2,
+      tag: "CAM 2",
+      detail: "vMix input 7 · nothing received",
+      word: "no picture",
+      tone: "attention",
+    });
+    expect(picturesWord(snapshot)).toBe("test pictures · 2 / 3 · CAM 2 missing");
+    const cam2 = cameraOf(snapshot, 2)!;
+    expect(pictureShows(cam2)).toBe(false);
+    expect(pictureLock(cam2)).toBe("CAM 2 has no picture to show.");
+    expect(controlsLock(cam2), "its controls are not the picture's").toBeNull();
+
+    // A camera that is not held speaks first.
+    await transport.request("cameras.release", { camera: 3, confirm: true });
+    expect(camerasStateView(await read())?.word).toBe("RELEASED");
+  });
+
+  it("says NO PICTURES when none arrives, and a read tells two pictures apart", async () => {
+    const { transport, read } = openCameras();
+    const showing = await read();
+    // No build has held cameras and no pictures yet; the page is ready for it all the same.
+    const none = {
+      ...showing,
+      pictures: {
+        ...showing.pictures,
+        state: "no-pictures" as const,
+        word: "NO PICTURES",
+        tone: "attention" as const,
+        sentence:
+          "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
+        source: "not built yet",
+      },
+    };
+    expect(camerasStateView(none)).toMatchObject({ camera: 1, word: "NO PICTURES", tone: "attention" });
+    expect(picturesWord(none)).toBe("none · not built yet");
+
+    const before = camerasFingerprint(showing);
+    await transport.request("cameras.setup.update", { camera: 3, vmixInput: 9 });
+    expect(camerasFingerprint(await read())).not.toBe(before);
+  });
+
+  it("has no pictures yet without the simulated cameras, as the studio's build", async () => {
+    const { read } = openCameras({ simulated: false });
+    const snapshot = await read();
+    expect(snapshot.cameras.some(pictureShows)).toBe(false);
+    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "vMix input 1 · not built yet", word: "no picture" });
+    expect(picturesWord(snapshot)).toBe("none · not built yet");
+    expect(camerasStateView(snapshot)?.word, "the cameras speak first").toBe("NOT SET UP");
   });
 });

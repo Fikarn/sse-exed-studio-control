@@ -102,12 +102,13 @@ The presenter reads the script on the Prompter XL, in a window of Studio Control
 
 ## Cameras
 
-The links to the real cameras and their pictures are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, every control and `REC` are locked, and the pictures are test pictures. This is how the page works with a camera that is held.
+The links to the real cameras and their pictures are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, every control and `REC` are locked, and each picture's place reads `NO PICTURE` and says the pictures come with a later version. This is how the page works with a camera that is held.
 
 - **Select** a camera with its key on the left or its small picture. The big picture, the plate and the Stream Deck's dials follow. `REC` does not: it is always CAM 1's.
 - **The Stream Deck's dials** set the selected camera. `Exposure`, `Colour` and `Focus` choose what they set, as the deck's `BANK` does. The line under them says what the dials set, or why they set nothing now.
 - **Pictures.** The selected camera is big, the other two small. `Whole frame` shows all of it, at 87.5 %; `1:1` shows a part pixel for pixel. The loupe shows a part at `2:1` or `4:1`. Press the big picture to move the part.
 - **Aids.** `Guides`, `Peaking` and `Zebras 95 %` are drawn on this screen only and never reach a camera, vMix or a recording. They are off at every start.
+- **A picture that does not arrive** leaves its place empty with the reason in it, and the Pictures rows on the left read `no picture`. While the selected camera's is missing, `Whole frame`, `1:1`, the aids and the loupe are locked; the camera's own controls still work. When every camera is held, the state display reads `PICTURE MISSING` (vMix sends pictures, and none for that camera's input: check the input in vMix) or `NO PICTURES`, and `Look again` looks once more.
 - **Values.** An arrow steps a value at one press. A press on the value opens the list the camera allows, or typed entry for white balance and tint. `Auto iris once`, `Auto white balance once` and `Autofocus once` run once. A value a camera does not report says so.
 - **Format and look.** Resolution, frame rate, dynamic range and the display LUT are press twice: the picture drops while the camera changes. A value the camera does not allow now is locked and says why.
 - **Record.** `REC` starts CAM 1 at one press. While CAM 1 records the key has a red lamp, and the header shows `REC CAM 1` on every page. Stopping is press twice, the second within 3 s.

@@ -230,12 +230,14 @@ const STATE_FIXTURES = [
   "teleprompter-new-script",
   // The Cameras: CAM 1 recording, a camera handed over, one that does not
   // answer, CAM 1 lost while it recorded, the studio's build before the
-  // cameras' links are built, and the cameras' setup.
+  // cameras' links and pictures are built, a picture vMix does not send, and
+  // the cameras' setup.
   "cameras-recording",
   "cameras-released",
   "cameras-unreachable",
   "cameras-lost-mid-take",
   "cameras-no-link",
+  "cameras-picture-missing",
   "setup-cameras",
   // Setup's Map step on the deck's two pages of 2026-09-28, CAMERAS and
   // PROMPTER, as the hardware link's page model gives them.

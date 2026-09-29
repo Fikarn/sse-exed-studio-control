@@ -140,6 +140,15 @@ Still to find out, on the PC: what vMix's NDI sources are called and what each s
 
 Ask the owner first: the NDI SDK's licence (the runtime in the build folder, the notices), the two new crates (`libloading`, a JPEG encoder), a firewall rule if NDI's settings cannot keep it off the networks, and vMix's licence (expired 2026-09-24).
 
+Step 1, which the owner approved on 2026-09-29: everything but NDI, with no vMix and no new crate, in four pull requests.
+
+- [x] The picture states. Each camera's picture and the three together are the hardware link's (`cameras/pictures.rs`): `LIVE`, `NO PICTURE`, and on the state display and the Cameras lamp `PICTURE MISSING` or `NO PICTURES`, while every camera is held. A studio build reads `NO PICTURES` until step 3 and starts no helper (the owner, 2026-09-29); the simulated cameras' test pictures stand in for vMix inputs 1 to 4 (#264).
+- [ ] The simulated helper, which the hardware link starts below normal priority, steers, restarts and stops; its secret reaches it on its input. `docs/HARDWARE.md`'s rule 3 takes the owner's new wording with it: "Never open the DeckLink, the Cam Link, a camera stream or an NDI source from a test or a development build. They get test pictures: a still one, or the simulated source's."
+- [ ] The shell's frame route: a loopback listener with a secret made at each start, the newest frame of each camera, and `pictures_next` for the main window only. The page's connection policy stays as it is, and a test pins it.
+- [ ] The page draws with WebGL2, the aids as shaders held to `pictureAids.ts`; then the measurement in a development run on this PC.
+
+The frames are raw (UYVY) until a JPEG encoder crate is allowed: each frame names its format. If the measurement shows raw frames too heavy for the window, the encoder goes to the owner before step 3.
+
 ### The Pocket 6K Pro over Bluetooth (was Slice 11)
 
 - The engine speaks Blackmagic's published Bluetooth protocol for CAM 1. Battery and card time are not in it, and read "not reported".

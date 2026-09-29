@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Cameras page says when a picture does not arrive: its place reads `NO PICTURE` with the reason, and the state display `PICTURE MISSING` or `NO PICTURES`. Until the pictures are built, the studio's build shows `NO PICTURE` where the test pictures were (#264).
 - Lighting's `Undo` keeps its steps when you leave the page and come back; it forgot them. A restore or a restart of the hardware link still clears them (#263).
 - On the deck's LIGHTS page each dial's display follows its turn: the next light's name, intensity and colour temperature, the next scene. A change made on screen shows within a second. They followed only an arrival on the page. It reaches the deck with the next import of the profile (#262).
 - An AUDIO dial on the deck speeds up only when two detents arrive within 80 ms of each other, however late they are handled: a slow turn that waited behind the displays' poll could jump five steps (#262).

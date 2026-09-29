@@ -90,7 +90,7 @@ The Prompter XL:
 Until the links to the cameras are built:
 
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
-- [ ] The pictures are test pictures, and the page says so. Guides, peaking, zebras, 1:1 and the loupe change the pictures on the screen.
+- [ ] Each picture's place reads `NO PICTURE` and says the pictures come with a later version; the footer reads `Pictures none · not built yet`. `Whole frame`, `1:1`, the aids and the loupe are locked, and say why.
 - [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and a vMix input is saved and still there after a restart.
 - [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC` and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
