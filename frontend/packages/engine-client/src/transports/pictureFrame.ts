@@ -38,11 +38,29 @@ function rawLength(format: FrameFormat, width: number, height: number): number {
   return width * height * (format === "uyvy" ? 2 : 4);
 }
 
-/** A frame read from the shell's answer; `null` for an empty answer (no new frame). Throws on a frame that is not one. */
-export function readFrame(buffer: ArrayBuffer): PictureFrame | null {
-  if (buffer.byteLength === 0) return null;
-  if (buffer.byteLength < FRAME_HEADER_LEN) throw new Error("not a frame: too short");
-  const view = new DataView(buffer);
+/**
+ * The frames of the shell's answer, back to back (one take brings the three cameras'
+ * newest); none for an empty answer. Throws when any part of it is not a frame, or a
+ * camera comes twice: the whole answer is refused.
+ */
+export function readFrames(buffer: ArrayBuffer): PictureFrame[] {
+  const frames: PictureFrame[] = [];
+  let at = 0;
+  while (at < buffer.byteLength) {
+    const frame = readFrameAt(buffer, at);
+    if (frames.some((kept) => kept.camera === frame.camera)) {
+      throw new Error(`not an answer: camera ${frame.camera} twice`);
+    }
+    frames.push(frame);
+    at += FRAME_HEADER_LEN + frame.pixels.byteLength;
+  }
+  return frames;
+}
+
+/** The frame that begins `at` bytes into the answer. Throws on a frame that is not one. */
+function readFrameAt(buffer: ArrayBuffer, at: number): PictureFrame {
+  if (buffer.byteLength - at < FRAME_HEADER_LEN) throw new Error("not a frame: too short");
+  const view = new DataView(buffer, at);
   for (let index = 0; index < MAGIC.length; index += 1) {
     if (view.getUint8(index) !== MAGIC[index]) throw new Error("not a frame");
   }
@@ -62,10 +80,10 @@ export function readFrame(buffer: ArrayBuffer): PictureFrame | null {
     format === "jpeg"
       ? length > 0 && length <= FRAME_MAX_JPEG_BYTES
       : length === rawLength(format, width, height) && (format !== "uyvy" || width % 2 === 0);
-  if (!fits || buffer.byteLength !== FRAME_HEADER_LEN + length) {
+  if (!fits || buffer.byteLength - at < FRAME_HEADER_LEN + length) {
     throw new Error(`not a frame: ${length} bytes for a ${format} picture of ${width} × ${height}`);
   }
-  return { camera, format, width, height, sequence, pixels: new Uint8Array(buffer, FRAME_HEADER_LEN, length) };
+  return { camera, format, width, height, sequence, pixels: new Uint8Array(buffer, at + FRAME_HEADER_LEN, length) };
 }
 
 /** A frame as the helper writes it: the fixture double's pictures, and the tests'. */
