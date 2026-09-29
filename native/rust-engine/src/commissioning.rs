@@ -433,7 +433,7 @@ pub fn run_commissioning_check(
                     CONTROL_SURFACE_CHECK_ID,
                     String::from("passed"),
                     format!(
-                        "The deck asked the bridge {age} s ago. {}",
+                        "Companion asked the deck's bridge {age} s ago. {}",
                         summarize_control_surface_probe()
                     ),
                 )
@@ -1022,7 +1022,7 @@ mod tests {
         assert_eq!(status, "failed", "no deck has asked this bridge");
         assert!(
             message.starts_with(
-                "The deck has not asked the bridge for anything since the hardware link started."
+                "Companion has not asked the deck's bridge for anything since the hardware link started."
             ),
             "{message}"
         );
@@ -1033,7 +1033,7 @@ mod tests {
         // New pages program, Slice 2: the probe describes the deck's pages,
         // not a Planning selection (it said "Planning context is reachable").
         assert!(
-            message.starts_with("The deck asked the bridge "),
+            message.starts_with("Companion asked the deck's bridge "),
             "{message}"
         );
         assert!(message.contains("The deck's bridge serves "), "{message}");

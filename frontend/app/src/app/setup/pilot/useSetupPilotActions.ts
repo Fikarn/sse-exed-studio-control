@@ -127,16 +127,19 @@ export function useSetupPilotActions({ props, state }: { props: SetupSupportPilo
             }
           : { target };
 
-    await store.runCommissioningCheck(params);
-    return {
-      message:
-        target === "lighting"
-          ? "Lighting bridge probe passed."
-          : target === "audio"
-            ? "The desk probe passed."
-            : "The deck probe passed.",
-      tone: "ok" as const,
-    };
+    const latest = await store.runCommissioningCheck(params);
+    // Say what the probe returned (the review of #261): the line said
+    // "passed" whatever the probe found, and the deck's probe can fail since
+    // it asks whether the deck has been heard. As `runAllProbes` reads it.
+    const fromResult = getCommissioningChecks(asRecord(latest));
+    const check = (
+      fromResult.length > 0 ? fromResult : getCommissioningChecks(asRecord(store.getSnapshot().commissioningSnapshot))
+    ).find((entry) => entry.id === target);
+    const name = target === "lighting" ? "The bridge probe" : target === "audio" ? "The desk probe" : "The deck probe";
+    if (check && check.status !== "ok") {
+      return { message: `${name} did not pass: ${check.detail}`, tone: "error" as const };
+    }
+    return { message: `${name} passed.`, tone: "ok" as const };
   };
 
   const runAllProbes = async (advance = false) => {

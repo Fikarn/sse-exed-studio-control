@@ -2,11 +2,14 @@
 //! deck's probe always passed; the owner's decision, 2026-09-29).
 //!
 //! Companion asks the bridge for the deck's displays once a second, whatever
-//! page the deck is on. Every request that carries the workstation's token is
-//! noted here, by the saved data the bridge serves. Setup's deck probe passes
-//! only when the deck asked within `DECK_QUIET_AFTER`, and the Surface lamp
-//! reads `no deck` while it has not. A request without the token is not the
-//! deck's: a profile exported before the token, or another program.
+//! page the deck is on, and whether a Stream Deck is plugged in or not (the
+//! review of #261): being heard says that Companion runs with the profile;
+//! Setup's `Verify live echo` proves the deck itself. Every request that
+//! carries the workstation's token is noted here, by the saved data the
+//! bridge serves. Setup's deck probe passes only when one came within
+//! `DECK_QUIET_AFTER`, and the Surface lamp reads `no deck` while none has. A
+//! request without the token is not the deck's: a profile exported before
+//! the token, or another program.
 //!
 //! It locks nothing: the bridge serves whoever asks with the token, heard or
 //! not. The quiet watch announces a change (`app.changed { reason: "health" }`)
@@ -59,14 +62,17 @@ pub(crate) fn deck_heard_lately(db_path: &Path, now: Instant) -> bool {
 }
 
 /// The sentence for a deck that has not asked lately, for the probe and the
-/// lamp.
+/// lamp. It names no count of seconds: the health summary that carries it is
+/// read again only when the deck goes quiet or is heard (the review of #261).
+/// Companion's poll runs whether a Stream Deck is plugged in or not, so it
+/// speaks of Companion; `Verify live echo` proves the deck itself.
 pub(crate) fn deck_quiet_sentence(db_path: &Path, now: Instant) -> String {
     let when = match deck_heard_age(db_path, now) {
-        Some(age) => format!("for {} s", age.as_secs()),
-        None => String::from("since the hardware link started"),
+        Some(_) => "in the last 5 s",
+        None => "since the hardware link started",
     };
     format!(
-        "The deck has not asked the bridge for anything {when}. Check that Companion is running, with the profile from Setup imported by Full Reset & Import."
+        "Companion has not asked the deck's bridge for anything {when}. Check that it is running, with the profile from Setup imported by Full Reset & Import."
     )
 }
 
@@ -120,7 +126,7 @@ mod tests {
         assert!(!deck_heard_lately(&db, heard_at + DECK_QUIET_AFTER));
         assert_eq!(
             deck_quiet_sentence(&db, heard_at + Duration::from_secs(12)),
-            "The deck has not asked the bridge for anything for 12 s. Check that Companion is running, with the profile from Setup imported by Full Reset & Import."
+            "Companion has not asked the deck's bridge for anything in the last 5 s. Check that it is running, with the profile from Setup imported by Full Reset & Import."
         );
     }
 

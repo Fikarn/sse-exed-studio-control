@@ -246,7 +246,7 @@ export function handleFixtureSetupRequest(
           state,
           "control-surface",
           "passed",
-          `The deck asked the bridge 1 s ago. The deck's bridge serves ${countControls(state)} controls on ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
+          `Companion asked the deck's bridge 1 s ago. The deck's bridge serves ${countControls(state)} controls on ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
         );
       } else {
         throw new Error("target must be one of: control-surface, lighting, audio");

@@ -19,7 +19,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
 - `Prompter`. `ready`: the Prompter XL shows Studio Control's window. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`.
-- `Surface`. `ready`: the Stream Deck asked the app in the last 5 s (Companion asks once a second). `no deck`, amber: it has not; Companion may be closed, or its profile lacks the right token. Nothing locks. `unavailable`: the app could not open its port.
+- `Surface`. `ready`: Companion, with the profile and its token, asked the app in the last 5 s (it asks once a second, whether the Stream Deck is plugged in or not). `no deck`, amber: it has not; Companion may be closed, or its profile lacks the right token. Nothing locks. `unavailable`: the app could not open its port. That the deck itself answers, Setup's `Verify live echo` shows.
 - `Backup`, amber, after the five, only while something is wrong: `failed` when the automatic backup could not be written, `overdue` when none has been written for two days. Pressing it opens Setup / Support, where the backups are.
 
 A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`, `REC CAM 1`. Pressing it opens its page. The clock comes last.
@@ -153,7 +153,7 @@ The deck follows the app: `Lighting` turns it to `LIGHTS`, `Audio` to `AUDIO`, `
 **The runner's steps**
 
 1. `Import profile` exports the Stream Deck's profile for Companion.
-2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe passes when the deck asked the app in the last 5 s: start Companion with the profile imported first.
+2. `Probe hardware` holds the bridge's and TotalMix's addresses and runs the probes. The deck's probe passes when Companion asked the app in the last 5 s: start Companion with the profile imported first. A probe that failed stays failed, and Setup `DEGRADED`, until the probes run again, even after the lamp turns `ready`.
 3. `Map bindings` shows the deck's four pages as the app holds them: the keys and the strip where the deck has them, each dial under its cell of the strip.
 4. `Verify live echo`: a control pressed on the deck pulses on screen. A key of another page turns the screen to that page.
 5. `Publish` unlocks the pages, exports a backup and opens the Console. Over a probe that is not green it asks first and records it.
@@ -190,7 +190,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
 | Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |
 | Surface `unavailable`        | The deck's port is taken    | Close what holds it, restart the link |
-| Surface `no deck`            | The deck has stopped asking | Start Companion; import the profile   |
+| Surface `no deck`            | Companion stopped asking    | Start Companion; import the profile   |
 | The deck does nothing        | Companion is closed         | Start Companion                       |
 | `401` in Companion's log     | The profile is refused      | Import the profile again              |
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
