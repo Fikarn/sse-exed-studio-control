@@ -237,8 +237,10 @@ test("not answering: the watch's word is amber, and nothing is locked", async ({
   const stateDisplay = page.getByTestId("lighting-state-display");
   await expect(stateDisplay).toContainText("NOT ANSWERING");
   await expect(stateDisplay).toHaveAttribute("data-tone", "attention");
-  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Nothing is locked/);
-  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
+  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Nothing is locked; this clears/);
+  // No key to Setup: a probe run mid-session that fails would lock the rig
+  // (the review of #260).
+  await expect(page.getByTestId("lighting-state-setup")).toHaveCount(0);
 
   const lamp = page.getByTestId("shell-lamp-lighting");
   await expect(lamp).toHaveAttribute("data-tone", "attention");
@@ -249,6 +251,18 @@ test("not answering: the watch's word is amber, and nothing is locked", async ({
   }
   await expect(page.getByTestId("lighting-stage")).not.toHaveAttribute("data-locked", "");
   await expect(page.getByTestId("lighting-stage-lock-note")).toHaveCount(0);
+});
+
+// The review of #260: a silent bridge outranks a hold, so its sentence names
+// the hold, and `Open Setup` is the way to the switch, as it is for HELD.
+test("not answering while held: the sentence names the hold, and Open Setup goes to the switch", async ({ page }) => {
+  await openFixture(page, "lighting-bridge-silent-held");
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("NOT ANSWERING");
+  await expect(stateDisplay).toContainText(/and the outputs are held until armed in Setup \/ Support/);
+  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
+  await expect(page.getByTestId("shell-lamp-lighting")).toContainText("not answering");
 });
 
 // Visual overhaul A, Slice 5: the rig has drifted from the scene it was

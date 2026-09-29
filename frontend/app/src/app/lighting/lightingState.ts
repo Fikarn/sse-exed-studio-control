@@ -97,13 +97,18 @@ export function deriveLightingState({
   // owner's decision (2026-09-29) is to say it and lock nothing: the sACN
   // stream never needed the port the watch knocks on. It ranks below PREVIEW,
   // whose keys are the only way out of it, and above HELD: a bridge that went
-  // is news whether the outputs are held or not.
+  // is news whether the outputs are held or not, and the sentence then names
+  // the hold too (the review of #260). It points at the bridge, never at
+  // Setup's probe: a probe that fails mid-session locks the rig, which is what
+  // the owner ruled out, and the word clears by itself.
   if (bridgeAnswering === false) {
     const since = bridgeSilentLabel ? ` since ${bridgeSilentLabel}` : "";
     return {
       word: "NOT ANSWERING",
       tone: "attention",
-      sentence: `The bridge at ${target} has not answered${since}. Nothing is locked: check its power and its network cable.`,
+      sentence: outputsHeld
+        ? `The bridge at ${target} has not answered${since}, and the outputs are held until armed in Setup / Support. Check its power and cable.`
+        : `The bridge at ${target} has not answered${since}. Nothing is locked; this clears when it answers. Check its power and cable.`,
       meta,
       locked: false,
       lockNote: null,

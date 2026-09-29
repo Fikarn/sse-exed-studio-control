@@ -97,7 +97,9 @@ struct WatchChange {
 #[derive(Debug)]
 struct Watch {
     address: Ipv4Addr,
-    last_answer: Option<BridgeAnswer>,
+    /// The last answer that was one (taken or refused), for the log: a
+    /// silent look between two alike is not worth a line (the review of #260).
+    last_answering_kind: Option<BridgeAnswer>,
     silent_looks: u32,
     silent_since: Option<String>,
     /// `None` until the first verdict: one answer, or two silent looks.
@@ -108,7 +110,7 @@ impl Watch {
     fn new(address: Ipv4Addr) -> Self {
         Self {
             address,
-            last_answer: None,
+            last_answering_kind: None,
             silent_looks: 0,
             silent_since: None,
             answering: None,
@@ -116,9 +118,10 @@ impl Watch {
     }
 
     fn take(&mut self, answer: BridgeAnswer, now: SystemTime) -> WatchChange {
-        let first = self.last_answer.is_none();
-        let kind_moved = self.last_answer != Some(answer);
-        self.last_answer = Some(answer);
+        let kind_moved = answer.answers() && self.last_answering_kind != Some(answer);
+        if answer.answers() {
+            self.last_answering_kind = Some(answer);
+        }
         let before = self.answering;
         if answer.answers() {
             self.silent_looks = 0;
@@ -139,12 +142,8 @@ impl Watch {
             Some(format!(
                 "The bridge at {address} has not answered on port {BRIDGE_PORT} for {SILENT_LOOKS_TO_NOT_ANSWERING} looks in a row: Lighting says so, and nothing is locked."
             ))
-        } else if kind_moved && answer.answers() {
-            let again = if first || before != Some(false) {
-                ""
-            } else {
-                " again"
-            };
+        } else if answer.answers() && (verdict_moved || kind_moved) {
+            let again = if before == Some(false) { " again" } else { "" };
             Some(match answer {
                 BridgeAnswer::Accepted => {
                     format!("The bridge at {address} answers{again}: it took a connection on port {BRIDGE_PORT}.")
@@ -284,16 +283,18 @@ mod tests {
             BridgeAnswer::Accepted
         );
 
-        let closed = {
-            let gone = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a listener binds");
-            gone.local_addr().expect("its address")
-        };
-        // Windows reports a refusal about 2 s after it (it tries twice more),
-        // so the look waits longer here than the watch's 1.5 s.
-        assert_eq!(
-            look_at_bridge(closed, Duration::from_secs(10)),
-            BridgeAnswer::Refused
-        );
+        // A port given up at once; another test may take the same port in
+        // between, so up to three are tried (the review of #260). Windows
+        // reports a refusal about 2 s after it (it tries twice more), so the
+        // look waits longer here than the watch's 1.5 s.
+        let refused = (0..3).any(|_| {
+            let closed = {
+                let gone = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).expect("a listener binds");
+                gone.local_addr().expect("its address")
+            };
+            look_at_bridge(closed, Duration::from_secs(10)) == BridgeAnswer::Refused
+        });
+        assert!(refused, "a port nobody listens on refuses");
         assert!(BridgeAnswer::Refused.answers());
         assert!(!BridgeAnswer::Silent.answers());
     }
@@ -365,6 +366,29 @@ mod tests {
                 answering: true,
                 silent_since: None
             })
+        );
+    }
+
+    // The review of #260: one silent look between two answers alike is no
+    // verdict and no line in the log.
+    #[test]
+    fn one_missed_look_says_nothing() {
+        let mut watch = Watch::new(Ipv4Addr::new(10, 1, 0, 1));
+        assert!(watch.take(BridgeAnswer::Accepted, at(0)).log.is_some());
+        assert_eq!(
+            watch.take(BridgeAnswer::Silent, at(5)),
+            WatchChange::default()
+        );
+        assert_eq!(
+            watch.take(BridgeAnswer::Accepted, at(10)),
+            WatchChange::default()
+        );
+        // A different kind of answer is worth its line.
+        let refused = watch.take(BridgeAnswer::Refused, at(15));
+        assert!(!refused.verdict_moved);
+        assert_eq!(
+            refused.log.as_deref(),
+            Some("The bridge at 10.1.0.1 answers: it refused a connection on port 80, so something is at that address.")
         );
     }
 

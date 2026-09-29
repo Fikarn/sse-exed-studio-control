@@ -240,7 +240,7 @@ function buildEveryPageFixture(): FixtureScenarioRecord {
 // the bridge stopped answering at 10:42 UTC. Setup's probe passed, so nothing
 // is locked. Built here, not in `fixtures.json`, so it adds no UI-contract
 // board.
-function buildLightingBridgeSilentFixture(): FixtureScenarioRecord {
+function buildLightingBridgeSilentFixture(outputsHeld = false): FixtureScenarioRecord {
   const scenario = cloneFixture(fixtureMap["lighting-populated"]) as FixtureScenarioRecord & {
     lightingSnapshot: Record<string, unknown>;
   };
@@ -248,6 +248,7 @@ function buildLightingBridgeSilentFixture(): FixtureScenarioRecord {
     ...scenario.lightingSnapshot,
     bridgeAnswering: false,
     bridgeSilentSince: "2026-09-29T10:42:05.000Z",
+    ...(outputsHeld ? { outputArmed: false } : {}),
   };
   return scenario;
 }
@@ -288,6 +289,7 @@ const derivedFixtureMap: FixtureMap = {
   "audio-no-send": buildAudioNoSendFixture(),
   "every-page": buildEveryPageFixture(),
   "lighting-bridge-silent": buildLightingBridgeSilentFixture(),
+  "lighting-bridge-silent-held": buildLightingBridgeSilentFixture(true),
   "lighting-palettes-empty": buildLightingPaletteFixture("empty"),
   "lighting-palettes-patch-disabled": buildLightingPaletteFixture("patch-disabled"),
   "lighting-palettes-preview-active": buildLightingPalettePreviewFixture(),

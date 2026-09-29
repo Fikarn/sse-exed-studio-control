@@ -193,8 +193,11 @@ export function LightingCluster(props: LightingClusterProps) {
   const stateActions = (
     <>
       {/* The bridge probe lives in Setup / Support, so the way out of an
-          unreachable or silent bridge is the key that takes the operator there. */}
-      {state.word === "UNREACHABLE" || state.word === "NOT ANSWERING" || state.word === "HELD" ? (
+          unreachable bridge is the key that takes the operator there, as it is
+          the way to the Light outputs switch. A bridge that is not answering
+          gets none of its own: a probe run mid-session that fails locks the
+          rig (the review of #260). Held as well, the key is the way to arm. */}
+      {state.word === "UNREACHABLE" || state.word === "HELD" || (state.word === "NOT ANSWERING" && outputsHeld) ? (
         <Key size="small" testId="lighting-state-setup" onClick={onOpenSetup}>
           Open Setup
         </Key>

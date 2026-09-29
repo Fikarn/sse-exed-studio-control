@@ -15,7 +15,7 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 **Header.** The tabs are `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Then comes one lamp for each subsystem, with its worst state as a word: green is fine, amber wants attention, red is a fault. Pressing a lamp opens Setup / Support.
 
-- `Lighting`. `ready`: the bridge passed its last probe; the app never checks the bridge by itself. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
+- `Lighting`. `ready`: the bridge passed its last probe, and answers during the session. `not answering`: it has stopped answering (the app looks every 5 s); nothing is locked. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
 - `Prompter`. `ready`: the Prompter XL shows Studio Control's window. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`.
@@ -35,7 +35,7 @@ A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Pro
 The state display reads one of six words.
 
 - `REACHABLE`: the bridge passed its last probe.
-- `NOT ANSWERING`, amber: the bridge has stopped answering during the session (Studio Control looks every 5 s). Nothing is locked, and what you press is still sent. Check the bridge's power and its network cable; `Open Setup` runs the probe. It ends by itself when the bridge answers again.
+- `NOT ANSWERING`, amber: the bridge has stopped answering during the session (Studio Control looks every 5 s). Nothing is locked. Check the bridge's power and its network cable; the word clears by itself when the bridge answers again. Do not run the bridge probe during a session: a probe that fails locks the rig. When the light outputs are held as well, the sentence says so, and `Open Setup` goes to the `Light outputs` switch.
 - `HELD`: the light outputs are held, and nothing is sent to the rig. `Open Setup` goes to the `Light outputs` switch.
 - `UNSAVED`: the rig differs from the recalled scene. `Save changes` writes the rig into the scene. `Recall it again` puts the scene back.
 - `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
