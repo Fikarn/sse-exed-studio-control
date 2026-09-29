@@ -5,12 +5,14 @@ import type { CameraDialBank } from "../../generated/snapshots/CameraDialBank";
 import type { CameraDials } from "../../generated/snapshots/CameraDials";
 import type { CameraHealthEntry } from "../../generated/snapshots/CameraHealthEntry";
 import type { CameraLevel } from "../../generated/snapshots/CameraLevel";
+import type { CameraPicture } from "../../generated/snapshots/CameraPicture";
 import type { CameraRecentAction } from "../../generated/snapshots/CameraRecentAction";
 import type { CameraSetupSummary } from "../../generated/snapshots/CameraSetupSummary";
 import type { CameraSnapshot } from "../../generated/snapshots/CameraSnapshot";
 import type { CameraState } from "../../generated/snapshots/CameraState";
 import type { CameraValues } from "../../generated/snapshots/CameraValues";
 import type { CamerasHealthCheck } from "../../generated/snapshots/CamerasHealthCheck";
+import type { CamerasPictures } from "../../generated/snapshots/CamerasPictures";
 import type { CamerasSnapshot } from "../../generated/snapshots/CamerasSnapshot";
 import {
   CAMERA_NUMBERS,
@@ -24,6 +26,12 @@ import {
   type LevelSetting,
 } from "./camerasModel";
 import {
+  NO_PICTURES_SENTENCE,
+  NO_PICTURE_YET_SENTENCE,
+  PICTURE_MISSING_DETAIL,
+  PICTURE_SHOWING_DETAIL,
+  PICTURE_WORDS,
+  SIMULATED_VMIX_INPUTS,
   STATE_RANK,
   STATE_TONES,
   STATE_WORDS,
@@ -31,6 +39,11 @@ import {
   noLinkRefusalSentence,
   noLinkSentence,
   notSetUpSentence,
+  pictureMissingAdvice,
+  pictureMissingSentence,
+  pictureSourceWords,
+  picturesMissingSentence,
+  picturesNote,
   releasedSentence,
   unreachableSentence,
 } from "./camerasWords";
@@ -385,6 +398,76 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
       cardTimeLeft: null,
       cardTimeNotReported: model.cardTimeNotReported,
     },
+    picture: cameraPicture(cameras, camera),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The pictures (`pictures.rs`; D17, D28)
+// ---------------------------------------------------------------------------
+
+/**
+ * A camera's picture, which is vMix's and not the camera's link's: whatever state the camera
+ * is in. No build receives the cameras' own pictures yet. Without the simulated cameras (the
+ * studio's build) none arrives; the simulated cameras' test pictures stand in for vMix inputs
+ * 1 to 4, so a camera on another input reads NO PICTURE while the others show.
+ */
+export function cameraPicture(cameras: FixtureCameras, camera: CameraNumber): CameraPicture {
+  const vmixInput = cameras.held[camera].vmixInput;
+  if (!cameras.simulated) {
+    return {
+      state: "no-pictures",
+      word: PICTURE_WORDS.noPicture,
+      tone: "attention",
+      detail: pictureSourceWords(false),
+      sentence: NO_PICTURE_YET_SENTENCE,
+      advice: null,
+    };
+  }
+  if (vmixInput >= SIMULATED_VMIX_INPUTS.first && vmixInput <= SIMULATED_VMIX_INPUTS.last) {
+    return {
+      state: "showing",
+      word: PICTURE_WORDS.live,
+      tone: "ok",
+      detail: PICTURE_SHOWING_DETAIL,
+      sentence: null,
+      advice: null,
+    };
+  }
+  return {
+    state: "missing",
+    word: PICTURE_WORDS.noPicture,
+    tone: "attention",
+    detail: PICTURE_MISSING_DETAIL,
+    sentence: pictureMissingSentence(cameraModel(camera)),
+    advice: pictureMissingAdvice(vmixInput),
+  };
+}
+
+/**
+ * The three pictures together. When not every one arrives, the state display speaks of one
+ * camera: the selected one when its picture is missing, otherwise the first whose picture is.
+ */
+export function camerasPictures(cameras: FixtureCameras): CamerasPictures {
+  const common = { source: pictureSourceWords(cameras.simulated), note: picturesNote(cameras.simulated) };
+  if (!cameras.simulated) {
+    return {
+      state: "no-pictures",
+      word: PICTURE_WORDS.noPictures,
+      tone: "attention",
+      sentence: NO_PICTURES_SENTENCE,
+      ...common,
+    };
+  }
+  const missing = CAMERA_NUMBERS.filter((camera) => cameraPicture(cameras, camera).state !== "showing");
+  const spoken = missing.includes(cameras.selected) ? cameras.selected : missing[0];
+  if (spoken === undefined) return { state: "showing", word: null, tone: "ok", sentence: null, ...common };
+  return {
+    state: "missing",
+    word: PICTURE_WORDS.missing,
+    tone: "attention",
+    sentence: picturesMissingSentence(cameraModel(spoken), cameras.held[spoken].vmixInput),
+    ...common,
   };
 }
 
@@ -429,6 +512,7 @@ export function camerasSnapshot(cameras: FixtureCameras, recent: CameraRecentAct
     selected: cameras.selected,
     dials: cameraDials(cameras),
     cameras: CAMERA_NUMBERS.map((camera) => cameraSnapshot(cameras, camera)),
+    pictures: camerasPictures(cameras),
     recent,
   };
 }
@@ -453,16 +537,22 @@ function healthEntry(cameras: FixtureCameras, camera: CameraNumber): CameraHealt
 /**
  * `checks.cameras` in `health.snapshot`: the worst camera's tone, word and sentence — the
  * highest state in `CameraState`'s order, the lowest camera number among equals — and
- * whether CAM 1 records.
+ * whether CAM 1 records. While every camera is held, the pictures speak instead when not
+ * every one arrives: the Cameras lamp reads `no pictures` or `picture missing`.
  */
 export function camerasHealthCheck(cameras: FixtureCameras): CamerasHealthCheck {
   const entries = CAMERA_NUMBERS.map((camera) => healthEntry(cameras, camera));
   const worst = entries.reduce((worse, entry) => (STATE_RANK[entry.state] > STATE_RANK[worse.state] ? entry : worse));
+  const pictures = camerasPictures(cameras);
+  const spoken =
+    worst.tone === "ok" && pictures.word !== null && pictures.sentence !== null
+      ? { tone: pictures.tone, word: pictures.word, sentence: pictures.sentence }
+      : worst;
   return {
-    ok: worst.tone === "ok",
-    status: worst.tone,
-    word: worst.word,
-    summary: worst.sentence,
+    ok: spoken.tone === "ok",
+    status: spoken.tone,
+    word: spoken.word,
+    summary: spoken.sentence,
     recording: cam1Recording(cameras),
     cameras: entries,
   };

@@ -19,6 +19,12 @@ import { startingReport } from "./camerasState";
 import {
   NOT_CONFIRMED_SENTENCE,
   NO_LINK_SENTENCE,
+  NO_PICTURES_SENTENCE,
+  NO_PICTURE_YET_SENTENCE,
+  PICTURE_MISSING_DETAIL,
+  PICTURE_SHOWING_DETAIL,
+  PICTURE_WORDS,
+  SIMULATED_VMIX_INPUTS,
   STATE_TONES,
   STATE_WORDS,
   addressInvalidRefusal,
@@ -38,6 +44,11 @@ import {
   notAllowedRefusal,
   notRecordingRefusal,
   notSetUpSentence,
+  pictureMissingAdvice,
+  pictureMissingSentence,
+  pictureSourceWords,
+  picturesMissingSentence,
+  picturesNote,
   releasedRefusal,
   releasedSentence,
   releasedToSentence,
@@ -305,7 +316,9 @@ function everyDoubleSentence(): string[] {
       autoNotOfferedRefusal(model, "focus").message,
       autoNotOfferedRefusal(model, "whiteBalance").message,
       autoNotOfferedRefusal(model, "iris").message,
-      formatNotAllowedRefusal(model, "60", "6K").message
+      formatNotAllowedRefusal(model, "60", "6K").message,
+      pictureMissingSentence(model),
+      picturesMissingSentence(model, 7)
     );
     for (const setting of [...CHOICE_SETTINGS, "whiteBalance", "tint", "focus"] as const) {
       sentences.push(notAllowedRefusal(model, setting, "7").message);
@@ -318,6 +331,11 @@ function everyDoubleSentence(): string[] {
   sentences.push(
     unreachableSentence(CAM2, null),
     NO_LINK_SENTENCE,
+    pictureMissingAdvice(7),
+    NO_PICTURE_YET_SENTENCE,
+    NO_PICTURES_SENTENCE,
+    picturesNote(true),
+    picturesNote(false),
     addressesNotRestoredSentence([CAM2])!,
     addressesNotRestoredSentence([CAM2, CAM3])!,
     NOT_CONFIRMED_SENTENCE,
@@ -362,6 +380,51 @@ function rustStart(camera: CameraNumber): Record<string, string | number | boole
   }
   return values;
 }
+
+describe("the fixture double's picture words: the hardware link's (`pictures.rs`)", () => {
+  it("names the pictures' states, where they come from and what arrives as the hardware link does", () => {
+    for (const word of Object.values(PICTURE_WORDS)) expect(LITERALS, word).toContain(word);
+    expect(PICTURE_SHOWING_DETAIL).toBe(rust("test picture"));
+    expect(PICTURE_MISSING_DETAIL).toBe(rust("nothing received"));
+    expect(pictureSourceWords(true)).toBe(rust("test pictures"));
+    expect(pictureSourceWords(false)).toBe(rust("not built yet"));
+    const inputs = rustSource("cameras/pictures.rs").match(
+      /const SIMULATED_VMIX_INPUTS: RangeInclusive<u32> = (\d+)\.\.=(\d+);/
+    );
+    if (!inputs) throw new Error("pictures.rs's SIMULATED_VMIX_INPUTS is not a range any more; update this test");
+    expect(SIMULATED_VMIX_INPUTS).toEqual({ first: Number(inputs[1]), last: Number(inputs[2]) });
+  });
+
+  it("speaks the pictures' sentences word for word", () => {
+    expect(picturesNote(true)).toBe(
+      rust(
+        "Test pictures stand in for vMix inputs {} to {}. The cameras' own come with a later version, over NDI from vMix on this PC.",
+        [SIMULATED_VMIX_INPUTS.first, SIMULATED_VMIX_INPUTS.last]
+      )
+    );
+    expect(picturesNote(false)).toBe(
+      rust("The cameras' own pictures come with a later version, over NDI from vMix on this PC.")
+    );
+    expect(NO_PICTURE_YET_SENTENCE).toBe(rust("No picture yet: the cameras' pictures come with a later version."));
+    expect(NO_PICTURES_SENTENCE).toBe(
+      rust("Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.")
+    );
+    expect(pictureMissingAdvice(7)).toBe(
+      rust("vMix sends other inputs: check that vMix input {vmix_input} is still there and live.", [], {
+        vmix_input: 7,
+      })
+    );
+    for (const model of [CAM1, CAM2, CAM3]) {
+      expect(pictureMissingSentence(model)).toBe(rust("vMix is not sending {tag} over NDI.", [], { tag: model.tag }));
+      expect(picturesMissingSentence(model, 7)).toBe(
+        rust("vMix sends no picture for {tag}. Check that vMix input {input} is still there and live.", [], {
+          tag: model.tag,
+          input: 7,
+        })
+      );
+    }
+  });
+});
 
 describe("the fixture double's camera words: the hardware link's", () => {
   it("names the states, the settings and the autos in the hardware link's words", () => {

@@ -182,6 +182,59 @@ pub struct CameraRecording {
     pub card_time_not_reported: Option<String>,
 }
 
+/// Whether the pictures arrive (D17, D28).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+#[serde(rename_all = "kebab-case")]
+pub enum PictureState {
+    /// It arrives; for the three, every one does.
+    Showing,
+    /// The source sends pictures, and not this one; for the three, not
+    /// every one: `PICTURE MISSING`.
+    Missing,
+    /// No picture arrives at all: `NO PICTURES`.
+    NoPictures,
+}
+
+/// One camera's picture.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct CameraPicture {
+    pub state: PictureState,
+    /// `LIVE`, `NO PICTURE`.
+    pub word: String,
+    pub tone: CameraTone,
+    /// What arrives, as the Pictures rows say it after the vMix input
+    /// (`test picture`); `nothing received`, or why nothing can
+    /// (`not built yet`).
+    pub detail: String,
+    /// Why no picture arrives, said in its place; `null` while it arrives.
+    pub sentence: Option<String>,
+    /// What to check, under the sentence; `null` when there is nothing to
+    /// check.
+    pub advice: Option<String>,
+}
+
+/// The three pictures together: the state display, the Pictures section and
+/// the footer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct CamerasPictures {
+    pub state: PictureState,
+    /// `PICTURE MISSING`, `NO PICTURES`; `null` while every picture arrives.
+    pub word: Option<String>,
+    pub tone: CameraTone,
+    /// The state display's sentence; `null` while every picture arrives.
+    pub sentence: Option<String>,
+    /// Where the pictures come from: `test pictures`, `not built yet`.
+    pub source: String,
+    /// The Pictures section's fine print.
+    pub note: String,
+}
+
 /// One camera.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
@@ -210,6 +263,9 @@ pub struct CameraSnapshot {
     #[serde(rename = "focusSteps")]
     pub focus_steps: bool,
     pub recording: CameraRecording,
+    /// Its picture, whatever state the camera is in: the picture comes from
+    /// vMix, not from the camera's link.
+    pub picture: CameraPicture,
 }
 
 /// One of the cameras' Recent actions: a row of the action log, as it was
@@ -269,6 +325,8 @@ pub struct CamerasSnapshot {
     /// What the deck's dials set on it.
     pub dials: CameraDials,
     pub cameras: Vec<CameraSnapshot>,
+    /// The three pictures together.
+    pub pictures: CamerasPictures,
     /// The cameras' newest Recent actions, newest first; `null` when the
     /// action log could not be read.
     pub recent: Option<Vec<CameraRecentAction>>,

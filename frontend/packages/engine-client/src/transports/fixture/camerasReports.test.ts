@@ -151,6 +151,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         cardTimeLeft: null,
         cardTimeNotReported: "CAM 1 does not report its card time over Bluetooth.",
       },
+      picture: { state: "showing", word: "LIVE", tone: "ok", detail: "test picture", sentence: null, advice: null },
     });
   });
 
@@ -197,6 +198,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
         cardTimeLeft: null,
         cardTimeNotReported: null,
       },
+      picture: { state: "showing", word: "LIVE", tone: "ok", detail: "test picture", sentence: null, advice: null },
     });
     const cam3 = await camera(3);
     expect(cam3.values.iso.value).toBe("1600");

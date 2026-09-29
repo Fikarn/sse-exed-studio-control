@@ -2,6 +2,7 @@
 import type { CameraDials } from "./CameraDials";
 import type { CameraRecentAction } from "./CameraRecentAction";
 import type { CameraSnapshot } from "./CameraSnapshot";
+import type { CamerasPictures } from "./CamerasPictures";
 
 /**
  * `cameras.snapshot`.
@@ -16,6 +17,10 @@ export type CamerasSnapshot = {
    */
   dials: CameraDials;
   cameras: Array<CameraSnapshot>;
+  /**
+   * The three pictures together.
+   */
+  pictures: CamerasPictures;
   /**
    * The cameras' newest Recent actions, newest first; `null` when the
    * action log could not be read.
