@@ -145,6 +145,16 @@ pub(crate) struct PicturesLink {
 impl PicturesLink {
     /// Opens a listener on 127.0.0.1 with a new secret.
     pub(crate) fn open(store: Arc<PicturesStore>, log: PicturesLog) -> io::Result<Self> {
+        Self::open_with(store, log, HANDSHAKE_TIMEOUT)
+    }
+
+    /// `open`, with the time a connection has to say the secret: the tests'
+    /// is longer, so what refuses a connection sooner can only be the cap.
+    fn open_with(
+        store: Arc<PicturesStore>,
+        log: PicturesLog,
+        handshake: Duration,
+    ) -> io::Result<Self> {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
         let address = listener.local_addr()?;
         let secret = new_secret()?;
@@ -157,7 +167,7 @@ impl PicturesLink {
             let log = Arc::clone(&log);
             thread::Builder::new()
                 .name(String::from("pictures-listener"))
-                .spawn(move || accept(&listener, &secret, &store, &closed, &log))?;
+                .spawn(move || accept(&listener, &secret, handshake, &store, &closed, &log))?;
         }
         {
             let closed = Arc::clone(&closed);
@@ -200,6 +210,7 @@ fn new_secret() -> io::Result<String> {
 fn accept(
     listener: &TcpListener,
     secret: &str,
+    handshake: Duration,
     store: &Arc<PicturesStore>,
     closed: &Arc<AtomicBool>,
     log: &PicturesLog,
@@ -241,6 +252,7 @@ fn accept(
                     stream,
                     number,
                     &secret,
+                    handshake,
                     &store,
                     &closed,
                     &current,
@@ -259,13 +271,14 @@ fn serve(
     mut stream: TcpStream,
     number: u64,
     secret: &str,
+    handshake: Duration,
     store: &PicturesStore,
     closed: &AtomicBool,
     current: &AtomicU64,
     handshaking: &AtomicUsize,
     log: &PicturesLog,
 ) {
-    let said = !closed.load(Ordering::SeqCst) && says_the_secret(&mut stream, secret);
+    let said = !closed.load(Ordering::SeqCst) && says_the_secret(&mut stream, secret, handshake);
     handshaking.fetch_sub(1, Ordering::SeqCst);
     if closed.load(Ordering::SeqCst) {
         return;
@@ -288,10 +301,10 @@ fn serve(
     let _ = stream.shutdown(Shutdown::Both);
 }
 
-/// Reads the first line, bounded, within `HANDSHAKE_TIMEOUT`, and compares
-/// it with the secret.
-fn says_the_secret(stream: &mut TcpStream, secret: &str) -> bool {
-    let deadline = Instant::now() + HANDSHAKE_TIMEOUT;
+/// Reads the first line, bounded, within `handshake`, and compares it with
+/// the secret.
+fn says_the_secret(stream: &mut TcpStream, secret: &str, handshake: Duration) -> bool {
+    let deadline = Instant::now() + handshake;
     let mut line = Vec::with_capacity(LINK_SECRET_HEX + 2);
     let mut byte = [0_u8; 1];
     while line.len() <= LINK_SECRET_HEX + 1 {

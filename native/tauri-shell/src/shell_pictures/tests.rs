@@ -124,16 +124,28 @@ fn a_connection_without_the_secret_is_closed_and_counted() {
 }
 
 // A flood of connections that say nothing: past `MAX_HANDSHAKES` they are
-// closed at once, and once the waiting ones are gone the helper gets in.
+// closed at once, and once the waiting ones are gone the helper gets in. The
+// handshake here waits half a minute, longer than this test waits for the
+// refusals: they can only come from the cap.
 #[test]
 fn a_flood_of_silent_connections_is_turned_away_and_the_helper_still_gets_in() {
-    let (store, link, _) = open();
+    let store = Arc::new(PicturesStore::default());
+    let (log, _) = recorded_log();
+    let link = PicturesLink::open_with(Arc::clone(&store), log, Duration::from_secs(30))
+        .expect("the listener opens");
     let flood: Vec<TcpStream> = (0..MAX_HANDSHAKES + 12)
         .filter_map(|_| TcpStream::connect(link.address()).ok())
         .collect();
-    wait_until("the ones past the cap are refused at once", || {
-        lock(&store.counts).refused >= 12
-    });
+    assert_eq!(flood.len(), MAX_HANDSHAKES + 12);
+    let started = Instant::now();
+    while lock(&store.counts).refused < 12 {
+        assert!(
+            started.elapsed() < Duration::from_secs(15),
+            "the ones past the cap are refused at once"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    // The ones that wait end when the flood lets go of them.
     drop(flood);
     // The helper tries again after a second, as its sender does.
     wait_until("the helper gets in", || {
