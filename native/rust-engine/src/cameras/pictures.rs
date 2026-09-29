@@ -13,8 +13,8 @@
 //!   supervises (`pictures_helper.rs`): what it says it receives is what the
 //!   page shows, and while it starts, restarts or is missing, `NO PICTURES`
 //!   says so;
-//! - with the simulated cameras and no helper (a test, a lane, a studio
-//!   build's trial start) the simulated source's rule stands in for it.
+//! - with the simulated cameras and no helper (the engine's unit tests, a
+//!   studio build's lanes) the simulated source's rule stands in for it.
 //!
 //! The simulated source sends vMix inputs 1 to 4, so a camera on another
 //! input reads `PICTURE MISSING` and the page's states can be tried in a
@@ -61,7 +61,7 @@ impl Nothing {
             Self::NotBuilt => "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
             Self::Starting => "The pictures are starting.",
             Self::Stopped => "The pictures stopped. Studio Control starts them again.",
-            Self::NoProgram => "This build has no picture program, so it shows no pictures.",
+            Self::NoProgram => "The picture program is not beside this build, so it shows no pictures. npm run app builds it.",
             Self::NotSending => "No pictures from vMix. Open vMix and turn on NDI for Cameras / Calls / Audio Inputs.",
         })
     }
@@ -121,12 +121,14 @@ impl PictureSource {
         }
     }
 
-    /// Camera `camera`'s picture arrives, while the source sends.
+    /// Camera `camera`'s picture arrives, while the source sends. The
+    /// helper's word counts for the input it was told: until it answers a
+    /// changed input, no picture is claimed for it.
     fn carries(&self, camera: u8, vmix_input: u32) -> bool {
         match self {
-            Self::Helper(HelperStatus::Running { cameras, .. }) => cameras
-                .iter()
-                .any(|received| received.camera == camera && received.receiving),
+            Self::Helper(HelperStatus::Running { cameras, .. }) => cameras.iter().any(|received| {
+                received.camera == camera && received.vmix_input == vmix_input && received.receiving
+            }),
             _ => SIMULATED_VMIX_INPUTS.contains(&vmix_input),
         }
     }

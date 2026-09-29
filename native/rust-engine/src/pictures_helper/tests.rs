@@ -37,11 +37,24 @@ fn a_helper_that_ends_is_started_again_after_a_doubling_wait() {
         supervision.take(Happened::Started(at(now)));
     }
 
-    // A line heard: the next end waits one second again.
-    supervision.take(Happened::Heard(at(now)));
-    supervision.take(Happened::Ended(at(now)));
+    // A line heard soon after a start clears nothing: a helper that fails
+    // after its first line still waits the longest.
+    supervision.take(Happened::Heard(at(now + 1)));
+    supervision.take(Happened::Ended(at(now + 2)));
+    now += 2;
+    assert_eq!(supervision.take(Happened::Tick(at(now + 29))), None);
     assert_eq!(
-        supervision.take(Happened::Tick(at(now + 1))),
+        supervision.take(Happened::Tick(at(now + 30))),
+        Some(Todo::Start)
+    );
+    now += 30;
+    supervision.take(Happened::Started(at(now)));
+
+    // One that stayed up 30 s and speaks: the next end waits one second again.
+    supervision.take(Happened::Heard(at(now + 30)));
+    supervision.take(Happened::Ended(at(now + 31)));
+    assert_eq!(
+        supervision.take(Happened::Tick(at(now + 32))),
         Some(Todo::Start)
     );
 }
@@ -177,18 +190,16 @@ fn a_helper_that_ends_by_itself_is_started_again() {
         launch(program, args),
         quick_times(),
     );
-    wait_for(&cameras, "restarting", |status| {
-        *status == HelperStatus::Restarting
-    });
-    wait_for(&cameras, "started again", |status| {
-        *status == HelperStatus::Starting
-    });
+    // Its start lasts a moment only: the log, not the status, says it came
+    // round again.
+    let log = || std::fs::read_to_string(log_of(&cameras)).unwrap_or_default();
+    let started = Instant::now();
+    while log().matches("The pictures helper started").count() < 2 {
+        assert!(started.elapsed() < PATIENCE, "{}", log());
+        thread::sleep(Duration::from_millis(20));
+    }
     helper.stop();
-    let log = std::fs::read_to_string(log_of(&cameras)).unwrap_or_default();
-    assert!(
-        log.matches("The pictures helper started").count() >= 2,
-        "{log}"
-    );
+    assert!(log().contains("it is started again in"), "{}", log());
 }
 
 #[test]

@@ -582,10 +582,10 @@ fn main() -> io::Result<()> {
     prompter::spawn_prompter_clock(db_path.clone());
 
     let served = serve_requests(&app, &mut reader, &output_sender);
-    // The pictures helper ends first, within about a second, whatever
-    // ended the requests.
-    if let Some(helper) = pictures_helper {
-        helper.stop();
+    // The pictures helper is asked to stop now, and waited for after the
+    // backup: the shell gives this whole stop two seconds.
+    if let Some(helper) = &pictures_helper {
+        helper.begin_stop();
     }
     served?;
 
@@ -608,6 +608,9 @@ fn main() -> io::Result<()> {
             "WARN",
             &format!("The database was not checkpointed on shutdown: {error}"),
         );
+    }
+    if let Some(helper) = pictures_helper {
+        helper.finish(Duration::from_millis(500));
     }
 
     Ok(())

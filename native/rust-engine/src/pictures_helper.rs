@@ -15,7 +15,13 @@
 //!   along; a graceful stop closes it first, and ends it if it lingers.
 //! - Only a development build with the simulated cameras starts it (step 1):
 //!   its one source is the simulated one. A studio build shows no pictures
-//!   until NDI is built (the owner, 2026-09-29), and no test starts it.
+//!   until NDI is built (the owner, 2026-09-29). The engine's unit tests
+//!   start none; the lanes and the end-to-end tests run a development engine
+//!   from `target`, which starts the helper built beside it.
+//! - A stop never holds up the engine's own: it is asked for before the
+//!   shutdown backup, and waited for after it, for half a second at most.
+//!   Nothing written to the helper can block the supervisor: its stdin has a
+//!   thread of its own.
 //!
 //! What it says reaches the page through `cameras/pictures.rs`, which reads
 //! the status here: a change raises `cameras.changed { reason: "pictures" }`
@@ -32,7 +38,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard, OnceLock};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::pictures::{
     from_line, read_line_bounded, to_line, FromHelper, ReceivedCamera, ToHelper, WantedCamera,
@@ -88,7 +94,8 @@ fn helpers() -> MutexGuard<'static, HashMap<PathBuf, Entry>> {
 }
 
 /// What the helper of this saved data is doing; `None` when no helper is
-/// supervised for it (a studio build, a test, a lane's scratch start).
+/// supervised for it (a studio build, the engine's unit tests, an engine
+/// without the simulated cameras).
 pub(crate) fn helper_status(db_path: &Path) -> Option<HelperStatus> {
     helpers()
         .get(db_path)
@@ -176,8 +183,8 @@ enum Todo {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
-    /// It runs; when it was last heard, or started.
-    Running { heard: Instant },
+    /// It runs: since when, and when it was last heard (or started).
+    Running { started: Instant, heard: Instant },
     /// It ended; it is started again at `until`.
     Waiting { until: Instant },
     /// Its program is not there.
@@ -190,7 +197,7 @@ enum Phase {
 struct Supervision {
     times: Times,
     phase: Option<Phase>,
-    /// Ends in a row without a line heard in between.
+    /// Ends in a row of helpers that did not stay up `longest_delay`.
     restarts: u32,
 }
 
@@ -214,7 +221,12 @@ impl Supervision {
 
     fn take(&mut self, happened: Happened) -> Option<Todo> {
         match happened {
-            Happened::Started(now) => self.phase = Some(Phase::Running { heard: now }),
+            Happened::Started(now) => {
+                self.phase = Some(Phase::Running {
+                    started: now,
+                    heard: now,
+                });
+            }
             Happened::NotFound => self.phase = Some(Phase::Missing),
             Happened::Ended(now) => {
                 self.phase = Some(Phase::Waiting {
@@ -223,14 +235,19 @@ impl Supervision {
                 self.restarts = self.restarts.saturating_add(1);
             }
             Happened::Heard(now) => {
-                if let Some(Phase::Running { heard }) = &mut self.phase {
+                if let Some(Phase::Running { started, heard }) = &mut self.phase {
                     *heard = now;
-                    self.restarts = 0;
+                    // Only a helper that stayed up clears the doubling: one
+                    // that fails soon after its first line waits longer each
+                    // time, as one that never speaks does.
+                    if now.saturating_duration_since(*started) >= self.times.longest_delay {
+                        self.restarts = 0;
+                    }
                 }
             }
             Happened::Tick(now) => {
                 return match self.phase {
-                    Some(Phase::Running { heard })
+                    Some(Phase::Running { heard, .. })
                         if now.saturating_duration_since(heard) > self.times.silence =>
                     {
                         Some(Todo::End)
@@ -266,22 +283,41 @@ struct Launch {
     args: Vec<String>,
 }
 
-/// The running supervisor; `stop` ends the helper and the thread.
+/// The running supervisor. `begin_stop` asks it to end the helper, and
+/// `finish` waits for that, for a while at most; dropped, it is asked to
+/// stop and not waited for.
 pub struct PicturesHelper {
     db_path: PathBuf,
     to_supervisor: Sender<Message>,
-    thread: Option<JoinHandle<()>>,
+    /// Hears when the supervisor has ended.
+    ended: Receiver<()>,
 }
 
 impl PicturesHelper {
-    /// Ends the helper (its stdin closed, then ended if it lingers) and the
-    /// supervisor, within about a second.
-    pub fn stop(mut self) {
+    /// Asks the supervisor to end the helper (its stdin closed, then ended
+    /// if it lingers past `STOP_GRACE`) and to end itself. Nothing waits.
+    pub fn begin_stop(&self) {
         let _ = self.to_supervisor.send(Message::Stop);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+    }
+
+    /// Waits for the stop, `limit` at most. A helper still there after it
+    /// ends with the engine all the same: its stdin closes then.
+    pub fn finish(self, limit: Duration) {
+        self.begin_stop();
+        let _ = self.ended.recv_timeout(limit);
         helpers().remove(&self.db_path);
+    }
+
+    /// `begin_stop` and `finish`, with time for the grace and the end.
+    #[cfg(test)]
+    pub(crate) fn stop(self) {
+        self.finish(STOP_GRACE + Duration::from_secs(10));
+    }
+}
+
+impl Drop for PicturesHelper {
+    fn drop(&mut self) {
+        self.begin_stop();
     }
 }
 
@@ -314,11 +350,12 @@ fn start_supervisor(
     times: Times,
 ) -> PicturesHelper {
     let (to_supervisor, messages) = mpsc::channel();
+    let (say_ended, ended) = mpsc::channel();
     helpers().entry(db_path.clone()).or_default().to_supervisor = Some(to_supervisor.clone());
-    let thread = {
+    {
         let db_path = db_path.clone();
         let to_supervisor = to_supervisor.clone();
-        thread::Builder::new()
+        let _ = thread::Builder::new()
             .name(String::from("pictures-helper"))
             .spawn(move || {
                 Supervisor {
@@ -332,21 +369,44 @@ fn start_supervisor(
                     generation: 0,
                 }
                 .run(&messages);
-            })
-            .ok()
-    };
+                let _ = say_ended.send(());
+            });
+    }
     PicturesHelper {
         db_path,
         to_supervisor,
-        thread,
+        ended,
     }
 }
 
 /// The helper while it runs.
 struct Running {
     child: Child,
-    stdin: Option<ChildStdin>,
+    /// Lines for its stdin, which a thread of its own writes: a helper that
+    /// stops reading blocks that thread, never the supervisor. `None` once a
+    /// stop closed it.
+    to_stdin: Option<Sender<String>>,
     generation: u64,
+}
+
+/// Writes the lines it is handed to the helper's stdin, until the sender is
+/// dropped (the stdin then closes) or a write fails (the helper is ending).
+fn spawn_stdin_writer(mut stdin: ChildStdin) -> Option<Sender<String>> {
+    let (sender, lines) = mpsc::channel::<String>();
+    thread::Builder::new()
+        .name(String::from("pictures-helper-stdin"))
+        .spawn(move || {
+            for line in lines {
+                if writeln!(stdin, "{line}")
+                    .and_then(|()| stdin.flush())
+                    .is_err()
+                {
+                    return;
+                }
+            }
+        })
+        .ok()?;
+    Some(sender)
 }
 
 struct Supervisor {
@@ -379,6 +439,8 @@ impl Supervisor {
                     self.tell();
                 }
                 Ok(Message::Stop) | Err(RecvTimeoutError::Disconnected) => {
+                    // (Disconnected cannot come while this thread holds a
+                    // sender of its own; `Stop` is how it ends.)
                     self.stop();
                     return;
                 }
@@ -405,20 +467,29 @@ impl Supervisor {
             .is_some_and(|running| running.generation == generation)
     }
 
-    /// Each camera's vMix input as the saved data holds it.
+    /// Each camera's vMix input as the saved data holds it. A read that
+    /// fails is logged, and the helper is told of no camera until an input
+    /// changes: none of the three is said to have a picture meanwhile.
     fn saved_inputs(&self) -> Vec<WantedCamera> {
-        open_connection(&self.db_path)
-            .ok()
-            .and_then(|connection| read_setup(&connection).ok())
-            .map(|rows| {
-                rows.iter()
-                    .map(|row| WantedCamera {
-                        camera: row.camera,
-                        vmix_input: row.vmix_input,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
+        let rows = open_connection(&self.db_path)
+            .map_err(|error| error.to_string())
+            .and_then(|connection| read_setup(&connection).map_err(|error| error.to_string()));
+        match rows {
+            Ok(rows) => rows
+                .iter()
+                .map(|row| WantedCamera {
+                    camera: row.camera,
+                    vmix_input: row.vmix_input,
+                })
+                .collect(),
+            Err(error) => {
+                self.log(
+                    "WARN",
+                    &format!("The cameras' vMix inputs could not be read for the pictures helper: {error}"),
+                );
+                Vec::new()
+            }
+        }
     }
 
     fn log(&self, level: &str, message: &str) {
@@ -494,10 +565,10 @@ impl Supervisor {
             "INFO",
             &format!("The pictures helper started (process {}).", child.id()),
         );
-        let stdin = child.stdin.take();
+        let to_stdin = child.stdin.take().and_then(spawn_stdin_writer);
         self.running = Some(Running {
             child,
-            stdin,
+            to_stdin,
             generation,
         });
         self.supervision.take(Happened::Started(Instant::now()));
@@ -510,13 +581,13 @@ impl Supervisor {
         let line = to_line(&ToHelper::Want {
             cameras: self.wanted.clone(),
         });
-        if let Some(stdin) = self
+        if let Some(to_stdin) = self
             .running
-            .as_mut()
-            .and_then(|running| running.stdin.as_mut())
+            .as_ref()
+            .and_then(|running| running.to_stdin.as_ref())
         {
             // A helper that cannot be written to is ending: its end is seen.
-            let _ = writeln!(stdin, "{line}").and_then(|()| stdin.flush());
+            let _ = to_stdin.send(line);
         }
     }
 
@@ -563,7 +634,7 @@ impl Supervisor {
         let Some(mut running) = self.running.take() else {
             return;
         };
-        drop(running.stdin.take());
+        drop(running.to_stdin.take());
         let deadline = Instant::now() + STOP_GRACE;
         while Instant::now() < deadline {
             if matches!(running.child.try_wait(), Ok(Some(_)) | Err(_)) {

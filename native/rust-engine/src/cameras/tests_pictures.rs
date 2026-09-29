@@ -334,7 +334,7 @@ fn a_helper_starting_stopped_or_missing_reads_no_pictures_and_why() {
         ),
         (
             HelperStatus::Missing,
-            "This build has no picture program, so it shows no pictures.",
+            "The picture program is not beside this build, so it shows no pictures. npm run app builds it.",
             "no picture program",
         ),
     ] {
