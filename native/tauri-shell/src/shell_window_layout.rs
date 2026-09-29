@@ -750,12 +750,13 @@ pub(crate) fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewW
     let paths = read_display_paths().unwrap_or_default();
     let saved = read_window_preferences(app).and_then(|preferences| preferences.monitor);
     let Some(seen) = look_on_the_main_thread(window, &paths) else {
-        // As when the window did not go fullscreen: the saved display stays
-        // the window's own, so the watch does not take the one it opened on.
+        // As when the window did not go fullscreen: the saved display is held,
+        // so a saved display that is away stays the window's own. (The launch's
+        // look runs in place, so this does not happen with Tauri as it is.)
         app.state::<HeldDisplay>().lock().display = saved;
         log_shell_line(
             app,
-            "The screens could not be read at launch: the window stays where it opened, and its saved display stays its own.",
+            "The screens could not be read at launch: the window stays where it opened.",
         );
         return;
     };
