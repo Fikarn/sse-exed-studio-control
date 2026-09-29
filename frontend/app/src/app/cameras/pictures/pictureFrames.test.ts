@@ -66,6 +66,20 @@ describe("the page's takes", () => {
     stop();
   });
 
+  it("goes on when a view throws as it draws, and the other cameras still get their frames", async () => {
+    const held = heldLink();
+    const frames = new PictureFrames();
+    frames.subscribe(1, () => {
+      throw new Error("this view could not draw");
+    });
+    const stop = takePictures(held.link, frames);
+    await settle();
+    await held.answer([frame(1, 1), frame(2, 1)]);
+    expect(frames.latest(2)?.sequence, "CAM 2's frame was kept").toBe(1);
+    expect(held.asked(), "the loop asked again").toBe(2);
+    stop();
+  });
+
   it("stops: no take after it, and a take that answers late is not kept", async () => {
     const held = heldLink();
     const frames = new PictureFrames();

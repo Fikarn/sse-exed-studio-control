@@ -12,7 +12,7 @@ import type { PictureCamera, PictureFrame, PicturesLink } from "@sse/engine-clie
 
 /** The rest after a take that brought nothing new: only a link that answers at once (the double) would spin without it; the shell's take has waited already. */
 const PULL_REST_MS = 8;
-/** After a take that failed (the hardware link starting again), a longer rest. */
+/** After a take that failed (the shell's route not there yet, or a view that could not draw), a longer rest. */
 const PULL_FAILED_REST_MS = 500;
 
 export class PictureFrames {
@@ -61,8 +61,16 @@ export function takePictures(link: PicturesLink, frames: PictureFrames): () => v
       }
       if (!running) return;
       // A new frame: ask again at once, for the shell waits for the next. Otherwise rest.
+      // A view that throws while it draws costs its own frame, never the other cameras'
+      // pictures: the one loop carries on.
       let anyNew = false;
-      for (const frame of taken) anyNew = frames.put(frame) || anyNew;
+      for (const frame of taken) {
+        try {
+          anyNew = frames.put(frame) || anyNew;
+        } catch {
+          anyNew = true;
+        }
+      }
       if (!anyNew) await rest(PULL_REST_MS);
     }
   })();

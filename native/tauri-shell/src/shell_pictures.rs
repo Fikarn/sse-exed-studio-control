@@ -58,13 +58,16 @@ const COUNT_INTERVAL: Duration = Duration::from_secs(60);
 const MAX_HANDSHAKES: usize = 8;
 /// The rest after an accept that failed (the system out of sockets).
 const ACCEPT_FAILED_REST: Duration = Duration::from_millis(50);
-/// How long a take waits for a frame when none is new: also how long the
-/// page's last take outlives the page, and how often a page with no
-/// pictures asks.
+/// How long a take waits for a frame when none is new: also about how long
+/// the page's last take outlives the page (with the gather, up to 258 ms),
+/// and how often a page with no pictures asks.
 const TAKE_WAIT: Duration = Duration::from_millis(250);
 /// After a take's first new frame, how long it waits for the others of the
 /// helper's tick, which the helper writes back to back: well under a frame
-/// (33 ms), so none is replaced while it waits.
+/// (33 ms), so none is replaced while it waits. It waits for all three, so
+/// with a camera that sends nothing every answer waits it out; and a
+/// Condvar's wait on Windows ends on the system's timer tick, so it is
+/// nearer 16 ms there. Latency only, still under a frame.
 const TAKE_GATHER: Duration = Duration::from_millis(8);
 
 /// Where the frame route's lines go: `shell.log`, or a test's list.

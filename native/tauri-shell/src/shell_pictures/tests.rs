@@ -123,7 +123,9 @@ fn a_take_waits_for_the_next_frame_and_no_longer_than_its_bound() {
     assert!(store
         .take(Duration::from_millis(300), Duration::ZERO)
         .is_empty());
-    assert!(started.elapsed() >= Duration::from_millis(300));
+    let waited = started.elapsed();
+    assert!(waited >= Duration::from_millis(300), "{waited:?}");
+    assert!(waited < Duration::from_secs(5), "no longer: {waited:?}");
 
     // A frame that comes while a take waits reaches it at once, and the
     // listener keeps frames while the take waits.
@@ -170,7 +172,9 @@ fn a_take_gathers_the_frames_of_a_tick_into_one_answer() {
     put(3, 2);
     let started = Instant::now();
     let answer = store.take(PATIENCE, Duration::from_millis(300));
-    assert!(started.elapsed() >= Duration::from_millis(300));
+    let gathered = started.elapsed();
+    assert!(gathered >= Duration::from_millis(300), "{gathered:?}");
+    assert!(gathered < Duration::from_secs(5), "no longer: {gathered:?}");
     assert_eq!(cameras_in(&answer), [(1, 2), (3, 2)]);
     assert!(taken_now(&store).is_empty());
 
