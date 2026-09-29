@@ -6,7 +6,7 @@ import type { InspectorTab } from "../components/LightingInspectorTabs";
 import { useToast } from "../../shared/toastContext";
 import { useResizableColumns } from "../useResizableColumns";
 import { useUndoStack } from "../useUndoStack";
-import { UndoTargets } from "../undoTargets";
+import { lightingUndoMemory } from "../lightingUndoMemory";
 import { useLiveCallback } from "../../shared/useLiveCallback";
 import type { LightingWorkspaceSurfaceProps } from "../lightingWorkspaceModel";
 import type { LightingRig } from "./useLightingRig";
@@ -16,7 +16,7 @@ import type { LightingRig } from "./useLightingRig";
  *  busy, the column widths, the DMX strip, and the undo history. Nothing in it
  *  reaches the rig. */
 export function useLightingSession({ props, rig }: { props: LightingWorkspaceSurfaceProps; rig: LightingRig }) {
-  const { appSnapshot } = props;
+  const { appSnapshot, store } = props;
   const { persistedLightingSectionId, selectedFixture, persistedSelectedFixtureId, previewMode } = rig;
   const [uiMode, setUiMode] = useState<LightingUiMode>(() => {
     const initialSectionId = asRecord(asRecord(appSnapshot?.shell)?.lighting)?.currentSectionId;
@@ -75,11 +75,14 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   }, []);
 
   const columns = useResizableColumns();
-  const undoStack = useUndoStack();
-  // The scenes and fixtures the undo steps act on, followed through the ids an
-  // undo gives them (Slice 3 review, finding 17). The steps read the rig at
+  // The undo history and the scenes and fixtures its steps act on, followed
+  // through the ids an undo gives them (Slice 3 review, finding 17). They
+  // outlive the page (2026-09-29), and are forgotten at a restore or a restart
+  // of the hardware link (`lightingUndoMemory.ts`). The steps read the rig at
   // undo time from the store (`rigNow`), not from a copy kept here.
-  const [undoTargets] = useState(() => new UndoTargets());
+  const undoMemory = lightingUndoMemory(store);
+  const undoStack = useUndoStack(undoMemory.history);
+  const undoTargets = undoMemory.targets;
 
   const activeTab =
     activeTabOverride ??

@@ -440,6 +440,29 @@ test("supports lighting palette pools from the inspector", async ({ page }) => {
   await expect(patchInspector.getByRole("button", { name: "Delete Low" })).toBeDisabled();
 });
 
+// Found, to check (2026-09-28): Lighting's Undo forgot its steps when the page
+// was left. It keeps them for the session now, and forgets them only at a
+// restore or a restart of the hardware link.
+test("Undo still reaches a step after the page was left and opened again", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+
+  await page.getByRole("button", { name: /^Recall scene Interview/ }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
+  await page.getByRole("button", { name: "Delete scene" }).click();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toHaveCount(0);
+  await expect(page.getByTestId("lighting-undo")).toHaveAttribute("aria-label", "Undo Delete scene Interview");
+
+  const nav = page.getByRole("navigation", { name: "Workspace navigation" });
+  await nav.getByRole("button", { name: "Audio", exact: true }).click();
+  await expect(page.getByTestId("lighting-undo")).toHaveCount(0);
+  await nav.getByRole("button", { name: "Lighting", exact: true }).click();
+
+  const undo = page.getByTestId("lighting-undo");
+  await expect(undo).toHaveAttribute("aria-label", "Undo Delete scene Interview");
+  await undo.click();
+  await expect(page.getByRole("button", { name: /Recall scene Interview/ })).toBeVisible();
+});
+
 test("supports lighting toolbar search, patch mode, and empty-state fixture create", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 

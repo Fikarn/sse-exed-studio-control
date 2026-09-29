@@ -47,6 +47,26 @@ export class UndoTargets {
     this.place(target, id);
   }
 
+  /** Forgets every target, with the steps that held them (a restore, a
+   *  restart of the hardware link): a target kept would name, by its old id,
+   *  whatever the saved data holds under that id now. */
+  clear(): void {
+    for (const target of this.byId.values()) target.id = null;
+    this.byId.clear();
+  }
+
+  /** The rig no longer holds these ids (the review of #263): a scene or a
+   *  fixture deleted elsewhere, by the deck while the page was closed. Its
+   *  steps are refused, and a scene or fixture given its id later is another
+   *  target, not this one. */
+  forgetMissing(kind: UndoTargetKind, liveIds: ReadonlySet<string>): void {
+    for (const target of [...this.byId.values()]) {
+      if (target.kind === kind && target.id !== null && !liveIds.has(target.id)) {
+        this.deleted(target);
+      }
+    }
+  }
+
   /** A step deleted it: the steps that name it are refused until an undo
    *  brings it back. */
   deleted(target: UndoTarget): void {

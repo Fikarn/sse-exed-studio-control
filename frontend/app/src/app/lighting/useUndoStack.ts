@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 /** How many steps the Undo key reaches back. */
 export const UNDO_STACK_LIMIT = 25;
@@ -44,33 +44,43 @@ export class UndoRefusedError extends Error {
 // undoes the newest of the last 25 steps — Save scene, Delete scene, Add
 // fixture, Delete fixture — and its small print names that step. There is no
 // redo: to do a step again, the operator saves, adds or deletes again.
-export function useUndoStack(): UndoStack {
-  // A mutating ref avoids re-render churn while an undo runs; the newest
-  // label is state so the Undo key re-renders when the history changes.
-  const entriesRef = useRef<UndoEntry[]>([]);
-  const [nextLabel, setNextLabel] = useState<string | null>(null);
-  const idCounterRef = useRef(0);
+//
+// Found, to check (2026-09-28): the steps lived in the Lighting page's own
+// hook and were forgotten when the page was left. They live here, outside the
+// page, so the Lighting page keeps one history for the whole session
+// (`lightingUndoMemory.ts`), and the page reads it through `useUndoStack`.
+export class UndoHistory {
+  private entries: UndoEntry[] = [];
+  private idCounter = 0;
+  /** Raised by every `clear`: an undo that was running then does not put its
+   *  step back into the history that forgot it (the review of #263). */
+  private generation = 0;
+  private readonly listeners = new Set<() => void>();
 
-  const sync = useCallback(() => {
-    const newest = entriesRef.current[entriesRef.current.length - 1];
-    setNextLabel(newest ? newest.label : null);
-  }, []);
+  /** The label of the step the next undo reverses, or null when there is none. */
+  readonly nextLabel = (): string | null => this.entries[this.entries.length - 1]?.label ?? null;
 
-  const push = useCallback(
-    (entry: Omit<UndoEntry, "id">) => {
-      idCounterRef.current += 1;
-      entriesRef.current.push({ id: `u${idCounterRef.current}`, ...entry });
-      if (entriesRef.current.length > UNDO_STACK_LIMIT) {
-        entriesRef.current.shift();
-      }
-      sync();
-    },
-    [sync]
-  );
+  readonly subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  };
 
-  const undo = useCallback(async (): Promise<UndoOutcome> => {
-    const entry = entriesRef.current.pop();
-    sync();
+  readonly push = (entry: Omit<UndoEntry, "id">): void => {
+    this.idCounter += 1;
+    this.entries.push({ id: `u${this.idCounter}`, ...entry });
+    if (this.entries.length > UNDO_STACK_LIMIT) {
+      this.entries.shift();
+    }
+    this.announce();
+  };
+
+  /** Undoes the newest step. */
+  readonly undo = async (): Promise<UndoOutcome> => {
+    const entry = this.entries.pop();
+    const generation = this.generation;
+    this.announce();
     if (!entry) return { kind: "noop" };
     try {
       await entry.undo();
@@ -79,12 +89,34 @@ export function useUndoStack(): UndoStack {
       if (error instanceof UndoRefusedError) {
         return { kind: "rejected", label: entry.label, reason: error.message };
       }
-      // Put the entry back so the operator can try again.
-      entriesRef.current.push(entry);
-      sync();
+      // Put the entry back so the operator can try again, unless the history
+      // was cleared while it ran: the saved data it names may be gone.
+      if (generation === this.generation) {
+        this.entries.push(entry);
+        this.announce();
+      }
       return { kind: "error", label: entry.label, error };
     }
-  }, [sync]);
+  };
 
-  return { push, undo, canUndo: nextLabel !== null, nextLabel };
+  /** Forgets every step: the saved data they name is not the saved data now. */
+  readonly clear = (): void => {
+    this.generation += 1;
+    if (this.entries.length === 0) return;
+    this.entries = [];
+    this.announce();
+  };
+
+  private announce() {
+    for (const listener of this.listeners) listener();
+  }
+}
+
+/** The Undo key's view of a history: `history` when the page keeps one beyond
+ *  itself, else one of this component's own. */
+export function useUndoStack(history?: UndoHistory): UndoStack {
+  const [own] = useState(() => new UndoHistory());
+  const active = history ?? own;
+  const nextLabel = useSyncExternalStore(active.subscribe, active.nextLabel);
+  return { push: active.push, undo: active.undo, canUndo: nextLabel !== null, nextLabel };
 }

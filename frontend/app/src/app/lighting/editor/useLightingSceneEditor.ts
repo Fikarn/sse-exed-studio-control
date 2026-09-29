@@ -8,6 +8,7 @@ import { useLiveCallback } from "../../shared/useLiveCallback";
 import { renderSceneThumbnailDataUri, withSceneThumbUpserted, withSceneThumbRemoved } from "../sceneThumbnails";
 import { UndoRefusedError } from "../useUndoStack";
 import { rigNow } from "../undoTargets";
+import { lightingUndoMemory } from "../lightingUndoMemory";
 import {
   RECENT_SCENE_LIMIT,
   pushUndoOutcomeToast,
@@ -46,16 +47,18 @@ export function useLightingSceneEditor({
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
 
-  const sceneThumbsRef = useRef(sceneThumbs);
+  // Shared by every visit to the page, so an undo step taken on an earlier
+  // visit writes the thumbnails as they are now (2026-09-29).
+  const sceneThumbsRef = lightingUndoMemory(store).sceneThumbs;
   useEffect(() => {
     sceneThumbsRef.current = sceneThumbs;
-  }, [sceneThumbs]);
+  }, [sceneThumbs, sceneThumbsRef]);
   const persistSceneThumbs = useCallback(
     async (next: Record<string, string>) => {
       sceneThumbsRef.current = next;
       await store.setLightingSceneThumbs(next);
     },
-    [store]
+    [sceneThumbsRef, store]
   );
 
   const [recallFadeMs, setRecallFadeMs] = useState(0);
@@ -363,13 +366,20 @@ export function useLightingSceneEditor({
         // Push undo: deleting the just-created scene. Once undone the entry
         // is gone; there is no redo (new pages program, Slice 3, decision 5).
         // It deletes the scene under the id it has now, and is refused once
-        // the scene is gone (Slice 3 review, finding 17).
+        // the scene is gone (Slice 3 review, finding 17), or no longer has the
+        // name it was saved under: the deck can delete it and save another
+        // under its id while the page is closed (the review of #263).
+        const savedName = typeof created?.name === "string" ? created.name : name;
         undoStack.push({
           label: `Save scene ${name}`,
           undo: async () => {
             const sceneId = sceneTarget.id;
-            if (sceneId === null || !rigNow(store).scenes.some((scene) => scene.id === sceneId)) {
+            const scene = sceneId === null ? undefined : rigNow(store).scenes.find((entry) => entry.id === sceneId);
+            if (sceneId === null || !scene) {
               throw new UndoRefusedError("the scene has been deleted");
+            }
+            if (scene.name !== savedName) {
+              throw new UndoRefusedError(`the scene is ${scene.name} now, not ${savedName}`);
             }
             await store.deleteLightingScene(sceneId);
             undoTargets.deleted(sceneTarget);
