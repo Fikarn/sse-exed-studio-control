@@ -25,7 +25,7 @@ use crate::EngineState;
 use std::fs::{create_dir_all, read_to_string, remove_file, rename, write};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 #[derive(Clone, serde::Deserialize, serde::Serialize)]
@@ -377,9 +377,9 @@ fn route_window_to_monitor(window: &WebviewWindow, monitor: &Monitor) -> Result<
 }
 
 /// The monitors, and where the window stands among them, as one look finds
-/// them. The watch over the screens reads them before it locks the held
-/// display: on its thread each of these calls waits for the main thread,
-/// which must never wait for the watch in turn.
+/// them: always on the main thread (`look_on_the_main_thread`). The watch
+/// over the screens takes its look before it locks the held display, and the
+/// main thread never waits for the watch in turn.
 struct Seen {
     monitors: Vec<Monitor>,
     snapshots: Vec<AvailableMonitorSnapshot>,
@@ -388,6 +388,39 @@ struct Seen {
     fullscreen: bool,
 }
 
+/// How long a look from another thread waits for the main thread before it
+/// is let go; the watch looks again within a second.
+const LOOK_ON_THE_MAIN_THREAD: Duration = Duration::from_secs(5);
+
+/// One look at the screens, taken on the main thread whoever asks: at once
+/// when the caller is the main thread (the launch, the window commands), and
+/// through the event loop when it is the watch over the screens. `None` when
+/// the main thread did not take it in time.
+///
+/// Tauri answers the monitor calls on the main thread but turns what they
+/// found into its `Monitor`s on the caller's thread, and on Linux that asks
+/// GDK for the work area. GDK is not to be called from two threads: taken on
+/// the watch's own thread, the looks crashed the shell under CI's X server
+/// about once in five runs of the Setup/Support lane (heap corruption, or a
+/// failed assertion on GDK's error traps; the watch's thread and the main
+/// thread were both in `gdk_x11_display_error_trap_push`). Taken here, 16
+/// runs out of 16 passed where the old way crashed 6 times in 32
+/// (2026-09-29). Windows asks nothing that is not safe from any thread, and
+/// finds the same values here.
+fn look_on_the_main_thread(window: &WebviewWindow, paths: &[DisplayPath]) -> Option<Seen> {
+    let (answer, answered) = std::sync::mpsc::sync_channel(1);
+    let (asked, paths) = (window.clone(), paths.to_vec());
+    // On the main thread Tauri runs the task at once (tauri-runtime-wry's
+    // `send_user_message`), so the answer is there before the wait begins.
+    window
+        .run_on_main_thread(move || {
+            let _ = answer.send(see(&asked, &paths));
+        })
+        .ok()?;
+    answered.recv_timeout(LOOK_ON_THE_MAIN_THREAD).ok()
+}
+
+/// One look, on the main thread: only `look_on_the_main_thread` calls it.
 fn see(window: &WebviewWindow, paths: &[DisplayPath]) -> Seen {
     let monitors = window.available_monitors().unwrap_or_default();
     let snapshots = monitors
@@ -642,7 +675,9 @@ pub(crate) fn hold_while_the_screens_stand_still(app: &AppHandle, paths: &[Displ
     let Ok(window) = main_window(app) else {
         return;
     };
-    let seen = see(&window, paths);
+    let Some(seen) = look_on_the_main_thread(&window, paths) else {
+        return;
+    };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let hold = hold_at_rest(&seen.snapshots, seen.on, held.display.as_ref(), held.sent);
@@ -655,7 +690,9 @@ pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPat
     let Ok(window) = main_window(app) else {
         return;
     };
-    let seen = see(&window, paths);
+    let Some(seen) = look_on_the_main_thread(&window, paths) else {
+        return;
+    };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let hold = hold_after_change(
@@ -704,7 +741,13 @@ pub(crate) fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewW
     // The screens' own names. Without them a display is known by its place.
     let paths = read_display_paths().unwrap_or_default();
     let saved = read_window_preferences(app).and_then(|preferences| preferences.monitor);
-    let seen = see(window, &paths);
+    let Some(seen) = look_on_the_main_thread(window, &paths) else {
+        log_shell_line(
+            app,
+            "The screens could not be read at launch: the window stays where it opened.",
+        );
+        return;
+    };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let away = saved.is_some()
@@ -728,7 +771,8 @@ pub(crate) fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewW
 /// window's own from now on.
 fn send_to_the_studio_display(app: &AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let paths = read_display_paths().unwrap_or_default();
-    let seen = see(window, &paths);
+    let seen = look_on_the_main_thread(window, &paths)
+        .ok_or_else(|| "The screens could not be read on the main thread.".to_string())?;
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let index = index_of(fullscreen_display(&seen.snapshots, None), seen.on);
