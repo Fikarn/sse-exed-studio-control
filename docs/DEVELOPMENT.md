@@ -29,6 +29,8 @@ Then open `http://127.0.0.1:4180/?fixture=lighting-populated&transport=fixture`.
 
 To work on the studio's data, copy its folder and name the copy: `npm run app -- --data=<the copy>`. The studio's own folder, and any folder inside it, is refused by the command and by every development build.
 
+To measure what the app costs, `npm run app -- --release` builds the shell, the engine and the pictures helper in the release profile, in `native/target/dev-release` (the first build takes some minutes), never in `native/target/release`, where `npm run release` builds. It is still a development run: only `npm run release` makes a studio build.
+
 A development build started any other way is as careful: where a switch is not set it takes the safe value (`native/rust-engine/src/development.rs`), and says so in its log.
 
 A change to the pages shows at once. After a change to the engine or the contract, close the app and start it again.

@@ -3,7 +3,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { dataFolderFrom, DEVELOPMENT_BRIDGE_PORT, developmentEnv, STUDIO_BRIDGE_PORT } from "./dev-app.mjs";
+import {
+  DEVELOPMENT_BRIDGE_PORT,
+  developmentEnv,
+  RELEASE_TARGET_DIR,
+  runOptionsFrom,
+  STUDIO_BRIDGE_PORT,
+} from "./dev-app.mjs";
 import { laneEnvRefusal } from "./native-runtime-harness.mjs";
 
 const repositoryRoot = path.resolve("/work/studio-control");
@@ -43,7 +49,8 @@ test("a development run keeps its folders and switches whatever the caller's env
   assert.deepEqual(env, developmentEnv({}, { repositoryRoot }));
 });
 
-test("`--data=<folder>` is the one argument, and it names the saved data", () => {
+test("`--data=<folder>` names the saved data, and `--release` is the only other argument", () => {
+  const dataFolderFrom = (args) => runOptionsFrom(args).dataFolder;
   assert.equal(dataFolderFrom([]), null);
   const copy = path.resolve("/work/a copy of the studio data");
   assert.equal(dataFolderFrom([`--data=${copy}`]), copy);
@@ -54,12 +61,52 @@ test("`--data=<folder>` is the one argument, and it names the saved data", () =>
   assert.equal(env.SSE_LOG_DIR, path.join(copy, "logs"));
   assert.equal(env.SSE_SAFE_START, "1");
 
-  // `--release` would build the studio's kind of app from development code,
-  // `--config` can change the identity, and `--` hands arguments to the app.
-  for (const refused of ["--release", "--config=other.json", "--", "--data", "--data=", "data=x", "--features"]) {
-    assert.throws(() => dataFolderFrom([refused]), /is not an argument of `npm run app`/, refused);
-    assert.throws(() => dataFolderFrom([`--data=${copy}`, refused]), /is not an argument/, refused);
+  // `--config` can change the identity, `--` hands arguments to the app, and
+  // a profile by another spelling would build where `npm run release` does.
+  for (const refused of [
+    "--config=other.json",
+    "--",
+    "--data",
+    "--data=",
+    "data=x",
+    "--features",
+    "--release=1",
+    "--profile=release",
+  ]) {
+    assert.throws(() => runOptionsFrom([refused]), /is not an argument of `npm run app`/, refused);
+    assert.throws(() => runOptionsFrom([`--data=${copy}`, refused]), /is not an argument/, refused);
   }
+});
+
+test("`--release` builds the run in the release profile, in a folder of its own, and changes nothing else", () => {
+  const copy = path.resolve("/work/a copy of the studio data");
+  assert.deepEqual(runOptionsFrom([]), { dataFolder: null, release: false });
+  assert.deepEqual(runOptionsFrom(["--release"]), { dataFolder: null, release: true });
+  assert.deepEqual(runOptionsFrom(["--release", `--data=${copy}`]), { dataFolder: copy, release: true });
+
+  // The build folder is the run's own, whatever the caller's environment
+  // holds, and never the one `npm run release` builds the studio's app in.
+  const env = developmentEnv(
+    { CARGO_TARGET_DIR: "C:/elsewhere", cargo_target_dir: "C:/elsewhere" },
+    { release: true, repositoryRoot }
+  );
+  const target = path.join(repositoryRoot, RELEASE_TARGET_DIR);
+  assert.equal(env.CARGO_TARGET_DIR, target);
+  const studioBuilds = path.join(repositoryRoot, "native", "target", "release");
+  assert.notEqual(target, studioBuilds);
+  assert.ok(!target.startsWith(studioBuilds + path.sep), target);
+
+  // The rest is a development run's, hardened the same way.
+  const rest = { ...env };
+  delete rest.CARGO_TARGET_DIR;
+  assert.deepEqual(rest, developmentEnv({}, { repositoryRoot }));
+  assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
+
+  // Without it, the caller's own build folder is left as it was.
+  assert.equal(
+    developmentEnv({ CARGO_TARGET_DIR: "C:/elsewhere" }, { repositoryRoot }).CARGO_TARGET_DIR,
+    "C:/elsewhere"
+  );
 });
 
 test("a development run is hardened the way a lane is, and the studio's folder is refused", () => {
