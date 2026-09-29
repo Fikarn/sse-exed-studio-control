@@ -15,7 +15,8 @@ import { createFixtureTransport } from "../fixtureTransport";
 
 const RIG_WORDS = ["unconfigured", "disabled", "ready", "attention", "not-verified"];
 const CONSOLE_WORDS = ["ready", "attention", "not-verified"];
-const BRIDGE_WORDS = ["ready", "unavailable"];
+// `quiet` since 2026-09-29: the bridge serves and the deck has not asked lately.
+const BRIDGE_WORDS = ["ready", "quiet", "unavailable"];
 
 type Transport = ReturnType<typeof createFixtureTransport>;
 

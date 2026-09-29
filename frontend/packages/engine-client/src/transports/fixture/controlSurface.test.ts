@@ -102,7 +102,9 @@ describe("the fixture double's Stream Deck pages", () => {
 
     const commissioning = await request("commissioning.check.run", { target: "control-surface" });
     const probe = (commissioning.checks as JsonObject[]).find((check) => check.id === "control-surface");
-    expect(probe?.message).toBe("The deck's bridge serves 87 controls on 4 pages.");
+    expect(probe?.message).toBe(
+      "Companion asked the deck's bridge 1 s ago. The deck's bridge serves 87 controls on 4 pages."
+    );
 
     const exported = await request("exports.companion.export");
     expect(exported.pageCount).toBe(4);

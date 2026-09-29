@@ -381,13 +381,14 @@ async function runWorkspaceQualification() {
     });
     assertWorkspaceReady(initialStatus, "setup");
 
-    // All three probes run, so a host where they pass publishes through the
-    // real gate (the audio probe against the simulated console since Slice 2b
-    // of the new pages program). The engine refuses `stage: ready` while any
-    // probe is not `passed` (2026-09 audit Slice 8), so the explicit override is
-    // sent only when a probe is not counted on: the audio block skipped
-    // (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80 not bindable
-    // for the lighting probe server (2026-09 production readiness, Slice 1).
+    // All three probes run (the audio probe against the simulated console
+    // since Slice 2b of the new pages program). The engine refuses `stage:
+    // ready` while any probe is not `passed` (2026-09 audit Slice 8). The
+    // deck's probe passes only when Companion has asked the bridge in the last
+    // 5 s (2026-09-29), and no Companion asks a lane's bridge, so the explicit
+    // override is always sent; it used to be sent only when the audio block
+    // was skipped (SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE=1, CI) or port 80
+    // was not bindable for the lighting probe server.
     await dispatchCommand(firstSession, firstRun, "runCommissioningCheck", {
       request: {
         target: "control-surface",
@@ -413,7 +414,7 @@ async function runWorkspaceQualification() {
     } finally {
       await closeLightingProbeServer(lightingProbeServer);
     }
-    const overrideProbes = SKIP_AUDIO_PROBE || lightingProbeServer === null;
+    const overrideProbes = true;
     await dispatchCommand(firstSession, firstRun, "updateCommissioning", {
       request: {
         runnerStage: "publish",

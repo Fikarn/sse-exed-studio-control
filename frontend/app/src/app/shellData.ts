@@ -490,6 +490,10 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
       return "ready";
     case "not-verified":
       return "not verified";
+    case "quiet":
+      // The deck's bridge serves, and the deck has not asked it for anything
+      // lately (2026-09-29).
+      return "no deck";
     case "unconfigured":
       return "not set up";
     case "disabled":
@@ -508,7 +512,8 @@ function statusLabelFor(check: { status?: string } | undefined, fallback: string
 /** The tone of a health check in the header. The hardware link reports its
  *  subsystems in words of its own — audio and lighting `ready` /
  *  `not-verified` / `attention` (lighting also `unconfigured` / `disabled`),
- *  the Stream Deck bridge `ready` / `unavailable`. Until 2026-09-21 only the
+ *  the Stream Deck bridge `ready` / `quiet` (no deck has asked lately, since
+ *  2026-09-29) / `unavailable`. Until 2026-09-21 only the
  *  fixture double's `ok` / `attention` were mapped, so on the workstation a
  *  healthy Audio, Lighting and Deck all read as a yellow "pending"; the double
  *  has said the hardware link's words since 2026-09-22, and the older two
@@ -521,6 +526,7 @@ export function healthCheckTone(status: unknown): StatusToneLike {
     case "not-verified":
     case "unconfigured":
     case "disabled":
+    case "quiet":
       return "attention";
     case "unavailable":
       return "error";

@@ -12,6 +12,7 @@ mod control_surface_audio;
 mod control_surface_http;
 mod control_surface_pages;
 mod control_surface_presses;
+mod deck_heard;
 mod development;
 mod diagnostics;
 mod engine_events;

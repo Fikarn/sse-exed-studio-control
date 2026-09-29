@@ -992,14 +992,29 @@ pub(crate) fn cycle_value(values: &[&str], current: &str, forward: bool) -> Stri
     values[next].to_string()
 }
 
+/// The Surface lamp's check. A bridge that serves reads `ready` while the
+/// deck has asked within `DECK_QUIET_AFTER`, and `quiet` while it has not
+/// (2026-09-29): the lamp says `no deck`, and nothing else changes. `ok`
+/// stays whether the bridge serves, as the lanes and the pages read it.
 pub fn build_control_surface_health_check(runtime: &RuntimeContext) -> Value {
+    let bridge = &runtime.control_surface_bridge;
+    let now = std::time::Instant::now();
+    let quiet = bridge.available && !crate::deck_heard::deck_heard_lately(&runtime.db_path, now);
+    let (status, summary) = if quiet {
+        (
+            String::from("quiet"),
+            crate::deck_heard::deck_quiet_sentence(&runtime.db_path, now),
+        )
+    } else {
+        (bridge.status.clone(), bridge.summary.clone())
+    };
     json!({
-        "ok": runtime.control_surface_bridge.available,
-        "status": runtime.control_surface_bridge.status,
-        "summary": runtime.control_surface_bridge.summary,
-        "baseUrl": runtime.control_surface_bridge.base_url,
-        "port": runtime.control_surface_bridge.port,
-        "error": runtime.control_surface_bridge.error,
+        "ok": bridge.available,
+        "status": status,
+        "summary": summary,
+        "baseUrl": bridge.base_url,
+        "port": bridge.port,
+        "error": bridge.error,
     })
 }
 
