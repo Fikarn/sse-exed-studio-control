@@ -610,7 +610,7 @@ fn main() -> io::Result<()> {
         );
     }
     if let Some(helper) = pictures_helper {
-        helper.finish(Duration::from_millis(500));
+        helper.finish();
     }
 
     Ok(())

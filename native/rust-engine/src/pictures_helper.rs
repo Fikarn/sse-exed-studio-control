@@ -19,7 +19,9 @@
 //!   start none; the lanes and the end-to-end tests run a development engine
 //!   from `target`, which starts the helper built beside it.
 //! - A stop never holds up the engine's own: it is asked for before the
-//!   shutdown backup, and waited for after it, for half a second at most.
+//!   shutdown backup and waited for after it, until the grace and a margin
+//!   have passed since it was asked for, so a helper that lingers is ended
+//!   before the engine goes.
 //!   Nothing written to the helper can block the supervisor: its stdin has a
 //!   thread of its own.
 //!
@@ -32,6 +34,7 @@ use crate::diagnostics::append_log;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
 use crate::storage::open_connection;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -51,8 +54,13 @@ use studio_control_protocol::pictures::{
 const SILENCE: Duration = Duration::from_secs(5);
 const FIRST_RESTART_DELAY: Duration = Duration::from_secs(1);
 const LONGEST_RESTART_DELAY: Duration = Duration::from_secs(30);
-/// How long a stop waits for the helper to end by itself.
+/// How long a stop waits for the helper to end by itself, before it ends
+/// it.
 const STOP_GRACE: Duration = Duration::from_secs(1);
+/// The engine's stop waits this much past the grace for the end, so the
+/// helper is ended before the engine goes; with the backup inside it, the
+/// whole stop stays within the shell's two seconds.
+const STOP_MARGIN: Duration = Duration::from_millis(300);
 /// How often the supervisor looks, between lines.
 const TICK: Duration = Duration::from_millis(250);
 
@@ -291,27 +299,42 @@ pub struct PicturesHelper {
     to_supervisor: Sender<Message>,
     /// Hears when the supervisor has ended.
     ended: Receiver<()>,
+    /// When the stop was asked for.
+    stop_asked: Cell<Option<Instant>>,
 }
 
 impl PicturesHelper {
     /// Asks the supervisor to end the helper (its stdin closed, then ended
     /// if it lingers past `STOP_GRACE`) and to end itself. Nothing waits.
     pub fn begin_stop(&self) {
+        if self.stop_asked.get().is_none() {
+            self.stop_asked.set(Some(Instant::now()));
+        }
         let _ = self.to_supervisor.send(Message::Stop);
     }
 
-    /// Waits for the stop, `limit` at most. A helper still there after it
-    /// ends with the engine all the same: its stdin closes then.
-    pub fn finish(self, limit: Duration) {
+    /// Waits for the stop until `STOP_GRACE` and `STOP_MARGIN` after it was
+    /// asked for: past the grace the supervisor ends a helper that lingers,
+    /// so the helper is gone before the engine is. Whatever ran meanwhile
+    /// (the shutdown backup) counts towards the wait.
+    pub fn finish(self) {
+        self.finish_within(STOP_MARGIN);
+    }
+
+    fn finish_within(self, margin: Duration) {
         self.begin_stop();
-        let _ = self.ended.recv_timeout(limit);
+        let asked = self.stop_asked.get().unwrap_or_else(Instant::now);
+        let deadline = asked + STOP_GRACE + margin;
+        let _ = self
+            .ended
+            .recv_timeout(deadline.saturating_duration_since(Instant::now()));
         helpers().remove(&self.db_path);
     }
 
-    /// `begin_stop` and `finish`, with time for the grace and the end.
+    /// `begin_stop` and `finish`, with time to spare on a slow test run.
     #[cfg(test)]
     pub(crate) fn stop(self) {
-        self.finish(STOP_GRACE + Duration::from_secs(10));
+        self.finish_within(Duration::from_secs(10));
     }
 }
 
@@ -376,6 +399,7 @@ fn start_supervisor(
         db_path,
         to_supervisor,
         ended,
+        stop_asked: Cell::new(None),
     }
 }
 
