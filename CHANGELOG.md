@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The header's Surface lamp reads `no deck`, amber, when the Stream Deck has not asked Studio Control for anything in 5 s (Companion closed, or a profile without the right token), and Setup's deck probe passes only when it has. The probe always passed. Nothing locks (#261).
 - Lighting reads `NOT ANSWERING`, amber, and its header lamp `not answering`, when the bridge stops answering during a session: Studio Control looks every 5 s. Nothing is locked, and the word clears when the bridge answers again (#260).
 - The recovery screen's `Restore latest` restores the newest database backup; it could pick a newer backup archive, which cannot be restored while the saved data does not open (#259).
 - In Setup, before the setup is published, the state display's key goes to the step the setup stands at (`Continue with Map bindings`). It read `Start with Import profile` on every step and sent the runner back to step 1 (#259).

@@ -421,11 +421,30 @@ pub fn run_commissioning_check(
         .map_err(|error| CommissioningCommandError::Storage(error.to_string()))?;
 
     let (check_id, status, message) = match request.target {
-        CommissioningCheckTarget::ControlSurface => (
-            CONTROL_SURFACE_CHECK_ID,
-            String::from("passed"),
-            summarize_control_surface_probe(),
-        ),
+        // The deck passes when it asked the bridge lately (2026-09-29): until
+        // then the probe counted the pages the app holds and always passed.
+        CommissioningCheckTarget::ControlSurface => {
+            let now = std::time::Instant::now();
+            if crate::deck_heard::deck_heard_lately(db_path, now) {
+                let age = crate::deck_heard::deck_heard_age(db_path, now)
+                    .map(|age| age.as_secs())
+                    .unwrap_or(0);
+                (
+                    CONTROL_SURFACE_CHECK_ID,
+                    String::from("passed"),
+                    format!(
+                        "The deck asked the bridge {age} s ago. {}",
+                        summarize_control_surface_probe()
+                    ),
+                )
+            } else {
+                (
+                    CONTROL_SURFACE_CHECK_ID,
+                    String::from("failed"),
+                    crate::deck_heard::deck_quiet_sentence(db_path, now),
+                )
+            }
+        }
         CommissioningCheckTarget::Lighting => {
             let bridge_ip = request
                 .lighting_bridge_ip
@@ -970,45 +989,54 @@ mod tests {
         );
     }
 
+    // Found, to check (2026-09-28): the deck's probe counted the pages the app
+    // holds and always passed. It passes when the deck asked the bridge
+    // lately, and says what to check when it has not (2026-09-29).
     #[test]
-    fn control_surface_probe_records_passed_status() {
+    fn control_surface_probe_passes_only_when_the_deck_asked_lately() {
         let test_dir = TestDir::new("commissioning-control-surface");
         let runtime = runtime_for(&test_dir);
         initialize_test_database(&runtime.db_path).expect("database should initialize");
-
-        let snapshot = run_commissioning_check(
-            &runtime.db_path,
-            &CommissioningCheckRequest {
-                target: CommissioningCheckTarget::ControlSurface,
-                lighting_bridge_ip: None,
-                lighting_universe: None,
-                audio_send_host: None,
-                audio_send_port: None,
-                audio_receive_port: None,
-            },
-        )
-        .expect("control surface probe should succeed");
-
-        assert_eq!(
+        let probe = || {
+            let snapshot = run_commissioning_check(
+                &runtime.db_path,
+                &CommissioningCheckRequest {
+                    target: CommissioningCheckTarget::ControlSurface,
+                    lighting_bridge_ip: None,
+                    lighting_universe: None,
+                    audio_send_host: None,
+                    audio_send_port: None,
+                    audio_receive_port: None,
+                },
+            )
+            .expect("control surface probe should run");
             snapshot
                 .checks
-                .iter()
+                .into_iter()
                 .find(|check| check.id == CONTROL_SURFACE_CHECK_ID)
-                .map(|check| check.status.as_str()),
-            Some("passed")
-        );
-        // New pages program, Slice 2: the probe describes the deck's pages,
-        // not a Planning selection (it said "Planning context is reachable").
-        let message = snapshot
-            .checks
-            .iter()
-            .find(|check| check.id == CONTROL_SURFACE_CHECK_ID)
-            .map(|check| check.message.as_str())
-            .unwrap_or_default();
+                .map(|check| (check.status, check.message))
+                .expect("the deck's probe is listed")
+        };
+
+        let (status, message) = probe();
+        assert_eq!(status, "failed", "no deck has asked this bridge");
         assert!(
-            message.starts_with("The deck's bridge serves "),
+            message.starts_with(
+                "The deck has not asked the bridge for anything since the hardware link started."
+            ),
             "{message}"
         );
+
+        crate::deck_heard::note_deck_heard(&runtime.db_path, std::time::Instant::now());
+        let (status, message) = probe();
+        assert_eq!(status, "passed");
+        // New pages program, Slice 2: the probe describes the deck's pages,
+        // not a Planning selection (it said "Planning context is reachable").
+        assert!(
+            message.starts_with("The deck asked the bridge "),
+            "{message}"
+        );
+        assert!(message.contains("The deck's bridge serves "), "{message}");
         assert!(!message.to_lowercase().contains("planning"), "{message}");
     }
 

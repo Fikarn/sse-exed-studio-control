@@ -20,6 +20,23 @@ describe("a restore's detail", () => {
   });
 });
 
+// Found, to check (2026-09-28): the deck's probe always passed. Since
+// 2026-09-29 the hardware link says `quiet` while the deck has not asked its
+// bridge lately, and the Surface lamp reads `no deck`, amber.
+describe("the Surface lamp and a quiet deck", () => {
+  const surfaceLamp = (status: string) =>
+    buildMonitorItems({ checks: { controlSurface: { status } } }).find((item) => item.id === "surface");
+
+  it("reads no deck, amber, while the deck is quiet", () => {
+    expect(surfaceLamp("quiet")).toMatchObject({ detail: "no deck", status: "attention" });
+  });
+
+  it("reads ready while it asks, and unavailable in red when the bridge could not open", () => {
+    expect(surfaceLamp("ready")).toMatchObject({ detail: "ready", status: "ok" });
+    expect(surfaceLamp("unavailable")).toMatchObject({ detail: "unavailable", status: "error" });
+  });
+});
+
 // 2026-09 production readiness, Slice 11 (F31): the header's Lighting lamp
 // says `held` while the light outputs are held — on every workspace, because
 // the header is on every workspace.

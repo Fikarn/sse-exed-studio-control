@@ -240,11 +240,13 @@ export function handleFixtureSetupRequest(
           );
         }
       } else if (target === "control-surface") {
+        // The hardware link passes the deck's probe when the deck asked its
+        // bridge lately (2026-09-29); the double's deck always has, a second ago.
         updateFixtureCheck(
           state,
           "control-surface",
           "passed",
-          `The deck's bridge serves ${countControls(state)} controls on ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
+          `The deck asked the bridge 1 s ago. The deck's bridge serves ${countControls(state)} controls on ${asArray(state.controlSurfaceSnapshot.pages).length} pages.`
         );
       } else {
         throw new Error("target must be one of: control-surface, lighting, audio");

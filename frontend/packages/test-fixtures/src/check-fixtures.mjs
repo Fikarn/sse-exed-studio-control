@@ -58,7 +58,8 @@ function requireBoolean(scenario, value, fieldPath) {
 const RIG_WORDS = new Set(["unconfigured", "disabled", "ready", "attention", "not-verified"]);
 const LIGHTING_STATE_WORDS = new Set([...RIG_WORDS, "loading"]);
 const CONSOLE_WORDS = new Set(["ready", "attention", "not-verified"]);
-const BRIDGE_WORDS = new Set(["ready", "unavailable"]);
+// `quiet` since 2026-09-29: the bridge serves and the deck has not asked lately.
+const BRIDGE_WORDS = new Set(["ready", "quiet", "unavailable"]);
 
 function requireWord(scenario, value, allowed, fieldPath) {
   if (value === undefined) {

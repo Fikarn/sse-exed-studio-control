@@ -140,6 +140,7 @@ pub fn start_control_surface_bridge(
             thread::spawn(move || {
                 run_control_surface_bridge(listener, context, WORKER_COUNT, QUEUE_CAPACITY)
             });
+            crate::deck_heard::spawn_deck_quiet_watch(db_path.to_path_buf());
 
             ControlSurfaceBridgeInfo {
                 base_url,
@@ -425,6 +426,9 @@ fn respond_at(
         .and_then(|request| authorize(&request, &context.token, context.port).map(|()| request));
     match authorized {
         Ok(request) => {
+            // A request with the token is the deck's: Setup's probe and the
+            // Surface lamp read when it last asked (2026-09-29).
+            crate::deck_heard::note_deck_heard(&context.db_path, arrived);
             let response = route_control_surface_request(
                 &context.db_path,
                 context.cameras_simulated,
