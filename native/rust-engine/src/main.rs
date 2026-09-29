@@ -416,7 +416,17 @@ fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
     });
 }
 
+/// What build this engine is, kept in its file for the shell, which reads it
+/// there before it starts an engine and starts only one of its own build
+/// (`studio_control_protocol::development::build_marked_in`). `main` refers
+/// to it first thing, so that the linker keeps it: `#[used]` alone leaves the
+/// linker free to drop it. Were it dropped all the same, the shell would find
+/// no mark and refuse this engine: never the wrong start.
+static BUILD_MARK: [u8; studio_control_protocol::development::BUILD_MARK_LEN] =
+    studio_control_protocol::development::BUILD_MARK;
+
 fn main() -> io::Result<()> {
+    std::hint::black_box(&BUILD_MARK);
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut reader = BufReader::new(stdin.lock());

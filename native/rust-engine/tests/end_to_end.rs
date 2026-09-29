@@ -29,6 +29,19 @@ fn engine_binary_path() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_studio-control-engine"))
 }
 
+// 2026-09-29: the shell reads the engine's file for its mark before it
+// starts it, and refuses an engine with none. The built engine carries it:
+// the linker kept it, on Windows and on the Linux runners alike.
+#[test]
+fn the_engine_file_says_what_build_it_is() {
+    use studio_control_protocol::development::{build_marked_in, MarkedBuild};
+
+    let file = fs::read(engine_binary_path()).expect("the engine's file is read");
+    assert_eq!(build_marked_in(&file), MarkedBuild::this_build());
+    // Tests are built with debug assertions.
+    assert_eq!(build_marked_in(&file), MarkedBuild::Development);
+}
+
 fn unique_runtime_dir(label: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)

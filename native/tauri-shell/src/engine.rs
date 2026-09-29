@@ -17,7 +17,8 @@ use crate::shell_pictures::{PicturesLink, PicturesLog, PicturesStore};
 use crate::shell_prompter_window::WatchWake;
 use crate::shell_windows::{deliveries, listens_in};
 use studio_control_protocol::development::{
-    default_app_data_dir, development_build, host_platform, refuse_studio_folders,
+    build_marked_in, default_app_data_dir, development_build, host_platform, refuse_studio_folders,
+    MarkedBuild,
 };
 use studio_control_protocol::pictures::{LINK_ADDRESS_ENV, LINK_SECRET_ENV};
 use studio_control_protocol::{
@@ -142,7 +143,10 @@ impl EngineBridge {
             return Ok(summary);
         }
 
-        let binary_path = resolve_engine_binary()?;
+        let binary_path = resolve_engine_binary().map_err(|not_started| {
+            self.log_shell_line("SHELL", &not_started.detail);
+            not_started.sentence
+        })?;
         let (app_data_dir, logs_dir) = resolve_runtime_directories()?;
         create_dir_all(&app_data_dir).map_err(|error| error.to_string())?;
         create_dir_all(&logs_dir).map_err(|error| error.to_string())?;
@@ -676,7 +680,12 @@ fn env_path(name: &str) -> Option<PathBuf> {
 /// on to the repository's `target/debug` and `target/release`, whose path is
 /// compiled in, and `SSE_ENGINE_BIN` named any other: a studio build could
 /// start whatever engine the last development build had left there.
-pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
+///
+/// And only an engine of the shell's own build (2026-09-29): until then a
+/// development shell built alone into `native/target/release` would have
+/// started the studio engine `npm run release` leaves there, which drives
+/// the studio's devices.
+pub(crate) fn resolve_engine_binary() -> Result<PathBuf, NotStarted> {
     let binary_name = if cfg!(target_os = "windows") {
         "studio-control-engine.exe"
     } else {
@@ -684,7 +693,104 @@ pub(crate) fn resolve_engine_binary() -> Result<PathBuf, String> {
         "studio-control-engine"
     };
 
-    resolve_engine_binary_from(std::env::current_exe().ok(), binary_name)
+    engine_to_start(
+        std::env::current_exe().ok(),
+        binary_name,
+        MarkedBuild::this_build(),
+    )
+}
+
+/// Why the shell did not start the engine beside it: a sentence for the
+/// screen, and the detail for `shell.log`.
+#[derive(Debug)]
+pub(crate) struct NotStarted {
+    pub(crate) sentence: String,
+    pub(crate) detail: String,
+}
+
+impl NotStarted {
+    fn saying(message: String) -> Self {
+        Self {
+            sentence: message.clone(),
+            detail: message,
+        }
+    }
+}
+
+/// The engine beside the shell, when its file says it is of `shell`'s build
+/// (`MarkedBuild::this_build`): both development builds, or the studio build
+/// of one commit. The file is read, never started: an engine, once started,
+/// opens its saved data and the devices at once.
+fn engine_to_start(
+    current_exe: Option<PathBuf>,
+    binary_name: &str,
+    shell: MarkedBuild<'_>,
+) -> Result<PathBuf, NotStarted> {
+    let path = resolve_engine_binary_from(current_exe, binary_name).map_err(NotStarted::saying)?;
+    let (this, advice) = match shell {
+        MarkedBuild::Studio(commit) => (
+            format!("This studio build of Studio Control ({})", short(commit)),
+            "Start Studio Control from the builds folder, where each build holds both.",
+        ),
+        _ => (
+            "This development build of Studio Control".to_string(),
+            "Build both with npm run app.",
+        ),
+    };
+    let file = std::fs::read(&path).map_err(|error| NotStarted {
+        sentence: format!(
+            "{this} could not read the hardware link beside it, so it did not start it: {error}. {advice}"
+        ),
+        detail: format!("Not started: {} could not be read: {error}.", path.display()),
+    })?;
+    let engine = build_marked_in(&file);
+    let why = match (shell, engine) {
+        (MarkedBuild::Development, MarkedBuild::Development) => return Ok(path),
+        (MarkedBuild::Studio(own), MarkedBuild::Studio(theirs)) if own == theirs => {
+            return Ok(path)
+        }
+        (MarkedBuild::Studio(_), MarkedBuild::Studio(theirs)) => {
+            format!(
+                "that one is the studio build of {}, another commit",
+                short(theirs)
+            )
+        }
+        (_, MarkedBuild::Studio(theirs)) => format!(
+            "that one is a studio build ({}), which drives the studio's devices",
+            short(theirs)
+        ),
+        (_, MarkedBuild::Development) => "that one is a development build".to_string(),
+        (_, MarkedBuild::Unmarked) => {
+            "that one is from an older build, which does not say what build it is".to_string()
+        }
+        (_, MarkedBuild::Conflicting) => {
+            "that one says two different things about what build it is".to_string()
+        }
+    };
+    Err(NotStarted {
+        sentence: format!("{this} did not start the hardware link beside it: {why}. {advice}"),
+        detail: format!(
+            "Not started: {} is {}, and this shell is {}.",
+            path.display(),
+            described(engine),
+            described(shell)
+        ),
+    })
+}
+
+/// A commit as the screen shows it.
+fn short(commit: &str) -> &str {
+    commit.get(..7).unwrap_or(commit)
+}
+
+/// A build as `shell.log` names it.
+fn described(build: MarkedBuild<'_>) -> String {
+    match build {
+        MarkedBuild::Development => "a development build".to_string(),
+        MarkedBuild::Studio(commit) => format!("the studio build of {commit}"),
+        MarkedBuild::Unmarked => "unmarked".to_string(),
+        MarkedBuild::Conflicting => "marked as two different builds".to_string(),
+    }
 }
 
 fn resolve_engine_binary_from(
@@ -1054,6 +1160,131 @@ mod tests {
         let error = resolve_engine_binary_from(None, binary_name)
             .expect_err("a shell that cannot read its own path starts nothing");
         assert!(error.contains(binary_name), "{error}");
+    }
+
+    // 2026-09-29: the shell reads the mark in the engine's file and starts
+    // only an engine of its own build. A development shell built alone into
+    // `native/target/release` would have started the studio engine that
+    // `npm run release` leaves there.
+    #[test]
+    fn a_shell_starts_only_a_hardware_link_of_its_own_build() {
+        use studio_control_protocol::development::build_mark_of;
+
+        let a = "55efa2990123456789abcdef0123456789abcdef";
+        let b = "0123456789abcdef0123456789abcdef01234567";
+        let binary_name = "studio-control-engine";
+        let tree = TempTree::new("kind");
+        let junk: &[u8] = b"\0\x7fELF the hardware link's code and strings \xff";
+        let file = |marks: &[&[u8]]| {
+            let mut bytes = junk.to_vec();
+            for mark in marks {
+                bytes.extend_from_slice(mark);
+                bytes.extend_from_slice(junk);
+            }
+            bytes
+        };
+        let start = |label: &str, shell: MarkedBuild<'static>, engine: &[u8]| {
+            let shell_exe = tree.path(&format!("{label}/sse-exed-tauri-shell"));
+            touch(&shell_exe);
+            fs::write(tree.path(&format!("{label}/{binary_name}")), engine)
+                .expect("the engine's file is written");
+            engine_to_start(Some(shell_exe), binary_name, shell)
+        };
+        let development = build_mark_of(None);
+        let studio_a = build_mark_of(Some(a));
+        let studio_b = build_mark_of(Some(b));
+
+        // Started: both development builds, or the studio build of one commit.
+        let started = start("dev-dev", MarkedBuild::Development, &file(&[&development]))
+            .expect("a development shell starts a development engine");
+        assert_eq!(started, tree.path(&format!("dev-dev/{binary_name}")));
+        start("a-a", MarkedBuild::Studio(a), &file(&[&studio_a]))
+            .expect("a studio shell starts the studio engine of its own commit");
+
+        // Refused, each with its reason, in words the screen may show.
+        for (label, shell, engine, reason, commits) in [
+            (
+                "dev-a",
+                MarkedBuild::Development,
+                file(&[&studio_a]),
+                "that one is a studio build (55efa29), which drives the studio's devices",
+                vec![a],
+            ),
+            (
+                "a-dev",
+                MarkedBuild::Studio(a),
+                file(&[&development]),
+                "that one is a development build",
+                vec![a],
+            ),
+            (
+                "a-b",
+                MarkedBuild::Studio(a),
+                file(&[&studio_b]),
+                "that one is the studio build of 0123456, another commit",
+                vec![a, b],
+            ),
+            (
+                "dev-empty",
+                MarkedBuild::Development,
+                Vec::new(),
+                "that one is from an older build",
+                vec![],
+            ),
+            (
+                "a-unmarked",
+                MarkedBuild::Studio(a),
+                file(&[]),
+                "that one is from an older build",
+                vec![a],
+            ),
+            (
+                "dev-both",
+                MarkedBuild::Development,
+                file(&[&development, &studio_a]),
+                "that one says two different things",
+                vec![],
+            ),
+        ] {
+            let refused = start(label, shell, &engine).expect_err(label);
+            let sentence = &refused.sentence;
+            assert!(sentence.contains(reason), "{label}: {sentence}");
+            assert!(
+                sentence.contains("did not start the hardware link beside it"),
+                "{label}: {sentence}"
+            );
+            let advice = match shell {
+                MarkedBuild::Studio(_) => "from the builds folder",
+                _ => "npm run app",
+            };
+            assert!(sentence.contains(advice), "{label}: {sentence}");
+            let lower = sentence.to_lowercase();
+            for word in ["engine", "backend", "transport", "ipc", "snapshot"] {
+                assert!(!lower.contains(word), "{label}: {word} in {sentence}");
+            }
+            // Joined, as the shell joins it: a `/` in the middle would print
+            // otherwise than the shell's path on Windows.
+            let engine_path = tree.path(label).join(binary_name);
+            assert!(
+                refused.detail.contains(&engine_path.display().to_string()),
+                "{label}: {}",
+                refused.detail
+            );
+            for commit in commits {
+                assert!(
+                    refused.detail.contains(commit),
+                    "{label}: {}",
+                    refused.detail
+                );
+            }
+        }
+
+        // With no engine beside it, the shell says so, as before.
+        let alone = tree.path("alone/sse-exed-tauri-shell");
+        touch(&alone);
+        let missing = engine_to_start(Some(alone), binary_name, MarkedBuild::Development)
+            .expect_err("no engine beside the shell");
+        assert!(missing.sentence.contains("missing"), "{}", missing.sentence);
     }
 
     // 2026-09 production readiness, Slice 4 (finding F08): an id that is

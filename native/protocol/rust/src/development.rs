@@ -11,6 +11,13 @@
 //!
 //! `npm run app` gives a development run folders of its own. To work on the
 //! studio's data, copy the folder and name the copy.
+//!
+//! Every engine carries a mark in its file that says what build it is
+//! (`BUILD_MARK`), and the shell reads it before it starts one: it starts an
+//! engine only of its own build, both development builds or the studio build
+//! of one commit. It reads the file, never asks the program: an engine, once
+//! started, opens its saved data and the devices at once, and an engine older
+//! than the mark would not understand a question.
 
 use std::ffi::OsString;
 use std::fs;
@@ -32,20 +39,137 @@ pub const STUDIO_BUILD_ENV: &str = "SSE_STUDIO_BUILD";
 /// `tauri build`) is development code the owner has not walked, and it is a
 /// development build like the rest.
 pub fn studio_build_commit() -> Option<&'static str> {
-    studio_build_commit_from(cfg!(debug_assertions), option_env!("SSE_STUDIO_BUILD"))
+    STUDIO_BUILD_COMMIT
 }
 
-fn studio_build_commit_from(
-    debug_assertions: bool,
-    marker: Option<&'static str>,
-) -> Option<&'static str> {
-    marker.filter(|commit| {
-        !debug_assertions
-            && commit.len() == 40
-            && commit
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    })
+/// Worked out once, for the answer above and for the mark alike.
+const STUDIO_BUILD_COMMIT: Option<&str> =
+    studio_build_commit_from(cfg!(debug_assertions), option_env!("SSE_STUDIO_BUILD"));
+
+/// The commit `marker` names when it makes a studio build: forty lowercase
+/// hexadecimal characters, in a build without debug assertions.
+const fn studio_build_commit_from(debug_assertions: bool, marker: Option<&str>) -> Option<&str> {
+    let Some(commit) = marker else {
+        return None;
+    };
+    if debug_assertions || commit.len() != 40 {
+        return None;
+    }
+    let bytes = commit.as_bytes();
+    let mut at = 0;
+    while at < bytes.len() {
+        if !matches!(bytes[at], b'0'..=b'9' | b'a'..=b'f') {
+            return None;
+        }
+        at += 1;
+    }
+    Some(commit)
+}
+
+/// What an engine's file says it is (`build_marked_in`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MarkedBuild<'a> {
+    Development,
+    /// The studio build of this commit.
+    Studio(&'a str),
+    /// No mark: an engine older than the mark, or not an engine at all.
+    Unmarked,
+    /// Marks that say different things.
+    Conflicting,
+}
+
+impl MarkedBuild<'static> {
+    /// This build, as its own mark says it.
+    pub fn this_build() -> Self {
+        match STUDIO_BUILD_COMMIT {
+            Some(commit) => Self::Studio(commit),
+            None => Self::Development,
+        }
+    }
+}
+
+/// The mark's layout, all ASCII: the prefix, which holds the layout's
+/// version, so that another layout reads as no mark; `S` or `D` and a colon;
+/// then a studio build's commit, or forty dashes for a development build.
+const BUILD_MARK_PREFIX: &[u8; 24] = b"studio-control-build:v1:";
+const BUILD_MARK_KIND: usize = BUILD_MARK_PREFIX.len();
+const BUILD_MARK_COMMIT: usize = BUILD_MARK_KIND + 2;
+pub const BUILD_MARK_LEN: usize = BUILD_MARK_COMMIT + 40;
+
+/// This build's mark. The engine keeps it in its file (its `main`), where
+/// the shell reads it.
+pub const BUILD_MARK: [u8; BUILD_MARK_LEN] = build_mark_of(STUDIO_BUILD_COMMIT);
+
+/// The mark of the studio build of `commit`, or of a development build. The
+/// commit is forty characters, as `studio_build_commit` gives it (the shell's
+/// tests make marks of other commits).
+pub const fn build_mark_of(commit: Option<&str>) -> [u8; BUILD_MARK_LEN] {
+    let mut mark = [b'-'; BUILD_MARK_LEN];
+    let mut at = 0;
+    while at < BUILD_MARK_KIND {
+        mark[at] = BUILD_MARK_PREFIX[at];
+        at += 1;
+    }
+    mark[BUILD_MARK_KIND] = b'D';
+    mark[BUILD_MARK_KIND + 1] = b':';
+    if let Some(commit) = commit {
+        let bytes = commit.as_bytes();
+        assert!(
+            bytes.len() == 40,
+            "a studio build's commit has forty characters"
+        );
+        mark[BUILD_MARK_KIND] = b'S';
+        let mut at = 0;
+        while at < 40 {
+            mark[BUILD_MARK_COMMIT + at] = bytes[at];
+            at += 1;
+        }
+    }
+    mark
+}
+
+/// What `file`, an engine's bytes, says it is. Its well-formed marks must
+/// all say the same; a stretch that begins like a mark and is not one is
+/// passed over. A plain indexed loop: a debug shell reads a whole debug
+/// engine at every start, and iterator adapters are slower there.
+pub fn build_marked_in(file: &[u8]) -> MarkedBuild<'_> {
+    let mut kept: Option<&[u8]> = None;
+    let mut at = 0;
+    while at + BUILD_MARK_LEN <= file.len() {
+        if file[at] == BUILD_MARK_PREFIX[0] {
+            let candidate = &file[at..at + BUILD_MARK_LEN];
+            if marked_build(candidate).is_some() {
+                match kept {
+                    None => kept = Some(candidate),
+                    Some(mark) if mark != candidate => return MarkedBuild::Conflicting,
+                    Some(_) => {}
+                }
+                at += BUILD_MARK_LEN;
+                continue;
+            }
+        }
+        at += 1;
+    }
+    kept.and_then(marked_build).unwrap_or(MarkedBuild::Unmarked)
+}
+
+/// The build one well-formed mark says; `None` when `candidate` is not one.
+fn marked_build(candidate: &[u8]) -> Option<MarkedBuild<'_>> {
+    if candidate.len() != BUILD_MARK_LEN
+        || !candidate.starts_with(BUILD_MARK_PREFIX)
+        || candidate[BUILD_MARK_KIND + 1] != b':'
+    {
+        return None;
+    }
+    let commit = &candidate[BUILD_MARK_COMMIT..];
+    match candidate[BUILD_MARK_KIND] {
+        b'D' if commit.iter().all(|byte| *byte == b'-') => Some(MarkedBuild::Development),
+        b'S' => std::str::from_utf8(commit)
+            .ok()
+            .and_then(|commit| studio_build_commit_from(false, Some(commit)))
+            .map(MarkedBuild::Studio),
+        _ => None,
+    }
 }
 
 /// Whether this is a studio build.
@@ -299,6 +423,115 @@ mod tests {
         assert!(development_build());
         assert!(!studio_build());
         assert_eq!(STUDIO_BUILD_ENV, "SSE_STUDIO_BUILD");
+    }
+
+    // 2026-09-29: a shell started whatever engine sat beside it; now it reads
+    // the engine's mark first, and starts only one of its own build.
+    #[test]
+    fn a_build_is_marked_with_what_it_is() {
+        let commit = "55efa2990123456789abcdef0123456789abcdef";
+        assert_eq!(
+            build_mark_of(Some(commit)).as_slice(),
+            format!("studio-control-build:v1:S:{commit}").as_bytes()
+        );
+        assert_eq!(
+            build_mark_of(None).as_slice(),
+            format!("studio-control-build:v1:D:{}", "-".repeat(40)).as_bytes()
+        );
+        assert_eq!(
+            build_marked_in(&build_mark_of(Some(commit))),
+            MarkedBuild::Studio(commit)
+        );
+        // This build's mark and its answer come from one place.
+        assert_eq!(BUILD_MARK, build_mark_of(studio_build_commit()));
+        assert_eq!(build_marked_in(&BUILD_MARK), MarkedBuild::this_build());
+        // Tests are built with debug assertions.
+        assert_eq!(MarkedBuild::this_build(), MarkedBuild::Development);
+    }
+
+    #[test]
+    fn a_file_is_read_for_its_marks_and_nothing_else() {
+        let a = "55efa2990123456789abcdef0123456789abcdef";
+        let b = "0123456789abcdef0123456789abcdef01234567";
+        let development = build_mark_of(None);
+        let studio_a = build_mark_of(Some(a));
+        let studio_b = build_mark_of(Some(b));
+        let junk: &[u8] = b"\0\x7fELF studio control's strings \xff\xfe";
+        let file = |parts: &[&[u8]]| parts.concat();
+
+        assert_eq!(
+            build_marked_in(&file(&[junk, &development, junk])),
+            MarkedBuild::Development
+        );
+        assert_eq!(
+            build_marked_in(&file(&[junk, &studio_a, junk])),
+            MarkedBuild::Studio(a)
+        );
+        // At the file's very start and very end; one byte short is none.
+        assert_eq!(build_marked_in(&development), MarkedBuild::Development);
+        assert_eq!(
+            build_marked_in(&file(&[junk, &studio_a])),
+            MarkedBuild::Studio(a)
+        );
+        assert_eq!(
+            build_marked_in(&file(&[junk, &studio_a[..BUILD_MARK_LEN - 1]])),
+            MarkedBuild::Unmarked
+        );
+        // The same mark twice is one; marks that differ are refused.
+        assert_eq!(
+            build_marked_in(&file(&[&studio_a, junk, &studio_a])),
+            MarkedBuild::Studio(a)
+        );
+        assert_eq!(
+            build_marked_in(&file(&[&development, junk, &studio_a])),
+            MarkedBuild::Conflicting
+        );
+        assert_eq!(
+            build_marked_in(&file(&[&studio_a, &studio_b])),
+            MarkedBuild::Conflicting
+        );
+        // Nothing, or nothing that is a mark.
+        assert_eq!(build_marked_in(b""), MarkedBuild::Unmarked);
+        assert_eq!(build_marked_in(junk), MarkedBuild::Unmarked);
+
+        // What only looks like a mark is passed over, and a mark after it is
+        // still read.
+        let with = |at: usize, byte: u8, from: &[u8]| {
+            let mut copy = from.to_vec();
+            copy[at] = byte;
+            copy
+        };
+        let version = BUILD_MARK_PREFIX
+            .iter()
+            .position(|byte| *byte == b'1')
+            .expect("the prefix holds its version");
+        for (why, lookalike) in [
+            ("another kind", with(BUILD_MARK_KIND, b'X', &development)),
+            ("no colon", with(BUILD_MARK_KIND + 1, b';', &development)),
+            (
+                "a development build with a commit",
+                with(BUILD_MARK_KIND, b'D', &studio_a),
+            ),
+            ("a capital", with(BUILD_MARK_COMMIT, b'A', &studio_a)),
+            ("a g", with(BUILD_MARK_COMMIT + 5, b'g', &studio_a)),
+            (
+                "a studio build with a dash",
+                with(BUILD_MARK_COMMIT + 39, b'-', &studio_a),
+            ),
+            ("another layout", with(version, b'2', &development)),
+        ] {
+            assert_eq!(build_marked_in(&lookalike), MarkedBuild::Unmarked, "{why}");
+            assert_eq!(
+                build_marked_in(&file(&[&lookalike, junk, &studio_b])),
+                MarkedBuild::Studio(b),
+                "{why}"
+            );
+        }
+        // The prefix alone, right before a mark.
+        assert_eq!(
+            build_marked_in(&file(&[BUILD_MARK_PREFIX, &studio_b])),
+            MarkedBuild::Studio(b)
+        );
     }
 
     #[test]
