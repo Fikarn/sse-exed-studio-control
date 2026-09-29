@@ -619,3 +619,111 @@ fn a_development_build_sets_its_own_switches() {
 
     engine.shutdown();
 }
+
+// The camera pictures' frame route (D28), with the real pictures helper: the
+// test plays the shell's side — a listener on 127.0.0.1, its address and a
+// secret in the engine's environment — and the frames come straight from the
+// helper, never through the engine, while the page says it shows the
+// pictures: the selected camera big, the other two small.
+#[test]
+fn the_helper_sends_frames_to_the_shell_s_listener_while_the_page_shows_them() {
+    use std::io::Read;
+    use std::net::TcpListener;
+    use std::sync::mpsc;
+    use studio_control_protocol::pictures::{
+        FrameFormat, FrameHeader, FRAME_HEADER_LEN, HELPER_PROGRAM, LINK_ADDRESS_ENV,
+        LINK_SECRET_ENV,
+    };
+
+    assert!(
+        engine_binary_path()
+            .with_file_name(HELPER_PROGRAM)
+            .is_file(),
+        "the pictures helper is built beside the engine (`npm run native:test` builds it; \
+         `cargo build -p studio-control-pictures` alone)"
+    );
+    let listener = TcpListener::bind("127.0.0.1:0").expect("a listener");
+    let address = listener.local_addr().expect("its address");
+    let secret = "5e".repeat(32);
+    let mut engine = EngineProcess::spawn_with("pictures", |command, _| {
+        command
+            .env(LINK_ADDRESS_ENV, address.to_string())
+            .env(LINK_SECRET_ENV, &secret);
+    });
+    wait_for_ready(&mut engine);
+
+    let (accepted, connection) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = accepted.send(listener.accept().map(|(stream, _)| stream));
+    });
+    // Nothing is sent before the page shows the pictures.
+    assert!(connection
+        .recv_timeout(Duration::from_millis(1500))
+        .is_err());
+
+    engine.send(&json!({
+        "type": "request", "id": "show-1", "method": "cameras.pictures.showing", "params": {}
+    }));
+    let shown = engine.wait_for("cameras.pictures.showing", response_with_id("show-1"));
+    assert_eq!(shown.get("result"), Some(&json!({})), "{shown}");
+
+    let mut stream = connection
+        .recv_timeout(Duration::from_secs(20))
+        .expect("the helper connects")
+        .expect("accepted");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(20)))
+        .expect("a timeout");
+    let mut said = vec![0_u8; secret.len() + 1];
+    stream.read_exact(&mut said).expect("the secret");
+    assert_eq!(said, format!("{secret}\n").into_bytes());
+
+    let mut next_frame = || {
+        let mut header = [0_u8; FRAME_HEADER_LEN];
+        stream.read_exact(&mut header).expect("a header");
+        let header = FrameHeader::decode(&header).expect("a frame");
+        let mut picture = vec![0_u8; header.length as usize];
+        stream.read_exact(&mut picture).expect("its picture");
+        header
+    };
+    let mut sizes = std::collections::BTreeMap::new();
+    let mut last_sequence = [0_u64; 3];
+    for _ in 0..12 {
+        let frame = next_frame();
+        assert_eq!(frame.format, FrameFormat::Uyvy);
+        let index = usize::from(frame.camera) - 1;
+        assert!(frame.sequence > last_sequence[index], "{frame:?}");
+        last_sequence[index] = frame.sequence;
+        sizes.insert(frame.camera, (frame.width, frame.height));
+    }
+    assert_eq!(
+        sizes.into_iter().collect::<Vec<_>>(),
+        [(1, (1920, 1080)), (2, (544, 306)), (3, (544, 306))],
+        "CAM 1 is selected after a start"
+    );
+
+    // Another camera selected: it is sent big.
+    engine.send(&json!({
+        "type": "request", "id": "select-2", "method": "cameras.select", "params": { "camera": 2 }
+    }));
+    engine.wait_for("cameras.select", response_with_id("select-2"));
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        let frame = next_frame();
+        if frame.camera == 2 && frame.width == 1920 {
+            break;
+        }
+        assert!(Instant::now() < deadline, "CAM 2 never came big");
+    }
+
+    // The engine's end ends the helper, and its connection with it.
+    engine.shutdown();
+    let mut rest = [0_u8; 64 * 1024];
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        match stream.read(&mut rest) {
+            Ok(0) | Err(_) => break,
+            Ok(_) => assert!(Instant::now() < deadline, "the frames never stopped"),
+        }
+    }
+}

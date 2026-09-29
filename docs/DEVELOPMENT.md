@@ -45,7 +45,7 @@ Each step of `check:quick` logs to `node_modules/.cache/dev-check/`. A step that
 
 The layers, and what each is for:
 
-- **Engine tests** (`cargo test`, in `native/rust-engine`): behaviour. This is where a feature is tested first. The three readers of outside bytes also have fuzz tests; a failing case leaves its seed under `proptest-regressions/`, which is committed with the fix.
+- **Engine tests** (`cargo test`, in `native/rust-engine`): behaviour. This is where a feature is tested first. The three readers of outside bytes also have fuzz tests; a failing case leaves its seed under `proptest-regressions/`, which is committed with the fix. The shell's frame reader has one of its own, with a small generator in the test (`shell_pictures/tests.rs`).
 - **Unit tests** (Vitest, beside the source as `*.test.ts`): page logic.
 - **Page tests** (Playwright, `frontend/app/tests`): what the operator does on screen, against the test double of the engine (`frontend/packages/engine-client/src/transports/fixture/`).
 - **The layout measures** (`ui-contract.spec.ts`): every page against `docs/DESIGN.md` section 10.

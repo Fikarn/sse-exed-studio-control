@@ -308,7 +308,8 @@ impl FrameHeader {
         };
         let fits = match format {
             FrameFormat::Uyvy => {
-                width % 2 == 0 && length == Self::raw(camera, format, width, height, 0).length
+                width.is_multiple_of(2)
+                    && length == Self::raw(camera, format, width, height, 0).length
             }
             FrameFormat::Rgba8 => length == Self::raw(camera, format, width, height, 0).length,
             FrameFormat::Jpeg => length > 0 && length <= FRAME_MAX_JPEG_BYTES,

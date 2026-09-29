@@ -295,6 +295,10 @@ fn without_the_simulated_cameras_no_helper_starts() {
 // What reaches the helper
 // ---------------------------------------------------------------------------
 
+/// A want as the helper hears it: the selected camera, and each camera's
+/// input.
+type HeardWant = (u8, Vec<(u8, u32)>);
+
 #[test]
 fn a_vmix_input_or_the_selection_changed_reaches_the_helper_and_nothing_else_does() {
     let cameras = TestCameras::set_up("helper-wants");
@@ -305,7 +309,7 @@ fn a_vmix_input_or_the_selection_changed_reaches_the_helper_and_nothing_else_doe
         .to_supervisor = Some(sender);
     // Each want as (the selected camera, each camera's input), and whether
     // the page said it shows the pictures.
-    let heard = |messages: &Receiver<Message>| -> (Vec<(u8, Vec<(u8, u32)>)>, usize) {
+    let heard = |messages: &Receiver<Message>| -> (Vec<HeardWant>, usize) {
         let mut wants = Vec::new();
         let mut showings = 0;
         for message in messages.try_iter() {
