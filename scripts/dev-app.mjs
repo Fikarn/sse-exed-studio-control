@@ -19,7 +19,10 @@
 // (`native/target/dev-release`), never in `native/target/release`, where
 // `npm run release` builds the studio's app; and a release build that
 // command did not make is a development build like the rest
-// (`development::studio_build`): the same identity, data and switches.
+// (`development::studio_build`): the same identity, data and switches. The
+// one variable that makes a studio build of a release build,
+// `SSE_STUDIO_BUILD`, is never handed on, whatever the caller's
+// environment holds (`npm run release` refuses to start with it set).
 //
 // No other argument is taken: `--config` can change the app's identity, and
 // what `tauri dev` hands on to the app is the app's to refuse.
@@ -41,6 +44,17 @@ export const DEVELOPMENT_BRIDGE_PORT = 38211;
 
 /** Where `--release` builds, beside the debug builds and apart from the studio's. */
 export const RELEASE_TARGET_DIR = path.join("native", "target", "dev-release");
+
+/**
+ * Tells the before-command (`scripts/tauri-before-command.mjs`) the run's
+ * profile, "1" for `--release`, so that it builds the engine and the helper
+ * beside the shell: the run's own word, set on every run, rather than what
+ * the Tauri CLI may or may not say.
+ */
+export const DEV_RUN_RELEASE_ENV = "SSE_DEV_RUN_RELEASE";
+
+/** Made a studio build of any release build by the compiler (`development::studio_build`). */
+const STUDIO_BUILD_ENV = "SSE_STUDIO_BUILD";
 
 /**
  * What the arguments ask for: the data folder they name (null for the run's
@@ -68,10 +82,11 @@ export function runOptionsFrom(args) {
 
 /**
  * The environment of a development run: `env` with the run's own folders and
- * port, and the switches that keep it off the devices; with `release`, the
- * build folder of its own as well. Every one of them is set here, whatever
- * `env` holds: a variable of the same name in `env`, in any case (Windows
- * reads the names without regard to it), is left out.
+ * port, the switches that keep it off the devices, and its profile; with
+ * `release`, the build folder of its own as well. Every one of them is set
+ * here, whatever `env` holds: a variable of the same name in `env`, in any
+ * case (Windows reads the names without regard to it), is left out, and so
+ * is `SSE_STUDIO_BUILD`.
  */
 export function developmentEnv(env, { dataFolder = null, release = false, repositoryRoot = root } = {}) {
   const appDataDir = dataFolder ?? path.join(repositoryRoot, ".dev", "app-data");
@@ -83,9 +98,13 @@ export function developmentEnv(env, { dataFolder = null, release = false, reposi
     SSE_LIGHTS_SIMULATED: "1",
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
     SSE_CAMERAS_SIMULATED: "1",
+    [DEV_RUN_RELEASE_ENV]: release ? "1" : "0",
     ...(release ? { CARGO_TARGET_DIR: path.join(repositoryRoot, RELEASE_TARGET_DIR) } : {}),
   };
-  const inherited = Object.entries(env).filter(([name]) => !Object.hasOwn(own, name.toUpperCase()));
+  const inherited = Object.entries(env).filter(([name]) => {
+    const upper = name.toUpperCase();
+    return !Object.hasOwn(own, upper) && upper !== STUDIO_BUILD_ENV;
+  });
   return { ...Object.fromEntries(inherited), ...own };
 }
 
@@ -122,8 +141,8 @@ function main() {
 
   // The Tauri CLI's own entry, started with this node: no shell between, so
   // the spaces in this repository's path need no quoting. With `--release`
-  // Tauri tells the before-command (`TAURI_ENV_DEBUG`), which builds the
-  // engine and the helper in the same profile, beside the shell.
+  // the before-command reads the run's profile (`SSE_DEV_RUN_RELEASE`) and
+  // builds the engine and the helper in it, beside the shell.
   const tauri = path.join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
   const child = spawn(process.execPath, [tauri, "dev", ...(release ? ["--release"] : [])], {
     cwd: path.join(root, "native", "tauri-shell"),

@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  DEV_RUN_RELEASE_ENV,
   DEVELOPMENT_BRIDGE_PORT,
   developmentEnv,
   RELEASE_TARGET_DIR,
@@ -13,6 +14,8 @@ import {
 import { laneEnvRefusal } from "./native-runtime-harness.mjs";
 
 const repositoryRoot = path.resolve("/work/studio-control");
+/** A commit as `npm run release` hands it to the compiler (`SSE_STUDIO_BUILD`). */
+const STUDIO_COMMIT = "0123456789abcdef0123456789abcdef01234567";
 
 test("a development run has its own data and port and reaches no device", () => {
   const env = developmentEnv({ PATH: "/bin" }, { repositoryRoot });
@@ -26,6 +29,7 @@ test("a development run has its own data and port and reaches no device", () => 
   assert.equal(env.SSE_LIGHTS_SIMULATED, "1");
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
+  assert.equal(env[DEV_RUN_RELEASE_ENV], "0");
 });
 
 test("a development run keeps its folders and switches whatever the caller's environment holds", () => {
@@ -38,10 +42,15 @@ test("a development run keeps its folders and switches whatever the caller's env
       SSE_LIGHTS_SIMULATED: "0",
       SSE_AUDIO_SIMULATED_INPUT_MODE: "0",
       SSE_CAMERAS_SIMULATED: "0",
+      [DEV_RUN_RELEASE_ENV]: "1",
+      // The marker that makes a studio build of a release build is never
+      // handed on (`npm run release` refuses to start with it set).
+      SSE_STUDIO_BUILD: STUDIO_COMMIT,
       // Windows reads a variable's name without regard to case, so a twin in
       // another case is left out as well.
       sse_safe_start: "0",
       Sse_Lights_Simulated: "0",
+      sse_studio_build: STUDIO_COMMIT,
     },
     { repositoryRoot }
   );
@@ -86,8 +95,10 @@ test("`--release` builds the run in the release profile, in a folder of its own,
 
   // The build folder is the run's own, whatever the caller's environment
   // holds, and never the one `npm run release` builds the studio's app in.
+  // A caller's studio-build marker is left out: with it, the release build
+  // would be a studio build.
   const env = developmentEnv(
-    { CARGO_TARGET_DIR: "C:/elsewhere", cargo_target_dir: "C:/elsewhere" },
+    { CARGO_TARGET_DIR: "C:/elsewhere", cargo_target_dir: "C:/elsewhere", SSE_STUDIO_BUILD: STUDIO_COMMIT },
     { release: true, repositoryRoot }
   );
   const target = path.join(repositoryRoot, RELEASE_TARGET_DIR);
@@ -95,9 +106,11 @@ test("`--release` builds the run in the release profile, in a folder of its own,
   const studioBuilds = path.join(repositoryRoot, "native", "target", "release");
   assert.notEqual(target, studioBuilds);
   assert.ok(!target.startsWith(studioBuilds + path.sep), target);
+  assert.equal(env[DEV_RUN_RELEASE_ENV], "1");
+  assert.ok(!Object.keys(env).some((name) => name.toUpperCase() === "SSE_STUDIO_BUILD"));
 
   // The rest is a development run's, hardened the same way.
-  const rest = { ...env };
+  const rest = { ...env, [DEV_RUN_RELEASE_ENV]: "0" };
   delete rest.CARGO_TARGET_DIR;
   assert.deepEqual(rest, developmentEnv({}, { repositoryRoot }));
   assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
