@@ -301,7 +301,7 @@ impl EngineBridge {
             .stderr(Stdio::piped());
         let mut child = command
             .spawn()
-            .map_err(|error| format!("Failed to start engine: {error}"))?;
+            .map_err(|error| format!("The hardware link could not be started: {error}."))?;
 
         let stdin = child
             .stdin
@@ -1334,8 +1334,9 @@ mod tests {
         );
     }
 
-    /// The words the screen never shows (AGENTS.md; the engine's
-    /// `operator_words.rs` holds the same list for its own sentences).
+    /// The five words AGENTS.md says the screen never shows, found anywhere
+    /// in a word (the engine's `operator_words.rs` keeps a longer list, by
+    /// whole words, for its own sentences).
     fn assert_screen_words(label: &str, sentence: &str) {
         let lower = sentence.to_lowercase();
         for word in ["engine", "backend", "transport", "ipc", "snapshot"] {
