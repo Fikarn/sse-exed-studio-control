@@ -126,7 +126,14 @@ describe("createTauriGlassLink", () => {
       .map((match) => match[1])
       .filter((name) => name !== "engine.ready");
     expect([...new Set(methods)].sort()).toEqual(["prompter.glass.snapshot", "prompter.layout.report"]);
-    for (const word of ["engine_start", "engine_stop", "engine_summary", "shell_confirm_close", "shell_open_path"]) {
+    for (const word of [
+      "engine_start",
+      "engine_stop",
+      "engine_summary",
+      "shell_confirm_close",
+      "shell_open_path",
+      "pictures_next",
+    ]) {
       expect(source.includes(word), word).toBe(false);
     }
   });

@@ -8,6 +8,7 @@ import {
   type CameraPressSetting,
   type CamerasSnapshot,
   type JsonValue,
+  type PicturesLink,
   type ShellStore,
 } from "@sse/engine-client";
 
@@ -27,6 +28,7 @@ import {
 } from "./camerasModel";
 import { STOP_WINDOW_MS, type PerformAction } from "./perform";
 import { NO_AIDS, type PictureAids } from "./pictures/CameraPicture";
+import { usePictureFrames } from "./pictures/pictureFrames";
 import { CENTRE, type BigView, type LoupeZoom, type Point } from "./pictures/pictureGeometry";
 import styles from "./CamerasWorkspace.module.css";
 
@@ -45,9 +47,14 @@ import styles from "./CamerasWorkspace.module.css";
 //
 // The page reads the cameras once a second while it is open: a camera says
 // nothing by itself until its link is built, and a read sends nothing (D12).
+// It also says once a second that it shows the pictures, and takes each
+// camera's newest frame from the shell while it is open (the camera
+// pictures, D28): frames come while it says so and a while after.
 
 export interface CamerasWorkspaceProps {
   camerasSnapshot: CamerasSnapshot | null;
+  /** Where the page takes the pictures from; `null` in a window with none. */
+  pictures?: PicturesLink | null;
   store: ShellStore;
 }
 
@@ -60,7 +67,7 @@ function sentenceOf(result: JsonValue): string | null {
 
 const EVERY_CAMERA: Record<CameraNumber, Point> = { 1: CENTRE, 2: CENTRE, 3: CENTRE };
 
-export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspaceProps) {
+export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: CamerasWorkspaceProps) {
   const toast = useToast();
   const arm = useArm();
   const [view, setView] = useState<BigView>("whole");
@@ -74,10 +81,18 @@ export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspacePro
   const main = camerasSnapshot ? cameraOf(camerasSnapshot, 1) : null;
   const state = useMemo(() => (camerasSnapshot ? camerasStateView(camerasSnapshot) : null), [camerasSnapshot]);
 
+  const frames = usePictureFrames(pictures);
+
   // A read that fails is recorded when it begins to fail, not once a second.
   const readFailing = useRef(false);
   useEffect(() => {
+    // The pictures are wanted from the moment the page opens: it says so now,
+    // then with every read. What it says changes nothing, so a failure is not
+    // worth a word.
+    const showPictures = () => void store.showCameraPictures().catch(() => {});
+    showPictures();
     const id = window.setInterval(() => {
+      showPictures();
       setNow(Date.now());
       store.refreshCamerasSnapshot().then(
         () => {
@@ -264,6 +279,7 @@ export function CamerasWorkspace({ camerasSnapshot, store }: CamerasWorkspacePro
       </ShellRegion>
       <CamerasBay
         aids={aids}
+        frames={frames}
         point={points[selectedNumber]}
         selected={selected}
         snapshot={camerasSnapshot}

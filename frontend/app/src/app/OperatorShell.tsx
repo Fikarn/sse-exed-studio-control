@@ -344,7 +344,13 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
       />
     );
   } else if (activeWorkspace === "cameras") {
-    surface = <CamerasSurface camerasSnapshot={shellState.camerasSnapshot} store={environment.store} />;
+    surface = (
+      <CamerasSurface
+        camerasSnapshot={shellState.camerasSnapshot}
+        pictures={environment.pictures}
+        store={environment.store}
+      />
+    );
   } else if (activeWorkspace === "teleprompter") {
     surface = (
       <TeleprompterSurface

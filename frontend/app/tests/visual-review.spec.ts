@@ -84,6 +84,15 @@ async function gotoFixture(page: Page, fixture: string) {
   // A board the page reaches by a press (Slice 6b: the Teleprompter's editor).
   await page.evaluate(() => document.fonts.ready);
   await stepToBoard(page, fixture);
+  // The camera pictures come a moment after the page: each is drawn before the capture.
+  await page.waitForFunction(
+    () =>
+      Array.from(document.querySelectorAll("[data-picture][data-camera]")).every((view) =>
+        /^\d+$/.test(view.getAttribute("data-drawn") ?? "")
+      ),
+    undefined,
+    { timeout: 10_000 }
+  );
 }
 
 async function assertViewportFit(page: Page, size: Viewport, fixture: string) {

@@ -85,6 +85,7 @@ Blooms are the only glows: lit lamps, lit keys, the meter peak and the meter's e
 | Drawer, dialog, toast enter · exit            | 200 · 120 ms | out · in (8 px rise and fade)    |
 | Bank or tab change                            | 160 ms       | in-out                           |
 | Meters, countdown bars, the prompter's scroll | frame rate   | the engine's                     |
+| The cameras' pictures                         | frame rate   | the source's                     |
 
 Nothing on an idle surface animates. Hover changes an edge, never a position. `prefers-reduced-motion` removes enter, exit and move and the meters' display smoothing.
 

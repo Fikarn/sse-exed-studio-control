@@ -5,6 +5,7 @@ import type { CameraNumber, CameraSnapshot, CamerasSnapshot } from "@sse/engine-
 
 import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
 import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
+import type { PictureFrames } from "./pictures/pictureFrames";
 import {
   CENTRE,
   HERO,
@@ -38,6 +39,8 @@ import styles from "./CamerasBay.module.css";
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
   selected: CameraSnapshot;
+  /** The cameras' newest frames, which each view draws as they come. */
+  frames: PictureFrames;
   view: BigView;
   aids: PictureAids;
   zoom: LoupeZoom;
@@ -94,6 +97,7 @@ function RecTag({ camera }: { camera: CameraSnapshot }) {
 export function CamerasBay({
   snapshot,
   selected,
+  frames,
   view,
   aids,
   zoom,
@@ -221,6 +225,7 @@ export function CamerasBay({
         {shows ? (
           <CameraPicture
             camera={camera}
+            frames={frames}
             part={part}
             width={HERO.width}
             height={HERO.height}
@@ -248,6 +253,7 @@ export function CamerasBay({
             {pictureShows(entry) ? (
               <CameraPicture
                 camera={cameraNumber(entry)}
+                frames={frames}
                 part={WHOLE}
                 width={TILE.width}
                 height={TILE.height}
@@ -301,6 +307,7 @@ export function CamerasBay({
             {shows ? (
               <CameraPicture
                 camera={camera}
+                frames={frames}
                 part={loupe}
                 width={LOUPE.width}
                 height={LOUPE.height}

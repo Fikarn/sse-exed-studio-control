@@ -64,7 +64,13 @@ describe("the recovery screen is one screen", () => {
     // The shell starts the hardware link itself, as it does in the app.
     render(
       <OperatorShell
-        environment={{ crashWorkspace: null, fixtureId: "audio-populated", liveTransportRequested: false, store }}
+        environment={{
+          crashWorkspace: null,
+          fixtureId: "audio-populated",
+          liveTransportRequested: false,
+          pictures: null,
+          store,
+        }}
       />
     );
     await waitFor(() => expect(store.getSnapshot().lifecycle).toBe("ready"));

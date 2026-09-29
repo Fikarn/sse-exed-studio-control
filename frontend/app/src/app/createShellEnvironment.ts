@@ -1,4 +1,10 @@
-import { createShellStore, createTauriTransport, type WorkspaceId } from "@sse/engine-client";
+import {
+  createShellStore,
+  createTauriPicturesLink,
+  createTauriTransport,
+  type PicturesLink,
+  type WorkspaceId,
+} from "@sse/engine-client";
 
 import { disarmWorkspaceCrash } from "./startup/WorkspaceCrashProbe";
 
@@ -25,9 +31,16 @@ export async function createShellEnvironment() {
   const tauriAvailable = "__TAURI_INTERNALS__" in window;
   const useLiveTransport = tauriAvailable || url.searchParams.get("transport") === "live";
 
-  const transport = useLiveTransport
-    ? createTauriTransport()
-    : (await import("./fixtureDouble")).createFixtureDouble(fixtureId);
+  // The cameras' pictures come from the shell in the app's window, and from the
+  // double's test cards in a browser (the camera pictures, D28).
+  let transport;
+  let pictures: PicturesLink | null;
+  if (useLiveTransport) {
+    transport = createTauriTransport();
+    pictures = tauriAvailable ? createTauriPicturesLink() : null;
+  } else {
+    ({ transport, pictures } = (await import("./fixtureDouble")).createFixtureDouble(fixtureId));
+  }
 
   // 2026-09 production readiness, Slice 9 (finding F10): `?crash=lighting`
   // makes that workspace throw while it renders, so Playwright can watch the
@@ -44,6 +57,7 @@ export async function createShellEnvironment() {
     crashWorkspace,
     fixtureId,
     liveTransportRequested: useLiveTransport,
+    pictures,
     // A development build refuses a malformed reply loudly (Slice 9 — F32);
     // the packaged build keeps the last good snapshot and records the failure.
     store: createShellStore(transport, { development: import.meta.env.DEV }),
