@@ -292,14 +292,16 @@ fn generate_companion_config_without_auth(base_url: &str, deck_surface_id: Optio
 
 /// Every display the 1 s poll refreshes: the AUDIO page's (with `workspace`,
 /// which every page's follow reads), the CAMERAS page's, the PROMPTER
-/// page's, and the two LIGHTS keys that ask first. The LIGHTS page's other
-/// displays are refreshed as the deck arrives.
+/// page's, the two LIGHTS keys that ask first, and the LIGHTS page's four
+/// dial displays (since 2026-09-29; they were refreshed only as the deck
+/// arrived on the page, so a change on screen did not show).
 pub(crate) fn polled_lcd_keys() -> Vec<&'static str> {
     AUDIO_LCD_KEYS
         .iter()
         .chain(CAMERA_LCD_KEYS.iter())
         .chain(PROMPTER_LCD_KEYS.iter())
         .chain(LIGHT_POLLED_LCD_KEYS.iter())
+        .chain(LIGHT_LCD_KEYS.iter())
         .copied()
         .collect()
 }
@@ -338,7 +340,7 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
         let slug = deck_page.workspace;
         let page = deck_page_number(deck_page.id);
         let sort_order = index + 1;
-        let mut actions = vec![json!({
+        let actions = vec![json!({
             "id": format!("sse-act-follow-{slug}"),
             "definitionId": "set_page",
             "connectionId": "internal",
@@ -353,7 +355,6 @@ fn generate_companion_triggers(deck_surface_id: Option<&str>) -> Value {
             "type": "action",
             "children": {}
         })];
-        actions.extend(trigger_lcd_refreshes(deck_page.arrival_refreshes));
         triggers.insert(
             format!("sse-trigger-follow-{slug}"),
             json!({
@@ -416,11 +417,7 @@ fn trigger_lcd_refreshes(keys: &[&str]) -> Vec<Value> {
 // silent no-op, so the profile must ship every LCD variable it polls into.
 fn generate_companion_custom_variables() -> Value {
     let mut variables = Map::new();
-    for (sort_order, key) in polled_lcd_keys()
-        .iter()
-        .chain(LIGHT_LCD_KEYS.iter())
-        .enumerate()
-    {
+    for (sort_order, key) in polled_lcd_keys().iter().enumerate() {
         variables.insert(
             format!("lcd_{key}"),
             json!({
@@ -530,7 +527,9 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
 /// follow triggers sent nothing to the bridge until the lighting one took over
 /// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4). With
 /// the CAMERAS and PROMPTER pages the poll was 41 requests, and the instant 62;
-/// with the LIGHTS page's `OFF?` and `DEL?` (2026-09-28) they are 43 and 64.
+/// with the LIGHTS page's `OFF?` and `DEL?` (2026-09-28) they were 43 and 64.
+/// Since 2026-09-29 the LIGHTS page's four dial displays are polled and no
+/// follow trigger sends anything: 47 and 64.
 #[cfg(test)]
 pub(crate) fn deck_worst_instant_requests() -> DeckWorstInstant {
     fn bridge_requests(value: &Value) -> usize {

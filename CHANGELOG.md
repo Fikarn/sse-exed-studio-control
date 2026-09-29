@@ -40,6 +40,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- On the deck's LIGHTS page each dial's display follows its turn: the next light's name, intensity and colour temperature, the next scene. A change made on screen shows within a second. They followed only an arrival on the page. It reaches the deck with the next import of the profile (#262).
+- An AUDIO dial on the deck speeds up only when two detents arrive within 80 ms of each other, however late they are handled: a slow turn that waited behind the displays' poll could jump five steps (#262).
 - The header's Surface lamp reads `no deck`, amber, when Companion has not asked Studio Control for anything in 5 s (Companion closed, or a profile without the right token), and Setup's deck probe passes only when it has. The probe always passed. Nothing locks. A probe's own `Run probe` key says whether it passed; it always said it had (#261).
 - Lighting reads `NOT ANSWERING`, amber, and its header lamp `not answering`, when the bridge stops answering during a session: Studio Control looks every 5 s. Nothing is locked, and the word clears when the bridge answers again (#260).
 - The recovery screen's `Restore latest` restores the newest database backup; it could pick a newer backup archive, which cannot be restored while the saved data does not open (#259).

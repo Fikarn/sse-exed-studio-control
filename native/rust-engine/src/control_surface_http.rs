@@ -40,8 +40,7 @@ const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
 /// Sized for the deck's worst instant: the exported profile's once-a-second
-/// LCD poll sends one request per polled LCD key, all at once, the lighting
-/// page-follow trigger the poll can set off adds the four LIGHTS LCDs, and the
+/// LCD poll sends one request per polled LCD key, all at once, and the
 /// control with the most LCD refreshes sends its own burst on one press
 /// (`exports::deck_worst_instant_requests` counts them). All
 /// of them must fit the workers and the queue together, with
@@ -51,7 +50,12 @@ const WORKER_COUNT: usize = 4;
 /// the CAMERAS and PROMPTER pages the instant was 62 requests (it was 44),
 /// and 64 since the LIGHTS page's `OFF?` and `DEL?` (2026-09-28); the queue
 /// went from 64 to 96: a refused key press is lost, since Companion never
-/// sends one again.
+/// sends one again. Since 2026-09-29 the LIGHTS page's four dial displays are
+/// polled rather than refreshed by its page-follow trigger, which sends
+/// nothing to the bridge now: the instant stays 64 (47 polled, a press of
+/// 17). A fast spin of the Light dial sends its action and three displays a
+/// detent, and is worked off about one detent at a time behind the lighting
+/// lock.
 const QUEUE_CAPACITY: usize = 96;
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 /// A key a page refuses is a line of its own, one a second at most for each
@@ -459,7 +463,7 @@ const KEY_ROUTES: [&str; 4] = [
 /// press was lost without a trace (`REC` while CAM 1 is released). One line
 /// a second at most for each route and action, since a dial's turn is many
 /// refused detents; the next line of that key counts the ones between. The
-/// displays' reads are left out, since the poll asks for 43 of them a second,
+/// displays' reads are left out, since the poll asks for 47 of them a second,
 /// and so are the bridge's own refusals, which `note_rejection` counts.
 fn note_refused_key(
     context: &BridgeContext,
@@ -1569,10 +1573,12 @@ mod tests {
     fn the_pool_holds_the_decks_worst_instant() {
         let worst = crate::exports::deck_worst_instant_requests();
         // The numbers the queue was sized for. A profile that sends more
-        // changes them here, and the queue with them.
+        // changes them here, and the queue with them. Since 2026-09-29 the
+        // LIGHTS page's four dial displays are polled, and arriving on LIGHTS
+        // refreshes nothing (it was 43, 4, 17): the instant is the same size.
         assert_eq!(
             (worst.poll, worst.follow, worst.press, worst.total()),
-            (43, 4, 17, 64)
+            (47, 0, 17, 64)
         );
         // The instant and the largest press again must fit: a key pressed
         // while the instant waits is not turned away.
@@ -1587,12 +1593,11 @@ mod tests {
         let host = format!("127.0.0.1:{port}");
 
         // What the instant asks for: every display of the poll, the LIGHTS
-        // displays of the follow, and a press's worth of displays more.
+        // page's among them, and a press's worth of displays more.
         let polled = crate::exports::polled_lcd_keys();
         let keys: Vec<&str> = polled
             .iter()
             .copied()
-            .chain(["light_nav", "light_intensity", "light_cct", "scene_nav"])
             .chain(polled.iter().copied().take(worst.press))
             .collect();
         assert_eq!(keys.len(), worst.total());

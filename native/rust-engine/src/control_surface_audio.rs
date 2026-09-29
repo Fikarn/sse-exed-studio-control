@@ -296,10 +296,26 @@ pub(crate) fn audio_key_lcd_text(
     }
 }
 
+/// An AUDIO key or dial at the moment of the call: the tests' form. The
+/// bridge calls `handle_audio_action_at` with the moment the request arrived.
+#[cfg(test)]
 pub(crate) fn handle_audio_action(
     db_path: &Path,
     action: &str,
     value: Option<&str>,
+) -> Result<Value, ControlSurfaceError> {
+    handle_audio_action_at(db_path, action, value, Instant::now())
+}
+
+/// An AUDIO key or dial that arrived at `at`. A dial's turn counts its
+/// acceleration from the arrival (Found, to check, 2026-09-28, from the
+/// review of #254): a detent that waited behind the deck's poll was taken for
+/// part of a fast turn.
+pub(crate) fn handle_audio_action_at(
+    db_path: &Path,
+    action: &str,
+    value: Option<&str>,
+    at: Instant,
 ) -> Result<Value, ControlSurfaceError> {
     // New pages program, Slice 2: `switchToDeckMode` left with Planning (it
     // stored the Planning setting `planning.deck_mode`, which nothing read);
@@ -323,7 +339,7 @@ pub(crate) fn handle_audio_action(
             emit_audio_changed();
             Ok(json!({ "recalled": result.snapshot_name }))
         }
-        "dialTurn" => handle_audio_dial_turn(db_path, value),
+        "dialTurn" => handle_audio_dial_turn(db_path, value, at),
         "dialPress" => handle_audio_dial_press(db_path, value),
         "stripTap" => handle_audio_strip_tap(db_path, value),
         "setMixTarget" => handle_audio_set_mix_target(db_path, value),
@@ -475,15 +491,22 @@ fn audio_settings_update_request() -> AudioSettingsUpdateRequest {
     }
 }
 
-fn audio_dial_turn_multiplier(turn_key: &str, now: Instant) -> f64 {
+/// Whether a detent that arrived at `at` is part of a fast turn: another of
+/// the same dial arrived within `AUDIO_DECK_FAST_TURN_WINDOW` of it. The
+/// bridge's four workers can handle two detents of one dial out of their
+/// order, so the gap is taken either way round, and the time kept is the
+/// later arrival.
+fn audio_dial_turn_multiplier(turn_key: &str, at: Instant) -> f64 {
     let times = AUDIO_DIAL_TURN_TIMES.get_or_init(|| Mutex::new(HashMap::new()));
     let Ok(mut times) = times.lock() else {
         return 1.0;
     };
-    let fast = times
-        .get(turn_key)
-        .is_some_and(|last| now.saturating_duration_since(*last) < AUDIO_DECK_FAST_TURN_WINDOW);
-    times.insert(String::from(turn_key), now);
+    let last = times.get(turn_key).copied();
+    let fast = last.is_some_and(|last| {
+        let gap = if at >= last { at - last } else { last - at };
+        gap < AUDIO_DECK_FAST_TURN_WINDOW
+    });
+    times.insert(String::from(turn_key), last.map_or(at, |last| last.max(at)));
     if fast {
         AUDIO_DECK_FAST_TURN_MULTIPLIER
     } else {
@@ -498,6 +521,7 @@ fn audio_dial_turn_key(db_path: &Path, bank: &str, strip_index: usize) -> String
 fn handle_audio_dial_turn(
     db_path: &Path,
     value: Option<&str>,
+    at: Instant,
 ) -> Result<Value, ControlSurfaceError> {
     let value = value.ok_or_else(|| {
         ControlSurfaceError::InvalidParams(String::from(
@@ -546,7 +570,7 @@ fn handle_audio_dial_turn(
             } else {
                 let multiplier = audio_dial_turn_multiplier(
                     &audio_dial_turn_key(db_path, &bank, strip_index),
-                    Instant::now(),
+                    at,
                 );
                 let mix_target_id = snapshot.selected_mix_target_id.clone();
                 let current = channel
@@ -576,10 +600,8 @@ fn handle_audio_dial_turn(
             }
         }
         AudioDeckStrip::MixTarget(target) => {
-            let multiplier = audio_dial_turn_multiplier(
-                &audio_dial_turn_key(db_path, &bank, strip_index),
-                Instant::now(),
-            );
+            let multiplier =
+                audio_dial_turn_multiplier(&audio_dial_turn_key(db_path, &bank, strip_index), at);
             let next = (target.volume + step_sign as f64 * AUDIO_DECK_FADER_STEP * multiplier)
                 .clamp(0.0, 1.0);
             let mut request = audio_mix_target_update_request(&target.id);
@@ -973,6 +995,77 @@ mod tests {
         assert_eq!(
             audio_dial_turn_multiplier("accel-test|inputs|2", t0 + Duration::from_millis(505)),
             1.0
+        );
+    }
+
+    // Found, to check (2026-09-28, from the review of #254): the acceleration
+    // read when a detent was handled. Two detents that arrived half a second
+    // apart, handled back to back (the second waited behind the deck's poll),
+    // are two slow steps; two that arrived 10 ms apart are a fast turn.
+    #[test]
+    fn a_dial_turn_counts_its_acceleration_from_its_arrival() {
+        let test_dir = ready_audio_test_db("dial-arrival");
+        let db_path = test_dir.db_path();
+        let level = || {
+            let snapshot = audio_snapshot_for(&test_dir);
+            let target_id = snapshot.selected_mix_target_id.clone();
+            let channel = snapshot
+                .channels
+                .iter()
+                .find(|entry| entry.id == "audio-input-9")
+                .expect("host input should exist")
+                .clone();
+            channel
+                .mix_levels
+                .get(&target_id)
+                .copied()
+                .unwrap_or(channel.fader)
+        };
+        let t0 = Instant::now();
+        let start = level();
+
+        for at in [t0, t0 + Duration::from_millis(500)] {
+            handle_audio_action_at(db_path.as_path(), "dialTurn", Some("1:down"), at)
+                .expect("dial turn should succeed");
+        }
+        assert!(
+            (level() - (start - 2.0 * AUDIO_DECK_FADER_STEP)).abs() < 1e-9,
+            "two slow steps, however quickly they were handled"
+        );
+
+        handle_audio_action_at(
+            db_path.as_path(),
+            "dialTurn",
+            Some("1:down"),
+            t0 + Duration::from_millis(510),
+        )
+        .expect("dial turn should succeed");
+        assert!(
+            (level() - (start - (2.0 + AUDIO_DECK_FAST_TURN_MULTIPLIER) * AUDIO_DECK_FADER_STEP))
+                .abs()
+                < 1e-9,
+            "a detent 10 ms after the last is a fast turn"
+        );
+    }
+
+    // Two detents of one dial handled out of their order are still two
+    // within the window, and the later arrival is kept.
+    #[test]
+    fn a_detent_handled_after_a_later_one_is_still_a_fast_turn() {
+        let t0 = Instant::now();
+        let key = "accel-order-test|inputs|1";
+        assert_eq!(
+            audio_dial_turn_multiplier(key, t0 + Duration::from_millis(50)),
+            1.0
+        );
+        assert_eq!(
+            audio_dial_turn_multiplier(key, t0),
+            AUDIO_DECK_FAST_TURN_MULTIPLIER
+        );
+        assert_eq!(
+            audio_dial_turn_multiplier(key, t0 + Duration::from_millis(120)),
+            AUDIO_DECK_FAST_TURN_MULTIPLIER,
+            "70 ms after the later arrival, not 120 ms after the earlier"
         );
     }
 

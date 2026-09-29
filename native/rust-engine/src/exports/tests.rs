@@ -300,7 +300,12 @@ fn companion_export_triggers_poll_and_follow_the_app() {
         poll["actions"].as_array().map(Vec::len),
         Some(polled_lcd_keys().len())
     );
-    assert_eq!(polled_lcd_keys().len(), 43);
+    // 47 since 2026-09-29: the LIGHTS page's four dial displays joined the
+    // poll (43 until then).
+    assert_eq!(polled_lcd_keys().len(), 47);
+    for key in LIGHT_LCD_KEYS {
+        assert!(polled_lcd_keys().contains(&key), "{key} is polled");
+    }
 
     let follow = &triggers["sse-trigger-follow-audio"];
     assert_eq!(follow["events"][0]["type"], "condition_true");
@@ -670,19 +675,66 @@ fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
         );
     }
 
-    let mut lighting_keys = LcdKeys::default();
-    collect_lcd_keys(
-        &triggers["sse-trigger-follow-lighting"]["actions"],
-        &mut lighting_keys,
+    // The follow triggers turn the page and refresh nothing: every page's
+    // displays are polled (2026-09-29; arriving on LIGHTS refreshed its four
+    // until then, which were polled by nothing).
+    for (workspace, _) in &follows {
+        let mut keys = LcdKeys::default();
+        collect_lcd_keys(
+            &triggers[format!("sse-trigger-follow-{workspace}").as_str()]["actions"],
+            &mut keys,
+        );
+        assert!(
+            keys.requested.is_empty(),
+            "following to {workspace} refreshes nothing: {:?}",
+            keys.requested
+        );
+    }
+}
+
+// Found, to check (2026-09-28): the LIGHTS strip followed only an arrival on
+// the page and a push of the Light dial, so a turn to the next light left the
+// last one's name. Each dial's turn and push refresh what they change, as the
+// AUDIO page's do.
+#[test]
+fn each_lights_dial_refreshes_what_it_changes() {
+    let config = generate_companion_config(
+        "http://127.0.0.1:38201",
+        Some("streamdeck:TESTSERIAL"),
+        TEST_TOKEN,
     );
-    assert_eq!(
-        lighting_keys.requested,
-        LIGHT_LCD_KEYS
-            .iter()
+    let lights = &config["pages"]["1"]["controls"];
+    let refreshed = |row: &str, col: &str, set: &str| {
+        let mut keys = LcdKeys::default();
+        collect_lcd_keys(
+            &lights[row][col]["steps"]["0"]["action_sets"][set],
+            &mut keys,
+        );
+        keys.requested
+    };
+    let set = |keys: &[&str]| {
+        keys.iter()
             .map(|key| key.to_string())
-            .collect::<BTreeSet<_>>(),
-        "arriving on LIGHTS refreshes its LCDs, as the PROJECTS page's `LIGHTS >>` did"
-    );
+            .collect::<BTreeSet<_>>()
+    };
+    for step in ["down", "rotate_left", "rotate_right"] {
+        assert_eq!(
+            refreshed("3", "0", step),
+            set(&["light_nav", "light_intensity", "light_cct"]),
+            "the Light dial's {step}"
+        );
+        assert_eq!(
+            refreshed("3", "1", step),
+            set(&["light_intensity"]),
+            "Intensity {step}"
+        );
+        assert_eq!(refreshed("3", "2", step), set(&["light_cct"]), "CCT {step}");
+        assert_eq!(
+            refreshed("3", "3", step),
+            set(&["scene_nav"]),
+            "Scene {step}"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

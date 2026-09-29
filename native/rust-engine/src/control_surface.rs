@@ -1,11 +1,13 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::read_audio_snapshot;
 use crate::bootstrap::RuntimeContext;
+#[cfg(test)]
+use crate::control_surface_audio::handle_audio_action;
 use crate::control_surface_audio::{
     audio_deck_bank, audio_deck_dial_mode, audio_deck_gate_label, audio_key_lcd_text,
     audio_state_value_text, audio_strip_key_index, audio_strip_lcd_text, audio_strip_level_text,
-    audio_strip_state_text, current_audio_snapshot, handle_audio_action, resolve_audio_deck_strip,
-    AudioDeckStrip,
+    audio_strip_state_text, current_audio_snapshot, handle_audio_action_at,
+    resolve_audio_deck_strip, AudioDeckStrip,
 };
 use crate::control_surface_presses::{
     ask, asked_key_acted, asking_key_text, dwelling_press, end_arm, release_dwelling_press,
@@ -497,7 +499,7 @@ pub(crate) fn deck_key_stamped(
     let mut events = Vec::new();
     let response = match path {
         "/api/deck/light-action" => handle_light_action(db_path, action, at),
-        "/api/deck/audio-action" => handle_audio_action(db_path, action, value),
+        "/api/deck/audio-action" => handle_audio_action_at(db_path, action, value, at),
         _ => match crate::control_surface_pages::handle_page_action(
             db_path,
             cameras_simulated,

@@ -7,15 +7,28 @@ use super::controls::{
 use super::pages::deck_page_number;
 use serde_json::json;
 
-// The LIGHTS page's LCD keys: not polled. The lighting page-follow trigger
-// refreshes all four as the deck arrives on LIGHTS, and the Light dial's press
-// refreshes `light_nav`, `light_intensity` and `light_cct`; the dial turns and
-// the scene keys refresh none of them. (New pages program, Slice 2: the
-// Planning keys `project_nav`, `project_status`, `project_priority`,
+// The LIGHTS page's dial displays. Polled once a second with the other pages'
+// displays, so a change made on screen shows within a second, and each dial's
+// turn and push refresh what they change at once, as the AUDIO page's dials
+// do (Found, to check, 2026-09-28: they were refreshed only as the deck
+// arrived on LIGHTS and at a push of the Light dial, so a turn to the next
+// light left the last one's name on the strip). (New pages program, Slice 2:
+// the Planning keys `project_nav`, `project_status`, `project_priority`,
 // `sort_mode` and `task_nav` left with the PROJECTS and TASKS pages; the list
 // was called `LEGACY_LCD_KEYS` until then.)
-pub(super) const LIGHT_LCD_KEYS: &[&str] =
-    &["light_nav", "light_intensity", "light_cct", "scene_nav"];
+pub(crate) const LIGHT_LCD_KEYS: [&str; 4] =
+    ["light_nav", "light_intensity", "light_cct", "scene_nav"];
+
+/// What a turn of the Light dial changes: the light, and so its two values.
+const LIGHT_SELECTION_LCD_KEYS: [&str; 3] = ["light_nav", "light_intensity", "light_cct"];
+
+/// A LIGHTS action, then the displays it changes.
+fn light_action(action: &str, refresh_keys: &[&str]) -> Vec<serde_json::Value> {
+    http_post("/api/deck/light-action", json!({ "action": action }))
+        .into_iter()
+        .chain(lcd_refreshes(refresh_keys))
+        .collect()
+}
 
 /// The LIGHTS page's two keys that ask first (2026-09-28): `All Off` reads
 /// `OFF?` and `Del Scene` `DEL?` while armed. They are polled with the other
@@ -111,55 +124,36 @@ pub(super) fn light_controls() -> Vec<ControlDef> {
             "0",
             "Light",
             Some("$(custom:lcd_light_nav)"),
-            http_post("/api/deck/light-action", json!({"action":"toggleLight"}))
-                .into_iter()
-                .chain(lcd_refreshes(&[
-                    "light_nav",
-                    "light_intensity",
-                    "light_cct",
-                ]))
-                .collect(),
-            http_post(
-                "/api/deck/light-action",
-                json!({"action":"selectPrevLight"}),
-            ),
-            http_post(
-                "/api/deck/light-action",
-                json!({"action":"selectNextLight"}),
-            ),
+            light_action("toggleLight", &LIGHT_SELECTION_LCD_KEYS),
+            light_action("selectPrevLight", &LIGHT_SELECTION_LCD_KEYS),
+            light_action("selectNextLight", &LIGHT_SELECTION_LCD_KEYS),
         ),
         dial(
             "3",
             "1",
             "Intensity",
             Some("$(custom:lcd_light_intensity)"),
-            http_post("/api/deck/light-action", json!({"action":"resetIntensity"})),
-            http_post("/api/deck/light-action", json!({"action":"intensityDown"})),
-            http_post("/api/deck/light-action", json!({"action":"intensityUp"})),
+            light_action("resetIntensity", &["light_intensity"]),
+            light_action("intensityDown", &["light_intensity"]),
+            light_action("intensityUp", &["light_intensity"]),
         ),
         dial(
             "3",
             "2",
             "CCT",
             Some("$(custom:lcd_light_cct)"),
-            http_post("/api/deck/light-action", json!({"action":"resetCct"})),
-            http_post("/api/deck/light-action", json!({"action":"cctDown"})),
-            http_post("/api/deck/light-action", json!({"action":"cctUp"})),
+            light_action("resetCct", &["light_cct"]),
+            light_action("cctDown", &["light_cct"]),
+            light_action("cctUp", &["light_cct"]),
         ),
         dial(
             "3",
             "3",
             "Scene",
             Some("$(custom:lcd_scene_nav)"),
-            http_post("/api/deck/light-action", json!({"action":"recallScene"})),
-            http_post(
-                "/api/deck/light-action",
-                json!({"action":"selectPrevScene"}),
-            ),
-            http_post(
-                "/api/deck/light-action",
-                json!({"action":"selectNextScene"}),
-            ),
+            light_action("recallScene", &["scene_nav"]),
+            light_action("selectPrevScene", &["scene_nav"]),
+            light_action("selectNextScene", &["scene_nav"]),
         ),
     ]
 }
