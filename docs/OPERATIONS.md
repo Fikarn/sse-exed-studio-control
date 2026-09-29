@@ -186,7 +186,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | `Backup failed` or `overdue` | No automatic backup written | `Export backup`; check disk space     |
 | Lighting `no bridge`         | Its probe has not passed    | Run it in Setup, then publish         |
 | Lighting `not answering`     | The bridge went silent      | Check its power and network cable     |
-| Rig dark, Lighting `ready`   | The probe may be old        | Check the bridge's power and cable    |
+| Rig dark, Lighting `ready`   | The rig does not follow     | Check the fixtures, patch, routing    |
 | Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
 | Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |
 | Surface `unavailable`        | The deck's port is taken    | Close what holds it, restart the link |

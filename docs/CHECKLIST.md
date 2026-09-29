@@ -24,8 +24,8 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] `Light outputs` set to `Armed` in Setup / Support › Workstation: the rig follows at once.
 - [ ] Set to `Held` while the rig is lit: the rig keeps its last look.
 - [ ] A light selected in the list, then on the plot: the plate follows both, and the footer's values are complete.
-- [ ] Through the whole walk the Lighting lamp never reads `not answering` while the bridge is on, and the rig follows steadily: the bridge watch knocks on its web page every 5 s. `engine.log` has one line that the bridge answers (a connection taken, or refused).
-- [ ] The bridge's network cable pulled for 15 s: Lighting reads `NOT ANSWERING`, amber, nothing is locked, and there is no `Open Setup` key. Plugged back: it clears by itself within 5 s.
+- [ ] Through the whole walk the Lighting lamp never reads `not answering` while the bridge is on, and the rig follows steadily: the bridge watch knocks on its web page every 5 s. `engine.log` has one line that the bridge answers (a connection taken, or refused) for each start of the hardware link, and none that it stopped.
+- [ ] The bridge's network cable pulled for 15 s: Lighting reads `NOT ANSWERING`, amber, nothing is locked, and there is no `Open Setup` key. Plugged back: it clears by itself within about 10 s.
 
 ## Audio console
 
