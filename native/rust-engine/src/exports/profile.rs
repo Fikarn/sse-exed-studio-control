@@ -527,7 +527,9 @@ fn build_page(page_id: &str, name: &str, controls: Vec<ControlDef>) -> Value {
 /// follow triggers sent nothing to the bridge until the lighting one took over
 /// the LIGHTS LCD refreshes of the PROJECTS page's `LIGHTS >>` key (4). With
 /// the CAMERAS and PROMPTER pages the poll was 41 requests, and the instant 62;
-/// with the LIGHTS page's `OFF?` and `DEL?` (2026-09-28) they are 43 and 64.
+/// with the LIGHTS page's `OFF?` and `DEL?` (2026-09-28) they were 43 and 64.
+/// Since 2026-09-29 the LIGHTS page's four dial displays are polled and no
+/// follow trigger sends anything: 47 and 64.
 #[cfg(test)]
 pub(crate) fn deck_worst_instant_requests() -> DeckWorstInstant {
     fn bridge_requests(value: &Value) -> usize {
