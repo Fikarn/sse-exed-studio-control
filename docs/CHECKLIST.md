@@ -50,6 +50,9 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
 - [ ] `All Off` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `All Off` again within about a second. `Del Scene` does the same with `DEL?`, and deletes nothing if the scene dial was turned in between.
 - [ ] A quick double press on `PLAY`, `DIM`, a mute (a dial's push) or `Toggle` switches once.
+- [ ] On LIGHTS, a turn of the Light dial shows the next light's name, intensity and colour temperature at once; a turn of Intensity, CCT or Scene changes its own display at once; a light changed on screen shows on the strip within a second.
+- [ ] On AUDIO, a slow turn of a dial steps one step a detent, and a fast spin steps further.
+- [ ] With Companion closed, the header's Surface lamp reads `no deck`, amber, within about 5 s, and nothing locks; started again, it reads `ready`.
 
 - [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
 

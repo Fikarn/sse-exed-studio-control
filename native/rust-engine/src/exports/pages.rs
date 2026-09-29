@@ -4,7 +4,7 @@
 use super::audio::audio_controls;
 use super::cameras::camera_controls;
 use super::controls::ControlDef;
-use super::lights::{light_controls, LIGHT_LCD_KEYS};
+use super::lights::light_controls;
 use super::prompter::prompter_controls;
 
 /// One page of the exported Stream Deck profile.
@@ -16,12 +16,10 @@ pub(super) struct DeckPage {
     pub(super) id: &'static str,
     pub(super) label: &'static str,
     /// The app page (`shell.workspace`) whose page-follow trigger brings the
-    /// deck here.
+    /// deck here. The trigger turns the page and refreshes nothing: every
+    /// page's displays are polled once a second (the LIGHTS page's too, since
+    /// 2026-09-29, when its refresh on arrival went).
     pub(super) workspace: &'static str,
-    /// The LCDs the page-follow trigger refreshes as the deck arrives: the
-    /// LIGHTS texts are not polled, so they are refreshed here; the other
-    /// pages' by the 1 s poll.
-    pub(super) arrival_refreshes: &'static [&'static str],
     pub(super) controls: fn() -> Vec<ControlDef>,
 }
 
@@ -36,7 +34,6 @@ pub(super) const DECK_PAGES: [DeckPage; 4] = [
         id: "lights",
         label: "LIGHTS",
         workspace: "lighting",
-        arrival_refreshes: LIGHT_LCD_KEYS,
         controls: light_controls,
     },
     DeckPage {
@@ -44,7 +41,6 @@ pub(super) const DECK_PAGES: [DeckPage; 4] = [
         id: "audio",
         label: "AUDIO",
         workspace: "audio",
-        arrival_refreshes: &[],
         controls: audio_controls,
     },
     DeckPage {
@@ -52,7 +48,6 @@ pub(super) const DECK_PAGES: [DeckPage; 4] = [
         id: "cameras",
         label: "CAMERAS",
         workspace: "cameras",
-        arrival_refreshes: &[],
         controls: camera_controls,
     },
     DeckPage {
@@ -61,7 +56,6 @@ pub(super) const DECK_PAGES: [DeckPage; 4] = [
         label: "PROMPTER",
         // The page's word in the app, which the hardware link accepts.
         workspace: "teleprompter",
-        arrival_refreshes: &[],
         controls: prompter_controls,
     },
 ];

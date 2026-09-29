@@ -1569,10 +1569,12 @@ mod tests {
     fn the_pool_holds_the_decks_worst_instant() {
         let worst = crate::exports::deck_worst_instant_requests();
         // The numbers the queue was sized for. A profile that sends more
-        // changes them here, and the queue with them.
+        // changes them here, and the queue with them. Since 2026-09-29 the
+        // LIGHTS page's four dial displays are polled, and arriving on LIGHTS
+        // refreshes nothing (it was 43, 4, 17): the instant is the same size.
         assert_eq!(
             (worst.poll, worst.follow, worst.press, worst.total()),
-            (43, 4, 17, 64)
+            (47, 0, 17, 64)
         );
         // The instant and the largest press again must fit: a key pressed
         // while the instant waits is not turned away.
@@ -1587,12 +1589,11 @@ mod tests {
         let host = format!("127.0.0.1:{port}");
 
         // What the instant asks for: every display of the poll, the LIGHTS
-        // displays of the follow, and a press's worth of displays more.
+        // page's among them, and a press's worth of displays more.
         let polled = crate::exports::polled_lcd_keys();
         let keys: Vec<&str> = polled
             .iter()
             .copied()
-            .chain(["light_nav", "light_intensity", "light_cct", "scene_nav"])
             .chain(polled.iter().copied().take(worst.press))
             .collect();
         assert_eq!(keys.len(), worst.total());
