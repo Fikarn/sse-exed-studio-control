@@ -412,6 +412,10 @@ pub fn spawn_pictures_helper(
     if !cameras_simulated || !studio_control_protocol::development::development_build() {
         return None;
     }
+    // PROBE (the throwaway branch probe/shell-xvfb-crash, never merged).
+    if std::env::var("SSE_PROBE_HELPER").as_deref() == Ok("off") {
+        return None;
+    }
     let program = std::env::current_exe().ok()?.with_file_name(HELPER_PROGRAM);
     Some(start_supervisor(
         db_path,

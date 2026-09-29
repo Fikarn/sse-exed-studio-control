@@ -408,6 +408,25 @@ fn see(window: &WebviewWindow, paths: &[DisplayPath]) -> Seen {
     }
 }
 
+/// PROBE (the throwaway branch probe/shell-xvfb-crash, never merged): with
+/// `SSE_PROBE_SEE=main`, the watch's looks are gathered on the main thread,
+/// where GTK must be called; otherwise on the watch's thread, as on main.
+fn see_from_the_watch(window: &WebviewWindow, paths: &[DisplayPath]) -> Option<Seen> {
+    if std::env::var("SSE_PROBE_SEE").as_deref() != Ok("main") {
+        return Some(see(window, paths));
+    }
+    let (answer, answered) = std::sync::mpsc::sync_channel(1);
+    let (asked, paths) = (window.clone(), paths.to_vec());
+    window
+        .run_on_main_thread(move || {
+            let _ = answer.send(see(&asked, &paths));
+        })
+        .ok()?;
+    answered
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .ok()
+}
+
 /// Whether two snapshots of one look are of one monitor.
 fn same_monitor(one: &AvailableMonitorSnapshot, other: &AvailableMonitorSnapshot) -> bool {
     one.name == other.name && same_place(one, &saved_from(other))
@@ -642,7 +661,9 @@ pub(crate) fn hold_while_the_screens_stand_still(app: &AppHandle, paths: &[Displ
     let Ok(window) = main_window(app) else {
         return;
     };
-    let seen = see(&window, paths);
+    let Some(seen) = see_from_the_watch(&window, paths) else {
+        return;
+    };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let hold = hold_at_rest(&seen.snapshots, seen.on, held.display.as_ref(), held.sent);
@@ -655,7 +676,9 @@ pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPat
     let Ok(window) = main_window(app) else {
         return;
     };
-    let seen = see(&window, paths);
+    let Some(seen) = see_from_the_watch(&window, paths) else {
+        return;
+    };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
     let hold = hold_after_change(
