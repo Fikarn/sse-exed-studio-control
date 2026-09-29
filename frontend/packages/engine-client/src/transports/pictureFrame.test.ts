@@ -42,7 +42,11 @@ describe("a picture's frame", () => {
     expect(() => readFrame(changed(4, 2)), "the version").toThrow("version");
     expect(() => readFrame(changed(5, 4)), "camera 4").toThrow("camera 4");
     expect(() => readFrame(changed(6, 9)), "a format").toThrow("format 9");
-    expect(() => readFrame(changed(8, 17)), "an odd UYVY width").toThrow();
+    // An odd width with the length that fits it: only UYVY's pairs of pixels refuse it.
+    const odd = (format: "uyvy" | "rgba8", size: number) =>
+      readFrame(writeFrame(1, format, 17, 2, 1, new Uint8Array(17 * 2 * size)));
+    expect(() => odd("uyvy", 2), "an odd UYVY width").toThrow("17 × 2");
+    expect(odd("rgba8", 4), "an odd RGBA width").not.toBeNull();
     expect(() => readFrame(good.slice(0, good.byteLength - 1)), "a picture cut short").toThrow();
     expect(() => readFrame(new ArrayBuffer(10)), "a header cut short").toThrow("too short");
     const huge = writeFrame(1, "rgba8", 1, 1, 1, new Uint8Array(4));

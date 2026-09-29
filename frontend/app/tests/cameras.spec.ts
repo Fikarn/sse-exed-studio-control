@@ -600,8 +600,10 @@ test.describe("the Cameras page", () => {
     await expect(hero).toHaveAttribute("data-part", "120,68,1680,945");
     await expect(hero).toHaveAttribute("data-aids", "zebras peaking");
     await expect(hero).toHaveAttribute("data-drawn", /^\d+$/);
-    // The view's rows through the bars, the steps, and the line pairs and patches.
-    const rows = [232, 732, 832];
+    // The view's rows through the bars, the steps, and the line pairs and patches, and
+    // the rows on each side of two horizontal edges (the bars' top, the patches'),
+    // where the peaking can come only from the pixel above or below.
+    const rows = [51, 52, 232, 732, 791, 792, 832];
     const drawn = await page.evaluate((rows) => {
       const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=cameras-hero-picture] canvas")!;
       const gl = canvas.getContext("webgl2")!;
@@ -650,7 +652,8 @@ test.describe("the Cameras page", () => {
       .click();
     await expectWorkspaceMounted(page, "lighting");
     const left = await hooks();
-    await page.waitForTimeout(400);
+    // Longer than a second: the page says it shows the pictures once a second.
+    await page.waitForTimeout(1_200);
     expect(await hooks(), "nothing is taken, and nothing said, once the page is left").toEqual(left);
   });
 
