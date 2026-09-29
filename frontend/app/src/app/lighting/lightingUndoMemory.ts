@@ -14,7 +14,10 @@ import { UndoHistory } from "./useUndoStack";
 // (it restarts, a database restore included, or it failed) and when a restore
 // was made (an archive's does not restart it). Until 2026-09-29 leaving the
 // page did that by accident; a step kept past a restore could have deleted
-// another scene that now has its id.
+// another scene that now has its id. The deck can delete a scene and save one
+// that takes its id while the page is closed: the memory forgets the targets
+// that left the rig, and Undo of Save scene deletes only a scene that still
+// has the name it was saved under.
 
 export interface LightingUndoMemory {
   history: UndoHistory;
@@ -37,12 +40,22 @@ export function lightingUndoMemory(store: ShellStore): LightingUndoMemory {
     sceneThumbs: { current: {} },
   };
   let restoreCount = store.getSnapshot().restoreCount;
+  let rig = store.getSnapshot().lightingSnapshot;
   store.subscribe(() => {
     const now = store.getSnapshot();
     if (now.lifecycle !== "ready" || now.restoreCount !== restoreCount) {
       restoreCount = now.restoreCount;
       memory.history.clear();
       memory.targets.clear();
+    }
+    // A scene or a fixture that left the rig, the deck's doing while the page
+    // was closed or the screen's, is forgotten as a target (the review of
+    // #263): a scene the deck saves later under its id is not the one a step
+    // named.
+    if (now.lightingSnapshot && now.lightingSnapshot !== rig) {
+      rig = now.lightingSnapshot;
+      memory.targets.forgetMissing("scene", new Set(rig.scenes.map((scene) => scene.id)));
+      memory.targets.forgetMissing("fixture", new Set(rig.fixtures.map((fixture) => fixture.id)));
     }
   });
   memories.set(store, memory);

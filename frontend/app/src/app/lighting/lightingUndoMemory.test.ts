@@ -11,8 +11,8 @@ import { lightingUndoMemory } from "./lightingUndoMemory";
 // saved data they name may have changed under them: a restore, or a restart of
 // the hardware link.
 
-async function readyStore() {
-  const store = createShellStore(createFixtureTransport(getFixtureScenario("setup-ready")));
+async function readyStore(scenario = "setup-ready") {
+  const store = createShellStore(createFixtureTransport(getFixtureScenario(scenario)));
   await store.initialize();
   expect(store.getSnapshot().lifecycle).toBe("ready");
   return store;
@@ -60,6 +60,58 @@ describe("Lighting's undo memory", () => {
     await store.restart();
 
     expect(store.getSnapshot().lifecycle).toBe("ready");
+    expect(memory.history.nextLabel()).toBeNull();
+    await store.dispose();
+  });
+
+  // The review of #263: a restore the hardware link applied can still throw
+  // in the store (the reads after it failed, the reply came late), so the
+  // count moves before the request and the steps go either way.
+  it("forgets every step at a restore that throws, and keeps the count through a restart", async () => {
+    const store = await readyStore();
+    const memory = lightingUndoMemory(store);
+    memory.history.push(step("Save scene A"));
+
+    await expect(store.restoreSupportBackup("C:\\elsewhere\\not-a-backup.json")).rejects.toThrow();
+    expect(store.getSnapshot().restoreCount).toBe(1);
+    expect(memory.history.nextLabel()).toBeNull();
+
+    await store.restart();
+    expect(store.getSnapshot().restoreCount).toBe(1);
+    await store.dispose();
+  });
+
+  it("forgets a target whose scene left the rig, so a scene saved later under its id is another", async () => {
+    const store = await readyStore("lighting-populated");
+    const memory = lightingUndoMemory(store);
+    const scene = store.getSnapshot().lightingSnapshot?.scenes[0];
+    if (!scene) throw new Error("the rig has a scene");
+    const target = memory.targets.of("scene", scene.id);
+
+    await store.deleteLightingScene(scene.id);
+
+    expect(target.id).toBeNull();
+    expect(memory.targets.of("scene", scene.id)).not.toBe(target);
+    await store.dispose();
+  });
+
+  it("does not put a failed step back into a history cleared while it ran", async () => {
+    const store = await readyStore();
+    const memory = lightingUndoMemory(store);
+    let fail: (error: unknown) => void = () => {};
+    memory.history.push({
+      label: "Delete fixture Key",
+      undo: () =>
+        new Promise<void>((_, reject) => {
+          fail = reject;
+        }),
+    });
+
+    const running = memory.history.undo();
+    memory.history.clear();
+    fail(new Error("the hardware link stopped"));
+
+    expect((await running).kind).toBe("error");
     expect(memory.history.nextLabel()).toBeNull();
     await store.dispose();
   });

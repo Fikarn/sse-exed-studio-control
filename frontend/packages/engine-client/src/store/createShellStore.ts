@@ -1132,6 +1132,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       // export carries about the session. So does the fixture catalog, which
       // is fetched once per session (Slice 9).
       backgroundFailures: state.backgroundFailures,
+      // The restores are counted for the session, as the field says.
+      restoreCount: state.restoreCount,
       lightingFixtureCatalogSnapshot: catalogLoaded ? state.lightingFixtureCatalogSnapshot : null,
       lifecycle: transitionStartupState("idle", { type: "spawned" }),
     });
@@ -1533,10 +1535,13 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return performRequest("support.backup.export");
     },
     async restoreSupportBackup(path: string) {
-      const result = await performRequest("support.backup.restore", { path });
-      // Counted before a database backup's restart, so what remembers ids of
-      // the saved data forgets them whichever way the restore went on.
+      // Counted before the request (the review of #263): a restore the
+      // hardware link applied can still throw here, when the reads that
+      // follow it fail or the reply is late, and what remembers ids of the
+      // saved data must forget them then too. Forgetting them for a refused
+      // restore costs nothing.
       setState({ ...state, restoreCount: state.restoreCount + 1 });
+      const result = await performRequest("support.backup.restore", { path });
       // A database backup is staged, not applied (2026-09 production
       // readiness, Slice 7 — F20): the engine takes it at its next start, so
       // the link is restarted here through the same path as Retry startup.

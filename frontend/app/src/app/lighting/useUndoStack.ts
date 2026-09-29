@@ -52,6 +52,9 @@ export class UndoRefusedError extends Error {
 export class UndoHistory {
   private entries: UndoEntry[] = [];
   private idCounter = 0;
+  /** Raised by every `clear`: an undo that was running then does not put its
+   *  step back into the history that forgot it (the review of #263). */
+  private generation = 0;
   private readonly listeners = new Set<() => void>();
 
   /** The label of the step the next undo reverses, or null when there is none. */
@@ -76,6 +79,7 @@ export class UndoHistory {
   /** Undoes the newest step. */
   readonly undo = async (): Promise<UndoOutcome> => {
     const entry = this.entries.pop();
+    const generation = this.generation;
     this.announce();
     if (!entry) return { kind: "noop" };
     try {
@@ -85,15 +89,19 @@ export class UndoHistory {
       if (error instanceof UndoRefusedError) {
         return { kind: "rejected", label: entry.label, reason: error.message };
       }
-      // Put the entry back so the operator can try again.
-      this.entries.push(entry);
-      this.announce();
+      // Put the entry back so the operator can try again, unless the history
+      // was cleared while it ran: the saved data it names may be gone.
+      if (generation === this.generation) {
+        this.entries.push(entry);
+        this.announce();
+      }
       return { kind: "error", label: entry.label, error };
     }
   };
 
   /** Forgets every step: the saved data they name is not the saved data now. */
   readonly clear = (): void => {
+    this.generation += 1;
     if (this.entries.length === 0) return;
     this.entries = [];
     this.announce();

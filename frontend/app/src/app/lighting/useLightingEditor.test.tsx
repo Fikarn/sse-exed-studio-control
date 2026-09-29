@@ -570,6 +570,26 @@ describe("the Undo key follows a scene or fixture through the ids an undo gives 
     expect(rig.sceneNames()).toEqual(["Warm wash", "Interview"]);
   });
 
+  // The review of #263: the steps outlive the page, and the deck can delete a
+  // saved scene and save another that takes its id meanwhile. The step that
+  // would take the saved scene away leaves the deck's alone.
+  it("a scene deleted elsewhere and another saved under its id: Undo Save scene leaves the other alone", async () => {
+    const rig = linkLikeRig();
+    render(<Harness store={rig.store} />);
+    await run((lighting) => lighting.sceneEditor.handleSaveScene("S"));
+    expect(rig.sceneNames()).toEqual(["Warm wash", "Interview", "S"]);
+
+    await rig.deleteSceneElsewhere("scene-custom-1");
+    await act(async () => {
+      await rig.store.createLightingScene({ name: "Scene 3" });
+    });
+    expect(rig.sceneNames()).toEqual(["Warm wash", "Interview", "Scene 3"]);
+
+    await pressUndo();
+    expect(lastMessage()).toBe("Cannot undo ‘Save scene S’: the scene has been deleted.");
+    expect(rig.sceneNames()).toEqual(["Warm wash", "Interview", "Scene 3"]);
+  });
+
   it("a deleted scene comes back without the fixtures deleted since, and not at all when none is left", async () => {
     const rig = linkLikeRig();
     render(<Harness store={rig.store} />);
