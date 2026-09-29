@@ -16,6 +16,18 @@ export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
 export { EngineRequestError } from "./transports/engineRequestError";
 export { createTauriGlassLink, glassLinkOver, PROMPTER_WINDOW_LABEL } from "./transports/glassLink";
 export type { GlassLink } from "./transports/glassLink";
+export { createTauriPicturesLink } from "./transports/picturesLink";
+export type { PictureCamera, PicturesLink } from "./transports/picturesLink";
+export {
+  FRAME_HEADER_LEN,
+  FULL_PICTURE,
+  SMALL_PICTURE,
+  readFrame,
+  testCardUyvy,
+  uyvyToRgba,
+  writeFrame,
+} from "./transports/pictureFrame";
+export type { FrameFormat, PictureFrame } from "./transports/pictureFrame";
 export { createTauriTransport } from "./transports/tauriTransport";
 export type {
   CommissioningCheckRequest,

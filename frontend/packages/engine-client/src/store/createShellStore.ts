@@ -1643,6 +1643,10 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     selectCamera(camera: CameraNumber) {
       return performRequest("cameras.select", { camera });
     },
+    showCameraPictures() {
+      // No read after it: it changes nothing the page shows.
+      return transport.request("cameras.pictures.showing", {});
+    },
     setCameraDialBank(bank: CameraDialBank) {
       return performRequest("cameras.bank.set", { bank });
     },

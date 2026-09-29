@@ -701,6 +701,11 @@ export interface ShellStore {
   // The cameras. Each answers what the hardware link answered, or throws its
   // refusal (`EngineRequestError`), and the cameras' state is read again.
   selectCamera(camera: CameraNumber): Promise<JsonValue>;
+  /**
+   * The Cameras page shows the pictures (`cameras.pictures.showing`): said once a second
+   * while it is open, so frames come while it does and a while after. Changes nothing.
+   */
+  showCameraPictures(): Promise<JsonValue>;
   /** What the Stream Deck's dials set on the selected camera (D14). Nothing reaches a camera. */
   setCameraDialBank(bank: CameraDialBank): Promise<JsonValue>;
   setCameraValue(request: CameraSetRequest): Promise<JsonValue>;

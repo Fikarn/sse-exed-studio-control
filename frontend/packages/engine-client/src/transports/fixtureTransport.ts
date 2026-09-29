@@ -29,6 +29,7 @@ export { calculateNextFixturePeakHold } from "./fixture/audioMetering";
 // The simulated cameras' hooks, for the tests that hold a double: a value changed on a
 // camera's body, a camera that stops answering and answers again.
 export { simulatedCameras, type SimulatedCameraHooks } from "./fixture/camerasRequests";
+export { fixturePicturesLink } from "./fixture/picturesDouble";
 
 // The domains, in the order the requests are offered to them. The snapshot
 // reads stay in `handleRequest` below; everything that changes the double is

@@ -1,7 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { ARM_DWELL_MS } from "../../packages/design-system/src/components/useArm";
+import { FULL_PICTURE, testCardUyvy, uyvyToRgba } from "../../packages/engine-client/src/transports/pictureFrame";
 import { STOP_WINDOW_MS } from "../src/app/cameras/perform";
+import { peakingMask, peakingOverlay, zebraMask, zebraOverlay } from "../src/app/cameras/pictures/pictureAids";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
@@ -551,25 +553,105 @@ test.describe("the Cameras page", () => {
 
   test("the pictures are drawn, and the aids change what is drawn", async ({ page }) => {
     await openCameras(page);
+    const hero = page.getByTestId("cameras-hero-picture");
+    await expect(hero).toHaveAttribute("data-drawn", /^\d+$/);
     const inks = () =>
       page.evaluate(() => {
-        const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=cameras-hero-picture]")!;
-        const context = canvas.getContext("2d")!;
-        const at = (x: number, y: number) => Array.from(context.getImageData(x, y, 1, 1).data);
-        // The first bar, the white patch, and a point on the first third's line.
-        return { bar: at(200, 300), white: at(950, 800), third: at(560, 300) };
+        const view = document.querySelector("[data-testid=cameras-hero-picture]")!;
+        const [picture, overlay] = Array.from(view.querySelectorAll("canvas"));
+        // The picture is WebGL2's, and kept once drawn; the guides are on the canvas above it.
+        const gl = picture!.getContext("webgl2")!;
+        const at = (x: number, y: number) => {
+          const pixel = new Uint8Array(4);
+          gl.readPixels(x, picture!.height - 1 - y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+          return Array.from(pixel);
+        };
+        const above = (x: number, y: number) => Array.from(overlay!.getContext("2d")!.getImageData(x, y, 1, 1).data);
+        // The first bar, the white patch where a dark zebra stripe crosses it, and a
+        // point on the first third's line.
+        return { bar: at(200, 300), white: at(958, 800), third: above(560, 300) };
       });
     const plain = await inks();
-    expect(plain.bar.slice(0, 3)).toEqual([191, 191, 191]);
+    // 75 % and full white, through UYVY and back.
+    for (const channel of plain.bar.slice(0, 3)) expect(Math.abs(channel - 191)).toBeLessThanOrEqual(1);
     expect(plain.white.slice(0, 3)).toEqual([255, 255, 255]);
 
     await page.getByTestId("cameras-aid-zebras").click();
+    await expect(hero).toHaveAttribute("data-aids", "zebras");
     const zebras = await inks();
     expect(zebras.bar, "75 % is under the zebras' 95 %").toEqual(plain.bar);
     expect(zebras.white, "full white is striped").not.toEqual(plain.white);
 
     await page.getByTestId("cameras-aid-guides").click();
+    await expect(hero).toHaveAttribute("data-aids", "guides zebras");
     expect((await inks()).third, "a guide runs down the first third").not.toEqual(plain.third);
+  });
+
+  // The shader works the aids out as `pictureAids.ts` does, which stays their reference:
+  // at 1:1 each of the view's pixels is one of the picture's, so they can be held to it
+  // pixel for pixel, the card decoded as the shader decodes it and the overlays laid over
+  // as a canvas lays them.
+  test("the shader's zebras and peaking are pictureAids.ts's, pixel for pixel at 1:1", async ({ page }) => {
+    await openCameras(page);
+    const hero = page.getByTestId("cameras-hero-picture");
+    await page.getByTestId("cameras-view-one-to-one").click();
+    await page.getByTestId("cameras-aid-zebras").click();
+    await page.getByTestId("cameras-aid-peaking").click();
+    await expect(hero).toHaveAttribute("data-part", "120,68,1680,945");
+    await expect(hero).toHaveAttribute("data-aids", "zebras peaking");
+    await expect(hero).toHaveAttribute("data-drawn", /^\d+$/);
+    // The view's rows through the bars, the steps, and the line pairs and patches.
+    const rows = [232, 732, 832];
+    const drawn = await page.evaluate((rows) => {
+      const canvas = document.querySelector<HTMLCanvasElement>("[data-testid=cameras-hero-picture] canvas")!;
+      const gl = canvas.getContext("webgl2")!;
+      return rows.map((row) => {
+        const line = new Uint8Array(canvas.width * 4);
+        gl.readPixels(0, canvas.height - 1 - row, canvas.width, 1, gl.RGBA, gl.UNSIGNED_BYTE, line);
+        return Array.from(line);
+      });
+    }, rows);
+
+    const { width, height } = FULL_PICTURE;
+    const picture = uyvyToRgba(testCardUyvy(1, true), width, height);
+    const zebras = zebraOverlay(zebraMask(picture, width, height), width, height);
+    const peaking = peakingOverlay(peakingMask(picture, width, height), width, height);
+    const over = (under: number, ink: number, alpha: number) => Math.round(ink * alpha + under * (1 - alpha));
+    let differing = 0;
+    let total = 0;
+    rows.forEach((row, index) => {
+      for (let x = 0; x < 1680; x += 1) {
+        const at = ((68 + row) * width + 120 + x) * 4;
+        const expected = [0, 1, 2].map((channel) => {
+          let value = picture[at + channel]!;
+          value = over(value, zebras[at + channel]!, zebras[at + 3]! / 255);
+          return over(value, peaking[at + channel]!, peaking[at + 3]! / 255);
+        });
+        const got = drawn[index]!.slice(x * 4, x * 4 + 3);
+        total += 1;
+        if (expected.some((value, channel) => Math.abs(value - got[channel]!) > 2)) differing += 1;
+      }
+    });
+    expect(differing, `${differing} of ${total} pixels differ from pictureAids.ts`).toBeLessThanOrEqual(total * 0.002);
+  });
+
+  test("the page takes the pictures only while it is open, and says that it shows them", async ({ page }) => {
+    await openCameras(page);
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-drawn", /^\d+$/);
+    const hooks = () =>
+      page.evaluate(() => ({
+        pulled: window.__SSE_TEST_CAMERAS__!.picturesPulled(),
+        said: window.__SSE_TEST_CAMERAS__!.picturesShowingSaid(),
+      }));
+    expect((await hooks()).said, "the page said it shows the pictures").toBeGreaterThan(0);
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Lighting" })
+      .click();
+    await expectWorkspaceMounted(page, "lighting");
+    const left = await hooks();
+    await page.waitForTimeout(400);
+    expect(await hooks(), "nothing is taken, and nothing said, once the page is left").toEqual(left);
   });
 
   test("the Recent list says when it cannot be read, and the cameras' state stays", async ({ page }) => {

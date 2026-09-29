@@ -121,6 +121,8 @@ export interface FixtureCameras {
   recentUnreadable: boolean;
   /** How many times the page said it shows the pictures (`cameras.pictures.showing`), for the tests. */
   showingSaid: number;
+  /** How many times the page took a picture (`picturesDouble.ts`), for the tests. */
+  picturesPulled: number;
   held: Record<CameraNumber, HeldCamera>;
   bodies: Record<CameraNumber, SimulatedCamera>;
 }
@@ -180,6 +182,7 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
       bank: "exposure",
       recentUnreadable: false,
       showingSaid: 0,
+      picturesPulled: 0,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
         1: { report: startingReport(1), answering: true, sent: 0 },

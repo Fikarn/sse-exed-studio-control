@@ -674,6 +674,8 @@ export interface SimulatedCameraHooks {
   actionLogUnreadable(unreadable: boolean): void;
   /** How many times the page said it shows the pictures (`cameras.pictures.showing`). */
   picturesShowingSaid(): number;
+  /** How many times the page took a picture. */
+  picturesPulled(): number;
 }
 
 const bound = new WeakMap<EngineTransport, FixtureRequestContext>();
@@ -725,6 +727,9 @@ export function simulatedCameras(transport: EngineTransport): SimulatedCameraHoo
     },
     picturesShowingSaid() {
       return fixtureCameras(context.state).showingSaid;
+    },
+    picturesPulled() {
+      return fixtureCameras(context.state).picturesPulled;
     },
   };
 }

@@ -38,6 +38,15 @@ export async function openBoard(page, fixture) {
   }
   await page.evaluate(() => document.fonts.ready);
   await stepToBoard(page, fixture);
+  // The camera pictures come a moment after the page: each is drawn before the measure.
+  await page.waitForFunction(
+    () =>
+      Array.from(document.querySelectorAll("[data-picture][data-camera]")).every((view) =>
+        /^\d+$/.test(view.getAttribute("data-drawn") ?? "")
+      ),
+    undefined,
+    { timeout: 10_000 }
+  );
   // Let every finite animation (enter transitions, banner fades) finish before
   // measuring, so the idle count and the sampled pixels are the board at rest;
   // infinite animations (an idle pulse) are what the idle census must catch.

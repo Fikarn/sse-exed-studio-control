@@ -32,7 +32,7 @@ export async function createGlassLink(): Promise<GlassLink> {
   const url = new URL(window.location.href);
   const fixtureId = window.__SSE_FIXTURE_ID__ ?? url.searchParams.get("fixture") ?? "teleprompter-ready";
   const { createFixtureDouble } = await import("../app/fixtureDouble");
-  const double = createFixtureDouble(fixtureId);
+  const { transport: double } = createFixtureDouble(fixtureId);
   window.__SSE_TEST_GLASS__ = {
     request: (method, params) => double.request(method as Parameters<typeof double.request>[0], params),
   };

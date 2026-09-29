@@ -1,0 +1,18 @@
+/* A view of a picture: the picture's canvas, and above it the canvas of the
+   guides and the loupe's marker. Its size is the view's own pixels. */
+
+.view {
+  position: relative;
+  display: block;
+}
+
+.picture,
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.overlay {
+  pointer-events: none;
+}

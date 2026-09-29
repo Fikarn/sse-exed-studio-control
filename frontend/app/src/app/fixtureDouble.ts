@@ -2,7 +2,12 @@
 // tests. `createShellEnvironment` loads this module on request, so the double
 // and its test data are a chunk of their own, which the app's window never
 // asks for.
-import { createFixtureTransport, simulatedCameras, type SimulatedCameraHooks } from "@sse/engine-client/fixture";
+import {
+  createFixtureTransport,
+  fixturePicturesLink,
+  simulatedCameras,
+  type SimulatedCameraHooks,
+} from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
 declare global {
@@ -18,5 +23,5 @@ declare global {
 export function createFixtureDouble(fixtureId: string) {
   const transport = createFixtureTransport(getFixtureScenario(fixtureId));
   window.__SSE_TEST_CAMERAS__ = simulatedCameras(transport);
-  return transport;
+  return { transport, pictures: fixturePicturesLink(transport) };
 }
