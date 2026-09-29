@@ -13,11 +13,13 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
+use crate::shell_pictures::{PicturesLink, PicturesLog, PicturesStore};
 use crate::shell_prompter_window::WatchWake;
 use crate::shell_windows::{deliveries, listens_in};
 use studio_control_protocol::development::{
     default_app_data_dir, development_build, host_platform, refuse_studio_folders,
 };
+use studio_control_protocol::pictures::{LINK_ADDRESS_ENV, LINK_SECRET_ENV};
 use studio_control_protocol::{
     error_response, RequestEnvelope, ResponseEnvelope, EVENT_ENGINE_EXITED, EVENT_ENGINE_READY,
     PROTOCOL_VERSION,
@@ -88,6 +90,9 @@ pub struct EngineBridge {
     /// a report about a process it already replaced from one about the
     /// process it is talking to.
     generations: AtomicU64,
+    /// The newest frame of each camera, which the page takes
+    /// (`shell_pictures.rs`), for the life of the shell.
+    pictures: Arc<PicturesStore>,
 }
 
 struct EngineProcess {
@@ -103,6 +108,8 @@ struct EngineProcess {
     /// under the process mutex.
     expected_exit: bool,
     sink: EventSink,
+    /// This start's frame listener; it closes with the process.
+    _pictures_link: Option<PicturesLink>,
 }
 
 impl EngineProcess {
@@ -146,6 +153,40 @@ impl EngineBridge {
             .env("SSE_PROTOCOL_VERSION", PROTOCOL_VERSION)
             .env("SSE_APP_DATA_DIR", &app_data_dir)
             .env("SSE_LOG_DIR", &logs_dir);
+        let shell_log = self.shell_log_for(&logs_dir)?;
+        // The pictures' frame listener of this start, its address and its
+        // secret for the engine alone (it hands them to the pictures helper).
+        // Without it the hardware link starts all the same, with no pictures.
+        // Only a development build has a helper to use it until NDI is built
+        // (the owner, 2026-09-29); elsewhere, and when it does not open, no
+        // value from the shell's own environment reaches the engine.
+        command
+            .env_remove(LINK_ADDRESS_ENV)
+            .env_remove(LINK_SECRET_ENV);
+        let pictures_link = development_build()
+            .then(|| {
+                let shell_log = Arc::clone(&shell_log);
+                let log: PicturesLog = Arc::new(move |line: &str| {
+                    if let Ok(mut log) = shell_log.lock() {
+                        let _ = log.write_line("PICTURES", line);
+                    }
+                });
+                match PicturesLink::open(Arc::clone(&self.pictures), Arc::clone(&log)) {
+                    Ok(link) => {
+                        command
+                            .env(LINK_ADDRESS_ENV, link.address().to_string())
+                            .env(LINK_SECRET_ENV, link.secret());
+                        Some(link)
+                    }
+                    Err(error) => {
+                        log(&format!(
+                            "The pictures' listener did not open: {error}. No pictures."
+                        ));
+                        None
+                    }
+                }
+            })
+            .flatten();
         // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
         // GUI-subsystem shell would pop a fresh terminal for it on Windows.
         #[cfg(windows)]
@@ -155,13 +196,18 @@ impl EngineBridge {
             command.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let shell_log = self.shell_log_for(&logs_dir)?;
-        self.launch(
+        self.launch_with_link(
             command,
             binary_path,
             app_event_sink(app.clone()),
             Some(shell_log),
+            pictures_link,
         )
+    }
+
+    /// The newest frame of each camera.
+    pub(crate) fn pictures(&self) -> &PicturesStore {
+        &self.pictures
     }
 
     /// One line of the shell's own in `<logs>/shell.log`, the file the
@@ -211,16 +257,30 @@ impl EngineBridge {
         Ok(log)
     }
 
+    /// `launch_with_link` without a frame listener: the tests' stand-ins.
+    #[cfg(test)]
+    fn launch(
+        &self,
+        command: Command,
+        binary_path: PathBuf,
+        sink: EventSink,
+        shell_log: Option<SharedShellLog>,
+    ) -> Result<EngineBootstrapSummary, String> {
+        self.launch_with_link(command, binary_path, sink, shell_log, None)
+    }
+
     /// Spawns `command` as the engine process, wires its stdout to `sink`
     /// and its stderr to `shell_log` (the production path always has one),
     /// and starts the exit watcher for it. A running engine is returned as
-    /// it is; nothing is spawned twice.
-    fn launch(
+    /// it is; nothing is spawned twice, and a frame listener opened for a
+    /// start that did not happen closes unused, its secret with it.
+    fn launch_with_link(
         &self,
         mut command: Command,
         binary_path: PathBuf,
         sink: EventSink,
         shell_log: Option<SharedShellLog>,
+        pictures_link: Option<PicturesLink>,
     ) -> Result<EngineBootstrapSummary, String> {
         let mut process_guard = self
             .process
@@ -265,6 +325,7 @@ impl EngineBridge {
             pid,
             expected_exit: false,
             sink,
+            _pictures_link: pictures_link,
         };
         let summary = process.summary();
         *process_guard = Some(process);

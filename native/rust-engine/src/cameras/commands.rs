@@ -71,6 +71,12 @@ pub(crate) fn handle_cameras_request(
             "cameras.setup.update" => setup_update_request(db_path, cameras, bodies, params, now)?,
             "cameras.setup.pair" => setup_pair_request(db_path, cameras, bodies, params, now)?,
             "cameras.setup.forget" => setup_forget_request(db_path, cameras, bodies, params, now)?,
+            // The page shows the pictures: frames go while it says so, once a
+            // second, and a while after. It changes nothing a camera holds.
+            "cameras.pictures.showing" => {
+                crate::pictures_helper::showing(db_path);
+                (serde_json::json!({}), None)
+            }
             other => return Err(CameraError::Invalid(format!("Unsupported method: {other}"))),
         };
         Ok(CamerasReply {

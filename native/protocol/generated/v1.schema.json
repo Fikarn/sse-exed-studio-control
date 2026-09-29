@@ -151,7 +151,8 @@
           "cameras.connect",
           "cameras.setup.update",
           "cameras.setup.pair",
-          "cameras.setup.forget"
+          "cameras.setup.forget",
+          "cameras.pictures.showing"
         ]
       }
     },

@@ -12,6 +12,7 @@ fn times() -> Times {
         silence: Duration::from_secs(5),
         first_delay: Duration::from_secs(1),
         longest_delay: Duration::from_secs(30),
+        showing_tail: Duration::from_secs(30),
     }
 }
 
@@ -101,6 +102,7 @@ fn quick_times() -> Times {
         silence: Duration::from_millis(600),
         first_delay: Duration::from_millis(100),
         longest_delay: Duration::from_millis(200),
+        showing_tail: Duration::from_millis(300),
     }
 }
 
@@ -159,6 +161,7 @@ fn a_program_that_is_not_there_reads_missing_and_is_said_once() {
             args: Vec::new(),
         },
         quick_times(),
+        None,
     );
     wait_for(&cameras, "missing", |status| {
         *status == HelperStatus::Missing
@@ -189,6 +192,7 @@ fn a_helper_that_ends_by_itself_is_started_again() {
         log_of(&cameras),
         launch(program, args),
         quick_times(),
+        None,
     );
     // Its start lasts a moment only: the log, not the status, says it came
     // round again.
@@ -217,6 +221,7 @@ fn a_silent_helper_is_ended_and_started_again() {
         log_of(&cameras),
         launch(program, args),
         quick_times(),
+        None,
     );
     wait_for(&cameras, "restarting", |status| {
         *status == HelperStatus::Restarting
@@ -260,6 +265,7 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
             silence: PATIENCE,
             ..quick_times()
         },
+        None,
     );
     wait_for(
         &cameras,
@@ -280,7 +286,10 @@ fn without_the_simulated_cameras_no_helper_starts() {
     // A test build is a development build: it would look for the helper
     // with the simulated cameras, and never without them.
     let cameras = TestCameras::new("helper-none");
-    assert!(spawn_pictures_helper(cameras.path().to_path_buf(), log_of(&cameras), false).is_none());
+    assert!(
+        spawn_pictures_helper(cameras.path().to_path_buf(), log_of(&cameras), false, None)
+            .is_none()
+    );
     assert_eq!(helper_status(cameras.path()), None);
 }
 
@@ -288,45 +297,150 @@ fn without_the_simulated_cameras_no_helper_starts() {
 // What reaches the helper
 // ---------------------------------------------------------------------------
 
+/// A want as the helper hears it: the selected camera, and each camera's
+/// input.
+type HeardWant = (u8, Vec<(u8, u32)>);
+
 #[test]
-fn a_vmix_input_changed_reaches_the_helper_and_nothing_else_does() {
+fn a_vmix_input_or_the_selection_changed_reaches_the_helper_and_nothing_else_does() {
     let cameras = TestCameras::set_up("helper-wants");
     let (sender, messages) = mpsc::channel();
     helpers()
         .entry(cameras.path().to_path_buf())
         .or_default()
         .to_supervisor = Some(sender);
-    let wanted = |messages: &Receiver<Message>| -> Vec<Vec<(u8, u32)>> {
-        messages
-            .try_iter()
-            .filter_map(|message| match message {
-                Message::Want(cameras) => Some(
-                    cameras
+    // Each want as (the selected camera, each camera's input), and whether
+    // the page said it shows the pictures.
+    let heard = |messages: &Receiver<Message>| -> (Vec<HeardWant>, usize) {
+        let mut wants = Vec::new();
+        let mut showings = 0;
+        for message in messages.try_iter() {
+            match message {
+                Message::Want(wanted) => wants.push((
+                    wanted.selected,
+                    wanted
+                        .cameras
                         .iter()
                         .map(|camera| (camera.camera, camera.vmix_input))
                         .collect(),
-                ),
-                _ => None,
-            })
-            .collect()
+                )),
+                Message::Showing => showings += 1,
+                _ => {}
+            }
+        }
+        (wants, showings)
     };
 
-    cameras.call("cameras.select", serde_json::json!({ "camera": 2 }));
     cameras.call("cameras.snapshot", serde_json::json!({}));
-    assert!(
-        wanted(&messages).is_empty(),
-        "a read or a selection is not a want"
+    cameras.call("cameras.select", serde_json::json!({ "camera": 1 }));
+    assert_eq!(
+        heard(&messages),
+        (Vec::new(), 0),
+        "a read, or the camera selected already, is not a want"
+    );
+
+    // The selected camera is sent big.
+    cameras.call("cameras.select", serde_json::json!({ "camera": 2 }));
+    assert_eq!(
+        heard(&messages),
+        (vec![(2, vec![(1, 1), (2, 2), (3, 3)])], 0)
     );
 
     cameras.call(
         "cameras.setup.update",
         serde_json::json!({ "camera": 3, "vmixInput": 9 }),
     );
-    assert_eq!(wanted(&messages), [vec![(1, 1), (2, 2), (3, 9)]]);
+    assert_eq!(
+        heard(&messages),
+        (vec![(2, vec![(1, 1), (2, 2), (3, 9)])], 0)
+    );
     // The same input again changes nothing.
     cameras.call(
         "cameras.setup.update",
         serde_json::json!({ "camera": 3, "vmixInput": 9 }),
     );
-    assert!(wanted(&messages).is_empty());
+    assert_eq!(heard(&messages), (Vec::new(), 0));
+
+    // The page shows the pictures: it answers nothing and changes nothing.
+    let reply = cameras
+        .reply("cameras.pictures.showing", serde_json::json!({}))
+        .expect("it answers");
+    assert_eq!(reply.result, serde_json::json!({}));
+    assert_eq!(reply.event, None);
+    assert_eq!(heard(&messages), (Vec::new(), 1));
+}
+
+// The page says it shows the pictures: the helper is told at once, after the
+// link and a first want that wanted no frames.
+#[test]
+fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
+    let cameras = TestCameras::new("helper-showing");
+    let line = r#"{"type":"state","source":"simulated","sending":true,"cameras":[]}"#;
+    // A stand-in that says one state line and then writes each line it is
+    // told to its stderr, which the supervisor logs.
+    let launch = if cfg!(windows) {
+        Launch {
+            program: which("powershell"),
+            args: vec![
+                String::from("-NoProfile"),
+                String::from("-Command"),
+                format!(
+                    "Write-Output '{line}'; while ($null -ne ($l = [Console]::In.ReadLine())) {{ [Console]::Error.WriteLine($l) }}"
+                ),
+            ],
+        }
+    } else {
+        Launch {
+            program: which("sh"),
+            args: vec![
+                String::from("-c"),
+                format!("echo '{line}'; while read -r l; do echo \"$l\" >&2; done"),
+            ],
+        }
+    };
+    let helper = start_supervisor(
+        cameras.path().to_path_buf(),
+        log_of(&cameras),
+        launch,
+        Times {
+            silence: PATIENCE,
+            ..quick_times()
+        },
+        Some(Link {
+            address: String::from("127.0.0.1:9"),
+            secret: LinkSecret("ab".repeat(32)),
+        }),
+    );
+    wait_for(&cameras, "running", |status| {
+        matches!(status, HelperStatus::Running { .. })
+    });
+    showing(cameras.path());
+    let log = || std::fs::read_to_string(log_of(&cameras)).unwrap_or_default();
+    let started = Instant::now();
+    while !log().contains(r#""showing":true"#) {
+        assert!(started.elapsed() < PATIENCE, "{}", log());
+        thread::sleep(Duration::from_millis(20));
+    }
+    // Nothing said since: when the tail has run out the helper hears that
+    // frames are no longer wanted.
+    let started = Instant::now();
+    loop {
+        let log = log();
+        let shown = log.find(r#""showing":true"#).expect("shown");
+        if log[shown..].contains(r#""showing":false"#) {
+            break;
+        }
+        assert!(started.elapsed() < PATIENCE, "{log}");
+        thread::sleep(Duration::from_millis(20));
+    }
+    helper.stop();
+    let log = log();
+    assert!(
+        log.contains(r#""type":"link","address":"127.0.0.1:9""#),
+        "{log}"
+    );
+    assert!(log.contains(r#""showing":false"#), "the first want: {log}");
+    // The stand-in echoed the link's line, secret and all, into the log: the
+    // supervisor itself never writes it anywhere but the helper's stdin.
+    assert_eq!(log.matches(&"ab".repeat(32)).count(), 1, "{log}");
 }

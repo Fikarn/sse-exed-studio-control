@@ -21,7 +21,7 @@ use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
-use crate::pictures_helper;
+use crate::pictures_helper::{self, Wanted};
 use crate::storage::open_connection;
 use crate::storage_backups::civil_from_days;
 use std::collections::HashMap;
@@ -251,15 +251,20 @@ impl Cameras {
         &self.cameras
     }
 
-    /// Each camera's vMix input, as the pictures helper is told it.
-    pub(crate) fn wanted_pictures(&self) -> Vec<WantedCamera> {
-        self.cameras
-            .iter()
-            .map(|runtime| WantedCamera {
-                camera: runtime.camera(),
-                vmix_input: runtime.setup.vmix_input,
-            })
-            .collect()
+    /// Each camera's vMix input and the selection, as the pictures helper
+    /// is told them.
+    pub(crate) fn wanted_pictures(&self) -> Wanted {
+        Wanted {
+            cameras: self
+                .cameras
+                .iter()
+                .map(|runtime| WantedCamera {
+                    camera: runtime.camera(),
+                    vmix_input: runtime.setup.vmix_input,
+                })
+                .collect(),
+            selected: self.selected,
+        }
     }
 
     fn link_read(
@@ -477,8 +482,8 @@ fn lock(entry: &Entry) -> MutexGuard<'_, EntryState> {
 /// Runs `action` on the cameras of this saved data, loaded the first time
 /// (every set-up camera held and read), after reading every camera again.
 /// The cameras' lock is held for the whole action, so two requests never
-/// interleave. A vMix input the action changed (Setup, a restore) reaches
-/// the pictures helper.
+/// interleave. A vMix input or the selection the action changed (Setup, a
+/// restore, a camera selected) reaches the pictures helper.
 pub(crate) fn with_cameras<T>(
     db_path: &Path,
     simulated: bool,

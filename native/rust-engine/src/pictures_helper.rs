@@ -28,6 +28,15 @@
 //! What it says reaches the page through `cameras/pictures.rs`, which reads
 //! the status here: a change raises `cameras.changed { reason: "pictures" }`
 //! and `app.changed { reason: "health" }`.
+//!
+//! The frames go from the helper to the shell and never through here. The
+//! shell puts its frame listener's address and secret into this process's
+//! environment; the engine takes them at its start, clears the secret from
+//! its environment, and hands both to the helper on its stdin alone
+//! (`link_from_environment`). It tells the helper which camera is selected,
+//! which is sent big, and whether the Cameras page shows the pictures: the
+//! page says so once a second (`cameras.pictures.showing`), and frames go
+//! while it does and for `SHOWING_TAIL` after.
 
 use crate::cameras::store::read_setup;
 use crate::diagnostics::append_log;
@@ -44,8 +53,8 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::pictures::{
-    from_line, read_line_bounded, to_line, FromHelper, ReceivedCamera, ToHelper, WantedCamera,
-    HELPER_PROGRAM,
+    from_line, is_link_secret, read_line_bounded, to_line, FromHelper, LinkSecret, ReceivedCamera,
+    ToHelper, WantedCamera, HELPER_PROGRAM, LINK_ADDRESS_ENV, LINK_SECRET_ENV,
 };
 
 /// A helper silent this long is ended and started again: five of its
@@ -63,6 +72,41 @@ const STOP_GRACE: Duration = Duration::from_secs(1);
 const STOP_MARGIN: Duration = Duration::from_millis(300);
 /// How often the supervisor looks, between lines.
 const TICK: Duration = Duration::from_millis(250);
+/// Frames go this long after the page last said it shows the pictures, so
+/// a look at another page and back finds them at once.
+const SHOWING_TAIL: Duration = Duration::from_secs(30);
+
+/// What the helper is told of the cameras: each one's vMix input, and the
+/// selected one, which is sent big.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Wanted {
+    pub cameras: Vec<WantedCamera>,
+    pub selected: u8,
+}
+
+/// The shell's frame listener for this start: its address and its secret.
+pub struct Link {
+    address: String,
+    secret: LinkSecret,
+}
+
+/// Takes the frame listener's address and secret from this process's
+/// environment, where the shell put them, and clears the secret from it:
+/// the helper is told it on its stdin, and nothing else ever reads it. Called
+/// while `main` is the only thread. `None` when the shell opened none (a
+/// lane, a test, an engine started by hand).
+pub fn link_from_environment() -> Option<Link> {
+    let address = std::env::var(LINK_ADDRESS_ENV).ok();
+    let secret = std::env::var(LINK_SECRET_ENV).ok();
+    std::env::remove_var(LINK_SECRET_ENV);
+    match (address, secret) {
+        (Some(address), Some(secret)) if is_link_secret(&secret) => Some(Link {
+            address,
+            secret: LinkSecret(secret),
+        }),
+        _ => None,
+    }
+}
 
 /// What the hardware link knows of the helper, for the pictures' words.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,14 +171,24 @@ fn set_status(db_path: &Path, status: HelperStatus) {
     }
 }
 
-/// The cameras' vMix inputs changed (a request, a restore): the helper hears
-/// them again. Nothing when no helper is supervised for this saved data.
-pub(crate) fn want(db_path: &Path, cameras: Vec<WantedCamera>) {
+/// A vMix input or the selection changed (a request, a restore): the helper
+/// hears them again. Nothing when no helper is supervised for this saved
+/// data.
+pub(crate) fn want(db_path: &Path, wanted: Wanted) {
+    send(db_path, Message::Want(wanted));
+}
+
+/// The Cameras page shows the pictures now (`cameras.pictures.showing`).
+pub(crate) fn showing(db_path: &Path) {
+    send(db_path, Message::Showing);
+}
+
+fn send(db_path: &Path, message: Message) {
     let sender = helpers()
         .get(db_path)
         .and_then(|entry| entry.to_supervisor.clone());
     if let Some(sender) = sender {
-        let _ = sender.send(Message::Want(cameras));
+        let _ = sender.send(message);
     }
 }
 
@@ -160,12 +214,14 @@ struct Times {
     silence: Duration,
     first_delay: Duration,
     longest_delay: Duration,
+    showing_tail: Duration,
 }
 
 const TIMES: Times = Times {
     silence: SILENCE,
     first_delay: FIRST_RESTART_DELAY,
     longest_delay: LONGEST_RESTART_DELAY,
+    showing_tail: SHOWING_TAIL,
 };
 
 /// What happened to the helper.
@@ -279,7 +335,8 @@ enum Message {
     Line(u64, String),
     /// That helper's stdout closed.
     Closed(u64),
-    Want(Vec<WantedCamera>),
+    Want(Wanted),
+    Showing,
     Stop,
 }
 
@@ -350,6 +407,7 @@ pub fn spawn_pictures_helper(
     db_path: PathBuf,
     log_file_path: PathBuf,
     cameras_simulated: bool,
+    link: Option<Link>,
 ) -> Option<PicturesHelper> {
     if !cameras_simulated || !studio_control_protocol::development::development_build() {
         return None;
@@ -363,6 +421,7 @@ pub fn spawn_pictures_helper(
             args: Vec::new(),
         },
         TIMES,
+        link,
     ))
 }
 
@@ -371,6 +430,7 @@ fn start_supervisor(
     log_file_path: PathBuf,
     launch: Launch,
     times: Times,
+    link: Option<Link>,
 ) -> PicturesHelper {
     let (to_supervisor, messages) = mpsc::channel();
     let (say_ended, ended) = mpsc::channel();
@@ -387,7 +447,12 @@ fn start_supervisor(
                     launch,
                     supervision: Supervision::new(times),
                     to_supervisor,
-                    wanted: Vec::new(),
+                    wanted: Wanted {
+                        cameras: Vec::new(),
+                        selected: 1,
+                    },
+                    showing_until: None,
+                    link,
                     running: None,
                     generation: 0,
                 }
@@ -440,7 +505,10 @@ struct Supervisor {
     supervision: Supervision,
     to_supervisor: Sender<Message>,
     /// What the helper is told at every start and every change.
-    wanted: Vec<WantedCamera>,
+    wanted: Wanted,
+    /// Until when frames are wanted: the page's last word and the tail.
+    showing_until: Option<Instant>,
+    link: Option<Link>,
     running: Option<Running>,
     generation: u64,
 }
@@ -458,9 +526,16 @@ impl Supervisor {
                     self.end("its output closed");
                 }
                 Ok(Message::Line(..) | Message::Closed(_)) => {}
-                Ok(Message::Want(cameras)) => {
-                    self.wanted = cameras;
+                Ok(Message::Want(wanted)) => {
+                    self.wanted = wanted;
                     self.tell();
+                }
+                Ok(Message::Showing) => {
+                    let was = self.showing();
+                    self.showing_until = Some(Instant::now() + self.supervision.times.showing_tail);
+                    if !was {
+                        self.tell();
+                    }
                 }
                 Ok(Message::Stop) | Err(RecvTimeoutError::Disconnected) => {
                     // (Disconnected cannot come while this thread holds a
@@ -477,6 +552,13 @@ impl Supervisor {
             if exited {
                 self.end("it ended");
             }
+            if self
+                .showing_until
+                .is_some_and(|until| Instant::now() >= until)
+            {
+                self.showing_until = None;
+                self.tell();
+            }
             match self.supervision.take(Happened::Tick(Instant::now())) {
                 Some(Todo::End) => self.end("it was silent too long"),
                 Some(Todo::Start) => self.start(),
@@ -491,14 +573,15 @@ impl Supervisor {
             .is_some_and(|running| running.generation == generation)
     }
 
-    /// Each camera's vMix input as the saved data holds it. A read that
-    /// fails is logged, and the helper is told of no camera until an input
-    /// changes: none of the three is said to have a picture meanwhile.
-    fn saved_inputs(&self) -> Vec<WantedCamera> {
+    /// Each camera's vMix input as the saved data holds it, CAM 1 selected,
+    /// as after a start (D19). A read that fails is logged, and the helper
+    /// is told of no camera until an input changes: none of the three is
+    /// said to have a picture meanwhile.
+    fn saved_inputs(&self) -> Wanted {
         let rows = open_connection(&self.db_path)
             .map_err(|error| error.to_string())
             .and_then(|connection| read_setup(&connection).map_err(|error| error.to_string()));
-        match rows {
+        let cameras = match rows {
             Ok(rows) => rows
                 .iter()
                 .map(|row| WantedCamera {
@@ -513,7 +596,16 @@ impl Supervisor {
                 );
                 Vec::new()
             }
+        };
+        Wanted {
+            cameras,
+            selected: 1,
         }
+    }
+
+    fn showing(&self) -> bool {
+        self.showing_until
+            .is_some_and(|until| Instant::now() < until)
     }
 
     fn log(&self, level: &str, message: &str) {
@@ -597,14 +689,29 @@ impl Supervisor {
         });
         self.supervision.take(Happened::Started(Instant::now()));
         set_status(&self.db_path, HelperStatus::Starting);
+        if let Some(link) = &self.link {
+            let line = to_line(&ToHelper::Link {
+                address: link.address.clone(),
+                secret: link.secret.clone(),
+            });
+            self.write(line);
+        }
         self.tell();
     }
 
-    /// Tells the running helper the cameras wanted.
+    /// Tells the running helper the cameras wanted, and whether frames are.
     fn tell(&mut self) {
         let line = to_line(&ToHelper::Want {
-            cameras: self.wanted.clone(),
+            cameras: self.wanted.cameras.clone(),
+            selected: self.wanted.selected,
+            showing: self.showing(),
         });
+        self.write(line);
+    }
+
+    /// One line to the running helper. Never logged: a link's line holds
+    /// the secret.
+    fn write(&mut self, line: String) {
         if let Some(to_stdin) = self
             .running
             .as_ref()

@@ -348,6 +348,8 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     "cameras.auto",
     // What the deck's dials set: a choice of the surface, as the selection.
     "cameras.bank.set",
+    // The page shows the pictures, once a second: nothing a person did.
+    "cameras.pictures.showing",
     "cameras.select",
     "cameras.set",
     "cameras.setup.forget",
