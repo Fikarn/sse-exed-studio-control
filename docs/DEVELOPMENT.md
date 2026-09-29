@@ -31,6 +31,8 @@ To work on the studio's data, copy its folder and name the copy: `npm run app --
 
 To measure what the app costs, `npm run app -- --release` builds the shell, the engine and the pictures helper in the release profile, in `native/target/dev-release` (the first build takes some minutes), never in `native/target/release`, where `npm run release` builds. It is still a development run: only `npm run release` makes a studio build.
 
+The shell starts only an engine of its own build, read from a mark in the engine's file (`docs/ARCHITECTURE.md`). A shell built alone beside an engine from before the mark, or beside the studio engine that `npm run release` leaves in `native/target/release`, refuses it and says why. `npm run app` and the lanes build both.
+
 A development build started any other way is as careful: where a switch is not set it takes the safe value (`native/rust-engine/src/development.rs`), and says so in its log.
 
 A change to the pages shows at once. After a change to the engine or the contract, close the app and start it again.

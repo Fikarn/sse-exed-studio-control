@@ -142,16 +142,16 @@ pub(crate) fn run_smoke_test(args: &[String]) -> i32 {
     let status_path = read_arg_value(args, "--smoke-status-path");
     let binary_path = match engine::resolve_engine_binary() {
         Ok(path) => path,
-        Err(message) => {
+        Err(not_started) => {
             write_smoke_status(
                 status_path.as_deref(),
                 json!({
                     "finished": true,
                     "exitCode": 1,
-                    "error": message,
+                    "error": not_started.detail,
                 }),
             );
-            eprintln!("{message}");
+            eprintln!("{}", not_started.detail);
             return 1;
         }
     };
