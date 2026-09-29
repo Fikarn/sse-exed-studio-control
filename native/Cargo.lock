@@ -3299,6 +3299,7 @@ dependencies = [
 name = "sse-exed-tauri-shell"
 version = "2.2.1"
 dependencies = [
+ "getrandom 0.3.4",
  "serde",
  "serde_json",
  "studio-control-protocol",

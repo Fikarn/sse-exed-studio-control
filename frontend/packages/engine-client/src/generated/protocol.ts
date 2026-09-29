@@ -102,6 +102,7 @@ export const REQUEST_METHODS = [
   "cameras.setup.update",
   "cameras.setup.pair",
   "cameras.setup.forget",
+  "cameras.pictures.showing",
 ] as const;
 export type RequestMethod = (typeof REQUEST_METHODS)[number];
 

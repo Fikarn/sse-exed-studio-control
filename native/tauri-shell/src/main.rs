@@ -24,6 +24,8 @@
 // - `shell_smoke.rs`: the `--smoke-test` mode.
 // - `shell_test_bridge.rs`: the commands of the `test-bridge` feature.
 // - `shell_log.rs`: `shell.log`.
+// - `shell_pictures.rs`: the pictures' frame route, from the pictures helper
+//   to the page.
 
 mod engine;
 #[cfg(windows)]
@@ -33,6 +35,7 @@ mod shell_display_watch;
 mod shell_displays;
 mod shell_log;
 mod shell_paths;
+mod shell_pictures;
 mod shell_prompter_window;
 mod shell_smoke;
 #[cfg(feature = "test-bridge")]
@@ -162,6 +165,7 @@ fn main() {
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
         shell_prompter_window::prompter_window_alive,
+        shell_pictures::pictures_next,
         shell_test_bridge::shell_test_bridge_config,
         shell_test_bridge::shell_test_bridge_write_status,
         shell_test_bridge::shell_test_bridge_read_command,
@@ -179,7 +183,8 @@ fn main() {
         shell_window_layout::shell_enter_studio_fullscreen,
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
-        shell_prompter_window::prompter_window_alive
+        shell_prompter_window::prompter_window_alive,
+        shell_pictures::pictures_next
     ]));
 
     let mut context = tauri::generate_context!();

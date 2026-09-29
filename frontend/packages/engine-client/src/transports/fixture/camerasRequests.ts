@@ -567,12 +567,16 @@ function answerRequest(
       return setupPairRequest(cameras, params, now);
     case "cameras.setup.forget":
       return setupForgetRequest(cameras, params);
+    case "cameras.pictures.showing":
+      // The page shows the pictures: the double has no helper to tell, and counts it.
+      cameras.showingSaid += 1;
+      return answer({});
     default:
       throw new Error(`${method} is not a cameras request`);
   }
 }
 
-/** The fifteen methods (`v1.md`'s "Cameras"). */
+/** The sixteen methods (`v1.md`'s "Cameras"). */
 export const CAMERAS_METHODS: ReadonlySet<RequestMethod> = new Set<RequestMethod>([
   "cameras.snapshot",
   "cameras.select",
@@ -589,6 +593,7 @@ export const CAMERAS_METHODS: ReadonlySet<RequestMethod> = new Set<RequestMethod
   "cameras.setup.update",
   "cameras.setup.pair",
   "cameras.setup.forget",
+  "cameras.pictures.showing",
 ]);
 
 /** The check and the whole status's part of it, compared whole. */
@@ -667,6 +672,8 @@ export interface SimulatedCameraHooks {
    * answers `recent: null` and everything else as ever.
    */
   actionLogUnreadable(unreadable: boolean): void;
+  /** How many times the page said it shows the pictures (`cameras.pictures.showing`). */
+  picturesShowingSaid(): number;
 }
 
 const bound = new WeakMap<EngineTransport, FixtureRequestContext>();
@@ -715,6 +722,9 @@ export function simulatedCameras(transport: EngineTransport): SimulatedCameraHoo
       }),
     actionLogUnreadable: (unreadable) => {
       fixtureCameras(context.state).recentUnreadable = unreadable;
+    },
+    picturesShowingSaid() {
+      return fixtureCameras(context.state).showingSaid;
     },
   };
 }

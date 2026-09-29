@@ -429,6 +429,10 @@ fn main() -> io::Result<()> {
     for (name, value) in development_defaults.iter().flatten() {
         std::env::set_var(name, value);
     }
+    // The pictures' frame listener the shell opened for this start: its
+    // secret leaves this process's environment here, while this is the
+    // only thread, and goes to the pictures helper alone.
+    let pictures_link = pictures_helper::link_from_environment();
     // The app-data directory defaults to the platform's durable location
     // (2026-09 production readiness, Slice 1 — finding F22); a host with no
     // APPDATA / HOME cannot start without SSE_APP_DATA_DIR.
@@ -566,6 +570,7 @@ fn main() -> io::Result<()> {
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
         planned_paths.cameras_simulated,
+        pictures_link,
     );
     if app.should_emit_simulated_audio_meter_ticks() {
         spawn_simulated_audio_meter_ticks(output_sender.clone(), planned_paths.db_path);

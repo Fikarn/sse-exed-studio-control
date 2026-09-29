@@ -240,6 +240,7 @@ mod window_gate_tests {
         "shell_reset_window_layout",
         "shell_confirm_close",
         "prompter_window_alive",
+        "pictures_next",
         "shell_test_bridge_config",
         "shell_test_bridge_write_status",
         "shell_test_bridge_read_command",
@@ -263,6 +264,7 @@ mod window_gate_tests {
                     "shell_paths",
                     "shell_window_layout",
                     "shell_prompter_window",
+                    "shell_pictures",
                     "shell_test_bridge",
                 ]
                 .contains(module)
@@ -302,6 +304,10 @@ mod window_gate_tests {
             PROMPTER_WINDOW_LABEL,
             "a_command_added_later"
         ));
+        // The pictures reach the operator's window alone: never the
+        // prompter's, whose glass carries nothing of the cameras.
+        assert!(window_may_call(MAIN_WINDOW_LABEL, "pictures_next"));
+        assert!(!window_may_call(PROMPTER_WINDOW_LABEL, "pictures_next"));
 
         let contract: serde_json::Value =
             serde_json::from_str(include_str!("../../protocol/v1.contract.json"))

@@ -596,6 +596,7 @@ impl EngineApp {
             "cameras.setup.update" => self.dispatch_cameras(request),
             "cameras.setup.pair" => self.dispatch_cameras(request),
             "cameras.setup.forget" => self.dispatch_cameras(request),
+            "cameras.pictures.showing" => self.dispatch_cameras(request),
 
             // -------------------------------------------------------------
             // Custom arms — kept hand-written because they have non-uniform

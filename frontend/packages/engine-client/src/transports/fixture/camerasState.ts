@@ -119,6 +119,8 @@ export interface FixtureCameras {
   bank: CameraDialBank;
   /** The action log cannot be read (a test hook): `cameras.snapshot` answers `recent: null`. */
   recentUnreadable: boolean;
+  /** How many times the page said it shows the pictures (`cameras.pictures.showing`), for the tests. */
+  showingSaid: number;
   held: Record<CameraNumber, HeldCamera>;
   bodies: Record<CameraNumber, SimulatedCamera>;
 }
@@ -177,6 +179,7 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
       selected: 1,
       bank: "exposure",
       recentUnreadable: false,
+      showingSaid: 0,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
         1: { report: startingReport(1), answering: true, sent: 0 },
