@@ -40,6 +40,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The recovery screen's `Restore latest` restores the newest database backup; it could pick a newer backup archive, which cannot be restored while the saved data does not open (#259).
+- In Setup, before the setup is published, the state display's key goes to the step the setup stands at (`Continue with Map bindings`). It read `Start with Import profile` on every step and sent the runner back to step 1 (#259).
 - Lighting's scene names, the plot's pill, the scene's title and figures, the fixture's name, the recovery screen's check titles and the shell's dialog titles are printed in Inter, as the rest of the app is: Fraunces, the old display face, is gone (#256).
 - Lighting reads `HELD` while the light outputs are held; it read `REACHABLE`, "the rig is following it" (#255).
 - `DIM` and `MONO` are `Main Out`'s whichever output is the mix target, and the phones' strips no longer show them: nothing was ever sent for the phones (#255).

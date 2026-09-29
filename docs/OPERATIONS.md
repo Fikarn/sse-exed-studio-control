@@ -193,7 +193,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Wrong display                | It opened where it was last | `Reset the window layout`             |
 | Tabs locked                  | The setup is not published  | `Publish setup` in Setup / Support    |
 
-The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
+The hardware link restarts by itself after a stop, three times in five minutes. At the recovery screen only a database backup restores: `Restore latest`, which takes the newest database backup, or press one in the list and `Restore path`. It asks first. The link restarts into it, with the light outputs held.
 
 Closing asks first. It resets and recalls nothing: TotalMix keeps its state, the light output stops and the fixtures hold their last levels.
 

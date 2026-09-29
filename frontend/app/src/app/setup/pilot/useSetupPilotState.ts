@@ -241,6 +241,7 @@ export function useSetupPilotState({ props }: { props: SetupSupportPilotProps })
     setMode,
     activeStepId,
     setActiveStepId,
+    recommendedStepId,
     pendingStepId,
     setPendingStepId,
     busyAction,
