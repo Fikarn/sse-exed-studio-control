@@ -160,18 +160,21 @@ Ask the owner first: a start takes a released camera back without a press. Does 
 
 ### The BGH1s over the network (was Slice 13)
 
-It starts once the owner has made the two checks under "Waiting on the owner".
+It starts once the owner has read the SDK's licence (under "Waiting on the owner").
 
-- The engine drives CAM 2 and CAM 3 through Panasonic's LUMIX SDK (C++, 64-bit Windows, in beta) over Ethernet, at the addresses Setup holds and no other. Setup takes an address again.
-- The address guard runs before every connection: a test build refuses a camera address that is not on this PC.
+- The engine drives CAM 2 and CAM 3 through Panasonic's LUMIX SDK (C++, 64-bit Windows, in beta) over Ethernet, as D29 allows: the SDK's search finds them, and the engine connects only to a camera whose address Setup holds. Setup takes an address again.
+- The SDK runs in a helper process of its own, as NDI does (D28), so a crash or a hang in it costs CAM 2 and CAM 3 and nothing else.
 - The watch between requests and the rule for steps are the Pocket's, with their tests.
-- The page shows only what the SDK reports back, and `Release` promises only what the owner's check showed.
+- The page shows only what the SDK reports back. A BGH1's `Release` lets the camera go and promises nothing of LUMIX Tether (D29). The words that still name LUMIX Tether for a BGH1 change with this part: the cameras' model in the engine and the double (`app`), the Release key and its sentences, `docs/OPERATIONS.md` and `docs/CHECKLIST.md`.
 
-Find out first what the SDK does on the wire:
+What the SDK does on the wire, read on 2026-09-29 from its document, its headers and its library's strings (nothing run). The SDK the owner downloaded is `LumixRemoteControlLibrary` v2.0.0 of 2021-04-28 ("Tether SDK Beta2.01" in the library); it came without a licence file:
 
-- Does it connect to a given address without searching? If it can only search, D18 goes back to the owner.
-- Does it connect to 127.0.0.1 at a given port, as a fake BGH1 needs? If not, the tests stop at a camera interface backed by the simulated camera, and the wording of rule 1 (D15) goes back to the owner.
-- What does it report back, not only accept: the exposure and white-balance modes, the resolutions and frame rates it lists, a focus position?
+- **It connects only after a search.** No call takes an address: `Get_PnPDeviceInfo` searches (10 s by default) and `Select_PnPDevice` connects to the n-th camera found. The search is SSDP, an `M-SEARCH` to `239.255.255.250` for `urn:schemas-upnp-org:device:MediaServer:1`, sent from every network adapter; a camera answers with its PTP/IP port (15740), and the SDK then speaks PTP/IP there and HTTP (`/cam.cgi`). Its own reconnect searches again. D18 went back to the owner, who took D29.
+- **It cannot be pointed at 127.0.0.1**, so no fake BGH1 can stand in for a camera. The tests stop at a camera interface backed by the simulated camera, and no test or development build starts the SDK's helper: its search leaves this PC. Rule 1's wording (D15, `docs/HARDWARE.md`) follows that; the owner sees the new wording before the part starts.
+- **What it reports back:** the value and the list of choices for ISO, shutter, white balance (with its Kelvin value and the A-B and G-M shifts), aperture, exposure compensation, AF mode and area, the camera mode, and the movie settings (C-movie mode, HDMI mode, quality, recording mode). Focus is driven in steps (`Rec_Ctrl_Lens`); no call reads a focus position. Recording starts and stops (`MoveRec_Ctrl_Start`, `_Stop`).
+- **A LAN connection has a password,** registered at the first connection and after every network reset of the camera, and given at every connection after that. Setup will hold it.
+- **After LUMIX Tether, the SDK cannot connect** until the camera's network settings are reset in its menu (Panasonic's note). A reset also clears the password.
+- Its live view works for one camera at a time. The pictures come over NDI (D17) and never from it.
 
 Ask the owner first: does taking a BGH1 back at a start disturb LUMIX Tether?
 
@@ -211,17 +214,18 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **A slow read of a camera would hold the bridge.** A display waits for its page's texts while they are read, so with a real link that answers slowly the poll's displays can hold all four workers. Measure it when the first real link is built.
 - [x] **A key the deck was refused leaves no line in the log.** The bridge logs what it refuses itself (a token, a full queue), not what a page refuses (`REC` while CAM 1 is released). Fixed in #254: one `WARN` line a refused key, with the key and the reason.
 - [x] **`PLAY`, `DIM`, a mute and `Toggle` on the deck have no dwell.** A press that arrives twice switches twice. `REC` has one. Fixed in #254: the bridge drops a second press within 350 ms, counted from the press that acted; each strip's mute has its own.
-- [ ] **Setup's runner offers `Start with Import profile` on every step,** also when the first steps are done.
+- [x] **Setup's runner offers `Start with Import profile` on every step,** also when the first steps are done. Its press also moved the saved setup back to step 1. Fixed in #259: the key names the step the saved setup stands at (`Continue with Map bindings`) and goes there.
 - [ ] **The shell can end by itself, with code 0, about 40 s after a start.** CI's Setup/Support lane failed so ("Tauri shell exited early … with code 0") on `main` after #251 and twice on #253, at different steps, while the same code passed on other runs. Not found by reading. The timing fits a development build's prompter window whose page does not draw under xvfb: it is closed after 10 s and opened again after 5 s, and the exit comes near the third close; Tauri ends the app when its last window closes. Whether a studio build can do it with the Prompter XL is not known: the walk watches for it. Found on 2026-09-28 (#255).
 - [ ] **The AUDIO dials' acceleration reads when a detent is handled, not when it arrived.** A fast turn (two detents within 80 ms) steps five times as far. A detent that waits behind the deck's poll can be taken for part of a fast turn. The deck's other keys count from the arrival since #254. Found in its review; not a regression.
-- [ ] **The recovery screen's `Restore latest` can pick a backup archive.** It takes the newest backup of either kind, and the recovery screen restores only a database backup, so the restore is refused with a sentence. Found in #252.
+- [x] **The recovery screen's `Restore latest` can pick a backup archive.** It takes the newest backup of either kind, and while the saved data does not open only a database backup restores, so the restore is refused with a sentence. Found in #252. Fixed in #259: it takes the newest database backup, the card reads `Latest database backup`, and after a storage failure the sentence says only a database backup restores.
 
 ## Waiting on the owner
 
-Two checks hold the BGH1 work and nothing else (D18):
+One check holds the BGH1 work and nothing else (D18, D29):
 
-- [ ] Download the LUMIX SDK and read its licence. The download asks for a camera's 11-digit code, from its battery holder.
-- [ ] On one BGH1, with nothing recording, check that it goes back to LUMIX Tether without a settings reset. Put back every setting touched.
+- [ ] Read the LUMIX SDK's licence: may `Lmxptpif.dll` ship in the build's folder? The SDK was downloaded on 2026-09-29, to `BGH1 SDK\` beside the repository, and came without a licence file; the download page may have shown it.
+- [x] ~~On one BGH1, check that it goes back to LUMIX Tether without a settings reset.~~ No longer holds the work: a BGH1's `Release` promises nothing of LUMIX Tether (D29), since Panasonic's document says the SDK cannot connect after LUMIX Tether until the camera's network settings are reset.
+- [ ] When the part is built, a Windows firewall rule that keeps the SDK's helper off the lighting network (D29). The owner makes it.
 
 One question about the lights, with no hurry:
 
@@ -278,7 +282,7 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D15** The safe path, six rules, in full as the six numbered rules for the cameras and the prompter under "Safety rules" in `docs/HARDWARE.md` (1 to 6 there; the line said "rules 5 to 10" until 2026-09-28). Code cites them by these numbers: (1) the BGH1s' addresses, (2) Bluetooth, (3) pictures, (4) the Prompter XL, (5) checks on the real cameras, (6) learning the BGH1's protocol.
 - **D16** "Working" means the Cameras and Teleprompter checks in `docs/CHECKLIST.md`.
 - **D17** The pictures come over NDI from vMix on this PC, and from nowhere else. No OBS path.
-- **D18** The BGH1s through Panasonic's LUMIX SDK over Ethernet; the Pocket 6K Pro over Blackmagic's Bluetooth protocol. If the licence rules the SDK out, the decision comes back to the owner.
+- **D18** The BGH1s through Panasonic's LUMIX SDK over Ethernet; the Pocket 6K Pro over Blackmagic's Bluetooth protocol. If the licence rules the SDK out, the decision comes back to the owner. Amended by D29.
 - **D19** Cameras from board 2, Teleprompter from board 1, in Studio only (D25). `REC` is a red lamp and the word, never a red fill. `Release` and `Update the prompter` are press twice. No false colour, no waveform. At a script's end `PLAY` stays locked until a jump moves the place back. Header lamps: Lighting · Audio · Cameras · Prompter · Surface. A camera that does not answer reads `UNREACHABLE`.
 - **D20** The prompter is `docs/design/teleprompter.md`: scripts from Word, pasted text and `.txt`; 88 px standard size; speed in words a minute; only `TOP` pauses; `NOT CONNECTED` is red.
 - **D21** The Teleprompter before the Cameras. What is left follows the order under "Next".
@@ -289,3 +293,4 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D26** (2026-09-28) Talkback is removed from the app entirely. The Stream Deck's AUDIO page keeps its other keys where they were; the TALK key's place is empty.
 - **D27** (2026-09-28) Studio builds. Only `npm run release` makes one, from a commit on `main`, marked while it compiles. Every other build is a development build: it refuses the studio's folders, takes the safe value of every switch that is not set, and is an app of its own. Builds are kept in `builds\` beside the repository and never deleted by a script. `npm run release:verified` names the one the studio starts and tags its commit.
 - **D28** (2026-09-29) The camera pictures come by route (b): a helper process of its own receives NDI from vMix on this PC only, started, steered and stopped by the engine, and hands each frame to the shell over a secret-guarded loopback connection; the page pulls the newest frame through the shell. The shell never receives NDI (route c).
+- **D29** (2026-09-29) The LUMIX SDK takes no address: it connects to a camera its own search found (SSDP, from every network adapter), and searches again to reconnect. The owner allows the search, with limits. The SDK runs in a helper process of its own; the engine connects only to a found camera whose address Setup holds and refuses every other; a Windows firewall rule, made by the owner, keeps the helper off the lighting network; no test or development build starts it. A BGH1's `Release` promises nothing of LUMIX Tether, since the SDK cannot connect after LUMIX Tether until the camera's network settings are reset. D12's "scan the network" and D13's hand-off to LUMIX Tether are amended for the BGH1s only.

@@ -26,7 +26,8 @@ import { useSetupPilot } from "./useSetupPilot";
 export function SetupSupportPilot(props: SetupSupportPilotProps) {
   const editor = useSetupPilot(props);
   const { store } = props;
-  const { busyAction, canReturnToConsole, checks, mode, feedback, runnerSteps, stepIndex } = editor.state;
+  const { busyAction, canReturnToConsole, checks, mode, feedback, recommendedStepId, runnerSteps, stepIndex } =
+    editor.state;
   const { setupState, clusterSteps, openEngineLog } = editor.chrome;
   const { arm } = editor.state;
   const {
@@ -46,6 +47,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
           canReturnToConsole={canReturnToConsole}
           checks={probeChecks(checks)}
           mode={mode}
+          nextStepId={recommendedStepId}
           state={setupState}
           steps={clusterSteps}
           onExportBackup={() => void performAction("support-export", exportSupportBackup)}
@@ -56,7 +58,7 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
           onSelectStep={(stepId) => requestStepSelection(stepId as RunnerStepId)}
           onStartRunner={() => {
             persistMode("runner");
-            void activateStep("import");
+            void activateStep(recommendedStepId);
           }}
         />
       </ShellRegion>

@@ -102,8 +102,8 @@ The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the a
 ## Cameras
 
 - **`CAM 1`** is the Blackmagic Pocket Cinema Camera 6K Pro, the only camera that records. Its link is Bluetooth, with Blackmagic's published protocol (service `291D567A-6D75-11E6-8B77-86F30CA893D3`). It is paired once, in Setup: the camera shows a 6-digit PIN.
-- **`CAM 2` and `CAM 3`** are Panasonic LUMIX BGH1s on the office network, powered over Ethernet (`172.16.16.85` and `172.16.16.30` when last read). Their link is Panasonic's LUMIX SDK, to the address typed into Setup. Two checks come first: the SDK's licence, and that a BGH1 goes back to LUMIX Tether without a settings reset.
-- `Release` hands a camera to the iPad (Bluetooth+) or LUMIX Tether. `Connect` takes it back.
+- **`CAM 2` and `CAM 3`** are Panasonic LUMIX BGH1s on the office network, powered over Ethernet (`172.16.16.85` and `172.16.16.30` when last read). Their link is Panasonic's LUMIX SDK. The SDK takes no address: it finds cameras by an SSDP search from every network adapter, and the app connects only to a found camera whose address is typed into Setup (D29). A LAN connection has a password, which a reset of the camera's network settings clears. The SDK's licence is read first.
+- `Release` hands `CAM 1` to the iPad (Bluetooth+), and lets a BGH1 go. `Connect` takes it back. After LUMIX Tether has held a BGH1, the SDK cannot connect to it until its network settings are reset in its menu (Panasonic's note).
 - **Pictures.** Each camera's HDMI goes to vMix: `CAM 1` into the DeckLink 8K Pro, one BGH1 through an SDI converter into the DeckLink, the other into a Cam Link 4K. The app gets pictures only as NDI from vMix on this PC. vMix's NDI option for cameras (`Settings › Outputs`) must be on, and Setup holds each camera's vMix input. There is no OBS path.
 - **Not built yet:** the links and the pictures. Until a camera's link is built, the Cameras page reads it `NOT SET UP`, and Setup takes its vMix input and neither its pairing nor its address. The page's pictures are test pictures.
 

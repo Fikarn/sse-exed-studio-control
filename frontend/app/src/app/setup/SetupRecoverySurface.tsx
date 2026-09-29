@@ -75,7 +75,13 @@ export function SetupRecoverySurface({
   // A restore asks first, and says what it replaces (2026-09-28).
   const [restorePrompt, setRestorePrompt] = useState<RestorePrompt | null>(null);
   const cancelRestore = useCallback(() => setRestorePrompt(null), []);
-  const lastBackup = backups[0] ?? null;
+  // `Restore latest` takes the newest database backup, never an archive
+  // (Found, to check, 2026-09-29): a database backup brings back all the saved
+  // data, and it is the one kind the hardware link restores while the saved
+  // data does not open. It took the newest of either kind until then, and an
+  // archive was refused.
+  const lastBackup = backups.find((backup) => backup.kind === "database") ?? null;
+  const storageFailed = failure?.code === "STORAGE_CORRUPT" || failure?.code === "STORAGE_MIGRATION_FAILED";
   const summary =
     failure?.message ??
     String(
@@ -87,8 +93,7 @@ export function SetupRecoverySurface({
   // The hardware link answers the backup requests here only in recovery
   // mode — after a storage failure it stays up for exactly that (2026-09
   // production readiness, Slice 7 — F20); after any other failure it is gone.
-  const engineRequestsAvailable =
-    failure === null || failure.code === "STORAGE_CORRUPT" || failure.code === "STORAGE_MIGRATION_FAILED";
+  const engineRequestsAvailable = failure === null || storageFailed;
   // Slice 8 (system §9): name the hardware. "Control surface", "DMX" and "OSC"
   // are the wires; the operator knows the deck, the bridge and the desk.
   const diagnosticsChecks = [
@@ -247,17 +252,19 @@ export function SetupRecoverySurface({
 
           <div className={styles.setupIncidentRestoreGrid}>
             <div className={styles.setupIncidentHighlight}>
-              <span className={styles.setupIncidentMetaLabel}>Latest backup</span>
-              <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No backup exported yet"}</strong>
+              <span className={styles.setupIncidentMetaLabel}>Latest database backup</span>
+              <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No database backup yet"}</strong>
               <span className={styles.setupIncidentHint}>
-                {String(
-                  supportSnapshot?.restoreSummary ??
-                    (engineRequestsAvailable
-                      ? "Restore a backup archive or a database backup from the backups folder."
-                      : failure?.code === "PROTOCOL_MISMATCH"
-                        ? "Nothing can be restored until the app and the hardware link are the same version."
-                        : "Nothing can be restored from here; use Retry startup, or Setup / Support once Studio Control is back.")
-                )}
+                {storageFailed
+                  ? "While the saved data does not open, only a database backup can be restored. The hardware link restarts into it."
+                  : String(
+                      supportSnapshot?.restoreSummary ??
+                        (engineRequestsAvailable
+                          ? "Restore a backup archive or a database backup from the backups folder."
+                          : failure?.code === "PROTOCOL_MISMATCH"
+                            ? "Nothing can be restored until the app and the hardware link are the same version."
+                            : "Nothing can be restored from here; use Retry startup, or Setup / Support once Studio Control is back.")
+                    )}
               </span>
             </div>
             <label className={styles.setupIncidentField}>

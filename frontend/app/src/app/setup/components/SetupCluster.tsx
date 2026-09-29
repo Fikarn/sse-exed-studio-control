@@ -28,6 +28,9 @@ export interface SetupClusterProps {
   canReturnToConsole: boolean;
   checks: readonly CommissioningCheck[];
   mode: SetupMode;
+  /** The step the saved setup stands at: the key out of `SETUP REQUIRED` goes
+   *  there. */
+  nextStepId: string;
   state: SetupState;
   steps: readonly SetupClusterStep[];
   onExportBackup: () => void;
@@ -71,6 +74,7 @@ export function SetupCluster({
   canReturnToConsole,
   checks,
   mode,
+  nextStepId,
   state,
   steps,
   onExportBackup,
@@ -81,7 +85,11 @@ export function SetupCluster({
   onSelectStep,
   onStartRunner,
 }: SetupClusterProps) {
-  const firstStep = steps[0];
+  // The key out of `SETUP REQUIRED` goes to the step the saved setup stands
+  // at, and names it (Found, to check, 2026-09-29): it read `Start with Import
+  // profile` on every step, and its press moved the saved setup back to step 1.
+  const nextStep = steps.find((step) => step.id === nextStepId) ?? steps[0];
+  const nextStepVerb = nextStep === steps[0] ? "Start with" : "Continue with";
   const probesArmed = armed?.key === "run-all-probes";
 
   // The way out of the state commissioning is in, as a key on the display.
@@ -104,9 +112,9 @@ export function SetupCluster({
           Run all probes
         </Key>
       )
-    ) : state.wayOut === "start-runner" && firstStep ? (
+    ) : state.wayOut === "start-runner" && nextStep ? (
       <Key size="small" mode="primary" testId="setup-state-start" onClick={onStartRunner}>
-        Start with {firstStep.label}
+        {nextStepVerb} {nextStep.label}
       </Key>
     ) : null;
 
