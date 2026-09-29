@@ -214,12 +214,14 @@ struct Times {
     silence: Duration,
     first_delay: Duration,
     longest_delay: Duration,
+    showing_tail: Duration,
 }
 
 const TIMES: Times = Times {
     silence: SILENCE,
     first_delay: FIRST_RESTART_DELAY,
     longest_delay: LONGEST_RESTART_DELAY,
+    showing_tail: SHOWING_TAIL,
 };
 
 /// What happened to the helper.
@@ -530,7 +532,7 @@ impl Supervisor {
                 }
                 Ok(Message::Showing) => {
                     let was = self.showing();
-                    self.showing_until = Some(Instant::now() + SHOWING_TAIL);
+                    self.showing_until = Some(Instant::now() + self.supervision.times.showing_tail);
                     if !was {
                         self.tell();
                     }

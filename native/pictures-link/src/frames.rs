@@ -105,9 +105,10 @@ impl Sender {
         self.stream.as_mut()
     }
 
-    /// One frame of every camera whose picture arrives.
+    /// One frame of every camera whose picture arrives. Nothing is made
+    /// while there is no connection to send it on.
     fn send_frames(&mut self) {
-        if !self.showing {
+        if !self.showing || self.connected().is_none() {
             return;
         }
         let frame = self.frame;
@@ -140,7 +141,7 @@ impl Sender {
                 height,
                 self.sequence[index],
             );
-            let Some(stream) = self.connected() else {
+            let Some(stream) = self.stream.as_mut() else {
                 return;
             };
             let written = stream
@@ -171,6 +172,16 @@ pub fn run(orders: &Receiver<Order>) {
     };
     let mut due = Instant::now();
     loop {
+        // Nothing to send while the page does not show the pictures: wait for
+        // an order, not for the next frame's time.
+        if !sender.showing {
+            match orders.recv() {
+                Ok(order) => sender.take(order),
+                Err(_) => return,
+            }
+            due = Instant::now();
+            continue;
+        }
         match orders.recv_timeout(due.saturating_duration_since(Instant::now())) {
             Ok(order) => {
                 sender.take(order);

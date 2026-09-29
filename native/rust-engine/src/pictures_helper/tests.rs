@@ -12,6 +12,7 @@ fn times() -> Times {
         silence: Duration::from_secs(5),
         first_delay: Duration::from_secs(1),
         longest_delay: Duration::from_secs(30),
+        showing_tail: Duration::from_secs(30),
     }
 }
 
@@ -101,6 +102,7 @@ fn quick_times() -> Times {
         silence: Duration::from_millis(600),
         first_delay: Duration::from_millis(100),
         longest_delay: Duration::from_millis(200),
+        showing_tail: Duration::from_millis(300),
     }
 }
 
@@ -417,6 +419,18 @@ fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
     let started = Instant::now();
     while !log().contains(r#""showing":true"#) {
         assert!(started.elapsed() < PATIENCE, "{}", log());
+        thread::sleep(Duration::from_millis(20));
+    }
+    // Nothing said since: when the tail has run out the helper hears that
+    // frames are no longer wanted.
+    let started = Instant::now();
+    loop {
+        let log = log();
+        let shown = log.find(r#""showing":true"#).expect("shown");
+        if log[shown..].contains(r#""showing":false"#) {
+            break;
+        }
+        assert!(started.elapsed() < PATIENCE, "{log}");
         thread::sleep(Duration::from_millis(20));
     }
     helper.stop();

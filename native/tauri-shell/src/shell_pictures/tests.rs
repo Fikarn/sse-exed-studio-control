@@ -123,11 +123,45 @@ fn a_connection_without_the_secret_is_closed_and_counted() {
     assert_eq!(store.take_counts().refused, 5);
 }
 
+// A flood of connections that say nothing: past `MAX_HANDSHAKES` they are
+// closed at once, and once the waiting ones are gone the helper gets in.
+#[test]
+fn a_flood_of_silent_connections_is_turned_away_and_the_helper_still_gets_in() {
+    let (store, link, _) = open();
+    let flood: Vec<TcpStream> = (0..MAX_HANDSHAKES + 12)
+        .filter_map(|_| TcpStream::connect(link.address()).ok())
+        .collect();
+    wait_until("the ones past the cap are refused at once", || {
+        lock(&store.counts).refused >= 12
+    });
+    drop(flood);
+    // The helper tries again after a second, as its sender does.
+    wait_until("the helper gets in", || {
+        let Ok(mut helper) = connect_saying(link.address(), link.secret()) else {
+            return false;
+        };
+        if helper.write_all(&frame(1, 1, 544, 306)).is_err() {
+            thread::sleep(Duration::from_millis(200));
+            return false;
+        }
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            if lock(&store.newest)[0].is_some() {
+                return true;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        false
+    });
+}
+
 #[test]
 fn a_frame_that_is_not_one_closes_the_connection() {
     let (store, link, lines) = open();
     let mut helper = connect_saying(link.address(), link.secret()).expect("connects");
-    let mut bad = frame(1, 1, 544, 306);
+    // Only the header: the listener closes on it, and a picture written after
+    // it could meet a closed connection.
+    let mut bad = frame(1, 1, 544, 306)[..FRAME_HEADER_LEN].to_vec();
     bad[5] = 7; // CAM 7
     helper.write_all(&bad).expect("writes");
     helper.set_read_timeout(Some(PATIENCE)).expect("a timeout");

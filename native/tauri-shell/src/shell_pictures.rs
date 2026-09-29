@@ -15,7 +15,10 @@
 //!
 //! - It listens on 127.0.0.1 alone. Any program on this PC can connect: a
 //!   connection that does not say the secret within a second is closed, and
-//!   the secret is compared in the same time whatever its difference.
+//!   the secret is compared in the same time whatever its difference. At
+//!   most `MAX_HANDSHAKES` wait to say it at once; one more is closed at
+//!   once, so a flood of connections costs the pictures and never the shell,
+//!   which is also the window's process.
 //! - One connection at a time: a new one that says the secret replaces the
 //!   old, for a helper started again says the same secret. The next start of
 //!   the hardware link has a secret of its own.
@@ -29,7 +32,7 @@
 use crate::EngineState;
 use std::io::{self, ErrorKind, Read};
 use std::net::{Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -44,6 +47,10 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(1);
 const FRAME_STALL: Duration = Duration::from_secs(2);
 /// How often the counts are logged while frames arrive.
 const COUNT_INTERVAL: Duration = Duration::from_secs(60);
+/// Connections that may wait to say the secret at once.
+const MAX_HANDSHAKES: usize = 8;
+/// The rest after an accept that failed (the system out of sockets).
+const ACCEPT_FAILED_REST: Duration = Duration::from_millis(50);
 
 /// Where the frame route's lines go: `shell.log`, or a test's list.
 pub(crate) type PicturesLog = Arc<dyn Fn(&str) + Send + Sync>;
@@ -78,14 +85,23 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl PicturesStore {
-    fn put(&self, camera: u8, bytes: Vec<u8>) {
+    /// Keeps a frame, while `still` says its connection is the current one:
+    /// asked under the lock a new start's `clear` takes, so no frame of the
+    /// last start's helper survives into this one.
+    fn put(&self, camera: u8, bytes: Vec<u8>, still: &dyn Fn() -> bool) {
         let Some(index) = usize::from(camera)
             .checked_sub(1)
             .filter(|index| *index < 3)
         else {
             return;
         };
-        let replaced = lock(&self.newest)[index].replace(Frame { bytes }).is_some();
+        let replaced = {
+            let mut newest = lock(&self.newest);
+            if !still() {
+                return;
+            }
+            newest[index].replace(Frame { bytes }).is_some()
+        };
         let mut counts = lock(&self.counts);
         counts.received += 1;
         if replaced {
@@ -190,28 +206,55 @@ fn accept(
 ) {
     // The connection that may send frames; each one's own number.
     let current = Arc::new(AtomicU64::new(0));
+    // The connections still to say the secret.
+    let handshaking = Arc::new(AtomicUsize::new(0));
     let mut number = 0_u64;
     for stream in listener.incoming() {
         if closed.load(Ordering::SeqCst) {
             return;
         }
-        let Ok(stream) = stream else { continue };
+        let Ok(stream) = stream else {
+            thread::sleep(ACCEPT_FAILED_REST);
+            continue;
+        };
+        if handshaking.load(Ordering::SeqCst) >= MAX_HANDSHAKES {
+            store.refused();
+            let _ = stream.shutdown(Shutdown::Both);
+            continue;
+        }
+        handshaking.fetch_add(1, Ordering::SeqCst);
         number += 1;
-        let (secret, store, closed, current, log) = (
+        let (secret, store, closed, current, handshaking_now, log) = (
             secret.to_string(),
             Arc::clone(store),
             Arc::clone(closed),
             Arc::clone(&current),
+            Arc::clone(&handshaking),
             Arc::clone(log),
         );
         // A connection of its own, so one that says nothing never holds the
         // listener.
-        let _ = thread::Builder::new()
+        let spawned = thread::Builder::new()
             .name(String::from("pictures-connection"))
-            .spawn(move || serve(stream, number, &secret, &store, &closed, &current, &log));
+            .spawn(move || {
+                serve(
+                    stream,
+                    number,
+                    &secret,
+                    &store,
+                    &closed,
+                    &current,
+                    &handshaking_now,
+                    &log,
+                );
+            });
+        if spawned.is_err() {
+            handshaking.fetch_sub(1, Ordering::SeqCst);
+        }
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn serve(
     mut stream: TcpStream,
     number: u64,
@@ -219,12 +262,15 @@ fn serve(
     store: &PicturesStore,
     closed: &AtomicBool,
     current: &AtomicU64,
+    handshaking: &AtomicUsize,
     log: &PicturesLog,
 ) {
+    let said = !closed.load(Ordering::SeqCst) && says_the_secret(&mut stream, secret);
+    handshaking.fetch_sub(1, Ordering::SeqCst);
     if closed.load(Ordering::SeqCst) {
         return;
     }
-    if !says_the_secret(&mut stream, secret) {
+    if !said {
         store.refused();
         let _ = stream.shutdown(Shutdown::Both);
         return;
@@ -301,10 +347,7 @@ fn read_frames(
         stream
             .read_exact(&mut bytes[FRAME_HEADER_LEN..])
             .map_err(|error| format!("a frame's picture stalled ({error})"))?;
-        if !is_current() {
-            return Ok(());
-        }
-        store.put(frame.camera, bytes);
+        store.put(frame.camera, bytes, is_current);
     }
 }
 

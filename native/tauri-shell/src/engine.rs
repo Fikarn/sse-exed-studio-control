@@ -157,28 +157,36 @@ impl EngineBridge {
         // The pictures' frame listener of this start, its address and its
         // secret for the engine alone (it hands them to the pictures helper).
         // Without it the hardware link starts all the same, with no pictures.
-        let pictures_link = {
-            let shell_log = Arc::clone(&shell_log);
-            let log: PicturesLog = Arc::new(move |line: &str| {
-                if let Ok(mut log) = shell_log.lock() {
-                    let _ = log.write_line("PICTURES", line);
+        // Only a development build has a helper to use it until NDI is built
+        // (the owner, 2026-09-29); elsewhere, and when it does not open, no
+        // value from the shell's own environment reaches the engine.
+        command
+            .env_remove(LINK_ADDRESS_ENV)
+            .env_remove(LINK_SECRET_ENV);
+        let pictures_link = development_build()
+            .then(|| {
+                let shell_log = Arc::clone(&shell_log);
+                let log: PicturesLog = Arc::new(move |line: &str| {
+                    if let Ok(mut log) = shell_log.lock() {
+                        let _ = log.write_line("PICTURES", line);
+                    }
+                });
+                match PicturesLink::open(Arc::clone(&self.pictures), Arc::clone(&log)) {
+                    Ok(link) => {
+                        command
+                            .env(LINK_ADDRESS_ENV, link.address().to_string())
+                            .env(LINK_SECRET_ENV, link.secret());
+                        Some(link)
+                    }
+                    Err(error) => {
+                        log(&format!(
+                            "The pictures' listener did not open: {error}. No pictures."
+                        ));
+                        None
+                    }
                 }
-            });
-            match PicturesLink::open(Arc::clone(&self.pictures), Arc::clone(&log)) {
-                Ok(link) => {
-                    command
-                        .env(LINK_ADDRESS_ENV, link.address().to_string())
-                        .env(LINK_SECRET_ENV, link.secret());
-                    Some(link)
-                }
-                Err(error) => {
-                    log(&format!(
-                        "The pictures' listener did not open: {error}. No pictures."
-                    ));
-                    None
-                }
-            }
-        };
+            })
+            .flatten();
         // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
         // GUI-subsystem shell would pop a fresh terminal for it on Windows.
         #[cfg(windows)]
