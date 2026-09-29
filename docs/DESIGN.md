@@ -23,7 +23,7 @@ The tabs are Setup / Support · Lighting · Audio · Cameras · Teleprompter. Th
 
 ## 3. Type
 
-Inter for everything read as language, JetBrains Mono (tabular) for values, state words and key caps. Nine steps; any one page uses at most eight of them.
+Inter for everything read as language, JetBrains Mono (tabular) for values, state words and key caps. Nine steps; any one page uses at most eight of them. One exception, the owner's (2026-09-29): Lighting's scene figures on the plate stay in Inter, with tabular digits.
 
 | Step       | Size | Where                                                               |
 | ---------- | ---: | ------------------------------------------------------------------- |

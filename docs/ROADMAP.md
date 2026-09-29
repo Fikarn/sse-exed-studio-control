@@ -123,20 +123,22 @@ Decided while it was built, and kept by the work that follows:
 
 ### The camera pictures, NDI from vMix (was Slice 10)
 
-- The page shows the three inputs vMix publishes over NDI on this PC, each by its vMix input from Setup (`setup.vmixInput`), at 25 frames a second, with neither the page nor vMix dropping a frame.
+- The page shows the three inputs vMix publishes over NDI on this PC, each by its vMix input from Setup (`setup.vmixInput`), at the rate vMix sends, with neither the page nor vMix dropping a frame. The studio records at 3840×2160 29.97, 1920×1080 29.97 and 1920×1080 25 (the owner, 2026-09-29); a 4K picture is scaled to 1920×1080 before it reaches the page, so the page, the 1:1 view and the loupe stay as designed.
 - Without vMix or its NDI option the page says so (`NO PICTURES`, `PICTURE MISSING`), and the controls still work.
 - The aids are worked out on this PC and drawn on this screen only.
 - Setup / Support carries NDI's attribution: a link to ndi.video and the trademark line.
 - The NDI runtime ships in the build's folder and loads at run time, so every build works without it installed.
 
-Find out first, and write down what it changes between engine, shell and pages:
+Found out on 2026-09-28, reading only (the note `camera-pictures-note-2026-09-28.md` in the owner's plans folder), and decided on 2026-09-29 (D28):
 
-- The frames' route. Today the engine reaches the page only through its line-by-line pipe, and the page may connect only to the shell (`connect-src ipc:` in `tauri.conf.json`). (a) The engine serves JPEG frames on 127.0.0.1 behind the bridge's token, with the policy widened for that address. (b) The engine hands the frames to the shell over a second channel, and the shell passes them on as raw data. (c) The shell receives NDI itself, which puts device I/O outside the engine.
-- Where the SDK's calls live. The NDI and LUMIX SDKs need `unsafe` code, which the engine forbids: a crate of their own that names each allowance, or a helper process. A new crate's licence is read first (`libloading` is ISC).
-- That finding the sources stays on this PC. NDI searches every network adapter unless told otherwise.
-- The processor's load of three pictures decoded while vMix records.
+- The frames' route is (b). A helper process of its own receives NDI; the engine starts, steers and stops it, below normal priority. The helper sends each frame, as a level-converted JPEG, straight to the shell over one loopback connection guarded by a secret the shell makes at each start. The page pulls the newest frame through a call of the shell's, behind its window gate, and draws it with WebGL2, the aids as shaders. The page's connection policy stays as it is, no secret reaches the page, and the engine never holds a picture. Route (c) is refused: a crash in NDI would close the operator's window and the prompter's glass.
+- The SDK's calls live in the helper, `deny` with a named list of `unsafe` like the shell's: an NDI crash or hang costs the pictures and nothing else, and the engine stays `forbid`. The helper loads the runtime by full path from its own folder. The LUMIX SDK gets a helper of its own later.
+- The sources stay on this PC: the helper runs on NDI settings of its own (`NDI_CONFIG_DIR`, 127.0.0.1 the only extra address, no multicast), and connects to a source only on 127.0.0.1 with the source's port.
+- The load: three pictures received at full bandwidth, scaled in the helper; roughly under one core of 32, to be measured while vMix records.
 
-Ask the owner first: route (c), if it is wanted. It is an architecture decision.
+Still to find out, on the PC: what vMix's NDI sources are called and what each sends (size, rate, full NDI or HX); whether NDI's own settings keep it off the two networks; whether vMix keeps zero dropped frames with NDI on while it records; JPEG against raw frames (the first measurement settles it).
+
+Ask the owner first: the NDI SDK's licence (the runtime in the build folder, the notices), the two new crates (`libloading`, a JPEG encoder), a firewall rule if NDI's settings cannot keep it off the networks, and vMix's licence (expired 2026-09-24).
 
 ### The Pocket 6K Pro over Bluetooth (was Slice 11)
 
@@ -198,7 +200,7 @@ Found while the operator's manual was rewritten from the code (2026-09-28). Each
 - [ ] **Lighting's `Undo` forgets its steps** when the page is left.
 - [ ] **The deck's `LIGHTS` strip refreshes only on arriving at the page** and on a push of the `LIGHT` dial.
 - [x] **Developer words still reach the screen** in some of the engine's sentences, and the key `Engine log` breaks the rule against "engine". Fixed in #255 for the key (`Open the log`) and the sentences seen in ordinary use: Setup's state sentence, the probes' details and refusals, the deck's bridge, the Console's Global OSC sentence, Lighting's refusals, the log's fallbacks and the log lines the recovery screen quotes. `operator_words.rs` holds them. Left as they were: the health and lighting summaries (the recovery screen and DEGRADED), the audio settings summary, the archive and database verify sentences, "not exposed by the native editor state" on a stale id, raw storage errors, and the shell's start errors.
-- [x] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions. Fixed in #256: Inter prints them, and the fixture's name at the top of the plate, `Loading the rig…` and the three dialog titles of the shell, which were in Fraunces too, at the weight and the size each had. The token is retired, the fonts are no longer loaded, and the gate has no exception left for it. The package `@fontsource-variable/fraunces` stays in `frontend/app/package.json` until the owner says it may go (dependency changes wait on the owner's word); nothing imports it.
+- [x] **A third typeface is still on screen.** Fraunces, the display face of the design before A, prints the scenes' names, the plot's pill, the scene's figures and the recovery screen's check titles. The design names two families. The layout gate lists the pages as exceptions. Fixed in #256: Inter prints them, and the fixture's name at the top of the plate, `Loading the rig…` and the three dialog titles of the shell, which were in Fraunces too, at the weight and the size each had. The token is retired, the fonts are no longer loaded, and the gate has no exception left for it. The package `@fontsource-variable/fraunces` left `frontend/app/package.json` and the lock file on 2026-09-29, with the owner's word.
 - [x] **Recent actions names the main output two ways:** `Main Out` for a key on screen or a switch at TotalMix, `main out` for the deck's `DIM`. Fixed in #255: the deck's row takes the name from the hardware link, `Dim on: Main Out`.
 - [ ] **The studio's engine keeps more than one processor core busy.** Read on 2026-09-28: 509,570 s of processor time in the 4 days 18 hours since its start, 1.2 cores on average, with nobody at the desk. It is a debug build, and Companion asks it for every display once a second. Measure the first studio build the same way; if it is still high, find what takes the time.
 - [ ] **Tests and lanes leave their scratch folders behind.** About 13,000 of them stood in `%TEMP%` on 2026-09-28, 675 MB, named `sse-*` and `studio-control-*`. Most are from scripts that are gone; find which tests still leave one.
@@ -286,3 +288,4 @@ Code comments cite these numbers. D1 to D23 date from 2026-09-24 to 2026-09-27.
 - **D25** (2026-09-28) Studio, the dark theme, is the only theme. Graphite and Bone are removed.
 - **D26** (2026-09-28) Talkback is removed from the app entirely. The Stream Deck's AUDIO page keeps its other keys where they were; the TALK key's place is empty.
 - **D27** (2026-09-28) Studio builds. Only `npm run release` makes one, from a commit on `main`, marked while it compiles. Every other build is a development build: it refuses the studio's folders, takes the safe value of every switch that is not set, and is an app of its own. Builds are kept in `builds\` beside the repository and never deleted by a script. `npm run release:verified` names the one the studio starts and tags its commit.
+- **D28** (2026-09-29) The camera pictures come by route (b): a helper process of its own receives NDI from vMix on this PC only, started, steered and stopped by the engine, and hands each frame to the shell over a secret-guarded loopback connection; the page pulls the newest frame through the shell. The shell never receives NDI (route c).
