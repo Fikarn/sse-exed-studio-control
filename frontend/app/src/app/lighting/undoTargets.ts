@@ -47,6 +47,14 @@ export class UndoTargets {
     this.place(target, id);
   }
 
+  /** Forgets every target, with the steps that held them (a restore, a
+   *  restart of the hardware link): a target kept would name, by its old id,
+   *  whatever the saved data holds under that id now. */
+  clear(): void {
+    for (const target of this.byId.values()) target.id = null;
+    this.byId.clear();
+  }
+
   /** A step deleted it: the steps that name it are refused until an undo
    *  brings it back. */
   deleted(target: UndoTarget): void {

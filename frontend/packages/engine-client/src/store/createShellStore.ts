@@ -89,6 +89,7 @@ const initialState: ShellState = {
   lastEvent: null,
   errorSummary: null,
   backgroundFailures: [],
+  restoreCount: 0,
   snapshotFault: null,
 };
 
@@ -1533,6 +1534,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async restoreSupportBackup(path: string) {
       const result = await performRequest("support.backup.restore", { path });
+      // Counted before a database backup's restart, so what remembers ids of
+      // the saved data forgets them whichever way the restore went on.
+      setState({ ...state, restoreCount: state.restoreCount + 1 });
       // A database backup is staged, not applied (2026-09 production
       // readiness, Slice 7 — F20): the engine takes it at its next start, so
       // the link is restarted here through the same path as Retry startup.

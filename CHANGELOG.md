@@ -40,6 +40,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Lighting's `Undo` keeps its steps when you leave the page and come back; it forgot them. A restore or a restart of the hardware link still clears them (#263).
 - On the deck's LIGHTS page each dial's display follows its turn: the next light's name, intensity and colour temperature, the next scene. A change made on screen shows within a second. They followed only an arrival on the page. It reaches the deck with the next import of the profile (#262).
 - An AUDIO dial on the deck speeds up only when two detents arrive within 80 ms of each other, however late they are handled: a slow turn that waited behind the displays' poll could jump five steps (#262).
 - The header's Surface lamp reads `no deck`, amber, when Companion has not asked Studio Control for anything in 5 s (Companion closed, or a profile without the right token), and Setup's deck probe passes only when it has. The probe always passed. Nothing locks. A probe's own `Run probe` key says whether it passed; it always said it had (#261).

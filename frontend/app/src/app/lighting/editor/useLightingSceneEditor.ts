@@ -8,6 +8,7 @@ import { useLiveCallback } from "../../shared/useLiveCallback";
 import { renderSceneThumbnailDataUri, withSceneThumbUpserted, withSceneThumbRemoved } from "../sceneThumbnails";
 import { UndoRefusedError } from "../useUndoStack";
 import { rigNow } from "../undoTargets";
+import { lightingUndoMemory } from "../lightingUndoMemory";
 import {
   RECENT_SCENE_LIMIT,
   pushUndoOutcomeToast,
@@ -46,16 +47,18 @@ export function useLightingSceneEditor({
 
   const sceneThumbs = useMemo(() => getSceneThumbs(appSnapshot), [appSnapshot]);
 
-  const sceneThumbsRef = useRef(sceneThumbs);
+  // Shared by every visit to the page, so an undo step taken on an earlier
+  // visit writes the thumbnails as they are now (2026-09-29).
+  const sceneThumbsRef = lightingUndoMemory(store).sceneThumbs;
   useEffect(() => {
     sceneThumbsRef.current = sceneThumbs;
-  }, [sceneThumbs]);
+  }, [sceneThumbs, sceneThumbsRef]);
   const persistSceneThumbs = useCallback(
     async (next: Record<string, string>) => {
       sceneThumbsRef.current = next;
       await store.setLightingSceneThumbs(next);
     },
-    [store]
+    [sceneThumbsRef, store]
   );
 
   const [recallFadeMs, setRecallFadeMs] = useState(0);

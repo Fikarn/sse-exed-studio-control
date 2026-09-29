@@ -50,7 +50,7 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **Select** a fixture on the plot. While `Add to selection` is lit, a press adds or removes one and a dragged box adds several. Press a group to switch it on or off.
 - **Set** the selection in the plate: `Turn on`, `Turn off`, `Intensity`, `Colour temperature`, `Palettes`. Double-click a slider to type a value.
 - **Find a light.** `Identify` flashes one fixture, `Find` the selection in turn. `Highlight` holds the selection at full, `Solo` takes all others to off. Press the key again to end it.
-- **Undo** takes back the newest of 25 steps: a scene saved or deleted, a fixture added or deleted. It takes back no recall and no level, and forgets its steps when you leave the page.
+- **Undo** takes back the newest of 25 steps: a scene saved or deleted, a fixture added or deleted. It takes back no recall and no level. It keeps its steps when you leave the page and come back, and forgets them at a restore or a restart of the hardware link, when the saved data they name may have changed.
 
 ## Audio (the Console)
 

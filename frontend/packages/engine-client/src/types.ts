@@ -587,6 +587,13 @@ export interface ShellState {
   errorSummary: string | null;
   backgroundFailures: BackgroundFailure[];
   /**
+   * How many restores this store has made (2026-09-29): an archive's and a
+   * database backup's, counted when the hardware link accepted it. What
+   * remembers ids of the saved data across pages (Lighting's Undo) forgets
+   * them when it moves, as it does when the hardware link restarts.
+   */
+  restoreCount: number;
+  /**
    * Development builds only (Slice 9): the reply that failed its shape guard,
    * request and field named. `useShellSnapshot` throws it while rendering.
    */
