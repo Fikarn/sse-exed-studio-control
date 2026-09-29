@@ -395,15 +395,17 @@ const LOOK_ON_THE_MAIN_THREAD: Duration = Duration::from_secs(5);
 /// One look at the screens, taken on the main thread whoever asks: at once
 /// when the caller is the main thread (the launch, the window commands), and
 /// through the event loop when it is the watch over the screens. `None` when
-/// the main thread did not take it in time.
+/// the main thread did not take it in time, or its event loop has closed
+/// (the app is ending).
 ///
 /// Tauri answers the monitor calls on the main thread but turns what they
 /// found into its `Monitor`s on the caller's thread, and on Linux that asks
 /// GDK for the work area. GDK is not to be called from two threads: taken on
 /// the watch's own thread, the looks crashed the shell under CI's X server
 /// about once in five runs of the Setup/Support lane (heap corruption, or a
-/// failed assertion on GDK's error traps; the watch's thread and the main
-/// thread were both in `gdk_x11_display_error_trap_push`). Taken here, 16
+/// failed assertion on GDK's error traps: the thread that aborted, the
+/// watch's in four cores of six and the main thread in two, was in
+/// `gdk_x11_display_error_trap_push`). Taken here, 16
 /// runs out of 16 passed where the old way crashed 6 times in 32
 /// (2026-09-29). Windows asks nothing that is not safe from any thread, and
 /// finds the same values here.
@@ -685,13 +687,16 @@ pub(crate) fn hold_while_the_screens_stand_still(app: &AppHandle, paths: &[Displ
 }
 
 /// Once the screens have changed and stand still again
-/// (`hold_after_change`).
-pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPath]) {
+/// (`hold_after_change`). False when the look did not come back: the watch
+/// then takes the change as unsettled, and the hold runs again at its next
+/// look, where one at rest would take the display Windows moved the window
+/// to.
+pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPath]) -> bool {
     let Ok(window) = main_window(app) else {
-        return;
+        return true;
     };
     let Some(seen) = look_on_the_main_thread(&window, paths) else {
-        return;
+        return false;
     };
     let held = app.state::<HeldDisplay>();
     let mut held = held.lock();
@@ -702,6 +707,7 @@ pub(crate) fn hold_once_the_screens_changed(app: &AppHandle, paths: &[DisplayPat
         held.display.as_ref(),
     );
     held.act(app, &window, &seen, hold);
+    true
 }
 
 /// Sends the window to the monitor of `index`, else to the display it says
@@ -717,7 +723,9 @@ fn send_window(
         route_window_to_monitor(window, monitor)?;
         return Ok(saved_from(snapshot));
     }
-    // No monitor is listed, or the window stands on none that is.
+    // No monitor is listed, or the window stands on none that is. A look at
+    // the monitors of its own: its callers (the launch, the two window
+    // commands, which are sync) are on the main thread, where GDK is asked.
     let monitor = window
         .current_monitor()
         .ok()
@@ -742,9 +750,12 @@ pub(crate) fn restore_or_route_initial_window(app: &AppHandle, window: &WebviewW
     let paths = read_display_paths().unwrap_or_default();
     let saved = read_window_preferences(app).and_then(|preferences| preferences.monitor);
     let Some(seen) = look_on_the_main_thread(window, &paths) else {
+        // As when the window did not go fullscreen: the saved display stays
+        // the window's own, so the watch does not take the one it opened on.
+        app.state::<HeldDisplay>().lock().display = saved;
         log_shell_line(
             app,
-            "The screens could not be read at launch: the window stays where it opened.",
+            "The screens could not be read at launch: the window stays where it opened, and its saved display stays its own.",
         );
         return;
     };
