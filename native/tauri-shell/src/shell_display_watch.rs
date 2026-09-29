@@ -110,6 +110,12 @@ impl DisplayWatch {
             Screens::Settled
         }
     }
+
+    /// A settled look whose hold could not look at the screens: the next
+    /// look settles again, and the hold runs again.
+    fn settle_again(&mut self) {
+        self.unsettled = true;
+    }
 }
 
 /// Starts the watch, on a thread of its own for as long as the shell runs.
@@ -213,7 +219,13 @@ fn look(
                 Screens::Settling => {}
                 Screens::Settled => {
                     log_shell_line(app, &line);
-                    hold_once_the_screens_changed(app, displays.screens());
+                    if !hold_once_the_screens_changed(app, displays.screens()) {
+                        log_shell_line(
+                            app,
+                            "The look at the screens did not come back in time: it is taken again at the next look.",
+                        );
+                        displays.settle_again();
+                    }
                 }
             }
         }
@@ -283,6 +295,28 @@ mod tests {
         assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Changing);
         assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Settled);
         assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
+    }
+
+    // 2026-09-29 (#270): the hold after a change looks at the screens on the
+    // main thread, and that look can fail to come back in time. The change is
+    // not lost: the next look settles again, and the hold runs again, where a
+    // look at rest would take the display Windows moved the window to.
+    #[test]
+    fn a_settled_look_whose_hold_did_not_look_settles_again() {
+        let mut watch = DisplayWatch::default();
+        let mut clock = Clock::new();
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
+        let mut arrived = the_studio();
+        arrived.push(prompter(r"\\.\DISPLAY4", (-1920, 0)));
+        assert_eq!(watch.look(arrived.clone(), clock.tick()), Screens::Changing);
+        assert_eq!(watch.look(arrived.clone(), clock.tick()), Screens::Settled);
+        watch.settle_again();
+        assert_eq!(
+            watch.look(arrived.clone(), clock.tick()),
+            Screens::Settled,
+            "the hold runs again"
+        );
+        assert_eq!(watch.look(arrived, clock.tick()), Screens::Still);
     }
 
     // Where there is nothing to read (any system but Windows) every look
