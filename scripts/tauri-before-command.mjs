@@ -23,6 +23,27 @@ function findWorkspaceRoot(startDirectory) {
   }
 }
 
+/**
+ * Cargo's arguments for the engine and the pictures helper. `tauri build`
+ * makes release builds of the shell and the engine (the studio's, when
+ * `npm run release` runs it); `tauri dev` builds both in the shell's profile:
+ * the debug profile, or the release profile of `npm run app -- --release`,
+ * which says so in `SSE_DEV_RUN_RELEASE` (scripts/dev-app.mjs). The pictures
+ * helper is built beside the engine, which starts it in a development run
+ * (D28).
+ */
+export function engineBuildArgs(command, env) {
+  const release = command === "build" || env.SSE_DEV_RUN_RELEASE === "1";
+  return [
+    "build",
+    "--package",
+    "studio-control-engine",
+    "--package",
+    "studio-control-pictures",
+    ...(release ? ["--release"] : []),
+  ];
+}
+
 function main() {
   const command = process.argv[2];
   const cargo = process.platform === "win32" ? "cargo.exe" : "cargo";
@@ -41,19 +62,7 @@ function main() {
     process.exit(1);
   }
 
-  // `tauri build` makes release builds of the shell and the engine (the
-  // studio's, when `npm run release` runs it); `tauri dev` runs the
-  // development builds of both. The pictures helper is built beside the
-  // engine, which starts it in a development run (D28).
-  const engineArgs = [
-    "build",
-    "--package",
-    "studio-control-engine",
-    "--package",
-    "studio-control-pictures",
-    ...(command === "build" ? ["--release"] : []),
-  ];
-  const engineBuild = spawnSync(cargo, engineArgs, {
+  const engineBuild = spawnSync(cargo, engineBuildArgs(command, process.env), {
     cwd: path.join(rootDirectory, "native"),
     stdio: "inherit",
     shell: process.platform === "win32",
