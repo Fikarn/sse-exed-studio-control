@@ -43,8 +43,16 @@ function main() {
 
   // `tauri build` makes release builds of the shell and the engine (the
   // studio's, when `npm run release` runs it); `tauri dev` runs the
-  // development builds of both.
-  const engineArgs = ["build", "--package", "studio-control-engine", ...(command === "build" ? ["--release"] : [])];
+  // development builds of both. The pictures helper is built beside the
+  // engine, which starts it in a development run (D28).
+  const engineArgs = [
+    "build",
+    "--package",
+    "studio-control-engine",
+    "--package",
+    "studio-control-pictures",
+    ...(command === "build" ? ["--release"] : []),
+  ];
   const engineBuild = spawnSync(cargo, engineArgs, {
     cwd: path.join(rootDirectory, "native"),
     stdio: "inherit",

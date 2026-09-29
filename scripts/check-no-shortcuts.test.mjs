@@ -351,6 +351,28 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
   assert.deepEqual(lintTable(crate, "lints.clippy"), lintTable(workspace, "workspace.lints.clippy"));
 });
 
+test("every crate of the workspace takes its lints, so unsafe is forbidden but in the shell's named list", () => {
+  // A crate without `[lints] workspace = true` takes no lint table at all, and would allow
+  // `unsafe` unseen. The shell has a table of its own (deny, with SHELL_UNSAFE, above).
+  const workspace = readFileSync(path.join(repoRoot, "native/Cargo.toml"), "utf8");
+  const members = workspace.match(/^members = \[([^\]]*)\]/m);
+  assert.ok(members, "native/Cargo.toml lists its members");
+  const crates = [...members[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(crates.includes("pictures-link"), "the pictures helper is a member");
+  for (const crate of crates) {
+    const manifest = readFileSync(path.join(repoRoot, "native", crate, "Cargo.toml"), "utf8")
+      .split("\n")
+      .map((line) => line.replace(/#.*/, "").trimEnd())
+      .join("\n");
+    if (crate === "tauri-shell") {
+      assert.ok(/^\[lints\.rust\]\s*\nunsafe_code = "deny"/m.test(manifest), "the shell denies unsafe");
+      continue;
+    }
+    assert.ok(/^\[lints\]\s*\nworkspace = true/m.test(manifest), `${crate} takes the workspace's lints`);
+    assert.ok(!/unsafe_code/.test(manifest), `${crate} does not lift unsafe_code`);
+  }
+});
+
 test("the shell's windows and webview2-com are the ones Tauri's wry uses (the COM code compiles only on Windows)", () => {
   // `set_browser_accelerator_keys_off` takes wry's ICoreWebView2Controller and returns
   // windows::core::Result, and no CI job compiles cfg(windows) code: a second version of

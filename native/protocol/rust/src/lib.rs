@@ -3,6 +3,8 @@ use serde_json::{json, Value};
 
 /// The build the engine and the shell are, and the studio's data folder.
 pub mod development;
+/// The pictures helper's lines, between the engine and the helper.
+pub mod pictures;
 
 pub const PROTOCOL_VERSION: &str = "2";
 

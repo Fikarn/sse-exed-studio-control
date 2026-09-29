@@ -376,7 +376,8 @@ const ENGINE_CRASH_DETECT_MS = 2_000;
 const SECOND_INSTANCE_EXIT_MS = process.platform === "linux" ? DEFAULT_WAIT_TIMEOUT_MS : 5_000;
 
 // Ends the engine process from outside the shell — what a crash looks like
-// to it. The engine has no children of its own, so no tree kill.
+// to it. No tree kill: the engine's one child, the pictures helper, ends by
+// itself when the engine's end closes its stdin.
 function killEngineProcess(pid) {
   if (process.platform === "win32") {
     const result = spawnSync("taskkill", ["/PID", String(pid), "/F"], { encoding: "utf8" });

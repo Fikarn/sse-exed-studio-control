@@ -5,109 +5,191 @@
 //! `one-picture`).
 //!
 //! No build receives the cameras' own pictures yet: they come over NDI from
-//! vMix on this PC with a later version. Until then a build without the
-//! simulated cameras (the studio's) reads `NO PICTURES`, and the simulated
-//! cameras' test pictures stand in for vMix inputs 1 to 4, so a camera on
-//! another input reads `PICTURE MISSING` and the page's states can be tried
-//! in a development run. A picture is vMix's, not the camera's link's: a
-//! camera that is released, not set up or does not answer keeps its picture.
+//! vMix on this PC with a later version. Until then:
+//!
+//! - a build without the simulated cameras (the studio's) reads
+//!   `NO PICTURES`, and says they come with a later version;
+//! - a development run has the pictures helper, which the hardware link
+//!   supervises (`pictures_helper.rs`): what it says it receives is what the
+//!   page shows, and while it starts, restarts or is missing, `NO PICTURES`
+//!   says so;
+//! - with the simulated cameras and no helper (the engine's unit tests, a
+//!   studio build's lanes) the simulated source's rule stands in for it.
+//!
+//! The simulated source sends vMix inputs 1 to 4, so a camera on another
+//! input reads `PICTURE MISSING` and the page's states can be tried in a
+//! development run. A picture is vMix's, not the camera's link's: a camera
+//! that is released, not set up or does not answer keeps its picture.
 
 use crate::cameras::model::{model, CAMERA_NUMBERS};
 use crate::cameras::runtime::Cameras;
 use crate::cameras::snapshot::{CameraPicture, CameraTone, CamerasPictures, PictureState};
-use std::ops::RangeInclusive;
-
-/// The vMix inputs the simulated cameras' test pictures stand in for: the
-/// four DeckLink inputs of the studio's vMix preset.
-pub(crate) const SIMULATED_VMIX_INPUTS: RangeInclusive<u32> = 1..=4;
+use crate::pictures_helper::{helper_status, HelperStatus};
+use studio_control_protocol::pictures::SIMULATED_VMIX_INPUTS;
 
 /// Where this build's pictures come from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PictureSource {
     /// No build receives the cameras' own pictures yet.
     NotBuilt,
-    /// The simulated cameras' test pictures (`SSE_CAMERAS_SIMULATED=1`).
+    /// The simulated source's rule, with no helper to ask.
     Simulated,
+    /// The pictures helper, and what it last said.
+    Helper(HelperStatus),
+}
+
+/// Why no picture arrives at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Nothing {
+    /// The pictures are not built in this build.
+    NotBuilt,
+    /// The helper started and has not said what it receives yet.
+    Starting,
+    /// The helper ended or went silent, and is started again.
+    Stopped,
+    /// The helper's program is not in this build.
+    NoProgram,
+    /// The source sends no picture at all: vMix is closed, or its NDI output
+    /// is off.
+    NotSending,
+}
+
+impl Nothing {
+    /// The state display's sentence.
+    fn sentence(self) -> String {
+        String::from(match self {
+            Self::NotBuilt => "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
+            Self::Starting => "The pictures are starting.",
+            Self::Stopped => "The pictures stopped. Studio Control starts them again.",
+            Self::NoProgram => "The picture program is not beside this build, so it shows no pictures. npm run app builds it.",
+            Self::NotSending => "No pictures from vMix. Open vMix and turn on NDI for Cameras / Calls / Audio Inputs.",
+        })
+    }
+
+    /// In the picture's place.
+    fn camera_sentence(self, tag: &str) -> String {
+        match self {
+            Self::NotBuilt => {
+                String::from("No picture yet: the cameras' pictures come with a later version.")
+            }
+            Self::NotSending => format!("vMix is not sending {tag} over NDI."),
+            Self::Starting | Self::Stopped | Self::NoProgram => self.sentence(),
+        }
+    }
+
+    /// What to check, under it.
+    fn advice(self) -> Option<String> {
+        (self == Self::NotSending).then(|| {
+            String::from(
+                "Either vMix is closed, or its NDI output for Cameras / Calls / Audio Inputs (Settings › Outputs) is off.",
+            )
+        })
+    }
+
+    /// What the Pictures rows say after the vMix input.
+    fn detail(self) -> &'static str {
+        match self {
+            Self::NotBuilt => "not built yet",
+            Self::Starting => "starting",
+            Self::Stopped => "stopped",
+            Self::NoProgram => "no picture program",
+            Self::NotSending => "nothing received",
+        }
+    }
 }
 
 impl PictureSource {
     pub(crate) fn of(cameras: &Cameras) -> Self {
-        if cameras.simulated {
-            Self::Simulated
-        } else {
-            Self::NotBuilt
+        match helper_status(&cameras.db_path) {
+            Some(status) => Self::Helper(status),
+            None if cameras.simulated => Self::Simulated,
+            None => Self::NotBuilt,
+        }
+    }
+
+    /// Why no picture arrives at all; `None` when the source sends.
+    fn nothing(&self) -> Option<Nothing> {
+        match self {
+            Self::NotBuilt => Some(Nothing::NotBuilt),
+            Self::Simulated => None,
+            Self::Helper(HelperStatus::Starting) => Some(Nothing::Starting),
+            Self::Helper(HelperStatus::Restarting) => Some(Nothing::Stopped),
+            Self::Helper(HelperStatus::Missing) => Some(Nothing::NoProgram),
+            Self::Helper(HelperStatus::Running { sending, .. }) => {
+                (!sending).then_some(Nothing::NotSending)
+            }
+        }
+    }
+
+    /// Camera `camera`'s picture arrives, while the source sends. The
+    /// helper's word counts for the input it was told: until it answers a
+    /// changed input, no picture is claimed for it.
+    fn carries(&self, camera: u8, vmix_input: u32) -> bool {
+        match self {
+            Self::Helper(HelperStatus::Running { cameras, .. }) => cameras.iter().any(|received| {
+                received.camera == camera && received.vmix_input == vmix_input && received.receiving
+            }),
+            _ => SIMULATED_VMIX_INPUTS.contains(&vmix_input),
         }
     }
 
     /// Where the pictures come from, as the Pictures section and the footer
     /// say it.
-    fn words(self) -> &'static str {
+    fn words(&self) -> &'static str {
         match self {
             Self::NotBuilt => "not built yet",
-            Self::Simulated => "test pictures",
+            Self::Simulated | Self::Helper(_) => "test pictures",
         }
     }
 
     /// The Pictures section's fine print.
-    fn note(self) -> String {
+    fn note(&self) -> String {
         match self {
             Self::NotBuilt => String::from(
                 "The cameras' own pictures come with a later version, over NDI from vMix on this PC.",
             ),
-            Self::Simulated => format!(
+            Self::Simulated | Self::Helper(_) => format!(
                 "Test pictures stand in for vMix inputs {} to {}. The cameras' own come with a later version, over NDI from vMix on this PC.",
                 SIMULATED_VMIX_INPUTS.start(),
                 SIMULATED_VMIX_INPUTS.end()
             ),
         }
     }
-
-    /// The source sends pictures at all.
-    fn sends(self) -> bool {
-        self == Self::Simulated
-    }
-
-    /// The source sends this vMix input's picture; `None` when it sends no
-    /// picture at all.
-    fn carries(self, vmix_input: u32) -> Option<bool> {
-        self.sends()
-            .then(|| SIMULATED_VMIX_INPUTS.contains(&vmix_input))
-    }
 }
 
 /// One camera's picture: it arrives, the source sends others and not this
 /// one, or no picture arrives at all.
-fn camera_picture(source: PictureSource, camera: u8, vmix_input: u32) -> CameraPicture {
+fn camera_picture(source: &PictureSource, camera: u8, vmix_input: u32) -> CameraPicture {
     let tag = model(camera).tag;
-    match source.carries(vmix_input) {
-        Some(true) => CameraPicture {
+    if let Some(nothing) = source.nothing() {
+        return CameraPicture {
+            state: PictureState::NoPictures,
+            word: String::from(NO_PICTURE),
+            tone: CameraTone::Attention,
+            detail: String::from(nothing.detail()),
+            sentence: Some(nothing.camera_sentence(tag)),
+            advice: nothing.advice(),
+        };
+    }
+    if source.carries(camera, vmix_input) {
+        return CameraPicture {
             state: PictureState::Showing,
             word: String::from("LIVE"),
             tone: CameraTone::Ok,
             detail: String::from("test picture"),
             sentence: None,
             advice: None,
-        },
-        Some(false) => CameraPicture {
-            state: PictureState::Missing,
-            word: String::from(NO_PICTURE),
-            tone: CameraTone::Attention,
-            detail: String::from("nothing received"),
-            sentence: Some(format!("vMix is not sending {tag} over NDI.")),
-            advice: Some(format!(
-                "vMix sends other inputs: check that vMix input {vmix_input} is still there and live."
-            )),
-        },
-        None => CameraPicture {
-            state: PictureState::NoPictures,
-            word: String::from(NO_PICTURE),
-            tone: CameraTone::Attention,
-            detail: String::from(source.words()),
-            sentence: Some(String::from(
-                "No picture yet: the cameras' pictures come with a later version.",
-            )),
-            advice: None,
-        },
+        };
+    }
+    CameraPicture {
+        state: PictureState::Missing,
+        word: String::from(NO_PICTURE),
+        tone: CameraTone::Attention,
+        detail: String::from("nothing received"),
+        sentence: Some(format!("vMix is not sending {tag} over NDI.")),
+        advice: Some(format!(
+            "vMix sends other inputs: check that vMix input {vmix_input} is still there and live."
+        )),
     }
 }
 
@@ -118,7 +200,7 @@ impl Cameras {
     /// Camera `camera`'s picture.
     pub(crate) fn picture(&self, camera: u8) -> CameraPicture {
         camera_picture(
-            PictureSource::of(self),
+            &PictureSource::of(self),
             camera,
             self.camera(camera).setup.vmix_input,
         )
@@ -131,22 +213,23 @@ impl Cameras {
         let source = PictureSource::of(self);
         let missing: Vec<u8> = CAMERA_NUMBERS
             .into_iter()
-            .filter(|camera| self.picture(*camera).state != PictureState::Showing)
+            .filter(|camera| {
+                camera_picture(&source, *camera, self.camera(*camera).setup.vmix_input).state
+                    != PictureState::Showing
+            })
             .collect();
         let spoken = missing
             .iter()
             .copied()
             .find(|camera| *camera == self.selected)
             .or_else(|| missing.first().copied());
-        let (state, word, sentence) = match (source.sends(), spoken) {
-            (false, _) => (
+        let (state, word, sentence) = match (source.nothing(), spoken) {
+            (Some(nothing), _) => (
                 PictureState::NoPictures,
                 Some(String::from("NO PICTURES")),
-                Some(String::from(
-                    "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
-                )),
+                Some(nothing.sentence()),
             ),
-            (true, Some(camera)) => {
+            (None, Some(camera)) => {
                 let tag = model(camera).tag;
                 let input = self.camera(camera).setup.vmix_input;
                 (
@@ -157,7 +240,7 @@ impl Cameras {
                     )),
                 )
             }
-            (true, None) => (PictureState::Showing, None, None),
+            (None, None) => (PictureState::Showing, None, None),
         };
         CamerasPictures {
             state,

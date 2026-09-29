@@ -1,13 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["protocol/rust", "rust-engine", "tauri-shell"]
+members = ["pictures-link", "protocol/rust", "rust-engine", "tauri-shell"]
 
 [workspace.package]
 edition = "2021"
 rust-version = "1.95"
 # The repository's licence (`LICENSE`, `package.json`).
 license = "MIT"
-# None of the three crates is a crates.io package.
+# None of the four crates is a crates.io package.
 publish = false
 
 [workspace.dependencies]

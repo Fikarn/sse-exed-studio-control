@@ -368,8 +368,11 @@ fn the_simulated_cameras_answer_over_the_pipe() {
         Some(&json!(true)),
         "{paired}"
     );
+    // The pictures helper a development engine starts says `pictures` when
+    // it likes, so the pairing's own event is picked out by its reason.
     let changed = engine.wait_for("cameras.changed", |value| {
         value.get("event").and_then(Value::as_str) == Some("cameras.changed")
+            && value.pointer("/payload/reason") == Some(&json!("setup"))
     });
     assert_eq!(
         changed.get("payload"),

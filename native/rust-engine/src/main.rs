@@ -24,6 +24,7 @@ mod lighting_bridge_watch;
 mod lighting_sacn_output;
 #[cfg(test)]
 mod operator_words;
+mod pictures_helper;
 mod prompter;
 mod protocol;
 mod rme_console_link;
@@ -559,6 +560,13 @@ fn main() -> io::Result<()> {
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
     );
+    // The camera pictures' helper (D28), in a development build with the
+    // simulated cameras: step 1 has only its simulated source.
+    let pictures_helper = pictures_helper::spawn_pictures_helper(
+        planned_paths.db_path.clone(),
+        planned_paths.log_file_path.clone(),
+        planned_paths.cameras_simulated,
+    );
     if app.should_emit_simulated_audio_meter_ticks() {
         spawn_simulated_audio_meter_ticks(output_sender.clone(), planned_paths.db_path);
     } else if app.should_emit_rme_totalmix_audio_metering() {
@@ -573,7 +581,13 @@ fn main() -> io::Result<()> {
     // text at END and saves the place while the text scrolls.
     prompter::spawn_prompter_clock(db_path.clone());
 
-    serve_requests(&app, &mut reader, &output_sender)?;
+    let served = serve_requests(&app, &mut reader, &output_sender);
+    // The pictures helper is asked to stop now, and waited for after the
+    // backup: the shell gives this whole stop two seconds.
+    if let Some(helper) = &pictures_helper {
+        helper.begin_stop();
+    }
+    served?;
 
     // stdin closed: the shell is going away.
     // A verified copy of the database on every graceful stop (2026-09
@@ -594,6 +608,9 @@ fn main() -> io::Result<()> {
             "WARN",
             &format!("The database was not checkpointed on shutdown: {error}"),
         );
+    }
+    if let Some(helper) = pictures_helper {
+        helper.finish();
     }
 
     Ok(())
