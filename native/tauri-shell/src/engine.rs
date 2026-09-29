@@ -708,15 +708,6 @@ pub(crate) struct NotStarted {
     pub(crate) detail: String,
 }
 
-impl NotStarted {
-    fn saying(message: String) -> Self {
-        Self {
-            sentence: message.clone(),
-            detail: message,
-        }
-    }
-}
-
 /// The engine beside the shell, when its file says it is of `shell`'s build
 /// (`MarkedBuild::this_build`): both development builds, or the studio build
 /// of one commit. The file is read, never started: an engine, once started,
@@ -726,23 +717,16 @@ fn engine_to_start(
     binary_name: &str,
     shell: MarkedBuild<'_>,
 ) -> Result<PathBuf, NotStarted> {
-    let path = resolve_engine_binary_from(current_exe, binary_name).map_err(NotStarted::saying)?;
-    let (this, advice) = match shell {
-        MarkedBuild::Studio(commit) => (
-            format!("This studio build of Studio Control ({})", short(commit)),
-            "Start Studio Control from the builds folder, where each build holds both.",
-        ),
-        _ => (
-            "This development build of Studio Control".to_string(),
-            "Build both with npm run app.",
-        ),
-    };
-    let file = std::fs::read(&path).map_err(|error| NotStarted {
-        sentence: format!(
-            "{this} could not read the hardware link beside it, so it did not start it: {error}. {advice}"
-        ),
-        detail: format!("Not started: {} could not be read: {error}.", path.display()),
-    })?;
+    let (this, advice) = this_and_advice(shell);
+    // The screen names no file: the path goes to the log alone.
+    let path =
+        resolve_engine_binary_from(current_exe, binary_name).map_err(|detail| NotStarted {
+            sentence: format!(
+                "{this} found no hardware link beside it, so the build is incomplete. {advice}"
+            ),
+            detail,
+        })?;
+    let file = std::fs::read(&path).map_err(|error| unreadable(shell, &path, &error))?;
     let engine = build_marked_in(&file);
     let why = match (shell, engine) {
         (MarkedBuild::Development, MarkedBuild::Development) => return Ok(path),
@@ -761,7 +745,8 @@ fn engine_to_start(
         ),
         (_, MarkedBuild::Development) => "that one is a development build".to_string(),
         (_, MarkedBuild::Unmarked) => {
-            "that one is from an older build, which does not say what build it is".to_string()
+            "that one does not say what build it is: it is from an older build, or not a whole file"
+                .to_string()
         }
         (_, MarkedBuild::Conflicting) => {
             "that one says two different things about what build it is".to_string()
@@ -776,6 +761,32 @@ fn engine_to_start(
             described(shell)
         ),
     })
+}
+
+/// How the screen names this shell, and what it advises: the words follow
+/// the shell's own build.
+fn this_and_advice(shell: MarkedBuild<'_>) -> (String, &'static str) {
+    match shell {
+        MarkedBuild::Studio(commit) => (
+            format!("This studio build of Studio Control ({})", short(commit)),
+            "Start Studio Control from the builds folder, where each build holds both.",
+        ),
+        _ => (
+            "This development build of Studio Control".to_string(),
+            "Build both with npm run app.",
+        ),
+    }
+}
+
+/// The engine's file could not be read: nothing is started.
+fn unreadable(shell: MarkedBuild<'_>, path: &Path, error: &std::io::Error) -> NotStarted {
+    let (this, advice) = this_and_advice(shell);
+    NotStarted {
+        sentence: format!(
+            "{this} could not read the hardware link beside it, so it did not start it: {error}. {advice}"
+        ),
+        detail: format!("Not started: {} could not be read: {error}.", path.display()),
+    }
 }
 
 /// A commit as the screen shows it.
@@ -1228,14 +1239,14 @@ mod tests {
                 "dev-empty",
                 MarkedBuild::Development,
                 Vec::new(),
-                "that one is from an older build",
+                "that one does not say what build it is: it is from an older build, or not a whole file",
                 vec![],
             ),
             (
                 "a-unmarked",
                 MarkedBuild::Studio(a),
                 file(&[]),
-                "that one is from an older build",
+                "that one does not say what build it is: it is from an older build, or not a whole file",
                 vec![a],
             ),
             (
@@ -1258,10 +1269,7 @@ mod tests {
                 _ => "npm run app",
             };
             assert!(sentence.contains(advice), "{label}: {sentence}");
-            let lower = sentence.to_lowercase();
-            for word in ["engine", "backend", "transport", "ipc", "snapshot"] {
-                assert!(!lower.contains(word), "{label}: {word} in {sentence}");
-            }
+            assert_screen_words(label, sentence);
             // Joined, as the shell joins it: a `/` in the middle would print
             // otherwise than the shell's path on Windows.
             let engine_path = tree.path(label).join(binary_name);
@@ -1279,12 +1287,60 @@ mod tests {
             }
         }
 
-        // With no engine beside it, the shell says so, as before.
+        // With no engine beside it, the shell says so; the path goes to the
+        // log alone.
         let alone = tree.path("alone/sse-exed-tauri-shell");
         touch(&alone);
         let missing = engine_to_start(Some(alone), binary_name, MarkedBuild::Development)
             .expect_err("no engine beside the shell");
-        assert!(missing.sentence.contains("missing"), "{}", missing.sentence);
+        assert!(
+            missing
+                .sentence
+                .contains("found no hardware link beside it, so the build is incomplete"),
+            "{}",
+            missing.sentence
+        );
+        assert_screen_words("missing", &missing.sentence);
+        assert!(missing.detail.contains("missing"), "{}", missing.detail);
+        assert!(
+            missing
+                .detail
+                .contains(&tree.path("alone").join(binary_name).display().to_string()),
+            "{}",
+            missing.detail
+        );
+
+        // A file it cannot read is not started either.
+        let path = tree.path("unread").join(binary_name);
+        let error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Access is denied.");
+        let unread = unreadable(MarkedBuild::Studio(a), &path, &error);
+        assert!(
+            unread
+                .sentence
+                .contains("could not read the hardware link beside it, so it did not start it"),
+            "{}",
+            unread.sentence
+        );
+        assert!(
+            unread.sentence.contains("from the builds folder"),
+            "{}",
+            unread.sentence
+        );
+        assert_screen_words("unread", &unread.sentence);
+        assert!(
+            unread.detail.contains(&path.display().to_string()),
+            "{}",
+            unread.detail
+        );
+    }
+
+    /// The words the screen never shows (AGENTS.md; the engine's
+    /// `operator_words.rs` holds the same list for its own sentences).
+    fn assert_screen_words(label: &str, sentence: &str) {
+        let lower = sentence.to_lowercase();
+        for word in ["engine", "backend", "transport", "ipc", "snapshot"] {
+            assert!(!lower.contains(word), "{label}: {word} in {sentence}");
+        }
     }
 
     // 2026-09 production readiness, Slice 4 (finding F08): an id that is
