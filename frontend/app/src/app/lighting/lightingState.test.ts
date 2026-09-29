@@ -35,6 +35,30 @@ describe("deriveLightingState and held light outputs", () => {
     expect(deriveLightingState({ ...base, outputsHeld: true, sceneModified: true }).word).toBe("HELD");
   });
 
+  // Found, to check (2026-09-28): nothing looked at the bridge during a
+  // session. The watch's word locks nothing (the owner, 2026-09-29).
+  it("reads NOT ANSWERING, amber and unlocked, when the watch says the bridge went silent", () => {
+    const state = deriveLightingState({ ...base, bridgeAnswering: false, bridgeSilentLabel: "10:42" });
+    expect(state.word).toBe("NOT ANSWERING");
+    expect(state.tone).toBe("attention");
+    expect(state.locked).toBe(false);
+    expect(state.lockNote).toBeNull();
+    expect(state.sentence).toBe(
+      "The bridge at 10.1.0.1 · universe 1 has not answered since 10:42. Nothing is locked: check its power and its network cable."
+    );
+    expect(deriveLightingState({ ...base, bridgeAnswering: false }).sentence).toContain("has not answered. Nothing");
+  });
+
+  it("a failed probe and Preview outrank a silent bridge; a silent bridge outranks a hold", () => {
+    const silent = { ...base, bridgeAnswering: false };
+    expect(deriveLightingState({ ...silent, bridgeReachable: false }).word).toBe("UNREACHABLE");
+    expect(deriveLightingState({ ...silent, previewMode: true }).word).toBe("PREVIEW");
+    expect(deriveLightingState({ ...silent, outputsHeld: true }).word).toBe("NOT ANSWERING");
+    expect(deriveLightingState({ ...silent, sceneModified: true }).word).toBe("NOT ANSWERING");
+    expect(deriveLightingState({ ...base, bridgeAnswering: true }).word).toBe("REACHABLE");
+    expect(deriveLightingState({ ...base, bridgeAnswering: null }).word).toBe("REACHABLE");
+  });
+
   it("armed and reachable is REACHABLE, and Preview's sentence names the scene", () => {
     expect(deriveLightingState(base).word).toBe("REACHABLE");
     expect(deriveLightingState({ ...base, previewMode: true, previewDirty: true }).sentence).toContain(

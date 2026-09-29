@@ -167,6 +167,8 @@ function linkLikeRig(options: { previewMode?: boolean; highlight?: string[]; sol
       grandMaster: 100,
       connected: true,
       reachable: true,
+      bridgeAnswering: null,
+      bridgeSilentSince: null,
       outputArmed: true,
       lastRecalledSceneId: null,
       lastSceneRecallAt: null,

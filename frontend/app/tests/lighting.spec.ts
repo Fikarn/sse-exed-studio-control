@@ -227,6 +227,30 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   );
 });
 
+// Found, to check (2026-09-28): nothing looked at the bridge during a session.
+// The hardware link's watch says when it stops answering, and the owner's
+// decision (2026-09-29) is to say it and lock nothing: the rig's keys stay
+// live, the plot is not locked, and the header lamp is amber.
+test("not answering: the watch's word is amber, and nothing is locked", async ({ page }) => {
+  await openFixture(page, "lighting-bridge-silent");
+
+  const stateDisplay = page.getByTestId("lighting-state-display");
+  await expect(stateDisplay).toContainText("NOT ANSWERING");
+  await expect(stateDisplay).toHaveAttribute("data-tone", "attention");
+  await expect(stateDisplay).toContainText(/has not answered since \d\d:\d\d\. Nothing is locked/);
+  await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
+
+  const lamp = page.getByTestId("shell-lamp-lighting");
+  await expect(lamp).toHaveAttribute("data-tone", "attention");
+  await expect(lamp).toContainText("not answering");
+
+  for (const testId of ["lighting-power-toggle", "lighting-emergency-cut", "lighting-grand-master"]) {
+    await expect(page.getByTestId(testId), `${testId} stays live`).not.toHaveAttribute("aria-disabled", "true");
+  }
+  await expect(page.getByTestId("lighting-stage")).not.toHaveAttribute("data-locked", "");
+  await expect(page.getByTestId("lighting-stage-lock-note")).toHaveCount(0);
+});
+
 // Visual overhaul A, Slice 5: the rig has drifted from the scene it was
 // recalled from — the state display says so and offers both ways back.
 test("unsaved: the state display says the rig no longer matches the scene and offers both ways back", async ({

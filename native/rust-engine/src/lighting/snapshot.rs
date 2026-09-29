@@ -12,6 +12,13 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let check_status = lighting_check_status(settings);
     let enabled = config.enabled;
     let reachable = enabled && check_status == "passed";
+    // The bridge watch's word, for the address the rig is set to; none while
+    // lighting is off.
+    let bridge_watch = if enabled {
+        crate::lighting_bridge_watch::bridge_watch_report(&config.bridge_ip)
+    } else {
+        None
+    };
     let inventory = read_lighting_editor_inventory(&config);
     let last_recalled_scene_id =
         read_optional_setting(settings, LIGHTING_LAST_RECALLED_SCENE_ID_KEY);
@@ -183,6 +190,8 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         grand_master,
         connected: reachable,
         reachable,
+        bridge_answering: bridge_watch.as_ref().map(|report| report.answering),
+        bridge_silent_since: bridge_watch.and_then(|report| report.silent_since),
         output_armed: lighting_output_armed(settings),
         last_recalled_scene_id,
         last_scene_recall_at,
@@ -295,6 +304,16 @@ pub fn read_lighting_sacn_output_state(
     }
 
     Some(LightingSacnOutputState { bridge_ip, frames })
+}
+
+/// The address the bridge watch looks at: the bridge's, while lighting is on
+/// and it is a valid address; `None` otherwise, and the watch then ends.
+pub fn lighting_watched_bridge(settings: &HashMap<String, String>) -> Option<Ipv4Addr> {
+    let config = resolve_lighting_config(settings);
+    if !config.enabled {
+        return None;
+    }
+    Ipv4Addr::from_str(config.bridge_ip.trim()).ok()
 }
 
 pub fn build_lighting_health_check(settings: &HashMap<String, String>) -> LightingHealthCheck {

@@ -32,9 +32,10 @@ A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Pro
 
 ## Lighting
 
-The state display reads one of five words.
+The state display reads one of six words.
 
 - `REACHABLE`: the bridge passed its last probe.
+- `NOT ANSWERING`, amber: the bridge has stopped answering during the session (Studio Control looks every 5 s). Nothing is locked, and what you press is still sent. Check the bridge's power and its network cable; `Open Setup` runs the probe. It ends by itself when the bridge answers again.
 - `HELD`: the light outputs are held, and nothing is sent to the rig. `Open Setup` goes to the `Light outputs` switch.
 - `UNSAVED`: the rig differs from the recalled scene. `Save changes` writes the rig into the scene. `Recall it again` puts the scene back.
 - `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
@@ -184,6 +185,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 | Lighting `no output`         | The output's port is taken  | `Restart the hardware link…`          |
 | `Backup failed` or `overdue` | No automatic backup written | `Export backup`; check disk space     |
 | Lighting `no bridge`         | Its probe has not passed    | Run it in Setup, then publish         |
+| Lighting `not answering`     | The bridge went silent      | Check its power and network cable     |
 | Rig dark, Lighting `ready`   | The probe may be old        | Check the bridge's power and cable    |
 | Audio amber or red           | Console not `VERIFIED`      | Use the key on its state display      |
 | Cameras amber or red         | A camera is not `HELD`      | Use the key on its state display      |

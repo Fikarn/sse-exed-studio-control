@@ -63,7 +63,9 @@ Measured on the studio's desk (2026-09), for whoever probes by hand or reads a l
 
 The engine streams to the Litepanels Apollo Bridge as unicast sACN (E1.31) on UDP port `5568`. The bridge drives the fixtures: Litepanels Astra Bi-Color Soft, Aputure Infinimat 2x4 and Aputure Infinibar PB12.
 
-- The bridge is at `10.1.0.1`. Setup's lighting probe connects to it on TCP port `80`.
+- The bridge is at `10.1.0.1`. Setup's lighting probe connects to it on TCP port `80`, waiting 1.5 s.
+- During a session the studio build looks at the bridge the same way every 5 s. Two silent looks in a row make Lighting read `NOT ANSWERING`, amber, and the header's lamp `not answering`; one answer ends it. It locks nothing: the sACN stream does not need port 80. The watch writes to `engine.log` when the bridge stops answering and when it answers again. Development runs and tests never look (the simulated lights).
+- On Windows a refused connection is reported about 2 s after the refusal (Windows tries twice more), later than the probe waits, so a refusal reads as silence. The studio's probe has passed, so the bridge takes the connection on port 80.
 - Setup holds the bridge address and the universe, `1` unless changed. New saved data has no address, so nothing is sent.
 - The bridge must route that universe to its DMX/CRMX output. Each fixture's DMX address, mode and universe must match its patch on the Lighting page.
 - The stream has priority `100` and the source name `SSE ExEd Studio Control`.

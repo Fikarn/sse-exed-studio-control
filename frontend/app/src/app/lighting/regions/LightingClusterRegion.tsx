@@ -2,12 +2,23 @@ import { ShellRegion } from "@sse/design-system";
 import { LightingCluster } from "../components/LightingCluster";
 import type { LightingEditor } from "../useLightingEditor";
 
+const clockFormat = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** `10:42`, the studio's clock, for the time the bridge went silent. */
+function clockLabel(isoTime: string | null) {
+  if (!isoTime) return null;
+  const date = new Date(isoTime);
+  return Number.isNaN(date.getTime()) ? null : clockFormat.format(date);
+}
+
 /** The shell's cluster region: the rig's state, its keys, and the scene and group rails. */
 export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
   const { lightingDmxMonitorSnapshot, store } = editor.props;
   const {
     bridgeIp,
     bridgeReachable,
+    bridgeAnswering,
+    bridgeSilentSince,
     bridgeUniverse,
     fixtures,
     highlightActive,
@@ -82,6 +93,8 @@ export function LightingClusterRegion({ editor }: { editor: LightingEditor }) {
       <LightingCluster
         bridgeIp={bridgeIp}
         bridgeReachable={bridgeReachable}
+        bridgeAnswering={bridgeAnswering}
+        bridgeSilentLabel={clockLabel(bridgeSilentSince)}
         outputsHeld={outputsHeld}
         bridgeUniverse={bridgeUniverse}
         channelCount={lightingDmxMonitorSnapshot?.channels.length ?? 0}

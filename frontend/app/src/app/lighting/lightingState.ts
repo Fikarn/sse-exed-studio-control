@@ -5,11 +5,16 @@ import type { StateDisplayTone } from "@sse/design-system";
 // engine reports (the bridge's reachability), the scene-drift detector and
 // preview mode. The front end never invents a state the engine does not report.
 
-export type LightingStateWord = "UNREACHABLE" | "PREVIEW" | "HELD" | "UNSAVED" | "REACHABLE";
+export type LightingStateWord = "UNREACHABLE" | "PREVIEW" | "NOT ANSWERING" | "HELD" | "UNSAVED" | "REACHABLE";
 
 export interface LightingStateInput {
   bridgeIp: string;
   bridgeReachable: boolean;
+  /** The bridge watch's word during the session: `false` once the bridge has
+   *  stopped answering; `null` or absent when the watch has no word. */
+  bridgeAnswering?: boolean | null;
+  /** When the silence began, as the studio's clock reads it (`10:42`). */
+  bridgeSilentLabel?: string | null;
   channelCount: number;
   fixtureOnCount: number;
   fixtureTotal: number;
@@ -39,6 +44,8 @@ export interface LightingState {
 export function deriveLightingState({
   bridgeIp,
   bridgeReachable,
+  bridgeAnswering = null,
+  bridgeSilentLabel = null,
   channelCount,
   fixtureOnCount,
   fixtureTotal,
@@ -79,6 +86,24 @@ export function deriveLightingState({
         previewDirty && sceneName
           ? `You are editing offline. Save puts the edits into ${sceneName}; the rig takes them when it is recalled.`
           : "You are editing offline. The rig is unchanged.",
+      meta,
+      locked: false,
+      lockNote: null,
+    };
+  }
+
+  // Found, to check (2026-09-28): nothing looked at the bridge during a
+  // session. The hardware link's watch says when it stops answering, and the
+  // owner's decision (2026-09-29) is to say it and lock nothing: the sACN
+  // stream never needed the port the watch knocks on. It ranks below PREVIEW,
+  // whose keys are the only way out of it, and above HELD: a bridge that went
+  // is news whether the outputs are held or not.
+  if (bridgeAnswering === false) {
+    const since = bridgeSilentLabel ? ` since ${bridgeSilentLabel}` : "";
+    return {
+      word: "NOT ANSWERING",
+      tone: "attention",
+      sentence: `The bridge at ${target} has not answered${since}. Nothing is locked: check its power and its network cable.`,
       meta,
       locked: false,
       lockNote: null,
