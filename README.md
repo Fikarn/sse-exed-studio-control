@@ -10,6 +10,7 @@ It is developed by one person, working with Claude. Nothing here is packaged for
 - **Shell** (`native/tauri-shell`, Tauri 2): the window; it starts the engine and watches it.
 - **Pages** (`frontend/`, React and TypeScript): what the operator sees.
 - **Contract** (`native/protocol`): the requests and events between the engine and the pages.
+- **Pictures helper** (`native/pictures-link`, Rust): the cameras' pictures, in a process of their own that the engine starts and stops.
 
 ## Start here
 

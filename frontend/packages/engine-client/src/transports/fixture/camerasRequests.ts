@@ -102,7 +102,9 @@ export type CamerasChangedReason =
   | "reported"
   | "unreachable"
   | "reachable"
-  | "restore";
+  | "restore"
+  /** The pictures helper says something else (a development run; the double has none). */
+  | "pictures";
 
 interface Answer {
   result: JsonValue;

@@ -60,7 +60,7 @@
     "tauri:setup-support:qualify": "npm run native:engine:build && node scripts/tauri-setup-support-qualification.mjs",
     "tauri:workspaces:qualify": "npm run native:engine:build && node scripts/tauri-workspace-qualification.mjs",
     "native:test": "cd native && cargo test --workspace",
-    "native:engine:build": "cd native && cargo build --package studio-control-engine",
+    "native:engine:build": "cd native && cargo build --package studio-control-engine --package studio-control-pictures",
     "native:acceptance": "npm run native:engine:build && node scripts/native-acceptance.mjs",
     "native:bridge": "npm run native:engine:build && node scripts/native-control-surface-qualification.mjs",
     "native:test:hardware": "cd native && cargo test --workspace -- --ignored",

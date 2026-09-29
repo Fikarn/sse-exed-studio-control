@@ -21,12 +21,14 @@ use crate::cameras::store::{read_setup, StoredSetup};
 use crate::cameras::CameraError;
 use crate::engine_events::{emit_app_changed, emit_cameras_changed};
 use crate::health::APP_CHANGED_REASON_HEALTH;
+use crate::pictures_helper;
 use crate::storage::open_connection;
 use crate::storage_backups::civil_from_days;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use studio_control_protocol::pictures::WantedCamera;
 
 /// UTC as `2026-09-27T14:03:22.123Z`, the shape the other times in the
 /// snapshots take.
@@ -179,6 +181,9 @@ pub(crate) struct StopArm {
 /// The three cameras, the selection and the deck's dials.
 #[derive(Debug, Clone)]
 pub(crate) struct Cameras {
+    /// The saved data they belong to: the pictures helper of the same saved
+    /// data says what their pictures do (`pictures.rs`).
+    pub db_path: PathBuf,
     /// The simulated link (`SSE_CAMERAS_SIMULATED=1`), or the real ones.
     pub simulated: bool,
     /// The camera the big picture, the plate and the deck's dials set (D19).
@@ -218,6 +223,7 @@ impl Cameras {
     ) -> Result<Self, CameraError> {
         let setup = read_setup(&open_connection(db_path)?)?;
         let mut cameras = Self {
+            db_path: db_path.to_path_buf(),
             simulated,
             selected: RECORDING_CAMERA,
             bank: CameraDialBank::default(),
@@ -243,6 +249,17 @@ impl Cameras {
 
     pub(crate) fn all(&self) -> &[CameraRuntime; 3] {
         &self.cameras
+    }
+
+    /// Each camera's vMix input, as the pictures helper is told it.
+    pub(crate) fn wanted_pictures(&self) -> Vec<WantedCamera> {
+        self.cameras
+            .iter()
+            .map(|runtime| WantedCamera {
+                camera: runtime.camera(),
+                vmix_input: runtime.setup.vmix_input,
+            })
+            .collect()
     }
 
     fn link_read(
@@ -460,7 +477,8 @@ fn lock(entry: &Entry) -> MutexGuard<'_, EntryState> {
 /// Runs `action` on the cameras of this saved data, loaded the first time
 /// (every set-up camera held and read), after reading every camera again.
 /// The cameras' lock is held for the whole action, so two requests never
-/// interleave.
+/// interleave. A vMix input the action changed (Setup, a restore) reaches
+/// the pictures helper.
 pub(crate) fn with_cameras<T>(
     db_path: &Path,
     simulated: bool,
@@ -477,7 +495,13 @@ pub(crate) fn with_cameras<T>(
         }
         None => cameras.insert(Cameras::load(db_path, simulated, bodies, now)?),
     };
-    action(cameras, bodies, now)
+    let wanted = cameras.wanted_pictures();
+    let result = action(cameras, bodies, now);
+    let now_wanted = cameras.wanted_pictures();
+    if now_wanted != wanted {
+        pictures_helper::want(db_path, now_wanted);
+    }
+    result
 }
 
 /// `cameras.changed { reason, camera }` from outside a request's own reply.

@@ -184,6 +184,7 @@ impl TestCameras {
 impl Drop for TestCameras {
     fn drop(&mut self) {
         runtime::remove(&self.db_path);
+        crate::pictures_helper::set_status_for_test(&self.db_path, None);
         let _ = fs::remove_dir_all(&self.root);
     }
 }

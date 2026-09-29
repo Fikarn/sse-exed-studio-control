@@ -2,10 +2,14 @@
 //! and `checks.cameras` say of them. A studio build reads `NO PICTURES` until
 //! the pictures are built; the simulated cameras' test pictures stand in for
 //! vMix inputs 1 to 4, so a camera on another input reads `PICTURE MISSING`.
+//! With the pictures helper (a development run), what it says it receives is
+//! what shows.
 
 use crate::cameras::snapshot::{CameraTone, PictureState};
 use crate::cameras::test_support::{announced_changes, assert_operator_words, TestCameras};
+use crate::pictures_helper::{set_status_for_test, HelperStatus};
 use serde_json::{json, Value};
+use studio_control_protocol::pictures::ReceivedCamera;
 
 fn pictures(cameras: &TestCameras) -> Value {
     cameras.snapshot()["pictures"].clone()
@@ -227,4 +231,128 @@ fn a_picture_state_names_itself_in_the_answers() {
     ] {
         assert_eq!(serde_json::to_value(state).expect("serializes"), key);
     }
+}
+
+// ---------------------------------------------------------------------------
+// With the pictures helper (`pictures_helper.rs`): what it says is what shows
+// ---------------------------------------------------------------------------
+
+fn received(cameras: [(u32, bool); 3]) -> Vec<ReceivedCamera> {
+    cameras
+        .iter()
+        .zip(1_u8..)
+        .map(|((vmix_input, receiving), camera)| ReceivedCamera {
+            camera,
+            vmix_input: *vmix_input,
+            receiving: *receiving,
+        })
+        .collect()
+}
+
+// The helper's word is the picture's, whatever the simulated source's rule
+// would say.
+#[test]
+fn with_a_helper_each_picture_is_what_the_helper_receives() {
+    let cameras = TestCameras::set_up("pictures-helper-running");
+    set_status_for_test(
+        cameras.path(),
+        Some(HelperStatus::Running {
+            sending: true,
+            cameras: received([(1, true), (2, false), (3, true)]),
+        }),
+    );
+    assert_eq!(picture(&cameras, 1)["state"], "showing");
+    assert_eq!(picture(&cameras, 2)["state"], "missing");
+    assert_eq!(
+        picture(&cameras, 2)["advice"],
+        "vMix sends other inputs: check that vMix input 2 is still there and live."
+    );
+    assert_eq!(pictures(&cameras)["word"], "PICTURE MISSING");
+    assert_eq!(pictures(&cameras)["source"], "test pictures");
+    assert_eq!(cameras.health().word, "PICTURE MISSING");
+
+    set_status_for_test(
+        cameras.path(),
+        Some(HelperStatus::Running {
+            sending: true,
+            cameras: received([(1, true), (2, true), (3, true)]),
+        }),
+    );
+    assert_eq!(pictures(&cameras)["state"], "showing");
+    assert_eq!(cameras.health().word, "HELD");
+}
+
+// Board 2's `no-pictures`: the source sends nothing at all.
+#[test]
+fn a_helper_whose_source_sends_nothing_reads_no_pictures_from_vmix() {
+    let cameras = TestCameras::set_up("pictures-helper-not-sending");
+    set_status_for_test(
+        cameras.path(),
+        Some(HelperStatus::Running {
+            sending: false,
+            cameras: received([(1, false), (2, false), (3, false)]),
+        }),
+    );
+    let whole = pictures(&cameras);
+    assert_eq!(whole["state"], "no-pictures");
+    assert_eq!(whole["word"], "NO PICTURES");
+    assert_eq!(
+        whole["sentence"],
+        "No pictures from vMix. Open vMix and turn on NDI for Cameras / Calls / Audio Inputs."
+    );
+    assert_eq!(
+        picture(&cameras, 3),
+        json!({
+            "state": "no-pictures",
+            "word": "NO PICTURE",
+            "tone": "attention",
+            "detail": "nothing received",
+            "sentence": "vMix is not sending CAM 3 over NDI.",
+            "advice": "Either vMix is closed, or its NDI output for Cameras / Calls / Audio Inputs (Settings › Outputs) is off."
+        })
+    );
+    let health = cameras.health();
+    assert_eq!(health.word, "NO PICTURES");
+    assert!(!health.raises_whole_status());
+}
+
+// While the helper starts, restarts or is missing, no picture arrives, and
+// the page says why.
+#[test]
+fn a_helper_starting_stopped_or_missing_reads_no_pictures_and_why() {
+    let cameras = TestCameras::set_up("pictures-helper-states");
+    for (status, sentence, detail) in [
+        (
+            HelperStatus::Starting,
+            "The pictures are starting.",
+            "starting",
+        ),
+        (
+            HelperStatus::Restarting,
+            "The pictures stopped. Studio Control starts them again.",
+            "stopped",
+        ),
+        (
+            HelperStatus::Missing,
+            "This build has no picture program, so it shows no pictures.",
+            "no picture program",
+        ),
+    ] {
+        set_status_for_test(cameras.path(), Some(status.clone()));
+        let whole = pictures(&cameras);
+        assert_eq!(whole["state"], "no-pictures", "{status:?}");
+        assert_eq!(whole["sentence"], sentence, "{status:?}");
+        assert_eq!(whole["source"], "test pictures");
+        let cam1 = picture(&cameras, 1);
+        assert_eq!(cam1["sentence"], sentence, "{status:?}");
+        assert_eq!(cam1["detail"], detail, "{status:?}");
+        assert_eq!(cam1["advice"], Value::Null);
+        assert_operator_words(sentence);
+    }
+    set_status_for_test(cameras.path(), None);
+    assert_eq!(
+        pictures(&cameras)["state"],
+        "showing",
+        "no helper: the rule"
+    );
 }

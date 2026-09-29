@@ -388,7 +388,9 @@ describe("the fixture double's picture words: the hardware link's (`pictures.rs`
     expect(PICTURE_MISSING_DETAIL).toBe(rust("nothing received"));
     expect(pictureSourceWords(true)).toBe(rust("test pictures"));
     expect(pictureSourceWords(false)).toBe(rust("not built yet"));
-    const inputs = rustSource("cameras/pictures.rs").match(
+    // The simulated source's inputs are the helper's and the hardware link's alike: the
+    // protocol crate holds them (`native/protocol/rust/src/pictures.rs`).
+    const inputs = readFileSync(resolve(RUST_SRC, "../../protocol/rust/src/pictures.rs"), "utf-8").match(
       /const SIMULATED_VMIX_INPUTS: RangeInclusive<u32> = (\d+)\.\.=(\d+);/
     );
     if (!inputs) throw new Error("pictures.rs's SIMULATED_VMIX_INPUTS is not a range any more; update this test");

@@ -10,8 +10,9 @@ Studio Control is a local app for one trusted workstation. It has no cloud depen
 | Shell (Tauri 2)           | `native/tauri-shell`                  | The window, starting and watching the engine, the few things only the operating system can do |
 | Pages (React, TypeScript) | `frontend/app`, `frontend/packages/*` | What the operator sees and presses                                                            |
 | Contract                  | `native/protocol`                     | Every request and event between the engine and the pages                                      |
+| Pictures helper (Rust)    | `native/pictures-link`                | Receiving the cameras' pictures (D28)                                                         |
 
-The engine is a separate process. The shell starts it, passes the pages' requests to it over its standard input, and passes its answers and events back.
+The engine is a separate process. The shell starts it, passes the pages' requests to it over its standard input, and passes its answers and events back. The engine starts the pictures helper in turn, tells it each camera's vMix input over its standard input, and hears what it receives.
 
 ## The rule
 
@@ -39,6 +40,7 @@ These are part of the design. Do not remove one because it looks like weight.
 - **Saved data is checked and backed up.** The database is integrity-checked at every start. A verified backup is written before a schema upgrade, daily, and at every clean close. Every commit waits for the disk. A build refuses data from a newer schema rather than damage it.
 - **The shell opens and writes only inside its own folders:** the app-data, logs, backups and exports folders. The packaged pages run under a Content Security Policy with no inline or remote scripts.
 - **The parsers of outside bytes have fuzz tests:** the bridge's HTTP reader, the OSC reader and the Word import.
+- **The pictures cost the pictures and nothing else.** Whatever receives them runs in the pictures helper, a process of its own (D28): a crash or a hang there never stops the lights, the console, the deck or the prompter. The engine starts it below normal priority, with all three of its pipes, from beside its own program and from nowhere else; a helper silent for 5 s is ended, one that ends is started again after 1, 2, 4 … 30 s, and it ends by itself when the engine goes. Its one source is simulated for now, and only a development build starts it.
 - **Tests cannot reach a device.** Test builds drop every datagram aimed at TotalMix and refuse any camera address that is not on this PC. The simulated console and the simulated cameras stand in.
 - **A development build keeps off the studio.** A studio build is one `npm run release` made, marked while it compiled; every other build is a development build. It refuses `%APPDATA%\ExEd Studio Control Native`, and any folder inside it, for its saved data and its logs, before it creates or opens anything; the engine and the shell ask the same code (`native/protocol/rust/src/development.rs`). Where a switch is not set it takes the safe value: the lights held and their wire cut, the console and the cameras simulated, a bridge port of its own. It is also an app of its own (`.dev` at the end of its identifier), so the studio's saved display and browser profile are not its to write.
 
@@ -66,7 +68,8 @@ Engine (`native/rust-engine/src/`):
 - `lighting/`, `lighting_sacn_output.rs`: scenes, fixtures, the one lighting lock, held outputs, the sACN output.
 - `audio/`, `rme_totalmix_osc.rs`, `rme_console_link.rs`: the console's state, metering, and the link that confirms every send.
 - `prompter/`: scripts, the prompter's clock, the Prompter XL's state, imports.
-- `cameras/`: the three cameras, the simulated cameras, the link guard.
+- `cameras/`: the three cameras, the simulated cameras, the link guard, and what each picture does (`pictures.rs`).
+- `pictures_helper.rs`: the pictures helper's supervision. Its lines are the protocol crate's (`native/protocol/rust/src/pictures.rs`), and the helper is `native/pictures-link`.
 - `control_surface.rs`, `control_surface_http.rs`, `control_surface_pages.rs`: the Stream Deck bridge. What a key of the PROMPTER or the CAMERAS page does, and what their displays say, is in `prompter/deck.rs` and `cameras/deck.rs`, under the prompter's and the cameras' own locks.
 - `exports/`: the Companion profile and the page model Setup draws. The deck's pages come from one list, `DECK_PAGES` in `pages.rs`; each page has a file of its own. The pages' test double draws the same page model, from `deckPages.json`, which a test here holds equal to it.
 - `commissioning.rs`: Setup's steps and probes.

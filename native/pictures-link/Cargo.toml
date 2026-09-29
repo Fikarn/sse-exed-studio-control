@@ -1,0 +1,20 @@
+[package]
+name = "studio-control-pictures"
+version = "0.1.0"
+description = "The cameras' pictures, in a process of their own that the engine starts, steers and stops (D28)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "studio-control-pictures"
+path = "src/main.rs"
+
+[dependencies]
+studio-control-protocol.workspace = true
+
+# `forbid(unsafe_code)`, as the engine: the simulated source needs none. The
+# NDI calls (step 3) will lift it for a named list, as the shell's are.
+[lints]
+workspace = true

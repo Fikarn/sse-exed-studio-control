@@ -110,7 +110,7 @@ The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the a
 - **`CAM 2` and `CAM 3`** are Panasonic LUMIX BGH1s on the office network, powered over Ethernet (`172.16.16.85` and `172.16.16.30` when last read). Their link is Panasonic's LUMIX SDK. The SDK takes no address: it finds cameras by an SSDP search from every network adapter, and the app connects only to a found camera whose address is typed into Setup (D29). A LAN connection has a password, which a reset of the camera's network settings clears. The SDK's licence is read first.
 - `Release` hands `CAM 1` to the iPad (Bluetooth+), and lets a BGH1 go. `Connect` takes it back. After LUMIX Tether has held a BGH1, the SDK cannot connect to it until its network settings are reset in its menu (Panasonic's note).
 - **Pictures.** Each camera's HDMI goes to vMix: `CAM 1` into the DeckLink 8K Pro, one BGH1 through an SDI converter into the DeckLink, the other into a Cam Link 4K. The app gets pictures only as NDI from vMix on this PC. vMix's NDI option for cameras (`Settings › Outputs`) must be on, and Setup holds each camera's vMix input. There is no OBS path.
-- **Not built yet:** the links and the pictures. Until a camera's link is built, the Cameras page reads it `NOT SET UP`, and Setup takes its vMix input and neither its pairing nor its address. Until the pictures are built, each picture's place reads `NO PICTURE` and says they come with a later version. A development run shows test pictures, which stand in for vMix inputs 1 to 4: a camera on another input reads `NO PICTURE`, and the page `PICTURE MISSING`.
+- **Not built yet:** the links and the pictures. Until a camera's link is built, the Cameras page reads it `NOT SET UP`, and Setup takes its vMix input and neither its pairing nor its address. Until the pictures are built, each picture's place reads `NO PICTURE` and says they come with a later version. A development run shows test pictures from the pictures helper's simulated source, which sends vMix inputs 1 to 4: a camera on another input reads `NO PICTURE`, and the page `PICTURE MISSING`.
 
 What limits the design:
 
@@ -150,7 +150,7 @@ Cameras and the prompter, the six rules the code's comments cite as D15:
 
 1. Use a camera address only once the owner has typed it into Setup. Test builds refuse any address that is not on this PC.
 2. Use Bluetooth only in the studio build. Pair once, in Setup, with the owner present.
-3. Never open the DeckLink, the Cam Link or a camera stream from a test. Tests get a still test picture.
+3. Never open the DeckLink, the Cam Link, a camera stream or an NDI source from a test or a development build. They get test pictures: a still one, or the simulated source's.
 4. Draw on the Prompter XL only from the studio build. Anything else draws into an ordinary window: a development build's prompter is a window with a frame, wherever the Prompter XL is, and the hardware link is told of a screen of 1920×1080 so that the prompter can be tried.
 5. Check against the real cameras only with the owner present and nothing recording. Put back every setting touched.
 6. Learn the BGH1's protocol by listening only, and only with the owner's go-ahead at the time.

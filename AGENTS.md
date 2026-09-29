@@ -10,12 +10,13 @@ One developer builds it, working with Claude. Nobody else installs it. There is 
 
 ## How it is built
 
-| Part                      | Where                | Owns                                             |
-| ------------------------- | -------------------- | ------------------------------------------------ |
-| Engine (Rust)             | `native/rust-engine` | State, saved data, every device                  |
-| Shell (Tauri 2)           | `native/tauri-shell` | The window; starts the engine                    |
-| Pages (React, TypeScript) | `frontend/`          | What the operator sees                           |
-| Contract                  | `native/protocol`    | The requests and events between engine and pages |
+| Part                      | Where                  | Owns                                                  |
+| ------------------------- | ---------------------- | ----------------------------------------------------- |
+| Engine (Rust)             | `native/rust-engine`   | State, saved data, every device                       |
+| Shell (Tauri 2)           | `native/tauri-shell`   | The window; starts the engine                         |
+| Pages (React, TypeScript) | `frontend/`            | What the operator sees                                |
+| Contract                  | `native/protocol`      | The requests and events between engine and pages      |
+| Pictures helper (Rust)    | `native/pictures-link` | The cameras' pictures; the engine starts and stops it |
 
 Two rules hold the design together:
 
@@ -43,7 +44,7 @@ Two rules hold the design together:
 
 ## Safety
 
-- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console and the cameras, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes ask the address they are given.
+- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console, the cameras and their pictures, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes ask the address they are given.
 - **Real devices are driven only by a studio build,** or by a hardware test the owner asked for and is present at. Only `npm run release` makes a studio build: every other build, a release build included, is a development build.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.
