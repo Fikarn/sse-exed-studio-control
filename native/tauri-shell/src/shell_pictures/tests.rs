@@ -100,7 +100,14 @@ fn a_connection_without_the_secret_is_closed_and_counted() {
     let wrong = "0".repeat(LINK_SECRET_HEX);
     let short = &link.secret()[..LINK_SECRET_HEX - 1];
     let longer = format!("{}0", link.secret());
-    for said in [wrong.as_str(), short, longer.as_str(), ""] {
+    // A failure names the attempt, never what it said: that is the secret, or
+    // nearly.
+    for (attempt, said) in [
+        ("a wrong secret", wrong.as_str()),
+        ("one character short", short),
+        ("one character more", longer.as_str()),
+        ("an empty line", ""),
+    ] {
         let mut stranger = connect_saying(link.address(), said).expect("connects");
         let _ = stranger.write_all(&frame(1, 1, 544, 306));
         stranger
@@ -110,7 +117,7 @@ fn a_connection_without_the_secret_is_closed_and_counted() {
         // Closed by the listener: the read ends with nothing (or an error).
         assert!(
             matches!(stranger.read(&mut byte), Ok(0) | Err(_)),
-            "{said:?}"
+            "{attempt}"
         );
     }
     // One that says nothing at all is closed after a second.
