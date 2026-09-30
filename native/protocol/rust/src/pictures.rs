@@ -5,8 +5,14 @@
 //! receives; a helper that stays silent for longer is ended and started again.
 //!
 //! Both sides read and write these types, so a line has one shape. The
-//! frames themselves never pass the engine: they come with the shell's frame
-//! route, which is not this file's.
+//! pictures themselves never pass the engine: the helper draws them itself
+//! (D30).
+//!
+//! The helper's source is the simulated one, or, in a development run that
+//! `npm run app -- --vmix-pictures` started and nothing else, vMix's Outputs
+//! 2 to 4 over NDI on this PC (D31 to D33): the engine says which on each
+//! want, and the helper takes vMix's only when its own environment holds the
+//! switch as well.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -28,6 +34,39 @@ pub const SIMULATED_VMIX_INPUTS: RangeInclusive<u32> = 1..=4;
 /// The helper says what it receives at least this often, and on every
 /// change.
 pub const STATE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The switch of `npm run app -- --vmix-pictures` (D33): `1` asks a
+/// development run's pictures helper for vMix's Outputs 2 to 4 over NDI, a
+/// hardware test the owner asks for and attends. Only that command sets it:
+/// every other run sets it to `0`, the lanes refuse it, the tests remove it,
+/// and a studio build never reads it. The engine reads it in its own
+/// environment and says the source on each want; the helper reads it again
+/// in its own.
+pub const VMIX_PICTURES_ENV: &str = "SSE_VMIX_PICTURES";
+
+/// NDI's library for that run, by its full path: the NDI SDK's own file,
+/// whose hash `npm run app` checks against the pin
+/// (`native/pictures-link/ndi-library.json`) before the run starts.
+pub const NDI_LIBRARY_ENV: &str = "SSE_NDI_LIBRARY";
+
+/// Only `1` asks for vMix's pictures; the value is trimmed first, as the
+/// simulated cameras' switch is.
+pub fn vmix_pictures_requested(value: &str) -> bool {
+    value.trim() == "1"
+}
+
+/// The vMix output each camera's picture comes from (D31): CAM 1 is Output
+/// 2, CAM 2 Output 3 and CAM 3 Output 4. Which input an output carries is
+/// set in vMix; Output 1 is vMix's own, what it records and streams.
+pub const VMIX_OUTPUTS: [u8; 3] = [2, 3, 4];
+
+/// Camera `camera`'s vMix output; `None` for a camera that is not one of
+/// the three.
+pub fn vmix_output(camera: u8) -> Option<u8> {
+    VMIX_OUTPUTS
+        .get(usize::from(camera).checked_sub(1)?)
+        .copied()
+}
 
 /// The longest line either side reads; a longer one is refused whole.
 pub const MAX_LINE_BYTES: usize = 4096;
@@ -59,15 +98,18 @@ impl fmt::Debug for LinkSecret {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum ToHelper {
     /// The cameras and their vMix inputs, all three, each time one changes;
-    /// the selected camera, which is sent big and the others small; and
-    /// whether the Cameras page shows the pictures, the only time frames are
-    /// sent.
+    /// the selected camera, which is sent big and the others small; whether
+    /// the Cameras page shows the pictures, the only time they are drawn and
+    /// vMix's are received; and where they come from (absent: the simulated
+    /// source, so a line of the simulated source reads as it always did).
     Want {
         cameras: Vec<WantedCamera>,
         #[serde(default = "first_camera")]
         selected: u8,
         #[serde(default)]
         showing: bool,
+        #[serde(default, skip_serializing_if = "HelperSource::is_simulated")]
+        source: HelperSource,
     },
     /// Where the shell's frame listener is, `127.0.0.1:<port>`, and its
     /// secret: once, before the first want, when the shell opened one.
@@ -79,11 +121,49 @@ fn first_camera() -> u8 {
 }
 
 /// Where the helper's pictures come from.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HelperSource {
     /// Test pictures of its own: the vMix inputs of `SIMULATED_VMIX_INPUTS`.
+    #[default]
     Simulated,
+    /// vMix's Outputs 2 to 4 over NDI on this PC (`VMIX_OUTPUTS`): only in a
+    /// development run started with `npm run app -- --vmix-pictures` (D33).
+    Vmix,
+}
+
+impl HelperSource {
+    pub fn is_simulated(&self) -> bool {
+        *self == Self::Simulated
+    }
+}
+
+/// What a camera's picture arrives as: its size and its rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PictureFormat {
+    pub width: u32,
+    pub height: u32,
+    /// Frames a second as a fraction: 30000 / 1001 is 29.97.
+    pub rate_numerator: u32,
+    pub rate_denominator: u32,
+}
+
+impl PictureFormat {
+    /// `3840 × 2160 · 29.97`: the rate to two decimals at most, and none
+    /// for a whole one.
+    pub fn words(&self) -> String {
+        let rate = if self.rate_denominator == 0 {
+            String::from("?")
+        } else {
+            let text = format!(
+                "{:.2}",
+                f64::from(self.rate_numerator) / f64::from(self.rate_denominator)
+            );
+            text.trim_end_matches('0').trim_end_matches('.').to_string()
+        };
+        format!("{} × {} · {rate}", self.width, self.height)
+    }
 }
 
 /// What the helper receives for one camera.
@@ -94,6 +174,20 @@ pub struct ReceivedCamera {
     pub vmix_input: u32,
     /// Its picture arrives.
     pub receiving: bool,
+    /// What it arrives as, while it does (vMix's pictures only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<PictureFormat>,
+}
+
+/// Why the helper takes no pictures from its source at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HelperProblem {
+    /// It was told vMix's pictures and does not take them: it was started
+    /// without the switch in its own environment, or it is a studio build.
+    NotAllowed,
+    /// NDI's library was not given, is not the SDK's file, or did not load.
+    NoLibrary,
 }
 
 /// A line from the helper to the engine.
@@ -103,8 +197,12 @@ pub enum FromHelper {
     /// What it receives, for the cameras of the last `Want`.
     State {
         source: HelperSource,
-        /// The source sends pictures at all (vMix runs and sends over NDI).
+        /// The source sends pictures at all (vMix runs and sends at least
+        /// one of the three outputs over NDI).
         sending: bool,
+        /// Why it takes none at all; absent while it can.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        problem: Option<HelperProblem>,
         cameras: Vec<ReceivedCamera>,
     },
 }
@@ -166,12 +264,14 @@ pub fn simulated_state(want: &[WantedCamera]) -> FromHelper {
     FromHelper::State {
         source: HelperSource::Simulated,
         sending: true,
+        problem: None,
         cameras: want
             .iter()
             .map(|wanted| ReceivedCamera {
                 camera: wanted.camera,
                 vmix_input: wanted.vmix_input,
                 receiving: SIMULATED_VMIX_INPUTS.contains(&wanted.vmix_input),
+                format: None,
             })
             .collect(),
     }
@@ -416,6 +516,7 @@ mod tests {
             cameras: want([1, 7, 3]),
             selected: 2,
             showing: true,
+            source: HelperSource::Simulated,
         };
         let line = to_line(&wanted);
         assert_eq!(
@@ -428,9 +529,10 @@ mod tests {
             Ok(ToHelper::Want {
                 cameras: Vec::new(),
                 selected: 1,
-                showing: false
+                showing: false,
+                source: HelperSource::Simulated,
             }),
-            "a want that names neither selects CAM 1 and shows nothing"
+            "a want that names neither selects CAM 1, shows nothing and is the simulated source's"
         );
 
         let link = ToHelper::Link {
@@ -452,6 +554,109 @@ mod tests {
             r#"{"type":"state","source":"simulated","sending":true,"cameras":[{"camera":1,"vmixInput":1,"receiving":true},{"camera":2,"vmixInput":7,"receiving":false},{"camera":3,"vmixInput":3,"receiving":true}]}"#
         );
         assert_eq!(from_line::<FromHelper>(&line), Ok(state));
+    }
+
+    #[test]
+    fn vmix_s_pictures_are_said_on_the_want_and_in_the_state() {
+        let wanted = ToHelper::Want {
+            cameras: want([1, 2, 3]),
+            selected: 1,
+            showing: false,
+            source: HelperSource::Vmix,
+        };
+        let line = to_line(&wanted);
+        assert_eq!(
+            line,
+            r#"{"type":"want","cameras":[{"camera":1,"vmixInput":1},{"camera":2,"vmixInput":2},{"camera":3,"vmixInput":3}],"selected":1,"showing":false,"source":"vmix"}"#
+        );
+        assert_eq!(from_line::<ToHelper>(&line), Ok(wanted));
+
+        let state = FromHelper::State {
+            source: HelperSource::Vmix,
+            sending: true,
+            problem: None,
+            cameras: vec![
+                ReceivedCamera {
+                    camera: 1,
+                    vmix_input: 1,
+                    receiving: true,
+                    format: Some(PictureFormat {
+                        width: 3840,
+                        height: 2160,
+                        rate_numerator: 30000,
+                        rate_denominator: 1001,
+                    }),
+                },
+                ReceivedCamera {
+                    camera: 2,
+                    vmix_input: 2,
+                    receiving: false,
+                    format: None,
+                },
+            ],
+        };
+        let line = to_line(&state);
+        assert_eq!(
+            line,
+            r#"{"type":"state","source":"vmix","sending":true,"cameras":[{"camera":1,"vmixInput":1,"receiving":true,"format":{"width":3840,"height":2160,"rateNumerator":30000,"rateDenominator":1001}},{"camera":2,"vmixInput":2,"receiving":false}]}"#
+        );
+        assert_eq!(from_line::<FromHelper>(&line), Ok(state));
+
+        let refused = FromHelper::State {
+            source: HelperSource::Vmix,
+            sending: false,
+            problem: Some(HelperProblem::NotAllowed),
+            cameras: Vec::new(),
+        };
+        let line = to_line(&refused);
+        assert_eq!(
+            line,
+            r#"{"type":"state","source":"vmix","sending":false,"problem":"notAllowed","cameras":[]}"#
+        );
+        assert_eq!(from_line::<FromHelper>(&line), Ok(refused));
+        assert_eq!(
+            from_line::<FromHelper>(
+                r#"{"type":"state","source":"vmix","sending":false,"problem":"noLibrary","cameras":[]}"#
+            )
+            .map(|FromHelper::State { problem, .. }| problem),
+            Ok(Some(HelperProblem::NoLibrary))
+        );
+    }
+
+    #[test]
+    fn the_cameras_are_vmix_s_outputs_two_to_four() {
+        assert_eq!(vmix_output(1), Some(2));
+        assert_eq!(vmix_output(2), Some(3));
+        assert_eq!(vmix_output(3), Some(4));
+        assert_eq!(vmix_output(0), None);
+        assert_eq!(vmix_output(4), None);
+    }
+
+    #[test]
+    fn only_one_asks_for_vmix_s_pictures() {
+        assert!(vmix_pictures_requested("1"));
+        assert!(vmix_pictures_requested(" 1\n"));
+        for refused in ["", "0", "true", "yes", "2", "01", "on"] {
+            assert!(!vmix_pictures_requested(refused), "{refused:?}");
+        }
+        assert_eq!(VMIX_PICTURES_ENV, "SSE_VMIX_PICTURES");
+        assert_eq!(NDI_LIBRARY_ENV, "SSE_NDI_LIBRARY");
+    }
+
+    #[test]
+    fn a_format_says_its_size_and_its_rate() {
+        let format = |rate_numerator, rate_denominator| PictureFormat {
+            width: 1920,
+            height: 1080,
+            rate_numerator,
+            rate_denominator,
+        };
+        assert_eq!(format(30000, 1001).words(), "1920 × 1080 · 29.97");
+        assert_eq!(format(25, 1).words(), "1920 × 1080 · 25");
+        assert_eq!(format(60000, 1001).words(), "1920 × 1080 · 59.94");
+        assert_eq!(format(50, 2).words(), "1920 × 1080 · 25");
+        assert_eq!(format(24000, 1001).words(), "1920 × 1080 · 23.98");
+        assert_eq!(format(30, 0).words(), "1920 × 1080 · ?");
     }
 
     #[test]

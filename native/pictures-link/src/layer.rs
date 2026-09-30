@@ -4,7 +4,8 @@
 //! process; the shell answers with a composition surface made for it and,
 //! from then on, each scene the page shows. The helper draws that scene into
 //! the surface 29.97 times a second from each camera's newest frame
-//! (`renderer.rs`). No picture leaves this process.
+//! (`renderer.rs`): the test card's, or vMix's (`receive.rs`), a frame no
+//! older than half a second. No picture leaves this process.
 //!
 //! The listener is on 127.0.0.1 and nowhere else: an address that is not
 //! this PC's is refused, whatever the line said. No graphics object is made
@@ -15,10 +16,13 @@
 
 use crate::card::{card_uyvy, mark, FULL};
 use crate::picture::Picture;
+use crate::receive::{lock, Frames};
 use crate::renderer::Renderer;
+use crate::watch::Beats;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use studio_control_protocol::picture_layer::{FromLayerHelper, Scene, ToLayerHelper};
 use studio_control_protocol::pictures::{
@@ -37,6 +41,21 @@ const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const COUNT_INTERVAL: Duration = Duration::from_secs(60);
 /// The most the shell's lines are read in one go, between two draws.
 const MAX_READS: usize = 16;
+/// A received frame older than this is not drawn: its place stays clear.
+const SHOWN_FOR: Duration = Duration::from_millis(500);
+/// The draw loop's name to the helper's watch (`watch.rs`).
+const WHO: &str = "The draw loop";
+
+/// What the draw loop draws the pictures from.
+#[derive(Clone)]
+pub enum Pictures {
+    /// Each camera's test card: the simulated source.
+    Cards,
+    /// Each camera's newest frame from vMix (`receive.rs`).
+    Received(Arc<Frames>),
+    /// Nothing: vMix's pictures were asked for, and this helper takes none.
+    Nothing,
+}
 
 /// What the draw loop is told.
 pub enum Order {
@@ -44,7 +63,18 @@ pub enum Order {
     Want {
         cameras: Vec<WantedCamera>,
         showing: bool,
+        pictures: Pictures,
     },
+}
+
+/// A received frame the draw loop holds while it draws it.
+#[derive(Default)]
+struct Front {
+    bytes: Vec<u8>,
+    width: u32,
+    height: u32,
+    stride: u32,
+    sequence: u64,
 }
 
 /// A listener's address the helper may connect to: 127.0.0.1 and nothing
@@ -181,9 +211,12 @@ struct Drawer {
     retry_at: Instant,
     cameras: Vec<WantedCamera>,
     showing: bool,
+    pictures: Pictures,
     /// Each camera's test card, and the copy the moving mark is drawn into.
     cards: [Vec<u8>; 3],
     marked: [Vec<u8>; 3],
+    /// Each camera's received frame, as last taken from `receive.rs`.
+    fronts: [Front; 3],
     frame: u64,
     counts: Counts,
     counted: Instant,
@@ -192,10 +225,11 @@ struct Drawer {
     said: Option<String>,
     /// Connections given up in a row without a frame drawn.
     failures: u32,
+    beats: Arc<Beats>,
 }
 
 impl Drawer {
-    fn new() -> Self {
+    fn new(beats: Arc<Beats>) -> Self {
         let cards = [card_uyvy(1), card_uyvy(2), card_uyvy(3)];
         Self {
             link: None,
@@ -205,13 +239,16 @@ impl Drawer {
             retry_at: Instant::now(),
             cameras: Vec::new(),
             showing: false,
+            pictures: Pictures::Cards,
             marked: cards.clone(),
             cards,
+            fronts: Default::default(),
             frame: 0,
             counts: Counts::default(),
             counted: Instant::now(),
             said: None,
             failures: 0,
+            beats,
         }
     }
 
@@ -237,14 +274,21 @@ impl Drawer {
                 self.let_go();
                 self.retry_at = Instant::now();
             }
-            Order::Want { cameras, showing } => {
+            Order::Want {
+                cameras,
+                showing,
+                pictures,
+            } => {
                 self.cameras = cameras;
+                self.pictures = pictures;
                 if showing && !self.showing {
                     self.retry_at = Instant::now();
                 }
                 self.showing = showing;
                 if !showing {
                     self.let_go();
+                    // It waits for an order now, which cannot hang.
+                    self.beats.rest(WHO);
                 }
             }
         }
@@ -331,42 +375,87 @@ impl Drawer {
             }
             return;
         };
-        if self.renderer.is_none() {
-            self.counts.no_surface += 1;
-            return;
-        }
         let frame = self.frame;
         self.frame = self.frame.wrapping_add(1);
+        let shown = |camera: u8| scene.pictures.iter().any(|placed| placed.camera == camera);
         let mut arrives = [false; 3];
-        for camera in &self.cameras {
-            let index = usize::from(camera.camera).wrapping_sub(1);
-            let shown = scene
-                .pictures
-                .iter()
-                .any(|placed| placed.camera == camera.camera);
-            if index < 3 && shown && SIMULATED_VMIX_INPUTS.contains(&camera.vmix_input) {
-                arrives[index] = true;
+        match &self.pictures {
+            Pictures::Cards => {
+                for camera in &self.cameras {
+                    let index = usize::from(camera.camera).wrapping_sub(1);
+                    if index < 3
+                        && shown(camera.camera)
+                        && SIMULATED_VMIX_INPUTS.contains(&camera.vmix_input)
+                    {
+                        arrives[index] = true;
+                    }
+                }
+                for (index, marked) in self.marked.iter_mut().enumerate() {
+                    if arrives[index] {
+                        marked.copy_from_slice(&self.cards[index]);
+                        mark(marked, FULL.0, FULL.1, frame);
+                    }
+                }
             }
-        }
-        for (index, marked) in self.marked.iter_mut().enumerate() {
-            if arrives[index] {
-                marked.copy_from_slice(&self.cards[index]);
-                mark(marked, FULL.0, FULL.1, frame);
+            Pictures::Received(frames) => {
+                let now = Instant::now();
+                for (index, front) in self.fronts.iter_mut().enumerate() {
+                    if !shown(index as u8 + 1) {
+                        continue;
+                    }
+                    let mut newest = lock(&frames[index]);
+                    let recent = newest
+                        .arrived
+                        .is_some_and(|at| now.saturating_duration_since(at) < SHOWN_FOR);
+                    if !recent {
+                        continue;
+                    }
+                    // The newest frame for the one drawn last: the buffers
+                    // go round, and no frame is copied again.
+                    if newest.sequence != front.sequence {
+                        std::mem::swap(&mut newest.bytes, &mut front.bytes);
+                        front.width = newest.width;
+                        front.height = newest.height;
+                        front.stride = newest.stride;
+                        front.sequence = newest.sequence;
+                    }
+                    arrives[index] = true;
+                }
             }
+            Pictures::Nothing => {}
         }
         let picture = |index: usize| {
-            arrives[index].then(|| Picture {
-                uyvy: &self.marked[index],
-                width: u32::from(FULL.0),
-                height: u32::from(FULL.1),
-                stride: u32::from(FULL.0) * 2,
+            if !arrives[index] {
+                return None;
+            }
+            Some(match &self.pictures {
+                Pictures::Received(_) => {
+                    let front = &self.fronts[index];
+                    Picture {
+                        uyvy: &front.bytes,
+                        width: front.width,
+                        height: front.height,
+                        stride: front.stride,
+                        sequence: front.sequence,
+                    }
+                }
+                Pictures::Cards | Pictures::Nothing => Picture {
+                    uyvy: &self.marked[index],
+                    width: u32::from(FULL.0),
+                    height: u32::from(FULL.1),
+                    stride: u32::from(FULL.0) * 2,
+                    sequence: frame,
+                },
             })
         };
         let pictures = [picture(0), picture(1), picture(2)];
         let started = Instant::now();
         let drawn = match self.renderer.as_mut() {
             Some(renderer) => renderer.draw(scene, &pictures),
-            None => return,
+            None => {
+                self.counts.no_surface += 1;
+                return;
+            }
         };
         match drawn {
             Ok(_) => {
@@ -397,6 +486,7 @@ impl Drawer {
     }
 
     fn tick(&mut self) {
+        self.beats.beat(WHO);
         self.connect();
         self.hear();
         if self.connection.is_some() {
@@ -406,9 +496,10 @@ impl Drawer {
     }
 }
 
-/// Draws until `orders` closes: the helper is ending.
-pub fn run(orders: &Receiver<Order>) {
-    let mut drawer = Drawer::new();
+/// Draws until `orders` closes: the helper is ending. It beats while it
+/// draws (`watch.rs`), so a draw that hangs makes the helper go silent.
+pub fn run(orders: &Receiver<Order>, beats: &Arc<Beats>) {
+    let mut drawer = Drawer::new(Arc::clone(beats));
     let mut due = Instant::now();
     loop {
         // Nothing to draw while the page does not show the pictures: wait for
@@ -548,22 +639,109 @@ mod tests {
 
     #[test]
     fn nothing_is_drawn_and_nothing_made_without_the_shell_s_surface() {
-        let mut drawer = Drawer::new();
+        let beats = Arc::new(Beats::default());
+        let mut drawer = Drawer::new(Arc::clone(&beats));
         drawer.take(Order::Want {
             cameras: vec![WantedCamera {
                 camera: 1,
                 vmix_input: 1,
             }],
             showing: true,
+            pictures: Pictures::Cards,
         });
         // No link told: no connection is tried, and a draw is not counted.
         drawer.tick();
         assert!(drawer.connection.is_none() && drawer.renderer.is_none());
         assert!(!drawer.counts.any());
+        // It beats while it draws, and rests while the pictures do not show.
+        let later = Instant::now() + crate::watch::STALL;
+        assert_eq!(beats.stalled(later).as_deref(), Some(WHO));
         drawer.take(Order::Want {
             cameras: Vec::new(),
             showing: false,
+            pictures: Pictures::Cards,
         });
         assert!(!drawer.showing);
+        assert_eq!(beats.stalled(later), None);
+    }
+
+    /// A scene with each camera's picture in a place of its own.
+    fn scene_of(cameras: &[u8]) -> Scene {
+        use studio_control_protocol::picture_layer::{Part, PictureRect, PlacedPicture};
+        Scene {
+            width: 1000,
+            height: 600,
+            pictures: cameras
+                .iter()
+                .map(|camera| PlacedPicture {
+                    camera: *camera,
+                    at: PictureRect {
+                        x: 0,
+                        y: 0,
+                        width: 480,
+                        height: 270,
+                    },
+                    part: Part {
+                        x: 0,
+                        y: 0,
+                        width: 1920,
+                        height: 1080,
+                    },
+                    smooth: true,
+                })
+                .collect(),
+            holes: Vec::new(),
+        }
+    }
+
+    // The newest received frame is drawn, and a frame older than half a
+    // second is not: its place stays clear. There is no surface here, which
+    // the counts say; the frames it took are what this holds.
+    #[test]
+    fn a_received_frame_is_taken_while_it_is_recent() {
+        use crate::receive::Newest;
+        use std::sync::Mutex;
+        let frames: Arc<Frames> = Arc::new([
+            Mutex::new(Newest::default()),
+            Mutex::new(Newest::default()),
+            Mutex::new(Newest::default()),
+        ]);
+        // The drawer first: its test cards take a while to make in a test
+        // build, and the frame below must be recent when it is drawn.
+        let mut drawer = Drawer::new(Arc::new(Beats::default()));
+        drawer.take(Order::Want {
+            cameras: Vec::new(),
+            showing: true,
+            pictures: Pictures::Received(Arc::clone(&frames)),
+        });
+        drawer.scene = Some(scene_of(&[1, 2, 3]));
+        {
+            let mut newest = lock(&frames[1]);
+            newest.bytes = vec![7; 8 * 2 * 2];
+            newest.width = 8;
+            newest.height = 2;
+            newest.stride = 16;
+            newest.sequence = 5;
+            newest.arrived = Some(Instant::now());
+        }
+        {
+            let mut old = lock(&frames[2]);
+            old.bytes = vec![9; 8 * 2 * 2];
+            old.width = 8;
+            old.height = 2;
+            old.stride = 16;
+            old.sequence = 3;
+            old.arrived = Instant::now().checked_sub(Duration::from_secs(2));
+        }
+        drawer.draw();
+        assert_eq!(drawer.counts.no_surface, 1);
+        assert_eq!(drawer.fronts[1].sequence, 5, "CAM 2's frame is taken");
+        assert_eq!(drawer.fronts[1].bytes, vec![7; 32]);
+        assert!(
+            lock(&frames[1]).bytes.is_empty(),
+            "and its buffer handed back"
+        );
+        assert_eq!(drawer.fronts[2].sequence, 0, "CAM 3's is too old");
+        assert_eq!(drawer.fronts[0].sequence, 0, "CAM 1 sent none");
     }
 }
