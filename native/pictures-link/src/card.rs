@@ -1,17 +1,16 @@
 //! The simulated source's pictures: each camera's test card, the one the
 //! page drew until the pictures came (`frontend/app/src/app/cameras/pictures/
-//! testPicture.ts`), in the picture's own 1920 × 1080 pixels and at the small
-//! pictures' 544 × 306, as UYVY, the format NDI hands out. A mark moves along
-//! the card's foot, so a picture that stops is seen to stop.
+//! testPicture.ts`), in the picture's own 1920 × 1080 pixels, as UYVY, the
+//! format NDI hands out. A mark moves along the card's foot, so a picture
+//! that stops is seen to stop.
 //!
 //! The card holds what the aids are for: bars at 75 %, a ramp and steps that
 //! reach full white for the zebras, and line pairs down to one pixel for the
 //! peaking. The cameras are told apart by one, two or three squares at the
 //! top left.
 
-/// The picture's size, and the small pictures'.
+/// The picture's size.
 pub const FULL: (u16, u16) = (1920, 1080);
-pub const SMALL: (u16, u16) = (544, 306);
 
 type Rgb = [u8; 3];
 
@@ -128,32 +127,6 @@ fn card(camera: u8) -> Canvas {
     canvas
 }
 
-/// The card at the small pictures' size: each small pixel the average of
-/// the pixels it covers.
-fn shrink(canvas: &Canvas, width: usize, height: usize) -> Canvas {
-    let mut small = Canvas::new(width, height, [0, 0, 0]);
-    for y in 0..height {
-        let top = y * canvas.height / height;
-        let bottom = ((y + 1) * canvas.height / height).max(top + 1);
-        for x in 0..width {
-            let left = x * canvas.width / width;
-            let right = ((x + 1) * canvas.width / width).max(left + 1);
-            let mut sum = [0_u32; 3];
-            for source_y in top..bottom {
-                for source_x in left..right {
-                    let pixel = canvas.pixels[source_y * canvas.width + source_x];
-                    for channel in 0..3 {
-                        sum[channel] += u32::from(pixel[channel]);
-                    }
-                }
-            }
-            let count = ((bottom - top) * (right - left)) as u32;
-            small.pixels[y * width + x] = sum.map(|total| ((total + count / 2) / count) as u8);
-        }
-    }
-    small
-}
-
 /// Full-range RGB to BT.709 video-range Y, Cb and Cr, as NDI's UYVY holds
 /// them: what a camera through vMix would send.
 fn ycbcr(rgb: Rgb) -> (f64, f64, f64) {
@@ -184,21 +157,10 @@ fn uyvy(canvas: &Canvas) -> Vec<u8> {
     bytes
 }
 
-/// One camera's cards as UYVY, big and small, made once.
-pub struct Cards {
-    pub full: Vec<u8>,
-    pub small: Vec<u8>,
-}
-
-impl Cards {
-    pub fn new(camera: u8) -> Self {
-        let full = card(camera);
-        let small = shrink(&full, usize::from(SMALL.0), usize::from(SMALL.1));
-        Self {
-            full: uyvy(&full),
-            small: uyvy(&small),
-        }
-    }
+/// Camera `camera`'s card as UYVY, made once. The small pictures are drawn
+/// from it by the graphics card, as a real camera's are.
+pub fn card_uyvy(camera: u8) -> Vec<u8> {
+    uyvy(&card(camera))
 }
 
 /// Draws the moving mark into a UYVY picture of `width` × `height`: a white
@@ -257,23 +219,20 @@ mod tests {
         assert_eq!(ycbcr([0, 0, 0]).0.round(), 16.0);
         let (_, cb, cr) = ycbcr([128, 128, 128]);
         assert_eq!((cb.round(), cr.round()), (128.0, 128.0));
-        let cards = Cards::new(2);
-        assert_eq!(cards.full.len(), 1920 * 1080 * 2);
-        assert_eq!(cards.small.len(), 544 * 306 * 2);
+        assert_eq!(card_uyvy(2).len(), 1920 * 1080 * 2);
     }
 
     #[test]
     fn the_mark_moves_and_stays_inside_the_picture() {
-        let cards = Cards::new(1);
-        for (width, height, base) in [(1920_u16, 1080_u16, &cards.full), (544, 306, &cards.small)] {
-            let mut first = base.clone();
-            mark(&mut first, width, height, 0);
-            let mut later = base.clone();
-            mark(&mut later, width, height, 60);
-            assert_ne!(first, *base, "the mark is drawn");
-            assert_ne!(first, later, "it moves");
-            mark(&mut later, width, height, u64::MAX);
-            assert_eq!(later.len(), base.len());
-        }
+        let base = card_uyvy(1);
+        let (width, height) = FULL;
+        let mut first = base.clone();
+        mark(&mut first, width, height, 0);
+        let mut later = base.clone();
+        mark(&mut later, width, height, 60);
+        assert_ne!(first, base, "the mark is drawn");
+        assert_ne!(first, later, "it moves");
+        mark(&mut later, width, height, u64::MAX);
+        assert_eq!(later.len(), base.len());
     }
 }

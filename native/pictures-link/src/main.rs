@@ -9,14 +9,22 @@
 //! a line it cannot read is said on stderr, which the engine logs.
 //!
 //! Its one source is the simulated one: test pictures on vMix inputs 1 to 4
-//! (`simulated_state`, `card.rs`). While the Cameras page shows them it sends
-//! them as frames to the shell's listener on 127.0.0.1, whose address and
-//! secret the engine tells it (`frames.rs`); it opens no device. A studio
+//! (`simulated_state`, `card.rs`). While the Cameras page shows them it draws
+//! them itself (D30): it connects to the shell's listener on 127.0.0.1, whose
+//! address and secret the engine tells it, is handed a composition surface
+//! over the page and told where each picture stands (`layer.rs`), and draws
+//! them on the graphics card (`renderer.rs`). It opens no device. A studio
 //! build does not start it until NDI is built (the owner, 2026-09-29), and a
 //! studio build of it refuses to run.
 
 mod card;
-mod frames;
+mod layer;
+mod picture;
+#[cfg(windows)]
+mod renderer;
+#[cfg(not(windows))]
+#[path = "renderer_none.rs"]
+mod renderer;
 
 use std::io::{self, BufReader, Read, Write};
 use std::process::ExitCode;
@@ -35,14 +43,14 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
     let (orders, received) = mpsc::channel();
-    let sender = thread::Builder::new()
-        .name(String::from("frames"))
-        .spawn(move || frames::run(&received));
+    let drawer = thread::Builder::new()
+        .name(String::from("pictures"))
+        .spawn(move || layer::run(&received));
     let stdout = io::stdout();
     run(io::stdin(), &mut stdout.lock(), &orders);
     drop(orders);
-    if let Ok(sender) = sender {
-        let _ = sender.join();
+    if let Ok(drawer) = drawer {
+        let _ = drawer.join();
     }
     ExitCode::SUCCESS
 }
@@ -78,33 +86,32 @@ fn spawn_reader(input: impl Read + Send + 'static) -> Receiver<Input> {
 }
 
 /// The helper's loop: takes the engine's lines, hands the link and the
-/// wants to the frame sender, and says what it receives, until its input
+/// wants to the draw loop, and says what it receives, until its input
 /// closes or its output cannot be written. It says nothing before the first
 /// want: a helper that was never told the cameras has nothing to say, and
 /// the engine would read its silence as a hang.
-fn run(input: impl Read + Send + 'static, output: &mut impl Write, orders: &Sender<frames::Order>) {
+fn run(input: impl Read + Send + 'static, output: &mut impl Write, orders: &Sender<layer::Order>) {
     let lines = spawn_reader(input);
     let mut want: Option<Vec<WantedCamera>> = None;
     let mut said: Option<String> = None;
     let mut due = Instant::now();
     loop {
         match lines.recv_timeout(due.saturating_duration_since(Instant::now())) {
+            // Which camera is the selected one is the page's to say, in the
+            // scene the shell hands on: the helper draws what it is told.
             Ok(Input::Line(Ok(ToHelper::Want {
-                cameras,
-                selected,
-                showing,
+                cameras, showing, ..
             }))) => {
-                let _ = orders.send(frames::Order::Want {
+                let _ = orders.send(layer::Order::Want {
                     cameras: cameras.clone(),
-                    selected,
                     showing,
                 });
                 want = Some(cameras);
             }
             Ok(Input::Line(Ok(ToHelper::Link { address, secret }))) => {
-                match frames::listener_address(&address) {
+                match layer::listener_address(&address) {
                     Ok(address) => {
-                        let _ = orders.send(frames::Order::Link(address, secret));
+                        let _ = orders.send(layer::Order::Link(address, secret));
                     }
                     Err(why) => eprintln!("The pictures helper refused a listener: {why}"),
                 }

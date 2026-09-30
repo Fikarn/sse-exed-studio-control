@@ -3,6 +3,9 @@ use serde_json::{json, Value};
 
 /// The build the engine and the shell are, and the studio's data folder.
 pub mod development;
+/// The native picture layer's lines: the page's report, and what the shell
+/// and the pictures helper say to each other.
+pub mod picture_layer;
 /// The pictures helper's lines, between the engine and the helper.
 pub mod pictures;
 

@@ -13,7 +13,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::shell_log::{SharedShellLog, ShellLog, SHELL_LOG_FILE_NAME};
-use crate::shell_pictures::{PicturesLink, PicturesLog, PicturesStore};
+use crate::shell_pictures::{LayerSink, PicturesLink, PicturesLog};
 use crate::shell_prompter_window::WatchWake;
 use crate::shell_windows::{deliveries, listens_in};
 use studio_control_protocol::development::{
@@ -91,9 +91,6 @@ pub struct EngineBridge {
     /// a report about a process it already replaced from one about the
     /// process it is talking to.
     generations: AtomicU64,
-    /// The newest frame of each camera, which the page takes
-    /// (`shell_pictures.rs`), for the life of the shell.
-    pictures: Arc<PicturesStore>,
 }
 
 struct EngineProcess {
@@ -109,7 +106,8 @@ struct EngineProcess {
     /// under the process mutex.
     expected_exit: bool,
     sink: EventSink,
-    /// This start's frame listener; it closes with the process.
+    /// This start's listener for the pictures helper; it closes with the
+    /// process.
     _pictures_link: Option<PicturesLink>,
 }
 
@@ -137,6 +135,19 @@ pub struct EngineBootstrapSummary {
     pub generation: u64,
 }
 
+/// What a helper's connection asks its surface of: the native layer on
+/// Windows, and nothing on a system without it.
+fn picture_layer() -> Arc<dyn LayerSink> {
+    #[cfg(windows)]
+    {
+        Arc::new(crate::shell_picture_layer::LayerLink)
+    }
+    #[cfg(not(windows))]
+    {
+        Arc::new(crate::shell_pictures::NoLayer)
+    }
+}
+
 impl EngineBridge {
     pub fn start(&self, app: &AppHandle) -> Result<EngineBootstrapSummary, String> {
         if let Some(summary) = self.summary()? {
@@ -158,12 +169,13 @@ impl EngineBridge {
             .env("SSE_APP_DATA_DIR", &app_data_dir)
             .env("SSE_LOG_DIR", &logs_dir);
         let shell_log = self.shell_log_for(&logs_dir)?;
-        // The pictures' frame listener of this start, its address and its
-        // secret for the engine alone (it hands them to the pictures helper).
-        // Without it the hardware link starts all the same, with no pictures.
-        // Only a development build has a helper to use it until NDI is built
-        // (the owner, 2026-09-29); elsewhere, and when it does not open, no
-        // value from the shell's own environment reaches the engine.
+        // The pictures' listener of this start, its address and its secret
+        // for the engine alone (it hands them to the pictures helper, which
+        // connects for its surface in the native layer). Without it the
+        // hardware link starts all the same, with no pictures. Only a
+        // development build has a helper to use it until the studio build's
+        // step; elsewhere, and when it does not open, no value from the
+        // shell's own environment reaches the engine.
         command
             .env_remove(LINK_ADDRESS_ENV)
             .env_remove(LINK_SECRET_ENV);
@@ -175,7 +187,7 @@ impl EngineBridge {
                         let _ = log.write_line("PICTURES", line);
                     }
                 });
-                match PicturesLink::open(Arc::clone(&self.pictures), Arc::clone(&log)) {
+                match PicturesLink::open(Arc::clone(&log), picture_layer()) {
                     Ok(link) => {
                         command
                             .env(LINK_ADDRESS_ENV, link.address().to_string())
@@ -207,11 +219,6 @@ impl EngineBridge {
             Some(shell_log),
             pictures_link,
         )
-    }
-
-    /// The newest frame of each camera.
-    pub(crate) fn pictures(&self) -> &PicturesStore {
-        &self.pictures
     }
 
     /// One line of the shell's own in `<logs>/shell.log`, the file the

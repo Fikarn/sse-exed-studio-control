@@ -3368,6 +3368,7 @@ name = "studio-control-pictures"
 version = "0.1.0"
 dependencies = [
  "studio-control-protocol",
+ "windows",
 ]
 
 [[package]]

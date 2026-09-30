@@ -633,19 +633,22 @@ fn a_development_build_sets_its_own_switches() {
     engine.shutdown();
 }
 
-// The camera pictures' frame route (D28), with the real pictures helper: the
+// The camera pictures' link (D28, D30), with the real pictures helper: the
 // test plays the shell's side — a listener on 127.0.0.1, its address and a
-// secret in the engine's environment — and the frames come straight from the
-// helper, never through the engine, while the page says it shows the
-// pictures: the selected camera big, the other two small.
+// secret in the engine's environment. While the page says it shows the
+// pictures the helper connects, says the secret and then hello with its
+// process, and waits for a surface to draw into. No picture is sent: the
+// helper draws them itself, and makes nothing to draw with before it is
+// handed a surface, which this test never does.
 #[test]
-fn the_helper_sends_frames_to_the_shell_s_listener_while_the_page_shows_them() {
-    use std::io::Read;
+fn the_helper_says_the_secret_and_hello_to_the_shell_s_listener_while_the_page_shows_the_pictures()
+{
+    use std::io::{BufRead, BufReader, Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
+    use studio_control_protocol::picture_layer::FromLayerHelper;
     use studio_control_protocol::pictures::{
-        FrameFormat, FrameHeader, FRAME_HEADER_LEN, HELPER_PROGRAM, LINK_ADDRESS_ENV,
-        LINK_SECRET_ENV,
+        from_line, HELPER_PROGRAM, LINK_ADDRESS_ENV, LINK_SECRET_ENV,
     };
 
     assert!(
@@ -669,7 +672,7 @@ fn the_helper_sends_frames_to_the_shell_s_listener_while_the_page_shows_them() {
     std::thread::spawn(move || {
         let _ = accepted.send(listener.accept().map(|(stream, _)| stream));
     });
-    // Nothing is sent before the page shows the pictures.
+    // No connection before the page shows the pictures.
     assert!(connection
         .recv_timeout(Duration::from_millis(1500))
         .is_err());
@@ -687,56 +690,49 @@ fn the_helper_sends_frames_to_the_shell_s_listener_while_the_page_shows_them() {
     stream
         .set_read_timeout(Some(Duration::from_secs(20)))
         .expect("a timeout");
-    let mut said = vec![0_u8; secret.len() + 1];
-    stream.read_exact(&mut said).expect("the secret");
-    assert_eq!(said, format!("{secret}\n").into_bytes());
+    let mut lines = BufReader::new(stream.try_clone().expect("a second handle"));
+    let mut said = String::new();
+    lines.read_line(&mut said).expect("the secret");
+    assert_eq!(said, format!("{secret}\n"));
+    let mut hello = String::new();
+    lines.read_line(&mut hello).expect("the hello");
+    let FromLayerHelper::Hello { pid } =
+        from_line(hello.trim_end()).unwrap_or_else(|why| panic!("{why}: {hello}"));
+    assert_ne!(pid, 0, "{hello}");
+    assert_ne!(pid, std::process::id(), "the helper's own process: {hello}");
 
-    let mut next_frame = || {
-        let mut header = [0_u8; FRAME_HEADER_LEN];
-        stream.read_exact(&mut header).expect("a header");
-        let header = FrameHeader::decode(&header).expect("a frame");
-        let mut picture = vec![0_u8; header.length as usize];
-        stream.read_exact(&mut picture).expect("its picture");
-        header
-    };
-    let mut sizes = std::collections::BTreeMap::new();
-    let mut last_sequence = [0_u64; 3];
-    for _ in 0..12 {
-        let frame = next_frame();
-        assert_eq!(frame.format, FrameFormat::Uyvy);
-        let index = usize::from(frame.camera) - 1;
-        assert!(frame.sequence > last_sequence[index], "{frame:?}");
-        last_sequence[index] = frame.sequence;
-        sizes.insert(frame.camera, (frame.width, frame.height));
-    }
-    assert_eq!(
-        sizes.into_iter().collect::<Vec<_>>(),
-        [(1, (1920, 1080)), (2, (544, 306)), (3, (544, 306))],
-        "CAM 1 is selected after a start"
-    );
-
-    // Another camera selected: it is sent big.
-    engine.send(&json!({
-        "type": "request", "id": "select-2", "method": "cameras.select", "params": { "camera": 2 }
-    }));
-    engine.wait_for("cameras.select", response_with_id("select-2"));
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        let frame = next_frame();
-        if frame.camera == 2 && frame.width == 1920 {
-            break;
-        }
-        assert!(Instant::now() < deadline, "CAM 2 never came big");
+    // A scene with no surface to draw it into: the helper takes it, draws
+    // nothing and says nothing.
+    writeln!(
+        stream,
+        r#"{{"type":"scene","width":1712,"height":1344,"pictures":[{{"camera":1,"at":{{"x":16,"y":62,"width":1680,"height":945}},"part":{{"x":0,"y":0,"width":1920,"height":1080}},"smooth":true}}],"holes":[]}}"#
+    )
+    .expect("a scene");
+    // The timeout is the reading handle's own: on Windows a second handle
+    // does not share it.
+    lines
+        .get_ref()
+        .set_read_timeout(Some(Duration::from_millis(1500)))
+        .expect("a timeout");
+    let mut more = String::new();
+    match lines.read_line(&mut more) {
+        Ok(0) => panic!("the helper closed its connection"),
+        Ok(_) => panic!("the helper said more: {more}"),
+        Err(_) => assert!(more.is_empty(), "{more}"),
     }
 
     // The engine's end ends the helper, and its connection with it.
     engine.shutdown();
-    let mut rest = [0_u8; 64 * 1024];
+    lines
+        .get_ref()
+        .set_read_timeout(Some(Duration::from_secs(20)))
+        .expect("a timeout");
+    let mut rest = [0_u8; 1024];
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        match stream.read(&mut rest) {
+        match lines.read(&mut rest) {
             Ok(0) | Err(_) => break,
-            Ok(_) => assert!(Instant::now() < deadline, "the frames never stopped"),
+            Ok(_) => assert!(Instant::now() < deadline, "the connection never ended"),
         }
     }
 }

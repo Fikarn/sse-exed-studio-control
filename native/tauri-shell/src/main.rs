@@ -24,8 +24,10 @@
 // - `shell_smoke.rs`: the `--smoke-test` mode.
 // - `shell_test_bridge.rs`: the commands of the `test-bridge` feature.
 // - `shell_log.rs`: `shell.log`.
-// - `shell_pictures.rs`: the pictures' frame route, from the pictures helper
-//   to the page.
+// - `shell_pictures.rs`: the pictures' link, on which the pictures helper
+//   gets its surface and is told what to draw.
+// - `shell_picture_layer.rs`: the native layer the pictures are drawn in,
+//   topmost on the main window.
 
 mod engine;
 #[cfg(windows)]
@@ -35,6 +37,8 @@ mod shell_display_watch;
 mod shell_displays;
 mod shell_log;
 mod shell_paths;
+#[cfg(windows)]
+mod shell_picture_layer;
 mod shell_pictures;
 mod shell_prompter_window;
 mod shell_smoke;
@@ -116,6 +120,14 @@ fn main() {
             let _ = window.show();
             let app_handle = app.handle().clone();
             restore_or_route_initial_window(&app_handle, &window);
+            // The native layer the pictures helper draws the cameras'
+            // pictures in, topmost on this window, once the window stands
+            // where it stays. A development build's alone until the studio
+            // build's step, like the helper itself.
+            #[cfg(windows)]
+            if studio_control_protocol::development::development_build() {
+                shell_picture_layer::start(&app_handle, &window);
+            }
             // The window's display is saved by the watch over the screens,
             // which starts now that the window stands on it, and by the
             // window commands: no longer at every move of the window, which
@@ -140,6 +152,10 @@ fn main() {
                             SHELL_CLOSE_REQUESTED_EVENT,
                             (),
                         );
+                    } else {
+                        // The layer lets go of the window before the window goes.
+                        #[cfg(windows)]
+                        shell_picture_layer::stop();
                     }
                 }
                 // The app ends with the operator's window. Tauri ends it
@@ -165,7 +181,7 @@ fn main() {
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
         shell_prompter_window::prompter_window_alive,
-        shell_pictures::pictures_next,
+        shell_pictures::pictures_place,
         shell_test_bridge::shell_test_bridge_config,
         shell_test_bridge::shell_test_bridge_write_status,
         shell_test_bridge::shell_test_bridge_read_command,
@@ -184,7 +200,7 @@ fn main() {
         shell_window_layout::shell_reset_window_layout,
         shell_commands::shell_confirm_close,
         shell_prompter_window::prompter_window_alive,
-        shell_pictures::pictures_next
+        shell_pictures::pictures_place
     ]));
 
     let mut context = tauri::generate_context!();
