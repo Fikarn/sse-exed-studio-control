@@ -206,13 +206,33 @@ function simulatedLightsRequested(value) {
 }
 
 /**
+ * vMix's switch (D33): `1` asks a development run's pictures helper for
+ * vMix's Outputs 2 to 4 over NDI. Only `npm run app -- --vmix-pictures` sets
+ * it, for a hardware test the owner attends (`studio_control_protocol::
+ * pictures::VMIX_PICTURES_ENV`, which the engine and the helper read).
+ */
+export const VMIX_PICTURES_ENV = "SSE_VMIX_PICTURES";
+/** NDI's library for that run, by its full path (`NDI_LIBRARY_ENV`). */
+export const NDI_LIBRARY_ENV = "SSE_NDI_LIBRARY";
+
+// Whether `env` asks for vMix's pictures, under the name in any case, as
+// Windows reads it; the engine trims the value first.
+function vmixPicturesRequested(env) {
+  return Object.entries(env).some(
+    ([name, value]) => name.toUpperCase() === VMIX_PICTURES_ENV && String(value ?? "").trim() === "1"
+  );
+}
+
+/**
  * Why a lane process's environment is not hardened, or null when it is.
  * `safeStart: false` is for the one launch that proves a hold outlives the
  * launch that made it (tauri-setup-support-qualification.mjs, step 8).
  * `liveConsole` defaults to the live console lane's opt-in; only this
- * module's own tests pass it (`laneProcessEnv` refuses it).
+ * module's own tests pass it (`laneProcessEnv` refuses it). `vmixPictures`
+ * lets vMix's switch pass: only `npm run app -- --vmix-pictures` passes it
+ * (`scripts/dev-app.mjs`), and `laneProcessEnv` refuses it from a lane.
  */
-export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSOLE } = {}) {
+export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSOLE, vmixPictures = false } = {}) {
   for (const name of ["SSE_APP_DATA_DIR", "SSE_LOG_DIR"]) {
     const refusal = scratchFolderRefusal(env, name);
     if (refusal) {
@@ -242,6 +262,10 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
   if (!simulatedCamerasRequested(env.SSE_CAMERAS_SIMULATED)) {
     return "SSE_CAMERAS_SIMULATED must be 1: a lane uses the simulated cameras.";
   }
+  // No lane opens vMix's pictures: that is a hardware test the owner attends (D33).
+  if (!vmixPictures && vmixPicturesRequested(env)) {
+    return `${VMIX_PICTURES_ENV} is 1: only \`npm run app -- --vmix-pictures\` takes vMix's pictures, a hardware test the owner attends, and no lane may.`;
+  }
   return null;
 }
 
@@ -265,6 +289,11 @@ export function laneProcessEnv(base, overrides = {}, { label = "A lane process",
   if (Object.hasOwn(options, "liveConsole")) {
     throw new Error(
       `${label} was not started: a lane cannot choose the real console; only the live console lane's opt-in (SSE_NATIVE_ACCEPTANCE_LIVE_CONSOLE=1, read by acceptanceEngineEnv) leaves the simulated console.`
+    );
+  }
+  if (Object.hasOwn(options, "vmixPictures")) {
+    throw new Error(
+      `${label} was not started: a lane cannot take vMix's pictures; only \`npm run app -- --vmix-pictures\` does, a hardware test the owner attends (D33).`
     );
   }
   const env = { ...process.env, ...base, ...overrides };

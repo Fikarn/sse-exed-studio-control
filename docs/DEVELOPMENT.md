@@ -31,6 +31,8 @@ To work on the studio's data, copy its folder and name the copy: `npm run app --
 
 To measure what the app costs, `npm run app -- --release` builds the shell, the engine and the pictures helper in the release profile, in `native/target/dev-release` (the first build takes some minutes), never in `native/target/release`, where `npm run release` builds. It is still a development run: only `npm run release` makes a studio build.
 
+`npm run app -- --vmix-pictures` (with `--release` or without) is the hardware test of vMix's pictures (D33), run only when the owner asks and is present, with vMix running and Outputs 2, 3 and 4 sent over NDI. It starts only when the NDI SDK's library (from `NDI_SDK_DIR`, or the SDK's own folder) matches `native/pictures-link/ndi-library.json`, its version and SHA-256; a newer SDK is taken by changing that pin. It sets `SSE_VMIX_PICTURES=1` and hands the helper the library (`SSE_NDI_LIBRARY`); every other run sets the switch to 0 and hands no library, the lanes refuse the switch, and the tests remove both. The cameras' links, the lights and the console stay simulated. `engine.log` says which file and version the helper loaded, which of NDI's sources it passed over and why, which outputs NDI lists, and once a minute what each camera's receiver took.
+
 The shell starts only an engine of its own build, read from a mark in the engine's file (`docs/ARCHITECTURE.md`). A shell built alone beside an engine from before the mark, or beside the studio engine that `npm run release` leaves in `native/target/release`, refuses it and says why. `npm run app` and the lanes build both.
 
 A development build started any other way is as careful: where a switch is not set it takes the safe value (`native/rust-engine/src/development.rs`), and says so in its log.
@@ -123,7 +125,7 @@ The engine:
 
 The shell:
 
-- **CI compiles no Windows code.** Its jobs run on Linux, so what stands under `cfg(windows)` (the display calls, WebView2's settings, the picture layer, the pictures helper's renderer) is compiled and tested by the gate on this PC alone.
+- **CI compiles no Windows code.** Its jobs run on Linux, so what stands under `cfg(windows)` (the display calls, WebView2's settings, the picture layer, the pictures helper's renderer and its NDI calls) is compiled and tested by the gate on this PC alone. The helper's rules for NDI (`vmix.rs`, `ndi_sdk.rs`) are pure and run on CI too; to see what CI's Linux compiles, read every `windows` in the helper's `cfg` attributes as false (its stubs then stand in) and run clippy.
 - **`unsafe` has a list.** The shell's crate and the pictures helper's deny `unsafe`, and lift it for the functions `SHELL_UNSAFE` and `PICTURES_UNSAFE` name in `scripts/check-no-shortcuts.test.mjs`, each with its reason and its number of blocks. A block says why it is sound in a `// SAFETY:` comment above it. A new block changes the list.
 - **A command of the shell is named by its module** in `main.rs`'s two handler lists (`shell_commands::engine_start`): the macro that registers it lives beside the command.
 - **A rule about screens is a function over plain data.** `shell_displays.rs` reads Windows once and answers a list; everything else (which screen is the Prompter XL, whether the screens changed, where the window goes) takes that list, so it is tested without a screen.

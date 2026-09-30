@@ -7,9 +7,9 @@
 
 use crate::cameras::snapshot::{CameraTone, PictureState};
 use crate::cameras::test_support::{announced_changes, assert_operator_words, TestCameras};
-use crate::pictures_helper::{set_status_for_test, HelperStatus};
+use crate::pictures_helper::{set_status_for_test, set_vmix_status_for_test, HelperStatus};
 use serde_json::{json, Value};
-use studio_control_protocol::pictures::ReceivedCamera;
+use studio_control_protocol::pictures::{HelperProblem, PictureFormat, ReceivedCamera};
 
 fn pictures(cameras: &TestCameras) -> Value {
     cameras.snapshot()["pictures"].clone()
@@ -245,6 +245,7 @@ fn received(cameras: [(u32, bool); 3]) -> Vec<ReceivedCamera> {
             camera,
             vmix_input: *vmix_input,
             receiving: *receiving,
+            format: None,
         })
         .collect()
 }
@@ -258,6 +259,7 @@ fn with_a_helper_each_picture_is_what_the_helper_receives() {
         cameras.path(),
         Some(HelperStatus::Running {
             sending: true,
+            problem: None,
             cameras: received([(1, true), (2, false), (3, true)]),
         }),
     );
@@ -275,6 +277,7 @@ fn with_a_helper_each_picture_is_what_the_helper_receives() {
         cameras.path(),
         Some(HelperStatus::Running {
             sending: true,
+            problem: None,
             cameras: received([(1, true), (2, true), (3, true)]),
         }),
     );
@@ -290,6 +293,7 @@ fn a_helper_whose_source_sends_nothing_reads_no_pictures_from_vmix() {
         cameras.path(),
         Some(HelperStatus::Running {
             sending: false,
+            problem: None,
             cameras: received([(1, false), (2, false), (3, false)]),
         }),
     );
@@ -298,7 +302,7 @@ fn a_helper_whose_source_sends_nothing_reads_no_pictures_from_vmix() {
     assert_eq!(whole["word"], "NO PICTURES");
     assert_eq!(
         whole["sentence"],
-        "No pictures from vMix. Open vMix and turn on NDI for Cameras / Calls / Audio Inputs."
+        "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI."
     );
     assert_eq!(
         picture(&cameras, 3),
@@ -308,7 +312,7 @@ fn a_helper_whose_source_sends_nothing_reads_no_pictures_from_vmix() {
             "tone": "attention",
             "detail": "nothing received",
             "sentence": "vMix is not sending CAM 3 over NDI.",
-            "advice": "Either vMix is closed, or its NDI output for Cameras / Calls / Audio Inputs (Settings › Outputs) is off."
+            "advice": "Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs)."
         })
     );
     let health = cameras.health();
@@ -355,4 +359,165 @@ fn a_helper_starting_stopped_or_missing_reads_no_pictures_and_why() {
         "showing",
         "no helper: the rule"
     );
+}
+
+// ---------------------------------------------------------------------------
+// vMix's Outputs 2 to 4 (D31, D33): `npm run app -- --vmix-pictures`
+// ---------------------------------------------------------------------------
+
+fn uhd() -> PictureFormat {
+    PictureFormat {
+        width: 3840,
+        height: 2160,
+        rate_numerator: 30000,
+        rate_denominator: 1001,
+    }
+}
+
+// Each camera's picture is its output's: the rows say which, its size and
+// its rate; the Pictures section names vMix's outputs.
+#[test]
+fn vmix_s_outputs_read_live_with_their_output_size_and_rate() {
+    let cameras = TestCameras::set_up("pictures-vmix-live");
+    let mut received = received([(1, true), (2, true), (3, true)]);
+    received[0].format = Some(uhd());
+    set_vmix_status_for_test(
+        cameras.path(),
+        HelperStatus::Running {
+            sending: true,
+            problem: None,
+            cameras: received,
+        },
+    );
+    assert_eq!(
+        picture(&cameras, 1),
+        json!({
+            "state": "showing",
+            "word": "LIVE",
+            "tone": "ok",
+            "detail": "Output 2 · 3840 × 2160 · 29.97",
+            "sentence": null,
+            "advice": null
+        })
+    );
+    assert_eq!(
+        picture(&cameras, 2)["detail"],
+        "Output 3",
+        "its format not known yet"
+    );
+    let whole = pictures(&cameras);
+    assert_eq!(whole["state"], "showing");
+    assert_eq!(whole["source"], "vMix Outputs 2 to 4");
+    assert_eq!(
+        whole["note"],
+        "The pictures come over NDI from vMix's Outputs 2, 3 and 4 on this PC: CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4."
+    );
+    assert_eq!(cameras.health().word, "HELD");
+}
+
+// An output that is not sent reads PICTURE MISSING, and names the output to
+// check, not a vMix input.
+#[test]
+fn an_output_vmix_does_not_send_reads_picture_missing_with_its_output() {
+    let cameras = TestCameras::set_up("pictures-vmix-missing");
+    set_vmix_status_for_test(
+        cameras.path(),
+        HelperStatus::Running {
+            sending: true,
+            problem: None,
+            cameras: received([(1, true), (2, true), (3, false)]),
+        },
+    );
+    assert_eq!(
+        picture(&cameras, 3),
+        json!({
+            "state": "missing",
+            "word": "NO PICTURE",
+            "tone": "attention",
+            "detail": "nothing received",
+            "sentence": "vMix is not sending CAM 3 over NDI.",
+            "advice": "vMix sends other outputs: check that Output 4 is on and sent over NDI (Settings › Outputs)."
+        })
+    );
+    let whole = pictures(&cameras);
+    assert_eq!(whole["word"], "PICTURE MISSING");
+    assert_eq!(
+        whole["sentence"],
+        "vMix sends no picture for CAM 3. Check that vMix's Output 4 is on and sent over NDI."
+    );
+    assert_eq!(cameras.health().word, "PICTURE MISSING");
+}
+
+// A helper that takes nothing from vMix says why: not allowed, or no
+// library.
+#[test]
+fn a_helper_that_takes_nothing_from_vmix_says_why() {
+    let cameras = TestCameras::set_up("pictures-vmix-problem");
+    for (problem, sentence, detail) in [
+        (
+            HelperProblem::NotAllowed,
+            "This run does not take vMix's pictures, so it shows none.",
+            "not taken",
+        ),
+        (
+            HelperProblem::NoLibrary,
+            "NDI's library did not load, so there are no pictures from vMix.",
+            "NDI not loaded",
+        ),
+    ] {
+        set_vmix_status_for_test(
+            cameras.path(),
+            HelperStatus::Running {
+                sending: false,
+                problem: Some(problem),
+                cameras: received([(1, false), (2, false), (3, false)]),
+            },
+        );
+        let whole = pictures(&cameras);
+        assert_eq!(whole["state"], "no-pictures", "{problem:?}");
+        assert_eq!(whole["word"], "NO PICTURES");
+        assert_eq!(whole["sentence"], sentence);
+        let cam2 = picture(&cameras, 2);
+        assert_eq!(cam2["sentence"], sentence);
+        assert_eq!(cam2["detail"], detail);
+        assert_eq!(cam2["advice"], Value::Null);
+        assert_operator_words(sentence);
+        assert_operator_words(detail);
+    }
+    // Starting, a helper on vMix's pictures is named for them.
+    set_vmix_status_for_test(cameras.path(), HelperStatus::Starting);
+    assert_eq!(pictures(&cameras)["source"], "vMix Outputs 2 to 4");
+    set_status_for_test(cameras.path(), None);
+}
+
+#[test]
+fn vmix_s_words_are_the_operators() {
+    let cameras = TestCameras::set_up("pictures-vmix-words");
+    let mut received = received([(1, true), (2, true), (3, false)]);
+    received[0].format = Some(uhd());
+    set_vmix_status_for_test(
+        cameras.path(),
+        HelperStatus::Running {
+            sending: true,
+            problem: None,
+            cameras: received,
+        },
+    );
+    let snapshot = cameras.snapshot();
+    let mut words = vec![snapshot["pictures"].clone()];
+    words.extend(
+        snapshot["cameras"]
+            .as_array()
+            .expect("three cameras")
+            .iter()
+            .map(|camera| camera["picture"].clone()),
+    );
+    for entry in words {
+        for (_, value) in entry.as_object().expect("an object") {
+            if let Some(text) = value.as_str() {
+                assert_operator_words(text);
+            }
+        }
+    }
+    set_status_for_test(cameras.path(), None);
 }

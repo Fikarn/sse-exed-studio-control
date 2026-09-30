@@ -1177,6 +1177,46 @@ test("every lane uses the simulated cameras, and only the harness names them", a
   assert.doesNotThrow(() => laneProcessEnv(env, { SSE_CAMERAS_SIMULATED: " 1 " }, { label: "A lane" }));
 });
 
+// D33: vMix's pictures are a hardware test the owner attends, under
+// `npm run app -- --vmix-pictures` and nothing else. No lane names the switch
+// or lets it pass; a lane environment that holds it, under its name in any
+// case, is refused before anything is spawned; and of every script only
+// `npm run app` passes the option that lets it through.
+test("no lane takes vMix's pictures, and only npm run app lets the switch pass", async () => {
+  const namers = ALL_LANES.filter((lane) =>
+    /\bSSE_VMIX_PICTURES\b|\bVMIX_PICTURES_ENV\b|\bvmixPictures\b/.test(withoutComments(read(lane)))
+  );
+  assert.deepEqual(namers, [HARNESS], "a lane that names vMix's switch");
+  const scriptsDir = path.join(repoRoot, "scripts");
+  const passers = readdirSync(scriptsDir)
+    .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+    .filter((name) => /\bvmixPictures\b/.test(withoutComments(readFileSync(path.join(scriptsDir, name), "utf8"))));
+  assert.deepEqual(passers.sort(), ["dev-app.mjs", "native-runtime-harness.mjs"]);
+
+  const env = { ...(await hardenedLaneEnv()), ...scratchFolders() };
+  assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
+  assert.equal(laneEnvRefusal({ ...env, SSE_VMIX_PICTURES: "0" }, { liveConsole: false }), null);
+  for (const asked of [{ SSE_VMIX_PICTURES: "1" }, { SSE_VMIX_PICTURES: " 1 " }, { sse_vmix_pictures: "1" }]) {
+    assert.match(
+      laneEnvRefusal({ ...env, ...asked }, { liveConsole: false }) ?? "",
+      /SSE_VMIX_PICTURES is 1: only `npm run app -- --vmix-pictures`/,
+      JSON.stringify(asked)
+    );
+    assert.equal(laneEnvRefusal({ ...env, ...asked }, { liveConsole: false, vmixPictures: true }), null);
+    assert.throws(
+      () => laneProcessEnv(env, asked, { label: "A planted lane" }),
+      /A planted lane was not started: SSE_VMIX_PICTURES is 1/,
+      JSON.stringify(asked)
+    );
+  }
+  for (const vmixPictures of [true, false]) {
+    assert.throws(
+      () => laneProcessEnv(env, {}, { label: "A planted lane", vmixPictures }),
+      /A planted lane was not started: a lane cannot take vMix's pictures/
+    );
+  }
+});
+
 test("the scripts that do work do nothing when imported", () => {
   // The scan's own cases: what only reads passes, and a call to anything
   // else is work, however deep in a constant's value it sits.

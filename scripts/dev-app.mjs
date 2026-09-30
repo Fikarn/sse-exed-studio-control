@@ -24,6 +24,15 @@
 // `SSE_STUDIO_BUILD`, is never handed on, whatever the caller's
 // environment holds (`npm run release` refuses to start with it set).
 //
+// `npm run app -- --vmix-pictures` is a hardware test the owner asks for and
+// attends (D33): the run's pictures helper receives vMix's Outputs 2, 3 and 4
+// over NDI on this PC, and nothing else. It sets `SSE_VMIX_PICTURES=1` and
+// hands the helper NDI's library (`SSE_NDI_LIBRARY`), the SDK's own file,
+// once its hash is the pinned one (`scripts/ndi-library.mjs`). Every other
+// run sets the switch to 0 and hands no library, whatever the caller's
+// environment holds; the lanes refuse the switch (`laneEnvRefusal`), the
+// tests remove it, and the helper reads it again in its own environment.
+//
 // No other argument is taken: `--config` can change the app's identity, and
 // what `tauri dev` hands on to the app is the app's to refuse.
 
@@ -33,7 +42,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-import { laneEnvRefusal } from "./native-runtime-harness.mjs";
+import { ndiLibraryRefusal, readNdiPin, sdkLibraryPath } from "./ndi-library.mjs";
+import { laneEnvRefusal, NDI_LIBRARY_ENV, VMIX_PICTURES_ENV } from "./native-runtime-harness.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -58,37 +68,50 @@ const STUDIO_BUILD_ENV = "SSE_STUDIO_BUILD";
 
 /**
  * What the arguments ask for: the data folder they name (null for the run's
- * own) and whether the run is built in the release profile. Any other
- * argument is refused with a sentence.
+ * own), whether the run is built in the release profile, and whether it
+ * takes vMix's pictures. Any other argument is refused with a sentence.
  */
 export function runOptionsFrom(args) {
   let dataFolder = null;
   let release = false;
+  let vmixPictures = false;
   for (const arg of args) {
     if (arg === "--release") {
       release = true;
       continue;
     }
+    if (arg === "--vmix-pictures") {
+      vmixPictures = true;
+      continue;
+    }
     const named = /^--data=(.+)$/.exec(arg);
     if (!named) {
       throw new Error(
-        `'${arg}' is not an argument of \`npm run app\`. It takes --data=<folder>, the saved data to open in place of its own, and --release, to build the run in the release profile.`
+        `'${arg}' is not an argument of \`npm run app\`. It takes --data=<folder>, the saved data to open in place of its own; --release, to build the run in the release profile; and --vmix-pictures, for vMix's Outputs 2 to 4 over NDI, a hardware test the owner attends.`
       );
     }
     dataFolder = path.resolve(named[1]);
   }
-  return { dataFolder, release };
+  return { dataFolder, release, vmixPictures };
 }
 
 /**
  * The environment of a development run: `env` with the run's own folders and
- * port, the switches that keep it off the devices, and its profile; with
- * `release`, the build folder of its own as well. Every one of them is set
- * here, whatever `env` holds: a variable of the same name in `env`, in any
- * case (Windows reads the names without regard to it), is left out, and so
- * is `SSE_STUDIO_BUILD`.
+ * port, the switches that keep it off the devices, its profile and vMix's
+ * switch; with `release`, the build folder of its own as well, and with
+ * `vmixPictures`, NDI's library (`ndiLibrary`, checked by the caller). Every
+ * one of them is set here, whatever `env` holds: a variable of the same name
+ * in `env`, in any case (Windows reads the names without regard to it), is
+ * left out, and so are `SSE_STUDIO_BUILD` and, without the switch,
+ * `SSE_NDI_LIBRARY`.
  */
-export function developmentEnv(env, { dataFolder = null, release = false, repositoryRoot = root } = {}) {
+export function developmentEnv(
+  env,
+  { dataFolder = null, release = false, vmixPictures = false, ndiLibrary = null, repositoryRoot = root } = {}
+) {
+  if (vmixPictures && !ndiLibrary) {
+    throw new Error("vMix's pictures need NDI's library, checked against its pin.");
+  }
   const appDataDir = dataFolder ?? path.join(repositoryRoot, ".dev", "app-data");
   const own = {
     SSE_APP_DATA_DIR: appDataDir,
@@ -99,11 +122,13 @@ export function developmentEnv(env, { dataFolder = null, release = false, reposi
     SSE_AUDIO_SIMULATED_INPUT_MODE: "1",
     SSE_CAMERAS_SIMULATED: "1",
     [DEV_RUN_RELEASE_ENV]: release ? "1" : "0",
+    [VMIX_PICTURES_ENV]: vmixPictures ? "1" : "0",
+    ...(vmixPictures ? { [NDI_LIBRARY_ENV]: ndiLibrary } : {}),
     ...(release ? { CARGO_TARGET_DIR: path.join(repositoryRoot, RELEASE_TARGET_DIR) } : {}),
   };
   const inherited = Object.entries(env).filter(([name]) => {
     const upper = name.toUpperCase();
-    return !Object.hasOwn(own, upper) && upper !== STUDIO_BUILD_ENV;
+    return !Object.hasOwn(own, upper) && upper !== STUDIO_BUILD_ENV && upper !== NDI_LIBRARY_ENV;
   });
   return { ...Object.fromEntries(inherited), ...own };
 }
@@ -111,13 +136,27 @@ export function developmentEnv(env, { dataFolder = null, release = false, reposi
 function main() {
   let env;
   let release;
+  let vmixPictures;
+  let pin = null;
   try {
     const options = runOptionsFrom(process.argv.slice(2));
     release = options.release;
-    env = developmentEnv(process.env, options);
+    vmixPictures = options.vmixPictures;
+    let ndiLibrary = null;
+    if (vmixPictures) {
+      // NDI's library: the SDK's own file, and only the pinned one.
+      pin = readNdiPin(root);
+      ndiLibrary = sdkLibraryPath(process.env, pin);
+      const refusal = ndiLibraryRefusal(ndiLibrary, pin);
+      if (refusal) {
+        throw new Error(refusal);
+      }
+    }
+    env = developmentEnv(process.env, { ...options, ndiLibrary });
     // The lanes' own check of a hardened environment. Of its rules only the
     // data folder is the caller's to get wrong: the studio's own is refused.
-    const refusal = laneEnvRefusal(env, { liveConsole: false });
+    // vMix's switch passes here, and only here (D33).
+    const refusal = laneEnvRefusal(env, { liveConsole: false, vmixPictures });
     if (refusal) {
       throw new Error(refusal);
     }
@@ -133,6 +172,12 @@ function main() {
       `  Saved data   ${env.SSE_APP_DATA_DIR}`,
       `  Bridge port  ${env.SSE_CONTROL_SURFACE_PORT} (the studio's is ${STUDIO_BRIDGE_PORT})`,
       "  Lights held and simulated, console and cameras simulated.",
+      ...(vmixPictures
+        ? [
+            "  Pictures     vMix's Outputs 2, 3 and 4 over NDI on this PC (--vmix-pictures): a hardware test the owner attends.",
+            `  NDI library  ${env[NDI_LIBRARY_ENV]}, ${pin.version}, its hash the pinned one.`,
+          ]
+        : ["  Pictures     the helper's test card."]),
       "  Setup's probes still ask the address they are given.",
       ...(release ? [`  Release profile, built in ${env.CARGO_TARGET_DIR}: the first build takes some minutes.`] : []),
       "",

@@ -575,11 +575,13 @@ fn main() -> io::Result<()> {
         planned_paths.log_file_path.clone(),
     );
     // The camera pictures' helper (D28), in a development build with the
-    // simulated cameras: step 1 has only its simulated source.
+    // simulated cameras: the test card, or vMix's outputs under
+    // `npm run app -- --vmix-pictures` (D33).
     let pictures_helper = pictures_helper::spawn_pictures_helper(
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
         planned_paths.cameras_simulated,
+        planned_paths.vmix_pictures,
         pictures_link,
     );
     if app.should_emit_simulated_audio_meter_ticks() {

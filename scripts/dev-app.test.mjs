@@ -30,6 +30,8 @@ test("a development run has its own data and port and reaches no device", () => 
   assert.equal(env.SSE_AUDIO_SIMULATED_INPUT_MODE, "1");
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1");
   assert.equal(env[DEV_RUN_RELEASE_ENV], "0");
+  assert.equal(env.SSE_VMIX_PICTURES, "0", "no run takes vMix's pictures unasked");
+  assert.ok(!Object.keys(env).some((name) => name.toUpperCase() === "SSE_NDI_LIBRARY"));
 });
 
 test("a development run keeps its folders and switches whatever the caller's environment holds", () => {
@@ -51,6 +53,11 @@ test("a development run keeps its folders and switches whatever the caller's env
       sse_safe_start: "0",
       Sse_Lights_Simulated: "0",
       sse_studio_build: STUDIO_COMMIT,
+      // vMix's switch and NDI's library are the run's own to set (D33).
+      SSE_VMIX_PICTURES: "1",
+      sse_vmix_pictures: "1",
+      SSE_NDI_LIBRARY: "C:/elsewhere/Processing.NDI.Lib.x64.dll",
+      Sse_Ndi_Library: "C:/elsewhere/Processing.NDI.Lib.x64.dll",
     },
     { repositoryRoot }
   );
@@ -89,9 +96,13 @@ test("`--data=<folder>` names the saved data, and `--release` is the only other 
 
 test("`--release` builds the run in the release profile, in a folder of its own, and changes nothing else", () => {
   const copy = path.resolve("/work/a copy of the studio data");
-  assert.deepEqual(runOptionsFrom([]), { dataFolder: null, release: false });
-  assert.deepEqual(runOptionsFrom(["--release"]), { dataFolder: null, release: true });
-  assert.deepEqual(runOptionsFrom(["--release", `--data=${copy}`]), { dataFolder: copy, release: true });
+  assert.deepEqual(runOptionsFrom([]), { dataFolder: null, release: false, vmixPictures: false });
+  assert.deepEqual(runOptionsFrom(["--release"]), { dataFolder: null, release: true, vmixPictures: false });
+  assert.deepEqual(runOptionsFrom(["--release", `--data=${copy}`]), {
+    dataFolder: copy,
+    release: true,
+    vmixPictures: false,
+  });
 
   // The build folder is the run's own, whatever the caller's environment
   // holds, and never the one `npm run release` builds the studio's app in.
@@ -120,6 +131,37 @@ test("`--release` builds the run in the release profile, in a folder of its own,
     developmentEnv({ CARGO_TARGET_DIR: "C:/elsewhere" }, { repositoryRoot }).CARGO_TARGET_DIR,
     "C:/elsewhere"
   );
+});
+
+test("`--vmix-pictures` alone takes vMix's pictures, with NDI's library, and the lanes' check lets it pass only when asked", () => {
+  assert.deepEqual(runOptionsFrom(["--vmix-pictures"]), { dataFolder: null, release: false, vmixPictures: true });
+  assert.deepEqual(runOptionsFrom(["--release", "--vmix-pictures"]), {
+    dataFolder: null,
+    release: true,
+    vmixPictures: true,
+  });
+  for (const refused of ["--vmix-pictures=1", "--vmix", "--pictures=vmix", "--ndi-library=x"]) {
+    assert.throws(() => runOptionsFrom([refused]), /is not an argument of `npm run app`/, refused);
+  }
+
+  const library = "C:\\Program Files\\NDI\\NDI 6 SDK\\Bin\\x64\\Processing.NDI.Lib.x64.dll";
+  const env = developmentEnv(
+    { SSE_NDI_LIBRARY: "C:/elsewhere/Processing.NDI.Lib.x64.dll" },
+    { vmixPictures: true, ndiLibrary: library, repositoryRoot }
+  );
+  assert.equal(env.SSE_VMIX_PICTURES, "1");
+  assert.equal(env.SSE_NDI_LIBRARY, library, "the checked library, not the caller's");
+  assert.equal(env.SSE_CAMERAS_SIMULATED, "1", "the cameras' links stay simulated");
+  assert.equal(env.SSE_SAFE_START, "1");
+  assert.equal(laneEnvRefusal(env, { liveConsole: false, vmixPictures: true }), null);
+  assert.match(laneEnvRefusal(env, { liveConsole: false }) ?? "", /SSE_VMIX_PICTURES is 1/);
+
+  // The switch without a library checked is no run at all.
+  assert.throws(() => developmentEnv({}, { vmixPictures: true, repositoryRoot }), /NDI's library/);
+  // Without the switch a library is never handed on.
+  const plain = developmentEnv({}, { ndiLibrary: library, repositoryRoot });
+  assert.equal(plain.SSE_VMIX_PICTURES, "0");
+  assert.ok(!Object.hasOwn(plain, "SSE_NDI_LIBRARY"));
 });
 
 test("a development run is hardened the way a lane is, and the studio's folder is refused", () => {
