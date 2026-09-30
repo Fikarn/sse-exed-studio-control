@@ -1,11 +1,12 @@
-import type { MouseEvent } from "react";
+import { useRef, type MouseEvent } from "react";
 
 import { Key, LampWord, Segmented } from "@sse/design-system";
-import type { CameraNumber, CameraSnapshot, CamerasSnapshot } from "@sse/engine-client";
+import type { CameraNumber, CameraSnapshot, CamerasSnapshot, PicturePlaces } from "@sse/engine-client";
 
 import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
-import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
+import { CameraPicture, NO_AIDS, type PictureAids } from "./pictures/CameraPicture";
 import type { PictureFrames } from "./pictures/pictureFrames";
+import { usePicturePlaces } from "./pictures/picturePlaces";
 import {
   CENTRE,
   HERO,
@@ -35,12 +36,24 @@ import styles from "./CamerasBay.module.css";
 // place empty with the hardware link's words in it (board 2's `no-pictures`
 // and `one-picture`), and while the selected camera's does not, the view, the
 // aids and the loupe are locked. The camera's own controls still work.
+//
+// In the app's window the pictures helper draws the pictures over the page
+// (D30): the bay says where each picture stands and what it draws over one,
+// a small picture's chip (`picturePlaces.ts`). The aids and the loupe's
+// marker are not drawn there yet, so their keys are locked and say so.
+
+/** Why the aids' keys are locked where the pictures helper draws the pictures. */
+const AIDS_LATER = "Guides, peaking and zebras come with a later version.";
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
   selected: CameraSnapshot;
-  /** The cameras' newest frames, which each view draws as they come. */
+  /** Who draws the pictures: the page (a browser) or the pictures helper over it (the app's window). */
+  drawnBy: "page" | "helper";
+  /** The cameras' newest frames, which each view draws as they come, where the page draws. */
   frames: PictureFrames;
+  /** Where the bay's places are said; `null` in a window with no pictures. */
+  onPlaces: ((places: PicturePlaces) => void) | null;
   view: BigView;
   aids: PictureAids;
   zoom: LoupeZoom;
@@ -97,9 +110,11 @@ function RecTag({ camera }: { camera: CameraSnapshot }) {
 export function CamerasBay({
   snapshot,
   selected,
+  drawnBy,
   frames,
+  onPlaces,
   view,
-  aids,
+  aids: aidsOn,
   zoom,
   point,
   onView,
@@ -108,9 +123,13 @@ export function CamerasBay({
   onMoveLoupe,
   onSelect,
 }: CamerasBayProps) {
+  const bay = useRef<HTMLDivElement>(null);
+  usePicturePlaces(bay, onPlaces);
   const camera = cameraNumber(selected);
   const shows = pictureShows(selected);
   const lock = pictureLock(selected) ?? undefined;
+  const aidsDrawn = drawnBy === "page";
+  const aids = aidsDrawn ? aidsOn : NO_AIDS;
   const part = bigRect(view, point);
   const loupe = loupeRect(point, zoom);
   const others = snapshot.cameras.filter((entry) => entry.camera !== selected.camera);
@@ -143,8 +162,8 @@ export function CamerasBay({
       mode="toggle"
       size="small"
       engaged={aids[aid]}
-      locked={!shows}
-      reason={lock}
+      locked={!shows || !aidsDrawn}
+      reason={shows ? AIDS_LATER : lock}
       testId={`cameras-aid-${aid}`}
       onClick={() => onToggleAid(aid)}
     >
@@ -153,7 +172,7 @@ export function CamerasBay({
   );
 
   return (
-    <div className={styles.bay} data-testid="cameras-bay">
+    <div ref={bay} className={styles.bay} data-testid="cameras-bay">
       <div className={styles.caption} data-testid="cameras-caption">
         <span className={styles.title}>
           <b>{selected.tag}</b> {selected.model}
@@ -225,6 +244,7 @@ export function CamerasBay({
         {shows ? (
           <CameraPicture
             camera={camera}
+            drawnBy={drawnBy}
             frames={frames}
             part={part}
             width={HERO.width}
@@ -253,6 +273,7 @@ export function CamerasBay({
             {pictureShows(entry) ? (
               <CameraPicture
                 camera={cameraNumber(entry)}
+                drawnBy={drawnBy}
                 frames={frames}
                 part={WHOLE}
                 width={TILE.width}
@@ -262,7 +283,7 @@ export function CamerasBay({
             ) : (
               <NoPicture camera={entry} big={false} />
             )}
-            <span className={styles.chip}>
+            <span className={styles.chip} data-picture-hole="">
               <b>{entry.tag}</b>
               <LampWord tone={entry.tone} cap={false}>
                 {entry.word.toLowerCase()}
@@ -307,6 +328,7 @@ export function CamerasBay({
             {shows ? (
               <CameraPicture
                 camera={camera}
+                drawnBy={drawnBy}
                 frames={frames}
                 part={loupe}
                 width={LOUPE.width}

@@ -14,7 +14,28 @@ path = "src/main.rs"
 [dependencies]
 studio-control-protocol.workspace = true
 
-# `forbid(unsafe_code)`, as the engine: the simulated source needs none. The
-# NDI calls (step 3) will lift it for a named list, as the shell's are.
-[lints]
-workspace = true
+# The pictures are drawn with Direct3D 11 into a composition surface of the
+# shell's (`renderer.rs`, D30). The crate is the one the shell and Tauri's
+# wry already lock, so nothing new is fetched; the Linux CI builds do not see
+# it.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D_Fxc",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_Dxgi",
+    "Win32_Graphics_Dxgi_Common",
+] }
+
+# The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
+# difference, as in the shell: `unsafe_code` is `deny` here, not `forbid`,
+# because a `forbid` cannot be lifted even for one item. The functions of
+# `renderer.rs` that call Direct3D carry an `#[allow(unsafe_code)]` each, all
+# Windows only, and anything else that uses `unsafe` still fails the build.
+# `scripts/check-no-shortcuts.test.mjs` holds the list.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "warn"

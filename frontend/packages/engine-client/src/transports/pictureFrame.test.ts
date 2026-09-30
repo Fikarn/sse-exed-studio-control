@@ -128,10 +128,9 @@ describe("a picture's frame", () => {
 });
 
 describe("the double's test card", () => {
-  it("is the helper's card: its sizes and its numbers, read from card.rs", () => {
+  it("is the helper's card: its size and its numbers, read from card.rs", () => {
     const card = rust("pictures-link/src/card.rs");
     expect(card).toContain(`pub const FULL: (u16, u16) = (${FULL_PICTURE.width}, ${FULL_PICTURE.height});`);
-    expect(card).toContain(`pub const SMALL: (u16, u16) = (${SMALL_PICTURE.width}, ${SMALL_PICTURE.height});`);
     expect(card.replace(/\s+/g, " ")).toContain(
       "const BARS: [u32; 7] = [ 0xbfbfbf, 0xbfbf00, 0x00bfbf, 0x00bf00, 0xbf00bf, 0xbf0000, 0x0000bf, ];"
     );

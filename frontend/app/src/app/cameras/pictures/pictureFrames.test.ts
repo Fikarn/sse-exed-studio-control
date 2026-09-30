@@ -1,11 +1,11 @@
-import type { PictureFrame, PicturesLink } from "@sse/engine-client";
+import type { PictureFrame, PictureTakes } from "@sse/engine-client";
 import { describe, expect, it } from "vitest";
 
 import { PictureFrames, takePictures } from "./pictureFrames";
 
-// The Cameras page's one loop of takes (2026-09-29): one take for the three cameras at a
-// time, the next asked at once after a new frame (the shell's take waits for the next),
-// and nothing taken or kept once the page is gone.
+// The Cameras page's one loop of takes, where the page draws the pictures itself (a
+// browser): one take for the three cameras at a time, the next asked at once after a new
+// frame, and nothing taken or kept once the page is gone.
 
 function frame(camera: 1 | 2 | 3, sequence: number): PictureFrame {
   return { camera, format: "uyvy", width: 2, height: 1, sequence, pixels: new Uint8Array(4) };
@@ -20,7 +20,7 @@ function heldLink() {
   let asked = 0;
   let inFlight = 0;
   let most = 0;
-  const link: PicturesLink = {
+  const link: PictureTakes = {
     next: () => {
       asked += 1;
       inFlight += 1;

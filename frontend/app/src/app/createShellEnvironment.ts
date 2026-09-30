@@ -1,11 +1,6 @@
-import {
-  createShellStore,
-  createTauriPicturesLink,
-  createTauriTransport,
-  type PicturesLink,
-  type WorkspaceId,
-} from "@sse/engine-client";
+import { createShellStore, createTauriTransport, type PicturesLink, type WorkspaceId } from "@sse/engine-client";
 
+import { placePictures } from "./shellCommands";
 import { disarmWorkspaceCrash } from "./startup/WorkspaceCrashProbe";
 
 declare global {
@@ -31,13 +26,14 @@ export async function createShellEnvironment() {
   const tauriAvailable = "__TAURI_INTERNALS__" in window;
   const useLiveTransport = tauriAvailable || url.searchParams.get("transport") === "live";
 
-  // The cameras' pictures come from the shell in the app's window, and from the
-  // double's test cards in a browser (the camera pictures, D28).
+  // In the app's window the pictures helper draws the cameras' pictures over the
+  // page, which only says where they stand (the camera pictures, D30). In a
+  // browser the page draws the double's test cards itself.
   let transport;
   let pictures: PicturesLink | null;
   if (useLiveTransport) {
     transport = createTauriTransport();
-    pictures = tauriAvailable ? createTauriPicturesLink() : null;
+    pictures = tauriAvailable ? { drawnBy: "helper", place: placePictures } : null;
   } else {
     ({ transport, pictures } = (await import("./fixtureDouble")).createFixtureDouble(fixtureId));
   }

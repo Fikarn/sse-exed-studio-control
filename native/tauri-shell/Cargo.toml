@@ -35,15 +35,27 @@ tauri-plugin-single-instance = "2.4.4"
 #
 # The Prompter XL's window: the screens are read from Windows' display
 # configuration (`shell_displays.rs`), which is the crate's feature
-# `Win32_Devices_Display`. The crate is the one already locked.
+# `Win32_Devices_Display`. The native picture layer (`shell_picture_layer.rs`)
+# takes DirectComposition, the Direct3D device its device is made on, and the
+# two features a surface handle is made and handed over with. The crate is
+# the one already locked.
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38.2"
-windows = { version = "0.61", features = ["Win32_Devices_Display", "Win32_Foundation"] }
+windows = { version = "0.61", features = [
+    "Win32_Devices_Display",
+    "Win32_Foundation",
+    "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D11",
+    "Win32_Graphics_DirectComposition",
+    "Win32_Graphics_Dxgi",
+    "Win32_Security",
+    "Win32_System_Threading",
+] }
 
 # The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
 # difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
-# cannot be lifted even for one item. Two functions carry an
-# `#[allow(unsafe_code)]`, both Windows only, and anything else that uses
+# cannot be lifted even for one item. Eight functions carry an
+# `#[allow(unsafe_code)]`, all Windows only, and anything else that uses
 # `unsafe` still fails the build:
 #
 # - `set_browser_accelerator_keys_off` in shell_browser_keys.rs: WebView2's
@@ -51,6 +63,10 @@ windows = { version = "0.61", features = ["Win32_Devices_Display", "Win32_Founda
 #   (decision 12).
 # - `read_display_paths` in shell_displays.rs: Windows' display configuration
 #   is read through calls of user32 that fill lists and unions.
+# - `create_layer`, `new_surface`, `hand_over`, `let_go_of_helper`,
+#   `release` and `show` in shell_picture_layer.rs: DirectComposition's and
+#   Direct3D's COM calls, and the one handle duplicated into the pictures
+#   helper's process (and closed there when the helper was never told of it).
 #
 # `scripts/check-no-shortcuts.test.mjs` holds the list.
 [lints.rust]

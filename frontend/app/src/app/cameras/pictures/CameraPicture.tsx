@@ -7,12 +7,17 @@ import type { PictureFrames } from "./pictureFrames";
 import { PICTURE, type Rect } from "./pictureGeometry";
 import styles from "./CameraPicture.module.css";
 
-// One view of a camera's picture: a part of it, drawn with WebGL2 at the size it has on
-// screen (`pictureDrawer.ts`), with the zebras and the peaking laid over by the shader,
-// and the guides and the loupe's marker on a canvas above it. It draws each new frame of
-// its camera as it comes, and again when what it shows changes. A picture is signal, not
-// chrome: it is marked `data-picture`, and the layout measures skip it. `data-drawn`
-// says which frame is on it, for the page tests.
+// One view of a camera's picture: a part of it, at the size it has on screen. A picture
+// is signal, not chrome: it is marked `data-picture`, and the layout measures skip it.
+//
+// In the app's window the page draws nothing here (the camera pictures, D30): the
+// pictures helper draws the picture over this place, which the page reports with the
+// others (`picturePlaces.ts` reads `data-camera`, `data-part` and `data-pixels`).
+//
+// In a browser the page draws it with WebGL2 (`pictureDrawer.ts`), with the zebras and
+// the peaking laid over by the shader, and the guides and the loupe's marker on a canvas
+// above it. It draws each new frame of its camera as it comes, and again when what it
+// shows changes. `data-drawn` says which frame is on it, for the page tests.
 
 export interface PictureAids {
   guides: boolean;
@@ -24,6 +29,8 @@ export const NO_AIDS: PictureAids = { guides: false, zebras: false, peaking: fal
 
 export interface CameraPictureProps {
   camera: CameraNumber;
+  /** Who draws the picture: the page itself (a browser), or the pictures helper over the page (the app's window). */
+  drawnBy?: "page" | "helper";
   frames: PictureFrames;
   /** The part of the picture shown, in the picture's own pixels. */
   part: Rect;
@@ -75,7 +82,30 @@ function drawMarker(context: CanvasRenderingContext2D, marker: Rect) {
   context.restore();
 }
 
-export function CameraPicture({
+export function CameraPicture(props: CameraPictureProps) {
+  return props.drawnBy === "helper" ? <PicturePlace {...props} /> : <DrawnPicture {...props} />;
+}
+
+/** A picture's place in the app's window: empty in the page, with the helper's picture over it. */
+function PicturePlace({ camera, part, width, height, pixels = false, label, className, testId }: CameraPictureProps) {
+  return (
+    <div
+      className={[styles.view, className].filter(Boolean).join(" ")}
+      style={{ width, height }}
+      role="img"
+      aria-label={label}
+      data-picture=""
+      data-camera={camera}
+      data-part={`${part.x},${part.y},${part.width},${part.height}`}
+      data-pixels={pixels ? "" : undefined}
+      data-aids=""
+      data-drawn="helper"
+      data-testid={testId}
+    />
+  );
+}
+
+function DrawnPicture({
   camera,
   frames,
   part,
@@ -166,6 +196,7 @@ export function CameraPicture({
       data-picture=""
       data-camera={camera}
       data-part={`${part.x},${part.y},${part.width},${part.height}`}
+      data-pixels={pixels ? "" : undefined}
       data-aids={[guides ? "guides" : "", zebras ? "zebras" : "", peaking ? "peaking" : ""].filter(Boolean).join(" ")}
       data-testid={testId}
     >

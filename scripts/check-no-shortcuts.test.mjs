@@ -249,7 +249,132 @@ const SHELL_UNSAFE = [
       source.includes("#[cfg(windows)]\n#[allow(unsafe_code)]\npub(crate) fn read_display_paths(") &&
       source.includes("#[cfg(not(windows))]\npub(crate) fn read_display_paths("),
   },
+  // The native picture layer (D30): the whole module is compiled on Windows alone.
+  ...[
+    [
+      "fn create_layer(",
+      "DirectComposition's device, target and visual are COM calls, made on a Direct3D device of the layer's own.",
+    ],
+    [
+      "fn new_surface(",
+      "A composition surface handle is made by a call of dcomp and put into the visual by COM calls.",
+    ],
+    [
+      "fn hand_over(",
+      "The surface's handle is duplicated into the pictures helper's process, which is opened for that alone.",
+    ],
+    ["fn release(", "The surface is taken out of the visual by COM calls and the shell's handle to it is closed."],
+    ["fn show(", "The visual is moved, shown and hidden by COM calls on the layer's own thread."],
+    [
+      "fn let_go_of_helper(",
+      "The helper's process, held open since the hand-over, is closed, and a copy the helper was never told of is closed in it.",
+    ],
+  ].map(([item, reason]) => ({
+    file: "src/shell_picture_layer.rs",
+    item,
+    blocks: 1,
+    reason,
+    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod shell_picture_layer;/.test(main),
+  })),
 ];
+
+// Where the pictures helper may use `unsafe`: the renderer's Direct3D calls (D30), a function
+// each, in a module compiled on Windows alone. The same rules as the shell's list.
+const PICTURES_UNSAFE = [
+  [
+    "fn compile(",
+    "The shaders are compiled by a call of d3dcompiler that hands back blobs read by pointer and length.",
+  ],
+  ["fn open_renderer(", "The Direct3D device, its shaders, samplers and buffer are made by COM calls with out-values."],
+  ["fn open_chain(", "The swap chain is made on the composition surface whose handle the shell handed over."],
+  ["fn chain_target(", "The swap chain's buffer is taken and viewed as a render target by COM calls."],
+  ["fn resize_chain(", "The swap chain's buffers are resized by a COM call, with no view of them held."],
+  ["fn make_source(", "A camera's frame texture and its view are made by COM calls with out-values."],
+  ["fn make_converted(", "A camera's picture texture, its target and its view are made by COM calls."],
+  ["fn convert(", "A frame's bytes are uploaded by pointer and drawn into the camera's picture by COM calls."],
+  ["fn compose(", "The scene is drawn into the swap chain's buffer and presented by COM calls."],
+  ["fn read_statistics(", "The swap chain's present count is read by a COM call, for the minute's log line."],
+  [
+    "fn close_surface(",
+    "The helper's copy of the composition surface's handle is closed, once, by a call of kernel32.",
+  ],
+].map(([item, reason]) => ({
+  file: "src/renderer.rs",
+  item,
+  blocks: 1,
+  reason,
+  onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod renderer;/.test(main),
+}));
+
+const rustFiles = (dir) =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory()
+      ? rustFiles(path.join(dir, entry.name))
+      : entry.name.endsWith(".rs")
+        ? [path.join(dir, entry.name)]
+        : []
+  );
+
+/** A crate's Rust files (its sources, their folders, build.rs), each with its path in the crate. */
+function crateSources(crate) {
+  const crateDir = path.join(repoRoot, "native", crate);
+  return [...rustFiles(path.join(crateDir, "src")), path.join(crateDir, "build.rs")]
+    .filter((file) => existsSync(file))
+    .map((file) => [path.relative(crateDir, file).split(path.sep).join("/"), readFileSync(file, "utf8")]);
+}
+
+/**
+ * `unsafe` is lifted for the functions of `allowances`, and nowhere else in the crate: its Rust
+ * files name the lint once for each, in any form (allow, expect, warn, a crate-wide #![…], a
+ * list, cfg_attr), and hold the blocks the list says, each under a comment that says why it is sound.
+ */
+function assertUnsafeOnlyWhereListed(sources, allowances, main) {
+  const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
+  const unsafeItems = (source) => (source.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? []).length;
+  for (const [name, source] of sources) {
+    const listed = allowances.filter((allowance) => allowance.file === name);
+    assert.equal(lintNames(source), listed.length, `${name} names unsafe_code once for each of its allowances`);
+    assert.equal(
+      unsafeItems(source),
+      listed.reduce((sum, allowance) => sum + allowance.blocks, 0),
+      `${name} holds the unsafe blocks its allowances say`
+    );
+    for (const allowance of listed) {
+      assert.ok(allowance.reason.length > 40, `${allowance.item} says why`);
+      assert.ok(
+        source.includes(`#[allow(unsafe_code)]\n${allowance.item}`),
+        `the #[allow(unsafe_code)] of ${name} sits on ${allowance.item}`
+      );
+      assert.ok(allowance.onWindowsAlone(source, main), `${allowance.item} is compiled on Windows alone`);
+    }
+  }
+  for (const allowance of allowances) {
+    assert.ok(
+      sources.some(([name]) => name === allowance.file),
+      `${allowance.file} is a file of the crate`
+    );
+  }
+  // An unsafe block says why it is sound, in a comment of its own: the comment lines that stand
+  // directly above the block's line, with nothing between them and it.
+  for (const [name, source] of sources) {
+    const lines = source.split("\n");
+    lines.forEach((line, index) => {
+      if (!/\bunsafe\s*\{/.test(line)) return;
+      let first = index;
+      while (first > 0 && lines[first - 1].trim().startsWith("//")) first -= 1;
+      const above = lines.slice(first, index).join("\n");
+      assert.ok(/\/\/ SAFETY: /.test(above), `${name}:${index + 1} says why its unsafe block is sound`);
+    });
+  }
+}
+
+/** The features a crate takes of the one `windows` crate, as its manifest lists them. */
+function windowsFeatures(crate) {
+  const manifest = readFileSync(path.join(repoRoot, "native", crate, "Cargo.toml"), "utf8");
+  const list = manifest.match(/^windows = \{ version = "0\.61", features = \[([^\]]*)\] \}/m);
+  assert.ok(list, `${crate} takes windows 0.61 with a list of features`);
+  return [...list[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+}
 
 test("the native shell switches the web view's own keys off, and uses unsafe where its list says (decision 12)", () => {
   const shellFile = (name) => readFileSync(path.join(repoRoot, "native/tauri-shell/src", name), "utf8");
@@ -271,66 +396,26 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
     /#\[cfg\(windows\)\]\s*\n\s*switch_off_browser_keys\(app\.handle\(\), &window\);/.test(firstStatements),
     "setup switches the browser keys off before it routes the window"
   );
-  // `unsafe` is lifted for the functions of `SHELL_UNSAFE`, and nowhere else in the shell: the Rust
-  // files of the crate (its sources, their folders, build.rs) name the lint once for each, in any
-  // form (allow, expect, warn, a crate-wide #![…], a list, cfg_attr), and hold the blocks the list says.
-  const rustFiles = (dir) =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory()
-        ? rustFiles(path.join(dir, entry.name))
-        : entry.name.endsWith(".rs")
-          ? [path.join(dir, entry.name)]
-          : []
-    );
-  const shellCrate = path.join(repoRoot, "native/tauri-shell");
-  const shellSources = [...rustFiles(path.join(shellCrate, "src")), path.join(shellCrate, "build.rs")]
-    .filter((file) => existsSync(file))
-    .map((file) => [path.relative(shellCrate, file).split(path.sep).join("/"), readFileSync(file, "utf8")]);
+  // `unsafe` is lifted for the functions of `SHELL_UNSAFE`, and nowhere else in the shell.
+  const shellSources = crateSources("tauri-shell");
   const everySource = shellSources.map(([, source]) => source).join("\n");
   assert.ok(!/SetAreBrowserAcceleratorKeysEnabled\(true\)/.test(everySource), "the shell never sets them on");
-  const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
-  const unsafeItems = (source) => (source.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? []).length;
-  for (const [name, source] of shellSources) {
-    const listed = SHELL_UNSAFE.filter((allowance) => allowance.file === name);
-    assert.equal(lintNames(source), listed.length, `${name} names unsafe_code once for each of its allowances`);
-    assert.equal(
-      unsafeItems(source),
-      listed.reduce((sum, allowance) => sum + allowance.blocks, 0),
-      `${name} holds the unsafe blocks its allowances say`
-    );
-    for (const allowance of listed) {
-      assert.ok(allowance.reason.length > 40, `${allowance.item} says why`);
-      assert.ok(
-        source.includes(`#[allow(unsafe_code)]\n${allowance.item}`),
-        `the #[allow(unsafe_code)] of ${name} sits on ${allowance.item}`
-      );
-      assert.ok(allowance.onWindowsAlone(source, main), `${allowance.item} is compiled on Windows alone`);
-    }
-  }
-  for (const allowance of SHELL_UNSAFE) {
-    assert.ok(
-      shellSources.some(([name]) => name === allowance.file),
-      `${allowance.file} is a file of the shell`
-    );
-  }
-  // An unsafe block says why it is sound, in a comment of its own: the comment lines that stand
-  // directly above the block's line, with nothing between them and it.
-  for (const [name, source] of shellSources) {
-    const lines = source.split("\n");
-    lines.forEach((line, index) => {
-      if (!/\bunsafe\s*\{/.test(line)) return;
-      let first = index;
-      while (first > 0 && lines[first - 1].trim().startsWith("//")) first -= 1;
-      const above = lines.slice(first, index).join("\n");
-      assert.ok(/\/\/ SAFETY: /.test(above), `${name}:${index + 1} says why its unsafe block is sound`);
-    });
-  }
-  // The shell's crate takes the display calls from the one windows crate, by its feature.
-  assert.ok(
-    /windows = \{ version = "0\.61", features = \["Win32_Devices_Display", "Win32_Foundation"\] \}/.test(
-      readFileSync(path.join(repoRoot, "native/tauri-shell/Cargo.toml"), "utf8")
-    ),
-    "the shell's windows crate has the display configuration's feature"
+  assertUnsafeOnlyWhereListed(shellSources, SHELL_UNSAFE, main);
+  // The shell's crate takes the display calls and the picture layer's from the one windows crate,
+  // by these features and no others.
+  assert.deepEqual(
+    windowsFeatures("tauri-shell"),
+    [
+      "Win32_Devices_Display",
+      "Win32_Foundation",
+      "Win32_Graphics_Direct3D",
+      "Win32_Graphics_Direct3D11",
+      "Win32_Graphics_DirectComposition",
+      "Win32_Graphics_Dxgi",
+      "Win32_Security",
+      "Win32_System_Threading",
+    ],
+    "the shell's windows crate has the display configuration's features and the picture layer's"
   );
   // The shell's lints are the workspace's, with unsafe_code at deny (a forbid cannot be lifted for one item).
   const workspace = readFileSync(path.join(repoRoot, "native/Cargo.toml"), "utf8");
@@ -349,11 +434,43 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
   assert.deepEqual(lintTable(workspace, "workspace.lints.rust"), ['unsafe_code = "forbid"']);
   assert.deepEqual(lintTable(crate, "lints.rust"), ['unsafe_code = "deny"']);
   assert.deepEqual(lintTable(crate, "lints.clippy"), lintTable(workspace, "workspace.lints.clippy"));
+  // The pictures helper's table is the same (its list is PICTURES_UNSAFE).
+  const helper = readFileSync(path.join(repoRoot, "native/pictures-link/Cargo.toml"), "utf8");
+  assert.deepEqual(lintTable(helper, "lints.rust"), ['unsafe_code = "deny"']);
+  assert.deepEqual(lintTable(helper, "lints.clippy"), lintTable(workspace, "workspace.lints.clippy"));
 });
 
-test("every crate of the workspace takes its lints, so unsafe is forbidden but in the shell's named list", () => {
+test("the pictures helper draws with Direct3D, and uses unsafe where its list says (D30)", () => {
+  const sources = crateSources("pictures-link");
+  const main = sources.find(([name]) => name === "src/main.rs")?.[1] ?? "";
+  assertUnsafeOnlyWhereListed(sources, PICTURES_UNSAFE, main);
+  // A system without Direct3D has a renderer of its own, which draws nothing and uses no unsafe.
+  assert.ok(
+    /#\[cfg\(not\(windows\)\)\]\s*\n#\[path = "renderer_none\.rs"\]\s*\nmod renderer;/.test(main),
+    "main.rs has the renderer of a system without Direct3D"
+  );
+  // The Direct3D calls come from the one windows crate, by these features and no others.
+  assert.deepEqual(
+    windowsFeatures("pictures-link"),
+    [
+      "Win32_Foundation",
+      "Win32_Graphics_Direct3D",
+      "Win32_Graphics_Direct3D_Fxc",
+      "Win32_Graphics_Direct3D11",
+      "Win32_Graphics_Dxgi",
+      "Win32_Graphics_Dxgi_Common",
+    ],
+    "the helper's windows crate has the renderer's features"
+  );
+});
+
+// The crates with a lint table of their own: `unsafe_code` at deny, lifted for a named list.
+const CRATES_WITH_UNSAFE_LISTS = ["tauri-shell", "pictures-link"];
+
+test("every crate of the workspace takes its lints, so unsafe is forbidden but in the two named lists", () => {
   // A crate without `[lints] workspace = true` takes no lint table at all, and would allow
-  // `unsafe` unseen. The shell has a table of its own (deny, with SHELL_UNSAFE, above).
+  // `unsafe` unseen. The shell and the pictures helper have a table of their own (deny, with
+  // SHELL_UNSAFE and PICTURES_UNSAFE, above).
   const workspace = readFileSync(path.join(repoRoot, "native/Cargo.toml"), "utf8");
   const members = workspace.match(/^members = \[([^\]]*)\]/m);
   assert.ok(members, "native/Cargo.toml lists its members");
@@ -364,8 +481,9 @@ test("every crate of the workspace takes its lints, so unsafe is forbidden but i
       .split("\n")
       .map((line) => line.replace(/#.*/, "").trimEnd())
       .join("\n");
-    if (crate === "tauri-shell") {
-      assert.ok(/^\[lints\.rust\]\s*\nunsafe_code = "deny"/m.test(manifest), "the shell denies unsafe");
+    if (CRATES_WITH_UNSAFE_LISTS.includes(crate)) {
+      assert.ok(/^\[lints\.rust\]\s*\nunsafe_code = "deny"/m.test(manifest), `${crate} denies unsafe`);
+      assert.ok(!/^\[lints\]/m.test(manifest), `${crate} has the one lint table`);
       continue;
     }
     assert.ok(/^\[lints\]\s*\nworkspace = true/m.test(manifest), `${crate} takes the workspace's lints`);

@@ -1,13 +1,14 @@
-// A camera picture's frame as the shell hands it to the page (`pictures_next`; the
-// camera pictures, D28): a 24-byte header and the picture, the layout of the protocol
-// crate's `FrameHeader` (`native/protocol/rust/src/pictures.rs`), little-endian:
+// A camera picture's frame as a page that draws the pictures itself takes it (a browser,
+// on the double's test cards; in the app's window the pictures helper draws them, D30):
+// a 24-byte header and the picture, the layout of the protocol crate's `FrameHeader`
+// (`native/protocol/rust/src/pictures.rs`), little-endian:
 //
 //   0  "SCPF"     4  version (1)   5  camera (1–3)   6  format   7  (spare)
 //   8  width u16  10 height u16    12 sequence u64   20 length u32
 //
 // The format is UYVY (two pixels in four bytes, U Y0 V Y1, BT.709 video range: NDI's
 // own), RGBA8, or JPEG (reserved: no encoder yet). A header is held to what a frame may
-// be before its picture is looked at, as the shell holds it.
+// be before its picture is looked at.
 
 export type FrameFormat = "uyvy" | "rgba8" | "jpeg";
 
