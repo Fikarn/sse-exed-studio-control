@@ -20,8 +20,10 @@ use studio_control_protocol::pictures::{
 const PATIENCE: Duration = Duration::from_secs(30);
 
 /// The helper, started as the engine starts it; `configure` may add to its
-/// environment.
-fn start(configure: impl FnOnce(&mut Command)) -> (Child, ChildStdin, Receiver<String>) {
+/// environment. Its stdout's lines and its stderr's come on two channels.
+fn start(
+    configure: impl FnOnce(&mut Command),
+) -> (Child, ChildStdin, Receiver<String>, Receiver<String>) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_studio-control-pictures"));
     command
         .env_remove(VMIX_PICTURES_ENV)
@@ -32,17 +34,23 @@ fn start(configure: impl FnOnce(&mut Command)) -> (Child, ChildStdin, Receiver<S
     configure(&mut command);
     let mut child = command.spawn().expect("the helper starts");
     let stdin = child.stdin.take().expect("its stdin");
-    let stdout = child.stdout.take().expect("its stdout");
+    let lines = read_lines(child.stdout.take().expect("its stdout"));
+    let said = read_lines(child.stderr.take().expect("its stderr"));
+    (child, stdin, lines, said)
+}
+
+/// Each line of `input` on a channel, read on a thread of its own.
+fn read_lines(input: impl std::io::Read + Send + 'static) -> Receiver<String> {
     let (sender, lines) = mpsc::channel();
     thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
+        for line in BufReader::new(input).lines() {
             let Ok(line) = line else { return };
             if sender.send(line).is_err() {
                 return;
             }
         }
     });
-    (child, stdin, lines)
+    lines
 }
 
 /// Closes the helper's stdin and waits for it to end, as the engine does.
@@ -64,7 +72,7 @@ fn stop(mut child: Child, stdin: ChildStdin) {
 
 #[test]
 fn the_helper_answers_speaks_every_second_and_ends_with_its_stdin() {
-    let (child, mut stdin, lines) = start(|_| {});
+    let (child, mut stdin, lines, _said) = start(|_| {});
     writeln!(
         stdin,
         r#"{{"type":"want","cameras":[{{"camera":1,"vmixInput":2}},{{"camera":2,"vmixInput":5}},{{"camera":3,"vmixInput":4}}]}}"#
@@ -112,7 +120,7 @@ fn told_vmix(lines: &Receiver<String>, stdin: &mut ChildStdin) -> FromHelper {
 // without the switch takes none, and says so.
 #[test]
 fn a_helper_without_the_switch_takes_nothing_from_vmix() {
-    let (child, mut stdin, lines) = start(|_| {});
+    let (child, mut stdin, lines, _said) = start(|_| {});
     let FromHelper::State {
         source,
         sending,
@@ -136,7 +144,7 @@ fn a_helper_with_the_switch_loads_no_file_but_the_pinned_library() {
     std::fs::write(&named_so, b"not NDI's library").expect("a scratch file");
     let not_named = std::env::current_exe().expect("this test's own program");
     for library in [&not_named, &named_so] {
-        let (child, mut stdin, lines) = start(|command| {
+        let (child, mut stdin, lines, said) = start(|command| {
             command
                 .env(VMIX_PICTURES_ENV, "1")
                 .env(NDI_LIBRARY_ENV, library);
@@ -152,6 +160,17 @@ fn a_helper_with_the_switch_loads_no_file_but_the_pinned_library() {
             library.display()
         );
         stop(child, stdin);
+        // The file named as the library was held to the pin before any
+        // load was tried: the helper says so.
+        if library == &named_so {
+            // The helper has ended, so its stderr has closed: every line is in.
+            let said: Vec<String> = said.iter().collect();
+            assert!(
+                said.iter()
+                    .any(|line| line.contains("is not the pinned file")),
+                "{said:?}"
+            );
+        }
     }
     let _ = std::fs::remove_dir_all(&folder);
 }

@@ -42,8 +42,9 @@ use studio_control_protocol::pictures::{
 
 /// How long NDI's search waits for a change before it lists again.
 const SEARCH_WAIT: Duration = Duration::from_millis(500);
-/// How long a capture waits for a frame.
-const CAPTURE_WAIT: Duration = Duration::from_millis(500);
+/// How long a capture waits for a frame: short, so a receiver told to stop
+/// ends well within the helper's time at its end (`FINISH_WITHIN`).
+const CAPTURE_WAIT: Duration = Duration::from_millis(250);
 /// How often a receiver reads the library's counts.
 const COUNT_EVERY: Duration = Duration::from_secs(1);
 /// After a lost connection a receiver waits this long before it captures
@@ -89,6 +90,9 @@ struct Camera {
     /// Since the last minute's line.
     received: Received,
     library: Option<LibraryCounts>,
+    /// A receiver could not connect, and it was said: it is not said again
+    /// until one connects.
+    connect_failed: bool,
 }
 
 struct Shared {
@@ -150,15 +154,22 @@ impl Vmix {
     /// Holds NDI's library to its pin, loads it and starts its search; says
     /// on stderr which file and version it loaded.
     pub fn start(library: &Path, beats: Arc<Beats>) -> Result<Self, String> {
+        // The search's first seconds are counted from here, so that they
+        // overlap the check and the load: the engine hears the helper within
+        // its five seconds either way.
+        let started = Instant::now();
         let refused = |why: String| format!("NDI's library {} {why}", library.display());
         // The helper's own check of the pin, just before the load: the file
         // is the one `npm run app` checked, whoever started this helper.
         vmix::library_matches_pin(library).map_err(refused)?;
+        let checked = started.elapsed();
         let ndi = Arc::new(Ndi::load(library).map_err(refused)?);
         eprintln!(
-            "The pictures helper loaded NDI's library {}, version {}, its hash the pinned one.",
+            "The pictures helper loaded NDI's library {}, version {}, its hash the pinned one (checked in {} ms, loaded in {} ms).",
             library.display(),
-            ndi.version()
+            ndi.version(),
+            checked.as_millis(),
+            started.elapsed().saturating_sub(checked).as_millis()
         );
         let shared = Arc::new(Shared {
             cameras: Default::default(),
@@ -186,7 +197,7 @@ impl Vmix {
             ending: Vec::new(),
             asked: [None; 3],
             retry_at: [None; 3],
-            started: Instant::now(),
+            started,
             made: 0,
         })
     }
@@ -474,24 +485,38 @@ fn receive(
     let who = format!("CAM {}'s receiver ({made})", index + 1);
     beats.beat(&who);
     match Receiver::open(ndi, source, &format!("Studio Control CAM {}", index + 1)) {
-        // Told to stop while it connected: it ends at once, and says nothing
-        // of the camera, whose newer receiver may be connected by now.
-        Ok(_) if stop.load(Ordering::Acquire) => {}
         Ok(receiver) => {
-            {
+            // Told to stop while it connected, or overtaken by a newer
+            // receiver: it ends at once and says nothing of the camera.
+            let newest = {
                 let mut camera = shared.camera(index);
-                camera.receiver = Some((made, Instant::now()));
-                camera.last_taken = None;
-                camera.format = None;
-                camera.received.connects += 1;
+                let newest = !stop.load(Ordering::Acquire)
+                    && camera.receiver.is_none_or(|(which, _)| which < made);
+                if newest {
+                    camera.receiver = Some((made, Instant::now()));
+                    camera.last_taken = None;
+                    camera.format = None;
+                    camera.received.connects += 1;
+                    camera.connect_failed = false;
+                }
+                newest
+            };
+            if newest {
+                take_frames(receiver, shared, beats, index, stop, &who);
             }
-            take_frames(receiver, shared, beats, index, stop, &who);
         }
-        Err(why) => eprintln!(
-            "The pictures helper could not connect to {}: {why}; it tries again in {} s.",
-            source.name,
-            RETRY_WAIT.as_secs()
-        ),
+        Err(why) => {
+            // Said once, until a receiver connects.
+            let mut camera = shared.camera(index);
+            if !camera.connect_failed {
+                eprintln!(
+                    "The pictures helper could not connect to {}: {why}; it tries again every {} s.",
+                    source.name,
+                    RETRY_WAIT.as_secs()
+                );
+                camera.connect_failed = true;
+            }
+        }
     }
     {
         // Only its own: a newer receiver may have connected meanwhile.
