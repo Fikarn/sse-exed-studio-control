@@ -1,16 +1,18 @@
 //! NDI's library (D17, D31 to D33): the NDI SDK's own
 //! `Processing.NDI.Lib.x64.dll`, loaded once by the full path the helper was
-//! given (`vmix::permission` held it to the SDK's file, and `npm run app`
-//! checked its hash against the pin) and never unloaded. Each function is
-//! taken by its name and called with the types of its declaration in the
-//! SDK's headers; the structures are `ndi_sdk.rs`'s, whose tests hold them to
-//! the headers' layout.
+//! given and never unloaded. Before the load the path is held to the
+//! library's file name and to no copy of vMix's (`vmix::permission`), and
+//! the file to its pinned SHA-256 (`vmix::library_matches_pin`), as
+//! `npm run app` held it before the run. Each function is taken by its name
+//! and called with the types of its declaration in the SDK's headers; the
+//! structures are `ndi_sdk.rs`'s, whose tests hold them to the headers'
+//! layout.
 //!
 //! The calls stand in the free functions below, each listed with its reason
 //! in `PICTURES_UNSAFE` (`scripts/check-no-shortcuts.test.mjs`). Around them
-//! stand three owners, each used on the one thread that made it: `Ndi`, the
-//! library, shared by every thread; `Finder`, NDI's search; and `Receiver`,
-//! one camera's connection, which frees each frame it takes.
+//! stand three owners: `Ndi`, the library, which every thread shares; and
+//! `Finder`, NDI's search, and `Receiver`, one camera's connection, which
+//! frees each frame it takes, each used on the one thread that made it.
 
 use crate::ndi_sdk::{
     check_video, AudioFrameV3, Captured, FindCreate, MetadataFrame, Performance, Queue,

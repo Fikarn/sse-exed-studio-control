@@ -215,11 +215,12 @@ export const VMIX_PICTURES_ENV = "SSE_VMIX_PICTURES";
 /** NDI's library for that run, by its full path (`NDI_LIBRARY_ENV`). */
 export const NDI_LIBRARY_ENV = "SSE_NDI_LIBRARY";
 
-// Whether `env` asks for vMix's pictures, under the name in any case, as
-// Windows reads it; the engine trims the value first.
-function vmixPicturesRequested(env) {
+// Whether `env` holds vMix's switch at all, under the name in any case, as
+// Windows reads it: anything but absent, empty or 0. Wider than the engine's
+// reading (only `1`, trimmed), so that no way of trimming a value differs.
+function vmixSwitchSet(env) {
   return Object.entries(env).some(
-    ([name, value]) => name.toUpperCase() === VMIX_PICTURES_ENV && String(value ?? "").trim() === "1"
+    ([name, value]) => name.toUpperCase() === VMIX_PICTURES_ENV && !["", "0"].includes(String(value ?? "").trim())
   );
 }
 
@@ -263,8 +264,8 @@ export function laneEnvRefusal(env, { safeStart = true, liveConsole = LIVE_CONSO
     return "SSE_CAMERAS_SIMULATED must be 1: a lane uses the simulated cameras.";
   }
   // No lane opens vMix's pictures: that is a hardware test the owner attends (D33).
-  if (!vmixPictures && vmixPicturesRequested(env)) {
-    return `${VMIX_PICTURES_ENV} is 1: only \`npm run app -- --vmix-pictures\` takes vMix's pictures, a hardware test the owner attends, and no lane may.`;
+  if (!vmixPictures && vmixSwitchSet(env)) {
+    return `${VMIX_PICTURES_ENV} is set: only \`npm run app -- --vmix-pictures\` takes vMix's pictures, a hardware test the owner attends, and no lane may.`;
   }
   return null;
 }

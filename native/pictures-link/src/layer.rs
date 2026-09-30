@@ -75,6 +75,9 @@ struct Front {
     height: u32,
     stride: u32,
     sequence: u64,
+    /// When the draw loop last drew from it: frames replaced before they
+    /// were taken count only while it draws this camera without a break.
+    drawn_at: Option<Instant>,
 }
 
 /// A listener's address the helper may connect to: 127.0.0.1 and nothing
@@ -181,6 +184,11 @@ struct Counts {
     no_surface: u64,
     no_scene: u64,
     slowest: Duration,
+    /// Of vMix's frames: taken to be drawn, replaced by a newer one before
+    /// the draw loop took them, and drawn again for want of a newer one.
+    received: u64,
+    replaced: u64,
+    repeated: u64,
 }
 
 impl Counts {
@@ -189,8 +197,16 @@ impl Counts {
     }
 
     fn line(&self, statistics: &str) -> String {
+        let received = if self.received + self.replaced + self.repeated > 0 {
+            format!(
+                "; of vMix's frames {} were taken, {} replaced before they were drawn, and {} draws showed a frame again",
+                self.received, self.replaced, self.repeated
+            )
+        } else {
+            String::new()
+        };
         format!(
-            "The pictures helper drew {} frames in the last minute ({} failed, {} late; the slowest took {:.1} ms; {} waited for a surface, {} for a scene){}{}.",
+            "The pictures helper drew {} frames in the last minute ({} failed, {} late; the slowest took {:.1} ms; {} waited for a surface, {} for a scene){}{}{received}.",
             self.drawn,
             self.failed,
             self.late,
@@ -412,13 +428,24 @@ impl Drawer {
                     }
                     // The newest frame for the one drawn last: the buffers
                     // go round, and no frame is copied again.
+                    let unbroken = front
+                        .drawn_at
+                        .is_some_and(|at| now.saturating_duration_since(at) < SHOWN_FOR);
                     if newest.sequence != front.sequence {
+                        if unbroken {
+                            let missed = newest.sequence.wrapping_sub(front.sequence);
+                            self.counts.replaced += missed.saturating_sub(1).min(1_000);
+                        }
+                        self.counts.received += 1;
                         std::mem::swap(&mut newest.bytes, &mut front.bytes);
                         front.width = newest.width;
                         front.height = newest.height;
                         front.stride = newest.stride;
                         front.sequence = newest.sequence;
+                    } else if unbroken {
+                        self.counts.repeated += 1;
                     }
+                    front.drawn_at = Some(now);
                     arrives[index] = true;
                 }
             }
@@ -735,6 +762,11 @@ mod tests {
         }
         drawer.draw();
         assert_eq!(drawer.counts.no_surface, 1);
+        assert_eq!(drawer.counts.received, 1);
+        assert_eq!(
+            drawer.counts.replaced, 0,
+            "the first take after a break misses nothing"
+        );
         assert_eq!(drawer.fronts[1].sequence, 5, "CAM 2's frame is taken");
         assert_eq!(drawer.fronts[1].bytes, vec![7; 32]);
         assert!(
@@ -743,5 +775,20 @@ mod tests {
         );
         assert_eq!(drawer.fronts[2].sequence, 0, "CAM 3's is too old");
         assert_eq!(drawer.fronts[0].sequence, 0, "CAM 1 sent none");
+
+        // Drawing on without a break: frames replaced before they were taken
+        // are counted, and so is a draw of the same frame again.
+        {
+            let mut newest = lock(&frames[1]);
+            newest.bytes = vec![8; 32];
+            newest.sequence = 8;
+            newest.arrived = Some(Instant::now());
+        }
+        drawer.draw();
+        assert_eq!(drawer.fronts[1].sequence, 8);
+        assert_eq!(drawer.counts.replaced, 2, "frames 6 and 7 were never drawn");
+        drawer.draw();
+        assert_eq!(drawer.counts.repeated, 1, "frame 8 drawn again");
+        assert_eq!(drawer.counts.received, 2);
     }
 }

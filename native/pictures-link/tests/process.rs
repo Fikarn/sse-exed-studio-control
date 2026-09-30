@@ -126,19 +126,32 @@ fn a_helper_without_the_switch_takes_nothing_from_vmix() {
     stop(child, stdin);
 }
 
-// With the switch, a library that is not the SDK's file is never loaded.
+// With the switch, a file that is not named as NDI's library is never
+// loaded; nor is one named so whose SHA-256 is not the pinned one.
 #[test]
-fn a_helper_with_the_switch_loads_no_file_but_ndi_s() {
-    let not_ndi = std::env::current_exe().expect("this test's own program");
-    let (child, mut stdin, lines) = start(|command| {
-        command
-            .env(VMIX_PICTURES_ENV, "1")
-            .env(NDI_LIBRARY_ENV, &not_ndi);
-    });
-    let FromHelper::State {
-        sending, problem, ..
-    } = told_vmix(&lines, &mut stdin);
-    assert!(!sending);
-    assert_eq!(problem, Some(HelperProblem::NoLibrary));
-    stop(child, stdin);
+fn a_helper_with_the_switch_loads_no_file_but_the_pinned_library() {
+    let folder = std::env::temp_dir().join(format!("sse-pictures-process-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).expect("a scratch folder");
+    let named_so = folder.join("Processing.NDI.Lib.x64.dll");
+    std::fs::write(&named_so, b"not NDI's library").expect("a scratch file");
+    let not_named = std::env::current_exe().expect("this test's own program");
+    for library in [&not_named, &named_so] {
+        let (child, mut stdin, lines) = start(|command| {
+            command
+                .env(VMIX_PICTURES_ENV, "1")
+                .env(NDI_LIBRARY_ENV, library);
+        });
+        let FromHelper::State {
+            sending, problem, ..
+        } = told_vmix(&lines, &mut stdin);
+        assert!(!sending, "{}", library.display());
+        assert_eq!(
+            problem,
+            Some(HelperProblem::NoLibrary),
+            "{}",
+            library.display()
+        );
+        stop(child, stdin);
+    }
+    let _ = std::fs::remove_dir_all(&folder);
 }

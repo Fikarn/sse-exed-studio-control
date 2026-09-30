@@ -45,6 +45,7 @@ mod renderer;
 #[cfg(not(windows))]
 #[path = "renderer_none.rs"]
 mod renderer;
+mod sha256;
 mod vmix;
 mod watch;
 
@@ -86,11 +87,18 @@ fn main() -> ExitCode {
     let stdout = io::stdout();
     run(io::stdin(), &mut stdout.lock(), &orders, &mut sources);
     drop(orders);
+    // NDI's receivers and search end before the process does, within the
+    // engine's second of grace.
+    sources.finish(FINISH_WITHIN);
     if let Ok(drawer) = drawer {
         let _ = drawer.join();
     }
     ExitCode::SUCCESS
 }
+
+/// How long the helper waits at its end for NDI's threads: less than the
+/// second the engine gives it before it ends it (`STOP_GRACE`).
+const FINISH_WITHIN: Duration = Duration::from_millis(700);
 
 /// The last want: the cameras, whether the page shows them, and the source.
 struct Wanted {
@@ -192,6 +200,13 @@ impl Sources {
     /// The minute's line of what was received, if anything was.
     fn minute(&self) -> Option<String> {
         self.vmix.as_ref()?.as_ref().ok()?.minute()
+    }
+
+    /// Ends vMix's receivers and search, waiting up to `within` for them.
+    fn finish(&mut self, within: Duration) {
+        if let Some(Ok(vmix)) = self.vmix.as_mut() {
+            vmix.finish(within);
+        }
     }
 }
 

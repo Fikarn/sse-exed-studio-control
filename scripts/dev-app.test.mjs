@@ -65,7 +65,7 @@ test("a development run keeps its folders and switches whatever the caller's env
   assert.deepEqual(env, developmentEnv({}, { repositoryRoot }));
 });
 
-test("`--data=<folder>` names the saved data, and `--release` is the only other argument", () => {
+test("`--data=<folder>` names the saved data, and `--release` and `--vmix-pictures` are the only other arguments", () => {
   const dataFolderFrom = (args) => runOptionsFrom(args).dataFolder;
   assert.equal(dataFolderFrom([]), null);
   const copy = path.resolve("/work/a copy of the studio data");
@@ -154,7 +154,7 @@ test("`--vmix-pictures` alone takes vMix's pictures, with NDI's library, and the
   assert.equal(env.SSE_CAMERAS_SIMULATED, "1", "the cameras' links stay simulated");
   assert.equal(env.SSE_SAFE_START, "1");
   assert.equal(laneEnvRefusal(env, { liveConsole: false, vmixPictures: true }), null);
-  assert.match(laneEnvRefusal(env, { liveConsole: false }) ?? "", /SSE_VMIX_PICTURES is 1/);
+  assert.match(laneEnvRefusal(env, { liveConsole: false }) ?? "", /SSE_VMIX_PICTURES is set/);
 
   // The switch without a library checked is no run at all.
   assert.throws(() => developmentEnv({}, { vmixPictures: true, repositoryRoot }), /NDI's library/);

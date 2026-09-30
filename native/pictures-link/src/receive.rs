@@ -2,8 +2,8 @@
 //! development run started with `npm run app -- --vmix-pictures`, a hardware
 //! test the owner asks for and attends.
 //!
-//! - NDI's library is the SDK's own file, loaded once by its full path
-//!   (`ndi_library.rs`).
+//! - NDI's library is the SDK's own file, held to its pin and loaded once by
+//!   its full path (`ndi_library.rs`).
 //! - NDI's own search runs on a thread of its own for as long as the helper
 //!   is on vMix's pictures (D32). It lists sources and connects to none. A
 //!   source is taken only when it is named for this PC's Output 2, 3 or 4 and
@@ -13,13 +13,17 @@
 //!   after, each camera whose output is listed has a receiver on a thread of
 //!   its own, which makes every library call for it. vMix encodes an output
 //!   only while something is connected, so the pictures cost vMix nothing on
-//!   the other pages.
+//!   the other pages. A receiver that could not connect is made again after a
+//!   pause; one asked for and not connected within a few seconds does not
+//!   count as receiving.
 //! - A receiver takes each frame, drops the first after a silence (vMix hands
 //!   over a stale one at each connect), refuses what the renderer cannot take,
 //!   and copies the rest into its camera's newest frame, which the draw loop
 //!   takes (`layer.rs`): the newest wins, and the buffers go round.
 //! - Every thread beats (`watch.rs`): one stuck in the library makes the
-//!   helper go silent, and the hardware link starts it again.
+//!   helper go silent, and the hardware link starts it again. When the helper
+//!   ends, its receivers and its search end first (`finish`), so no thread is
+//!   inside the library when the process goes.
 
 use crate::ndi_library::{Finder, Ndi, Receiver};
 use crate::ndi_sdk::Captured;
@@ -37,7 +41,7 @@ use studio_control_protocol::pictures::{
 };
 
 /// How long NDI's search waits for a change before it lists again.
-const SEARCH_WAIT: Duration = Duration::from_secs(1);
+const SEARCH_WAIT: Duration = Duration::from_millis(500);
 /// How long a capture waits for a frame.
 const CAPTURE_WAIT: Duration = Duration::from_millis(500);
 /// How often a receiver reads the library's counts.
@@ -45,6 +49,8 @@ const COUNT_EVERY: Duration = Duration::from_secs(1);
 /// After a lost connection a receiver waits this long before it captures
 /// again; the library connects again by itself.
 const LOST_WAIT: Duration = Duration::from_millis(200);
+/// A receiver that could not connect is made again after this long.
+const RETRY_WAIT: Duration = Duration::from_secs(2);
 /// The most names of other sources said in the log, once each.
 const MOST_PASSED_OVER: usize = 64;
 
@@ -90,6 +96,9 @@ struct Shared {
     /// Why the search did not start, if it did not.
     search_failed: Mutex<Option<String>>,
     frames: Arc<Frames>,
+    /// The search ends when this is set, and says so in `search_ended`.
+    stop_search: AtomicBool,
+    search_ended: AtomicBool,
 }
 
 impl Shared {
@@ -99,10 +108,24 @@ impl Shared {
 }
 
 /// A camera's receiver: its thread ends by itself within a capture's wait
-/// once told to.
+/// once told to, and says so.
 struct Receiving {
     source: Announced,
     stop: Arc<AtomicBool>,
+    ended: Arc<AtomicBool>,
+}
+
+/// Whether a receiver made for `had` still serves `now`: the same name at the
+/// same port. The address alone may change, for NDI can list this PC's
+/// source at either of its networks' addresses, and the library follows it.
+fn same_source(had: &Announced, now: &Announced) -> bool {
+    let port = |source: &Announced| {
+        source
+            .url
+            .rsplit_once(':')
+            .map(|(_, port)| port.to_string())
+    };
+    had.name == now.name && port(had) == port(now)
 }
 
 /// vMix's pictures: the library, its search, and a receiver for each camera
@@ -112,21 +135,28 @@ pub struct Vmix {
     shared: Arc<Shared>,
     beats: Arc<Beats>,
     receivers: [Option<Receiving>; 3],
+    /// Receivers told to stop whose threads may not have ended yet.
+    ending: Vec<Arc<AtomicBool>>,
+    /// Since when each camera has been wanted connected: shown and listed.
+    asked: [Option<Instant>; 3],
+    /// When a receiver that could not connect may be made again.
+    retry_at: [Option<Instant>; 3],
     started: Instant,
     /// Counts the receivers made, so each is told apart.
     made: u64,
 }
 
 impl Vmix {
-    /// Loads NDI's library and starts its search; says on stderr which file
-    /// and version it loaded.
+    /// Holds NDI's library to its pin, loads it and starts its search; says
+    /// on stderr which file and version it loaded.
     pub fn start(library: &Path, beats: Arc<Beats>) -> Result<Self, String> {
-        let ndi = Arc::new(
-            Ndi::load(library)
-                .map_err(|why| format!("NDI's library {} {why}", library.display()))?,
-        );
+        let refused = |why: String| format!("NDI's library {} {why}", library.display());
+        // The helper's own check of the pin, just before the load: the file
+        // is the one `npm run app` checked, whoever started this helper.
+        vmix::library_matches_pin(library).map_err(refused)?;
+        let ndi = Arc::new(Ndi::load(library).map_err(refused)?);
         eprintln!(
-            "The pictures helper loaded NDI's library {}, version {}.",
+            "The pictures helper loaded NDI's library {}, version {}, its hash the pinned one.",
             library.display(),
             ndi.version()
         );
@@ -134,13 +164,18 @@ impl Vmix {
             cameras: Default::default(),
             search_failed: Mutex::new(None),
             frames: Arc::new(Default::default()),
+            stop_search: AtomicBool::new(false),
+            search_ended: AtomicBool::new(false),
         });
         let machine = std::env::var("COMPUTERNAME").unwrap_or_default();
         {
             let (ndi, shared, beats) = (Arc::clone(&ndi), Arc::clone(&shared), Arc::clone(&beats));
             thread::Builder::new()
                 .name(String::from("ndi-search"))
-                .spawn(move || search(&ndi, &shared, &beats, &machine))
+                .spawn(move || {
+                    search(&ndi, &shared, &beats, &machine);
+                    shared.search_ended.store(true, Ordering::Release);
+                })
                 .map_err(|error| format!("NDI's search did not start: {error}"))?;
         }
         Ok(Self {
@@ -148,6 +183,9 @@ impl Vmix {
             shared,
             beats,
             receivers: [None, None, None],
+            ending: Vec::new(),
+            asked: [None; 3],
+            retry_at: [None; 3],
             started: Instant::now(),
             made: 0,
         })
@@ -159,23 +197,46 @@ impl Vmix {
     }
 
     /// A receiver for each listed output while the pictures show, and none
-    /// otherwise. One whose output is listed at another place is made again.
+    /// otherwise. One whose output is listed at another port is made again,
+    /// and one that could not connect is made again after a pause.
     pub fn keep(&mut self, showing: bool) {
+        let now = Instant::now();
+        self.ending.retain(|ended| !ended.load(Ordering::Acquire));
         for index in 0..3 {
             let listed = self.shared.camera(index).announced.clone();
+            if self.receivers[index]
+                .as_ref()
+                .is_some_and(|receiving| receiving.ended.load(Ordering::Acquire))
+            {
+                // Its thread ended by itself: it could not connect.
+                self.receivers[index] = None;
+                self.retry_at[index] = Some(now + RETRY_WAIT);
+            }
             let keep = match (&self.receivers[index], &listed) {
-                (Some(receiving), Some(source)) => showing && receiving.source == *source,
+                (Some(receiving), Some(source)) => {
+                    showing && same_source(&receiving.source, source)
+                }
                 // The output went: the library connects again if it returns
-                // at the same place.
+                // at the same port.
                 (Some(_), None) => showing,
                 (None, _) => true,
             };
             if !keep {
                 if let Some(receiving) = self.receivers[index].take() {
-                    receiving.stop.store(true, Ordering::Relaxed);
+                    receiving.stop.store(true, Ordering::Release);
+                    self.ending.push(receiving.ended);
                 }
             }
-            if let (true, None, Some(source)) = (showing, &self.receivers[index], listed) {
+            self.asked[index] = if showing && listed.is_some() {
+                self.asked[index].or(Some(now))
+            } else {
+                None
+            };
+            let waited = self.retry_at[index].is_none_or(|at| now >= at);
+            if let (true, None, Some(source), true) =
+                (showing, &self.receivers[index], listed, waited)
+            {
+                self.retry_at[index] = None;
                 self.receivers[index] = self.connect(index, source);
             }
         }
@@ -184,24 +245,38 @@ impl Vmix {
     fn connect(&mut self, index: usize, source: Announced) -> Option<Receiving> {
         self.made += 1;
         let stop = Arc::new(AtomicBool::new(false));
+        let ended = Arc::new(AtomicBool::new(false));
         let thread = {
             let (ndi, shared, beats) = (
                 Arc::clone(&self.ndi),
                 Arc::clone(&self.shared),
                 Arc::clone(&self.beats),
             );
-            let (source, stop, made) = (source.clone(), Arc::clone(&stop), self.made);
+            let (source, stop, ended, made) = (
+                source.clone(),
+                Arc::clone(&stop),
+                Arc::clone(&ended),
+                self.made,
+            );
             thread::Builder::new()
                 .name(format!("ndi-cam{}", index + 1))
-                .spawn(move || receive(&ndi, &shared, &beats, index, &source, &stop, made))
+                .spawn(move || {
+                    receive(&ndi, &shared, &beats, index, &source, &stop, made);
+                    ended.store(true, Ordering::Release);
+                })
         };
         match thread {
-            Ok(_) => Some(Receiving { source, stop }),
+            Ok(_) => Some(Receiving {
+                source,
+                stop,
+                ended,
+            }),
             Err(error) => {
                 eprintln!(
                     "The pictures helper could not start CAM {}'s receiver: {error}.",
                     index + 1
                 );
+                self.retry_at[index] = Some(Instant::now() + RETRY_WAIT);
                 None
             }
         }
@@ -231,6 +306,7 @@ impl Vmix {
                 (
                     Seen {
                         announced: camera.announced.is_some(),
+                        asked_since: self.asked[index],
                         connected_since: camera.receiver.map(|(_, since)| since),
                         last_taken: camera.last_taken,
                     },
@@ -297,9 +373,33 @@ impl Vmix {
             .collect();
         Some(vmix::minute_line(&cameras))
     }
+
+    /// Ends the receivers and the search, and waits up to `within` for their
+    /// threads, so that none is inside the library when the helper ends.
+    pub fn finish(&mut self, within: Duration) {
+        self.keep(false);
+        self.shared.stop_search.store(true, Ordering::Release);
+        let deadline = Instant::now() + within;
+        let ended = || {
+            self.shared.search_ended.load(Ordering::Acquire)
+                && self
+                    .ending
+                    .iter()
+                    .all(|ended| ended.load(Ordering::Acquire))
+        };
+        while !ended() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(20));
+        }
+        if !ended() {
+            eprintln!(
+                "The pictures helper ends with NDI's threads still ending after {} ms.",
+                within.as_millis()
+            );
+        }
+    }
 }
 
-/// NDI's search, for the helper's life: lists what it hears of each second
+/// NDI's search, until the helper ends: lists what it hears of twice a second
 /// and takes this PC's Outputs 2 to 4.
 fn search(ndi: &Arc<Ndi>, shared: &Shared, beats: &Beats, machine: &str) {
     const WHO: &str = "NDI's search";
@@ -319,7 +419,7 @@ fn search(ndi: &Arc<Ndi>, shared: &Shared, beats: &Beats, machine: &str) {
         );
     }
     let mut passed_over: Vec<String> = Vec::new();
-    loop {
+    while !shared.stop_search.load(Ordering::Acquire) {
         let listed = finder.look(SEARCH_WAIT);
         beats.beat(WHO);
         let mut found: [Option<Announced>; 3] = [None, None, None];
@@ -357,6 +457,7 @@ fn search(ndi: &Arc<Ndi>, shared: &Shared, beats: &Beats, machine: &str) {
             camera.announced = found;
         }
     }
+    beats.rest(WHO);
 }
 
 /// One camera's receiver, until it is told to stop: every library call for
@@ -373,17 +474,23 @@ fn receive(
     let who = format!("CAM {}'s receiver ({made})", index + 1);
     beats.beat(&who);
     match Receiver::open(ndi, source, &format!("Studio Control CAM {}", index + 1)) {
+        // Told to stop while it connected: it ends at once, and says nothing
+        // of the camera, whose newer receiver may be connected by now.
+        Ok(_) if stop.load(Ordering::Acquire) => {}
         Ok(receiver) => {
             {
                 let mut camera = shared.camera(index);
                 camera.receiver = Some((made, Instant::now()));
+                camera.last_taken = None;
+                camera.format = None;
                 camera.received.connects += 1;
             }
             take_frames(receiver, shared, beats, index, stop, &who);
         }
         Err(why) => eprintln!(
-            "The pictures helper could not connect to {}: {why}.",
-            source.name
+            "The pictures helper could not connect to {}: {why}; it tries again in {} s.",
+            source.name,
+            RETRY_WAIT.as_secs()
         ),
     }
     {
@@ -410,8 +517,13 @@ fn take_frames(
     let mut silence = Silence::default();
     let mut spare: Vec<u8> = Vec::new();
     let mut counted = Instant::now();
-    while !stop.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Acquire) {
         let captured = receiver.capture(CAPTURE_WAIT, &mut |frame| {
+            // A receiver told to stop hands on nothing more: a newer one may
+            // be connected to the camera by now.
+            if stop.load(Ordering::Acquire) {
+                return;
+            }
             let now = Instant::now();
             let stale = silence.broken(now);
             let (checked, picture) = {
@@ -449,10 +561,37 @@ fn take_frames(
             thread::sleep(LOST_WAIT);
         }
         beats.beat(who);
-        if counted.elapsed() >= COUNT_EVERY {
+        if counted.elapsed() >= COUNT_EVERY && !stop.load(Ordering::Acquire) {
             let counts = receiver.counters();
             shared.camera(index).library = Some(counts);
             counted = Instant::now();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_receiver_serves_its_source_while_its_name_and_port_stay() {
+        let source = |name: &str, url: &str| Announced {
+            name: String::from(name),
+            url: String::from(url),
+        };
+        let had = source("PC (vMix - Output 2)", "172.16.16.118:5971");
+        assert!(same_source(&had, &had.clone()));
+        assert!(
+            same_source(&had, &source("PC (vMix - Output 2)", "10.0.0.5:5971")),
+            "the other network's address, the same port"
+        );
+        assert!(
+            !same_source(&had, &source("PC (vMix - Output 2)", "172.16.16.118:5974")),
+            "vMix started again on another port"
+        );
+        assert!(!same_source(
+            &had,
+            &source("PC (vMix - Output 3)", "172.16.16.118:5971")
+        ));
     }
 }

@@ -1196,16 +1196,24 @@ test("no lane takes vMix's pictures, and only npm run app lets the switch pass",
   const env = { ...(await hardenedLaneEnv()), ...scratchFolders() };
   assert.equal(laneEnvRefusal(env, { liveConsole: false }), null);
   assert.equal(laneEnvRefusal({ ...env, SSE_VMIX_PICTURES: "0" }, { liveConsole: false }), null);
-  for (const asked of [{ SSE_VMIX_PICTURES: "1" }, { SSE_VMIX_PICTURES: " 1 " }, { sse_vmix_pictures: "1" }]) {
+  assert.equal(laneEnvRefusal({ ...env, SSE_VMIX_PICTURES: " " }, { liveConsole: false }), null);
+  for (const asked of [
+    { SSE_VMIX_PICTURES: "1" },
+    { SSE_VMIX_PICTURES: " 1 " },
+    { sse_vmix_pictures: "1" },
+    // Anything but absent, empty or 0: no way of trimming a value may differ from the engine's.
+    { SSE_VMIX_PICTURES: "\u00851" },
+    { SSE_VMIX_PICTURES: "yes" },
+  ]) {
     assert.match(
       laneEnvRefusal({ ...env, ...asked }, { liveConsole: false }) ?? "",
-      /SSE_VMIX_PICTURES is 1: only `npm run app -- --vmix-pictures`/,
+      /SSE_VMIX_PICTURES is set: only `npm run app -- --vmix-pictures`/,
       JSON.stringify(asked)
     );
     assert.equal(laneEnvRefusal({ ...env, ...asked }, { liveConsole: false, vmixPictures: true }), null);
     assert.throws(
       () => laneProcessEnv(env, asked, { label: "A planted lane" }),
-      /A planted lane was not started: SSE_VMIX_PICTURES is 1/,
+      /A planted lane was not started: SSE_VMIX_PICTURES is set/,
       JSON.stringify(asked)
     );
   }

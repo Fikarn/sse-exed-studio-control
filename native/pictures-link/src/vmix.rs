@@ -7,6 +7,7 @@
 //! What the library hands over is `ndi_sdk.rs`'s; its calls are
 //! `ndi_library.rs`'s; the threads that make them are `receive.rs`'s.
 
+use crate::sha256::{pinned_sha256, sha256_hex};
 use std::ffi::{c_int, OsString};
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
@@ -71,6 +72,24 @@ pub fn permission(
         ),
         None => Permission::Allowed(library),
     }
+}
+
+/// The pin the helper holds NDI's library to, compiled in: the file
+/// `npm run app` checks against as well.
+const PIN: &str = include_str!("../ndi-library.json");
+
+/// Whether the file at `library` is the pinned one: its SHA-256 is the
+/// pin's. Read in whole just before it is loaded.
+pub fn library_matches_pin(library: &Path) -> Result<(), String> {
+    let pinned = pinned_sha256(PIN).ok_or("the pin holds no SHA-256")?;
+    let bytes = std::fs::read(library).map_err(|error| format!("could not be read: {error}"))?;
+    let digest = sha256_hex(&bytes);
+    if digest != pinned {
+        return Err(format!(
+            "is not the pinned file: its SHA-256 is {digest}, the pin's {pinned}"
+        ));
+    }
+    Ok(())
 }
 
 /// Why `library` is not a library the helper loads; `None` when it is.
@@ -199,27 +218,34 @@ pub const FRESH_FOR: Duration = Duration::from_secs(1);
 pub struct Seen {
     /// NDI's search lists its output now.
     pub announced: bool,
-    /// Since when a receiver is connected to it: only while Cameras shows
-    /// the pictures and for 30 s after.
+    /// Since when a receiver has been wanted for it: while Cameras shows the
+    /// pictures (and for 30 s after) and its output is listed.
+    pub asked_since: Option<Instant>,
+    /// Since when a receiver is connected to it.
     pub connected_since: Option<Instant>,
     /// When its last frame was taken.
     pub last_taken: Option<Instant>,
 }
 
-/// Whether a camera's picture arrives. While no receiver is connected (the
+/// Whether a camera's picture arrives. While no receiver is wanted (the
 /// Cameras page shows no pictures, and vMix is asked for none) an output
 /// that NDI's search lists counts as arriving, so the Cameras lamp stays
 /// true on the other pages. A connected one arrives while its frames come,
-/// and for the connection's first seconds while its output is listed.
+/// and for the connection's first seconds while its output is listed. One
+/// wanted and not connected arrives only for those first seconds: a
+/// receiver that cannot connect does not read as a picture.
 pub fn receiving(seen: &Seen, now: Instant) -> bool {
-    let Some(since) = seen.connected_since else {
-        return seen.announced;
-    };
-    let fresh = seen
-        .last_taken
-        .is_some_and(|last| now.saturating_duration_since(last) < FRESH_FOR);
-    let new = now.saturating_duration_since(since) < CONNECT_GRACE;
-    fresh || (new && seen.announced)
+    let within_grace = |since: Instant| now.saturating_duration_since(since) < CONNECT_GRACE;
+    match (seen.connected_since, seen.asked_since) {
+        (Some(since), _) => {
+            let fresh = seen
+                .last_taken
+                .is_some_and(|last| now.saturating_duration_since(last) < FRESH_FOR);
+            fresh || (within_grace(since) && seen.announced)
+        }
+        (None, Some(asked)) => seen.announced && within_grace(asked),
+        (None, None) => seen.announced,
+    }
 }
 
 /// After vMix's pictures start, what arrives is not said for this long,
@@ -403,6 +429,14 @@ mod tests {
                 "{label}"
             );
         }
+        // A file of the library's name is still held to the pin before it
+        // is loaded.
+        let refusal = library_matches_pin(&library).expect_err("not the pinned file");
+        assert!(refusal.contains("is not the pinned file"), "{refusal}");
+        assert!(library_matches_pin(&missing).is_err());
+        let _ = std::fs::remove_dir_all(
+            std::env::temp_dir().join(format!("sse-pictures-permission-{}", std::process::id())),
+        );
     }
 
     #[test]
@@ -511,12 +545,25 @@ mod tests {
         let at = |millis: u64| start + Duration::from_millis(millis);
         let seen = |announced, connected: Option<u64>, taken: Option<u64>| Seen {
             announced,
+            asked_since: connected.map(at),
             connected_since: connected.map(at),
             last_taken: taken.map(at),
         };
-        // Not connected: listed is receiving, and vMix is asked for nothing.
+        // Not wanted: listed is receiving, and vMix is asked for nothing.
         assert!(receiving(&seen(true, None, None), at(10_000)));
         assert!(!receiving(&seen(false, None, Some(9_900)), at(10_000)));
+        // Wanted and not connected: the first seconds only.
+        let waiting = |asked: u64| Seen {
+            announced: true,
+            asked_since: Some(at(asked)),
+            connected_since: None,
+            last_taken: None,
+        };
+        assert!(receiving(&waiting(0), at(2_900)));
+        assert!(
+            !receiving(&waiting(0), at(3_000)),
+            "a receiver that cannot connect is no picture"
+        );
         // Connected: the first seconds while listed, then its frames.
         assert!(receiving(&seen(true, Some(0), None), at(2_900)));
         assert!(!receiving(&seen(true, Some(0), None), at(3_000)));
