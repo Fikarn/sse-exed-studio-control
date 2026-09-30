@@ -55,6 +55,11 @@ const ACCEPT_FAILED_REST: Duration = Duration::from_millis(50);
 /// The longest hello a connection may say.
 const MAX_HELLO_BYTES: usize = 128;
 
+/// Each connection's own number, across the starts of the hardware link:
+/// the layer outlives a start, and tells an old connection's end from a new
+/// one's by it.
+static CONNECTIONS: AtomicU64 = AtomicU64::new(0);
+
 /// Where the link's lines go: `shell.log`, or a test's list.
 pub(crate) type PicturesLog = Arc<dyn Fn(&str) + Send + Sync>;
 
@@ -173,7 +178,6 @@ fn accept(
     let current = Arc::new(AtomicU64::new(0));
     // The connections still to say the secret.
     let handshaking = Arc::new(AtomicUsize::new(0));
-    let mut number = 0_u64;
     for stream in listener.incoming() {
         if closed.load(Ordering::SeqCst) {
             return;
@@ -188,7 +192,7 @@ fn accept(
             continue;
         }
         handshaking.fetch_add(1, Ordering::SeqCst);
-        number += 1;
+        let number = CONNECTIONS.fetch_add(1, Ordering::SeqCst) + 1;
         let connection = Connection {
             number,
             secret: secret.to_string(),
@@ -275,7 +279,8 @@ impl Connection {
             (self.log)("The pictures' connection closed: it could not be written to.");
             return;
         };
-        if stream.set_read_timeout(Some(LINK_WAKE)).is_err() {
+        // A newer connection took this one's place while it said hello.
+        if stream.set_read_timeout(Some(LINK_WAKE)).is_err() || !is_current() {
             return;
         }
         self.layer.attach(self.number, pid, writer);

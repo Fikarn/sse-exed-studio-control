@@ -65,6 +65,21 @@ fn open() -> (Arc<RecordedLayer>, PicturesLink, Arc<Mutex<Vec<String>>>) {
     (layer, link, lines)
 }
 
+/// The number of the connection whose helper said hello with `pid`, once the
+/// layer is asked for its surface. Numbers run on across the tests of this
+/// process, so a test learns them.
+fn attached(layer: &RecordedLayer, pid: u32) -> u64 {
+    let mut number = None;
+    wait_until("the layer is asked for a surface", || {
+        number = lock(&layer.asked).iter().find_map(|asked| match asked {
+            Asked::Attach { number, pid: said } if *said == pid => Some(*number),
+            _ => None,
+        });
+        number.is_some()
+    });
+    number.expect("an attach")
+}
+
 /// The helper's side: the secret, then hello.
 fn helper(link: &PicturesLink, pid: u32) -> TcpStream {
     let mut stream = connect_saying(link.address(), link.secret()).expect("connects");
@@ -100,23 +115,19 @@ fn it_listens_on_this_pc_alone_with_a_new_secret_each_start() {
 fn a_helper_that_says_hello_is_handed_to_the_layer_and_taken_back_at_its_end() {
     let (layer, link, lines) = open();
     let mut stream = helper(&link, 4242);
-    wait_until("the layer is asked for a surface", || {
-        lock(&layer.asked).as_slice()
-            == [Asked::Attach {
-                number: 1,
-                pid: 4242,
-            }]
-    });
+    let number = attached(&layer, 4242);
+    assert_eq!(lock(&layer.asked).len(), 1, "asked once");
     // The layer's writer is this connection: its line arrives.
     stream.set_read_timeout(Some(PATIENCE)).expect("a timeout");
-    let mut said = [0_u8; 11];
+    let expected = format!("attached {number}\n");
+    let mut said = vec![0_u8; expected.len()];
     stream.read_exact(&mut said).expect("the layer's line");
-    assert_eq!(&said, b"attached 1\n");
+    assert_eq!(said, expected.into_bytes());
     // What the helper says afterwards is passed over.
     writeln!(stream, "anything").expect("writes");
     drop(stream);
     wait_until("the surface is taken back", || {
-        lock(&layer.asked).last() == Some(&Asked::Detach { number: 1 })
+        lock(&layer.asked).last() == Some(&Asked::Detach { number })
     });
     let lines = lock(&lines);
     assert!(lines
@@ -228,19 +239,16 @@ fn a_first_line_that_is_not_a_hello_closes_the_connection() {
 fn a_new_connection_with_the_secret_takes_the_old_one_s_place() {
     let (layer, link, _) = open();
     let _first = helper(&link, 11);
-    wait_until("the first helper's surface", || {
-        lock(&layer.asked).contains(&Asked::Attach { number: 1, pid: 11 })
-    });
+    let first = attached(&layer, 11);
     let _second = helper(&link, 12);
-    wait_until("the second helper's surface", || {
-        lock(&layer.asked).contains(&Asked::Attach { number: 2, pid: 12 })
-    });
+    let second = attached(&layer, 12);
+    assert!(second > first, "{first} then {second}");
     // The first one's connection is given up though it stays open: its
     // surface is taken back, and the second one's is not.
     wait_until("the first one's surface is taken back", || {
-        lock(&layer.asked).contains(&Asked::Detach { number: 1 })
+        lock(&layer.asked).contains(&Asked::Detach { number: first })
     });
-    assert!(!lock(&layer.asked).contains(&Asked::Detach { number: 2 }));
+    assert!(!lock(&layer.asked).contains(&Asked::Detach { number: second }));
 }
 
 #[test]

@@ -85,11 +85,22 @@ pub struct PixelRect {
     pub height: u32,
 }
 
+/// A picture's rectangle in physical pixels of the surface. It may reach
+/// past the surface's edges: the page's bay cuts a picture off where it
+/// overflows, and the surface, which is the bay, cuts it off there too.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PictureRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
 /// One picture of a scene.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlacedPicture {
     pub camera: u8,
-    pub at: PixelRect,
+    pub at: PictureRect,
     pub part: Part,
     pub smooth: bool,
 }
@@ -188,8 +199,9 @@ fn part_fits(part: &Part) -> bool {
 /// picture, or when the report is not one a page would make (a scale or a
 /// bay that is not a number, a bay with no size or too large). A picture of
 /// a camera that is not one of the three, with a part outside the picture,
-/// or that does not lie whole inside the bay is left out, and so is a hole
-/// outside the bay; more than the scene holds are left out too.
+/// or that lies wholly outside the bay is left out, and so is a hole outside
+/// the bay; more than the scene holds are left out too. A picture the bay
+/// cuts keeps its whole rectangle, so its part stays the part drawn.
 pub fn placement(report: &PlaceReport) -> Option<Placement> {
     if !report.showing || !report.scale.is_finite() || report.scale <= 0.0 || report.scale > 8.0 {
         return None;
@@ -208,14 +220,22 @@ pub fn placement(report: &PlaceReport) -> Option<Placement> {
         .iter()
         .filter(|picture| (1..=3).contains(&picture.camera) && part_fits(&picture.part))
         .filter_map(|picture| {
-            let whole = edges(&picture.at, report.scale)?;
-            let at = inside(whole, origin, size)?;
-            // Clipped by the bay: its part would no longer be the part drawn.
-            let unclipped = i64::from(at.width) == whole.2 - whole.0
-                && i64::from(at.height) == whole.3 - whole.1;
-            unclipped.then_some(PlacedPicture {
+            let (left, top, right, bottom) = edges(&picture.at, report.scale)?;
+            // Some of it inside the bay, or nothing to draw.
+            inside((left, top, right, bottom), origin, size)?;
+            let length = |length: i64| {
+                u32::try_from(length)
+                    .ok()
+                    .filter(|length| (1..=MAX_PIXELS).contains(length))
+            };
+            Some(PlacedPicture {
                 camera: picture.camera,
-                at,
+                at: PictureRect {
+                    x: i32::try_from(left - origin.0).ok()?,
+                    y: i32::try_from(top - origin.1).ok()?,
+                    width: length(right - left)?,
+                    height: length(bottom - top)?,
+                },
                 part: picture.part,
                 smooth: picture.smooth,
             })
@@ -245,9 +265,9 @@ pub fn placement(report: &PlaceReport) -> Option<Placement> {
 
 impl Scene {
     /// A scene as the helper takes it: a size a surface may have, at most
-    /// `MAX_PICTURES` pictures and `MAX_HOLES` holes, each inside the surface,
-    /// each picture of one of the three cameras with a part inside the
-    /// picture.
+    /// `MAX_PICTURES` pictures and `MAX_HOLES` holes, each hole inside the
+    /// surface, each picture partly inside it at least, of one of the three
+    /// cameras, with a part inside the picture.
     pub fn check(&self) -> Result<(), String> {
         if !(1..=MAX_PIXELS).contains(&self.width) || !(1..=MAX_PIXELS).contains(&self.height) {
             return Err(format!("a surface of {} × {}", self.width, self.height));
@@ -271,11 +291,19 @@ impl Scene {
                     .checked_add(rect.height)
                     .is_some_and(|bottom| bottom <= self.height)
         };
+        let shows = |rect: &PictureRect| {
+            let across = |at: i32, length: u32, room: u32| {
+                (1..=MAX_PIXELS).contains(&length)
+                    && i64::from(at) < i64::from(room)
+                    && i64::from(at) + i64::from(length) > 0
+            };
+            across(rect.x, rect.width, self.width) && across(rect.y, rect.height, self.height)
+        };
         for picture in &self.pictures {
             if !(1..=3).contains(&picture.camera) {
                 return Err(format!("camera {}", picture.camera));
             }
-            if !fits(&picture.at) || !part_fits(&picture.part) {
+            if !shows(&picture.at) || !part_fits(&picture.part) {
                 return Err(format!("CAM {}'s picture does not fit", picture.camera));
             }
         }
@@ -350,7 +378,7 @@ mod tests {
         assert_eq!((placed.scene.width, placed.scene.height), (1712, 1344));
         assert_eq!(
             placed.scene.pictures[0].at,
-            PixelRect {
+            PictureRect {
                 x: 16,
                 y: 62,
                 width: 1680,
@@ -396,7 +424,10 @@ mod tests {
         let [first, second] = placed.scene.pictures[..] else {
             panic!("two pictures")
         };
-        assert_eq!(first.at.x + first.at.width, second.at.x);
+        assert_eq!(
+            i64::from(first.at.x) + i64::from(first.at.width),
+            i64::from(second.at.x)
+        );
         assert_eq!((first.at.x, first.at.width), (21, 125));
         assert_eq!(placed.scene.width, 2140);
     }
@@ -433,8 +464,8 @@ mod tests {
             width: 1000,
             height: 1080,
         };
-        // The loupe pushed half out of the bay: its part would not be what is drawn.
-        odd.pictures[2].at = css(2000.0, 1129.0, 568.0, 272.0);
+        // The loupe pushed wholly out of the bay.
+        odd.pictures[2].at = css(2140.0, 1129.0, 568.0, 272.0);
         odd.pictures.push(ReportedPicture {
             camera: 3,
             at: css(1000.0, 1095.0, 544.0, 306.0),
@@ -461,6 +492,73 @@ mod tests {
         let placed = placement(&many).expect("a placement");
         assert_eq!(placed.scene.pictures.len(), MAX_PICTURES);
         assert_eq!(placed.scene.holes.len(), MAX_HOLES);
+    }
+
+    // The Cameras page as it stands at 2560 × 1440: the small pictures and
+    // the loupe reach 13 px below the bay, whose overflow is hidden. The
+    // surface is the bay, so it cuts them off where the page does, and each
+    // keeps its whole rectangle and its part.
+    #[test]
+    fn a_picture_the_bay_cuts_is_drawn_whole_and_cut_by_the_surface() {
+        let mut cut = report(1.0);
+        cut.bay = css(440.0, 72.0, 1688.0, 1312.0);
+        cut.pictures = vec![
+            ReportedPicture {
+                camera: 2,
+                at: css(444.0, 1091.0, 544.0, 306.0),
+                part: WHOLE,
+                smooth: true,
+            },
+            ReportedPicture {
+                camera: 1,
+                at: css(1556.0, 1125.0, 568.0, 272.0),
+                part: Part {
+                    x: 818,
+                    y: 472,
+                    width: 284,
+                    height: 136,
+                },
+                smooth: false,
+            },
+            // One that starts above and left of the bay.
+            ReportedPicture {
+                camera: 3,
+                at: css(400.0, 50.0, 544.0, 306.0),
+                part: WHOLE,
+                smooth: true,
+            },
+        ];
+        let placed = placement(&cut).expect("a placement");
+        assert_eq!(
+            placed
+                .scene
+                .pictures
+                .iter()
+                .map(|picture| picture.at)
+                .collect::<Vec<_>>(),
+            [
+                PictureRect {
+                    x: 4,
+                    y: 1019,
+                    width: 544,
+                    height: 306
+                },
+                PictureRect {
+                    x: 1116,
+                    y: 1053,
+                    width: 568,
+                    height: 272
+                },
+                PictureRect {
+                    x: -40,
+                    y: -22,
+                    width: 544,
+                    height: 306
+                },
+            ]
+        );
+        assert_eq!(placed.scene.pictures[1].part.height, 136);
+        assert_eq!(placed.scene.check(), Ok(()));
     }
 
     #[test]
@@ -507,13 +605,19 @@ mod tests {
             width: MAX_PIXELS,
             height: MAX_PIXELS,
         };
+        let far = PictureRect {
+            x: -(MAX_PIXELS as i32) + 1,
+            y: -(MAX_PIXELS as i32) + 1,
+            width: MAX_PIXELS,
+            height: MAX_PIXELS,
+        };
         let scene = Scene {
             width: MAX_PIXELS,
             height: MAX_PIXELS,
             pictures: vec![
                 PlacedPicture {
                     camera: 3,
-                    at: rect,
+                    at: far,
                     part: Part {
                         x: 1919,
                         y: 1079,
@@ -542,8 +646,12 @@ mod tests {
         assert!(broken(&|scene| scene.width = 0));
         assert!(broken(&|scene| scene.height = MAX_PIXELS + 1));
         assert!(broken(&|scene| scene.pictures[0].camera = 0));
-        assert!(broken(&|scene| scene.pictures[0].at.width = 5000));
-        assert!(broken(&|scene| scene.pictures[0].at.x = u32::MAX));
+        assert!(broken(&|scene| scene.pictures[0].at.width = MAX_PIXELS + 1));
+        assert!(broken(&|scene| scene.pictures[0].at.height = 0));
+        assert!(broken(&|scene| scene.pictures[0].at.x = i32::MAX));
+        // Wholly outside the surface, by a pixel.
+        assert!(broken(&|scene| scene.pictures[0].at.x = -1680));
+        assert!(broken(&|scene| scene.pictures[0].at.y = 1344));
         assert!(broken(&|scene| scene.pictures[0].part.width = 0));
         assert!(broken(&|scene| scene.pictures[0].part.y = 1));
         assert!(broken(&|scene| scene.holes[0].height = 0));

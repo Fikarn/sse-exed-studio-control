@@ -549,7 +549,9 @@ fn make_converted(device: &ID3D11Device) -> Result<Converted, String> {
     }
 }
 
-fn viewport(x: u32, y: u32, width: u32, height: u32) -> D3D11_VIEWPORT {
+/// A rectangle of the target to draw into. It may reach past the target's
+/// edges: what lies outside is not drawn.
+fn viewport(x: i32, y: i32, width: u32, height: u32) -> D3D11_VIEWPORT {
     D3D11_VIEWPORT {
         TopLeftX: x as f32,
         TopLeftY: y as f32,
@@ -674,7 +676,12 @@ fn compose(
         }
         context.PSSetShader(&renderer.clear, None);
         for hole in &scene.holes {
-            context.RSSetViewports(Some(&[viewport(hole.x, hole.y, hole.width, hole.height)]));
+            context.RSSetViewports(Some(&[viewport(
+                hole.x as i32,
+                hole.y as i32,
+                hole.width,
+                hole.height,
+            )]));
             context.Draw(3, 0);
         }
         let started = Instant::now();
@@ -723,6 +730,21 @@ mod tests {
         assert_eq!(taps(2160, 1080), 2);
         assert_eq!(taps(7680, 1920), 4);
         assert_eq!(taps(0, 1920), 1);
+    }
+
+    // D3DCompile is Windows' own, and needs no graphics card: the shaders
+    // are held to it here, before a development run first draws with them.
+    #[test]
+    fn the_shaders_compile() {
+        for (entry, target) in [
+            (s!("vs"), s!("vs_4_0")),
+            (s!("ps_convert"), s!("ps_4_0")),
+            (s!("ps_place"), s!("ps_4_0")),
+            (s!("ps_clear"), s!("ps_4_0")),
+        ] {
+            let code = compile(entry, target).unwrap_or_else(|why| panic!("{why}"));
+            assert!(!code.is_empty());
+        }
     }
 
     #[test]

@@ -24,7 +24,7 @@
 
 use crate::shell_pictures::LayerSink;
 use std::io::Write;
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::OnceLock;
 use std::thread;
@@ -34,7 +34,8 @@ use studio_control_protocol::pictures::to_line;
 use tauri::AppHandle;
 use windows::core::{IUnknown, Interface};
 use windows::Win32::Foundation::{
-    CloseHandle, DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE, HMODULE, HWND,
+    CloseHandle, DuplicateHandle, DUPLICATE_CLOSE_SOURCE, DUPLICATE_SAME_ACCESS, HANDLE, HMODULE,
+    HWND,
 };
 use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
 use windows::Win32::Graphics::Direct3D11::{
@@ -221,35 +222,22 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
                 pid,
                 writer,
             }) => {
-                counts.attached += 1;
-                release(&layer, content.take(), log);
-                match new_surface(&layer).and_then(|handle| {
-                    hand_over(&layer, handle, pid).map(|remote| (handle, remote))
-                }) {
-                    Ok((handle, remote)) => {
-                        let mut held = Content {
-                            handle,
-                            number,
-                            writer,
-                            told: None,
-                        };
-                        let said = say(&mut held, &ToLayerHelper::Surface { handle: remote });
-                        log(&format!(
-                            "a surface for the pictures helper (process {pid}){}.",
-                            if said {
-                                ""
-                            } else {
-                                ", but its line did not go"
-                            }
-                        ));
-                        if let Some(placed) = placed.as_ref() {
-                            tell_scene(&mut held, &placed.scene, &mut counts);
-                        }
-                        content = Some(held);
-                    }
-                    Err(error) => log(&format!(
-                        "no surface for the pictures helper (process {pid}): {error}."
-                    )),
+                // A connection older than the one held, whose hello came late:
+                // the newer one keeps its surface, and the older one ends.
+                if content.as_ref().is_some_and(|held| held.number > number) {
+                    let _ = writer.shutdown(Shutdown::Both);
+                } else {
+                    counts.attached += 1;
+                    release(&layer, content.take(), log);
+                    content = attach(
+                        &layer,
+                        number,
+                        pid,
+                        writer,
+                        placed.as_ref(),
+                        &mut counts,
+                        log,
+                    );
                 }
             }
             Ok(LayerOrder::Detach { number }) => {
@@ -260,7 +248,7 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
             }
             Ok(LayerOrder::Stop) | Err(RecvTimeoutError::Disconnected) => {
                 release(&layer, content.take(), log);
-                let _ = show(&layer, None);
+                let _ = show(&layer, None, shown.is_some());
                 return;
             }
             Err(RecvTimeoutError::Timeout) => {}
@@ -270,7 +258,7 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
             .filter(|_| content.is_some() && last_word.elapsed() < PAGE_SILENCE)
             .map(|placed| (placed.x, placed.y));
         if wanted != shown {
-            match show(&layer, wanted) {
+            match show(&layer, wanted, shown.is_some()) {
                 Ok(()) => shown = wanted,
                 Err(error) => log(&format!(
                     "could not {}: {error}.",
@@ -294,6 +282,54 @@ fn run(hwnd: isize, orders: &Receiver<LayerOrder>, log: &dyn Fn(&str)) {
             counts = Counts::default();
         }
     }
+}
+
+/// A surface for a helper's connection, said to it on the connection. When
+/// no surface can be made, or its line does not go, the connection ends:
+/// the helper tries again after a while, and is not left waiting.
+fn attach(
+    layer: &Layer,
+    number: u64,
+    pid: u32,
+    writer: TcpStream,
+    placed: Option<&Placement>,
+    counts: &mut Counts,
+    log: &dyn Fn(&str),
+) -> Option<Content> {
+    let made = new_surface(layer)
+        .and_then(|handle| hand_over(layer, handle, pid).map(|remote| (handle, remote)));
+    let (handle, remote) = match made {
+        Ok(made) => made,
+        Err(error) => {
+            log(&format!(
+                "no surface for the pictures helper (process {pid}): {error}."
+            ));
+            let _ = writer.shutdown(Shutdown::Both);
+            return None;
+        }
+    };
+    let mut held = Content {
+        handle,
+        number,
+        writer,
+        told: None,
+    };
+    if !say(&mut held, &ToLayerHelper::Surface { handle: remote }) {
+        // The helper never learns of its copy: it is closed from here.
+        take_back(pid, remote);
+        log(&format!(
+            "a surface for the pictures helper (process {pid}) was not said: the connection ends."
+        ));
+        release(layer, Some(held), log);
+        return None;
+    }
+    log(&format!(
+        "a surface for the pictures helper (process {pid})."
+    ));
+    if let Some(placed) = placed {
+        tell_scene(&mut held, &placed.scene, counts);
+    }
+    Some(held)
 }
 
 /// The layer on the window: a composition device made on a Direct3D device,
@@ -388,13 +424,40 @@ fn hand_over(layer: &Layer, handle: HANDLE, pid: u32) -> windows::core::Result<u
     }
 }
 
+/// Closes the helper's copy of a surface's handle that the helper was never
+/// told of.
+#[allow(unsafe_code)]
+fn take_back(pid: u32, remote: u64) {
+    // SAFETY: the helper's process is opened for duplicating handles only,
+    // and closed at once. The handle closed in it is the copy `hand_over`
+    // put there, whose value the helper never read, so nothing there uses
+    // it or closes it too.
+    unsafe {
+        if let Ok(helper) = OpenProcess(PROCESS_DUP_HANDLE, false, pid) {
+            let _ = DuplicateHandle(
+                helper,
+                HANDLE(remote as usize as _),
+                HANDLE::default(),
+                std::ptr::null_mut(),
+                0,
+                false,
+                DUPLICATE_CLOSE_SOURCE,
+            );
+            let _ = CloseHandle(helper);
+        }
+    }
+}
+
 /// Takes a surface out of the visual and closes the shell's handle to it.
 #[allow(unsafe_code)]
 fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
     let Some(content) = content else {
         return;
     };
-    // The helper's connection closes with its writer.
+    // The helper's connection ends: its reader holds a handle of its own, so
+    // dropping the writer alone would leave it open, and the helper would
+    // wait on a surface that is gone.
+    let _ = content.writer.shutdown(Shutdown::Both);
     drop(content.writer);
     // SAFETY: the handle is the shell's own copy, closed once, here.
     unsafe {
@@ -409,16 +472,19 @@ fn release(layer: &Layer, content: Option<Content>, log: &dyn Fn(&str)) {
     }
 }
 
-/// Shows the visual with its corner at `at`, or hides it.
+/// Shows the visual with its corner at `at`, or hides it. `rooted` says
+/// that it is shown already: a move then only moves it.
 #[allow(unsafe_code)]
-fn show(layer: &Layer, at: Option<(i32, i32)>) -> windows::core::Result<()> {
+fn show(layer: &Layer, at: Option<(i32, i32)>, rooted: bool) -> windows::core::Result<()> {
     // SAFETY: COM calls on this thread's own objects.
     unsafe {
         match at {
             Some((x, y)) => {
                 layer.visual.SetOffsetX2(x as f32)?;
                 layer.visual.SetOffsetY2(y as f32)?;
-                layer.target.SetRoot(&layer.visual)?;
+                if !rooted {
+                    layer.target.SetRoot(&layer.visual)?;
+                }
             }
             None => layer.target.SetRoot(None::<&IDCompositionVisual>)?,
         }

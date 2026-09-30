@@ -29,6 +29,8 @@ use studio_control_protocol::pictures::{
 pub const FRAME_INTERVAL: Duration = Duration::from_nanos(33_366_667);
 /// How long a broken connection waits before it is made again.
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
+/// The longest wait after failures in a row: each doubles the last.
+const LONGEST_RECONNECT_DELAY: Duration = Duration::from_secs(30);
 /// How long a write may take before the connection counts as broken.
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 /// How often the counts go to stderr, which the engine logs.
@@ -188,6 +190,8 @@ struct Drawer {
     /// The last line said on stderr about the link: said once, not every
     /// second while it stays true.
     said: Option<String>,
+    /// Connections given up in a row without a frame drawn.
+    failures: u32,
 }
 
 impl Drawer {
@@ -207,6 +211,7 @@ impl Drawer {
             counts: Counts::default(),
             counted: Instant::now(),
             said: None,
+            failures: 0,
         }
     }
 
@@ -264,11 +269,15 @@ impl Drawer {
         }
     }
 
-    /// The connection is given up; it is made again after a second.
+    /// The connection is given up; it is made again after a second, and
+    /// after longer each time it is given up again before a frame is drawn,
+    /// so a surface that cannot be drawn into is not asked for every second.
     fn broke(&mut self, why: String) {
         self.say(why);
         self.let_go();
-        self.retry_at = Instant::now() + RECONNECT_DELAY;
+        let wait = RECONNECT_DELAY.saturating_mul(1 << self.failures.min(5));
+        self.retry_at = Instant::now() + wait.min(LONGEST_RECONNECT_DELAY);
+        self.failures = self.failures.saturating_add(1);
     }
 
     fn hear(&mut self) {
@@ -361,6 +370,7 @@ impl Drawer {
         };
         match drawn {
             Ok(_) => {
+                self.failures = 0;
                 self.counts.drawn += 1;
                 self.counts.slowest = self.counts.slowest.max(started.elapsed());
             }

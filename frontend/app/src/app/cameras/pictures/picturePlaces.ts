@@ -144,6 +144,9 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
     sizes.observe(element);
     document.addEventListener("visibilitychange", changed);
     window.addEventListener("resize", changed);
+    // A message slides in, a hint fades: where it ends is measured again.
+    document.addEventListener("animationend", changed, true);
+    document.addEventListener("transitionend", changed, true);
     const again = window.setInterval(() => say(true), SAY_AGAIN_MS);
     say(true);
     return () => {
@@ -151,6 +154,8 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
       sizes.disconnect();
       document.removeEventListener("visibilitychange", changed);
       window.removeEventListener("resize", changed);
+      document.removeEventListener("animationend", changed, true);
+      document.removeEventListener("transitionend", changed, true);
       window.clearInterval(again);
       place({ showing: false, scale: window.devicePixelRatio, bay: boxOf(element), pictures: [], holes: [] });
     };
