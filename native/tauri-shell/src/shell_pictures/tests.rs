@@ -251,6 +251,36 @@ fn a_new_connection_with_the_secret_takes_the_old_one_s_place() {
     assert!(!lock(&layer.asked).contains(&Asked::Detach { number: second }));
 }
 
+// A connection whose hello comes after a newer connection said the secret
+// gets no surface: the newer one keeps its place. The handshake waits half a
+// minute here, so the older one's hello can come as late as the test wants.
+#[test]
+fn a_hello_that_comes_after_a_newer_connection_gets_no_surface() {
+    let layer = Arc::new(RecordedLayer::default());
+    let (log, lines) = recorded_log();
+    let sink: Arc<dyn LayerSink> = Arc::clone(&layer) as Arc<dyn LayerSink>;
+    let link =
+        PicturesLink::open_with(log, sink, Duration::from_secs(30)).expect("the listener opens");
+    let mut older = connect_saying(link.address(), link.secret()).expect("connects");
+    wait_until("the older one's secret is taken", || {
+        lock(&lines)
+            .iter()
+            .filter(|line| *line == "The pictures helper is connected.")
+            .count()
+            == 1
+    });
+    let _newer = helper(&link, 22);
+    attached(&layer, 22);
+    writeln!(older, r#"{{"type":"hello","pid":21}}"#).expect("the late hello");
+    assert!(is_closed(&mut older), "the older connection ends");
+    assert!(
+        !lock(&layer.asked)
+            .iter()
+            .any(|asked| matches!(asked, Asked::Attach { pid: 21, .. })),
+        "the older one gets no surface"
+    );
+}
+
 #[test]
 fn a_new_start_refuses_the_old_secret_and_the_old_listener_closes() {
     let (_, old, _) = open();

@@ -54,7 +54,7 @@ windows = { version = "0.61", features = [
 
 # The workspace's lints ([workspace.lints] in native/Cargo.toml), with one
 # difference: `unsafe_code` is `deny` here, not `forbid`, because a `forbid`
-# cannot be lifted even for one item. Seven functions carry an
+# cannot be lifted even for one item. Eight functions carry an
 # `#[allow(unsafe_code)]`, all Windows only, and anything else that uses
 # `unsafe` still fails the build:
 #
@@ -63,9 +63,10 @@ windows = { version = "0.61", features = [
 #   (decision 12).
 # - `read_display_paths` in shell_displays.rs: Windows' display configuration
 #   is read through calls of user32 that fill lists and unions.
-# - `create_layer`, `new_surface`, `hand_over`, `release` and `show` in
-#   shell_picture_layer.rs: DirectComposition's and Direct3D's COM calls, and
-#   the one handle duplicated into the pictures helper's process.
+# - `create_layer`, `new_surface`, `hand_over`, `let_go_of_helper`,
+#   `release` and `show` in shell_picture_layer.rs: DirectComposition's and
+#   Direct3D's COM calls, and the one handle duplicated into the pictures
+#   helper's process (and closed there when the helper was never told of it).
 #
 # `scripts/check-no-shortcuts.test.mjs` holds the list.
 [lints.rust]

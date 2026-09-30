@@ -266,8 +266,8 @@ const SHELL_UNSAFE = [
     ["fn release(", "The surface is taken out of the visual by COM calls and the shell's handle to it is closed."],
     ["fn show(", "The visual is moved, shown and hidden by COM calls on the layer's own thread."],
     [
-      "fn take_back(",
-      "A surface's handle that the helper was never told of is closed in the helper's process, opened for that alone.",
+      "fn let_go_of_helper(",
+      "The helper's process, held open since the hand-over, is closed, and a copy the helper was never told of is closed in it.",
     ],
   ].map(([item, reason]) => ({
     file: "src/shell_picture_layer.rs",

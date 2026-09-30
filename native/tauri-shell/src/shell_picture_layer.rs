@@ -296,9 +296,10 @@ fn attach(
     counts: &mut Counts,
     log: &dyn Fn(&str),
 ) -> Option<Content> {
-    let made = new_surface(layer)
-        .and_then(|handle| hand_over(layer, handle, pid).map(|remote| (handle, remote)));
-    let (handle, remote) = match made {
+    let made = new_surface(layer).and_then(|handle| {
+        hand_over(layer, handle, pid).map(|(remote, helper)| (handle, remote, helper))
+    });
+    let (handle, remote, helper) = match made {
         Ok(made) => made,
         Err(error) => {
             log(&format!(
@@ -314,9 +315,10 @@ fn attach(
         writer,
         told: None,
     };
-    if !say(&mut held, &ToLayerHelper::Surface { handle: remote }) {
-        // The helper never learns of its copy: it is closed from here.
-        take_back(pid, remote);
+    let said = say(&mut held, &ToLayerHelper::Surface { handle: remote });
+    // A copy the helper never learns of is closed from here.
+    let_go_of_helper(helper, (!said).then_some(remote));
+    if !said {
         log(&format!(
             "a surface for the pictures helper (process {pid}) was not said: the connection ends."
         ));
@@ -393,17 +395,20 @@ fn new_surface(layer: &Layer) -> windows::core::Result<HANDLE> {
 }
 
 /// Hands a duplicate of the surface's handle to the helper's process and
-/// returns its value there. On an error the surface is taken out again and
-/// the shell's handle closed.
+/// returns its value there, with the helper's process still open: the caller
+/// lets go of it (`let_go_of_helper`) once the surface's line is said, so
+/// its number cannot be another process's meanwhile. On an error the
+/// surface is taken out again and the shell's handle closed.
 #[allow(unsafe_code)]
-fn hand_over(layer: &Layer, handle: HANDLE, pid: u32) -> windows::core::Result<u64> {
+fn hand_over(layer: &Layer, handle: HANDLE, pid: u32) -> windows::core::Result<(u64, HANDLE)> {
     // SAFETY: the helper's process is opened for duplicating handles only,
-    // and closed at once; the duplicate belongs to the helper from then on.
-    // The process is the one that said the link's secret.
+    // and closed here on an error, by `let_go_of_helper` otherwise; the
+    // duplicate belongs to the helper from then on. The process is the one
+    // that said the link's secret.
     unsafe {
         let handed = OpenProcess(PROCESS_DUP_HANDLE, false, pid).and_then(|helper| {
             let mut remote = HANDLE::default();
-            let duplicated = DuplicateHandle(
+            match DuplicateHandle(
                 GetCurrentProcess(),
                 handle,
                 helper,
@@ -411,9 +416,13 @@ fn hand_over(layer: &Layer, handle: HANDLE, pid: u32) -> windows::core::Result<u
                 0,
                 false,
                 DUPLICATE_SAME_ACCESS,
-            );
-            let _ = CloseHandle(helper);
-            duplicated.map(|()| remote.0 as usize as u64)
+            ) {
+                Ok(()) => Ok((remote.0 as usize as u64, helper)),
+                Err(error) => {
+                    let _ = CloseHandle(helper);
+                    Err(error)
+                }
+            }
         });
         if handed.is_err() {
             let _ = layer.visual.SetContent(None::<&IUnknown>);
@@ -424,16 +433,17 @@ fn hand_over(layer: &Layer, handle: HANDLE, pid: u32) -> windows::core::Result<u
     }
 }
 
-/// Closes the helper's copy of a surface's handle that the helper was never
-/// told of.
+/// Closes the helper's process that `hand_over` left open, and first, when
+/// its line did not go, the helper's copy of the surface's handle, which
+/// the helper was never told of.
 #[allow(unsafe_code)]
-fn take_back(pid: u32, remote: u64) {
-    // SAFETY: the helper's process is opened for duplicating handles only,
-    // and closed at once. The handle closed in it is the copy `hand_over`
-    // put there, whose value the helper never read, so nothing there uses
-    // it or closes it too.
+fn let_go_of_helper(helper: HANDLE, unsaid: Option<u64>) {
+    // SAFETY: `helper` is the process `hand_over` opened, still open, so it
+    // is the helper and no other; it is closed once, here. The handle closed
+    // in it is the copy `hand_over` put there, whose value the helper never
+    // read, so nothing there uses it or closes it too.
     unsafe {
-        if let Ok(helper) = OpenProcess(PROCESS_DUP_HANDLE, false, pid) {
+        if let Some(remote) = unsaid {
             let _ = DuplicateHandle(
                 helper,
                 HANDLE(remote as usize as _),
@@ -443,8 +453,8 @@ fn take_back(pid: u32, remote: u64) {
                 false,
                 DUPLICATE_CLOSE_SOURCE,
             );
-            let _ = CloseHandle(helper);
         }
+        let _ = CloseHandle(helper);
     }
 }
 

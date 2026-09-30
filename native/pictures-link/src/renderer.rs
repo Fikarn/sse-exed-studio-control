@@ -625,7 +625,9 @@ fn compose(
     let context = &renderer.context;
     // SAFETY: every object is the renderer's own, used on its one thread;
     // the constants live across the call that copies them. The scene has
-    // passed `Scene::check`: every rectangle lies inside the surface.
+    // passed `Scene::check`: every hole lies inside the surface, and every
+    // picture at least partly, within the viewport's limits; what lies
+    // outside the surface is not drawn.
     unsafe {
         context.PSSetShaderResources(0, Some(&[None]));
         context.OMSetRenderTargets(Some(&[Some(target.clone())]), None);
