@@ -6,15 +6,18 @@ import type { PictureCamera, PicturesLink } from "../picturesLink";
 import { fixtureContextOf } from "./camerasRequests";
 import { cameraPicture, fixtureCameras } from "./camerasState";
 
-// The pictures as the double hands them to the page, in place of the shell's
-// `pictures_next`: each camera's test card, the helper's (`pictureFrame.ts`), still — as
-// tests get their pictures (docs/HARDWARE.md, rule 3) — and only while the double says
-// its picture arrives. The selected camera's is big, the others small, as the helper
-// sends them; a card is made new (its sequence one up) only when its size changes. One
-// take brings the card of every camera whose picture arrives, in camera order, as the
-// shell's one take brings the three. The double hands the same cards at every take and
-// does not wait, where the shell hands each frame once and waits for the next: the page
-// draws a card again only when its sequence moved, so a page opened again draws it.
+// The pictures as the double hands them to the page, which draws them itself in a
+// browser (in the app's window the pictures helper draws them over the page, D30): each
+// camera's test card, the helper's (`pictureFrame.ts`), still — as tests get their
+// pictures (docs/HARDWARE.md, rule 3) — and only while the double says its picture
+// arrives. The selected camera's is big, the others small; a card is made new (its
+// sequence one up) only when its size changes. One take brings the card of every camera
+// whose picture arrives, in camera order. The double hands the same cards at every take
+// and does not wait: the page draws a card again only when its sequence moved, so a page
+// opened again draws it.
+//
+// The page says where its pictures stand here as it does to the shell; the double keeps
+// what it said, for the tests.
 
 const CAMERAS: readonly PictureCamera[] = [1, 2, 3];
 
@@ -39,6 +42,12 @@ export function fixturePicturesLink(transport: EngineTransport): PicturesLink {
     return frame;
   };
   return {
+    drawnBy: "page",
+    place(places) {
+      const cameras = fixtureCameras(context.state);
+      cameras.placesSaid += 1;
+      cameras.places = places;
+    },
     async next() {
       const cameras = fixtureCameras(context.state);
       cameras.picturesPulled += 1;

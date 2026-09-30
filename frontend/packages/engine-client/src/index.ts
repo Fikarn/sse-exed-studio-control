@@ -16,8 +16,15 @@ export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
 export { EngineRequestError } from "./transports/engineRequestError";
 export { createTauriGlassLink, glassLinkOver, PROMPTER_WINDOW_LABEL } from "./transports/glassLink";
 export type { GlassLink } from "./transports/glassLink";
-export { createTauriPicturesLink } from "./transports/picturesLink";
-export type { PictureCamera, PicturesLink } from "./transports/picturesLink";
+export type {
+  PictureCamera,
+  PicturePlaces,
+  PicturePlacesSink,
+  PictureTakes,
+  PicturesLink,
+  PlaceRect,
+  PlacedPicture,
+} from "./transports/picturesLink";
 export {
   FRAME_HEADER_LEN,
   FULL_PICTURE,

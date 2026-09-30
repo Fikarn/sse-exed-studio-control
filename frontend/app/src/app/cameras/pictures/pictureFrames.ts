@@ -1,16 +1,16 @@
 import { useEffect, useMemo } from "react";
 
-import type { PictureCamera, PictureFrame, PicturesLink } from "@sse/engine-client";
+import type { PictureCamera, PictureFrame, PictureTakes } from "@sse/engine-client";
 
-// The cameras' newest frames while the Cameras page is open (the camera pictures, D28):
-// the page takes the three cameras' newest from the shell, one take at a time, so a slow
-// page skips frames and never queues them. The shell's take waits for the next frame
-// when none is new, so the page asks about once a frame. A view that shows a camera
-// hears of each new frame and draws it at once; nothing is drawn on a timer. What
-// arrives is the shell's to say: the page never concludes from frames that a picture is
-// missing (the hardware link says that, `picture`).
+// The cameras' newest frames while the Cameras page is open in a browser, where the page
+// draws the pictures itself (the double's test cards; in the app's window the pictures
+// helper draws them and the page takes no frame, D30). The page takes the three cameras'
+// newest, one take at a time, so a slow page skips frames and never queues them. A view
+// that shows a camera hears of each new frame and draws it at once; nothing is drawn on
+// a timer. The page never concludes from frames that a picture is missing (the hardware
+// link says that, `picture`).
 
-/** The rest after a take that brought nothing new: only a link that answers at once (the double) would spin without it; the shell's take has waited already. */
+/** The rest after a take that brought nothing new: a link that answers at once (the double) would spin without it. */
 const PULL_REST_MS = 8;
 /** After a take that failed (an answer that is not frames, or the call refused), a longer rest. */
 const PULL_FAILED_REST_MS = 500;
@@ -48,7 +48,7 @@ const rest = (ms: number) => new Promise<void>((resolve) => window.setTimeout(re
  * Takes the three cameras' frames through `link` into `frames`, one take at a time, until
  * the function it returns is called; a take that answers after that is not kept.
  */
-export function takePictures(link: PicturesLink, frames: PictureFrames): () => void {
+export function takePictures(link: PictureTakes, frames: PictureFrames): () => void {
   let running = true;
   void (async () => {
     while (running) {
@@ -60,7 +60,7 @@ export function takePictures(link: PicturesLink, frames: PictureFrames): () => v
         continue;
       }
       if (!running) return;
-      // A new frame: ask again at once, for the shell waits for the next. Otherwise rest.
+      // A new frame: ask again at once. Otherwise rest.
       // A view that throws while it draws costs its own frame, never the other cameras'
       // pictures: the one loop carries on.
       let anyNew = false;
@@ -83,9 +83,9 @@ export function takePictures(link: PicturesLink, frames: PictureFrames): () => v
 
 /**
  * The frames of the three cameras, taken through `link` for as long as the calling page
- * is mounted; nothing is taken without a link (a window that has none).
+ * is mounted; nothing is taken without a link (a window that draws no picture itself).
  */
-export function usePictureFrames(link: PicturesLink | null): PictureFrames {
+export function usePictureFrames(link: PictureTakes | null): PictureFrames {
   const frames = useMemo(() => new PictureFrames(), []);
   useEffect(() => (link ? takePictures(link, frames) : undefined), [link, frames]);
   return frames;

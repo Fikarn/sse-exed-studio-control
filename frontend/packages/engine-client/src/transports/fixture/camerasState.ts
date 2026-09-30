@@ -14,6 +14,7 @@ import type { CameraValues } from "../../generated/snapshots/CameraValues";
 import type { CamerasHealthCheck } from "../../generated/snapshots/CamerasHealthCheck";
 import type { CamerasPictures } from "../../generated/snapshots/CamerasPictures";
 import type { CamerasSnapshot } from "../../generated/snapshots/CamerasSnapshot";
+import type { PicturePlaces } from "../picturesLink";
 import {
   CAMERA_NUMBERS,
   CHOICE_SETTINGS,
@@ -123,6 +124,9 @@ export interface FixtureCameras {
   showingSaid: number;
   /** How many takes the page made, each for the three cameras (`picturesDouble.ts`), for the tests. */
   picturesPulled: number;
+  /** How many times the page said where its pictures stand, and what it said last, for the tests. */
+  placesSaid: number;
+  places: PicturePlaces | null;
   held: Record<CameraNumber, HeldCamera>;
   bodies: Record<CameraNumber, SimulatedCamera>;
 }
@@ -183,6 +187,8 @@ export function fixtureCameras(state: MutableFixtureState): FixtureCameras {
       recentUnreadable: false,
       showingSaid: 0,
       picturesPulled: 0,
+      placesSaid: 0,
+      places: null,
       held: { 1: notSetUp(1), 2: notSetUp(2), 3: notSetUp(3) },
       bodies: {
         1: { report: startingReport(1), answering: true, sent: 0 },

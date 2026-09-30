@@ -132,7 +132,7 @@ describe("createTauriGlassLink", () => {
       "engine_summary",
       "shell_confirm_close",
       "shell_open_path",
-      "pictures_next",
+      "pictures_place",
     ]) {
       expect(source.includes(word), word).toBe(false);
     }

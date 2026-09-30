@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-import type { JsonValue } from "@sse/engine-client";
+import type { JsonValue, PicturePlaces } from "@sse/engine-client";
 
 /** Raised by the native shell when a window close still needs confirming. */
 export const SHELL_CLOSE_REQUESTED_EVENT = "shell://close-requested";
@@ -111,6 +111,18 @@ export function onShellCloseRequested(listener: () => void): () => void {
 export async function confirmShellClose() {
   if (tauriAvailable()) {
     await invoke("shell_confirm_close");
+  }
+}
+
+/**
+ * Says where the Cameras page's pictures stand (the camera pictures, D30): the shell puts
+ * the pictures helper's layer there, and the helper draws each picture in its place. Only
+ * the operator's window may call the command (`shell_commands.rs`). It answers nothing,
+ * and a report that does not go is not said again: the page says its places once a second.
+ */
+export function placePictures(place: PicturePlaces) {
+  if (tauriAvailable()) {
+    void invoke("pictures_place", { place }).catch(() => {});
   }
 }
 

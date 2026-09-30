@@ -2,6 +2,7 @@
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { JsonObject, JsonValue, RequestMethod } from "../../generated/protocol";
 import type { EngineTransport, FixtureCameraValuesSeed } from "../../types";
+import type { PicturePlaces } from "../picturesLink";
 import {
   AUTO_WHATS,
   CAMERA_NUMBERS,
@@ -676,6 +677,8 @@ export interface SimulatedCameraHooks {
   picturesShowingSaid(): number;
   /** How many takes the page made, each for the three cameras. */
   picturesPulled(): number;
+  /** How many times the page said where its pictures stand, and what it said last. */
+  picturePlaces(): { said: number; last: PicturePlaces | null };
 }
 
 const bound = new WeakMap<EngineTransport, FixtureRequestContext>();
@@ -730,6 +733,10 @@ export function simulatedCameras(transport: EngineTransport): SimulatedCameraHoo
     },
     picturesPulled() {
       return fixtureCameras(context.state).picturesPulled;
+    },
+    picturePlaces() {
+      const { placesSaid, places } = fixtureCameras(context.state);
+      return { said: placesSaid, last: places };
     },
   };
 }

@@ -8,6 +8,7 @@ import {
   type CameraPressSetting,
   type CamerasSnapshot,
   type JsonValue,
+  type PicturePlaces,
   type PicturesLink,
   type ShellStore,
 } from "@sse/engine-client";
@@ -47,13 +48,15 @@ import styles from "./CamerasWorkspace.module.css";
 //
 // The page reads the cameras once a second while it is open: a camera says
 // nothing by itself until its link is built, and a read sends nothing (D12).
-// It also says once a second that it shows the pictures, and takes the three
-// cameras' newest frames from the shell while it is open, one take at a time
-// (the camera pictures, D28): frames come while it says so and a while after.
+// It also says once a second that it shows the pictures (the camera pictures,
+// D28): they come while it says so and a while after. In the app's window the
+// pictures helper draws them over the page, and the bay says where each one
+// stands (D30); in a browser the page takes the double's test cards and draws
+// them itself.
 
 export interface CamerasWorkspaceProps {
   camerasSnapshot: CamerasSnapshot | null;
-  /** Where the page takes the pictures from; `null` in a window with none. */
+  /** How the pictures reach the page; `null` in a window with none. */
   pictures?: PicturesLink | null;
   store: ShellStore;
 }
@@ -81,7 +84,8 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
   const main = camerasSnapshot ? cameraOf(camerasSnapshot, 1) : null;
   const state = useMemo(() => (camerasSnapshot ? camerasStateView(camerasSnapshot) : null), [camerasSnapshot]);
 
-  const frames = usePictureFrames(pictures);
+  const frames = usePictureFrames(pictures?.drawnBy === "page" ? pictures : null);
+  const sayPlaces = useMemo(() => (pictures ? (places: PicturePlaces) => pictures.place(places) : null), [pictures]);
 
   // A read that fails is recorded when it begins to fail, not once a second.
   const readFailing = useRef(false);
@@ -279,6 +283,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
       </ShellRegion>
       <CamerasBay
         aids={aids}
+        drawnBy={pictures?.drawnBy ?? "page"}
         frames={frames}
         point={points[selectedNumber]}
         selected={selected}
@@ -286,6 +291,7 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
         view={view}
         zoom={zoom}
         onMoveLoupe={moveLoupe}
+        onPlaces={sayPlaces}
         onSelect={select}
         onToggleAid={toggleAid}
         onView={setView}

@@ -637,6 +637,83 @@ test.describe("the Cameras page", () => {
     expect(differing, `${differing} of ${total} pixels differ from pictureAids.ts`).toBeLessThanOrEqual(total * 0.002);
   });
 
+  // In the app's window the pictures helper draws the pictures over the page, where the
+  // page says they stand (D30). The page says the same in a browser, and the double keeps
+  // what it said: the boxes here are the ones the helper would draw into.
+  test("the page says where its pictures stand, and that it shows none under the values list or once it is left", async ({
+    page,
+  }) => {
+    await openCameras(page);
+    await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-drawn", /^\d+$/);
+    const places = () => page.evaluate(() => window.__SSE_TEST_CAMERAS__!.picturePlaces());
+    const last = async () => (await places()).last;
+    const boxOf = async (testId: string) => (await page.getByTestId(testId).boundingBox())!;
+    const whole = { x: 0, y: 0, width: 1920, height: 1080 };
+
+    await expect.poll(async () => (await last())?.pictures.length).toBe(4);
+    const first = (await last())!;
+    expect(first.showing).toBe(true);
+    expect(first.scale).toBe(1);
+    expect(first.bay).toEqual(await boxOf("cameras-bay"));
+    const [hero, tile2, tile3, loupe] = first.pictures;
+    expect(hero).toEqual({ camera: 1, at: await boxOf("cameras-hero-picture"), part: whole, smooth: true });
+    expect(hero!.at).toMatchObject({ width: 1680, height: 945 });
+    expect(tile2).toMatchObject({ camera: 2, part: whole, smooth: true, at: { width: 544, height: 306 } });
+    expect(tile3).toMatchObject({ camera: 3, part: whole, smooth: true, at: { width: 544, height: 306 } });
+    // The loupe shows each pixel as it is: 284 × 136 of the picture at 2:1, around its centre.
+    expect(loupe).toEqual({
+      camera: 1,
+      at: await boxOf("cameras-loupe-picture"),
+      part: { x: 818, y: 472, width: 284, height: 136 },
+      smooth: false,
+    });
+    // Each small picture's chip is a hole in it.
+    expect(first.holes).toHaveLength(2);
+    for (const [index, tile] of [tile2!, tile3!].entries()) {
+      const hole = first.holes[index]!;
+      expect(hole.x).toBeGreaterThanOrEqual(tile.at.x);
+      expect(hole.y).toBeGreaterThanOrEqual(tile.at.y);
+      expect(hole.x + hole.width).toBeLessThanOrEqual(tile.at.x + tile.at.width);
+      expect(hole.y + hole.height).toBeLessThanOrEqual(tile.at.y + tile.at.height);
+    }
+
+    // Nothing moves: it says the same again within about a second.
+    const said = (await places()).said;
+    await expect.poll(async () => (await places()).said, { timeout: 5_000 }).toBeGreaterThan(said);
+    expect(await last()).toEqual(first);
+
+    // The values list stands over the bay: no picture while it is open.
+    await page.getByTestId("cameras-iso-value").click();
+    await expect(page.getByTestId("cameras-values-list")).toBeVisible();
+    await expect.poll(async () => (await last())?.showing).toBe(false);
+    expect((await last())!.pictures).toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect.poll(async () => (await last())?.pictures.length).toBe(4);
+
+    // Another camera selected, the 1:1 view, the loupe at 4:1.
+    await page.getByTestId("cameras-key-2").click();
+    await expect.poll(async () => (await last())?.pictures.map((picture) => picture.camera)).toEqual([2, 1, 3, 2]);
+    await page.getByTestId("cameras-view-one-to-one").click();
+    await expect
+      .poll(async () => (await last())?.pictures[0]?.part)
+      .toEqual({ x: 120, y: 68, width: 1680, height: 945 });
+    await page.getByTestId("cameras-zoom-4").click();
+    await expect
+      .poll(async () => (await last())?.pictures[3]?.part)
+      .toEqual({ x: 889, y: 506, width: 142, height: 68 });
+
+    // Left: it says it shows no picture, and then nothing more.
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Lighting" })
+      .click();
+    await expectWorkspaceMounted(page, "lighting");
+    const left = await places();
+    expect(left.last?.showing).toBe(false);
+    await page.waitForTimeout(1_200);
+    expect((await places()).said, "nothing is said once the page is left").toBe(left.said);
+  });
+
   test("the page takes the pictures only while it is open, and says that it shows them", async ({ page }) => {
     await openCameras(page);
     await expect(page.getByTestId("cameras-hero-picture")).toHaveAttribute("data-drawn", /^\d+$/);
