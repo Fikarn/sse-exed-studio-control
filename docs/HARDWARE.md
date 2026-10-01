@@ -42,7 +42,7 @@ The engine listens on UDP `9001`–`9004`, bound to `127.0.0.1`, and reads only 
 
 What the app never does:
 
-- A snapshot recall never sends 48 V. Each difference is listed, then armed and confirmed per channel.
+- It never loads a TotalMix snapshot by itself. `/snapshot/load/N` goes out only at the operator's second press on the slot, and only from a studio build; the desk is then read back. It never stores a snapshot (`/snapshot/save` is never sent) and renames nothing: snapshots and names are TotalMix's (2026-10-01).
 - `Sync from TotalMix` only reads.
 - Nothing is written while the audio probe has not passed or OSC is off in Setup.
 - Closing the app recalls and resets nothing.
@@ -56,8 +56,12 @@ Measured on the studio's desk (2026-09), for whoever probes by hand or reads a l
 - A dump gives a fader in dB, never as a position. `/sendsubmix 2` sends nothing for a mix with no send above −65 dB. `/sendall 2` is 3,100 to 3,500 messages.
 - `/output/0/volume` in a dump is the level after dim (−20 dB), so the fader is set before dim is switched off.
 - TotalMix sends to a remote only while it hears from it. A command marked `(f)` in RME's table ignores a value under 0.5.
-- Playback 1/2 is Windows' sound and 3/4 is vMix's. Input 9, `Host`, has 48 V on: compare with the state read before, never with "off".
-- The desk's reference state is TotalMix's own snapshot `mix 1`: Main Out at 0 dB, dim off. The owner loads it; the app and the assistant never do.
+- Playback 1/2 is Windows' sound and 3/4 is vMix's. The preamps are inputs 9 to 12, and which of them has 48 V on changes: compare with the state read before, never with "off".
+- The desk's reference state is TotalMix's own snapshot `Mix 1`: Main Out at 0 dB, dim off. It is loaded in TotalMix, or at a second press on its slot in the Console; the app never loads it by itself, and the assistant never loads it.
+- TotalMix reports each of its eight snapshots on `/snapshot/load/N` (N from 1): 0 off, 2 active, 3 changed since it was loaded. It takes only `1` there. Whether it reports a load to the remote that sent it is read on the walk; the app marks the slot itself after the read-back when it does not.
+- 48 V does not switch when a TotalMix snapshot loads (the owner, 2026-10-01).
+- TotalMix's OSC carries no snapshot names. A studio build on the real console reads them from TotalMix's own settings file, `%LOCALAPPDATA%\TotalMixFX\last.<device>.xml` (`SnapshotName 0` to `7`; here `last.FirefaceUFXIII1.xml`), which TotalMix writes when it closes, so a name changed in TotalMix shows after TotalMix has closed once. Development builds and tests never read the file.
+- A channel's name comes in TotalMix's dumps as `/input|playback|output/<ch>/name`, and the Console shows it. A channel TotalMix sends no name for keeps the app's.
 
 ## Lights
 

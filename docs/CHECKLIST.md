@@ -35,8 +35,10 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
 - [ ] Remote 4 off, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED`, and `Sync from TotalMix` clears it.
 - [ ] A TotalMix fader at 0 dB and at −6 dB reads the same on the Console and on the Stream Deck.
-- [ ] A recalled snapshot brings back a changed fader and mute and leaves a changed 48 V alone; the Console names the channel, and arming it there switches its 48 V.
-- [ ] An armed recall moves nothing: the key is amber with its countdown, the state display shows the armed row, and Esc clears both.
+- [ ] The Console's Snapshots are TotalMix's eight, under the names TotalMix shows (after TotalMix has been closed once since they were named); the one loaded reads `active`, and `changed` once a fader moves in TotalMix.
+- [ ] A slot pressed twice loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. The log says whether TotalMix reported the load itself.
+- [ ] An armed load moves nothing: the key reads `LOAD?` in amber with its countdown, the state display shows the armed row, and Esc clears both.
+- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`. The Console has no Rename and no Capture.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
 - [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
 
@@ -122,7 +124,7 @@ Once the links are built, with the cameras on vMix's outputs:
 ## Saved data and recovery
 
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
-- [ ] After that first start, the Console's snapshots are all there by name, and Main Out, Phones 1 and Phones 2 stand where they stood; Lighting's fixtures, scenes and groups are all there.
+- [ ] After that first start, the Console's levels for Main Out, Phones 1 and Phones 2 read what TotalMix shows; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.

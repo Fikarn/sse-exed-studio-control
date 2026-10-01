@@ -36,40 +36,42 @@ function assert(condition, message) {
 
 // The saved data the backup and restore steps follow (new pages program,
 // Slice 1). Until then it was the Planning data: the sample projects and a
-// project added later, counted on the commissioning snapshot. Planning has
-// left the screen, and its data leaves the hardware link in Slice 2, so the
-// marker is now a snapshot slot of the Console, found by name. A slot is
-// saved data (`app.audio.snapshots_state` in the settings table), so a database
-// backup carries it; the archive carries every `app.audio.` setting and a
-// restore rewrites them as a whole; and creating or deleting one sends
-// nothing to the console, so the hardware link allows it before the audio
-// probe has passed (this lane never runs that probe). Found by name, because
-// a deleted slot's id is given to the next one created.
+// project added later, counted on the commissioning snapshot. Planning left
+// the screen, and its data the hardware link in Slice 2, so the marker became
+// a snapshot slot of the Console, found by name.
+// 2026-10-01: the Console's snapshots follow TotalMix, and the app keeps none
+// of its own, so the marker is now a lighting group, found by name. A group is
+// saved data (`app.lighting.editor.state` in the settings table, written by
+// `create_lighting_group`), so a database backup carries it, and the restore
+// that stages the backup brings the whole table back at the next start; the
+// archive carries every `app.lighting.` setting but the light outputs' hold,
+// and a restore clears and rewrites them as a whole (`support.rs`). Creating
+// or deleting a group needs no fixture and sends nothing to the rig, and the
+// hardware link allows it with no probe passed (this lane runs none). Found by
+// name, because a deleted group's id can be given to the next one created.
 const ARCHIVE_MARKER = "Qualification: kept by the archive";
 const DATABASE_MARKER = "Qualification: kept by the database backup";
 const LATER_CHANGE = "Qualification: added after the backup";
 const MARKER_CHANGED =
-  "New pages program, Slice 1: the saved data followed is a snapshot slot of the Console; until then it was the Planning projects and tasks.";
+  "2026-10-01: the saved data followed is a lighting group; from the new pages program's Slice 1 it was a snapshot slot of the Console, which the app no longer keeps (its snapshots are TotalMix's), and until then it was the Planning projects and tasks.";
 // The page the shell opens on is saved data too. The lane leaves on Lighting:
 // a page never saved, and a saved Planning page, read as the Console (the
 // program's D1), so only a page that was saved and came back reads as Lighting.
 const WORKSPACE_CHANGED =
-  "New pages program, Slice 1: the saved page is Lighting and the restored snapshot slot is checked too; until then the page was Planning.";
+  "New pages program, Slice 1: the saved page is Lighting and the restored marker is checked too (a lighting group since 2026-10-01, a snapshot slot of the Console before); until then the page was Planning.";
 
-function audioSnapshotNames(status) {
-  const snapshots = status?.shellState?.audioSnapshot?.snapshots;
-  return (Array.isArray(snapshots) ? snapshots : []).map((entry) => entry?.name);
+function lightingGroupNames(status) {
+  const groups = status?.shellState?.lightingSnapshot?.groups;
+  return (Array.isArray(groups) ? groups : []).map((entry) => entry?.name);
 }
 
-async function createAudioSnapshotSlot(session, child, name, oscIndex) {
-  const created = await dispatchCommand(session, child, "createAudioSnapshot", {
-    request: { name, oscIndex },
-  });
-  const id = created.result?.snapshot?.id;
-  assert(typeof id === "string" && id.length > 0, `Expected the new snapshot slot '${name}' to come back with an id.`);
+async function createLightingGroupMarker(session, child, name) {
+  const created = await dispatchCommand(session, child, "createLightingGroup", { name });
+  const id = created.result?.group?.id;
+  assert(typeof id === "string" && id.length > 0, `Expected the new lighting group '${name}' to come back with an id.`);
   assert(
-    audioSnapshotNames(created.status).includes(name),
-    `Expected the snapshot slot '${name}' in the Console's list, got ${JSON.stringify(audioSnapshotNames(created.status))}.`
+    lightingGroupNames(created.status).includes(name),
+    `Expected the lighting group '${name}' in the rig's groups, got ${JSON.stringify(lightingGroupNames(created.status))}.`
   );
   return { id, status: created.status };
 }
@@ -572,7 +574,7 @@ async function runSetupSupportQualification() {
     });
 
     // The saved data the archive must carry, written before it is exported.
-    const archiveMarker = await createAudioSnapshotSlot(firstSession, firstRun, ARCHIVE_MARKER, 5);
+    const archiveMarker = await createLightingGroupMarker(firstSession, firstRun, ARCHIVE_MARKER);
 
     const backupExport = await dispatchCommand(firstSession, firstRun, "exportSupportBackup");
     const backupPath = backupExport.result?.path;
@@ -621,16 +623,16 @@ async function runSetupSupportQualification() {
       file: path.basename(defaultDiagnosticsPath),
     });
 
-    // The saved data changes after the export: the marker goes and a slot the
+    // The saved data changes after the export: the marker goes and a group the
     // archive never saw arrives. The restore must undo both.
-    const markerDeleted = await dispatchCommand(firstSession, firstRun, "deleteAudioSnapshot", {
-      request: { snapshotId: archiveMarker.id },
+    const markerDeleted = await dispatchCommand(firstSession, firstRun, "deleteLightingGroup", {
+      groupId: archiveMarker.id,
     });
     assert(
-      !audioSnapshotNames(markerDeleted.status).includes(ARCHIVE_MARKER),
-      `Expected the snapshot slot '${ARCHIVE_MARKER}' to be gone after it was deleted.`
+      !lightingGroupNames(markerDeleted.status).includes(ARCHIVE_MARKER),
+      `Expected the lighting group '${ARCHIVE_MARKER}' to be gone after it was deleted.`
     );
-    await createAudioSnapshotSlot(firstSession, firstRun, LATER_CHANGE, 7);
+    await createLightingGroupMarker(firstSession, firstRun, LATER_CHANGE);
 
     const restoreStatus = await dispatchCommand(firstSession, firstRun, "restoreSupportBackup", {
       path: backupPath,
@@ -644,14 +646,14 @@ async function runSetupSupportQualification() {
         existsSync(restoreStatus.result.rollbackBackupPath),
       "Expected restore to create a rollback backup archive."
     );
-    const restoredNames = audioSnapshotNames(restoreStatus.status);
+    const restoredNames = lightingGroupNames(restoreStatus.status);
     assert(
       restoredNames.includes(ARCHIVE_MARKER),
-      `Expected the restore to bring back the snapshot slot the archive carried, got ${JSON.stringify(restoredNames)}.`
+      `Expected the restore to bring back the lighting group the archive carried, got ${JSON.stringify(restoredNames)}.`
     );
     assert(
       !restoredNames.includes(LATER_CHANGE),
-      `Expected the restore to undo the snapshot slot added after the export, got ${JSON.stringify(restoredNames)}.`
+      `Expected the restore to undo the lighting group added after the export, got ${JSON.stringify(restoredNames)}.`
     );
     evidence.recordCheck("backup-restore-round-trips-native-support-backup", {
       marker: ARCHIVE_MARKER,
@@ -708,8 +710,8 @@ async function runSetupSupportQualification() {
       "Expected restarted Tauri runtime to preserve support backup history."
     );
     assert(
-      audioSnapshotNames(restartStatus).includes(ARCHIVE_MARKER),
-      `Expected restarted Tauri runtime to keep the restored snapshot slot, got ${JSON.stringify(audioSnapshotNames(restartStatus))}.`
+      lightingGroupNames(restartStatus).includes(ARCHIVE_MARKER),
+      `Expected restarted Tauri runtime to keep the restored lighting group, got ${JSON.stringify(lightingGroupNames(restartStatus))}.`
     );
     evidence.recordCheck("persisted-restart-restores-dashboard-state", {
       activeWorkspace: restartStatus.shellState.activeWorkspace,
@@ -721,13 +723,14 @@ async function runSetupSupportQualification() {
     // Scenario `database-restore` (2026-09 production readiness, Slice 7 —
     // F20): a database backup is verified and restored through the running
     // shell. The restart the test bridge asks for stops the engine
-    // gracefully, which writes a `shutdown` database backup; a snapshot slot
+    // gracefully, which writes a `shutdown` database backup; a lighting group
     // saved before it must come back, and one added after it is the change
-    // the restore must undo. Verify reads the backup without touching
-    // anything (and calls junk junk); the restore stages the backup, the store
-    // restarts the hardware link, and the bootstrap moves the backup into
-    // place with the old file kept as `replaced`.
-    await createAudioSnapshotSlot(secondSession, secondRun, DATABASE_MARKER, 6);
+    // the restore must undo (a snapshot slot of the Console until 2026-10-01).
+    // Verify reads the backup without touching anything (and calls junk junk);
+    // the restore stages the backup, the store restarts the hardware link, and
+    // the bootstrap moves the backup into place with the old file kept as
+    // `replaced`.
+    await createLightingGroupMarker(secondSession, secondRun, DATABASE_MARKER);
     // Launch numbers reach the status file after the fact, so each count starts
     // from a number that was waited for and waits for the next one
     // (`tauri-launch-number.mjs`).
@@ -772,7 +775,7 @@ async function runSetupSupportQualification() {
     );
     databaseBackupBytes = readFileSync(shutdownBackup.path);
 
-    await createAudioSnapshotSlot(secondSession, secondRun, LATER_CHANGE, 7);
+    await createLightingGroupMarker(secondSession, secondRun, LATER_CHANGE);
 
     const verifyStatus = await dispatchCommand(secondSession, secondRun, "verifySupportBackup", {
       path: shutdownBackup.path,
@@ -829,14 +832,14 @@ async function runSetupSupportQualification() {
       launchAfterRestore === generationBeforeRestart + 2,
       `Expected launch ${generationBeforeRestart + 2} after the restore's restart, got ${launchAfterRestore}.`
     );
-    const restoredDatabaseNames = audioSnapshotNames(restoreDatabaseStatus.status);
+    const restoredDatabaseNames = lightingGroupNames(restoreDatabaseStatus.status);
     assert(
       restoredDatabaseNames.includes(DATABASE_MARKER),
-      `Expected the database restore to keep the snapshot slot saved before the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
+      `Expected the database restore to keep the lighting group saved before the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
     );
     assert(
       !restoredDatabaseNames.includes(LATER_CHANGE),
-      `Expected the database restore to undo the snapshot slot added after the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
+      `Expected the database restore to undo the lighting group added after the backup, got ${JSON.stringify(restoredDatabaseNames)}.`
     );
     assert(
       !existsSync(path.join(runtime.appDataDir, "restore-pending.sqlite3")),
@@ -1012,8 +1015,8 @@ async function runSetupSupportQualification() {
       `Expected launch ${recoveryGeneration + 1} after the restore's restart, got ${launchAfterRecoveryRestore}.`
     );
     assert(
-      audioSnapshotNames(recoveryRestore.status).includes(DATABASE_MARKER),
-      `Expected the restored database to carry the snapshot slot saved before the backup, got ${JSON.stringify(audioSnapshotNames(recoveryRestore.status))}.`
+      lightingGroupNames(recoveryRestore.status).includes(DATABASE_MARKER),
+      `Expected the restored database to carry the lighting group saved before the backup, got ${JSON.stringify(lightingGroupNames(recoveryRestore.status))}.`
     );
     const replacedJunk = readdirSync(corruptBackupsDir).filter((name) => name.endsWith("-replaced.sqlite3"));
     assert(

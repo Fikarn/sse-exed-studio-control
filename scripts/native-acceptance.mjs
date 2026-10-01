@@ -221,10 +221,8 @@ async function main() {
     assert(
       restoredAudioSnapshot.lastConsoleSyncAt === audioMutations.baselineLastConsoleSyncAt &&
         restoredAudioSnapshot.lastConsoleSyncReason === audioMutations.baselineLastConsoleSyncReason &&
-        restoredAudioSnapshot.lastRecalledSnapshotId === audioMutations.baselineLastRecalledSnapshotId &&
-        restoredAudioSnapshot.lastSnapshotRecallAt === audioMutations.baselineLastSnapshotRecallAt &&
         restoredAudioSnapshot.consoleStateConfidence === audioMutations.baselineConsoleStateConfidence,
-      "Expected restore to clear the temporary audio sync and recall markers and return console confidence to the restart baseline."
+      "Expected restore to clear the temporary audio sync and load markers and return console confidence to the restart baseline."
     );
     const { targets } = audioMutations;
     assert(
@@ -265,7 +263,8 @@ async function main() {
     assert(
       restoredAudioSnapshot.channels?.length === restartedAudioSnapshot.channels?.length &&
         restoredAudioSnapshot.mixTargets?.length === restartedAudioSnapshot.mixTargets?.length &&
-        restoredAudioSnapshot.snapshots?.length === restartedAudioSnapshot.snapshots?.length,
+        restoredAudioSnapshot.consoleSnapshots?.slots?.length ===
+          restartedAudioSnapshot.consoleSnapshots?.slots?.length,
       "Expected restore to preserve the baseline audio inventory counts."
     );
     assert(

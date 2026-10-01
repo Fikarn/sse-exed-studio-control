@@ -195,6 +195,13 @@ const SKIP_AUDIO_PROBE = process.env.SSE_TAURI_QUALIFICATION_SKIP_AUDIO_PROBE ==
 const SAVED_WORKSPACE = "lighting";
 const SCOPE_CHANGED =
   "New pages program, Slice 1: the saved page is Lighting and no Planning project is checked; until then the page was Planning and a created Planning project had to survive the restart.";
+// 2026-10-01 (the owner's decision, after the studio walk): the Console's
+// snapshots are TotalMix's own. The lane loads TotalMix's slot 2 through the
+// test bridge, as the operator's second press does; on the simulated console
+// nothing is sent and the slot becomes active.
+const AUDIO_LOAD_SLOT = 2;
+const AUDIO_LOAD_CHANGED =
+  "2026-10-01: the lane loads TotalMix's snapshot slot 2 and checks the slot reads active, and after the restart that the load was the console's last read; until then it recalled the app's first snapshot and checked lastRecalledSnapshotId.";
 
 async function waitForStatus({ child, label, predicate, statusPath, timeoutMs = DEFAULT_WAIT_TIMEOUT_MS }) {
   const deadline = Date.now() + timeoutMs;
@@ -361,7 +368,7 @@ async function runWorkspaceQualification() {
   let lightingRecalledSceneId;
   let audioChannelId;
   let audioMixTargetId;
-  let audioSnapshotId;
+  let audioLoadSummary;
 
   console.log("Tauri workspace qualification: step 1/2 live migrated workspace flows.");
 
@@ -493,13 +500,17 @@ async function runWorkspaceQualification() {
       const audioMixTarget =
         asArray(audioSnapshot?.mixTargets).find((entry) => entry?.id !== audioSnapshot.selectedMixTargetId) ??
         asArray(audioSnapshot?.mixTargets)[0];
-      const audioRecallSnapshot = asArray(audioSnapshot?.snapshots)[0];
+      // 2026-10-01: the Console's snapshots are TotalMix's eight slots, always
+      // listed; the lane loads slot 2 (it recalled the app's first snapshot).
+      const consoleSlots = asArray(audioSnapshot?.consoleSnapshots?.slots);
       assert(audioChannel?.id, "Expected live audio snapshot to expose at least one channel.");
       assert(audioMixTarget?.id, "Expected live audio snapshot to expose at least one mix target.");
-      assert(audioRecallSnapshot?.id, "Expected live audio snapshot to expose at least one recall snapshot.");
+      assert(
+        consoleSlots.length === 8 && consoleSlots[1]?.slot === AUDIO_LOAD_SLOT,
+        `Expected the audio snapshot to list TotalMix's eight snapshot slots, got ${JSON.stringify(consoleSlots)}.`
+      );
       audioChannelId = audioChannel.id;
       audioMixTargetId = audioMixTarget.id;
-      audioSnapshotId = audioRecallSnapshot.id;
 
       const audioSync = await dispatchCommand(firstSession, firstRun, "syncAudio");
       assert(
@@ -546,17 +557,33 @@ async function runWorkspaceQualification() {
       );
       assert(updatedAudioTarget?.dim === true, "Expected live audio mix target dim update to round-trip.");
 
-      const audioRecall = await dispatchCommand(firstSession, firstRun, "recallAudioSnapshot", {
-        snapshotId: audioSnapshotId,
+      // The simulated console sends nothing: the slot becomes active and the
+      // reply says so in the hardware link's own sentence.
+      const audioLoad = await dispatchCommand(firstSession, firstRun, "loadAudioSnapshot", {
+        slot: AUDIO_LOAD_SLOT,
       });
+      const loaded = audioLoad.result;
       assert(
-        audioRecall.status.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
-        "Expected live audio snapshot recall to update lastRecalledSnapshotId."
+        loaded?.loaded === true && loaded?.slot === AUDIO_LOAD_SLOT,
+        `Expected the TotalMix snapshot load to answer for slot ${AUDIO_LOAD_SLOT}, got ${JSON.stringify(loaded)}.`
+      );
+      const loadedLabel = typeof loaded.name === "string" ? loaded.name : `slot ${AUDIO_LOAD_SLOT}`;
+      audioLoadSummary = `Loaded ${loadedLabel} on the simulated console; nothing was sent (test mode).`;
+      assert(
+        loaded.summary === audioLoadSummary,
+        `Expected the load's summary '${audioLoadSummary}', got '${loaded.summary}'.`
+      );
+      const loadedSlots = asArray(audioLoad.status.shellState.audioSnapshot?.consoleSnapshots?.slots);
+      assert(
+        loadedSlots[AUDIO_LOAD_SLOT - 1]?.state === "active",
+        `Expected TotalMix's slot ${AUDIO_LOAD_SLOT} to read active after the load, got ${JSON.stringify(loadedSlots)}.`
       );
       evidence.recordCheck("audio-live-mutations-round-trip", {
         channelId: audioChannelId,
+        loadedSlot: AUDIO_LOAD_SLOT,
+        loadedSummary: loaded.summary,
+        markerChanged: AUDIO_LOAD_CHANGED,
         mixTargetId: audioMixTargetId,
-        snapshotId: audioSnapshotId,
       });
     }
 
@@ -631,14 +658,20 @@ async function runWorkspaceQualification() {
         restartStatus.shellState.audioSnapshot?.selectedMixTargetId === audioMixTargetId,
         "Expected restarted Tauri runtime to preserve selected audio mix target."
       );
+      // 2026-10-01: TotalMix reports its slots again after a restart, so what
+      // is checked is what was saved: the load was the console's last read
+      // (it was the app's last recalled snapshot).
       assert(
-        restartStatus.shellState.audioSnapshot?.lastRecalledSnapshotId === audioSnapshotId,
-        "Expected restarted Tauri runtime to preserve last recalled audio snapshot."
+        restartStatus.shellState.audioSnapshot?.lastConsoleSyncReason === "simulated-load",
+        `Expected restarted Tauri runtime to keep the load as the console's last read, got '${restartStatus.shellState.audioSnapshot?.lastConsoleSyncReason}'.`
       );
     }
     evidence.recordCheck("restart-preserves-migrated-workspace-state", {
       lastRecalledSceneId: restartStatus.shellState.lightingSnapshot?.lastRecalledSceneId,
       activeWorkspace: restartStatus.shellState.activeWorkspace,
+      audioLastActionMessage: restartStatus.shellState.audioSnapshot?.lastActionMessage ?? null,
+      audioLastConsoleSyncReason: restartStatus.shellState.audioSnapshot?.lastConsoleSyncReason ?? null,
+      expectedAudioLoadSummary: audioLoadSummary ?? null,
       scopeChanged: SCOPE_CHANGED,
       selectedAudioChannelId: restartStatus.shellState.audioSnapshot?.selectedChannelId,
     });
