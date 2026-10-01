@@ -273,9 +273,9 @@ pub(crate) fn snapshot_reason_of(file_name: &str) -> Option<SnapshotReason> {
 /// How long the daily backup waits: until the newest daily backup is 24 h
 /// old, and not at all when there is none (2026-10-01: each start wrote a
 /// daily of its own, three in one day, and with fourteen kept, restarts ate
-/// into the two weeks of history). A newest daily dated ahead of `now` (the
-/// clock went back) cannot say when the next is due, so it holds nothing
-/// off: waiting for it would hold the dailies off until the clock passed it.
+/// into the two weeks of history). The newest daily is the newest dated at
+/// or before `now` (`newest_daily_backup`), so it is never more than 24 h
+/// away; a time after `now`, should one be given, holds nothing off.
 pub(crate) fn daily_backup_wait(newest_daily_at: Option<SystemTime>, now: SystemTime) -> Duration {
     newest_daily_at
         .and_then(|written| now.duration_since(written).ok())
@@ -284,15 +284,35 @@ pub(crate) fn daily_backup_wait(newest_daily_at: Option<SystemTime>, now: System
         })
 }
 
-/// When the newest daily backup in `backups_dir` was written, by its name;
-/// `None` when there is none, or the directory cannot be read.
-pub(crate) fn newest_daily_backup_at(backups_dir: &Path) -> Option<SystemTime> {
+/// A daily backup on disk: its file name, and when it was written, by the
+/// time in that name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DailyBackup {
+    pub(crate) file_name: String,
+    pub(crate) written_at: SystemTime,
+}
+
+/// The newest daily backup in `backups_dir` dated at or before `now`;
+/// `None` when there is none, or the directory cannot be read. A daily dated
+/// after `now` was written while the clock ran ahead, and is left out: as
+/// the newest it would hold nothing off, so every start would write a daily
+/// again until the clock passed it. The dailies at or before `now` say when
+/// the next is due.
+pub(crate) fn newest_daily_backup(backups_dir: &Path, now: SystemTime) -> Option<DailyBackup> {
     fs::read_dir(backups_dir)
         .ok()?
         .filter_map(Result::ok)
         .filter(|entry| entry.path().is_file())
-        .filter_map(|entry| daily_backup_written_at(entry.file_name().to_str()?))
-        .max()
+        .filter_map(|entry| {
+            let file_name = entry.file_name().to_str()?.to_owned();
+            let written_at = daily_backup_written_at(&file_name)?;
+            Some(DailyBackup {
+                file_name,
+                written_at,
+            })
+        })
+        .filter(|daily| daily.written_at <= now)
+        .max_by_key(|daily| daily.written_at)
 }
 
 /// When a daily backup was written, read from the UTC time in its name.
@@ -412,11 +432,13 @@ mod tests {
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .expect("live journal mode should read");
         assert_eq!(live_mode, "wal", "the live database keeps its WAL");
-        assert_eq!(newest_snapshot(&backups_dir), Some(path));
+        assert_eq!(newest_snapshot(&backups_dir), Some(path.clone()));
         // The daily backup reads the time back from the name it wrote.
-        let written = newest_daily_backup_at(&backups_dir).expect("the daily is dated");
+        let newest =
+            newest_daily_backup(&backups_dir, SystemTime::now()).expect("the daily is dated");
+        assert_eq!(newest.file_name, name);
         assert!(SystemTime::now()
-            .duration_since(written)
+            .duration_since(newest.written_at)
             .is_ok_and(|age| age < Duration::from_secs(60)));
     }
 
@@ -527,7 +549,8 @@ mod tests {
             hours(24) - Duration::from_secs(1)
         );
         assert_eq!(daily_backup_wait(Some(now), now), hours(24));
-        // Dated ahead of the clock: it holds nothing off, never a day or more.
+        // `newest_daily_backup` gives no time after now; given one anyway,
+        // it holds nothing off, never a day or more.
         assert_eq!(daily_backup_wait(Some(now + hours(2)), now), Duration::ZERO);
         assert_eq!(
             daily_backup_wait(Some(now + hours(24 * 365)), now),
@@ -577,9 +600,11 @@ mod tests {
     fn the_newest_daily_backup_is_found_among_the_other_files() {
         let test_dir = TestDir::new("storage-newest-daily");
         let backups_dir = test_dir.path().join("backups");
-        assert_eq!(newest_daily_backup_at(&backups_dir), None);
+        // 2026-10-03T00-00-00Z: after every name below.
+        let now = UNIX_EPOCH + Duration::from_secs(1_790_985_600);
+        assert_eq!(newest_daily_backup(&backups_dir, now), None);
         fs::create_dir_all(&backups_dir).expect("backups dir should be created");
-        assert_eq!(newest_daily_backup_at(&backups_dir), None);
+        assert_eq!(newest_daily_backup(&backups_dir, now), None);
 
         for name in [
             "db-2026-09-30T10-27-00-000Z-daily.sqlite3",
@@ -598,9 +623,58 @@ mod tests {
         fs::create_dir_all(backups_dir.join("db-2026-10-03T00-00-00-000Z-daily.sqlite3"))
             .expect("folder should be created");
 
-        let newest = newest_daily_backup_at(&backups_dir).expect("a daily is found");
-        assert_eq!(file_timestamp(newest), "2026-10-01T10-27-00-000Z");
-        assert_eq!(newest, UNIX_EPOCH + Duration::from_secs(1_790_850_420));
+        let newest = newest_daily_backup(&backups_dir, now).expect("a daily is found");
+        assert_eq!(
+            newest.file_name,
+            "db-2026-10-01T10-27-00-000Z-daily.sqlite3"
+        );
+        assert_eq!(
+            file_timestamp(newest.written_at),
+            "2026-10-01T10-27-00-000Z"
+        );
+        assert_eq!(
+            newest.written_at,
+            UNIX_EPOCH + Duration::from_secs(1_790_850_420)
+        );
+    }
+
+    // Review of 2026-10-01: a daily dated after now (written while the clock
+    // ran ahead, then put back) made every start write a daily again until
+    // the clock passed it. It is left out; the dailies before it decide.
+    #[test]
+    fn a_daily_dated_after_now_is_left_out() {
+        let test_dir = TestDir::new("storage-future-daily");
+        let backups_dir = test_dir.path().join("backups");
+        fs::create_dir_all(&backups_dir).expect("backups dir should be created");
+        // 2026-10-01T10-27-00Z.
+        let now = UNIX_EPOCH + Duration::from_secs(1_790_850_420);
+        let hours = |count: u64| Duration::from_secs(count * 3_600);
+        let wait = || {
+            let newest = newest_daily_backup(&backups_dir, now);
+            daily_backup_wait(newest.map(|daily| daily.written_at), now)
+        };
+        let write = |name: &str| fs::write(backups_dir.join(name), b"x").expect("daily writes");
+
+        // Only dailies after now: none counts, so the daily is not held off.
+        write("db-2026-10-01T12-27-00-000Z-daily.sqlite3");
+        write("db-2026-10-04T10-27-00-000Z-daily.sqlite3");
+        assert_eq!(newest_daily_backup(&backups_dir, now), None);
+        assert_eq!(wait(), Duration::ZERO);
+
+        // One 2 h before now and one 2 h after: the one before decides.
+        write("db-2026-10-01T08-27-00-000Z-daily.sqlite3");
+        assert_eq!(
+            newest_daily_backup(&backups_dir, now),
+            Some(DailyBackup {
+                file_name: String::from("db-2026-10-01T08-27-00-000Z-daily.sqlite3"),
+                written_at: now - hours(2),
+            })
+        );
+        assert_eq!(wait(), hours(22));
+
+        // One dated exactly now counts.
+        write("db-2026-10-01T10-27-00-000Z-daily.sqlite3");
+        assert_eq!(wait(), hours(24));
     }
 
     #[test]

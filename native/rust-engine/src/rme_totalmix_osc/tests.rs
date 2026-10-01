@@ -1600,6 +1600,75 @@ fn classic_slots_read_the_console_address_only() {
     remove_temp_log(&log_path);
 }
 
+/// A classic slot's bundle with a channel's name in Windows-1252 (`Röst`)
+/// before the channel's levels. The OSC library stops at the name; since
+/// 2026-10-01 the levels after it are read too. The name is no level, and the
+/// classic parser leaves it.
+#[test]
+fn a_classic_slot_reads_the_levels_after_a_name_in_windows_1252() {
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let slot = BoundRmeSlot {
+        bus: RmeTotalMixBus::Input,
+        send_port: 7011,
+        socket: bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        console: LOOPBACK,
+    };
+    let mut bytes = encoder::encode(&OscPacket::Bundle(OscBundle {
+        timetag: OscTime::from((0, 1)),
+        content: vec![
+            OscPacket::Message(message(
+                "/1/trackname1",
+                OscType::String(String::from("Rxst")),
+            )),
+            OscPacket::Message(message("/1/level1Left", OscType::Float(0.25))),
+            OscPacket::Message(message("/1/level1Right", OscType::Float(0.5))),
+        ],
+    }))
+    .expect("bundle should encode");
+    let at = bytes
+        .windows(4)
+        .position(|window| window == b"Rxst")
+        .expect("the name is in the bundle");
+    bytes[at + 1] = 0xF6;
+    let Ok((_, OscPacket::Bundle(library))) = rosc::decoder::decode_udp(&bytes) else {
+        panic!("the library reads the bundle's start");
+    };
+    assert!(
+        library.content.is_empty(),
+        "the library alone stops at the name"
+    );
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+
+    sender
+        .send_to(&bytes, ("127.0.0.1", local_port_of(&slot.socket)))
+        .expect("send should succeed");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while state.lock().expect("state").diagnostics().packet_count < 3 && Instant::now() < deadline {
+        read_available_packets(
+            std::slice::from_ref(&slot),
+            state.clone(),
+            1_000,
+            &mut drops,
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let meters = state.lock().expect("state");
+    let diagnostics = meters.diagnostics();
+    assert_eq!(diagnostics.packet_count, 3, "every element is read");
+    assert_eq!(diagnostics.unknown_packet_count, 1, "the name is no level");
+    assert_eq!(diagnostics.mapped_packet_count, 2);
+    let input = meters
+        .entry_for_surface_id("audio-input-9")
+        .expect("the levels reach the meters");
+    assert!((input.left - 0.25).abs() < 1e-9);
+    assert!(
+        (input.right - 0.5).abs() < 1e-9,
+        "the level after the name is read"
+    );
+}
+
 #[test]
 fn dropped_source_log_notes_a_source_once_a_minute() {
     let log_path = temp_log_path("rate-limit");

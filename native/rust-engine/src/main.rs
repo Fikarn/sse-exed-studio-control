@@ -52,7 +52,7 @@ use crate::protocol::{
 };
 use crate::storage::list_settings_by_prefix;
 use crate::storage_backups::{
-    daily_backup_wait, newest_daily_backup_at, snapshot_database, SnapshotReason,
+    daily_backup_wait, newest_daily_backup, snapshot_database, SnapshotReason,
     DAILY_BACKUP_INTERVAL,
 };
 use serde::Serialize;
@@ -386,14 +386,16 @@ fn write_database_backup(
 /// Before each daily copy the scheduler waits until the newest daily on disk
 /// is 24 h old, so a start writes no daily of its own (2026-10-01: three
 /// starts wrote three in one day). After a copy, or a failed one, the next
-/// is a day away, as before.
+/// is a day away, as before. The first look after the start says in the log
+/// when it must wait, so the walk can tell a start held off from a stopped
+/// thread.
 fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
     let _ = thread::Builder::new()
         .name(String::from("database-backup"))
         .spawn(move || {
             thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
+            sleep_until_daily_backup_due(&backups_dir, Some(&log_file_path));
             loop {
-                sleep_until_daily_backup_due(&backups_dir);
                 write_database_backup(
                     &db_path,
                     &backups_dir,
@@ -401,20 +403,43 @@ fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_pat
                     SnapshotReason::Daily,
                 );
                 thread::sleep(DAILY_BACKUP_INTERVAL);
+                sleep_until_daily_backup_due(&backups_dir, None);
             }
         });
 }
 
 /// Sleeps until the newest daily backup on disk is 24 h old, looking again
-/// after each sleep: a daily written meanwhile counts.
-fn sleep_until_daily_backup_due(backups_dir: &Path) {
+/// after each sleep: a daily written meanwhile counts. With `log_wait_to`,
+/// a first look that must wait writes one INFO line there; a later look
+/// writes none.
+fn sleep_until_daily_backup_due(backups_dir: &Path, mut log_wait_to: Option<&Path>) {
     loop {
-        let wait = daily_backup_wait(newest_daily_backup_at(backups_dir), SystemTime::now());
+        let now = SystemTime::now();
+        let newest = newest_daily_backup(backups_dir, now);
+        let wait = daily_backup_wait(newest.as_ref().map(|daily| daily.written_at), now);
         if wait.is_zero() {
             return;
         }
+        if let (Some(log_file_path), Some(newest)) = (log_wait_to.take(), &newest) {
+            let line = daily_backup_wait_line(wait, &newest.file_name);
+            let _ = append_log(log_file_path, "INFO", &line);
+        }
         thread::sleep(wait);
     }
+}
+
+/// The engine log's line when the daily backup must wait (review of
+/// 2026-10-01: nothing in the log showed the scheduler waiting). The wait
+/// is rounded up to the whole minute: the line comes only with a wait, so
+/// it never says 0 h 0 min, and the copy is never due before the time given.
+fn daily_backup_wait_line(wait: Duration, newest_daily: &str) -> String {
+    let minutes = wait.as_nanos().div_ceil(60_000_000_000);
+    format!(
+        "The next daily database backup is due in {} h {} min; \
+         the newest daily is {newest_daily}.",
+        minutes / 60,
+        minutes % 60
+    )
 }
 
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
@@ -692,5 +717,36 @@ mod tests {
         assert!(
             (payload["peakRightDbfs"].as_f64().unwrap() - normalized_to_dbfs(0.40)).abs() < 0.001
         );
+    }
+
+    // Review of 2026-10-01: the log says when the daily backup must wait.
+    #[test]
+    fn the_daily_backup_wait_line_gives_hours_and_minutes_rounded_up() {
+        let name = "db-2026-10-01T08-27-00-000Z-daily.sqlite3";
+        let line = |wait: Duration| daily_backup_wait_line(wait, name);
+        let minutes = |count: u64| Duration::from_secs(count * 60);
+        assert_eq!(
+            line(minutes(22 * 60)),
+            "The next daily database backup is due in 22 h 0 min; \
+             the newest daily is db-2026-10-01T08-27-00-000Z-daily.sqlite3."
+        );
+        let due_in = |wait: Duration| {
+            let line = line(wait);
+            let rest = line
+                .strip_prefix("The next daily database backup is due in ")
+                .expect("the line's start");
+            let (due, newest) = rest.split_once("; ").expect("the line's two parts");
+            assert_eq!(newest, format!("the newest daily is {name}."));
+            due.to_owned()
+        };
+        assert_eq!(due_in(minutes(59)), "0 h 59 min");
+        assert_eq!(due_in(minutes(58) + Duration::from_secs(1)), "0 h 59 min");
+        assert_eq!(
+            due_in(minutes(22 * 60) - Duration::from_secs(1)),
+            "22 h 0 min"
+        );
+        assert_eq!(due_in(minutes(90)), "1 h 30 min");
+        assert_eq!(due_in(Duration::from_millis(1)), "0 h 1 min");
+        assert_eq!(due_in(minutes(24 * 60)), "24 h 0 min");
     }
 }

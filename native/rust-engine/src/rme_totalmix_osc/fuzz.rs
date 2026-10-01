@@ -223,11 +223,22 @@ fn datagram() -> impl Strategy<Value = Vec<u8>> {
     ]
 }
 
-/// How many messages a packet holds, in its bundles too.
-fn messages_in(packet: &OscPacket) -> usize {
-    match packet {
-        OscPacket::Message(_) => 1,
-        OscPacket::Bundle(bundle) => bundle.content.iter().map(messages_in).sum(),
+/// Whether `again` keeps what `library` read, each in its place: the same
+/// message, or a bundle at the same time tag whose elements begin with the
+/// library's, each kept in turn. Messages are compared by their bytes, as NaN
+/// is not equal to itself.
+fn keeps(again: &OscPacket, library: &OscPacket) -> bool {
+    match (again, library) {
+        (OscPacket::Bundle(again), OscPacket::Bundle(library)) => {
+            again.timetag == library.timetag
+                && again.content.len() >= library.content.len()
+                && again
+                    .content
+                    .iter()
+                    .zip(&library.content)
+                    .all(|(again, library)| keeps(again, library))
+        }
+        _ => encoder::encode(again).ok() == encoder::encode(library).ok(),
     }
 }
 
@@ -245,10 +256,12 @@ proptest! {
         }
     }
 
-    /// The second reading (2026-10-01) keeps everything the library read: it
-    /// never reads fewer messages, and where the library reads a datagram in
-    /// full (its packet is the datagram's bytes again) it changes nothing.
-    /// Packets are compared by their bytes, as NaN is not equal to itself.
+    /// The second reading (2026-10-01) keeps everything the library read,
+    /// each message in its place and each bundle's elements first, and where
+    /// the library reads a datagram in full (its packet is the datagram's
+    /// bytes again) it changes nothing. Packets are compared by their bytes,
+    /// as NaN is not equal to itself. That a datagram with names in
+    /// Windows-1252 is read exactly is `osc_read`'s own property.
     #[test]
     fn the_second_reading_never_reads_less_than_rosc(bytes in datagram()) {
         let read = read_datagram(&bytes);
@@ -256,7 +269,7 @@ proptest! {
             let Some(again) = read.packet.as_ref() else {
                 return Err(TestCaseError::fail("what the library read is kept"));
             };
-            prop_assert!(messages_in(again) >= messages_in(&library));
+            prop_assert!(keeps(again, &library), "{:?} keeps {:?}", again, library);
             let library_bytes = encoder::encode(&library).ok();
             if library_bytes.as_deref() == Some(bytes.as_slice()) {
                 prop_assert_eq!(encoder::encode(again).ok(), library_bytes);
