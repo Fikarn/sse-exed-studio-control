@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { brightness, peakingMask, peakingOverlay, zebraMask, zebraOverlay } from "./pictureAids";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  CROSS_ALPHA,
+  CROSS_ARM,
+  GUIDE_ALPHA,
+  GUIDE_WIDTH,
+  MARKER_DASH,
+  MARKER_WIDTH,
+  PEAKING_INK,
+  PEAKING_STEP,
+  STRIPE_DARK_ALPHA,
+  STRIPE_LIGHT_ALPHA,
+  STRIPE_PERIOD,
+  ZEBRA_LEVEL,
+  brightness,
+  peakingMask,
+  peakingOverlay,
+  zebraMask,
+  zebraOverlay,
+} from "./pictureAids";
 
 // The picture aids are worked out from pixels: a small picture written by
 // hand says what each marks.
@@ -83,5 +105,42 @@ describe("the picture aids", () => {
     const peaking = peakingOverlay(mask, 16, 2);
     expect(pixel(peaking, 0)).toEqual([124, 196, 255, 255]);
     expect(pixel(peaking, 3)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+// In the app's window the pictures helper draws the aids (`aids.rs`): with these numbers,
+// held here by reading its source, so that neither can move without the other.
+describe("the pictures helper's aids", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const source = readFileSync(resolve(here, "../../../../../../native/pictures-link/src/aids.rs"), "utf8");
+  /** The value of `pub const NAME: … = …;` in `aids.rs`, as written. */
+  const rust = (name: string) => {
+    const value = source.match(new RegExp(`pub const ${name}: [^=]+ = ([^;]+);`))?.[1];
+    if (value === undefined) throw new Error(`aids.rs has no ${name} any more; update this test`);
+    return value;
+  };
+  const number = (name: string) => Number(rust(name));
+  const list = (name: string) => [...rust(name).matchAll(/[\d.]+/g)].map((match) => Number(match[0]));
+
+  it("has the page's numbers, every one", () => {
+    expect(number("ZEBRA_LEVEL")).toBe(ZEBRA_LEVEL);
+    expect(number("PEAKING_STEP")).toBe(PEAKING_STEP);
+    expect(number("STRIPE_PERIOD")).toBe(STRIPE_PERIOD);
+    expect(number("STRIPE_LIGHT_ALPHA")).toBe(STRIPE_LIGHT_ALPHA);
+    expect(number("STRIPE_DARK_ALPHA")).toBe(STRIPE_DARK_ALPHA);
+    expect(list("PEAKING_INK")).toEqual([...PEAKING_INK]);
+    expect(number("GUIDE_WIDTH")).toBe(GUIDE_WIDTH);
+    expect(number("GUIDE_ALPHA")).toBe(GUIDE_ALPHA);
+    expect(number("CROSS_ARM")).toBe(CROSS_ARM);
+    expect(number("CROSS_ALPHA")).toBe(CROSS_ALPHA);
+    expect(number("MARKER_WIDTH")).toBe(MARKER_WIDTH);
+    expect(list("MARKER_DASH")).toEqual([...MARKER_DASH]);
+  });
+
+  it("works out brightness as the page does", () => {
+    expect(source).toContain(
+      "(0.2126 * f64::from(rgb[0]) + 0.7152 * f64::from(rgb[1]) + 0.0722 * f64::from(rgb[2])) / 255.0"
+    );
+    expect(brightness(255, 255, 255)).toBeCloseTo(1, 12);
   });
 });

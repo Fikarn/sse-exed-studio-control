@@ -297,7 +297,16 @@ const PICTURES_UNSAFE = [
     ["fn make_source(", "A camera's frame texture and its view are made by COM calls with out-values."],
     ["fn make_converted(", "A camera's picture texture, its target and its view are made by COM calls."],
     ["fn convert(", "A frame's bytes are uploaded by pointer and drawn into the camera's picture by COM calls."],
-    ["fn compose(", "The scene is drawn into the swap chain's buffer and presented by COM calls."],
+    ["fn compose(", "The scene's places, with their aids, and its holes are drawn into a target by COM calls."],
+    ["fn present(", "What was drawn into the swap chain is shown by one COM call on the renderer's own thread."],
+    [
+      "fn make_target(",
+      "A texture to draw a scene into in place of the surface is made by COM calls with out-values (tests only).",
+    ],
+    [
+      "fn read_back(",
+      "What was drawn is copied to a texture the processor maps and reads within its rows, then unmapped (tests only).",
+    ],
     ["fn read_statistics(", "The swap chain's present count is read by a COM call, for the minute's log line."],
     [
       "fn close_surface(",

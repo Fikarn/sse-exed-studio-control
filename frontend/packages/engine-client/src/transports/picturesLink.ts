@@ -31,6 +31,12 @@ export interface PlacedPicture {
   part: PlaceRect;
   /** Smoothed when scaled; the loupe shows each pixel as it is. */
   smooth: boolean;
+  /** The aids drawn over it: the big picture's may be all three, the loupe's zebras and peaking. */
+  guides: boolean;
+  zebras: boolean;
+  peaking: boolean;
+  /** Where the loupe looks, as a part of the picture in whole pixels; `null` when it shows none. */
+  marker: PlaceRect | null;
 }
 
 /** What the page reports, at every change and once a second (the shell's `PlaceReport`). */

@@ -2,6 +2,11 @@
 // drawn on this screen only: nothing here reaches a camera or vMix. Zebras
 // mark what is at or over a brightness; peaking marks what is sharp. Both
 // take the picture as 8-bit RGBA, row by row, as a canvas gives it.
+//
+// These are the reference. The page's shader (`pictureDrawer.ts`) and its
+// overlay (`CameraPicture.tsx`) draw with these numbers, and so does the
+// pictures helper in the app's window: `native/pictures-link/src/aids.rs`
+// holds the same, and `pictureAids.test.ts` holds the two together.
 
 /** Where the zebras start: 95 % of full brightness. */
 export const ZEBRA_LEVEL = 0.95;
@@ -9,11 +14,25 @@ export const ZEBRA_LEVEL = 0.95;
 /** How far two neighbours must differ in brightness, of the full range, to count as sharp. */
 export const PEAKING_STEP = 0.12;
 
-/** The zebra stripes' period, in the picture's pixels. */
-const STRIPE_PERIOD = 16;
+/** The zebra stripes' period, in the picture's pixels: light for the first half, dark for the second, along x + y. */
+export const STRIPE_PERIOD = 16;
 
-/** The peaking's ink: the display's blue (`#7cc4ff`). */
-const PEAKING_INK = [124, 196, 255] as const;
+/** The stripes' inks: white at 230 of 255, black at 153 of 255. */
+export const STRIPE_LIGHT_ALPHA = 230;
+export const STRIPE_DARK_ALPHA = 153;
+
+/** The peaking's ink: the display's blue (`#7cc4ff`), opaque. */
+export const PEAKING_INK = [124, 196, 255] as const;
+
+/** The guides: the thirds, and a cross at the centre, white, in the picture's pixels. */
+export const GUIDE_WIDTH = 2;
+export const GUIDE_ALPHA = 0.45;
+export const CROSS_ARM = 30;
+export const CROSS_ALPHA = 0.7;
+
+/** The loupe's marker: a dashed white frame, centred on the loupe's edge, in the picture's pixels. */
+export const MARKER_WIDTH = 3;
+export const MARKER_DASH = [14, 8] as const;
 
 /** A pixel's brightness from 0 to 1 (Rec. 709 luma of the 8-bit values). */
 export function brightness(red: number, green: number, blue: number): number {
@@ -72,7 +91,7 @@ export function zebraOverlay(mask: Uint8Array, width: number, height: number): U
       overlay[at] = ink;
       overlay[at + 1] = ink;
       overlay[at + 2] = ink;
-      overlay[at + 3] = light ? 230 : 153;
+      overlay[at + 3] = light ? STRIPE_LIGHT_ALPHA : STRIPE_DARK_ALPHA;
     }
   }
   return overlay;

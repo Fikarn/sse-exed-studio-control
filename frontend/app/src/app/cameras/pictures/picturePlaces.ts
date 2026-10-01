@@ -5,8 +5,9 @@ import type { PictureCamera, PicturePlaces, PlaceRect, PlacedPicture } from "@ss
 // Where the Cameras page's pictures stand (the camera pictures, D30). In the app's window
 // the pictures helper draws the pictures itself, in a layer over the page, and the page
 // is the one authority for what is where: it measures its own layout and says the bay's
-// box, each picture's box and part, and what it draws over a picture (a small picture's
-// chip, a message, a hint), which the helper leaves clear. While anything stands over
+// box, each picture's box and part, its aids and where the loupe looks, and what it draws
+// over a picture (a small picture's chip, a message, a hint), which the helper leaves
+// clear. While anything stands over
 // the bay that the helper cannot leave a hole for (a dialog, the values list), or the
 // window is hidden, the page says it shows no picture, and the layer hides.
 //
@@ -32,6 +33,11 @@ export interface MeasuredPicture {
   box: PlaceRect;
   part: PlaceRect;
   smooth: boolean;
+  guides: boolean;
+  zebras: boolean;
+  peaking: boolean;
+  /** Where the loupe looks, as a part of the picture; `null` when the picture shows none. */
+  marker: PlaceRect | null;
 }
 
 /** The page's layout, as measured. */
@@ -70,7 +76,16 @@ export function buildPlaces(measured: MeasuredPlaces): PicturePlaces {
   const pictures: PlacedPicture[] = measured.pictures
     .filter((picture) => picture.box.width > 0 && picture.box.height > 0)
     .slice(0, MAX_PICTURES)
-    .map((picture) => ({ camera: picture.camera, at: picture.box, part: whole(picture.part), smooth: picture.smooth }));
+    .map((picture) => ({
+      camera: picture.camera,
+      at: picture.box,
+      part: whole(picture.part),
+      smooth: picture.smooth,
+      guides: picture.guides,
+      zebras: picture.zebras,
+      peaking: picture.peaking,
+      marker: picture.marker ? whole(picture.marker) : null,
+    }));
   const showing = measured.visible && !measured.covered && pictures.length > 0;
   if (!showing) return { showing: false, scale: measured.scale, bay: measured.bay, pictures: [], holes: [] };
   // Only what stands over a picture: the layer is clear everywhere else already.
@@ -101,7 +116,17 @@ export function measurePlaces(bay: HTMLElement): MeasuredPlaces {
     const camera = Number(element.dataset.camera);
     const part = partOf(element.dataset.part);
     if (!isCamera(camera) || !part) continue;
-    pictures.push({ camera, box: boxOf(element), part, smooth: element.dataset.pixels === undefined });
+    const aids = (element.dataset.aids ?? "").split(" ");
+    pictures.push({
+      camera,
+      box: boxOf(element),
+      part,
+      smooth: element.dataset.pixels === undefined,
+      guides: aids.includes("guides"),
+      zebras: aids.includes("zebras"),
+      peaking: aids.includes("peaking"),
+      marker: partOf(element.dataset.marker),
+    });
   }
   return {
     scale: window.devicePixelRatio,
@@ -131,14 +156,14 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
       place(places);
     };
     const changed = () => say(false);
-    // A dialog, a message or a hint comes and goes as nodes; a picture's part and camera
-    // are attributes of its place.
+    // A dialog, a message or a hint comes and goes as nodes; a picture's part, camera,
+    // aids and marker are attributes of its place.
     const mutations = new MutationObserver(changed);
     mutations.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-part", "data-camera", "data-pixels", "data-visible"],
+      attributeFilter: ["data-part", "data-camera", "data-pixels", "data-aids", "data-marker", "data-visible"],
     });
     const sizes = new ResizeObserver(changed);
     sizes.observe(element);

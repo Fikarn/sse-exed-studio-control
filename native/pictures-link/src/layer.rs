@@ -1029,6 +1029,10 @@ mod tests {
                         height: 1080,
                     },
                     smooth: true,
+                    guides: false,
+                    zebras: false,
+                    peaking: false,
+                    marker: None,
                 })
                 .collect(),
             holes: Vec::new(),

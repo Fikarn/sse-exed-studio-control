@@ -30,6 +30,10 @@
 //! library) makes it go silent (`watch.rs`), and the engine ends it and
 //! starts it again.
 
+// The aids' rules and numbers: the renderer's alone, and its tests', where
+// there is no Windows to draw on.
+#[cfg_attr(not(windows), allow(dead_code))]
+mod aids;
 mod card;
 mod layer;
 #[cfg(windows)]
