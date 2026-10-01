@@ -36,6 +36,7 @@ import {
   STATE_RANK,
   STATE_TONES,
   STATE_WORDS,
+  VMIX_OUTPUTS,
   heldSentence,
   noLinkRefusalSentence,
   noLinkSentence,
@@ -321,6 +322,7 @@ export function setupSummary(cameras: FixtureCameras, camera: CameraNumber): Cam
     address: camera === 1 ? null : held.address,
     paired: camera === 1 ? held.paired : false,
     vmixInput: held.vmixInput,
+    vmixOutput: VMIX_OUTPUTS[camera - 1]!,
     noLink: hasLink(cameras, camera) ? null : noLinkRefusalSentence(cameraModel(camera)),
   };
 }
@@ -420,9 +422,9 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
 
 /**
  * A camera's picture, which is vMix's and not the camera's link's: whatever state the camera
- * is in. No build receives the cameras' own pictures yet. Without the simulated cameras (the
- * studio's build) none arrives; the simulated cameras' test pictures stand in for vMix inputs
- * 1 to 4, so a camera on another input reads NO PICTURE while the others show.
+ * is in. The double has no vMix: without the simulated cameras (the studio's build) none
+ * arrives; the simulated cameras' test pictures stand in for vMix inputs 1 to 4, so a camera
+ * whose saved input is another (a seed's) reads NO PICTURE while the others show.
  */
 export function cameraPicture(cameras: FixtureCameras, camera: CameraNumber): CameraPicture {
   const vmixInput = cameras.held[camera].vmixInput;

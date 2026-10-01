@@ -33,7 +33,7 @@ fn an_address_sets_a_camera_up_and_holds_it() {
             "camera": 2,
             "setup": {
                 "setUp": true, "address": "172.16.16.85", "paired": false, "vmixInput": 2,
-                "noLink": null
+                "vmixOutput": 3, "noLink": null
             }
         })
     );
@@ -161,7 +161,8 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
             json!({ "camera": 3, "address": null })
         )["setup"],
         json!({
-            "setUp": false, "address": null, "paired": false, "vmixInput": 12, "noLink": null
+            "setUp": false, "address": null, "paired": false, "vmixInput": 12,
+            "vmixOutput": 4, "noLink": null
         })
     );
     let cam3 = cameras.camera(3);
@@ -181,7 +182,7 @@ fn an_address_or_a_pairing_taken_away_leaves_the_vmix_input() {
             "camera": 1,
             "setup": {
                 "setUp": false, "address": null, "paired": false, "vmixInput": 5,
-                "noLink": null
+                "vmixOutput": 2, "noLink": null
             }
         })
     );
@@ -226,7 +227,8 @@ fn cam_1_is_paired_and_held() {
         json!({
             "camera": 1,
             "setup": {
-                "setUp": true, "address": null, "paired": true, "vmixInput": 1, "noLink": null
+                "setUp": true, "address": null, "paired": true, "vmixInput": 1,
+                "vmixOutput": 2, "noLink": null
             }
         })
     );

@@ -523,7 +523,7 @@ describe("the fixture double's cameras: Setup", () => {
     const before = (await rows()).length;
     expect(await call("cameras.setup.update", { camera: 2, address: " 010.000.000.002 " })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 2, noLink: null },
+      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 2, vmixOutput: 3, noLink: null },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 2],
@@ -533,14 +533,14 @@ describe("the fixture double's cameras: Setup", () => {
     expect((await camera(2)).values.iso.value).toBe("800");
     expect(await call("cameras.setup.update", { camera: 2, vmixInput: 7 })).toEqual({
       camera: 2,
-      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 7, noLink: null },
+      setup: { setUp: true, address: "10.0.0.2", paired: false, vmixInput: 7, vmixOutput: 3, noLink: null },
     });
     expect(await call("cameras.setup.update", { camera: 1, vmixInput: 1000 })).toMatchObject({
       setup: { setUp: false, vmixInput: 1000 },
     });
     expect(await call("cameras.setup.update", { camera: 2, address: null })).toEqual({
       camera: 2,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 7, noLink: null },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 7, vmixOutput: 3, noLink: null },
     });
     expect((await camera(2)).state).toBe("not-set-up");
     expect(cameras.sent(2)).toBe(0);
@@ -602,7 +602,7 @@ describe("the fixture double's cameras: Setup", () => {
     const { call, refused, seen, camera, cameras } = openCamerasDouble();
     expect(await call("cameras.setup.pair", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: true, address: null, paired: true, vmixInput: 1, noLink: null },
+      setup: { setUp: true, address: null, paired: true, vmixInput: 1, vmixOutput: 2, noLink: null },
     });
     expect(seen()).toEqual([
       ["cameras.changed", "setup", 1],
@@ -616,7 +616,7 @@ describe("the fixture double's cameras: Setup", () => {
     await call("cameras.setup.update", { camera: 1, vmixInput: 4 });
     expect(await call("cameras.setup.forget", { camera: 1 })).toEqual({
       camera: 1,
-      setup: { setUp: false, address: null, paired: false, vmixInput: 4, noLink: null },
+      setup: { setUp: false, address: null, paired: false, vmixInput: 4, vmixOutput: 2, noLink: null },
     });
     expect((await camera(1)).state).toBe("not-set-up");
     expect(cameras.sent(1)).toBe(0);
@@ -651,12 +651,12 @@ describe("the fixture double's cameras: Setup", () => {
       [
         "not-set-up",
         "Studio Control has no link to CAM 1 yet: it comes with a later version.",
-        { setUp: false, address: null, paired: false, vmixInput: 1, noLink: cannotPair },
+        { setUp: false, address: null, paired: false, vmixInput: 1, vmixOutput: 2, noLink: cannotPair },
       ],
       [
         "not-set-up",
         "Studio Control has no link to CAM 2 yet: it comes with a later version.",
-        { setUp: false, address: null, paired: false, vmixInput: 2, noLink: cannotTake },
+        { setUp: false, address: null, paired: false, vmixInput: 2, vmixOutput: 3, noLink: cannotTake },
       ],
       [
         "not-set-up",
@@ -666,6 +666,7 @@ describe("the fixture double's cameras: Setup", () => {
           address: null,
           paired: false,
           vmixInput: 3,
+          vmixOutput: 4,
           noLink: "Studio Control cannot take CAM 3's address yet: its network link comes with a later version.",
         },
       ],

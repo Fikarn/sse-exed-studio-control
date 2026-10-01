@@ -68,7 +68,7 @@ export interface CamerasBayProps {
 
 /**
  * A picture's place when it does not arrive: its word and, big, why and what to check;
- * small, its vMix input and what arrives from it.
+ * small, what arrives of it.
  */
 function NoPicture({ camera, big }: { camera: CameraSnapshot; big: boolean }) {
   const { picture } = camera;
@@ -87,9 +87,7 @@ function NoPicture({ camera, big }: { camera: CameraSnapshot; big: boolean }) {
           <span className={styles.noPictureDetail}>{picture.advice}</span>
         ) : null
       ) : (
-        <span className={styles.noPictureDetail}>
-          vMix input {camera.setup.vmixInput} · {picture.detail}
-        </span>
+        <span className={styles.noPictureDetail}>{picture.detail}</span>
       )}
     </span>
   );
@@ -182,7 +180,7 @@ export function CamerasBay({
         </LampWord>
         <RecTag camera={selected} />
         <span className={styles.detail} data-testid="cameras-caption-detail">
-          vMix input {selected.setup.vmixInput} · {selected.picture.detail}
+          {selected.picture.detail}
           {shows
             ? view === "one-to-one"
               ? ` · 1:1 · ${HERO.width} × ${HERO.height} of ${WHOLE.width} × ${WHOLE.height}`

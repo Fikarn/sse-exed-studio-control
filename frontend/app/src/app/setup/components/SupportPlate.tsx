@@ -218,6 +218,11 @@ export function SupportPlate({
             { id: "hardware", label: "Hardware profile", value: hardwareProfile },
           ]}
         />
+        {/* NDI's SDK asks for its trademark line and its address; the address is
+            words, for this app opens no page outside it. */}
+        <p className={styles.fine} data-testid="support-about-ndi">
+          NDI® is a registered trademark of Vizrt NDI AB · ndi.video
+        </p>
       </Section>
 
       <RecentActions actions={recentActions} />

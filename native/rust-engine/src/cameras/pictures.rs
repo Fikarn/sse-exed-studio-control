@@ -19,10 +19,13 @@
 //! - with the simulated cameras and no helper (the engine's unit tests, a
 //!   studio build's lanes) the simulated source's rule stands in for it.
 //!
-//! The simulated source sends vMix inputs 1 to 4, so a camera on another
-//! input reads `PICTURE MISSING` and the page's states can be tried in a
-//! development run. A picture is vMix's, not the camera's link's: a camera
-//! that is released, not set up or does not answer keeps its picture.
+//! With vMix's pictures each camera's comes from its own output, fixed
+//! (CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4: `vmix_output`), and what
+//! the rows say names it. The simulated source sends vMix inputs 1 to 4: a
+//! camera whose saved input is another reads `PICTURE MISSING` (Setup no
+//! longer offers the input; a fixture or a test sets it). A picture is
+//! vMix's, not the camera's link's: a camera that is released, not set up or
+//! does not answer keeps its picture.
 
 use crate::cameras::model::{model, CAMERA_NUMBERS};
 use crate::cameras::runtime::Cameras;
@@ -101,7 +104,7 @@ impl Nothing {
         })
     }
 
-    /// What the Pictures rows say after the vMix input.
+    /// What arrives, in the Pictures rows (`PictureSource::detail`).
     fn detail(self) -> &'static str {
         match self {
             Self::NotBuilt => "not built yet",
@@ -174,16 +177,27 @@ impl PictureSource {
         }
     }
 
-    /// What arrives, as the Pictures rows print it after the vMix input: the
-    /// test picture, or vMix's output with its size and rate.
+    /// What arrives of camera `camera`, as the Pictures rows and the page
+    /// print it: `what`, after the camera's output with vMix's pictures
+    /// (`vMix Output 4 · nothing received`), alone with the test pictures.
+    fn detail(&self, camera: u8, what: &str) -> String {
+        match (self.vmix(), vmix_output(camera)) {
+            (true, Some(output)) => format!("vMix Output {output} · {what}"),
+            _ => String::from(what),
+        }
+    }
+
+    /// What arrives while the picture does: the test picture, or vMix's
+    /// output with its size and rate (`vMix Output 2 · 3840 × 2160 ·
+    /// 29.97`).
     fn live_detail(&self, camera: u8, vmix_input: u32) -> String {
         match (self.vmix(), vmix_output(camera)) {
             (true, Some(output)) => match self
                 .received(camera, vmix_input)
                 .and_then(|received| received.format)
             {
-                Some(format) => format!("Output {output} · {}", format.words()),
-                None => format!("Output {output}"),
+                Some(format) => self.detail(camera, &format.words()),
+                None => format!("vMix Output {output}"),
             },
             _ => String::from("test picture"),
         }
@@ -229,7 +243,7 @@ fn camera_picture(source: &PictureSource, camera: u8, vmix_input: u32) -> Camera
             state: PictureState::NoPictures,
             word: String::from(NO_PICTURE),
             tone: CameraTone::Attention,
-            detail: String::from(nothing.detail()),
+            detail: source.detail(camera, nothing.detail()),
             sentence: Some(nothing.camera_sentence(tag)),
             advice: nothing.advice(),
         };
@@ -256,7 +270,7 @@ fn camera_picture(source: &PictureSource, camera: u8, vmix_input: u32) -> Camera
         state: PictureState::Missing,
         word: String::from(NO_PICTURE),
         tone: CameraTone::Attention,
-        detail: String::from("nothing received"),
+        detail: source.detail(camera, "nothing received"),
         sentence: Some(format!("vMix is not sending {tag} over NDI.")),
         advice: Some(advice),
     }

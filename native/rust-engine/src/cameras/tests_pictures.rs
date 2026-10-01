@@ -395,14 +395,14 @@ fn vmix_s_outputs_read_live_with_their_output_size_and_rate() {
             "state": "showing",
             "word": "LIVE",
             "tone": "ok",
-            "detail": "Output 2 · 3840 × 2160 · 29.97",
+            "detail": "vMix Output 2 · 3840 × 2160 · 29.97",
             "sentence": null,
             "advice": null
         })
     );
     assert_eq!(
         picture(&cameras, 2)["detail"],
-        "Output 3",
+        "vMix Output 3",
         "its format not known yet"
     );
     let whole = pictures(&cameras);
@@ -434,7 +434,7 @@ fn an_output_vmix_does_not_send_reads_picture_missing_with_its_output() {
             "state": "missing",
             "word": "NO PICTURE",
             "tone": "attention",
-            "detail": "nothing received",
+            "detail": "vMix Output 4 · nothing received",
             "sentence": "vMix is not sending CAM 3 over NDI.",
             "advice": "vMix sends other outputs: check that Output 4 is on and sent over NDI (Settings › Outputs)."
         })
@@ -457,12 +457,12 @@ fn a_helper_that_takes_nothing_from_vmix_says_why() {
         (
             HelperProblem::NotAllowed,
             "This run does not take vMix's pictures, so it shows none.",
-            "not taken",
+            "vMix Output 3 · not taken",
         ),
         (
             HelperProblem::NoLibrary,
             "NDI's library did not load, so there are no pictures from vMix.",
-            "NDI not loaded",
+            "vMix Output 3 · NDI not loaded",
         ),
     ] {
         set_vmix_status_for_test(

@@ -17,9 +17,16 @@ export type CameraSetupSummary = {
    */
   paired: boolean;
   /**
-   * The vMix input that carries the camera's picture (1–1000).
+   * The vMix input saved for the camera (1–1000). The simulated test
+   * pictures stand in for inputs 1 to 4; Setup no longer offers it, and
+   * vMix's own pictures come by output.
    */
   vmixInput: number;
+  /**
+   * The vMix output the camera's picture comes from, fixed (D31): CAM 1
+   * Output 2, CAM 2 Output 3, CAM 3 Output 4.
+   */
+  vmixOutput: number;
   /**
    * Why Setup cannot pair this camera (CAM 1) or take its address (CAM 2,
    * CAM 3): this build has no link to it yet. `null` when it can.

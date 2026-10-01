@@ -11,20 +11,12 @@ import styles from "./SetupCamerasScreen.module.css";
 // Setup / Support's third screen: what Studio Control needs to hold each
 // camera (D15). CAM 1 is paired, with the operator beside it; CAM 2 and CAM 3
 // take the address entered here and no other (D12: nothing scans the
-// network); each camera has the vMix input that carries its picture. Saving
-// sends nothing to a camera: the hardware link holds the camera and reads it.
+// network). Each camera's picture comes from its own vMix output, fixed
+// (D31), which the screen names and does not change. Saving sends nothing to
+// a camera: the hardware link holds the camera and reads it.
 //
 // In a build with no link to a camera (`setup.noLink`) its pairing and its
-// address are locked, with the hardware link's sentence; the vMix input and
-// Forget stay.
-
-/** A vMix input as Setup takes it: a whole number from 1 to 1000. */
-function vmixInputOf(text: string): number | null {
-  const trimmed = text.trim();
-  if (!/^\d{1,4}$/.test(trimmed)) return null;
-  const input = Number(trimmed);
-  return input >= 1 && input <= 1000 ? input : null;
-}
+// address are locked, with the hardware link's sentence; Forget stays.
 
 const cameraNumber = (camera: CameraSnapshot): CameraNumber => (camera.camera === 2 ? 2 : camera.camera === 3 ? 3 : 1);
 
@@ -40,7 +32,6 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
   const { performAction } = editor.actions;
   // What was typed and not saved yet; a field without an entry shows what Setup holds.
   const [addresses, setAddresses] = useState<Partial<Record<CameraNumber, string>>>({});
-  const [inputs, setInputs] = useState<Partial<Record<CameraNumber, string>>>({});
   const busy = busyAction !== null;
   const cameras = camerasSnapshot?.cameras ?? [];
   const noLink = cameras.find((camera) => camera.setup.noLink !== null) ?? null;
@@ -61,13 +52,6 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
       };
     });
 
-  const saveInput = (camera: CameraSnapshot, vmixInput: number) =>
-    void performAction(`camera-input-${camera.camera}`, async () => {
-      await store.updateCameraSetup({ camera: cameraNumber(camera), vmixInput });
-      setInputs((held) => forget(held, cameraNumber(camera)));
-      return { message: `${camera.tag}'s picture is vMix input ${vmixInput}.`, tone: "ok" as const };
-    });
-
   const pair = (camera: CameraSnapshot) =>
     void performAction("camera-pair", async () => {
       await store.pairCamera(cameraNumber(camera));
@@ -84,8 +68,8 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
       return {
         message:
           camera.link === "bluetooth"
-            ? `${camera.tag}'s pairing is forgotten. Its vMix input stays.`
-            : `${camera.tag}'s address is forgotten. Its vMix input stays.`,
+            ? `${camera.tag}'s pairing is forgotten.`
+            : `${camera.tag}'s address is forgotten.`,
         tone: "ok" as const,
       };
     });
@@ -95,7 +79,7 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
       head={bayHead}
       eyebrow="Cameras"
       title="Camera setup"
-      lead="What Studio Control needs to hold each camera: CAM 1's pairing, CAM 2's and CAM 3's addresses, and the vMix input that carries each picture. Saving sends nothing to a camera."
+      lead="What Studio Control needs to hold each camera: CAM 1's pairing and CAM 2's and CAM 3's addresses. Each picture comes from its own vMix output. Saving sends nothing to a camera."
       rules={[
         {
           id: "addresses",
@@ -106,7 +90,7 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
           ? [
               {
                 id: "no-link",
-                text: "This version has no link to the cameras yet, so it takes no pairing and no address. The vMix inputs can be set.",
+                text: "This version has no link to the cameras yet, so it takes no pairing and no address.",
                 tone: "attention" as const,
               },
             ]
@@ -119,9 +103,6 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
             const locked = camera.setup.noLink;
             const address = addresses[number] ?? camera.setup.address ?? "";
             const addressChanged = address.trim() !== "" && address.trim() !== (camera.setup.address ?? "");
-            const input = inputs[number] ?? String(camera.setup.vmixInput);
-            const parsedInput = vmixInputOf(input);
-            const inputChanged = parsedInput !== null && parsedInput !== camera.setup.vmixInput;
             return (
               <section
                 key={camera.camera}
@@ -185,31 +166,13 @@ export function SetupCamerasScreen({ editor, camerasSnapshot }: SetupCamerasScre
                   </label>
                 )}
 
-                <label className={styles.row}>
-                  <span className={styles.label}>vMix input</span>
-                  <input
-                    className={pilotStyles.textField}
-                    disabled={busy}
-                    inputMode="numeric"
-                    value={input}
-                    data-testid={`setup-camera-${camera.camera}-input`}
-                    onChange={(event) => setInputs((held) => ({ ...held, [number]: event.target.value }))}
-                  />
-                  <Key
-                    size="small"
-                    disabled={busy}
-                    locked={!inputChanged}
-                    reason={
-                      parsedInput === null
-                        ? "A vMix input is a whole number from 1 to 1000."
-                        : `This is the vMix input Setup holds for ${camera.tag}.`
-                    }
-                    testId={`setup-camera-${camera.camera}-save-input`}
-                    onClick={() => (parsedInput !== null ? saveInput(camera, parsedInput) : undefined)}
-                  >
-                    Save input
-                  </Key>
-                </label>
+                <div className={styles.row}>
+                  <span className={styles.label}>Picture</span>
+                  <span className={styles.value} data-testid={`setup-camera-${camera.camera}-output`}>
+                    vMix Output {camera.setup.vmixOutput}
+                  </span>
+                  <span />
+                </div>
 
                 <div className={styles.foot}>
                   {locked ? (

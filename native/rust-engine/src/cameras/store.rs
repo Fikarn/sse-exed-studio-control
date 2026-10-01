@@ -7,6 +7,7 @@
 use crate::cameras::model::{CAMERA_NUMBERS, VMIX_INPUT_MAX, VMIX_INPUT_MIN};
 use crate::cameras::snapshot::CameraSetupSummary;
 use rusqlite::{params, Connection};
+use studio_control_protocol::pictures::vmix_output;
 
 /// One camera's row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +50,7 @@ impl StoredSetup {
             address: self.address.clone().filter(|_| self.camera != 1),
             paired: self.camera == 1 && self.paired,
             vmix_input: self.vmix_input,
+            vmix_output: vmix_output(self.camera).unwrap_or_default(),
             no_link: None,
         }
     }

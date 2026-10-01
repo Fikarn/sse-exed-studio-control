@@ -379,6 +379,17 @@ test("Support keeps the shell header, tabs and lamps (H1)", async ({ page }) => 
   await expect(page.getByTestId("support-plate")).toBeVisible();
 });
 
+// The cameras' pictures come over NDI: About carries NDI's trademark line and
+// its address, as words, for the app opens no page outside it.
+test("About names NDI's trademark and its address as words, with no link", async ({ page }) => {
+  await openFixture(page, "setup-ready");
+  const about = page.getByTestId("support-about");
+  await expect(about.getByTestId("support-about-ndi")).toHaveText(
+    "NDI® is a registered trademark of Vizrt NDI AB · ndi.video"
+  );
+  await expect(about.locator("a, [href]")).toHaveCount(0);
+});
+
 // 2026-09 production readiness, Slice 11 (F30, F31): the Light outputs switch
 // on the Support plate, in the built app. Held is said in three places — the
 // switch's readout, the header's Lighting lamp (on every workspace, and ahead

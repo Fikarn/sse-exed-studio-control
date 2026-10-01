@@ -66,7 +66,7 @@ fn a_fresh_start_holds_nothing_and_selects_cam_1() {
             camera["setup"],
             json!({
                 "setUp": false, "address": null, "paired": false, "vmixInput": number,
-                "noLink": null
+                "vmixOutput": number + 1, "noLink": null
             })
         );
         assert_eq!(camera["readAt"], Value::Null);

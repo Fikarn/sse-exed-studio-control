@@ -56,9 +56,15 @@ pub struct CameraSetupSummary {
     pub address: Option<String>,
     /// CAM 1 is paired; always `false` for CAM 2 and CAM 3.
     pub paired: bool,
-    /// The vMix input that carries the camera's picture (1–1000).
+    /// The vMix input saved for the camera (1–1000). The simulated test
+    /// pictures stand in for inputs 1 to 4; Setup no longer offers it, and
+    /// vMix's own pictures come by output.
     #[serde(rename = "vmixInput")]
     pub vmix_input: u32,
+    /// The vMix output the camera's picture comes from, fixed (D31): CAM 1
+    /// Output 2, CAM 2 Output 3, CAM 3 Output 4.
+    #[serde(rename = "vmixOutput")]
+    pub vmix_output: u8,
     /// Why Setup cannot pair this camera (CAM 1) or take its address (CAM 2,
     /// CAM 3): this build has no link to it yet. `null` when it can.
     #[serde(rename = "noLink")]
@@ -206,9 +212,10 @@ pub struct CameraPicture {
     /// `LIVE`, `NO PICTURE`.
     pub word: String,
     pub tone: CameraTone,
-    /// What arrives, as the Pictures rows say it after the vMix input
-    /// (`test picture`); `nothing received`, or why nothing can
-    /// (`not built yet`).
+    /// What arrives, as the page prints it: `test picture`, or vMix's
+    /// output with its size and rate (`vMix Output 2 · 3840 × 2160 ·
+    /// 29.97`); `nothing received`, or why nothing can (`not built yet`),
+    /// after the output with vMix's pictures.
     pub detail: String,
     /// Why no picture arrives, said in its place; `null` while it arrives.
     pub sentence: Option<String>,
@@ -229,7 +236,8 @@ pub struct CamerasPictures {
     pub tone: CameraTone,
     /// The state display's sentence; `null` while every picture arrives.
     pub sentence: Option<String>,
-    /// Where the pictures come from: `test pictures`, `not built yet`.
+    /// Where the pictures come from: `test pictures`, `vMix Outputs 2 to 4`,
+    /// `not built yet`.
     pub source: String,
     /// The Pictures section's fine print.
     pub note: String,

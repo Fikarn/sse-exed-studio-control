@@ -569,14 +569,14 @@ describe("the Recent list and the footer", () => {
 });
 
 describe("the pictures", () => {
-  it("shows every picture on vMix inputs 1 to 4, and says where they come from", async () => {
+  it("shows every test picture, alone in its row, and says where they come from", async () => {
     const { read } = openCameras();
     const snapshot = await read();
     expect(snapshot.cameras.every(pictureShows)).toBe(true);
     expect(pictureRows(snapshot)).toEqual([
-      { camera: 1, tag: "CAM 1", detail: "vMix input 1 · test picture", word: "live", tone: "ok" },
-      { camera: 2, tag: "CAM 2", detail: "vMix input 2 · test picture", word: "live", tone: "ok" },
-      { camera: 3, tag: "CAM 3", detail: "vMix input 3 · test picture", word: "live", tone: "ok" },
+      { camera: 1, tag: "CAM 1", detail: "test picture", word: "live", tone: "ok" },
+      { camera: 2, tag: "CAM 2", detail: "test picture", word: "live", tone: "ok" },
+      { camera: 3, tag: "CAM 3", detail: "test picture", word: "live", tone: "ok" },
     ]);
     expect(picturesWord(snapshot)).toBe("test pictures · 3 / 3");
     expect(pictureLock(snapshot.cameras[0]!)).toBeNull();
@@ -598,7 +598,7 @@ describe("the pictures", () => {
     expect(pictureRows(snapshot)[1]).toEqual({
       camera: 2,
       tag: "CAM 2",
-      detail: "vMix input 7 · nothing received",
+      detail: "nothing received",
       word: "no picture",
       tone: "attention",
     });
@@ -641,7 +641,7 @@ describe("the pictures", () => {
     const { read } = openCameras({ simulated: false });
     const snapshot = await read();
     expect(snapshot.cameras.some(pictureShows)).toBe(false);
-    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "vMix input 1 · not built yet", word: "no picture" });
+    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "not built yet", word: "no picture" });
     expect(picturesWord(snapshot)).toBe("none · not built yet");
     expect(camerasStateView(snapshot)?.word, "the cameras speak first").toBe("NOT SET UP");
   });
