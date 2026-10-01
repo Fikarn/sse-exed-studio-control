@@ -217,9 +217,14 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({ "name": "Host mic" }),
         ),
         (
-            "audio.snapshot.recall",
-            json!({ "snapshotId": "snap-1" }),
-            json!({ "snapshotName": "Panel", "recalled": true }),
+            "audio.snapshot.load",
+            json!({ "slot": 2 }),
+            json!({ "loaded": true, "slot": 2, "name": "Panel" }),
+        ),
+        (
+            "audio.snapshot.load",
+            json!({ "slot": 5 }),
+            json!({ "loaded": true, "slot": 5, "name": null }),
         ),
         ("audio.solo.clearAll", json!({}), json!({})),
         (
@@ -305,6 +310,37 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
 // camera's tag as the target and the answer's sentence as the operator read
 // it; Connect is a row only when the camera is held again, and the selection,
 // a press on a setting and Setup are not actions.
+// TotalMix's own snapshots (2026-10-01): a load is one row, named by the
+// slot's TotalMix name or its number; a load whose read-back failed went out
+// unconfirmed, and the row says it was sent.
+#[test]
+fn a_load_in_totalmix_is_one_row_and_says_when_it_was_only_sent() {
+    let detail = |result: Value| {
+        let rows = ui_actions("audio.snapshot.load", &json!({ "slot": 2 }), &result, false);
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].action, "console-snapshot-loaded");
+        rows[0].detail.clone()
+    };
+    assert_eq!(
+        detail(
+            json!({ "loaded": true, "slot": 2, "name": "Interview", "consoleStateConfidence": "aligned" })
+        ),
+        "Console mix loaded in TotalMix: Interview"
+    );
+    assert_eq!(
+        detail(
+            json!({ "loaded": true, "slot": 5, "name": null, "consoleStateConfidence": "aligned" })
+        ),
+        "Console mix loaded in TotalMix: slot 5"
+    );
+    assert_eq!(
+        detail(
+            json!({ "loaded": true, "slot": 2, "name": "Interview", "consoleStateConfidence": "unknown" })
+        ),
+        "Console mix sent to TotalMix, not read back: Interview"
+    );
+}
+
 #[test]
 fn the_camera_rows_are_what_the_answer_says() {
     let row = |method: &str, result: Value| {
@@ -436,11 +472,6 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
             "/api/deck/light-action",
             "recallScene",
             json!({ "recalled": "Interview wide", "preview": false }),
-        ),
-        (
-            "/api/deck/audio-action",
-            "recallSnapshot",
-            json!({ "recalled": "Panel" }),
         ),
         (
             "/api/deck/audio-action",

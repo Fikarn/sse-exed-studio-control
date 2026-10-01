@@ -54,14 +54,14 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 
 ## Audio (the Console)
 
-- **Rows.** `Inputs` in banks of four, turned with the arrows on the heading; `Playback`; `Outputs`: `Main Out`, `Phones 1`, `Phones 2`.
+- **Rows.** `Inputs` in banks of four, turned with the arrows on the heading; `Playback`; `Outputs`: the main output and the two phones.
+- **Names.** Every strip carries TotalMix's name for its channel, and is renamed in TotalMix. A channel TotalMix names nothing keeps its own.
 - **Mix target.** The faders set what each strip sends into the chosen output. `DIM` and `MONO` are `Main Out`'s, whichever output is the mix target: TotalMix has neither for the phones, so their strips show neither.
 - **Strip.** A fader, `M` for mute, `S` for solo. Press a strip to open it in the plate.
 - **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on.
 - **Gain.** `GAIN` on a preamp's strip opens typed entry, 0 to 75 dB. The plate's knob rides it.
 - **Solo and clip.** The cluster names the soloed strips, with `Clear all solo`. A clipped strip shows `CLIP`; `Clear clips` clears all.
-- **Snapshots.** Eight slots. `Capture` fills the first empty one. Recall is press twice. Point at a slot to see what it would change, and to save over it (press twice), rename or delete it.
-- **A recall** reports `12 values pushed, 12 confirmed`. It never sends 48 V: each difference is listed with its own `Arm 48 V` key.
+- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot twice (`LOAD?`) to load it in TotalMix; the Console then reads the desk. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
 - **`Sync from TotalMix`** reads the desk and changes nothing on it.
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:

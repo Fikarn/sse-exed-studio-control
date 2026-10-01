@@ -19,10 +19,6 @@ export type AudioConsoleLinkSnapshot = {
   confirmedSends: number;
   adjustedSends: number;
   externalChanges: number;
-  /**
-   * TotalMix's own active snapshot slot (1-based), when it reported one.
-   */
-  activeConsoleSnapshot: number | null;
   lastPullAt: string | null;
   lastPullValues: number | null;
 };

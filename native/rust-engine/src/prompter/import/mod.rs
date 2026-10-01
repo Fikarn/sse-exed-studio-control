@@ -25,7 +25,9 @@
 
 mod docx;
 mod html;
-mod txt;
+// Its Windows-1252 reading is shared with TotalMix's settings file
+// (`rme_totalmix_names`).
+pub(crate) mod txt;
 mod zip;
 
 use crate::prompter::model::{

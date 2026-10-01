@@ -146,7 +146,7 @@ impl Drop for FakeTotalMix {
     }
 }
 
-struct SlotPump {
+pub(super) struct SlotPump {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// Completed pumps: read the slot, service the link, flush to the database.
     cycles: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -154,7 +154,7 @@ struct SlotPump {
 }
 
 impl SlotPump {
-    fn start(slot: crate::rme_totalmix_osc::GlobalOscSlot, db_path: PathBuf) -> Self {
+    pub(super) fn start(slot: crate::rme_totalmix_osc::GlobalOscSlot, db_path: PathBuf) -> Self {
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let cycles = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
         let stop_flag = stop.clone();
@@ -179,7 +179,7 @@ impl SlotPump {
     }
 
     /// Returns once `count` more pumps have completed after the call.
-    fn wait_for_cycles(&self, count: u64) {
+    pub(super) fn wait_for_cycles(&self, count: u64) {
         let target = self.cycles.load(std::sync::atomic::Ordering::SeqCst) + count;
         let deadline = std::time::Instant::now() + SETTLE_DEADLINE;
         while self.cycles.load(std::sync::atomic::Ordering::SeqCst) < target {
@@ -195,33 +195,6 @@ impl SlotPump {
 /// How long a settle may take before the test gives up — a guard against a
 /// hang, never a timing the test depends on.
 pub(super) const SETTLE_DEADLINE: Duration = Duration::from_secs(20);
-
-/// Production readiness S15. Waits until every send the shared link tracks has
-/// settled (confirmed, adjusted or expired), every read-back has had its
-/// replies, and the pump has flushed what arrived — the link's own state, where
-/// the recall test used to sleep 500 ms and hope. With it, one phase of a test
-/// can no longer overlap the read-back cycle of the phase before it.
-fn settle_console_link(pump: &SlotPump) {
-    let deadline = std::time::Instant::now() + SETTLE_DEADLINE;
-    loop {
-        let settled = {
-            let link = crate::rme_console_link::shared_console_link();
-            let guard = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-            guard.pending_count() == 0 && guard.outstanding_count() == 0
-        };
-        if settled {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the console link did not settle within {SETTLE_DEADLINE:?}"
-        );
-        std::thread::sleep(Duration::from_millis(2));
-    }
-    // Two full pumps after the link went quiet: whatever the last one read has
-    // been flushed to the database.
-    pump.wait_for_cycles(2);
-}
 
 impl Drop for SlotPump {
     fn drop(&mut self) {
@@ -552,6 +525,7 @@ fn console_echo_updates_channel_and_mix_target_state() {
         value,
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     };
     let updates = vec![
         update(
@@ -710,6 +684,7 @@ fn a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write() {
         value: ConsoleValue::Flag(true),
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     });
 
     // A database the flush cannot open: its folder does not exist.
@@ -900,7 +875,7 @@ fn console_confidence_has_one_writer() {
     // Every path that moves confidence must go through the single writer.
     let required_writers = [
         "audio/sync.rs",
-        "audio/snapshots.rs",
+        "audio/load.rs",
         "audio/settings.rs",
         "audio/console_link.rs",
     ];
@@ -935,7 +910,7 @@ fn console_confidence_has_one_writer() {
 }
 
 // ---------------------------------------------------------------------------
-// Recall = push (Slice 4). A console model on loopback remembers what the app
+// A console model on loopback (Slice 4's) remembers what the app
 // wrote and answers read-backs from that memory, in dB, like the desk does.
 // ---------------------------------------------------------------------------
 
@@ -1062,7 +1037,6 @@ pub(super) fn channel_request(channel_id: &str) -> AudioChannelUpdateRequest {
     AudioChannelUpdateRequest {
         channel_id: String::from(channel_id),
         mix_target_id: None,
-        name: None,
         gain: None,
         fader: None,
         mute: None,
@@ -1083,338 +1057,6 @@ pub(super) fn mix_target_request(mix_target_id: &str) -> AudioMixTargetUpdateReq
         dim: None,
         mono: None,
     }
-}
-
-#[test]
-fn recall_plan_orders_mutes_first_and_never_touches_48v_or_pad() {
-    let current = read_audio_snapshot(&HashMap::new());
-    let mut contents = super::helpers::capture_audio_scene_contents(&current, None);
-    let host_now = current
-        .channels
-        .iter()
-        .find(|entry| entry.id == "audio-input-9")
-        .expect("host");
-    {
-        let host = contents
-            .channels
-            .get_mut("audio-input-9")
-            .expect("host in contents");
-        host.mute = true;
-        host.gain = 30;
-        host.phantom = !host_now.phantom;
-        host.phase = true;
-        host.pad = true;
-        host.mix_levels.insert(String::from("audio-mix-main"), 0.5);
-        host.mix_levels
-            .insert(String::from("audio-mix-phones-a"), 0.0);
-    }
-    {
-        let playback = contents
-            .channels
-            .get_mut("audio-playback-3-4")
-            .expect("playback 3/4 in contents");
-        playback.mute = false;
-        playback.solo = true;
-    }
-    {
-        let main = contents
-            .mix_targets
-            .get_mut("audio-mix-main")
-            .expect("main in contents");
-        main.mute = false;
-        main.volume = 0.61;
-        main.dim = true;
-        main.mono = false;
-        let phones = contents
-            .mix_targets
-            .get_mut("audio-mix-phones-a")
-            .expect("phones a in contents");
-        phones.mute = true;
-    }
-
-    let plan = super::recall::build_recall_plan(&current, &contents);
-    assert_eq!(plan.phases.len(), 4);
-    let addresses = |phase: usize| -> Vec<String> {
-        plan.phases[phase]
-            .iter()
-            .map(|(address, _)| address.clone())
-            .collect()
-    };
-    let mutes_on = addresses(0);
-    assert!(mutes_on.contains(&String::from("/input/8/mute")));
-    assert!(mutes_on.contains(&String::from("/output/8/mute")));
-    assert!(!mutes_on.contains(&String::from("/playback/2/mute")));
-    let values = addresses(1);
-    assert!(values.contains(&String::from("/mix/in/8/0/faderlin")));
-    assert!(values.contains(&String::from("/mix/in/8/8/faderlin")));
-    assert!(values.contains(&String::from("/input/8/gain")));
-    assert!(values.contains(&String::from("/input/8/phase")));
-    assert!(values.contains(&String::from("/mix/pb/2/0/solo")));
-    assert!(values.contains(&String::from("/output/0/faderlin")));
-    let mutes_off = addresses(2);
-    assert!(mutes_off.contains(&String::from("/playback/2/mute")));
-    assert!(mutes_off.contains(&String::from("/output/0/mute")));
-    assert_eq!(
-        addresses(3),
-        vec![
-            String::from("/controlroom/dim"),
-            String::from("/controlroom/mainmono")
-        ]
-    );
-    let everything: Vec<String> = (0..4).flat_map(addresses).collect();
-    assert!(
-        everything.iter().all(|address| !address.contains("48v")
-            && !address.contains("pad")
-            && !address.contains("talkback")),
-        "48V and pad are never pushed, and the app sends no talkback"
-    );
-    let host_main = plan.phases[1]
-        .iter()
-        .find(|(address, _)| address == "/mix/in/8/0/faderlin")
-        .map(|(_, value)| value.clone());
-    assert_eq!(host_main, Some(rosc::OscType::Float(0.5)));
-    assert_eq!(plan.message_count(), everything.len());
-    assert!(!plan.keys.is_empty());
-    assert!(plan.keys.len() <= plan.message_count());
-    assert_eq!(
-        plan.phantom_differences,
-        vec![PhantomDifference {
-            channel_id: String::from("audio-input-9"),
-            channel_name: host_now.name.clone(),
-            current: host_now.phantom,
-            target: !host_now.phantom,
-        }]
-    );
-
-    let (channels, mix_targets) = super::recall::recalled_state_maps(&current, &contents);
-    assert_eq!(
-        channels["audio-input-9"].phantom, host_now.phantom,
-        "48V keeps the console's value in app state"
-    );
-    assert!(channels["audio-input-9"].mute);
-    assert!(mix_targets["audio-mix-main"].dim);
-}
-
-#[test]
-fn recall_pushes_the_snapshot_and_the_console_confirms_it() {
-    let _serial = serialize_shared_link();
-    let mut console = ConsoleModel::bind();
-    let slot = crate::rme_totalmix_osc::bind_test_global_slot(console.port);
-    console.start(slot.local_port());
-    let test_dir = pull_test_db("recall-push-confirmed", console.port);
-    crate::rme_totalmix_osc::mark_console_link_slot(true);
-    let pump = SlotPump::start(slot, test_dir.db_path());
-    let db = test_dir.db_path();
-    let link = crate::rme_console_link::shared_console_link();
-
-    // Production readiness S15. Old: `sleep(500 ms)` after each phase. New:
-    // `settle_console_link` — the phase's sends settled, their read-backs
-    // answered, the replies flushed — here and after the recall, before the
-    // stored state is read. Reason: under the instrumented build on a loaded
-    // workstation the recall confirmed everything and `main_after.dim` still
-    // read false (2026-09-18, not reproduced since): with fixed sleeps, one
-    // phase's read-back cycle could still be in flight when the next began.
-    // What is asserted is unchanged.
-
-    // The scene worth keeping: Host muted at 30 dB with its main send at the
-    // curve knee, Main dimmed at half fader.
-    let mut host = channel_request("audio-input-9");
-    host.mute = Some(true);
-    host.gain = Some(30);
-    host.fader = Some(649.0 / 1023.0);
-    update_audio_channel(&db, &host).expect("host edit should send");
-    let mut main = mix_target_request("audio-mix-main");
-    main.dim = Some(true);
-    main.volume = Some(0.5);
-    update_audio_mix_target(&db, &main).expect("main edit should send");
-    settle_console_link(&pump);
-    let created = create_audio_snapshot(
-        &db,
-        &AudioSnapshotCreateRequest {
-            name: String::from("Podcast"),
-            osc_index: 6,
-            capture_current_state: Some(true),
-        },
-    )
-    .expect("snapshot capture should succeed");
-
-    // Drift away from it.
-    let mut drift = channel_request("audio-input-9");
-    drift.mute = Some(false);
-    drift.gain = Some(45);
-    update_audio_channel(&db, &drift).expect("drift edit should send");
-    let mut main_drift = mix_target_request("audio-mix-main");
-    main_drift.dim = Some(false);
-    update_audio_mix_target(&db, &main_drift).expect("main drift should send");
-    settle_console_link(&pump);
-    // An earlier flush's write failed (2026-09-23). The recall's confirmations
-    // are flushed, and the mark with them, before it writes `aligned`. (Set
-    // far in the link's future, the mark is never due on its own here.)
-    link.lock().expect("link").mark_reports_lost(u64::MAX / 2);
-
-    let result = recall_audio_snapshot_with_timing(
-        &db,
-        &AudioSnapshotRecallRequest {
-            snapshot_id: created.snapshot.id.clone(),
-        },
-        PushTiming {
-            confirm_wait_ms: 1_500,
-            poll_ms: 10,
-        },
-    )
-    .expect("recall should push and confirm");
-    assert!(result.pushed > 20, "{}", result.summary);
-    assert_eq!(result.unconfirmed, 0, "{}", result.summary);
-    assert_eq!(result.adjusted, 0, "{}", result.summary);
-    assert_eq!(result.confirmed, result.pushed, "{}", result.summary);
-    assert_eq!(result.console_state_confidence, "aligned");
-    assert!(
-        !link.lock().expect("link").take_reports_lost(),
-        "the recall's flushes took the lost-reports mark before `aligned`"
-    );
-    assert!(result.phantom_differences.is_empty());
-    assert!(result.summary.contains("confirmed"), "{}", result.summary);
-
-    settle_console_link(&pump);
-    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.console_state_confidence, "aligned");
-    assert_eq!(
-        snapshot.last_console_sync_reason.as_deref(),
-        Some("snapshot-push")
-    );
-    assert_eq!(
-        snapshot.last_recalled_snapshot_id.as_deref(),
-        Some(created.snapshot.id.as_str())
-    );
-    let host_after = snapshot
-        .channels
-        .iter()
-        .find(|entry| entry.id == "audio-input-9")
-        .expect("host");
-    assert!(host_after.mute);
-    assert_eq!(host_after.gain, 30);
-    assert!((host_after.mix_levels["audio-mix-main"] - 649.0 / 1023.0).abs() < 0.002);
-    let main_after = snapshot
-        .mix_targets
-        .iter()
-        .find(|entry| entry.id == "audio-mix-main")
-        .expect("main");
-    assert!(main_after.dim);
-    assert!((main_after.volume - 0.5).abs() < 0.002);
-}
-
-#[test]
-fn recall_without_console_answer_stays_assumed_and_lists_unconfirmed() {
-    let _serial = serialize_shared_link();
-    let mut fake = FakeTotalMix::bind();
-    let slot = crate::rme_totalmix_osc::bind_test_global_slot(fake.port);
-    fake.start(slot.local_port(), Vec::new(), false, false);
-    let test_dir = pull_test_db("recall-push-unconfirmed", fake.port);
-    crate::rme_totalmix_osc::mark_console_link_slot(true);
-    let _pump = SlotPump::start(slot, test_dir.db_path());
-    let db = test_dir.db_path();
-    let created = create_audio_snapshot(
-        &db,
-        &AudioSnapshotCreateRequest {
-            name: String::from("Silent desk"),
-            osc_index: 7,
-            capture_current_state: Some(true),
-        },
-    )
-    .expect("snapshot capture should succeed");
-
-    let result = recall_audio_snapshot_with_timing(
-        &db,
-        &AudioSnapshotRecallRequest {
-            snapshot_id: created.snapshot.id.clone(),
-        },
-        PushTiming {
-            confirm_wait_ms: 300,
-            poll_ms: 10,
-        },
-    )
-    .expect("recall itself succeeds; the console just never confirms");
-    assert!(result.pushed > 20);
-    assert_eq!(result.confirmed, 0);
-    assert_eq!(result.unconfirmed, result.pushed, "{}", result.summary);
-    assert_eq!(result.console_state_confidence, "assumed");
-    assert!(result.summary.contains("unconfirmed"), "{}", result.summary);
-
-    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.console_state_confidence, "assumed");
-    assert_eq!(
-        snapshot.last_console_sync_reason.as_deref(),
-        Some("snapshot")
-    );
-    assert_eq!(
-        snapshot.last_recalled_snapshot_id.as_deref(),
-        Some(created.snapshot.id.as_str())
-    );
-}
-
-#[test]
-fn recall_in_simulated_mode_is_app_local_and_aligned() {
-    let test_dir = TestDir::new("recall-simulated");
-    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-    set_settings_owned(
-        test_dir.db_path().as_path(),
-        &[
-            (
-                String::from("app.commissioning.check.audio.status"),
-                String::from("passed"),
-            ),
-            (
-                String::from(AUDIO_METERING_SOURCE_KEY),
-                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
-            ),
-        ],
-    )
-    .expect("settings should persist");
-    let db = test_dir.db_path();
-    let mut host = channel_request("audio-input-9");
-    host.mute = Some(true);
-    update_audio_channel(&db, &host).expect("simulated edit should apply");
-    let created = create_audio_snapshot(
-        &db,
-        &AudioSnapshotCreateRequest {
-            name: String::from("Sim scene"),
-            osc_index: 5,
-            capture_current_state: Some(true),
-        },
-    )
-    .expect("snapshot capture should succeed");
-    let mut unmute = channel_request("audio-input-9");
-    unmute.mute = Some(false);
-    update_audio_channel(&db, &unmute).expect("simulated edit should apply");
-
-    let result = recall_audio_snapshot(
-        &db,
-        &AudioSnapshotRecallRequest {
-            snapshot_id: created.snapshot.id.clone(),
-        },
-    )
-    .expect("simulated recall should succeed");
-    assert_eq!(result.pushed, 0);
-    assert_eq!(result.console_state_confidence, "aligned");
-    assert!(
-        result.summary.contains("simulated console"),
-        "{}",
-        result.summary
-    );
-
-    let settings = list_settings_by_prefix(&db, APP_SETTINGS_PREFIX).expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.console_state_confidence, "aligned");
-    assert_eq!(
-        snapshot.last_console_sync_reason.as_deref(),
-        Some("snapshot")
-    );
-    assert!(snapshot
-        .channels
-        .iter()
-        .any(|entry| entry.id == "audio-input-9" && entry.mute));
 }
 
 // 2026-09 production readiness, Slice 11 (F30): a switch thrown at TotalMix
@@ -1442,6 +1084,7 @@ fn console_changes_record_source_console() {
         value,
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     };
     let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
@@ -1513,4 +1156,185 @@ fn console_changes_record_source_console() {
         .expect("the flush should apply");
     assert_eq!(again.applied, 0, "nothing changed the second time");
     assert_eq!(rows().len(), 2);
+}
+
+// 2026-10-01: the Console's channel and output names follow TotalMix. A name
+// TotalMix reports is written like any change made there, only when it
+// differs, and leaves no row in Recent actions.
+#[test]
+fn channel_names_from_totalmix_are_stored_and_shown() {
+    use crate::rme_console_link::{ConsoleBus, ConsoleUpdate, ConsoleValue, ParamKey};
+    let test_dir = TestDir::new("console-names");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    let name = |bus: ConsoleBus, channel: usize, value: &str| ConsoleUpdate {
+        key: ParamKey::ChannelName { bus, channel },
+        value: ConsoleValue::Text(String::from(value)),
+        adjusted: false,
+        confirms_send: false,
+        during_load: false,
+    };
+    let long = "N".repeat(51);
+    let updates = vec![
+        name(ConsoleBus::Input, 8, "  Host Mic  "),
+        name(ConsoleBus::Playback, 2, "Music"),
+        name(ConsoleBus::Output, 8, "Guest Cans"),
+        // Already the name the Console shows: nothing to write.
+        name(ConsoleBus::Output, 10, "Phones 2"),
+        // Not written: the right side of a stereo pair, a channel and outputs
+        // the app does not model, and names the app does not keep.
+        name(ConsoleBus::Playback, 3, "Music R"),
+        name(ConsoleBus::Input, 40, "MADI 41"),
+        name(ConsoleBus::Output, 9, "Guest Cans R"),
+        name(ConsoleBus::Output, 4, "AN 5"),
+        name(ConsoleBus::Input, 0, "   "),
+        name(ConsoleBus::Input, 1, &long),
+        name(ConsoleBus::Input, 2, "Line\u{7}Bell"),
+    ];
+    let names = |snapshot: &AudioSnapshot| {
+        snapshot
+            .channels
+            .iter()
+            .map(|entry| (entry.id.clone(), entry.name.clone()))
+            .chain(
+                snapshot
+                    .mix_targets
+                    .iter()
+                    .map(|entry| (entry.id.clone(), entry.name.clone())),
+            )
+            .collect::<HashMap<String, String>>()
+    };
+    let before = names(&read_audio_snapshot(
+        &list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load"),
+    ));
+    let report = apply_console_activity(db_path.as_path(), &updates, &[], false)
+        .expect("the names should apply");
+    assert_eq!(report.applied, 3);
+    assert!(report.changed());
+
+    let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let mut expected = before.clone();
+    expected.insert(String::from("audio-input-9"), String::from("Host Mic"));
+    expected.insert(String::from("audio-playback-3-4"), String::from("Music"));
+    expected.insert(
+        String::from("audio-mix-phones-a"),
+        String::from("Guest Cans"),
+    );
+    assert_eq!(
+        names(&read_audio_snapshot(&settings)),
+        expected,
+        "the three names, trimmed; every other name as it was"
+    );
+    assert_eq!(before["audio-mix-phones-b"], "Phones 2");
+    let stored_targets: HashMap<String, StoredAudioMixTargetState> = serde_json::from_str(
+        settings
+            .get(AUDIO_MIX_TARGET_STATE_KEY)
+            .expect("the outputs' state is written"),
+    )
+    .expect("the outputs' state reads");
+    assert_eq!(
+        stored_targets["audio-mix-phones-a"].name.as_deref(),
+        Some("Guest Cans")
+    );
+    assert!(
+        crate::action_log::list_recent_actions(db_path.as_path(), 20)
+            .expect("the action log should list")
+            .is_empty(),
+        "a name is not a row in Recent actions"
+    );
+
+    // The next dump repeats every name: nothing is written, nothing reported.
+    let again = apply_console_activity(db_path.as_path(), &updates, &[], false)
+        .expect("the names should apply");
+    assert_eq!(again.applied, 0);
+    assert!(!again.changed());
+
+    // An edit of the output keeps the name TotalMix gave it.
+    set_settings_owned(
+        db_path.as_path(),
+        &[
+            (
+                String::from("app.commissioning.check.audio.status"),
+                String::from("passed"),
+            ),
+            (
+                String::from(AUDIO_METERING_SOURCE_KEY),
+                String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+            ),
+        ],
+    )
+    .expect("the simulated console should be set");
+    let mut phones = mix_target_request("audio-mix-phones-a");
+    phones.mute = Some(true);
+    let edited = update_audio_mix_target(db_path.as_path(), &phones).expect("the edit applies");
+    assert!(edited.mute);
+    assert_eq!(edited.name, "Guest Cans");
+}
+
+#[test]
+fn a_changed_snapshot_slot_is_reported_by_the_flush_and_shown() {
+    use crate::rme_console_link::{ConsoleBus, ConsoleUpdate, ConsoleValue, ParamKey};
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-slots");
+    let db_path = test_dir.db_path();
+    initialize_test_database(db_path.as_path()).expect("database should initialize");
+    let link = crate::rme_console_link::shared_console_link();
+    let report_slot = |address: &str, value: f32| {
+        link.lock().expect("link").ingest(
+            &rosc::OscMessage {
+                addr: String::from(address),
+                args: vec![rosc::OscType::Float(value)],
+            },
+            crate::rme_console_link::link_now_ms(),
+        );
+    };
+    let active = || {
+        let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
+            .expect("settings should load");
+        // The first of TotalMix's slots that is loaded, changed or not.
+        read_audio_snapshot(&settings)
+            .console_snapshots
+            .slots
+            .iter()
+            .find(|slot| slot.state == "active" || slot.state == "changed")
+            .map(|slot| slot.slot)
+    };
+    let flush = || {
+        flush_console_link_at(db_path.as_path(), crate::rme_console_link::link_now_ms())
+            .expect("the flush should succeed")
+    };
+
+    assert_eq!(active(), None);
+    report_slot("/snapshot/load/1", 0.0);
+    report_slot("/snapshot/load/3", 2.0);
+    let report = flush();
+    assert!(report.slots_changed && report.changed());
+    assert_eq!(report.applied, 0, "nothing is written for a slot");
+    assert_eq!(active(), Some(3));
+
+    // Changed on the desk since it was loaded: still the loaded one.
+    report_slot("/snapshot/load/3", 3.0);
+    assert!(flush().slots_changed);
+    assert_eq!(active(), Some(3));
+
+    // The same report again changes nothing, and neither does a name the
+    // Console already shows.
+    report_slot("/snapshot/load/3", 3.0);
+    link.lock().expect("link").queue_for_test(ConsoleUpdate {
+        key: ParamKey::ChannelName {
+            bus: ConsoleBus::Output,
+            channel: 0,
+        },
+        value: ConsoleValue::Text(String::from("Main Out")),
+        adjusted: false,
+        confirms_send: false,
+        during_load: false,
+    });
+    assert!(!flush().changed());
+
+    report_slot("/snapshot/load/3", 0.0);
+    assert!(flush().slots_changed);
+    assert_eq!(active(), None);
 }

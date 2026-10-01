@@ -11,8 +11,8 @@ export interface AudioArmingFeedback {
 }
 
 export interface AudioArmingResetTriggers {
-  lastRecalledSnapshotId?: string | null;
-  lastSnapshotRecallAt?: string | number | null;
+  /** The TotalMix snapshot slot the desk holds (2026-10-01). */
+  loadedSnapshotSlot?: number | null;
   selectedChannelId?: string | null;
   selectedMixTargetId?: string | null;
 }
@@ -38,7 +38,7 @@ export interface UseAudioArmingResult {
  * arm window after `candidate.timeoutMs`. Consumers thread `armedAction` into
  * the snapshot deck (for the countdown bar and the data-armed lane treatment)
  * and call `armOrApplyAction` from each user-initiated armed action (48V
- * phantom, snapshot recall, snapshot save).
+ * phantom, a TotalMix snapshot load).
  *
  * `clearArmedAction` is intentionally exposed for the few non-arming code
  * paths that must drop the current arm — eg. `performAction` resetting state
@@ -86,18 +86,13 @@ export function useAudioArming({
     };
   }, [armedAction]);
 
-  // Why: any external state shift that invalidates the current arm (recall
-  // succeeded, snapshot rolled, selection changed, mix target changed) clears
+  // Why: any external state shift that invalidates the current arm (TotalMix
+  // loaded another snapshot, selection changed, mix target changed) clears
   // the arm without raising a toast. The toast would be misleading because
   // the operator did not cancel — the engine state moved.
   useEffect(() => {
     setArmedAction(null);
-  }, [
-    resetTriggers.lastRecalledSnapshotId,
-    resetTriggers.lastSnapshotRecallAt,
-    resetTriggers.selectedChannelId,
-    resetTriggers.selectedMixTargetId,
-  ]);
+  }, [resetTriggers.loadedSnapshotSlot, resetTriggers.selectedChannelId, resetTriggers.selectedMixTargetId]);
 
   // Why: ensure the timer is cancelled if the workspace unmounts while an
   // arm is pending — eg. operator switches workspace mid-arm.
@@ -117,7 +112,7 @@ export function useAudioArming({
     return true;
   });
 
-  // Why: Esc cancels an armed 48 V change, snapshot recall or snapshot save.
+  // Why: Esc cancels an armed 48 V change or snapshot load.
   // Registered only while something is armed, so an idle Console binds no key.
   // An Esc a dialog or a menu already took (`defaultPrevented`, or stopped
   // before it reached the window) closes that and leaves the arm alone, as the

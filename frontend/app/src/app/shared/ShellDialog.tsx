@@ -19,7 +19,7 @@ import { useLiveCallback } from "./useLiveCallback";
 //
 // It listens in the capture phase, so it takes a key before anything beneath it
 // that listens on the window. "Close Studio Control?" can open over a Console
-// with an armed 48 V change, recall or save, whose Esc listener was added first
+// with an armed 48 V change or snapshot load, whose Esc listener was added first
 // and so would run first in the bubble phase: the Esc that closes the dialog
 // would cancel the arm too. Taken first and default-prevented, it closes only
 // the dialog; the arm's listener passes over a prevented Esc.

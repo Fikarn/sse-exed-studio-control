@@ -695,21 +695,10 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       `${runtimeLabel} audio.mixTarget.update did not persist the expected control-room mix state.`
     );
 
-    if (LIVE_CONSOLE) {
-      // A rename is app-local (Slice 1 keeps it ungated) and proves the
-      // channel update path without touching a real preamp.
-      const renamed = await harness.request(`${requestIdPrefix}-audio-front-preamp`, "audio.channel.update", {
-        channelId: targets.frontChannelId,
-        name: "Parity Preamp",
-      });
-      assert(
-        renamed.id === targets.frontChannelId &&
-          renamed.name === "Parity Preamp" &&
-          renamed.gain === baselineFront.gain &&
-          renamed.phantom === baselineFront.phantom,
-        `${runtimeLabel} audio.channel.update did not persist the expected app-local rename.`
-      );
-    } else {
+    // The live lane leaves the real preamps alone; the channels' names are
+    // TotalMix's since 2026-10-01, so no app-local rename is left to prove
+    // the channel path with there.
+    if (!LIVE_CONSOLE) {
       const updatedFront = await harness.request(`${requestIdPrefix}-audio-front-preamp`, "audio.channel.update", {
         channelId: targets.frontChannelId,
         gain: 40,
@@ -799,18 +788,19 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     }
 
     if (!LIVE_CONSOLE) {
-      const recalled = await harness.request(`${requestIdPrefix}-audio-snapshot-recall`, "audio.snapshot.recall", {
-        snapshotId: "snapshot-panel",
+      // TotalMix's own snapshots (2026-10-01): a load on the simulated
+      // console sends nothing and marks the slot active. The live lane never
+      // loads (that would replace the real desk's mix; a development build
+      // refuses it anyway), and the studio walk covers it.
+      const loaded = await harness.request(`${requestIdPrefix}-audio-snapshot-load`, "audio.snapshot.load", {
+        slot: 3,
       });
-      // Slice 4: recall is a push. On the simulated console it is app-local
-      // and stays aligned; the live lane never recalls (that would push a
-      // snapshot to the real desk — operator checklist B3 covers it).
       assert(
-        recalled.recalled === true &&
-          recalled.snapshotId === "snapshot-panel" &&
-          recalled.consoleStateConfidence === "aligned" &&
-          recalled.unconfirmed === 0,
-        `${runtimeLabel} audio.snapshot.recall did not report an aligned, confirmed recall: ${JSON.stringify(recalled)}`
+        loaded.loaded === true &&
+          loaded.slot === 3 &&
+          loaded.consoleStateConfidence === "aligned" &&
+          loaded.totalMixReported === false,
+        `${runtimeLabel} audio.snapshot.load did not report a load on the simulated console: ${JSON.stringify(loaded)}`
       );
     }
 
@@ -826,20 +816,21 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
       mutatedSnapshot.selectedChannelId === "audio-input-12" &&
         mutatedSnapshot.selectedMixTargetId === "audio-mix-phones-a" &&
         // Ordinary edits never write console-state confidence (Slice 1); sync
-        // aligns it and, in the simulated lane, recall marks it assumed.
+        // aligns it and, in the simulated lane, so does the load.
         mutatedSnapshot.consoleStateConfidence === "aligned" &&
-        mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "console-pull" : "snapshot") &&
-        mutatedSnapshot.lastRecalledSnapshotId === (LIVE_CONSOLE ? null : "snapshot-panel"),
-      `${runtimeLabel} audio snapshot did not retain the expected selection and recall markers.`
+        mutatedSnapshot.lastConsoleSyncReason === (LIVE_CONSOLE ? "console-pull" : "simulated-load") &&
+        (LIVE_CONSOLE || mutatedSnapshot.consoleSnapshots?.slots?.[2]?.state === "active"),
+      `${runtimeLabel} audio snapshot did not retain the expected selection and load markers: ${JSON.stringify(
+        mutatedSnapshot.consoleSnapshots
+      )}`
     );
     if (LIVE_CONSOLE) {
       assert(
         mutatedFront &&
-          mutatedFront.name === "Parity Preamp" &&
           mutatedFront.gain === baselineFront.gain &&
           mutatedFront.phantom === baselineFront.phantom &&
           mutatedFront.phase === baselineFront.phase,
-        `${runtimeLabel} audio snapshot did not retain the expected app-local front-preamp rename.`
+        `${runtimeLabel} audio snapshot changed the live front preamp, which the lane never writes.`
       );
       assert(
         mutatedSnapshot.consoleLink?.unconfirmedSends === 0,
@@ -884,7 +875,6 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
         targets,
         baselineMixTarget,
         baselinePlayback,
-        baselineFront,
       });
     }
   }
@@ -901,19 +891,13 @@ export async function assertAudioWorkflowParity(harness, requestIdPrefix, runtim
     baselineExpectedCompatibilityMode: baselineSnapshot.expectedCompatibilityMode,
     baselineLastConsoleSyncAt: baselineSnapshot.lastConsoleSyncAt ?? null,
     baselineLastConsoleSyncReason: baselineSnapshot.lastConsoleSyncReason ?? null,
-    baselineLastRecalledSnapshotId: baselineSnapshot.lastRecalledSnapshotId ?? null,
-    baselineLastSnapshotRecallAt: baselineSnapshot.lastSnapshotRecallAt ?? null,
     baselineConsoleStateConfidence: baselineSnapshot.consoleStateConfidence,
   };
 }
 
 // Puts the live desk back exactly as the baseline saw it. Runs in `finally`,
 // so a failed assertion never leaves the studio console mutated.
-async function restoreLiveConsoleWrites(
-  harness,
-  requestIdPrefix,
-  { targets, baselineMixTarget, baselinePlayback, baselineFront }
-) {
+async function restoreLiveConsoleWrites(harness, requestIdPrefix, { targets, baselineMixTarget, baselinePlayback }) {
   await harness.request(`${requestIdPrefix}-audio-live-restore-mix`, "audio.mixTarget.update", {
     mixTargetId: targets.mixTargetId,
     volume: baselineMixTarget.volume,
@@ -926,10 +910,6 @@ async function restoreLiveConsoleWrites(
     mixTargetId: targets.playbackSendTargetId,
     fader: baselinePlayback.mixLevels?.[targets.playbackSendTargetId] ?? 0,
     mute: baselinePlayback.mute,
-  });
-  await harness.request(`${requestIdPrefix}-audio-live-restore-front`, "audio.channel.update", {
-    channelId: targets.frontChannelId,
-    name: baselineFront.name,
   });
   await awaitConsoleLinkQuiet(harness, `${requestIdPrefix}-audio-live-restore-quiet`);
 }

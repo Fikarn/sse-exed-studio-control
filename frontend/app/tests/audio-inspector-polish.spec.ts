@@ -57,22 +57,23 @@ test("the footer carries the console link, the metering source, the last sync an
   await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
 });
 
-test("snapshot diff shows '+N more' when more than two channels changed", async ({ page }) => {
+// 2026-10-01 (the owner's decision, after the studio walk). Old: "snapshot diff
+// shows '+N more' when more than two channels changed": a slot's hover float
+// previewed what its recall would change, with save, rename and delete keys.
+// New: a slot is one of TotalMix's own, shows its name and what TotalMix
+// reports of it, and a hover adds nothing. Reason: the app keeps none of a
+// TotalMix snapshot's contents, so it has nothing to compare or to edit.
+test("a TotalMix snapshot slot shows its name and state, and a hover adds nothing", async ({ page }) => {
   await openFixture(page, "audio-populated");
-  // The interview-block snapshot pre-populates several differing channels;
-  // pick the tile and hover so the preview pops, then look for the overflow
-  // indicator.
-  const snapshot = page.getByTestId("audio-snapshot-snapshot-interview-block");
-  await expect(snapshot).toBeVisible();
-  await snapshot.hover();
-  const overflow = page.getByTestId("audio-snapshot-diff-overflow-snapshot-interview-block");
-  // At minimum, assert the testid resolves. If the snapshot happens to carry
-  // ≤ 2 diffs the overflow will be hidden; treat that as a soft check.
-  const count = await overflow.count();
-  if (count > 0) {
-    expect(count).toBe(1);
-    expect((await overflow.textContent()) ?? "").toMatch(/^\+\d+ more changes$/);
-  }
+  const slot = page.getByTestId("audio-snapshot-slot-2");
+  await expect(slot).toBeVisible();
+  await expect(page.getByTestId("audio-snapshot-name-2")).toHaveText("Interview");
+  await expect(page.getByTestId("audio-snapshot-state-2")).toHaveText("–");
+  const atRest = await slot.innerText();
+  await slot.hover();
+  expect(await slot.innerText()).toBe(atRest);
+  await expect(slot.getByRole("button")).toHaveCount(1);
+  await expect(page.getByTestId("audio-snapshot-deck").getByRole("button")).toHaveCount(8);
 });
 
 test("EQ Band 2 locks the band-type selector via the capability flag", async ({ page }) => {

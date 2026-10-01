@@ -95,16 +95,16 @@ describe("ShellDialog", () => {
 });
 
 // Slice 3 review (#1, #13): "Close Studio Control?" opens over the Console, which
-// stays mounted, and an armed 48 V change, recall or save listens for Esc on the
-// window as well. The arm's listener is the older of the two (the arm came
+// stays mounted, and an armed 48 V change or snapshot load listens for Esc on
+// the window as well. The arm's listener is the older of the two (the arm came
 // before the dialog), so the dialog has to take the Esc ahead of it: the dialog
 // closes and the arm is left alone, as it was before Slice 3.
 describe("ShellDialog over an armed Console action", () => {
-  const armedRecall = {
-    key: "snapshot-recall:snapshot-interview-block",
-    label: "Recall Interview block",
-    targetId: "snapshot-interview-block",
-    targetKind: "snapshot-recall" as const,
+  const armedLoad = {
+    key: "snapshot-load:2",
+    label: "Load Interview in TotalMix",
+    targetId: "2",
+    targetKind: "snapshot-load" as const,
     // Longer than the test, so the arm cannot lapse on its own.
     timeoutMs: 60_000,
   };
@@ -112,8 +112,8 @@ describe("ShellDialog over an armed Console action", () => {
   function armThenOpenDialog() {
     const setFeedback = vi.fn();
     const arming = renderHook(() => useAudioArming({ resetTriggers: {}, setFeedback }));
-    act(() => arming.result.current.armOrApplyAction(armedRecall, () => {}));
-    expect(arming.result.current.armedAction?.key).toBe(armedRecall.key);
+    act(() => arming.result.current.armOrApplyAction(armedLoad, () => {}));
+    expect(arming.result.current.armedAction?.key).toBe(armedLoad.key);
     return { arming, setFeedback, ...renderDialog() };
   }
 
@@ -121,7 +121,7 @@ describe("ShellDialog over an armed Console action", () => {
     arming: ReturnType<typeof armThenOpenDialog>["arming"],
     setFeedback: ReturnType<typeof vi.fn>
   ) {
-    expect(arming.result.current.armedAction?.key).toBe(armedRecall.key);
+    expect(arming.result.current.armedAction?.key).toBe(armedLoad.key);
     // Only the arm's own "Armed: …" line; no "Armed audio action canceled.".
     expect(setFeedback).toHaveBeenCalledTimes(1);
     expect(setFeedback).not.toHaveBeenCalledWith(expect.objectContaining({ message: "Armed audio action canceled." }));

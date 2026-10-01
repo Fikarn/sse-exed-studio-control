@@ -72,10 +72,10 @@ export interface AudioSettingsUpdateRequest {
   viewMode?: "submix" | "master";
 }
 
+/** `audio.channel.update`. No `name`: the channels take TotalMix's names and are renamed in TotalMix (2026-10-01). */
 export interface AudioChannelUpdateRequest {
   channelId: string;
   mixTargetId?: string;
-  name?: string;
   gain?: number;
   fader?: number;
   mute?: boolean;
@@ -187,23 +187,6 @@ export interface CameraSetupUpdateRequest {
   camera: CameraNumber;
   address?: string | null;
   vmixInput?: number;
-}
-
-export interface AudioSnapshotCreateRequest {
-  name: string;
-  oscIndex: number;
-  captureCurrentState?: boolean;
-}
-
-export interface AudioSnapshotUpdateRequest {
-  snapshotId: string;
-  name?: string;
-  oscIndex?: number;
-  captureCurrentState?: boolean;
-}
-
-export interface AudioSnapshotDeleteRequest {
-  snapshotId: string;
 }
 
 export interface AudioClipClearRequest {
@@ -619,10 +602,8 @@ export interface ShellStore {
   runCommissioningCheck(request: CommissioningCheckRequest): Promise<JsonValue>;
   updateCommissioning(request: CommissioningUpdateRequest): Promise<JsonValue>;
   syncAudio(): Promise<JsonValue>;
-  recallAudioSnapshot(snapshotId: string): Promise<JsonValue>;
-  createAudioSnapshot(request: AudioSnapshotCreateRequest): Promise<JsonValue>;
-  updateAudioSnapshot(request: AudioSnapshotUpdateRequest): Promise<JsonValue>;
-  deleteAudioSnapshot(request: AudioSnapshotDeleteRequest): Promise<JsonValue>;
+  /** `audio.snapshot.load`: TotalMix loads its own snapshot `slot` (1 to 8), then the console is read again as Sync does (2026-10-01). */
+  loadAudioSnapshot(slot: number): Promise<JsonValue>;
   clearAudioClips(request?: AudioClipClearRequest): Promise<JsonValue>;
   clearAllAudioSolo(): Promise<JsonValue>;
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;

@@ -22,28 +22,32 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     let connected = check_status == "passed" && osc_enabled;
     let verified = check_status == "passed" && osc_enabled;
     let inventory = read_default_audio_inventory(&config);
-    let snapshot_entries = read_audio_snapshot_entries(settings, inventory.snapshots.as_slice());
     let console_state_confidence = audio_console_state_confidence(settings);
     let last_console_sync_at = read_optional_setting(settings, AUDIO_LAST_CONSOLE_SYNC_AT_KEY);
     let last_console_sync_reason =
         read_optional_setting(settings, AUDIO_LAST_CONSOLE_SYNC_REASON_KEY);
-    let last_recalled_snapshot_id =
-        read_optional_setting(settings, AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY).filter(
-            |snapshot_id| {
-                snapshot_entries
-                    .iter()
-                    .any(|snapshot| snapshot.id == *snapshot_id)
-            },
-        );
-    let last_snapshot_recall_at =
-        read_optional_setting(settings, AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY);
     // D26 (2026-09-28): the build before could leave a refused talkback as the
     // Console's last action, and nothing clears a last action at start. This
     // build has no talkback, so that refusal reads as no action at all; the
-    // next action writes over it.
-    let retired_refusal = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY).as_deref()
-        == Some(RETIRED_TALKBACK_REFUSED_CODE);
-    let last_action = |key: &str| read_optional_setting(settings, key).filter(|_| !retired_refusal);
+    // next action writes over it. The app's own snapshot recall went on
+    // 2026-10-01 the same way: a last action it wrote ("Recalled Snapshot 5:
+    // … unconfirmed") would describe a recall this build cannot make.
+    let saved_code = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY);
+    let retired_refusal = saved_code.as_deref() == Some(RETIRED_TALKBACK_REFUSED_CODE)
+        || saved_code
+            .as_deref()
+            .is_some_and(|code| RETIRED_SNAPSHOT_CODES.contains(&code));
+    // A load's own failure begins with the slot's name, which TotalMix may
+    // have named "Recalled …": that sentence says it was sent to TotalMix.
+    let retired_recall = read_optional_setting(settings, AUDIO_LAST_ACTION_MESSAGE_KEY)
+        .is_some_and(|message| {
+            (message.starts_with(RETIRED_RECALL_MESSAGE_PREFIX)
+                && !message.contains(" was sent to TotalMix; "))
+                || message.starts_with(RETIRED_SNAPSHOT_MESSAGE_PREFIX)
+        });
+    let last_action = |key: &str| {
+        read_optional_setting(settings, key).filter(|_| !retired_refusal && !retired_recall)
+    };
     let last_action_status =
         last_action(AUDIO_LAST_ACTION_STATUS_KEY).unwrap_or_else(|| String::from("idle"));
     let last_action_code = last_action(AUDIO_LAST_ACTION_CODE_KEY);
@@ -59,25 +63,6 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     let faders_per_bank = audio_faders_per_bank(settings);
     let view_mode = audio_view_mode(settings);
     let capabilities = audio_capabilities(&status, osc_enabled);
-    let snapshots = snapshot_entries
-        .into_iter()
-        .map(|snapshot| {
-            let last_recalled = last_recalled_snapshot_id
-                .as_deref()
-                .map(|value| value == snapshot.id)
-                .unwrap_or(false);
-            AudioSceneSnapshot {
-                last_recalled_at: if last_recalled {
-                    last_snapshot_recall_at.clone()
-                } else {
-                    None
-                },
-                last_recalled,
-                preview: audio_scene_preview(snapshot.contents.as_ref(), &channels, &mix_targets),
-                ..snapshot
-            }
-        })
-        .collect::<Vec<_>>();
     let metering_state = if !osc_enabled {
         String::from("disabled")
     } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
@@ -96,11 +81,8 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
             metering_source: &metering_source,
             channel_count: channels.len(),
             mix_target_count: mix_targets.len(),
-            snapshot_count: snapshots.len(),
             last_console_sync_at: last_console_sync_at.as_deref(),
             last_console_sync_reason: last_console_sync_reason.as_deref(),
-            last_recalled_snapshot_id: last_recalled_snapshot_id.as_deref(),
-            last_snapshot_recall_at: last_snapshot_recall_at.as_deref(),
             last_action_status: &last_action_status,
             last_action_code: last_action_code.as_deref(),
             last_action_message: last_action_message.as_deref(),
@@ -127,14 +109,12 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
         console_link: console_link_snapshot(settings),
         last_console_sync_at,
         last_console_sync_reason,
-        last_recalled_snapshot_id,
-        last_snapshot_recall_at,
         last_action_status,
         last_action_code,
         last_action_message,
         channels,
         mix_targets,
-        snapshots,
+        console_snapshots: console_snapshots_now(),
     }
 }
 

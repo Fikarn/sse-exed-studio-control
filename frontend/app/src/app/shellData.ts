@@ -2,8 +2,8 @@ import type {
   AudioChannelSnapshot,
   AudioDynamicsSnapshot,
   AudioEqSnapshot,
+  AudioConsoleSnapshotSlot,
   AudioMixTargetSnapshot,
-  AudioSceneSnapshot,
   AudioSendModeSnapshot,
   AudioSnapshot,
   LightingDmxChannelSnapshot,
@@ -175,15 +175,16 @@ export interface AudioMixTargetEntry {
   volume: number;
 }
 
-export interface AudioSnapshotEntry {
-  contents?: AudioSceneSnapshot["contents"];
-  id: string;
-  lastRecalled: boolean;
-  lastRecalledAt?: string;
+/** How TotalMix reports a snapshot slot: never yet, not loaded, loaded, or loaded and changed since. */
+export type AudioConsoleSnapshotState = "unknown" | "off" | "active" | "changed";
+
+/** One of TotalMix's eight snapshots as the Console shows it (2026-10-01). */
+export interface AudioConsoleSnapshotEntry {
+  /** 1 to 8, as TotalMix numbers them. */
+  slot: number;
+  /** TotalMix's saved name, or `Slot N` when it saved none (as the hardware link names it). */
   name: string;
-  order: number;
-  oscIndex: number;
-  preview: AudioSceneSnapshot["preview"];
+  state: AudioConsoleSnapshotState;
 }
 
 // Coercion helpers retained only for the loose JsonObject snapshots
@@ -457,19 +458,25 @@ export function getAudioMixTargets(snapshot: AudioSnapshot | null): AudioMixTarg
   }));
 }
 
-export function getAudioSnapshots(snapshot: AudioSnapshot | null): AudioSnapshotEntry[] {
-  return [...(snapshot?.snapshots ?? [])]
-    .map((s: AudioSceneSnapshot): AudioSnapshotEntry => ({
-      id: s.id,
-      contents: s.contents ?? undefined,
-      lastRecalled: s.lastRecalled,
-      lastRecalledAt: s.lastRecalledAt ?? undefined,
-      name: s.name,
-      order: s.order,
-      oscIndex: s.oscIndex,
-      preview: s.preview,
-    }))
-    .sort((left, right) => left.order - right.order);
+const AUDIO_CONSOLE_SNAPSHOT_SLOTS = 8;
+const AUDIO_CONSOLE_SNAPSHOT_STATES: ReadonlySet<string> = new Set(["unknown", "off", "active", "changed"]);
+
+/** TotalMix's eight slots, slot 1 first, whatever the reply held; a slot it did not report is unknown. */
+export function getAudioConsoleSnapshots(snapshot: AudioSnapshot | null): AudioConsoleSnapshotEntry[] {
+  const reported = snapshot?.consoleSnapshots?.slots ?? [];
+  return Array.from({ length: AUDIO_CONSOLE_SNAPSHOT_SLOTS }, (_, index) => {
+    const slot = index + 1;
+    const entry: AudioConsoleSnapshotSlot | undefined = reported.find((candidate) => candidate.slot === slot);
+    const name = entry?.name?.trim();
+    return {
+      slot,
+      name: name ? name : `Slot ${slot}`,
+      state:
+        entry && AUDIO_CONSOLE_SNAPSHOT_STATES.has(entry.state)
+          ? (entry.state as AudioConsoleSnapshotState)
+          : "unknown",
+    };
+  });
 }
 
 // Map the long engine summary to a short status word for the shell header

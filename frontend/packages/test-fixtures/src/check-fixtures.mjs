@@ -58,6 +58,8 @@ function requireBoolean(scenario, value, fieldPath) {
 const RIG_WORDS = new Set(["unconfigured", "disabled", "ready", "attention", "not-verified"]);
 const LIGHTING_STATE_WORDS = new Set([...RIG_WORDS, "loading"]);
 const CONSOLE_WORDS = new Set(["ready", "attention", "not-verified"]);
+// How TotalMix reports one of its snapshot slots (2026-10-01, `audio/load.rs`).
+const CONSOLE_SNAPSHOT_STATES = new Set(["unknown", "off", "active", "changed"]);
 // `quiet` since 2026-09-29: the bridge serves and the deck has not asked lately.
 const BRIDGE_WORDS = new Set(["ready", "quiet", "unavailable"]);
 
@@ -104,8 +106,29 @@ function validateFixture(scenario, entry) {
     if (entry.audioSnapshot.mixTargets !== undefined) {
       requireArray(scenario, entry.audioSnapshot.mixTargets, "audioSnapshot.mixTargets");
     }
-    if (entry.audioSnapshot.snapshots !== undefined) {
-      requireArray(scenario, entry.audioSnapshot.snapshots, "audioSnapshot.snapshots");
+    // 2026-10-01: the Console's snapshots are TotalMix's eight; the app keeps
+    // none of its own, so a fixture that still carries the old list or its
+    // recall markers is describing a hardware link that is gone.
+    for (const gone of ["snapshots", "lastRecalledSnapshotId", "lastSnapshotRecallAt"]) {
+      if (entry.audioSnapshot[gone] !== undefined) {
+        fail(scenario, `audioSnapshot.${gone} is gone; TotalMix's slots are audioSnapshot.consoleSnapshots`);
+      }
+    }
+    if (entry.audioSnapshot.consoleSnapshots !== undefined) {
+      const consoleSnapshots = entry.audioSnapshot.consoleSnapshots;
+      requireObject(scenario, consoleSnapshots, "audioSnapshot.consoleSnapshots");
+      requireArray(scenario, consoleSnapshots.slots, "audioSnapshot.consoleSnapshots.slots");
+      if (consoleSnapshots.slots.length !== 8) {
+        fail(scenario, "audioSnapshot.consoleSnapshots.slots must hold TotalMix's eight slots");
+      }
+      for (const [index, slot] of consoleSnapshots.slots.entries()) {
+        const at = `audioSnapshot.consoleSnapshots.slots[${index}]`;
+        requireObject(scenario, slot, at);
+        if (slot.slot !== index + 1) fail(scenario, `${at}.slot must be ${index + 1}`);
+        if (slot.name !== null) requireString(scenario, slot.name, `${at}.name`);
+        requireString(scenario, slot.state, `${at}.state`);
+        requireWord(scenario, slot.state, CONSOLE_SNAPSHOT_STATES, `${at}.state`);
+      }
     }
     if (entry.audioSnapshot.verified !== undefined) {
       requireBoolean(scenario, entry.audioSnapshot.verified, "audioSnapshot.verified");

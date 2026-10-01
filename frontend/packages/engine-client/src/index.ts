@@ -55,9 +55,6 @@ export type {
   AudioDynamicsUpdateRequest,
   AudioEqUpdateRequest,
   AudioSendModeUpdateRequest,
-  AudioSnapshotCreateRequest,
-  AudioSnapshotDeleteRequest,
-  AudioSnapshotUpdateRequest,
   BackgroundFailure,
   CameraAutoRequest,
   CameraFormatRequest,
@@ -103,15 +100,14 @@ export type {
 // `protocol:check` lane catches drift.
 export type { AudioChannelSnapshot } from "./generated/snapshots/AudioChannelSnapshot";
 export type { AudioCapabilitySnapshot } from "./generated/snapshots/AudioCapabilitySnapshot";
+export type { AudioConsoleSnapshotSlot } from "./generated/snapshots/AudioConsoleSnapshotSlot";
+export type { AudioConsoleSnapshots } from "./generated/snapshots/AudioConsoleSnapshots";
 export type { AudioDynamicsProcessorSnapshot } from "./generated/snapshots/AudioDynamicsProcessorSnapshot";
 export type { AudioDynamicsSnapshot } from "./generated/snapshots/AudioDynamicsSnapshot";
 export type { AudioEqBandSnapshot } from "./generated/snapshots/AudioEqBandSnapshot";
 export type { AudioEqSnapshot } from "./generated/snapshots/AudioEqSnapshot";
 export type { AudioLowCutSnapshot } from "./generated/snapshots/AudioLowCutSnapshot";
 export type { AudioMixTargetSnapshot } from "./generated/snapshots/AudioMixTargetSnapshot";
-export type { AudioSceneContentsSnapshot } from "./generated/snapshots/AudioSceneContentsSnapshot";
-export type { AudioScenePreviewSnapshot } from "./generated/snapshots/AudioScenePreviewSnapshot";
-export type { AudioSceneSnapshot } from "./generated/snapshots/AudioSceneSnapshot";
 export type { AudioSendModeSnapshot } from "./generated/snapshots/AudioSendModeSnapshot";
 export type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
 export type { CameraAutos } from "./generated/snapshots/CameraAutos";

@@ -1,36 +1,34 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { AUDIO_RECALL_PULSE_MS } from "../src/app/audio/audioConstants";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 
 const SETTLE_TIMEOUT_MS = 20_000;
+// How long the Console's render count must hold still to count as settled.
+const SETTLED_QUIET_MS = 250;
 
 async function getInspectorRenderCount(page: Page) {
   return page.evaluate(() => window.__SSE_TEST_RENDER_COUNTS__?.audioInspector ?? null);
 }
 
+async function getWorkspaceRenderCount(page: Page) {
+  return page.evaluate(() => window.__SSE_TEST_RENDER_COUNTS__?.audioWorkspace ?? null);
+}
+
 // Production readiness S15. Old: both cases waited out the Console's start-up
 // renders with a fixed 500 ms window after `audio-workspace` appeared, then took
 // their baseline. New: they wait for what ends those renders. Reason: the
-// Console renders three times as it starts — its mount, then the recall pulse
-// on the snapshot key the fixture says was just recalled, then that pulse's end
-// on a 1.5 s timer (AUDIO_RECALL_PULSE_MS) — and `audio-workspace` was also the
-// id of the Console's loading surface (until 2026-09-23). On a loaded machine the baseline was
-// read before the mount or before the pulse ended, and the rest of the burst
-// was counted in the idle window; with the burst over, an idle Console renders
-// nothing, on any machine. The pulse is recorded in the page as it happens, so
-// no read from here can miss it.
+// Console renders more than once as it starts, and `audio-workspace` was also
+// the id of the Console's loading surface (until 2026-09-23). On a loaded
+// machine the baseline was read before the mount or before the burst ended, and
+// the rest of the burst was counted in the idle window; with the burst over, an
+// idle Console renders nothing, on any machine.
+// 2026-10-01: the burst used to end with the recall pulse on the snapshot key
+// the fixture said was just recalled (a 1.5 s timer). The pulse went with the
+// app's own snapshots, so nothing times the start any more: the Console is
+// settled once its render count holds still for SETTLED_QUIET_MS.
 async function openSettledConsole(page: Page, fixtureId: string) {
   await page.addInitScript(() => {
     window.__SSE_TEST_RENDER_COUNTS__ = {};
-    const pulse = { started: false, ended: false };
-    (window as unknown as { __SSE_TEST_RECALL_PULSE__: typeof pulse }).__SSE_TEST_RECALL_PULSE__ = pulse;
-    new MutationObserver((records) => {
-      for (const record of records) {
-        if ((record.target as Element).getAttribute("data-flash") === "true") pulse.started = true;
-        else if (pulse.started) pulse.ended = true;
-      }
-    }).observe(document, { attributeFilter: ["data-flash"], subtree: true });
   });
   await openFixture(page, fixtureId);
   // Nothing is measured yet, so these two waits can be as long as a slow
@@ -38,14 +36,15 @@ async function openSettledConsole(page: Page, fixtureId: string) {
   await expectWorkspaceMounted(page, "audio", { timeout: SETTLE_TIMEOUT_MS });
   await expect
     .poll(
-      () =>
-        page.evaluate(
-          () =>
-            (window as unknown as { __SSE_TEST_RECALL_PULSE__?: { ended: boolean } }).__SSE_TEST_RECALL_PULSE__?.ended
-        ),
+      async () => {
+        const before = await getWorkspaceRenderCount(page);
+        // Load-bearing: the settle is the absence of renders over a window.
+        await page.waitForTimeout(SETTLED_QUIET_MS);
+        return before !== null && (await getWorkspaceRenderCount(page)) === before;
+      },
       {
-        message: `${fixtureId}: the recall pulse the Console starts at mount (the fixture double's snapshot was just recalled) should come and go`,
-        timeout: AUDIO_RECALL_PULSE_MS + SETTLE_TIMEOUT_MS,
+        message: `${fixtureId}: the Console's start-up renders should come to an end`,
+        timeout: SETTLE_TIMEOUT_MS,
       }
     )
     .toBe(true);
@@ -76,7 +75,8 @@ test("idle meter ticks do not bump the audio inspector render counter", async ({
   // the budget tight enough to flag subtle drift the previous ≤ 10
   // budget would have hidden.
   // Production readiness S15: that 1 was the recall pulse ending inside the
-  // window; with the start-up renders waited out the measured Δ is 0.
+  // window; with the start-up renders waited out the measured Δ is 0 (and the
+  // pulse itself went on 2026-10-01).
   expect(delta).toBeLessThanOrEqual(3);
 });
 

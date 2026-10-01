@@ -1,7 +1,7 @@
 // Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { JsonObject } from "../../generated/protocol";
-import { asArray, asRecord, asString, asBoolean, cloneJson, asNumber } from "./json";
+import { asArray, asRecord, asString, asBoolean, asNumber } from "./json";
 import { clampNumber } from "./lighting";
 import type { MutableFixtureState } from "./state";
 
@@ -114,14 +114,72 @@ export function buildAudioSendModes() {
   } satisfies JsonObject;
 }
 
-export function buildAudioSnapshotPreview(hasContents = false) {
+/** TotalMix's slots, `/snapshot/load/1` to `/snapshot/load/8` (`SNAPSHOT_SLOTS`). */
+export const CONSOLE_SNAPSHOT_SLOTS = 8;
+
+const CONSOLE_SNAPSHOT_STATES = new Set(["unknown", "off", "active", "changed"]);
+
+/**
+ * TotalMix's eight snapshots as a simulated console shows them (2026-10-01):
+ * the names of the hardware link's test file (`rme_totalmix_names/fixture.xml`),
+ * slot 1 loaded, 2 and 3 reported off, 4 to 8 neither named nor reported. The
+ * time is the populated fixture's own, so the Console's source line shows.
+ */
+export function buildFixtureConsoleSnapshots(): JsonObject {
+  const names = ["Mix 1", "Interview", "Panel & Q&A"];
+  const states = ["active", "off", "off"];
   return {
-    hasContents,
-    channelCount: hasContents ? 18 : 0,
-    mixTargetCount: hasContents ? 3 : 0,
-    changedChannels: [],
-    changedMixTargets: [],
+    slots: Array.from({ length: CONSOLE_SNAPSHOT_SLOTS }, (_, index) => ({
+      slot: index + 1,
+      name: names[index] ?? null,
+      state: states[index] ?? "unknown",
+    })),
+    namesSavedAt: "2026-09-21T08:17:36Z",
+    namesNote: null,
   };
+}
+
+/** Always eight slots, slot 1 first, each with a state word the hardware link uses. */
+export function normalizeConsoleSnapshots(value: JsonObject | null): JsonObject {
+  const given = asArray(value?.slots)
+    .map((entry) => asRecord(entry))
+    .filter((entry): entry is JsonObject => entry !== null);
+  return {
+    slots: Array.from({ length: CONSOLE_SNAPSHOT_SLOTS }, (_, index) => {
+      const entry = given.find((candidate) => asNumber(candidate.slot, 0) === index + 1);
+      const name = typeof entry?.name === "string" && entry.name.trim() ? entry.name.trim() : null;
+      const state = asString(entry?.state, "unknown");
+      return { slot: index + 1, name, state: CONSOLE_SNAPSHOT_STATES.has(state) ? state : "unknown" };
+    }),
+    namesSavedAt: typeof value?.namesSavedAt === "string" ? value.namesSavedAt : null,
+    namesNote: typeof value?.namesNote === "string" ? value.namesNote : null,
+  };
+}
+
+/** A transport change: another address may be another desk, so every slot is unknown again. */
+export function forgetConsoleSnapshotStates(audioSnapshot: JsonObject) {
+  const consoleSnapshots = normalizeConsoleSnapshots(asRecord(audioSnapshot.consoleSnapshots));
+  consoleSnapshots.slots = asArray(consoleSnapshots.slots).map((entry) => ({
+    ...(asRecord(entry) ?? {}),
+    state: "unknown",
+  }));
+  audioSnapshot.consoleSnapshots = consoleSnapshots;
+}
+
+/**
+ * The simulated console's load (`mark_snapshot_loaded`): the slot is active,
+ * and every other slot TotalMix had reported is off; a slot never reported
+ * stays unknown.
+ */
+export function markConsoleSnapshotLoaded(audioSnapshot: JsonObject, slot: number) {
+  const consoleSnapshots = normalizeConsoleSnapshots(asRecord(audioSnapshot.consoleSnapshots));
+  consoleSnapshots.slots = asArray(consoleSnapshots.slots).map((entry) => {
+    const record = asRecord(entry) ?? {};
+    const state = record.slot === slot ? "active" : record.state === "unknown" ? "unknown" : "off";
+    return { ...record, state };
+  });
+  audioSnapshot.consoleSnapshots = consoleSnapshots;
+  return consoleSnapshots;
 }
 
 export function buildAudioChannel(
@@ -167,55 +225,10 @@ export function buildAudioChannel(
   };
 }
 
-/// Captured console state for the "Interview block" slot, derived from the
-/// fixture's own channels so a recall pushes a coherent scene: Host's 48V is
-/// flipped relative to the live strip, which is exactly the case Slice 4
-/// refuses to push and lists instead.
-export function attachInterviewBlockContents(snapshot: JsonObject) {
-  const channels: JsonObject = {};
-  for (const channel of asArray(snapshot.channels).map((entry) => asRecord(entry))) {
-    if (!channel) continue;
-    const id = asString(channel.id);
-    channels[id] = {
-      name: channel.name ?? null,
-      gain: channel.gain ?? 0,
-      fader: channel.fader ?? 0,
-      clip: false,
-      mixLevels: cloneJson((asRecord(channel.mixLevels) ?? {}) as JsonObject),
-      mute: channel.mute === true,
-      solo: channel.solo === true,
-      phantom: id === "audio-input-9" ? channel.phantom !== true : channel.phantom === true,
-      phase: channel.phase === true,
-      pad: channel.pad === true,
-      instrument: channel.instrument === true,
-      autoSet: channel.autoSet === true,
-      eq: cloneJson((asRecord(channel.eq) ?? {}) as JsonObject),
-      dynamics: cloneJson((asRecord(channel.dynamics) ?? {}) as JsonObject),
-      sendModes: cloneJson((asRecord(channel.sendModes) ?? {}) as JsonObject),
-    };
-  }
-  const mixTargets: JsonObject = {};
-  for (const mixTarget of asArray(snapshot.mixTargets).map((entry) => asRecord(entry))) {
-    if (!mixTarget) continue;
-    mixTargets[asString(mixTarget.id)] = {
-      volume: mixTarget.volume ?? 0,
-      mute: mixTarget.mute === true,
-      dim: mixTarget.dim === true,
-      mono: mixTarget.mono === true,
-    };
-  }
-  for (const entry of asArray(snapshot.snapshots).map((item) => asRecord(item))) {
-    if (entry && asString(entry.id) === "snapshot-interview-block") {
-      entry.contents = { capturedAt: "2026-04-22T18:40:00+02:00", channels, mixTargets };
-    }
-  }
-}
-
 export function buildDefaultAudioSnapshot(): JsonObject {
   const snapshot: JsonObject = {
     status: "ready",
-    summary:
-      "Test mode: the console is simulated and nothing reaches TotalMix. 18 channels, 3 outputs and 5 snapshots.",
+    summary: "Test mode: the console is simulated and nothing reaches TotalMix. 18 channels and 3 outputs.",
     adapterMode: "simulated",
     sendHost: "127.0.0.1",
     sendPort: 7001,
@@ -238,14 +251,11 @@ export function buildDefaultAudioSnapshot(): JsonObject {
       canRecallConsoleSnapshot: true,
       canEditProcessing: true,
       canClearClips: true,
-      canCaptureSnapshot: true,
       canUseMasterView: true,
     },
     consoleStateConfidence: "aligned",
     lastConsoleSyncAt: "2026-04-23T18:24:12+02:00",
     lastConsoleSyncReason: "manual sync",
-    lastRecalledSnapshotId: "snapshot-show-open",
-    lastSnapshotRecallAt: "2026-04-23T06:05:43+02:00",
     lastActionStatus: "succeeded",
     lastActionCode: null,
     lastActionMessage: "Sync succeeded",
@@ -485,60 +495,8 @@ export function buildDefaultAudioSnapshot(): JsonObject {
         mono: false,
       },
     ],
-    snapshots: [
-      {
-        id: "snapshot-open-rehearsal",
-        name: "Open rehearsal",
-        oscIndex: 0,
-        order: 0,
-        lastRecalled: false,
-        lastRecalledAt: "2026-04-23T05:42:00+02:00",
-        contents: null,
-        preview: buildAudioSnapshotPreview(false),
-      },
-      {
-        id: "snapshot-show-open",
-        name: "Show open",
-        oscIndex: 1,
-        order: 1,
-        lastRecalled: true,
-        lastRecalledAt: "2026-04-23T06:05:43+02:00",
-        contents: null,
-        preview: buildAudioSnapshotPreview(false),
-      },
-      {
-        id: "snapshot-interview-block",
-        name: "Interview block",
-        oscIndex: 2,
-        order: 2,
-        lastRecalled: false,
-        lastRecalledAt: null,
-        contents: null,
-        preview: buildAudioSnapshotPreview(false),
-      },
-      {
-        id: "snapshot-break-bumper",
-        name: "Break bumper",
-        oscIndex: 3,
-        order: 3,
-        lastRecalled: false,
-        lastRecalledAt: null,
-        contents: null,
-        preview: buildAudioSnapshotPreview(false),
-      },
-      {
-        id: "snapshot-credits",
-        name: "Credits",
-        oscIndex: 4,
-        order: 4,
-        lastRecalled: false,
-        lastRecalledAt: null,
-        contents: null,
-        preview: buildAudioSnapshotPreview(false),
-      },
-    ],
+    consoleSnapshots: buildFixtureConsoleSnapshots(),
   };
-  attachInterviewBlockContents(snapshot);
   return snapshot;
 }
 
@@ -574,7 +532,6 @@ export function refreshAudioCapabilities(audioSnapshot: JsonObject, state: Mutab
       confirmedSends: 0,
       adjustedSends: 0,
       externalChanges: 0,
-      activeConsoleSnapshot: null,
       lastPullAt: null,
       lastPullValues: null,
     };
@@ -588,7 +545,6 @@ export function refreshAudioCapabilities(audioSnapshot: JsonObject, state: Mutab
     canRecallConsoleSnapshot: consoleReady,
     canEditProcessing: consoleReady,
     canClearClips: oscEnabled,
-    canCaptureSnapshot: oscEnabled,
     canUseMasterView: oscEnabled,
   };
 }
@@ -636,45 +592,4 @@ export function fixtureAudioChannel(audioSnapshot: JsonObject, channelIdValue: u
     throw new Error(`Audio channel '${channelId}' is not exposed by the fixture transport.`);
   }
   return channel;
-}
-
-export function captureFixtureAudioScene(audioSnapshot: JsonObject) {
-  const channels: JsonObject = {};
-  for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
-    if (!channel) continue;
-    channels[asString(channel.id)] = {
-      name: asString(channel.name),
-      gain: asNumber(channel.gain, 0),
-      fader: asNumber(channel.fader, 0),
-      clip: asBoolean(channel.clip, false),
-      mixLevels: cloneJson(asRecord(channel.mixLevels) ?? {}),
-      mute: asBoolean(channel.mute, false),
-      solo: asBoolean(channel.solo, false),
-      phantom: asBoolean(channel.phantom, false),
-      phase: asBoolean(channel.phase, false),
-      pad: false,
-      instrument: asBoolean(channel.instrument, false),
-      autoSet: asBoolean(channel.autoSet, false),
-      eq: cloneJson(normalizeAudioEq(asRecord(channel.eq))),
-      dynamics: cloneJson(asRecord(channel.dynamics) ?? buildAudioDynamics()),
-      sendModes: cloneJson(asRecord(channel.sendModes) ?? buildAudioSendModes()),
-    };
-  }
-
-  const mixTargets: JsonObject = {};
-  for (const mixTarget of asArray(audioSnapshot.mixTargets).map((entry) => asRecord(entry))) {
-    if (!mixTarget) continue;
-    mixTargets[asString(mixTarget.id)] = {
-      volume: asNumber(mixTarget.volume, 0),
-      mute: asBoolean(mixTarget.mute, false),
-      dim: asBoolean(mixTarget.dim, false),
-      mono: asBoolean(mixTarget.mono, false),
-    };
-  }
-
-  return {
-    capturedAt: new Date().toISOString(),
-    channels,
-    mixTargets,
-  };
 }

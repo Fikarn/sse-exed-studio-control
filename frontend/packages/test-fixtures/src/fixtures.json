@@ -1232,7 +1232,7 @@
     },
     "audioSnapshot": {
       "consoleStateConfidence": "assumed",
-      "lastActionMessage": "Recalled Show open",
+      "lastActionMessage": "Updated Host",
       "lastActionStatus": "succeeded"
     }
   },
@@ -1350,6 +1350,20 @@
       ]
     },
     "audioSnapshot": {
+      "consoleSnapshots": {
+        "slots": [
+          { "slot": 1, "name": "Mix 1", "state": "unknown" },
+          { "slot": 2, "name": "Interview", "state": "unknown" },
+          { "slot": 3, "name": "Panel & Q&A", "state": "unknown" },
+          { "slot": 4, "name": null, "state": "unknown" },
+          { "slot": 5, "name": null, "state": "unknown" },
+          { "slot": 6, "name": null, "state": "unknown" },
+          { "slot": 7, "name": null, "state": "unknown" },
+          { "slot": 8, "name": null, "state": "unknown" }
+        ],
+        "namesSavedAt": "2026-09-21T08:17:36Z",
+        "namesNote": null
+      },
       "consoleStateConfidence": "assumed",
       "lastActionCode": "AUDIO_SYNC_FAILED",
       "lastActionMessage": "TotalMix did not answer on the Global OSC remote (send 7004 → receive 9004). Check that remote 4 is In Use in Global OSC mode with these ports.",
@@ -1390,8 +1404,8 @@
     },
     "audioSnapshot": {
       "consoleStateConfidence": "aligned",
-      "lastActionCode": "AUDIO_SNAPSHOT_RECALL_FAILED",
-      "lastActionMessage": "Snapshot slot 3 did not match the current console layout.",
+      "lastActionCode": "AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY",
+      "lastActionMessage": "A development run never loads a mix in TotalMix; only the studio's build does.",
       "lastActionStatus": "failed"
     }
   },

@@ -750,7 +750,6 @@ fn test_guard_drops_sends_to_real_totalmix_ports_only() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-input-9"),
         mix_target_id: None,
-        name: None,
         gain: None,
         fader: None,
         mute: Some(true),
@@ -870,7 +869,6 @@ fn send_totalmix_channel_update_emits_global_absolute_commands() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-input-9"),
         mix_target_id: None,
-        name: None,
         gain: Some(30),
         fader: Some(0.5),
         mute: Some(true),
@@ -947,7 +945,6 @@ fn send_totalmix_channel_update_reaches_non_main_submixes_and_absolute_off() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-input-9"),
         mix_target_id: Some(String::from("audio-mix-phones-a")),
-        name: None,
         gain: None,
         fader: Some(0.7),
         mute: Some(false),
@@ -1000,7 +997,6 @@ fn send_totalmix_channel_update_handles_lines_and_playback_channels() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-input-1"),
         mix_target_id: None,
-        name: None,
         gain: Some(10),
         fader: Some(0.4),
         mute: Some(true),
@@ -1035,7 +1031,6 @@ fn send_totalmix_channel_update_handles_lines_and_playback_channels() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-playback-1-2"),
         mix_target_id: None,
-        name: None,
         gain: None,
         fader: None,
         mute: Some(true),

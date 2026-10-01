@@ -38,8 +38,10 @@ impl Drop for TestDir {
 }
 
 // D26 (2026-09-28): talkback is gone, and what the build before wrote is still
-// read. The mix targets' saved state and a Console snapshot's contents carry a
-// `talkback` field; it is read past, and nothing writes it again.
+// read. The mix targets' saved state carries a `talkback` field; it is read
+// past, and nothing writes it again. The builds before 2026-10-01 kept
+// Console snapshots of their own (`app.audio.snapshots_state`): the row stays
+// in the saved data and nothing reads it, so the Console lists TotalMix's.
 #[test]
 fn saved_state_with_the_old_talkback_field_still_reads() {
     let mut settings = HashMap::new();
@@ -50,7 +52,7 @@ fn saved_state_with_the_old_talkback_field_still_reads() {
         ),
     );
     settings.insert(
-        String::from(AUDIO_SNAPSHOTS_STATE_KEY),
+        String::from("app.audio.snapshots_state"),
         String::from(
             r#"[{"id":"audio-snapshot-1","name":"Panel","oscIndex":0,"order":0,"contents":{"capturedAt":"2026-09-20T10:00:00Z","channels":{},"mixTargets":{"audio-mix-main":{"volume":0.5,"mute":false,"dim":false,"mono":true,"talkback":true}}}}]"#,
         ),
@@ -65,17 +67,108 @@ fn saved_state_with_the_old_talkback_field_still_reads() {
     assert_eq!(main.volume, 0.61);
     assert!(main.mute && main.dim && !main.mono);
 
-    let panel = snapshot
-        .snapshots
-        .iter()
-        .find(|entry| entry.id == "audio-snapshot-1")
-        .expect("the saved Console snapshot");
-    assert_eq!(panel.name, "Panel");
-    let saved_main = &panel.contents.as_ref().expect("its contents").mix_targets["audio-mix-main"];
-    assert_eq!(saved_main.volume, 0.5);
-    assert!(saved_main.mono);
-    let written = serde_json::to_string(saved_main).expect("the state serializes");
+    let written = serde_json::to_string(
+        &super::helpers::read_mix_target_state_map(&settings)["audio-mix-main"],
+    )
+    .expect("the state serializes");
     assert!(!written.contains("talkback"), "{written}");
+
+    let slots = &snapshot.console_snapshots.slots;
+    assert_eq!(slots.len(), 8);
+    assert!(
+        slots
+            .iter()
+            .all(|slot| slot.name.as_deref() != Some("Panel")),
+        "the old build's own snapshot must not be listed: {slots:?}"
+    );
+}
+
+// The app's own recall went on 2026-10-01. A last action it wrote (the studio
+// walk left "Recalled Snapshot 5: … 25 unconfirmed") would describe a recall
+// this build cannot make, so it reads as no action, as a talkback refusal does.
+#[test]
+fn a_saved_recall_message_reads_as_no_action() {
+    let saved = HashMap::from([
+        (
+            String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+            String::from("failed"),
+        ),
+        (
+            String::from(AUDIO_LAST_ACTION_CODE_KEY),
+            String::from("AUDIO_CONSOLE_UNCONFIRMED"),
+        ),
+        (
+            String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+            String::from(
+                "Recalled Snapshot 5: 122 values pushed, 97 confirmed · 25 unconfirmed (…).",
+            ),
+        ),
+    ]);
+    let retired = read_audio_snapshot(&saved);
+    assert_eq!(retired.last_action_status, "idle");
+    assert_eq!(retired.last_action_code, None);
+    assert_eq!(retired.last_action_message, None);
+
+    // The same code from an ordinary edit is still the Console's state.
+    let mut edit = saved.clone();
+    edit.insert(
+        String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+        String::from("TotalMix did not confirm input 8 mute."),
+    );
+    let failed = read_audio_snapshot(&edit);
+    assert_eq!(failed.last_action_status, "failed");
+    assert_eq!(
+        failed.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_UNCONFIRMED")
+    );
+
+    // The old snapshot requests' and the old rename's last actions go too.
+    let last = |status: &str, code: &str, message: &str| {
+        read_audio_snapshot(&HashMap::from([
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from(status),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::from(code)),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from(message),
+            ),
+        ]))
+    };
+    for (status, code, message) in [
+        (
+            "failed",
+            "AUDIO_SNAPSHOT_NOT_FOUND",
+            "Snapshot 'x' no longer exists.",
+        ),
+        (
+            "failed",
+            "AUDIO_SNAPSHOT_RECALL_FAILED",
+            "The push could not send.",
+        ),
+        (
+            "failed",
+            "AUDIO_CHANNEL_NAME_INVALID",
+            "Audio channel names must be 1-50 characters.",
+        ),
+        (
+            "succeeded",
+            "",
+            "Audio snapshot 'Talk' was created on slot 6.",
+        ),
+    ] {
+        let retired = last(status, code, message);
+        assert_eq!(retired.last_action_status, "idle", "{message}");
+        assert_eq!(retired.last_action_message, None, "{message}");
+    }
+    // A load's own failure for a slot TotalMix named "Recalled …" stays.
+    let named = last(
+        "failed",
+        "AUDIO_SYNC_NO_ECHO",
+        "Recalled show was sent to TotalMix; TotalMix did not answer.",
+    );
+    assert_eq!(named.last_action_status, "failed");
 }
 
 // The same build could leave a refused talkback as the Console's last action.
@@ -125,10 +218,12 @@ fn audio_snapshot_defaults_to_not_verified() {
     assert!(!snapshot.verified);
     assert_eq!(snapshot.channels.len(), 18);
     assert_eq!(snapshot.mix_targets.len(), 3);
-    assert_eq!(snapshot.snapshots.len(), 3);
     assert_eq!(snapshot.console_state_confidence, "unknown");
-    assert_eq!(snapshot.snapshots[0].osc_index, 0);
-    assert_eq!(snapshot.snapshots[0].order, 0);
+    let slots = &snapshot.console_snapshots.slots;
+    assert_eq!(
+        slots.iter().map(|slot| slot.slot).collect::<Vec<_>>(),
+        (1..=8).collect::<Vec<i64>>()
+    );
 }
 
 #[test]
@@ -151,7 +246,7 @@ fn audio_snapshot_reports_ready_when_probe_passed() {
     assert!(snapshot.verified);
     assert_eq!(snapshot.channels.len(), 18);
     assert_eq!(snapshot.mix_targets.len(), 3);
-    assert_eq!(snapshot.snapshots.len(), 3);
+    assert_eq!(snapshot.console_snapshots.slots.len(), 8);
 }
 
 #[test]
@@ -641,75 +736,114 @@ fn audio_sync_rejects_until_probe_passes_and_records_failure_state() {
     );
 }
 
-#[test]
-fn audio_snapshot_recall_marks_last_recalled_snapshot() {
-    let test_dir = TestDir::new("snapshot-recall");
+fn probe_passed_db(label: &str, live_console: bool) -> TestDir {
+    let test_dir = TestDir::new(label);
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-    set_settings_owned(
-        test_dir.db_path().as_path(),
-        &[(
-            String::from("app.commissioning.check.audio.status"),
-            String::from("passed"),
-        )],
-    )
-    .expect("probe state should persist");
-
-    // The built-in "Panel" slot carries no captured console state, so a
-    // recall moves only the markers: nothing is pushed and console-state
-    // confidence is left exactly as it was (Slice 4). The push paths are
-    // covered in `tests_console_link.rs`.
-    let result = recall_audio_snapshot_with_timing(
-        test_dir.db_path().as_path(),
-        &AudioSnapshotRecallRequest {
-            snapshot_id: String::from("snapshot-panel"),
-        },
-        PushTiming {
-            confirm_wait_ms: 200,
-            poll_ms: 10,
-        },
-    )
-    .expect("snapshot recall should succeed");
-
-    assert!(result.recalled);
-    assert_eq!(result.snapshot_name, "Panel");
-    assert_eq!(result.pushed, 0);
-    assert_eq!(result.confirmed, 0);
-    assert_eq!(result.unconfirmed, 0);
-    assert_eq!(result.console_state_confidence, "unknown");
-    assert!(
-        result.summary.contains("nothing was pushed"),
-        "{}",
-        result.summary
-    );
-
-    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
-        .expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.console_state_confidence, "unknown");
-    assert_eq!(
-        snapshot.last_recalled_snapshot_id.as_deref(),
-        Some("snapshot-panel")
-    );
-    assert!(snapshot
-        .snapshots
-        .iter()
-        .any(|entry| entry.id == "snapshot-panel" && entry.last_recalled));
-    assert!(snapshot
-        .snapshots
-        .iter()
-        .any(|entry| entry.id == "snapshot-panel" && entry.osc_index == 1 && entry.order == 1));
+    let mut settings = vec![(
+        String::from("app.commissioning.check.audio.status"),
+        String::from("passed"),
+    )];
+    if !live_console {
+        settings.push((
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        ));
+    }
+    set_settings_owned(test_dir.db_path().as_path(), &settings)
+        .expect("probe state should persist");
+    test_dir
 }
 
+fn quick_load() -> LoadTiming {
+    LoadTiming {
+        report_wait_ms: 50,
+        poll_ms: 5,
+        pull: PullTiming {
+            quiet_ms: 60,
+            timeout_ms: 400,
+            poll_ms: 5,
+        },
+    }
+}
+
+// TotalMix's own snapshots (2026-10-01): on the simulated console a load sends
+// nothing, marks the slot active and leaves the console aligned.
 #[test]
-fn audio_snapshot_crud_uses_persisted_native_state() {
-    // The recall below starts and finishes a push on the process-wide console
-    // link, so it runs one at a time with the console-link tests: in parallel
-    // it finished a push one of them had begun (2026-09-22).
+fn a_load_on_the_simulated_console_marks_the_slot_and_sends_nothing() {
     let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let test_dir = TestDir::new("snapshot-crud");
+    crate::rme_console_link::shared_console_link()
+        .lock()
+        .expect("the link locks")
+        .reset_for_test();
+    let test_dir = probe_passed_db("load-simulated", false);
+
+    for studio in [false, true] {
+        let loaded = load_audio_console_snapshot_with(
+            test_dir.db_path().as_path(),
+            &AudioSnapshotLoadRequest { slot: 3 },
+            quick_load(),
+            studio,
+        )
+        .expect("a load on the simulated console succeeds in either build");
+        assert!(loaded.loaded);
+        assert_eq!(loaded.slot, 3);
+        assert_eq!(loaded.console_state_confidence, "aligned");
+        assert!(!loaded.total_mix_reported);
+        assert_eq!(loaded.pulled_values, 0);
+        assert!(
+            loaded.summary.contains("simulated console"),
+            "{}",
+            loaded.summary
+        );
+        assert!(
+            !loaded.summary.to_lowercase().contains("snapshot"),
+            "{}",
+            loaded.summary
+        );
+    }
+
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    let states: Vec<&str> = snapshot
+        .console_snapshots
+        .slots
+        .iter()
+        .map(|slot| slot.state.as_str())
+        .collect();
+    assert_eq!(states[2], "active", "{states:?}");
+    assert!(
+        states.iter().filter(|state| **state == "active").count() == 1,
+        "{states:?}"
+    );
+    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(
+        snapshot.last_console_sync_reason.as_deref(),
+        Some("simulated-load")
+    );
+    assert_eq!(snapshot.last_action_status, "succeeded");
+    crate::rme_console_link::shared_console_link()
+        .lock()
+        .expect("the link locks")
+        .reset_for_test();
+}
+
+// Only a studio build loads a mix on a real console: a development build on
+// the live console refuses before anything leaves.
+#[test]
+fn a_development_build_never_loads_a_mix_in_totalmix() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let test_dir = TestDir::new("load-development");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    // Pointing the transport at the receiver resets the probe, so it passes after.
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
     set_settings_owned(
         test_dir.db_path().as_path(),
         &[(
@@ -719,64 +853,88 @@ fn audio_snapshot_crud_uses_persisted_native_state() {
     )
     .expect("probe state should persist");
 
-    let created = create_audio_snapshot(
+    let error = load_audio_console_snapshot_with(
         test_dir.db_path().as_path(),
-        &AudioSnapshotCreateRequest {
-            name: String::from("Podcast"),
-            osc_index: 6,
-            capture_current_state: Some(true),
-        },
+        &AudioSnapshotLoadRequest { slot: 1 },
+        quick_load(),
+        false,
     )
-    .expect("audio snapshot create should succeed");
-    assert_eq!(created.snapshot.name, "Podcast");
-    assert_eq!(created.snapshot.osc_index, 6);
-    assert_eq!(created.snapshot.order, 3);
-
-    let updated = update_audio_snapshot(
-        test_dir.db_path().as_path(),
-        &AudioSnapshotUpdateRequest {
-            snapshot_id: created.snapshot.id.clone(),
-            name: Some(String::from("Podcast A")),
-            osc_index: Some(4),
-            capture_current_state: Some(true),
-        },
-    )
-    .expect("audio snapshot update should succeed");
-    assert_eq!(updated.snapshot.name, "Podcast A");
-    assert_eq!(updated.snapshot.osc_index, 4);
-
-    let recalled = recall_audio_snapshot_with_timing(
-        test_dir.db_path().as_path(),
-        &AudioSnapshotRecallRequest {
-            snapshot_id: created.snapshot.id.clone(),
-        },
-        PushTiming {
-            confirm_wait_ms: 200,
-            poll_ms: 10,
-        },
-    )
-    .expect("audio snapshot recall should succeed");
-    assert_eq!(recalled.snapshot_name, "Podcast A");
-
-    let deleted = delete_audio_snapshot(
-        test_dir.db_path().as_path(),
-        &AudioSnapshotDeleteRequest {
-            snapshot_id: created.snapshot.id.clone(),
-        },
-    )
-    .expect("audio snapshot delete should succeed");
-    assert!(deleted.deleted);
-
+    .expect_err("a development build refuses the load");
+    match error {
+        AudioCommandError::Rejected(code, message) => {
+            assert_eq!(code, "AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY");
+            assert!(!message.to_lowercase().contains("snapshot"), "{message}");
+        }
+        other => panic!("unexpected error: {other:?}"),
+    }
+    assert_no_console_datagram(&receiver, "a development build's load");
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.snapshots.len(), 3);
-    assert!(snapshot
-        .snapshots
-        .iter()
-        .all(|entry| entry.id != created.snapshot.id));
-    assert_eq!(snapshot.last_recalled_snapshot_id, None);
-    assert_eq!(snapshot.last_action_status, "succeeded");
+    assert_eq!(
+        read_audio_snapshot(&settings).last_action_code.as_deref(),
+        Some("AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY")
+    );
+}
+
+// A load writes to the desk, so it waits for the probe like any console write.
+#[test]
+fn a_load_waits_for_the_audio_probe() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let test_dir = TestDir::new("load-not-verified");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
+
+    let error = load_audio_console_snapshot_with(
+        test_dir.db_path().as_path(),
+        &AudioSnapshotLoadRequest { slot: 2 },
+        quick_load(),
+        true,
+    )
+    .expect_err("the load is refused before the probe passed");
+    match error {
+        AudioCommandError::Rejected(code, _) => assert_eq!(code, "AUDIO_NOT_VERIFIED"),
+        other => panic!("unexpected error: {other:?}"),
+    }
+    assert_no_console_datagram(&receiver, "a load before the probe");
+}
+
+#[test]
+fn a_load_takes_slots_one_to_eight_only() {
+    for slot in [1, 8] {
+        let parsed = parse_audio_snapshot_load_request(&serde_json::json!({ "slot": slot }))
+            .expect("slots 1 to 8 parse");
+        assert_eq!(parsed.slot, slot as usize);
+    }
+    for params in [
+        serde_json::json!({ "slot": 0 }),
+        serde_json::json!({ "slot": 9 }),
+        serde_json::json!({ "slot": "3" }),
+        serde_json::json!({ "slot": 2.5 }),
+        serde_json::json!({}),
+    ] {
+        assert!(
+            parse_audio_snapshot_load_request(&params).is_err(),
+            "{params} must be refused"
+        );
+    }
+    let test_dir = probe_passed_db("load-slot-nine", false);
+    assert!(matches!(
+        load_audio_console_snapshot_with(
+            test_dir.db_path().as_path(),
+            &AudioSnapshotLoadRequest { slot: 9 },
+            quick_load(),
+            true,
+        ),
+        Err(AudioCommandError::Rejected(
+            "AUDIO_SNAPSHOT_SLOT_INVALID",
+            _
+        ))
+    ));
 }
 
 #[test]
@@ -802,7 +960,6 @@ fn audio_channel_update_persists_front_preamp_controls() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-9"),
             mix_target_id: None,
-            name: Some(String::from("Host Mic")),
             gain: Some(41),
             fader: None,
             mute: None,
@@ -817,7 +974,6 @@ fn audio_channel_update_persists_front_preamp_controls() {
     .expect("front preamp update should succeed");
 
     assert_eq!(updated.id, "audio-input-9");
-    assert_eq!(updated.name, "Host Mic");
     assert_eq!(updated.gain, 41);
     assert!(updated.solo);
     assert!(updated.phantom);
@@ -834,7 +990,6 @@ fn audio_channel_update_persists_front_preamp_controls() {
         .iter()
         .find(|entry| entry.id == "audio-input-9")
         .expect("updated channel should be present");
-    assert_eq!(refreshed.name, "Host Mic");
     assert_eq!(refreshed.gain, 41);
     assert!(refreshed.phantom);
     assert!(refreshed.phase);
@@ -931,7 +1086,6 @@ fn clear_all_audio_solo_returns_full_snapshot_and_is_idempotent() {
                 instrument: None,
                 mix_target_id: None,
                 mute: None,
-                name: None,
                 pad: None,
                 phantom: None,
                 phase: None,
@@ -982,7 +1136,6 @@ fn audio_channel_update_is_refused_before_probe_passes() {
     let request = AudioChannelUpdateRequest {
         channel_id: String::from("audio-input-9"),
         mix_target_id: None,
-        name: None,
         gain: Some(before.gain + 7),
         fader: None,
         mute: Some(!before.mute),
@@ -1052,39 +1205,17 @@ fn audio_channel_update_is_refused_before_probe_passes() {
     assert_console_datagram_received(&receiver, "allowed channel update");
 }
 
+// The channels take TotalMix's names (2026-10-01): a request that still names
+// a channel is refused whole, never half applied.
 #[test]
-fn audio_channel_name_only_update_is_allowed_before_probe_passes() {
-    let test_dir = TestDir::new("channel-rename-not-verified");
-    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
-    let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
-
-    let updated = update_audio_channel(
-        test_dir.db_path().as_path(),
-        &AudioChannelUpdateRequest {
-            channel_id: String::from("audio-input-9"),
-            mix_target_id: None,
-            name: Some(String::from("Guest Mic")),
-            gain: None,
-            fader: None,
-            mute: None,
-            solo: None,
-            phantom: None,
-            phase: None,
-            pad: None,
-            instrument: None,
-            auto_set: None,
-        },
-    )
-    .expect("a rename is app-local and stays allowed before the probe passes");
-    assert_eq!(updated.name, "Guest Mic");
-
-    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
-        .expect("settings should load");
-    let snapshot = read_audio_snapshot(&settings);
-    assert_eq!(snapshot.status, "not-verified");
-    assert_eq!(snapshot.last_action_status, "succeeded");
-    assert_eq!(snapshot.console_state_confidence, "unknown");
-    assert_no_console_datagram(&receiver, "name-only update");
+fn a_channel_update_that_names_the_channel_is_refused() {
+    for params in [
+        serde_json::json!({ "channelId": "audio-input-9", "name": "Guest Mic" }),
+        serde_json::json!({ "channelId": "audio-input-9", "name": "Guest Mic", "mute": true }),
+    ] {
+        let error = parse_audio_channel_update_request(&params).expect_err("a name is refused");
+        assert!(error.contains("TotalMix"), "{error}");
+    }
 }
 
 #[test]
@@ -1116,7 +1247,6 @@ fn audio_channel_update_validates_before_sending() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-playback-1-2"),
             mix_target_id: None,
-            name: None,
             gain: Some(12),
             fader: None,
             mute: Some(true),
@@ -1151,7 +1281,6 @@ fn audio_channel_update_validates_before_sending() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-playback-1-2"),
             mix_target_id: None,
-            name: None,
             gain: None,
             fader: None,
             mute: Some(true),
@@ -1185,7 +1314,6 @@ fn audio_channel_update_rejects_unsupported_gain_controls() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-playback-1-2"),
             mix_target_id: None,
-            name: None,
             gain: Some(12),
             fader: None,
             mute: None,
@@ -1337,6 +1465,17 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
 
 #[test]
 fn audio_settings_update_resets_probe_when_transport_changes() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // TotalMix's slot states belong to the desk the link heard.
+    crate::rme_console_link::shared_console_link()
+        .lock()
+        .expect("the link locks")
+        .mark_snapshot_loaded(2);
     let test_dir = TestDir::new("settings-transport-reset");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -1382,6 +1521,15 @@ fn audio_settings_update_resets_probe_when_transport_changes() {
     assert!(!snapshot.verified);
     assert_eq!(snapshot.metering_state, "disabled");
     assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert!(
+        snapshot
+            .console_snapshots
+            .slots
+            .iter()
+            .all(|slot| slot.state == "unknown"),
+        "another address may be another desk: {:?}",
+        snapshot.console_snapshots.slots
+    );
     assert!(snapshot.last_console_sync_at.is_none());
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
@@ -1475,7 +1623,6 @@ fn a_phones_fader_edit_leaves_the_main_fader_alone() {
     let fader_edit = |mix_target_id: Option<&str>, level: f64| AudioChannelUpdateRequest {
         channel_id: String::from("audio-playback-7-8"),
         mix_target_id: mix_target_id.map(String::from),
-        name: None,
         gain: None,
         fader: Some(level),
         mute: None,

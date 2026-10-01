@@ -57,6 +57,43 @@ describe("createShellStore audio sync", () => {
     expect(audio?.lastActionMessage?.startsWith("Pulled ")).toBe(true);
     expect(audio?.consoleLink.lastPullValues).toBe(result.pulledValues);
   });
+
+  // 2026-10-01: the Console's snapshots are TotalMix's. A load is TotalMix's
+  // own, and what it changed on the desk is read again as a sync is.
+  it("refetches audio.snapshot after audio.snapshot.load", async () => {
+    const log: string[] = [];
+    const transport = recordingTransport(createFixtureTransport(getFixtureScenario("audio-populated")), log);
+    const store = createShellStore(transport);
+    await store.initialize();
+    await store.runCommissioningCheck({
+      target: "audio",
+      sendHost: "127.0.0.1",
+      sendPort: 7001,
+      receivePort: 9001,
+    });
+    log.length = 0;
+
+    const result = (await store.loadAudioSnapshot(2)) as Record<string, unknown>;
+    expect(result).toMatchObject({ loaded: true, slot: 2, name: "Interview", consoleStateConfidence: "aligned" });
+
+    const loadIndex = log.indexOf("audio.snapshot.load");
+    expect(loadIndex).toBeGreaterThanOrEqual(0);
+    expect(log.slice(loadIndex + 1)).toContain("audio.snapshot");
+
+    const audio = store.getSnapshot().audioSnapshot;
+    expect(audio?.consoleSnapshots.slots.map((slot) => slot.state)).toEqual([
+      "off",
+      "active",
+      "off",
+      "unknown",
+      "unknown",
+      "unknown",
+      "unknown",
+      "unknown",
+    ]);
+    expect(audio?.lastConsoleSyncReason).toBe("simulated-load");
+    expect(audio?.lastActionMessage).toBe("Loaded Interview on the simulated console; nothing was sent (test mode).");
+  });
 });
 
 // 2026-09 production readiness, Slice 3 (finding F02): an engine that refuses
@@ -908,7 +945,11 @@ describe("createShellStore snapshot guards", () => {
     expect(store.getSnapshot().snapshotFault).toBeNull();
 
     answer("lighting.snapshot", { fixtures: "none", groups: [], scenes: [] });
-    answer("audio.snapshot", { channels: [{ id: "audio-input-1" }], mixTargets: [] });
+    answer("audio.snapshot", {
+      channels: [{ id: "audio-input-1" }],
+      mixTargets: [],
+      consoleSnapshots: { slots: [], namesSavedAt: null, namesNote: null },
+    });
     await expect(store.refresh()).rejects.toThrow("lighting.snapshot: fixtures is not a list");
 
     const state = store.getSnapshot();

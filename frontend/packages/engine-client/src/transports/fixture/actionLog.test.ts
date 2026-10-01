@@ -173,10 +173,16 @@ describe("the fixture double's action log", () => {
       [row("audio", "send-mute", "Host", "Send mute on: Host to audio-mix-phones-a")],
     ],
     [
-      "audio.snapshot.recall",
-      { snapshotId: "audio-snapshot-1" },
-      { snapshotName: "Show open" },
-      [row("audio", "console-snapshot-recalled", "Show open", "Console mix recalled: Show open")],
+      "audio.snapshot.load",
+      { slot: 2 },
+      { loaded: true, slot: 2, name: "Interview" },
+      [row("audio", "console-snapshot-loaded", "Interview", "Console mix loaded in TotalMix: Interview")],
+    ],
+    [
+      "audio.snapshot.load",
+      { slot: 6 },
+      { loaded: true, slot: 6, name: null },
+      [row("audio", "console-snapshot-loaded", "slot 6", "Console mix loaded in TotalMix: slot 6")],
     ],
     ["audio.solo.clearAll", {}, {}, [row("audio", "solo-cleared", "Console", "Every solo cleared")]],
     [

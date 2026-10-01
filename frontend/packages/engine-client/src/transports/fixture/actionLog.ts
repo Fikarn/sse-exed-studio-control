@@ -20,7 +20,8 @@ export const RECORDED_UI_METHODS: readonly RequestMethod[] = [
   "audio.channel.update",
   "audio.mixTarget.update",
   "audio.settings.update",
-  "audio.snapshot.recall",
+  // TotalMix loads one of its own snapshots at the operator's second press (2026-10-01).
+  "audio.snapshot.load",
   "audio.solo.clearAll",
   // The cameras (new pages program, Slice 8): the record's start and stop, the format and
   // the look, and who holds a camera.
@@ -315,9 +316,15 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
         return on === null ? [] : [audio(action, name, `${label} ${onOff(on)}: ${name} to ${output}`)];
       });
     }
-    case "audio.snapshot.recall": {
-      const name = text(result, ["snapshotName"]) ?? "Console mix";
-      return [audio("console-snapshot-recalled", name, `Console mix recalled: ${name}`)];
+    case "audio.snapshot.load": {
+      // A slot TotalMix saved no name for is named by its number; the rows never say "snapshot".
+      const name = text(result, ["name"]) ?? `slot ${wholeNumber(result, ["slot"])}`;
+      // A load whose read-back failed went out, and nothing confirmed it: the row says it was sent.
+      const detail =
+        text(result, ["consoleStateConfidence"]) === "unknown"
+          ? `Console mix sent to TotalMix, not read back: ${name}`
+          : `Console mix loaded in TotalMix: ${name}`;
+      return [audio("console-snapshot-loaded", name, detail)];
     }
     case "audio.solo.clearAll":
       return [audio("solo-cleared", "Console", "Every solo cleared")];

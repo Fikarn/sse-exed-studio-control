@@ -65,9 +65,58 @@ pub fn sync_audio_console_with_timing(
     ensure_audio_action_allowed(db_path, &snapshot)?;
     let config = resolve_audio_config(&app_settings);
     if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        return sync_simulated_console(db_path);
+        let result = sync_simulated_console(db_path);
+        refresh_console_snapshot_names(true);
+        return result;
     }
-    pull_console_state(db_path, &config, timing)
+    let result = pull_console_state(db_path, &config, timing, PullCause::Sync);
+    // A Sync is also when the names TotalMix saved are looked at again.
+    refresh_console_snapshot_names(false);
+    result
+}
+
+/// Who asked for a pull: the Console's Sync, or a load in TotalMix whose
+/// result the read-back brings to the screen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PullCause<'a> {
+    Sync,
+    /// A load of the mix TotalMix saved under this label.
+    Load {
+        label: &'a str,
+    },
+}
+
+impl PullCause<'_> {
+    fn reason(self) -> &'static str {
+        match self {
+            Self::Sync => "console-pull",
+            Self::Load { .. } => "snapshot-load",
+        }
+    }
+
+    /// A failed read-back after a load says first that the load went out:
+    /// the desk has the mix even though the screen could not follow it.
+    fn failure(self, message: String) -> String {
+        match self {
+            Self::Sync => message,
+            Self::Load { label } => {
+                // "slot 3" opens the sentence as "Slot 3".
+                let mut letters = label.chars();
+                let opening: String = letters
+                    .next()
+                    .map(|first| first.to_uppercase().chain(letters).collect())
+                    .unwrap_or_default();
+                format!("{opening} was sent to TotalMix; {message}")
+            }
+        }
+    }
+
+    fn summary(self, pulled: String) -> String {
+        match self {
+            Self::Sync => pulled,
+            Self::Load { label } => format!("Loaded {label} in TotalMix · {pulled}"),
+        }
+    }
 }
 
 fn sync_simulated_console(db_path: &Path) -> Result<AudioSyncResult, AudioCommandError> {
@@ -128,10 +177,11 @@ fn fail(
     AudioCommandError::Rejected(code, message)
 }
 
-fn pull_console_state(
+pub(super) fn pull_console_state(
     db_path: &Path,
     config: &AudioBackendConfig,
     timing: PullTiming,
+    cause: PullCause<'_>,
 ) -> Result<AudioSyncResult, AudioCommandError> {
     let link = shared_console_link();
     {
@@ -152,7 +202,12 @@ fn pull_console_state(
 
     if let Err(message) = send_console_pull_request(&config.send_host, config.send_port) {
         lock_link(&link).finish_pull(link_now_ms());
-        return Err(fail(db_path, "AUDIO_SYNC_FAILED", message, None));
+        return Err(fail(
+            db_path,
+            "AUDIO_SYNC_FAILED",
+            cause.failure(message),
+            None,
+        ));
     }
 
     let started = Instant::now();
@@ -186,11 +241,11 @@ fn pull_console_state(
         return Err(fail(
             db_path,
             "AUDIO_SYNC_NO_ECHO",
-            format!(
+            cause.failure(format!(
                 "TotalMix did not answer on the Global OSC remote (send {} → receive {}). Check that remote 4 is In Use in Global OSC mode with these ports.",
                 config.send_port + 3,
                 config.receive_port + 3
-            ),
+            )),
             Some(ConsoleConfidence::Unknown),
         ));
     }
@@ -198,10 +253,10 @@ fn pull_console_state(
         return Err(fail(
             db_path,
             "AUDIO_SYNC_INCOMPLETE",
-            format!(
+            cause.failure(format!(
                 "TotalMix was still sending after {} ms ({} values so far), so the console state is incomplete. Press Sync again.",
                 timing.timeout_ms, progress.parsed_messages
-            ),
+            )),
             Some(ConsoleConfidence::Unknown),
         ));
     }
@@ -234,11 +289,11 @@ fn pull_console_state(
         let snapshot = read_audio_snapshot(&app_settings);
         let mut channel_state = read_channel_state_map(&app_settings);
         let zeroed = zero_absent_mix_nodes(&snapshot, &mut channel_state, &progress);
-        let summary = if zeroed > 0 {
+        let summary = cause.summary(if zeroed > 0 {
             format!("{summary_base} · {zeroed} sends off")
         } else {
             summary_base
-        };
+        });
         let mut writes = vec![
             confidence_setting(ConsoleConfidence::Aligned),
             (
@@ -247,7 +302,7 @@ fn pull_console_state(
             ),
             (
                 String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
-                String::from("console-pull"),
+                String::from(cause.reason()),
             ),
             (
                 String::from(AUDIO_LAST_CONSOLE_PULL_AT_KEY),

@@ -12,8 +12,12 @@
 //! confirmed downgrade console-state confidence to `assumed` and surface as
 //! `AUDIO_CONSOLE_UNCONFIRMED`; a `/status/connection 0`, or an earlier
 //! flush whose write failed and dropped what the desk reported (the link's
-//! lost-reports mark), resets it to `unknown`. Nothing here ever raises confidence — only a complete pull or a
-//! fully confirmed push may do that.
+//! lost-reports mark), resets it to `unknown`. Nothing here ever raises confidence — only a complete pull
+//! may do that.
+//!
+//! Channel and output names come from TotalMix (2026-10-01) and are written
+//! like any change made there, without a row in Recent actions. TotalMix's
+//! snapshot slots stay on the link: a flush only reports that one changed.
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -42,11 +46,18 @@ pub struct ConsoleFlushReport {
     /// An earlier flush's write failed and dropped desk reports, so this one
     /// marked the desk unread: the Console asks for a Sync.
     pub desk_unread: bool,
+    /// One of TotalMix's snapshot slots changed state (the link holds the
+    /// slots; nothing is written): the Console reads them again.
+    pub slots_changed: bool,
 }
 
 impl ConsoleFlushReport {
     pub fn changed(&self) -> bool {
-        self.applied > 0 || self.unconfirmed > 0 || self.connection_lost || self.desk_unread
+        self.applied > 0
+            || self.unconfirmed > 0
+            || self.connection_lost
+            || self.desk_unread
+            || self.slots_changed
     }
 }
 
@@ -86,7 +97,7 @@ pub(crate) fn flush_console_link_at(
         return Ok(ConsoleFlushReport::default());
     }
     let _state_guard = lock_audio_state();
-    let (updates, superseded, expired, connection_lost, desk_unread) = {
+    let (updates, superseded, expired, connection_lost, desk_unread, slots_changed) = {
         let mut link = lock_link();
         // A report or a confirmation of a parameter the app has sent again
         // since is older than that send: the desk takes the app's newer value,
@@ -104,8 +115,12 @@ pub(crate) fn flush_console_link_at(
             link.take_expired(),
             link.take_connection_lost(),
             link.take_reports_lost(),
+            link.take_snapshot_slots_changed(),
         )
     };
+    // A changed slot is reported, not written. A failed write drops the mark
+    // with the rest: the desk-unread flush that follows is reported too, and
+    // the Console then reads the slots as the link holds them.
     let result = apply_console_activity_locked(
         db_path,
         &updates,
@@ -113,7 +128,11 @@ pub(crate) fn flush_console_link_at(
         &expired,
         connection_lost,
         desk_unread,
-    );
+    )
+    .map(|report| ConsoleFlushReport {
+        slots_changed,
+        ..report
+    });
     if result.is_err() {
         // Under the state lock, so no Sync or recall writes `aligned` between
         // this failure and the mark. The retry is counted from the failure,
@@ -175,8 +194,9 @@ fn apply_console_activity_locked(
             applied += 1;
             // A confirmation of the app's own send is the app's action,
             // already recorded where it was asked for, not a change at
-            // TotalMix.
-            if !update.confirms_send {
+            // TotalMix; so is what the desk reports while a load in
+            // TotalMix is under way (the load's own row says it).
+            if !update.confirms_send && !update.during_load {
                 actions.extend(console_update_action(&snapshot, update));
             }
         }
@@ -184,10 +204,16 @@ fn apply_console_activity_locked(
     // A change made at TotalMix that a newer send of the app's replaces is not
     // written (the desk takes the app's value), but it happened: it is a row,
     // measured against what the app now holds.
-    if superseded.iter().any(|update| !update.confirms_send) {
+    if superseded
+        .iter()
+        .any(|update| !update.confirms_send && !update.during_load)
+    {
         let mut replaced_channels = channel_state.clone();
         let mut replaced_targets = mix_target_state.clone();
-        for update in superseded.iter().filter(|update| !update.confirms_send) {
+        for update in superseded
+            .iter()
+            .filter(|update| !update.confirms_send && !update.during_load)
+        {
             if apply_console_update(
                 &snapshot,
                 &mut replaced_channels,
@@ -255,6 +281,7 @@ fn apply_console_activity_locked(
         unconfirmed: expired.len(),
         connection_lost,
         desk_unread,
+        slots_changed: false,
     })
 }
 
@@ -318,6 +345,38 @@ fn set_if_changed<T: PartialEq + Copy>(slot: &mut T, next: T) -> bool {
         false
     } else {
         *slot = next;
+        true
+    }
+}
+
+/// The longest channel name the app keeps, as for a name given in the app.
+const CHANNEL_NAME_MAX_CHARS: usize = 50;
+
+/// A name TotalMix reported, as the app keeps it: trimmed, 1 to 50
+/// characters, no control characters. Anything else is `None` and leaves the
+/// stored name as it was.
+fn console_channel_name(value: &ConsoleValue) -> Option<&str> {
+    let ConsoleValue::Text(name) = value else {
+        return None;
+    };
+    let name = name.trim();
+    if name.is_empty()
+        || name.chars().count() > CHANNEL_NAME_MAX_CHARS
+        || name.chars().any(char::is_control)
+    {
+        return None;
+    }
+    Some(name)
+}
+
+/// Only a name that differs is written: TotalMix repeats every name in each
+/// dump, and the metering thread asks for one whenever the desk has been
+/// quiet for three seconds.
+fn set_name_if_changed(slot: &mut Option<String>, name: &str) -> bool {
+    if slot.as_deref() == Some(name) {
+        false
+    } else {
+        *slot = Some(String::from(name));
         true
     }
 }
@@ -462,6 +521,33 @@ pub(crate) fn apply_console_update(
             };
             set_if_changed(&mut entry.solo, flag)
         }
+        ParamKey::ChannelName {
+            bus: ConsoleBus::Output,
+            channel,
+        } => {
+            let Some(target_id) = global_output_mix_target(*channel) else {
+                return false;
+            };
+            let Some(name) = console_channel_name(&update.value) else {
+                return false;
+            };
+            let Some(entry) = mix_target_state_entry(snapshot, mix_target_state, target_id) else {
+                return false;
+            };
+            set_name_if_changed(&mut entry.name, name)
+        }
+        ParamKey::ChannelName { bus, channel } => {
+            let Some(surface_id) = global_channel_surface(bus.word(), *channel) else {
+                return false;
+            };
+            let Some(name) = console_channel_name(&update.value) else {
+                return false;
+            };
+            let Some((entry, _)) = channel_state_entry(snapshot, channel_state, &surface_id) else {
+                return false;
+            };
+            set_name_if_changed(&mut entry.name, name)
+        }
         ParamKey::ControlRoom(function) => {
             let Some(flag) = value_to_flag(&update.value) else {
                 return false;
@@ -484,12 +570,17 @@ pub(crate) fn apply_console_update(
 }
 
 /// The action-log row for a console change that was applied: the switches,
-/// named as the screen names them. `None` for a ride and for the status
+/// named as the screen names them. `None` for a ride, a name and the status
 /// parameters.
 pub(crate) fn console_update_action(
     snapshot: &AudioSnapshot,
     update: &ConsoleUpdate,
 ) -> Option<ActionRecord> {
+    // A name given at TotalMix is shown on the Console, and is not a row in
+    // Recent actions (2026-10-01).
+    if matches!(update.key, ParamKey::ChannelName { .. }) {
+        return None;
+    }
     let on = value_to_flag(&update.value)?;
     let word = if on { "on" } else { "off" };
     let channel_name = |surface_id: &str| {
@@ -573,7 +664,6 @@ pub fn console_link_snapshot(settings: &HashMap<String, String>) -> AudioConsole
         confirmed_sends: summary.confirmed_sends as i64,
         adjusted_sends: summary.adjusted_sends as i64,
         external_changes: summary.external_changes as i64,
-        active_console_snapshot: summary.active_snapshot.map(|number| number as i64),
         last_pull_at: read_optional_setting(settings, AUDIO_LAST_CONSOLE_PULL_AT_KEY),
         last_pull_values: settings
             .get(AUDIO_LAST_CONSOLE_PULL_VALUES_KEY)

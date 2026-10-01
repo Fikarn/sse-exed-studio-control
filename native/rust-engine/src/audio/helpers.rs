@@ -90,6 +90,14 @@ pub(super) fn apply_mix_target_state(
         .into_iter()
         .map(|mut mix_target| {
             if let Some(state) = stored_state.get(&mix_target.id) {
+                if let Some(name) = state
+                    .name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    mix_target.name = String::from(name);
+                }
                 mix_target.volume = clamp_level(state.volume);
                 mix_target.mute = state.mute;
                 mix_target.dim = state.dim;
@@ -98,100 +106,6 @@ pub(super) fn apply_mix_target_state(
             mix_target
         })
         .collect()
-}
-
-pub(super) fn read_audio_snapshot_entries(
-    settings: &HashMap<String, String>,
-    inventory_snapshots: &[AudioSceneSnapshot],
-) -> Vec<AudioSceneSnapshot> {
-    let stored_state = settings
-        .get(AUDIO_SNAPSHOTS_STATE_KEY)
-        .and_then(|value| serde_json::from_str::<Vec<StoredAudioSnapshotState>>(value).ok());
-    let source_state = stored_state.unwrap_or_else(|| {
-        inventory_snapshots
-            .iter()
-            .map(|snapshot| StoredAudioSnapshotState {
-                id: snapshot.id.clone(),
-                name: snapshot.name.clone(),
-                osc_index: snapshot.osc_index,
-                order: snapshot.order,
-                contents: snapshot.contents.clone(),
-            })
-            .collect()
-    });
-    normalize_audio_snapshot_entries(source_state)
-}
-
-pub(super) fn normalize_audio_snapshot_entries(
-    snapshots: Vec<StoredAudioSnapshotState>,
-) -> Vec<AudioSceneSnapshot> {
-    let mut ordered = snapshots
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, snapshot)| {
-            let id = snapshot.id.trim();
-            if id.is_empty() {
-                return None;
-            }
-            let name = snapshot.name.trim();
-            Some((
-                snapshot.order.max(0),
-                index,
-                AudioSceneSnapshot {
-                    id: String::from(id),
-                    name: if name.is_empty() {
-                        format!("Snapshot {}", clamp_snapshot_index(snapshot.osc_index) + 1)
-                    } else {
-                        String::from(name)
-                    },
-                    osc_index: clamp_snapshot_index(snapshot.osc_index),
-                    order: snapshot.order.max(0),
-                    last_recalled: false,
-                    last_recalled_at: None,
-                    contents: snapshot.contents,
-                    preview: AudioScenePreviewSnapshot {
-                        has_contents: false,
-                        channel_count: 0,
-                        mix_target_count: 0,
-                        changed_channels: Vec::new(),
-                        changed_mix_targets: Vec::new(),
-                    },
-                },
-            ))
-        })
-        .collect::<Vec<_>>();
-    ordered.sort_by_key(|(order, index, _)| (*order, *index));
-
-    let mut normalized = ordered
-        .into_iter()
-        .map(|(_, _, snapshot)| snapshot)
-        .collect::<Vec<_>>();
-    reindex_audio_snapshots(&mut normalized);
-    normalized
-}
-
-pub(super) fn serialize_audio_snapshot_state(
-    snapshots: &[AudioSceneSnapshot],
-) -> Result<String, AudioCommandError> {
-    let stored_state = snapshots
-        .iter()
-        .enumerate()
-        .map(|(order, snapshot)| StoredAudioSnapshotState {
-            id: snapshot.id.clone(),
-            name: snapshot.name.clone(),
-            osc_index: clamp_snapshot_index(snapshot.osc_index),
-            order: order as i64,
-            contents: snapshot.contents.clone(),
-        })
-        .collect::<Vec<_>>();
-    serde_json::to_string(&stored_state)
-        .map_err(|error| AudioCommandError::Storage(error.to_string()))
-}
-
-pub(super) fn reindex_audio_snapshots(snapshots: &mut [AudioSceneSnapshot]) {
-    for (index, snapshot) in snapshots.iter_mut().enumerate() {
-        snapshot.order = index as i64;
-    }
 }
 
 pub(super) fn read_channel_state_map(
@@ -351,8 +265,9 @@ pub(super) fn lock_audio_state() -> std::sync::MutexGuard<'static, ()> {
 }
 
 /// The only vocabulary for console-state confidence. `Aligned` is written
-/// solely after a complete console pull or a fully confirmed push; `Assumed`
-/// when a push starts or a send goes unconfirmed; `Unknown` when the
+/// solely after a complete console pull (a Sync, or the read-back after a
+/// load in TotalMix) or a load on the simulated console; `Assumed` when a
+/// send goes unconfirmed; `Unknown` when the
 /// transport changes, the console reports disconnected, a pull fails, or a
 /// flush's write failed and dropped what the desk reported (written by the
 /// next flush that works).
@@ -510,8 +425,8 @@ pub(super) fn audio_view_mode(settings: &HashMap<String, String>) -> String {
 pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabilitySnapshot {
     // Hardware-facing capabilities follow the same gate as the engine commands
     // (`ensure_audio_action_allowed`): OSC must be on AND the audio probe must
-    // have passed. App-local capabilities (clip latches, snapshot capture, the
-    // master view) only need OSC on, because they never reach TotalMix.
+    // have passed. App-local capabilities (clip latches, the master view) only
+    // need OSC on, because they never reach TotalMix.
     let console_ready = osc_enabled && status == "ready";
     AudioCapabilitySnapshot {
         can_edit_mixer_state: console_ready,
@@ -519,7 +434,6 @@ pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabi
         can_recall_console_snapshot: console_ready,
         can_edit_processing: console_ready,
         can_clear_clips: osc_enabled,
-        can_capture_snapshot: osc_enabled,
         can_use_master_view: osc_enabled,
     }
 }
@@ -561,10 +475,6 @@ pub(super) fn clamp_level(value: f64) -> f64 {
 
 pub(super) fn clamp_gain(value: i64) -> i64 {
     value.clamp(0, 75)
-}
-
-pub(super) fn clamp_snapshot_index(value: i64) -> i64 {
-    value.clamp(0, 7)
 }
 
 pub(super) fn clamp_eq_frequency(value: f64) -> f64 {
@@ -687,22 +597,6 @@ pub(super) fn clamp_dynamics_makeup(value: f64) -> f64 {
     value.clamp(0.0, 24.0)
 }
 
-pub(super) fn next_custom_audio_snapshot_id(snapshots: &[AudioSceneSnapshot]) -> String {
-    let next_index = snapshots
-        .iter()
-        .filter_map(|snapshot| {
-            snapshot
-                .id
-                .strip_prefix(AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX)
-                .and_then(|value| value.parse::<usize>().ok())
-        })
-        .max()
-        .unwrap_or(0)
-        + 1;
-
-    format!("{AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX}{next_index}")
-}
-
 pub(super) fn channel_supports_gain(channel: &AudioChannelSnapshot) -> bool {
     channel.role == "front-preamp"
 }
@@ -793,90 +687,11 @@ pub(super) fn stored_mix_target_state_from_snapshot(
     mix_target: &AudioMixTargetSnapshot,
 ) -> StoredAudioMixTargetState {
     StoredAudioMixTargetState {
+        name: Some(mix_target.name.clone()),
         volume: mix_target.volume,
         mute: mix_target.mute,
         dim: mix_target.dim,
         mono: mix_target.mono,
-    }
-}
-
-pub(super) fn capture_audio_scene_contents(
-    snapshot: &AudioSnapshot,
-    captured_at: Option<String>,
-) -> AudioSceneContentsSnapshot {
-    AudioSceneContentsSnapshot {
-        captured_at,
-        channels: snapshot
-            .channels
-            .iter()
-            .map(|channel| {
-                (
-                    channel.id.clone(),
-                    stored_channel_state_from_snapshot(channel),
-                )
-            })
-            .collect(),
-        mix_targets: snapshot
-            .mix_targets
-            .iter()
-            .map(|target| {
-                (
-                    target.id.clone(),
-                    stored_mix_target_state_from_snapshot(target),
-                )
-            })
-            .collect(),
-    }
-}
-
-pub(super) fn audio_scene_preview(
-    contents: Option<&AudioSceneContentsSnapshot>,
-    channels: &[AudioChannelSnapshot],
-    mix_targets: &[AudioMixTargetSnapshot],
-) -> AudioScenePreviewSnapshot {
-    let Some(contents) = contents else {
-        return AudioScenePreviewSnapshot {
-            has_contents: false,
-            channel_count: 0,
-            mix_target_count: 0,
-            changed_channels: Vec::new(),
-            changed_mix_targets: Vec::new(),
-        };
-    };
-
-    let changed_channels = channels
-        .iter()
-        .filter_map(|channel| {
-            let state = contents.channels.get(&channel.id)?;
-            let current = stored_channel_state_from_snapshot(channel);
-            if audio_channel_state_changed(&current, state) {
-                Some(channel.name.clone())
-            } else {
-                None
-            }
-        })
-        .take(6)
-        .collect::<Vec<_>>();
-    let changed_mix_targets = mix_targets
-        .iter()
-        .filter_map(|target| {
-            let state = contents.mix_targets.get(&target.id)?;
-            let current = stored_mix_target_state_from_snapshot(target);
-            if audio_mix_target_state_changed(&current, state) {
-                Some(target.name.clone())
-            } else {
-                None
-            }
-        })
-        .take(4)
-        .collect::<Vec<_>>();
-
-    AudioScenePreviewSnapshot {
-        has_contents: true,
-        channel_count: contents.channels.len() as i64,
-        mix_target_count: contents.mix_targets.len() as i64,
-        changed_channels,
-        changed_mix_targets,
     }
 }
 
@@ -891,34 +706,6 @@ pub(super) fn default_send_modes_for_mix_targets(
             .or_insert_with(default_audio_send_mode_snapshot);
     }
     send_modes
-}
-
-fn audio_channel_state_changed(
-    current: &StoredAudioChannelState,
-    stored: &StoredAudioChannelState,
-) -> bool {
-    current.name != stored.name
-        || current.gain != stored.gain
-        || (current.fader - stored.fader).abs() > f64::EPSILON
-        || current.clip != stored.clip
-        || current.mute != stored.mute
-        || current.solo != stored.solo
-        || current.phantom != stored.phantom
-        || current.phase != stored.phase
-        || current.instrument != stored.instrument
-        || current.auto_set != stored.auto_set
-        || current.mix_levels != stored.mix_levels
-        || current.send_modes != stored.send_modes
-}
-
-fn audio_mix_target_state_changed(
-    current: &StoredAudioMixTargetState,
-    stored: &StoredAudioMixTargetState,
-) -> bool {
-    (current.volume - stored.volume).abs() > f64::EPSILON
-        || current.mute != stored.mute
-        || current.dim != stored.dim
-        || current.mono != stored.mono
 }
 
 pub(super) fn channel_supports_instrument_from_role(
@@ -952,11 +739,8 @@ pub(super) struct AudioSummaryContext<'a> {
     pub(super) metering_source: &'a str,
     pub(super) channel_count: usize,
     pub(super) mix_target_count: usize,
-    pub(super) snapshot_count: usize,
     pub(super) last_console_sync_at: Option<&'a str>,
     pub(super) last_console_sync_reason: Option<&'a str>,
-    pub(super) last_recalled_snapshot_id: Option<&'a str>,
-    pub(super) last_snapshot_recall_at: Option<&'a str>,
     pub(super) last_action_status: &'a str,
     pub(super) last_action_code: Option<&'a str>,
     pub(super) last_action_message: Option<&'a str>,
@@ -970,11 +754,8 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         metering_source,
         channel_count,
         mix_target_count,
-        snapshot_count,
         last_console_sync_at,
         last_console_sync_reason,
-        last_recalled_snapshot_id,
-        last_snapshot_recall_at,
         last_action_status,
         last_action_code,
         last_action_message,
@@ -990,21 +771,20 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         )
     } else if metering_source == crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE {
         format!(
-            "Test mode: the console is simulated and nothing reaches TotalMix. {} channels, {} outputs and {} snapshots.",
-            channel_count, mix_target_count, snapshot_count
+            "Test mode: the console is simulated and nothing reaches TotalMix. {} channels and {} outputs.",
+            channel_count, mix_target_count
         )
     } else {
         match status {
             "ready" => format!(
-                "TotalMix on {} is answering (port incoming {}-{}, port outgoing {}-{}): {} channels, {} outputs and {} snapshots.",
+                "TotalMix on {} is answering (port incoming {}-{}, port outgoing {}-{}): {} channels and {} outputs.",
                 config.send_host,
                 config.send_port,
                 config.send_port.saturating_add(2),
                 config.receive_port,
                 config.receive_port.saturating_add(2),
                 channel_count,
-                mix_target_count,
-                snapshot_count
+                mix_target_count
             ),
             "attention" => format!(
                 "No meter data from TotalMix on {}. In TotalMix Options › Settings › OSC, check remote controllers 1–3 (port incoming {}-{}, port outgoing {}-{}), turn on Send Peak Level Data, and keep remote 4 in Global OSC mode.",
@@ -1029,21 +809,10 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
             " Last console sync: {}{}.",
             timestamp,
             last_console_sync_reason
-                .map(|reason| format!(" ({reason})"))
+                .map(|reason| format!(" ({})", sync_reason_words(reason)))
                 .unwrap_or_default()
         ),
         None => String::from(" No console sync has been recorded yet."),
-    };
-
-    let recall_summary = match last_recalled_snapshot_id {
-        Some(snapshot_id) => format!(
-            " Last snapshot recall: {}{}.",
-            snapshot_id,
-            last_snapshot_recall_at
-                .map(|timestamp| format!(" at {timestamp}"))
-                .unwrap_or_default()
-        ),
-        None => String::from(" No audio snapshot recall has been recorded yet."),
     };
 
     let action_summary = match last_action_status {
@@ -1062,5 +831,19 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
         _ => String::new(),
     };
 
-    format!("{transport_summary}{sync_summary}{recall_summary}{action_summary}")
+    format!("{transport_summary}{sync_summary}{action_summary}")
+}
+
+/// What brought the console in line, in the operator's words: the saved
+/// reasons are codes, and some say "snapshot".
+fn sync_reason_words(reason: &str) -> &str {
+    match reason {
+        "console-pull" => "Sync from TotalMix",
+        "snapshot-load" => "a mix loaded in TotalMix",
+        "simulated-load" => "a mix loaded on the simulated console",
+        "simulated-sync" => "Sync on the simulated console",
+        // The builds before 2026-10-01 wrote these for their own recall.
+        "snapshot" | "snapshot-push" => "a recall",
+        other => other,
+    }
 }

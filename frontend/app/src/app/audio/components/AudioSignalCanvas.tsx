@@ -3,7 +3,7 @@ import type { ShellStore } from "@sse/engine-client";
 
 import styles from "./AudioSignalCanvas.module.css";
 import type { AudioArmedAction } from "../audioArming";
-import type { AudioRecallReport } from "../audioRecallReport";
+import type { AudioLoadReport } from "../audioLoadReport";
 import { type AudioControlDraftStore } from "../audioControlDraftStore";
 import type { AudioChannelGroupSelectionRequest, AudioWorkspaceViewModel } from "../audioViewModel";
 import { AudioTieredMixer } from "./AudioTieredMixer";
@@ -22,9 +22,8 @@ export function AudioSignalCanvas({
   onNextBank,
   onOpenChannelMenu,
   onPreviousBank,
-  recallReport,
-  onDismissRecallReport,
-  onArmPhantomFromRecall,
+  loadReport,
+  onDismissLoadReport,
   onSelectChannel,
   onSelectChannelGroup,
   onSelectMixTarget: _onSelectMixTarget,
@@ -46,9 +45,8 @@ export function AudioSignalCanvas({
   onNextBank: () => void;
   onOpenChannelMenu: (event: ReactMouseEvent<HTMLElement>, channelId: string) => void;
   onPreviousBank: () => void;
-  recallReport: AudioRecallReport | null;
-  onDismissRecallReport: () => void;
-  onArmPhantomFromRecall: (channelId: string, channelName: string, phantom: boolean) => void;
+  loadReport: AudioLoadReport | null;
+  onDismissLoadReport: () => void;
   onSelectChannel: (channelId: string | null) => void;
   onSelectChannelGroup: (request: AudioChannelGroupSelectionRequest) => void;
   onSelectMixTarget: (mixTargetId: string) => void;
@@ -70,42 +68,27 @@ export function AudioSignalCanvas({
     <section className={styles.signalCanvas} data-testid="audio-signal-canvas" data-signal="canvas">
       {/* Visual overhaul A, Slice 4: the state, its sentence and its way out
           live in the cluster's state display, so the bay carries no band. */}
-      {/* 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to
-          the desk and says what the console confirmed. 48V is never pushed —
-          each difference gets its own armed confirm right here. */}
-      {recallReport ? (
+      {/* 2026-10-01: a TotalMix snapshot load says what the read-back
+          brought, or, when the read-back failed after the load went out, the
+          hardware link's sentence. 48 V does not switch with a TotalMix
+          snapshot, so the band has nothing to arm. */}
+      {loadReport ? (
         <div
           className={styles.warningBand}
           data-variant="compact"
-          data-tone={recallReport.unconfirmed > 0 ? "attention" : "ok"}
-          data-testid="audio-recall-report"
+          data-tone={loadReport.readBack ? "ok" : "attention"}
+          data-testid="audio-load-report"
           role="status"
         >
-          <strong>Recalled {recallReport.snapshotName}</strong>
-          <span>{recallReport.summaryLine}</span>
+          <strong>
+            {loadReport.readBack ? "Loaded" : "Sent"} {loadReport.name} {loadReport.readBack ? "in" : "to"} TotalMix
+          </strong>
+          <span>{loadReport.line}</span>
           <span className={styles.warningRecoveryActions}>
-            {recallReport.phantomDifferences.map((difference) => {
-              const armKey = `phantom:${difference.channelId}:${difference.target}`;
-              return (
-                <button
-                  data-armed={armedAction?.key === armKey ? "true" : "false"}
-                  data-testid={`audio-recall-arm-phantom-${difference.channelId}`}
-                  key={difference.channelId}
-                  onClick={() =>
-                    onArmPhantomFromRecall(difference.channelId, difference.channelName, difference.target)
-                  }
-                  title={`${difference.target ? "Enable" : "Disable"} 48 V on ${difference.channelName} — arm, then press again to apply`}
-                  type="button"
-                >
-                  {armedAction?.key === armKey ? "Confirm" : "Arm"} 48 V {difference.target ? "on" : "off"} ·{" "}
-                  {difference.channelName}
-                </button>
-              );
-            })}
             <button
-              aria-label="Dismiss recall report"
-              data-testid="audio-recall-report-dismiss"
-              onClick={onDismissRecallReport}
+              aria-label="Dismiss load report"
+              data-testid="audio-load-report-dismiss"
+              onClick={onDismissLoadReport}
               type="button"
             >
               Dismiss

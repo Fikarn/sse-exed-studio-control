@@ -429,34 +429,6 @@ function patchAudioMixTarget(snapshot: AudioSnapshot, value: JsonValue): AudioSn
   };
 }
 
-function patchAudioSnapshotList(method: string, snapshot: AudioSnapshot, params: JsonObject, value: JsonValue) {
-  const result = asRecord(value);
-  const scene = asRecord(result?.snapshot);
-  const sceneId = typeof scene?.id === "string" ? scene.id : null;
-
-  if (method === "audio.snapshot.delete") {
-    const snapshotId = typeof params.snapshotId === "string" ? params.snapshotId : null;
-    if (!snapshotId) return null;
-    return {
-      ...snapshot,
-      lastRecalledSnapshotId: snapshot.lastRecalledSnapshotId === snapshotId ? null : snapshot.lastRecalledSnapshotId,
-      lastSnapshotRecallAt: snapshot.lastRecalledSnapshotId === snapshotId ? null : snapshot.lastSnapshotRecallAt,
-      snapshots: snapshot.snapshots.filter((entry) => entry.id !== snapshotId),
-    };
-  }
-
-  if (!sceneId) return null;
-
-  const nextScene = scene as AudioSnapshot["snapshots"][number];
-  const existing = snapshot.snapshots.some((entry) => entry.id === sceneId);
-  return {
-    ...snapshot,
-    snapshots: existing
-      ? snapshot.snapshots.map((entry) => (entry.id === sceneId ? nextScene : entry))
-      : [...snapshot.snapshots, nextScene],
-  };
-}
-
 function patchAudioClipClear(snapshot: AudioSnapshot, params: JsonObject) {
   const channelId = typeof params.channelId === "string" ? params.channelId : null;
   return {
@@ -632,15 +604,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
     }
 
-    if (
-      method === "audio.snapshot.create" ||
-      method === "audio.snapshot.update" ||
-      method === "audio.snapshot.delete"
-    ) {
-      const patched = patchAudioSnapshotList(method, currentAudioSnapshot, params, result);
-      return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
-    }
-
     if (method === "audio.clip.clear") {
       return applyPatchedAudioSnapshot(patchAudioClipClear(currentAudioSnapshot, params), "audio.changed");
     }
@@ -649,6 +612,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     // remediation, Slice 3): a sync is now a console pull that rewrites
     // channel and mix-target state engine-side, so the only truthful thing to
     // show is a fresh `audio.snapshot`. Returning false triggers that refresh.
+    // `audio.snapshot.load` likewise (2026-10-01): TotalMix loads the mix and
+    // the console is read back, so the load ends with the same fresh read.
     return false;
   };
 
@@ -1395,17 +1360,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     async syncAudio() {
       return performAudioRequest("audio.sync");
     },
-    async recallAudioSnapshot(snapshotId: string) {
-      return performAudioRequest("audio.snapshot.recall", { snapshotId });
-    },
-    async createAudioSnapshot(request) {
-      return performAudioRequest("audio.snapshot.create", request as unknown as JsonObject);
-    },
-    async updateAudioSnapshot(request) {
-      return performAudioRequest("audio.snapshot.update", request as unknown as JsonObject);
-    },
-    async deleteAudioSnapshot(request) {
-      return performAudioRequest("audio.snapshot.delete", request as unknown as JsonObject);
+    async loadAudioSnapshot(slot: number) {
+      return performAudioRequest("audio.snapshot.load", { slot });
     },
     async clearAudioClips(request = {}) {
       return performAudioRequest("audio.clip.clear", request as unknown as JsonObject);
