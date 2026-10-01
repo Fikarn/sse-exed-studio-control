@@ -111,12 +111,15 @@ pub struct VideoFrameV2 {
     pub frame_rate_d: c_int,
     pub _picture_aspect_ratio: f32,
     pub frame_format_type: c_int,
-    pub _timecode: i64,
+    pub timecode: i64,
     pub p_data: *mut u8,
     pub line_stride_in_bytes: c_int,
     pub _p_metadata: *const c_char,
-    pub _timestamp: i64,
+    pub timestamp: i64,
 }
+
+/// `NDIlib_recv_timestamp_undefined`: a frame whose sender gave no time.
+pub const TIME_UNDEFINED: i64 = i64::MAX;
 
 /// `NDIlib_audio_frame_v3_t`: taken and freed, never read.
 #[repr(C)]
@@ -169,11 +172,11 @@ impl VideoFrameV2 {
             frame_rate_d: 0,
             _picture_aspect_ratio: 0.0,
             frame_format_type: 0,
-            _timecode: 0,
+            timecode: 0,
             p_data: null_mut(),
             line_stride_in_bytes: 0,
             _p_metadata: null(),
-            _timestamp: 0,
+            timestamp: 0,
         }
     }
 
@@ -188,6 +191,10 @@ impl VideoFrameV2 {
             rate_numerator: self.frame_rate_n,
             rate_denominator: self.frame_rate_d,
             has_data: !self.p_data.is_null(),
+            sent: Sent {
+                timecode: self.timecode,
+                timestamp: self.timestamp,
+            },
         }
     }
 }
@@ -243,6 +250,16 @@ pub struct VideoHeader {
     pub rate_numerator: c_int,
     pub rate_denominator: c_int,
     pub has_data: bool,
+    pub sent: Sent,
+}
+
+/// The sender's own times of a frame, in 100 ns: its timecode, which vMix
+/// steps by exactly one frame, and when it sent it (`TIME_UNDEFINED` when
+/// it did not say). Read for the minute's line only (`vmix::Spacing`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Sent {
+    pub timecode: i64,
+    pub timestamp: i64,
 }
 
 /// A frame the helper takes: its size, its rows, and how many bytes of the
@@ -254,6 +271,7 @@ pub struct Checked {
     pub stride: u32,
     pub length: usize,
     pub format: PictureFormat,
+    pub sent: Sent,
 }
 
 /// A video frame as a receiver hands it on while the library holds it: taken
@@ -306,6 +324,7 @@ pub fn check_video(header: &VideoHeader) -> Result<Checked, String> {
             rate_numerator: rate(header.rate_numerator),
             rate_denominator: rate(header.rate_denominator),
         },
+        sent: header.sent,
     })
 }
 
@@ -343,11 +362,11 @@ mod tests {
         assert_eq!(offset_of!(RecvCreateV3, p_ndi_recv_name), 32);
         assert_eq!(size_of::<VideoFrameV2>(), 72);
         assert_eq!(offset_of!(VideoFrameV2, frame_format_type), 24);
-        assert_eq!(offset_of!(VideoFrameV2, _timecode), 32);
+        assert_eq!(offset_of!(VideoFrameV2, timecode), 32);
         assert_eq!(offset_of!(VideoFrameV2, p_data), 40);
         assert_eq!(offset_of!(VideoFrameV2, line_stride_in_bytes), 48);
         assert_eq!(offset_of!(VideoFrameV2, _p_metadata), 56);
-        assert_eq!(offset_of!(VideoFrameV2, _timestamp), 64);
+        assert_eq!(offset_of!(VideoFrameV2, timestamp), 64);
         assert_eq!(size_of::<AudioFrameV3>(), 64);
         assert_eq!(offset_of!(AudioFrameV3, _four_cc), 24);
         assert_eq!(offset_of!(AudioFrameV3, _p_data), 32);
@@ -378,6 +397,10 @@ mod tests {
             rate_numerator: 30000,
             rate_denominator: 1001,
             has_data: true,
+            sent: Sent {
+                timecode: 7_000_000,
+                timestamp: TIME_UNDEFINED,
+            },
         }
     }
 
@@ -387,6 +410,14 @@ mod tests {
         assert_eq!(
             (taken.width, taken.height, taken.stride, taken.length),
             (3840, 2160, 7680, 3840 * 2160 * 2)
+        );
+        assert_eq!(
+            taken.sent,
+            Sent {
+                timecode: 7_000_000,
+                timestamp: TIME_UNDEFINED
+            },
+            "the sender's times go with it"
         );
         assert_eq!(taken.format.words(), "3840 × 2160 · 29.97");
         let padded = check_video(&header(1920, 1080, 4096)).expect("rows with room to spare");
@@ -445,5 +476,19 @@ mod tests {
         let empty = VideoFrameV2::empty();
         assert!(!empty.header().has_data);
         assert!(check_video(&empty.header()).is_err());
+    }
+
+    #[test]
+    fn a_frame_s_header_carries_the_sender_s_times() {
+        let mut frame = VideoFrameV2::empty();
+        frame.timecode = 12_345;
+        frame.timestamp = 67_890;
+        assert_eq!(
+            frame.header().sent,
+            Sent {
+                timecode: 12_345,
+                timestamp: 67_890
+            }
+        );
     }
 }

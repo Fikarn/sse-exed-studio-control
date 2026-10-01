@@ -3,9 +3,17 @@
 //! connects to the shell's listener, says the secret and then hello with its
 //! process; the shell answers with a composition surface made for it and,
 //! from then on, each scene the page shows. The helper draws that scene into
-//! the surface 29.97 times a second from each camera's newest frame
-//! (`renderer.rs`): the test card's, or vMix's (`receive.rs`), a frame no
-//! older than half a second. No picture leaves this process.
+//! the surface from each camera's newest frame (`renderer.rs`): the test
+//! card's, or vMix's (`receive.rs`), a frame no older than half a second. No
+//! picture leaves this process.
+//!
+//! vMix's frames are drawn in step with vMix: each frame handed over wakes
+//! the draw loop (`Inbox`), which draws once every live camera has a new
+//! frame (`pace`). Its own clock, 29.97 times a second, draws only while no
+//! camera's frames come: the test cards, or none at all. A clock of its own
+//! lost frames: a timed wait on Windows can wake up to 16 ms late (read on
+//! the studio PC on 2026-10-01), and a camera whose frames landed within that
+//! band had one in six or seven replaced before it was drawn.
 //!
 //! The listener is on 127.0.0.1 and nowhere else: an address that is not
 //! this PC's is refused, whatever the line said. No graphics object is made
@@ -18,11 +26,13 @@ use crate::card::{card_uyvy, mark, FULL};
 use crate::picture::Picture;
 use crate::receive::{lock, Frames};
 use crate::renderer::Renderer;
+use crate::vmix::Spread;
 use crate::watch::Beats;
+use std::collections::VecDeque;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-use std::sync::mpsc::{Receiver, RecvTimeoutError};
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
+use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::picture_layer::{FromLayerHelper, Scene, ToLayerHelper};
 use studio_control_protocol::pictures::{
@@ -30,7 +40,28 @@ use studio_control_protocol::pictures::{
 };
 
 /// 29.97 frames a second: what the studio's vMix preset sends.
-pub const FRAME_INTERVAL: Duration = Duration::from_nanos(33_366_667);
+const FRAME_NANOS: u64 = 33_366_667;
+pub const FRAME_INTERVAL: Duration = Duration::from_nanos(FRAME_NANOS);
+/// After the first new frame of the live cameras lands, the longest the draw
+/// waits for the others': half a frame. vMix renders its outputs on one
+/// clock, so theirs land close together; one that skipped a frame is drawn
+/// with the next.
+const SETTLE: Duration = Duration::from_nanos(FRAME_NANOS / 2);
+/// While cameras are live and none hands over a frame, a draw comes this
+/// long after the last all the same: the scene may have moved.
+const QUIET: Duration = Duration::from_nanos(FRAME_NANOS * 2);
+/// The last part of a timed wait is slept in steps of `STEP`, looking at the
+/// inbox between them: a wait on Windows' coarse timer can wake up to 16 ms
+/// late, a sleep within about a millisecond.
+const PRECISE_FOR: Duration = Duration::from_millis(20);
+const STEP: Duration = Duration::from_millis(1);
+/// The bins of the wait from a frame's landing to its draw.
+const WAIT_EDGES: [Duration; 4] = [
+    Duration::from_millis(1),
+    Duration::from_millis(4),
+    Duration::from_millis(12),
+    Duration::from_millis(20),
+];
 /// How long a broken connection waits before it is made again.
 const RECONNECT_DELAY: Duration = Duration::from_secs(1);
 /// The longest wait after failures in a row: each doubles the last.
@@ -65,6 +96,211 @@ pub enum Order {
         showing: bool,
         pictures: Pictures,
     },
+}
+
+/// What wakes the draw loop: the helper's orders, and each frame of vMix's as
+/// a receiver hands it over (`receive.rs`). Either wakes it at once, which a
+/// wait for a time alone does not on Windows; the last `PRECISE_FOR` of such
+/// a wait is slept in steps instead.
+#[derive(Default)]
+pub struct Inbox {
+    mail: Mutex<Mail>,
+    bell: Condvar,
+}
+
+#[derive(Default)]
+struct Mail {
+    orders: VecDeque<Order>,
+    /// No more orders come: the helper is ending.
+    closed: bool,
+    /// A frame was handed over since the draw loop last looked.
+    landed: bool,
+}
+
+impl Mail {
+    fn any(&self) -> bool {
+        !self.orders.is_empty() || self.closed || self.landed
+    }
+}
+
+/// What a wait brought.
+struct Delivery {
+    orders: Vec<Order>,
+    /// The helper is ending.
+    closed: bool,
+}
+
+impl Inbox {
+    pub fn order(&self, order: Order) {
+        lock(&self.mail).orders.push_back(order);
+        self.bell.notify_one();
+    }
+
+    /// The helper is ending: the draw loop ends at its next look.
+    pub fn close(&self) {
+        lock(&self.mail).closed = true;
+        self.bell.notify_one();
+    }
+
+    /// A camera's frame was handed over.
+    pub fn landed(&self) {
+        lock(&self.mail).landed = true;
+        self.bell.notify_one();
+    }
+
+    /// Waits until an order or a frame comes, the helper ends, or `until`
+    /// passes (never, for none).
+    fn wait(&self, until: Option<Instant>) -> Delivery {
+        let mut mail = lock(&self.mail);
+        while !mail.any() {
+            let Some(until) = until else {
+                mail = self.bell.wait(mail).unwrap_or_else(PoisonError::into_inner);
+                continue;
+            };
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                break;
+            }
+            if left > PRECISE_FOR {
+                mail = self
+                    .bell
+                    .wait_timeout(mail, left - PRECISE_FOR)
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .0;
+            } else {
+                drop(mail);
+                thread::sleep(left.min(STEP));
+                mail = lock(&self.mail);
+            }
+        }
+        mail.landed = false;
+        Delivery {
+            orders: mail.orders.drain(..).collect(),
+            closed: mail.closed,
+        }
+    }
+}
+
+/// What the draw loop knows of one camera's frames when it wakes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Waiting {
+    /// Its picture is in the scene and its frames come: one landed within
+    /// `SHOWN_FOR`.
+    live: bool,
+    /// When its newest frame landed, if that one is not drawn yet.
+    new_since: Option<Instant>,
+}
+
+/// What brought a draw, for the minute's line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Why {
+    /// Every live camera had a new frame.
+    AllCame,
+    /// `SETTLE` after the first new frame, without the rest.
+    Settled,
+    /// Cameras were live and none had a new frame for `QUIET`.
+    Quiet,
+    /// No camera was live: the draw loop's own clock.
+    Clock,
+}
+
+/// When the draw loop draws.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Pace {
+    Now(Why),
+    /// Not before then, unless a frame lands first.
+    At(Instant),
+}
+
+/// When to draw, in step with vMix's frames: as soon as every live camera has
+/// a new frame, or `SETTLE` after the first of them landed when one is
+/// missing; while cameras are live and none has a new frame, `QUIET` after
+/// the last draw; and on the draw loop's own clock (`due`) only while no
+/// camera is live.
+fn pace(cameras: &[Waiting; 3], due: Instant, drew_at: Option<Instant>, now: Instant) -> Pace {
+    let live = || cameras.iter().filter(|camera| camera.live);
+    if live().next().is_none() {
+        return if now >= due {
+            Pace::Now(Why::Clock)
+        } else {
+            Pace::At(due)
+        };
+    }
+    match live().filter_map(|camera| camera.new_since).min() {
+        Some(_) if live().all(|camera| camera.new_since.is_some()) => Pace::Now(Why::AllCame),
+        Some(first) if now >= first + SETTLE => Pace::Now(Why::Settled),
+        Some(first) => Pace::At(first + SETTLE),
+        None => match drew_at.map(|at| at + QUIET) {
+            Some(quiet) if now < quiet => Pace::At(quiet),
+            _ => Pace::Now(Why::Quiet),
+        },
+    }
+}
+
+/// Whether `scene` holds a place of `camera`'s (1 to 3).
+fn shows(scene: &Scene, camera: u8) -> bool {
+    scene.pictures.iter().any(|placed| placed.camera == camera)
+}
+
+/// What a draw took of one camera's frames from vMix, counted once the draw
+/// is presented (`Counts::add`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Took {
+    /// A new frame: how long it waited from its hand-over, and how many
+    /// before it were replaced unseen.
+    new: Option<(Duration, u64)>,
+    /// The frame drawn last was drawn again.
+    again: bool,
+}
+
+/// Takes each shown camera's newest frame from vMix for a draw, while one
+/// came within `SHOWN_FOR`: a new one takes the place of the one drawn last
+/// (the buffers go round, and no frame is copied again). Which cameras
+/// arrive, and what was taken of each.
+fn take_received(
+    frames: &Frames,
+    scene: &Scene,
+    fronts: &mut [Front; 3],
+    now: Instant,
+) -> ([bool; 3], [Took; 3]) {
+    let mut arrives = [false; 3];
+    let mut took = [Took::default(); 3];
+    for (index, front) in fronts.iter_mut().enumerate() {
+        if !shows(scene, index as u8 + 1) {
+            // Frames of a camera the scene does not show are not missed.
+            front.drawn_at = None;
+            continue;
+        }
+        let mut newest = lock(&frames[index]);
+        let Some(landed) = newest
+            .arrived
+            .filter(|at| now.saturating_duration_since(*at) < SHOWN_FOR)
+        else {
+            continue;
+        };
+        let unbroken = front
+            .drawn_at
+            .is_some_and(|at| now.saturating_duration_since(at) < SHOWN_FOR);
+        if newest.sequence != front.sequence {
+            let missed = if unbroken {
+                let missed = newest.sequence.wrapping_sub(front.sequence);
+                missed.saturating_sub(1).min(1_000)
+            } else {
+                0
+            };
+            took[index].new = Some((now.saturating_duration_since(landed), missed));
+            std::mem::swap(&mut newest.bytes, &mut front.bytes);
+            front.width = newest.width;
+            front.height = newest.height;
+            front.stride = newest.stride;
+            front.sequence = newest.sequence;
+        } else {
+            took[index].again = unbroken;
+        }
+        front.drawn_at = Some(now);
+        arrives[index] = true;
+    }
+    (arrives, took)
 }
 
 /// A received frame the draw loop holds while it draws it.
@@ -184,11 +420,15 @@ struct Counts {
     no_surface: u64,
     no_scene: u64,
     slowest: Duration,
-    /// Of vMix's frames: taken to be drawn, replaced by a newer one before
-    /// the draw loop took them, and drawn again for want of a newer one.
-    received: u64,
-    replaced: u64,
-    repeated: u64,
+    /// What brought each draw, by `Why`.
+    paced: [u64; 4],
+    /// Of each camera's frames from vMix: taken to be drawn, replaced by a
+    /// newer one before the draw loop took them, and drawn again for want of
+    /// a newer one; and how long each waited from its landing to its draw.
+    received: [u64; 3],
+    replaced: [u64; 3],
+    repeated: [u64; 3],
+    waited: [Spread; 3],
 }
 
 impl Counts {
@@ -196,17 +436,52 @@ impl Counts {
         self.drawn + self.failed + self.late + self.no_surface + self.no_scene > 0
     }
 
+    /// What a presented draw took of vMix's frames.
+    fn add(&mut self, took: &[Took; 3]) {
+        for (index, took) in took.iter().enumerate() {
+            if let Some((waited, missed)) = took.new {
+                self.received[index] += 1;
+                self.replaced[index] += missed;
+                self.waited[index].note(waited, &WAIT_EDGES);
+            }
+            if took.again {
+                self.repeated[index] += 1;
+            }
+        }
+    }
+
     fn line(&self, statistics: &str) -> String {
-        let received = if self.received + self.replaced + self.repeated > 0 {
+        let total = |counts: &[u64; 3]| counts.iter().sum::<u64>();
+        let received = if total(&self.received) + total(&self.replaced) + total(&self.repeated) > 0
+        {
+            let cameras: Vec<String> = (0..3)
+                .filter(|index| {
+                    self.received[*index] + self.replaced[*index] + self.repeated[*index] > 0
+                })
+                .map(|index| {
+                    format!(
+                        "CAM {}: {} taken, {} replaced, {} again, waited to be drawn {}",
+                        index + 1,
+                        self.received[index],
+                        self.replaced[index],
+                        self.repeated[index],
+                        self.waited[index].words(&WAIT_EDGES)
+                    )
+                })
+                .collect();
             format!(
-                "; of vMix's frames {} were taken, {} replaced before they were drawn, and {} draws showed a frame again",
-                self.received, self.replaced, self.repeated
+                "; of vMix's frames {} were taken, {} replaced before they were drawn, and {} times a frame was drawn again; {}",
+                total(&self.received),
+                total(&self.replaced),
+                total(&self.repeated),
+                cameras.join("; ")
             )
         } else {
             String::new()
         };
+        let [all_came, settled, quiet, clock] = self.paced;
         format!(
-            "The pictures helper drew {} frames in the last minute ({} failed, {} late; the slowest took {:.1} ms; {} waited for a surface, {} for a scene){}{}{received}.",
+            "The pictures helper drew {} frames in the last minute ({} failed, {} late; the slowest took {:.1} ms; {} waited for a surface, {} for a scene; {all_came} as every live camera's frame came, {settled} after half a frame without one, {quiet} with no new frame, {clock} on its own clock){}{}{received}.",
             self.drawn,
             self.failed,
             self.late,
@@ -234,6 +509,11 @@ struct Drawer {
     /// Each camera's received frame, as last taken from `receive.rs`.
     fronts: [Front; 3],
     frame: u64,
+    /// The own clock's next draw, and the last draw: when, and what brought
+    /// it.
+    due: Instant,
+    drew_at: Option<Instant>,
+    drew_by: Option<Why>,
     counts: Counts,
     counted: Instant,
     /// The last line said on stderr about the link: said once, not every
@@ -260,6 +540,9 @@ impl Drawer {
             cards,
             fronts: Default::default(),
             frame: 0,
+            due: Instant::now(),
+            drew_at: None,
+            drew_by: None,
             counts: Counts::default(),
             counted: Instant::now(),
             said: None,
@@ -298,7 +581,11 @@ impl Drawer {
                 self.cameras = cameras;
                 self.pictures = pictures;
                 if showing && !self.showing {
-                    self.retry_at = Instant::now();
+                    let now = Instant::now();
+                    self.retry_at = now;
+                    self.due = now;
+                    self.drew_at = None;
+                    self.drew_by = None;
                 }
                 self.showing = showing;
                 if !showing {
@@ -381,26 +668,76 @@ impl Drawer {
         }
     }
 
-    /// One draw: the scene, from every camera whose picture arrives.
-    fn draw(&mut self) {
+    /// Each camera's frames as the draw loop wakes: whether they come, and
+    /// whether one waits to be drawn. Only vMix's are live; the test cards
+    /// are drawn on the draw loop's own clock.
+    fn waiting(&self, now: Instant) -> [Waiting; 3] {
+        let mut waiting = [Waiting::default(); 3];
+        let (Some(scene), Pictures::Received(frames)) = (self.scene.as_ref(), &self.pictures)
+        else {
+            return waiting;
+        };
+        for (index, front) in self.fronts.iter().enumerate() {
+            if !shows(scene, index as u8 + 1) {
+                continue;
+            }
+            let newest = lock(&frames[index]);
+            let Some(landed) = newest
+                .arrived
+                .filter(|at| now.saturating_duration_since(*at) < SHOWN_FOR)
+            else {
+                continue;
+            };
+            waiting[index] = Waiting {
+                live: true,
+                new_since: (newest.sequence != front.sequence).then_some(landed),
+            };
+        }
+        waiting
+    }
+
+    /// A draw was made at `now` for `why`, presented or not. While the own
+    /// clock alone draws, its next draw is a frame after its last; any other
+    /// draw sets it a frame after itself, so that the clock takes over from
+    /// vMix's frames without reading as late.
+    fn drew(&mut self, why: Why, now: Instant) {
+        let clocked = self.drew_by == Some(Why::Clock);
+        self.drew_at = Some(now);
+        self.drew_by = Some(why);
+        if why == Why::Clock && clocked {
+            self.due += FRAME_INTERVAL;
+            // Behind by more than a frame (a busy PC, a slow present): the
+            // frames missed are missed, not drawn in a burst.
+            if self.due < now {
+                self.counts.late += 1;
+                self.due = now + FRAME_INTERVAL;
+            }
+        } else {
+            self.due = now + FRAME_INTERVAL;
+        }
+    }
+
+    /// One draw: the scene, from every camera whose picture arrives. Whether
+    /// it was presented; what it took of vMix's frames is counted only then.
+    fn draw(&mut self) -> bool {
         let Some(scene) = self.scene.as_ref() else {
             if self.renderer.is_some() {
                 self.counts.no_scene += 1;
             } else {
                 self.counts.no_surface += 1;
             }
-            return;
+            return false;
         };
         let frame = self.frame;
         self.frame = self.frame.wrapping_add(1);
-        let shown = |camera: u8| scene.pictures.iter().any(|placed| placed.camera == camera);
         let mut arrives = [false; 3];
+        let mut took = [Took::default(); 3];
         match &self.pictures {
             Pictures::Cards => {
                 for camera in &self.cameras {
                     let index = usize::from(camera.camera).wrapping_sub(1);
                     if index < 3
-                        && shown(camera.camera)
+                        && shows(scene, camera.camera)
                         && SIMULATED_VMIX_INPUTS.contains(&camera.vmix_input)
                     {
                         arrives[index] = true;
@@ -414,40 +751,7 @@ impl Drawer {
                 }
             }
             Pictures::Received(frames) => {
-                let now = Instant::now();
-                for (index, front) in self.fronts.iter_mut().enumerate() {
-                    if !shown(index as u8 + 1) {
-                        continue;
-                    }
-                    let mut newest = lock(&frames[index]);
-                    let recent = newest
-                        .arrived
-                        .is_some_and(|at| now.saturating_duration_since(at) < SHOWN_FOR);
-                    if !recent {
-                        continue;
-                    }
-                    // The newest frame for the one drawn last: the buffers
-                    // go round, and no frame is copied again.
-                    let unbroken = front
-                        .drawn_at
-                        .is_some_and(|at| now.saturating_duration_since(at) < SHOWN_FOR);
-                    if newest.sequence != front.sequence {
-                        if unbroken {
-                            let missed = newest.sequence.wrapping_sub(front.sequence);
-                            self.counts.replaced += missed.saturating_sub(1).min(1_000);
-                        }
-                        self.counts.received += 1;
-                        std::mem::swap(&mut newest.bytes, &mut front.bytes);
-                        front.width = newest.width;
-                        front.height = newest.height;
-                        front.stride = newest.stride;
-                        front.sequence = newest.sequence;
-                    } else if unbroken {
-                        self.counts.repeated += 1;
-                    }
-                    front.drawn_at = Some(now);
-                    arrives[index] = true;
-                }
+                (arrives, took) = take_received(frames, scene, &mut self.fronts, Instant::now());
             }
             Pictures::Nothing => {}
         }
@@ -481,7 +785,7 @@ impl Drawer {
             Some(renderer) => renderer.draw(scene, &pictures),
             None => {
                 self.counts.no_surface += 1;
-                return;
+                return false;
             }
         };
         match drawn {
@@ -489,10 +793,13 @@ impl Drawer {
                 self.failures = 0;
                 self.counts.drawn += 1;
                 self.counts.slowest = self.counts.slowest.max(started.elapsed());
+                self.counts.add(&took);
+                true
             }
             Err(why) => {
                 self.counts.failed += 1;
                 self.broke(format!("The pictures helper could not draw: {why}"));
+                false
             }
         }
     }
@@ -512,49 +819,56 @@ impl Drawer {
         self.counts = Counts::default();
     }
 
-    fn tick(&mut self) {
+    /// One wake while the pictures show: the link kept, the shell heard, and
+    /// a draw when it is time (`pace`). Returns when to wake next if no
+    /// order or frame comes first.
+    fn wake(&mut self) -> Instant {
         self.beats.beat(WHO);
         self.connect();
         self.hear();
-        if self.connection.is_some() {
-            self.draw();
-        }
+        let now = Instant::now();
+        let next = if self.connection.is_some() {
+            if let Pace::Now(why) = pace(&self.waiting(now), self.due, self.drew_at, now) {
+                if self.draw() {
+                    self.counts.paced[why as usize] += 1;
+                }
+                self.drew(why, now);
+            }
+            match pace(&self.waiting(now), self.due, self.drew_at, now) {
+                Pace::At(at) => at,
+                // A frame landed meanwhile: its wake is already in the inbox.
+                Pace::Now(_) => now,
+            }
+        } else {
+            // A connection is tried again within a frame (`connect`).
+            self.due = now + FRAME_INTERVAL;
+            self.due
+        };
         self.count();
+        next
     }
 }
 
-/// Draws until `orders` closes: the helper is ending. It beats while it
+/// Draws until the inbox is closed: the helper is ending. It beats while it
 /// draws (`watch.rs`), so a draw that hangs makes the helper go silent.
-pub fn run(orders: &Receiver<Order>, beats: &Arc<Beats>) {
+pub fn run(inbox: &Inbox, beats: &Arc<Beats>) {
     let mut drawer = Drawer::new(Arc::clone(beats));
-    let mut due = Instant::now();
+    let mut until = None;
     loop {
-        // Nothing to draw while the page does not show the pictures: wait for
-        // an order, not for the next frame's time.
-        if !drawer.showing {
-            match orders.recv() {
-                Ok(order) => drawer.take(order),
-                Err(_) => return,
-            }
-            due = Instant::now();
-            continue;
+        let delivery = inbox.wait(until);
+        if delivery.closed {
+            return;
         }
-        match orders.recv_timeout(due.saturating_duration_since(Instant::now())) {
-            Ok(order) => {
-                drawer.take(order);
-                continue;
-            }
-            Err(RecvTimeoutError::Disconnected) => return,
-            Err(RecvTimeoutError::Timeout) => {}
+        for order in delivery.orders {
+            drawer.take(order);
         }
-        drawer.tick();
-        due += FRAME_INTERVAL;
-        // Behind by more than a frame (a busy PC, a slow present): the frames
-        // missed are missed, not drawn in a burst.
-        if due < Instant::now() {
-            drawer.counts.late += 1;
-            due = Instant::now() + FRAME_INTERVAL;
-        }
+        // Nothing to draw while the page does not show the pictures: it
+        // waits for an order, not for a time.
+        until = if drawer.showing {
+            Some(drawer.wake())
+        } else {
+            None
+        };
     }
 }
 
@@ -677,7 +991,7 @@ mod tests {
             pictures: Pictures::Cards,
         });
         // No link told: no connection is tried, and a draw is not counted.
-        drawer.tick();
+        drawer.wake();
         assert!(drawer.connection.is_none() && drawer.renderer.is_none());
         assert!(!drawer.counts.any());
         // It beats while it draws, and rests while the pictures do not show.
@@ -721,74 +1035,291 @@ mod tests {
         }
     }
 
-    // The newest received frame is drawn, and a frame older than half a
-    // second is not: its place stays clear. There is no surface here, which
-    // the counts say; the frames it took are what this holds.
+    /// A frame of `bytes` handed over as `sequence` at `at`.
+    fn hand_over(frames: &Frames, index: usize, bytes: u8, sequence: u64, at: Option<Instant>) {
+        *lock(&frames[index]) = crate::receive::Newest {
+            bytes: vec![bytes; 8 * 2 * 2],
+            width: 8,
+            height: 2,
+            stride: 16,
+            sequence,
+            arrived: at,
+        };
+    }
+
+    // The newest received frame is taken, and a frame older than half a
+    // second is not: its place stays clear. A frame replaced before it was
+    // taken, and a frame taken again, are said of the camera they belong to.
     #[test]
     fn a_received_frame_is_taken_while_it_is_recent() {
-        use crate::receive::Newest;
-        use std::sync::Mutex;
-        let frames: Arc<Frames> = Arc::new([
-            Mutex::new(Newest::default()),
-            Mutex::new(Newest::default()),
-            Mutex::new(Newest::default()),
-        ]);
-        // The drawer first: its test cards take a while to make in a test
-        // build, and the frame below must be recent when it is drawn.
+        let frames: Frames = Default::default();
+        let mut fronts: [Front; 3] = Default::default();
+        let scene = scene_of(&[1, 2, 3]);
+        let now = Instant::now();
+        let before = |ms: u64| now.checked_sub(Duration::from_millis(ms));
+        let after = |ms: u64| now + Duration::from_millis(ms);
+        hand_over(&frames, 1, 7, 5, before(3));
+        hand_over(&frames, 2, 9, 3, before(2_000));
+        let (arrives, took) = take_received(&frames, &scene, &mut fronts, now);
+        assert_eq!(arrives, [false, true, false]);
+        assert_eq!(
+            took[1],
+            Took {
+                new: Some((Duration::from_millis(3), 0)),
+                again: false
+            },
+            "the first take after a break misses nothing"
+        );
+        assert_eq!((took[0], took[2]), (Took::default(), Took::default()));
+        assert_eq!(fronts[1].sequence, 5, "CAM 2's frame is taken");
+        assert_eq!(fronts[1].bytes, vec![7; 32]);
+        assert!(
+            lock(&frames[1]).bytes.is_empty(),
+            "and its buffer handed back"
+        );
+        assert_eq!(fronts[2].sequence, 0, "CAM 3's is too old");
+        assert_eq!(fronts[0].sequence, 0, "CAM 1 sent none");
+        let mut counts = Counts::default();
+        counts.add(&took);
+
+        // Taken on without a break: the frames replaced before it are
+        // counted, and so is the same frame taken again.
+        hand_over(&frames, 1, 8, 8, Some(now));
+        let (_, took) = take_received(&frames, &scene, &mut fronts, after(33));
+        assert_eq!(
+            took[1].new,
+            Some((Duration::from_millis(33), 2)),
+            "frames 6 and 7 were never drawn"
+        );
+        assert_eq!(fronts[1].bytes, vec![8; 32]);
+        counts.add(&took);
+        let (_, took) = take_received(&frames, &scene, &mut fronts, after(66));
+        assert_eq!(
+            took[1],
+            Took {
+                new: None,
+                again: true
+            },
+            "frame 8 taken again"
+        );
+        counts.add(&took);
+        assert_eq!(counts.received, [0, 2, 0]);
+        assert_eq!(counts.replaced, [0, 2, 0]);
+        assert_eq!(counts.repeated, [0, 1, 0]);
+        assert_eq!(counts.waited[1].counts, [0, 1, 0, 0, 1], "3 ms and 33 ms");
+        let line = counts.line("");
+        assert!(
+            line.contains("of vMix's frames 2 were taken, 2 replaced before they were drawn, and 1 times a frame was drawn again; CAM 2: 2 taken, 2 replaced, 1 again, waited to be drawn (under 1, 1–4, 4–12, 12–20, 20 ms or more) 0 / 1 / 0 / 0 / 1, the longest 33.0 ms."),
+            "{line}"
+        );
+
+        // A camera the scene stops showing for a moment has missed nothing
+        // when it shows again.
+        let (arrives, _) = take_received(&frames, &scene_of(&[1, 3]), &mut fronts, after(83));
+        assert!(!arrives[1]);
+        hand_over(&frames, 1, 4, 12, Some(after(93)));
+        let (_, took) = take_received(&frames, &scene, &mut fronts, after(99));
+        assert_eq!(took[1].new, Some((Duration::from_millis(6), 0)));
+    }
+
+    // A draw that is not presented counts no frame as taken: here there is
+    // no surface, and a frame taken for it is counted nowhere but there.
+    #[test]
+    fn a_draw_without_a_surface_counts_no_frame_taken() {
+        let frames: Arc<Frames> = Arc::new(Default::default());
         let mut drawer = Drawer::new(Arc::new(Beats::default()));
         drawer.take(Order::Want {
             cameras: Vec::new(),
             showing: true,
             pictures: Pictures::Received(Arc::clone(&frames)),
         });
-        drawer.scene = Some(scene_of(&[1, 2, 3]));
-        {
-            let mut newest = lock(&frames[1]);
-            newest.bytes = vec![7; 8 * 2 * 2];
-            newest.width = 8;
-            newest.height = 2;
-            newest.stride = 16;
-            newest.sequence = 5;
-            newest.arrived = Some(Instant::now());
-        }
-        {
-            let mut old = lock(&frames[2]);
-            old.bytes = vec![9; 8 * 2 * 2];
-            old.width = 8;
-            old.height = 2;
-            old.stride = 16;
-            old.sequence = 3;
-            old.arrived = Instant::now().checked_sub(Duration::from_secs(2));
-        }
-        drawer.draw();
+        drawer.scene = Some(scene_of(&[1]));
+        hand_over(&frames, 0, 7, 1, Some(Instant::now()));
+        assert!(!drawer.draw(), "nothing presented");
         assert_eq!(drawer.counts.no_surface, 1);
-        assert_eq!(drawer.counts.received, 1);
-        assert_eq!(
-            drawer.counts.replaced, 0,
-            "the first take after a break misses nothing"
-        );
-        assert_eq!(drawer.fronts[1].sequence, 5, "CAM 2's frame is taken");
-        assert_eq!(drawer.fronts[1].bytes, vec![7; 32]);
-        assert!(
-            lock(&frames[1]).bytes.is_empty(),
-            "and its buffer handed back"
-        );
-        assert_eq!(drawer.fronts[2].sequence, 0, "CAM 3's is too old");
-        assert_eq!(drawer.fronts[0].sequence, 0, "CAM 1 sent none");
+        assert_eq!(drawer.counts.received, [0; 3]);
+        assert!(!drawer.counts.waited[0].any());
+    }
 
-        // Drawing on without a break: frames replaced before they were taken
-        // are counted, and so is a draw of the same frame again.
-        {
-            let mut newest = lock(&frames[1]);
-            newest.bytes = vec![8; 32];
-            newest.sequence = 8;
-            newest.arrived = Some(Instant::now());
-        }
+    // The own clock takes over from vMix's frames a frame after their last
+    // draw, without reading as late; while it alone draws, a draw more than
+    // a frame behind is late, and the clock starts again from it.
+    #[test]
+    fn the_own_clock_takes_over_from_vmix_s_frames_without_reading_late() {
+        let mut drawer = Drawer::new(Arc::new(Beats::default()));
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        drawer.drew(Why::AllCame, at(0));
+        drawer.drew(Why::Quiet, at(67));
+        // Every output stopped: the clock's first draw comes a little after
+        // the quiet draw's own next frame.
+        drawer.drew(Why::Clock, at(140));
+        assert_eq!(drawer.counts.late, 0);
+        assert_eq!(drawer.due, at(140) + FRAME_INTERVAL);
+        drawer.drew(Why::Clock, at(174));
+        assert_eq!(drawer.counts.late, 0);
+        assert_eq!(drawer.due, at(140) + FRAME_INTERVAL * 2);
+        drawer.drew(Why::Clock, at(300));
+        assert_eq!(drawer.counts.late, 1);
+        assert_eq!(drawer.due, at(300) + FRAME_INTERVAL);
+    }
+
+    /// Three cameras' frames as the draw loop finds them.
+    fn cameras(live: [bool; 3], new_since: [Option<Instant>; 3]) -> [Waiting; 3] {
+        [0, 1, 2].map(|index| Waiting {
+            live: live[index],
+            new_since: new_since[index],
+        })
+    }
+
+    // In step with vMix: a draw as soon as every live camera has a new
+    // frame, half a frame after the first when one is missing, and the own
+    // clock only while no camera is live.
+    #[test]
+    fn the_draw_comes_when_every_live_camera_s_frame_has_come() {
+        let start = Instant::now();
+        let ms = |ms: u64| start + Duration::from_millis(ms);
+        let due = ms(30);
+
+        // No camera live: the own clock.
+        let none = cameras([false; 3], [None; 3]);
+        assert_eq!(pace(&none, due, None, ms(10)), Pace::At(due));
+        assert_eq!(pace(&none, due, None, ms(30)), Pace::Now(Why::Clock));
+        assert_eq!(
+            pace(&none, due, Some(ms(29)), ms(31)),
+            Pace::Now(Why::Clock)
+        );
+
+        // All three live; two have new frames, the third's has not come.
+        let two = cameras([true; 3], [Some(ms(2)), Some(ms(3)), None]);
+        assert_eq!(pace(&two, due, None, ms(4)), Pace::At(ms(2) + SETTLE));
+        assert_eq!(
+            pace(&two, due, None, ms(2) + SETTLE),
+            Pace::Now(Why::Settled),
+            "the third skipped a frame"
+        );
+        // The third's comes: drawn at once, whatever the own clock says.
+        let all = cameras([true; 3], [Some(ms(2)), Some(ms(3)), Some(ms(5))]);
+        assert_eq!(pace(&all, due, None, ms(5)), Pace::Now(Why::AllCame));
+        assert_eq!(pace(&all, ms(0), None, ms(5)), Pace::Now(Why::AllCame));
+
+        // A camera that is not live (its output off, or not in the scene)
+        // is not waited for.
+        let one_off = cameras([true, false, true], [Some(ms(2)), None, Some(ms(4))]);
+        assert_eq!(pace(&one_off, due, None, ms(4)), Pace::Now(Why::AllCame));
+
+        // Live, and nothing new since the last draw: a draw all the same
+        // after `QUIET`, for the scene may have moved.
+        let quiet = cameras([true; 3], [None; 3]);
+        assert_eq!(
+            pace(&quiet, due, Some(ms(40)), ms(50)),
+            Pace::At(ms(40) + QUIET)
+        );
+        assert_eq!(
+            pace(&quiet, due, Some(ms(40)), ms(40) + QUIET),
+            Pace::Now(Why::Quiet)
+        );
+        assert_eq!(pace(&quiet, due, None, ms(50)), Pace::Now(Why::Quiet));
+    }
+
+    // vMix's frames are live while one landed within half a second and the
+    // scene shows the camera; a frame not yet taken is new. The test cards
+    // are never live: they are drawn on the own clock.
+    #[test]
+    fn a_camera_is_live_while_its_frames_come_and_its_newest_waits_until_drawn() {
+        use crate::receive::Newest;
+        let frames: Arc<Frames> = Arc::new(Default::default());
+        let mut drawer = Drawer::new(Arc::new(Beats::default()));
+        drawer.scene = Some(scene_of(&[1, 2]));
+        assert_eq!(
+            drawer.waiting(Instant::now()),
+            [Waiting::default(); 3],
+            "the test cards"
+        );
+        drawer.take(Order::Want {
+            cameras: Vec::new(),
+            showing: true,
+            pictures: Pictures::Received(Arc::clone(&frames)),
+        });
+        let now = Instant::now();
+        let landed = now.checked_sub(Duration::from_millis(5)).expect("a clock");
+        let old = now.checked_sub(Duration::from_secs(2)).expect("a clock");
+        let hand_over = |index: usize, sequence: u64, at: Instant| {
+            *lock(&frames[index]) = Newest {
+                bytes: vec![1; 32],
+                width: 8,
+                height: 2,
+                stride: 16,
+                sequence,
+                arrived: Some(at),
+            };
+        };
+        hand_over(0, 1, landed);
+        hand_over(1, 4, old);
+        hand_over(2, 9, landed);
+        let waiting = drawer.waiting(now);
+        assert_eq!(
+            waiting[0],
+            Waiting {
+                live: true,
+                new_since: Some(landed)
+            }
+        );
+        assert_eq!(waiting[1], Waiting::default(), "its frames stopped");
+        assert_eq!(waiting[2], Waiting::default(), "not in the scene");
+
         drawer.draw();
-        assert_eq!(drawer.fronts[1].sequence, 8);
-        assert_eq!(drawer.counts.replaced, 2, "frames 6 and 7 were never drawn");
-        drawer.draw();
-        assert_eq!(drawer.counts.repeated, 1, "frame 8 drawn again");
-        assert_eq!(drawer.counts.received, 2);
+        assert_eq!(
+            drawer.waiting(now)[0],
+            Waiting {
+                live: true,
+                new_since: None
+            },
+            "drawn: nothing waits"
+        );
+    }
+
+    #[test]
+    fn the_inbox_wakes_the_draw_loop_at_once_for_an_order_or_a_frame() {
+        let inbox = Arc::new(Inbox::default());
+        let later = Instant::now() + Duration::from_secs(60);
+        let wake = |inbox: &Arc<Inbox>, tell: fn(&Inbox)| {
+            let teller = Arc::clone(inbox);
+            let started = Instant::now();
+            let thread = thread::spawn(move || {
+                thread::sleep(Duration::from_millis(20));
+                tell(&teller);
+            });
+            let delivery = inbox.wait(Some(later));
+            thread.join().expect("the teller");
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "woken by the teller, not by the time"
+            );
+            delivery
+        };
+
+        let delivery = wake(&inbox, |inbox| {
+            inbox.order(Order::Want {
+                cameras: Vec::new(),
+                showing: false,
+                pictures: Pictures::Nothing,
+            });
+        });
+        assert_eq!(delivery.orders.len(), 1);
+        assert!(!delivery.closed);
+
+        let delivery = wake(&inbox, Inbox::landed);
+        assert!(delivery.orders.is_empty() && !delivery.closed);
+        // A landing is taken once: the next wait runs to its time.
+        let until = Instant::now() + Duration::from_millis(30);
+        let delivery = inbox.wait(Some(until));
+        assert!(Instant::now() >= until, "it waited out its time");
+        assert!(delivery.orders.is_empty() && !delivery.closed);
+
+        let delivery = wake(&inbox, Inbox::close);
+        assert!(delivery.closed);
+        // Closed stays closed, and a wait without a time returns.
+        assert!(inbox.wait(None).closed);
     }
 }

@@ -49,11 +49,11 @@ mod sha256;
 mod vmix;
 mod watch;
 
-use layer::Pictures;
+use layer::{Inbox, Pictures};
 use receive::Vmix;
 use std::io::{self, BufReader, Read, Write};
 use std::process::ExitCode;
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -76,17 +76,21 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
     let beats = Arc::new(Beats::default());
+    let inbox = Arc::new(Inbox::default());
     let mut sources = Sources::new(
         vmix::permission(studio_build, |name| std::env::var_os(name)),
         Arc::clone(&beats),
+        Arc::clone(&inbox),
     );
-    let (orders, received) = mpsc::channel();
-    let drawer = thread::Builder::new()
-        .name(String::from("pictures"))
-        .spawn(move || layer::run(&received, &beats));
+    let drawer = {
+        let inbox = Arc::clone(&inbox);
+        thread::Builder::new()
+            .name(String::from("pictures"))
+            .spawn(move || layer::run(&inbox, &beats))
+    };
     let stdout = io::stdout();
-    run(io::stdin(), &mut stdout.lock(), &orders, &mut sources);
-    drop(orders);
+    run(io::stdin(), &mut stdout.lock(), &inbox, &mut sources);
+    inbox.close();
     // NDI's receivers and search end before the process does, within the
     // engine's second of grace.
     sources.finish(FINISH_WITHIN);
@@ -113,6 +117,8 @@ struct Wanted {
 struct Sources {
     permission: Permission,
     beats: Arc<Beats>,
+    /// The draw loop's inbox, which vMix's receivers wake with each frame.
+    inbox: Arc<Inbox>,
     /// vMix's pictures once asked for: started, or why not.
     vmix: Option<Result<Vmix, String>>,
     /// A refusal is said on stderr once.
@@ -120,10 +126,11 @@ struct Sources {
 }
 
 impl Sources {
-    fn new(permission: Permission, beats: Arc<Beats>) -> Self {
+    fn new(permission: Permission, beats: Arc<Beats>, inbox: Arc<Inbox>) -> Self {
         Self {
             permission,
             beats,
+            inbox,
             vmix: None,
             refusal_said: false,
         }
@@ -142,10 +149,10 @@ impl Sources {
                 return None;
             }
         };
-        let beats = &self.beats;
+        let (beats, inbox) = (&self.beats, &self.inbox);
         self.vmix
             .get_or_insert_with(|| {
-                Vmix::start(library, Arc::clone(beats)).inspect_err(|why| {
+                Vmix::start(library, Arc::clone(beats), Arc::clone(inbox)).inspect_err(|why| {
                     eprintln!("The pictures helper takes no pictures from vMix: {why}.");
                 })
             })
@@ -268,7 +275,7 @@ fn spawn_reader(input: impl Read + Send + 'static) -> Receiver<Input> {
 fn run(
     input: impl Read + Send + 'static,
     output: &mut impl Write,
-    orders: &Sender<layer::Order>,
+    orders: &Inbox,
     sources: &mut Sources,
 ) {
     let lines = spawn_reader(input);
@@ -287,7 +294,7 @@ fn run(
                 source,
                 ..
             }))) => {
-                let _ = orders.send(layer::Order::Want {
+                orders.order(layer::Order::Want {
                     cameras: cameras.clone(),
                     showing,
                     pictures: sources.pictures(source, showing),
@@ -301,7 +308,7 @@ fn run(
             Ok(Input::Line(Ok(ToHelper::Link { address, secret }))) => {
                 match layer::listener_address(&address) {
                     Ok(address) => {
-                        let _ = orders.send(layer::Order::Link(address, secret));
+                        orders.order(layer::Order::Link(address, secret));
                     }
                     Err(why) => eprintln!("The pictures helper refused a listener: {why}"),
                 }
@@ -373,6 +380,7 @@ mod tests {
         Sources::new(
             vmix::permission(false, |_| None),
             Arc::new(Beats::default()),
+            Arc::new(Inbox::default()),
         )
     }
 
@@ -381,7 +389,7 @@ mod tests {
         run(
             io::Cursor::new(input.as_bytes().to_vec()),
             &mut output,
-            &mpsc::channel().0,
+            &Inbox::default(),
             sources,
         );
         output
@@ -464,6 +472,7 @@ mod tests {
                     .then(|| std::ffi::OsString::from("1"))
             }),
             Arc::new(Beats::default()),
+            Arc::new(Inbox::default()),
         );
         let input = concat!(
             r#"{"type":"want","cameras":[{"camera":3,"vmixInput":3}],"source":"vmix"}"#,
