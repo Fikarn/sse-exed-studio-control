@@ -102,7 +102,7 @@ The presenter reads the script on the Prompter XL, in a window of Studio Control
 
 ## Cameras
 
-The links to the real cameras and their pictures are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, every control and `REC` are locked, and each picture's place reads `NO PICTURE` and says the pictures come with a later version. This is how the page works with a camera that is held.
+The links to the real cameras are not built yet. In the studio's build every camera reads `NOT SET UP` and says that its link comes with a later version, and every control and `REC` are locked. The pictures come from vMix's Outputs 2, 3 and 4 over NDI while vMix runs and sends them; with vMix closed each picture's place reads `NO PICTURE` and the state display `NO PICTURES`. The rest of this section is how the page works with a camera that is held.
 
 - **Select** a camera with its key on the left or its small picture. The big picture, the plate and the Stream Deck's dials follow. `REC` does not: it is always CAM 1's.
 - **The Stream Deck's dials** set the selected camera. `Exposure`, `Colour` and `Focus` choose what they set, as the deck's `BANK` does. The line under them says what the dials set, or why they set nothing now.

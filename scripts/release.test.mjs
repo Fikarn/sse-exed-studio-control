@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,8 +7,10 @@ import test from "node:test";
 
 import { hardenedLaneEnv } from "./native-runtime-harness.mjs";
 import {
+  BUILD_FILES,
   BUILD_RECORD_FILE,
   buildEnv,
+  buildMarkOf,
   buildName,
   buildsRoot,
   changedFilesOf,
@@ -15,10 +18,13 @@ import {
   isBuildName,
   laneEnv,
   launcherText,
+  NDI_LIBRARY_FILE,
+  PICTURES_FILE,
   readBuildRecord,
   releaseRefusal,
   schemaVersionOf,
   SHELL_FILE,
+  studioMarkOf,
   trialEnv,
   trialProblem,
   writeBuildRecord,
@@ -199,6 +205,31 @@ test("the trial start is read: the default folder, the engine beside the shell, 
   assert.match(trialProblem({ ...good, studioBuild: null }, expected), /built from no commit/);
 });
 
+test("a program's build mark is read as the engine reads it", () => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), "sse-release-test-"));
+  try {
+    const program = path.join(folder, "program.exe");
+    const studio = studioMarkOf(COMMIT);
+    const other = studioMarkOf("f".repeat(40));
+    const development = `studio-control-build:v1:D:${"-".repeat(40)}`;
+    assert.equal(studio, `studio-control-build:v1:S:${COMMIT}`);
+    const cases = [
+      ["the commit's mark, twice", `MZ\0${studio}\0junk\xff${studio}`, studio],
+      ["a development build's", `MZ${development}`, development],
+      ["no mark", "MZ\0studio control's strings", null],
+      // A stretch that begins like a mark and is not one is passed over.
+      ["a broken mark beside one", `studio-control-build:v1:S:${COMMIT.toUpperCase()} ${studio}`, studio],
+      ["two marks that differ", `${studio}\0${other}`, "conflicting"],
+    ];
+    for (const [what, bytes, mark] of cases) {
+      writeFileSync(program, Buffer.from(bytes, "latin1"));
+      assert.equal(buildMarkOf(program), mark, what);
+    }
+  } finally {
+    rmSync(folder, { force: true, recursive: true });
+  }
+});
+
 test("a build's record describes its folder, and a changed file is found", () => {
   const builds = mkdtempSync(path.join(os.tmpdir(), "sse-release-test-"));
   try {
@@ -207,8 +238,10 @@ test("a build's record describes its folder, and a changed file is found", () =>
     mkdirSync(folder);
     writeFileSync(path.join(folder, SHELL_FILE), "the shell");
     writeFileSync(path.join(folder, ENGINE_FILE), "the engine");
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
 
-    // A run that failed leaves the two files and no record.
+    // A run that failed leaves the files and no record.
     assert.throws(() => readBuildRecord(folder), /build\.json is missing/);
     const written = writeBuildRecord(
       folder,
@@ -218,7 +251,8 @@ test("a build's record describes its folder, and a changed file is found", () =>
     );
     assert.equal(written.name, name);
     assert.equal(written.builtAt, "2026-09-28T02:00:00.000Z");
-    assert.deepEqual(Object.keys(written.files), [SHELL_FILE, ENGINE_FILE]);
+    assert.deepEqual(Object.keys(written.files), BUILD_FILES);
+    assert.deepEqual(BUILD_FILES, [SHELL_FILE, ENGINE_FILE, PICTURES_FILE, NDI_LIBRARY_FILE]);
     assert.match(written.files[ENGINE_FILE], /^[0-9a-f]{64}$/);
     assert.deepEqual(readBuildRecord(folder), written);
     assert.deepEqual(JSON.parse(readFileSync(path.join(folder, BUILD_RECORD_FILE), "utf8")), written);
@@ -233,10 +267,61 @@ test("a build's record describes its folder, and a changed file is found", () =>
     assert.throws(() => readBuildRecord(folder), /does not describe the folder it is in/);
     writeFileSync(recordPath, JSON.stringify(written));
 
+    // Every file the record names is checked: the helper and the library too.
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "another library");
+    assert.throws(
+      () => readBuildRecord(folder),
+      /Processing\.NDI\.Lib\.x64\.dll is not the file build\.json describes/
+    );
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
+    rmSync(path.join(folder, PICTURES_FILE));
+    assert.throws(() => readBuildRecord(folder), /studio-control-pictures\.exe is missing/);
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
+    // A helper or a library in the folder is checked whatever the record names: a record
+    // that leaves one out does not vouch for it.
+    const { [PICTURES_FILE]: _helper, ...withoutHelper } = written.files;
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutHelper }));
+    assert.throws(() => readBuildRecord(folder), /studio-control-pictures\.exe is not the file build\.json describes/);
+    // A record names files of the folder, and nothing elsewhere.
+    for (const elsewhere of ["..\\studio-control-pictures.exe", "../x.exe", "C:\\x.exe", "sub/x.exe", ".."]) {
+      writeFileSync(recordPath, JSON.stringify({ ...written, files: { ...written.files, [elsewhere]: "0" } }));
+      assert.throws(() => readBuildRecord(folder), /which is not a file of the folder/, elsewhere);
+    }
+    // The helper and the library go together: one without the other is refused.
+    const { [NDI_LIBRARY_FILE]: _library, ...withoutLibrary } = written.files;
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutLibrary }));
+    rmSync(path.join(folder, NDI_LIBRARY_FILE));
+    assert.throws(() => readBuildRecord(folder), /the pictures helper without NDI's library/);
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutHelper }));
+    rmSync(path.join(folder, PICTURES_FILE));
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
+    assert.throws(() => readBuildRecord(folder), /NDI's library without the pictures helper/);
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
+    writeFileSync(recordPath, JSON.stringify(written));
+    assert.deepEqual(readBuildRecord(folder), written);
+
     writeFileSync(path.join(folder, ENGINE_FILE), "another engine");
     assert.throws(() => readBuildRecord(folder), /studio-control-engine\.exe is not the file build\.json describes/);
     rmSync(path.join(folder, ENGINE_FILE));
     assert.throws(() => readBuildRecord(folder), /studio-control-engine\.exe is missing/);
+
+    // A build made before the pictures helper (two files) still verifies.
+    const older = path.join(builds, "2026-09-27_0123456");
+    mkdirSync(older);
+    writeFileSync(path.join(older, SHELL_FILE), "an older shell");
+    writeFileSync(path.join(older, ENGINE_FILE), "an older engine");
+    const hash = (file) =>
+      createHash("sha256")
+        .update(readFileSync(path.join(older, file)))
+        .digest("hex");
+    const twoFiles = {
+      name: "2026-09-27_0123456",
+      commit: COMMIT,
+      builtAt: "2026-09-27T12:00:00.000Z",
+      files: { [SHELL_FILE]: hash(SHELL_FILE), [ENGINE_FILE]: hash(ENGINE_FILE) },
+    };
+    writeFileSync(path.join(older, BUILD_RECORD_FILE), JSON.stringify(twoFiles));
+    assert.deepEqual(readBuildRecord(older), twoFiles);
 
     // A record copied into another folder does not describe it.
     const copy = path.join(builds, "2026-09-29_0000000");

@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Added
 
+- The Cameras page shows the three cameras' pictures from vMix's Outputs 2, 3 and 4 over NDI, with Guides, Peaking, Zebras and the loupe; NDI's library comes in the build's folder. With vMix closed, `NO PICTURES` says to open vMix and send the outputs (#278, #279).
 - Setup / Support's About names NDI's trademark and ndi.video: the cameras' pictures come over NDI (#277).
 - A Teleprompter page runs the take: PLAY, BACK, TOP, the speed in words a minute, steps by line, paragraph and cue. The prompter is paused after every start and stops by itself only at END (#225, #227).
 - The Teleprompter shows a copy of the glass, line for line, with the place and the time left. The Prompter XL's own window comes later (#226, #227).

@@ -13,15 +13,19 @@
 //!   A program that is not there is said once, and not looked for again.
 //! - It ends by itself when its stdin closes, so an engine that goes takes it
 //!   along; a graceful stop closes it first, and ends it if it lingers.
-//! - Only a development build with the simulated cameras starts it, and
-//!   tells it its source on every want (`source_for`): the simulated one, or
-//!   vMix's Outputs 2 to 4 over NDI when `npm run app -- --vmix-pictures`
-//!   set `SSE_VMIX_PICTURES=1` (D33), a hardware test the owner attends. The
-//!   helper checks that switch again in its own environment. A studio build
-//!   shows no pictures until the studio build's step (the owner,
-//!   2026-09-29). The engine's unit tests start none; the lanes and the
-//!   end-to-end tests run a development engine from `target`, which starts
-//!   the helper built beside it, never with the switch.
+//! - It tells the helper its source on every want (`source_for`). A studio
+//!   build with the real cameras starts it on vMix's Outputs 2 to 4 over NDI
+//!   (D31, D34); a studio build with the simulated cameras (`npm run
+//!   release`'s trial start and lanes) starts none. A development build
+//!   starts it only with the simulated cameras: on the test card, or on
+//!   vMix's outputs when `npm run app -- --vmix-pictures` set
+//!   `SSE_VMIX_PICTURES=1` (D33), a hardware test the owner attends. The
+//!   helper checks its source again by itself. The engine starts only a
+//!   helper of its own build, as its mark says (`own_helper`), and a studio
+//!   build's helper gets neither of the development run's two variables.
+//!   The engine's unit tests start none; the lanes and the end-to-end tests
+//!   run a development engine from `target`, which starts the helper built
+//!   beside it, never with the switch.
 //! - A stop never holds up the engine's own: it is asked for before the
 //!   shutdown backup and waited for after it, until the grace and a margin
 //!   have passed since it was asked for, so a helper that lingers is ended
@@ -56,10 +60,11 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+use studio_control_protocol::development::{build_marked_in, development_build, MarkedBuild};
 use studio_control_protocol::pictures::{
     from_line, is_link_secret, read_line_bounded, to_line, FromHelper, HelperProblem, HelperSource,
     LinkSecret, ReceivedCamera, ToHelper, WantedCamera, HELPER_PROGRAM, LINK_ADDRESS_ENV,
-    LINK_SECRET_ENV,
+    LINK_SECRET_ENV, NDI_LIBRARY_ENV, VMIX_PICTURES_ENV,
 };
 
 /// A helper silent this long is ended and started again: five of its
@@ -165,8 +170,9 @@ pub(crate) fn helper_status(db_path: &Path) -> Option<HelperStatus> {
 }
 
 /// The helper of this saved data: the source it is told, and what it is
-/// doing; `None` when no helper is supervised for it (a studio build, the
-/// engine's unit tests, an engine without the simulated cameras).
+/// doing; `None` when no helper is supervised for it (the engine's unit
+/// tests, a studio build's trial start and lanes, a development engine
+/// without the simulated cameras).
 pub(crate) fn helper(db_path: &Path) -> Option<(HelperSource, HelperStatus)> {
     helpers()
         .get(db_path)
@@ -370,10 +376,48 @@ enum Message {
 
 /// How the helper is started: its program, and in the tests what stands in
 /// for it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct Launch {
     program: PathBuf,
     args: Vec<String>,
+    /// The build the program must be, as its mark says; `None` takes any
+    /// program (the tests' stand-ins).
+    own: Option<MarkedBuild<'static>>,
+    /// Variables of the engine's environment the helper does not get.
+    withheld: Vec<&'static str>,
+}
+
+/// Why `program` is not the helper of `own`'s build: another build kind, the
+/// studio build of another commit, or no mark at all; `None` when it is.
+fn own_helper(program: &Path, own: MarkedBuild<'_>) -> Option<String> {
+    let file = match std::fs::read(program) {
+        Ok(file) => file,
+        Err(error) => return Some(format!("it could not be read ({error})")),
+    };
+    let helper = build_marked_in(&file);
+    if helper == own {
+        return None;
+    }
+    Some(match helper {
+        MarkedBuild::Development => String::from("it is a development build's"),
+        MarkedBuild::Studio(commit) => format!(
+            "it is the studio build of {}",
+            commit.get(..7).unwrap_or(commit)
+        ),
+        MarkedBuild::Unmarked => String::from("it carries no build's mark"),
+        MarkedBuild::Conflicting => String::from("its marks say different builds"),
+    })
+}
+
+/// The variables a helper does not get from the engine: in a studio build,
+/// the development run's switch and library, which a studio helper never
+/// reads either.
+fn withheld(development_build: bool) -> Vec<&'static str> {
+    if development_build {
+        Vec::new()
+    } else {
+        vec![VMIX_PICTURES_ENV, NDI_LIBRARY_ENV]
+    }
 }
 
 /// The running supervisor. `begin_stop` asks it to end the helper, and
@@ -429,24 +473,28 @@ impl Drop for PicturesHelper {
     }
 }
 
-/// Which source a helper is started on, if one is started: only a
-/// development build with the simulated cameras starts one; it takes vMix's
-/// pictures when the build read `SSE_VMIX_PICTURES=1` (D33), and the test
-/// card otherwise. A studio build starts none until the studio build's step.
+/// Which source a helper is started on, if one is started. A studio build
+/// with the real cameras takes vMix's pictures (D34); one with the simulated
+/// cameras (the release's trial start and lanes) starts none. A development
+/// build starts one only with the simulated cameras: on vMix's pictures
+/// when the build read `SSE_VMIX_PICTURES=1` (D33), on the test card
+/// otherwise.
 pub(crate) fn source_for(
     development_build: bool,
     cameras_simulated: bool,
     vmix_pictures: bool,
 ) -> Option<HelperSource> {
     match (development_build, cameras_simulated, vmix_pictures) {
+        (false, false, _) => Some(HelperSource::Vmix),
+        (false, true, _) => None,
         (true, true, true) => Some(HelperSource::Vmix),
         (true, true, false) => Some(HelperSource::Simulated),
-        _ => None,
+        (true, false, _) => None,
     }
 }
 
-/// Starts the helper's supervisor where the build has a helper to start: a
-/// development build with the simulated cameras. Elsewhere nothing starts.
+/// Starts the helper's supervisor where the build has a helper to start
+/// (`source_for`). Elsewhere nothing starts.
 pub fn spawn_pictures_helper(
     db_path: PathBuf,
     log_file_path: PathBuf,
@@ -454,11 +502,8 @@ pub fn spawn_pictures_helper(
     vmix_pictures: bool,
     link: Option<Link>,
 ) -> Option<PicturesHelper> {
-    let source = source_for(
-        studio_control_protocol::development::development_build(),
-        cameras_simulated,
-        vmix_pictures,
-    )?;
+    let development = development_build();
+    let source = source_for(development, cameras_simulated, vmix_pictures)?;
     let program = std::env::current_exe().ok()?.with_file_name(HELPER_PROGRAM);
     Some(start_supervisor(
         db_path,
@@ -466,6 +511,8 @@ pub fn spawn_pictures_helper(
         Launch {
             program,
             args: Vec::new(),
+            own: Some(MarkedBuild::this_build()),
+            withheld: withheld(development),
         },
         TIMES,
         source,
@@ -493,7 +540,11 @@ fn start_supervisor(
         let _ = append_log(
             &log_file_path,
             "INFO",
-            "The pictures helper is told to take vMix's Outputs 2, 3 and 4 over NDI (npm run app -- --vmix-pictures): a hardware test the owner attends.",
+            if development_build() {
+                "The pictures helper is told to take vMix's Outputs 2, 3 and 4 over NDI (npm run app -- --vmix-pictures): a hardware test the owner attends."
+            } else {
+                "The pictures helper is told to take vMix's Outputs 2, 3 and 4 over NDI, with the library beside it."
+            },
         );
     }
     {
@@ -677,19 +728,32 @@ impl Supervisor {
     }
 
     fn start(&mut self) {
-        if !self.launch.program.is_file() {
+        let refused = if self.launch.program.is_file() {
+            self.launch
+                .own
+                .and_then(|own| own_helper(&self.launch.program, own))
+                .map(|why| {
+                    format!(
+                        "The pictures helper beside the hardware link is not this build's own ({}): {why}. No pictures.",
+                        self.launch.program.display()
+                    )
+                })
+        } else {
+            Some(format!(
+                "The pictures helper is not beside the hardware link ({}): no pictures.",
+                self.launch.program.display()
+            ))
+        };
+        if let Some(why) = refused {
             self.supervision.take(Happened::NotFound);
-            self.log(
-                "WARN",
-                &format!(
-                    "The pictures helper is not beside the hardware link ({}): no pictures.",
-                    self.launch.program.display()
-                ),
-            );
+            self.log("WARN", &why);
             set_status(&self.db_path, HelperStatus::Missing);
             return;
         }
         let mut command = Command::new(&self.launch.program);
+        for name in &self.launch.withheld {
+            command.env_remove(name);
+        }
         command
             .args(&self.launch.args)
             .stdin(Stdio::piped())

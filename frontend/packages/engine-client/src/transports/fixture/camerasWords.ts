@@ -3,7 +3,14 @@
 import type { CameraState } from "../../generated/snapshots/CameraState";
 import type { CameraTone } from "../../generated/snapshots/CameraTone";
 import { EngineRequestError } from "../engineRequestError";
-import { SETTING_LABELS, type AutoWhat, type CameraModel, type ChoiceSetting, type LevelSetting } from "./camerasModel";
+import {
+  SETTING_LABELS,
+  type AutoWhat,
+  type CameraModel,
+  type CameraNumber,
+  type ChoiceSetting,
+  type LevelSetting,
+} from "./camerasModel";
 
 // The operator's words for the cameras (new pages program, Slice 8): each state's word,
 // tone and sentence, the refusals with their codes, and the Recent actions' sentences, word
@@ -232,17 +239,30 @@ export const PICTURE_WORDS = {
 export const PICTURE_SHOWING_DETAIL = "test picture";
 export const PICTURE_MISSING_DETAIL = "nothing received";
 
-/** Where the pictures come from (`PictureSource::words`): the simulated cameras' test pictures, or none yet. */
+/**
+ * Where the pictures come from (`PictureSource::words`): the simulated cameras' test
+ * pictures, or vMix's outputs (the studio's build, which the double shows with vMix sending
+ * none of them: it has no vMix).
+ */
 export function pictureSourceWords(simulated: boolean): string {
-  return simulated ? "test pictures" : "not built yet";
+  return simulated ? "test pictures" : "vMix Outputs 2 to 4";
 }
 
 /** The Pictures section's fine print (`PictureSource::note`). */
 export function picturesNote(simulated: boolean): string {
   return simulated
-    ? `Test pictures stand in for vMix inputs ${SIMULATED_VMIX_INPUTS.first} to ${SIMULATED_VMIX_INPUTS.last}. The cameras' own come with a later version, over NDI from vMix on this PC.`
-    : "The cameras' own pictures come with a later version, over NDI from vMix on this PC.";
+    ? `Test pictures stand in for vMix inputs ${SIMULATED_VMIX_INPUTS.first} to ${SIMULATED_VMIX_INPUTS.last}. A studio build shows vMix's Outputs 2, 3 and 4 over NDI.`
+    : `Over NDI from vMix on this PC: CAM 1 from Output ${VMIX_OUTPUTS[0]}, CAM 2 from Output ${VMIX_OUTPUTS[1]}, CAM 3 from Output ${VMIX_OUTPUTS[2]}.`;
 }
+
+/** A camera's place while vMix sends none of the three outputs (`PictureSource::detail`). */
+export function vmixNothingDetail(camera: CameraNumber): string {
+  return `vMix Output ${VMIX_OUTPUTS[camera - 1]} · nothing received`;
+}
+
+/** What to check while vMix sends none of the three outputs (`Nothing::NotSending`). */
+export const VMIX_NOT_SENDING_ADVICE =
+  "Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs).";
 
 /** A camera whose input the source does not send, in the picture's place. */
 export function pictureMissingSentence(model: CameraModel): string {
@@ -254,12 +274,8 @@ export function pictureMissingAdvice(vmixInput: number): string {
   return `vMix sends other inputs: check that vMix input ${vmixInput} is still there and live.`;
 }
 
-/** A build that receives no pictures yet, in each picture's place. */
-export const NO_PICTURE_YET_SENTENCE = "No picture yet: the cameras' pictures come with a later version.";
-
-/** The state display when no picture arrives at all, in a build that receives none yet. */
-export const NO_PICTURES_SENTENCE =
-  "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.";
+/** The state display while vMix sends none of the three outputs. */
+export const NO_PICTURES_SENTENCE = "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI.";
 
 /** The state display when a camera's picture is missing. */
 export function picturesMissingSentence(model: CameraModel, vmixInput: number): string {

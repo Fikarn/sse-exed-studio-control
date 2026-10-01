@@ -574,8 +574,9 @@ fn main() -> io::Result<()> {
         planned_paths.db_path.clone(),
         planned_paths.log_file_path.clone(),
     );
-    // The camera pictures' helper (D28), in a development build with the
-    // simulated cameras: the test card, or vMix's outputs under
+    // The camera pictures' helper (D28): in the studio's build with the real
+    // cameras, vMix's outputs (D34); in a development build with the
+    // simulated cameras, the test card, or vMix's outputs under
     // `npm run app -- --vmix-pictures` (D33).
     let pictures_helper = pictures_helper::spawn_pictures_helper(
         planned_paths.db_path.clone(),

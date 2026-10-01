@@ -15,7 +15,7 @@ export type CameraPicture = {
   /**
    * What arrives, as the page prints it: `test picture`, or vMix's
    * output with its size and rate (`vMix Output 2 · 3840 × 2160 ·
-   * 29.97`); `nothing received`, or why nothing can (`not built yet`),
+   * 29.97`); `nothing received`, or why nothing can (`not started`),
    * after the output with vMix's pictures.
    */
   detail: string;

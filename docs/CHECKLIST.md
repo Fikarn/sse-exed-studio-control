@@ -87,16 +87,22 @@ The Prompter XL:
 
 ## Cameras
 
+The pictures, with vMix running and its Outputs 2, 3 and 4 sent over NDI:
+
+- [ ] The build's folder holds the shell, the engine, `studio-control-pictures.exe`, `Processing.NDI.Lib.x64.dll` and `build.json`. When the app starts, Windows may ask about the firewall for `studio-control-pictures.exe` at the build's path. The answer is the owner's, as a firewall rule is a security setting; with Cancel, check that the pictures still come.
+- [ ] All three pictures show, CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4, each `live` with `vMix Output N · 3840 × 2160 · 29.97` (or its own size and rate), with no switch; the footer reads `Pictures vMix Outputs 2 to 4 · 3 / 3`. The engine's log says the helper loaded NDI's library from the build's folder, its hash the pinned one.
+- [ ] `Guides`, `Peaking` and `Zebras 95 %` draw on the big picture, zebras and peaking in the loupe, and the loupe's dashed frame on the big picture; `1:1`, 2:1 and 4:1 and a press on the big picture move them.
+- [ ] With one of Outputs 2 to 4 not sent over NDI in vMix, that camera's place reads `NO PICTURE` and names the output to check; with vMix closed, `NO PICTURES` says to open vMix and send the outputs. The controls still work.
+
 Until the links to the cameras are built:
 
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
-- [ ] Each picture's place reads `NO PICTURE` and says the pictures come with a later version; the footer reads `Pictures none · not built yet`. `Whole frame`, `1:1`, the aids and the loupe are locked, and say why.
 - [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
 - [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
 - [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC` and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
-Once the links and the pictures are built:
+Once the links are built, with the cameras on vMix's outputs:
 
 - [ ] All three cameras show; the selected one is big enough to judge framing and exposure, and the 1:1 view sharp enough to judge focus.
 - [ ] A hand waved at a camera moves on the page with no delay you can see beside vMix's own preview.
@@ -108,7 +114,6 @@ Once the links and the pictures are built:
 - [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds.
 - [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
-- [ ] With one of Outputs 2 to 4 not sent over NDI in vMix, that camera's place reads `NO PICTURE` and names the output to check.
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
 - [ ] After `Release` the iPad reaches CAM 1 and LUMIX Tether reaches a BGH1; `Connect` takes the camera back.
 - [ ] Closing the app while CAM 1 records leaves it recording, and a restart changes no camera setting.

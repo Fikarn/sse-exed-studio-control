@@ -2,21 +2,25 @@
 // repository. `npm run release:verified -- <name>` makes a build the one the
 // studio starts, once the owner has walked docs/CHECKLIST.md with it.
 //
-// A studio build is a folder that holds the shell and the engine, both
-// release builds marked as the studio's (`SSE_STUDIO_BUILD` holds the commit
-// while they compile: native/protocol/rust/src/development.rs), and
-// `build.json`, which names the commit and the hash of each file. The folders
+// A studio build is a folder that holds the shell, the engine and the
+// pictures helper, release builds marked as the studio's (`SSE_STUDIO_BUILD`
+// holds the commit while they compile: native/protocol/rust/src/
+// development.rs), NDI's library (the SDK's own file, copied only when its
+// hash is the pin's: native/pictures-link/ndi-library.json; never in git),
+// and `build.json`, which names the commit and the hash of each file. The folders
 // live in the builds folder beside the repository (`STUDIO_BUILDS_DIR` names
 // another place), so nothing git or a build does can remove one. A build is
 // never overwritten and never deleted here.
 //
 // Making a build:
-//   1. the working tree is clean and the commit is on `origin/main`;
-//   2. `tauri build` builds the pages, the engine and the shell; the tree and
-//      the commit are read again afterwards, and the two files must be newer
-//      than the build's start;
-//   3. the two files are copied into `<builds>/<name>.unfinished-<time>/`,
-//      where <name> is `<day>_<commit>`;
+//   1. the working tree is clean, the commit is on `origin/main`, and the
+//      SDK's NDI library is the pinned file;
+//   2. `tauri build` builds the pages, the engine, the pictures helper and
+//      the shell; the tree and the commit are read again afterwards, and the
+//      three programs must be newer than the build's start;
+//   3. the three programs and NDI's library are copied into
+//      `<builds>/<name>.unfinished-<time>/`, where <name> is
+//      `<day>_<commit>`, and the library's copy is held to the pin again;
 //   4. the copied shell starts the copied engine and reads a snapshot (the
 //      shell's own `--smoke-test`), with the platform's app-data folder moved
 //      to a scratch folder and no data folder named: the build opens its
@@ -25,10 +29,13 @@
 //      studio's kind, and the status it writes names the commit;
 //   5. the acceptance lane and the bridge lane run against the copied engine,
 //      on scratch data with simulated devices: every other test runs a
-//      development build;
-//   6. `build.json` is written and the folder gets its name. A run that
-//      failed leaves an `.unfinished` folder without a record, which
-//      `release:verified` refuses.
+//      development build. With the simulated cameras the engine starts no
+//      pictures helper and no library is loaded: the helper first runs on
+//      the owner's walk;
+//   6. `build.json` is written, its hash of NDI's library held to the pin,
+//      and the folder gets its name. A run that failed leaves an
+//      `.unfinished` folder, with no record or with one that names another
+//      folder, which `release:verified` refuses.
 //
 // Nothing here opens the studio's saved data or sends to a device. The
 // bridge lane's profile export reads Companion's own export at
@@ -57,11 +64,18 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { hardenedLaneEnv, isSameOrInside } from "./native-runtime-harness.mjs";
+import { ndiLibraryRefusal, readNdiPin, sdkLibraryPath } from "./ndi-library.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export const SHELL_FILE = "sse-exed-tauri-shell.exe";
 export const ENGINE_FILE = "studio-control-engine.exe";
+/** The pictures helper, which the engine starts from its own folder (`HELPER_PROGRAM`). */
+export const PICTURES_FILE = "studio-control-pictures.exe";
+/** NDI's library, which the helper loads from its own folder (the pin's `file`). */
+export const NDI_LIBRARY_FILE = "Processing.NDI.Lib.x64.dll";
+/** What a build holds besides its record, each with its hash in it. */
+export const BUILD_FILES = [SHELL_FILE, ENGINE_FILE, PICTURES_FILE, NDI_LIBRARY_FILE];
 export const BUILD_RECORD_FILE = "build.json";
 export const LAUNCHER_FILE = "Studio Control.cmd";
 export const VERIFIED_LOG_FILE = "verified.txt";
@@ -209,10 +223,29 @@ export function writeBuildRecord(folder, name, facts, now = new Date()) {
     name,
     ...facts,
     builtAt: now.toISOString(),
-    files: Object.fromEntries([SHELL_FILE, ENGINE_FILE].map((file) => [file, sha256(path.join(folder, file))])),
+    files: Object.fromEntries(BUILD_FILES.map((file) => [file, sha256(path.join(folder, file))])),
   };
   writeFileSync(path.join(folder, BUILD_RECORD_FILE), `${JSON.stringify(record, null, 2)}\n`, { flag: "wx" });
   return record;
+}
+
+/**
+ * The build mark the program at `file` carries, as the engine reads it before it starts the
+ * pictures helper (`build_marked_in`, native/protocol/rust/src/development.rs): the one
+ * well-formed mark, `null` when it carries none, `"conflicting"` when its marks differ.
+ */
+export function buildMarkOf(file) {
+  const marks = new Set(
+    readFileSync(file)
+      .toString("latin1")
+      .match(/studio-control-build:v1:(?:D:-{40}|S:[0-9a-f]{40})/g) ?? []
+  );
+  return marks.size > 1 ? "conflicting" : ([...marks][0] ?? null);
+}
+
+/** The mark of a studio build of `commit`. */
+export function studioMarkOf(commit) {
+  return `studio-control-build:v1:S:${commit}`;
 }
 
 /** The build's record when the folder is the build it describes; throws with the reason when not. */
@@ -220,15 +253,34 @@ export function readBuildRecord(folder) {
   const recordPath = path.join(folder, BUILD_RECORD_FILE);
   if (!existsSync(recordPath)) {
     throw new Error(
-      `${recordPath} is missing: that folder is not a build \`npm run release\` finished. A run that failed leaves a folder without a record.`
+      `${recordPath} is missing: that folder is not a build \`npm run release\` finished. A run that failed leaves an \`.unfinished\` folder.`
     );
   }
   const record = JSON.parse(readFileSync(recordPath, "utf8"));
   if (record.name !== path.basename(folder) || !COMMIT.test(record.commit ?? "")) {
     throw new Error(`${recordPath} does not describe the folder it is in.`);
   }
-  // The two files the launcher's build is made of, whatever else the record names.
-  for (const file of [SHELL_FILE, ENGINE_FILE]) {
+  const named = record.files && typeof record.files === "object" && !Array.isArray(record.files) ? record.files : {};
+  for (const file of Object.keys(named)) {
+    if (file !== path.win32.basename(file) || file !== path.posix.basename(file) || file === "." || file === "..") {
+      throw new Error(`${recordPath} names ${JSON.stringify(file)}, which is not a file of the folder.`);
+    }
+  }
+  // The pictures helper and NDI's library go together: a build holds both or neither.
+  const [helper, library] = [PICTURES_FILE, NDI_LIBRARY_FILE].map(
+    (file) => file in named || existsSync(path.join(folder, file))
+  );
+  if (helper !== library) {
+    throw new Error(
+      `${folder} holds ${helper ? "the pictures helper without NDI's library" : "NDI's library without the pictures helper"}: a build holds both or neither.`
+    );
+  }
+  // The shell and the engine always, whatever else the record names; the pictures helper and
+  // NDI's library whenever they are in the folder, so that nothing the build runs goes
+  // unchecked; and every other file the record names. A build made before the helper (two
+  // files) still verifies.
+  const present = [PICTURES_FILE, NDI_LIBRARY_FILE].filter((file) => existsSync(path.join(folder, file)));
+  for (const file of new Set([SHELL_FILE, ENGINE_FILE, ...present, ...Object.keys(named)])) {
     const filePath = path.join(folder, file);
     if (!existsSync(filePath)) {
       throw new Error(`${filePath} is missing.`);
@@ -356,6 +408,18 @@ async function makeBuild() {
     throw new Error(`${folder} is there already: this commit was built today, and a build is never overwritten.`);
   }
 
+  // NDI's library goes into the build only as the pinned file: held to the pin before the
+  // build, and its copy again before the trial start.
+  const pin = readNdiPin(root);
+  if (pin.file !== NDI_LIBRARY_FILE) {
+    throw new Error(`The pin names ${pin.file}, not ${NDI_LIBRARY_FILE}. Nothing was built.`);
+  }
+  const library = sdkLibraryPath(process.env, pin);
+  const libraryRefused = ndiLibraryRefusal(library, pin);
+  if (libraryRefused) {
+    throw new Error(`${libraryRefused} Nothing was built.`);
+  }
+
   try {
     os.setPriority(os.constants.priority.PRIORITY_BELOW_NORMAL);
   } catch {
@@ -377,7 +441,9 @@ async function makeBuild() {
       `The repository changed while the build ran (${after.commit.slice(0, 7)}, ${after.changedFiles.length} changed files): what was built is not ${before.commit.slice(0, 7)}. Nothing was copied.`
     );
   }
-  const built = [SHELL_FILE, ENGINE_FILE].map((file) => path.join(root, "native", "target", "release", file));
+  const built = [SHELL_FILE, ENGINE_FILE, PICTURES_FILE].map((file) =>
+    path.join(root, "native", "target", "release", file)
+  );
   for (const file of built) {
     if (!existsSync(file) || statSync(file).mtimeMs < buildStarted) {
       throw new Error(`${file} is not from this build: cargo wrote its files elsewhere. Nothing was copied.`);
@@ -393,8 +459,21 @@ async function makeBuild() {
   for (const file of built) {
     copyFileSync(file, path.join(unfinished, path.basename(file)), constants.COPYFILE_EXCL);
   }
+  copyFileSync(library, path.join(unfinished, NDI_LIBRARY_FILE), constants.COPYFILE_EXCL);
+  const copyRefused = ndiLibraryRefusal(path.join(unfinished, NDI_LIBRARY_FILE), pin);
+  if (copyRefused) {
+    throw new Error(`The copy of NDI's library is not the pinned file: ${copyRefused}`);
+  }
+  // The trial start and the lanes run with the simulated cameras and start no helper, so its
+  // mark is read here: the engine starts only a helper of its own build and commit.
+  const helperMark = buildMarkOf(path.join(unfinished, PICTURES_FILE));
+  if (helperMark !== studioMarkOf(before.commit)) {
+    throw new Error(
+      `The pictures helper is not this commit's studio build (its mark: ${helperMark ?? "none"}), so the engine would not start it.`
+    );
+  }
   say();
-  say(`Copied to ${unfinished}. It gets its name once it has passed.`);
+  say(`Copied to ${unfinished}, with NDI's library ${pin.version}. It gets its name once it has passed.`);
 
   say();
   say("The build's shell starts the engine beside it, on its default folder under a scratch base:");
@@ -419,7 +498,12 @@ async function makeBuild() {
     savedDataSchema: schemaVersionOf(
       readFileSync(path.join(root, "native", "rust-engine", "src", "storage.rs"), "utf8")
     ),
+    ndiLibrary: pin.version,
   });
+  // The record vouches for the library only as the pinned file, whatever ran meanwhile.
+  if (record.files[NDI_LIBRARY_FILE] !== pin.sha256) {
+    throw new Error(`NDI's library in ${unfinished} is no longer the pinned file. The build was not named.`);
+  }
   // A folder of that name made meanwhile is not replaced: the rename fails.
   renameSync(unfinished, folder);
 
@@ -428,6 +512,9 @@ async function makeBuild() {
   say(`  Folder   ${folder}`);
   say(`  Commit   ${record.commit}`);
   say(`  Schema   ${record.savedDataSchema ?? "not read"} (saved data)`);
+  say(
+    `  NDI      ${record.ndiLibrary} (the pinned SDK library; NDI asks that a release use an SDK no older than 30 days when a newer one is out)`
+  );
   say();
   say("It is not the studio's build yet. To make it that:");
   say(`  1. Close the studio app and start ${path.join(folder, SHELL_FILE)}`);

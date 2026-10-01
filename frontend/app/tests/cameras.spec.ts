@@ -424,19 +424,23 @@ test.describe("the Cameras page", () => {
     await expect(recChip(page)).toHaveCount(0);
   });
 
-  // The studio's build before the pictures are built: each picture's place
-  // says so, and the view, the aids and the loupe are locked.
-  test("without the pictures every picture's place says they come with a later version", async ({ page }) => {
+  // The studio's build with vMix sending none of its outputs: each
+  // picture's place says so and what to check, and the view, the aids and
+  // the loupe are locked.
+  test("with no picture from vMix every picture's place says so and what to check", async ({ page }) => {
     await openCameras(page, "cameras-no-link");
     const empty = page.getByTestId("cameras-no-picture");
     await expect(empty).toHaveAttribute("data-no-picture", "no-pictures");
     await expect(empty).toContainText("NO PICTURE");
-    await expect(empty).toContainText("No picture yet: the cameras' pictures come with a later version.");
+    await expect(empty).toContainText("vMix is not sending CAM 1 over NDI.");
+    await expect(empty).toContainText(
+      "Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs)."
+    );
     await expect(page.getByTestId("cameras-hero-picture")).toHaveCount(0);
     for (const camera of [2, 3]) {
       const small = page.getByTestId(`cameras-no-picture-${camera}`);
       await expect(small).toContainText("NO PICTURE");
-      await expect(small).toContainText("not built yet");
+      await expect(small).toContainText(`vMix Output ${camera + 1} · nothing received`);
       await expect(small).not.toContainText("vMix input");
     }
     await expect(page.getByTestId("cameras-loupe-empty")).toHaveText("No picture to check");
@@ -451,17 +455,17 @@ test.describe("the Cameras page", () => {
     ]) {
       await expect(page.getByTestId(`cameras-${key}`), key).toHaveAttribute("aria-disabled", "true");
     }
-    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("not built yet");
+    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("vMix Output 2 · nothing received");
     // The plate names the camera's own vMix output, fixed: CAM 1's is Output 2.
     await expect(page.getByTestId("cameras-plate-head")).toContainText("vMix Output 2");
     const pictures = page.getByTestId("cameras-pictures");
-    await expect(pictures).toContainText("not built yet");
+    await expect(pictures).toContainText("vMix Outputs 2 to 4");
     await expect(pictures).toContainText(
-      "The cameras' own pictures come with a later version, over NDI from vMix on this PC."
+      "Over NDI from vMix on this PC: CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4."
     );
-    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("not built yet");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("vMix Output 2 · nothing received");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("no picture");
-    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures none · not built yet");
+    await expect(page.getByTestId("cameras-footer")).toContainText("Pictures none · vMix Outputs 2 to 4");
   });
 
   // Board 2's `one-picture`: vMix sends pictures, and none for CAM 2's input.

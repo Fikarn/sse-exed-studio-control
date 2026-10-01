@@ -618,7 +618,7 @@ export function pictureRows(snapshot: CamerasSnapshot): PictureRowView[] {
 
 /**
  * The footer's words for the pictures: `test pictures · 3 / 3`, `test pictures · 2 / 3 ·
- * CAM 2 missing`, or `none · not built yet` when none arrives.
+ * CAM 2 missing`, or `none · vMix Outputs 2 to 4` when none arrives.
  */
 export function picturesWord(snapshot: CamerasSnapshot): string {
   const { source, state } = snapshot.pictures;

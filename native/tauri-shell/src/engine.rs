@@ -20,7 +20,20 @@ use studio_control_protocol::development::{
     build_marked_in, default_app_data_dir, development_build, host_platform, refuse_studio_folders,
     MarkedBuild,
 };
-use studio_control_protocol::pictures::{LINK_ADDRESS_ENV, LINK_SECRET_ENV};
+use studio_control_protocol::pictures::{
+    LINK_ADDRESS_ENV, LINK_SECRET_ENV, NDI_LIBRARY_ENV, VMIX_PICTURES_ENV,
+};
+
+/// What of the shell's own environment the engine does not get: a pictures'
+/// link of another start, and in a studio build the development run's switch
+/// and library for vMix's pictures, which a studio build never reads.
+fn withheld_from_engine(development_build: bool) -> Vec<&'static str> {
+    let mut names = vec![LINK_ADDRESS_ENV, LINK_SECRET_ENV];
+    if !development_build {
+        names.extend([VMIX_PICTURES_ENV, NDI_LIBRARY_ENV]);
+    }
+    names
+}
 use studio_control_protocol::{
     error_response, RequestEnvelope, ResponseEnvelope, EVENT_ENGINE_EXITED, EVENT_ENGINE_READY,
     PROTOCOL_VERSION,
@@ -172,37 +185,37 @@ impl EngineBridge {
         // The pictures' listener of this start, its address and its secret
         // for the engine alone (it hands them to the pictures helper, which
         // connects for its surface in the native layer). Without it the
-        // hardware link starts all the same, with no pictures. Only a
-        // development build has a helper to use it until the studio build's
-        // step; elsewhere, and when it does not open, no value from the
-        // shell's own environment reaches the engine.
-        command
-            .env_remove(LINK_ADDRESS_ENV)
-            .env_remove(LINK_SECRET_ENV);
-        let pictures_link = development_build()
-            .then(|| {
-                let shell_log = Arc::clone(&shell_log);
-                let log: PicturesLog = Arc::new(move |line: &str| {
-                    if let Ok(mut log) = shell_log.lock() {
-                        let _ = log.write_line("PICTURES", line);
-                    }
-                });
-                match PicturesLink::open(Arc::clone(&log), picture_layer()) {
-                    Ok(link) => {
-                        command
-                            .env(LINK_ADDRESS_ENV, link.address().to_string())
-                            .env(LINK_SECRET_ENV, link.secret());
-                        Some(link)
-                    }
-                    Err(error) => {
-                        log(&format!(
-                            "The pictures' listener did not open: {error}. No pictures."
-                        ));
-                        None
-                    }
+        // hardware link starts all the same, with no pictures. It opens in
+        // every build: whether a helper starts is the hardware link's to
+        // decide (a studio build with the real cameras, D34). When it does
+        // not open, no value from the shell's own environment reaches the
+        // engine; nor, in a studio build, the development run's switch and
+        // library for vMix's pictures (`withheld_from_engine`).
+        for name in withheld_from_engine(development_build()) {
+            command.env_remove(name);
+        }
+        let pictures_link = {
+            let shell_log = Arc::clone(&shell_log);
+            let log: PicturesLog = Arc::new(move |line: &str| {
+                if let Ok(mut log) = shell_log.lock() {
+                    let _ = log.write_line("PICTURES", line);
                 }
-            })
-            .flatten();
+            });
+            match PicturesLink::open(Arc::clone(&log), picture_layer()) {
+                Ok(link) => {
+                    command
+                        .env(LINK_ADDRESS_ENV, link.address().to_string())
+                        .env(LINK_SECRET_ENV, link.secret());
+                    Some(link)
+                }
+                Err(error) => {
+                    log(&format!(
+                        "The pictures' listener did not open: {error}. No pictures."
+                    ));
+                    None
+                }
+            }
+        };
         // The engine is a console-subsystem binary; without CREATE_NO_WINDOW a
         // GUI-subsystem shell would pop a fresh terminal for it on Windows.
         #[cfg(windows)]
@@ -845,6 +858,27 @@ fn value_key(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The engine never gets a pictures' link from the shell's own
+    // environment; a studio build's never gets the development run's switch
+    // or library for vMix's pictures, which only `npm run app --
+    // --vmix-pictures` sets for a development build.
+    #[test]
+    fn the_engine_gets_no_link_of_another_start_and_a_studio_one_no_development_switch() {
+        assert_eq!(
+            withheld_from_engine(true),
+            [LINK_ADDRESS_ENV, LINK_SECRET_ENV]
+        );
+        assert_eq!(
+            withheld_from_engine(false),
+            [
+                LINK_ADDRESS_ENV,
+                LINK_SECRET_ENV,
+                VMIX_PICTURES_ENV,
+                NDI_LIBRARY_ENV
+            ]
+        );
+    }
     use std::fs::{self, File};
     use std::time::{SystemTime, UNIX_EPOCH};
 

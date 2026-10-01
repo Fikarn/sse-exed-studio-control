@@ -8,10 +8,11 @@
 //! pictures themselves never pass the engine: the helper draws them itself
 //! (D30).
 //!
-//! The helper's source is the simulated one, or, in a development run that
-//! `npm run app -- --vmix-pictures` started and nothing else, vMix's Outputs
-//! 2 to 4 over NDI on this PC (D31 to D33): the engine says which on each
-//! want, and the helper takes vMix's only when its own environment holds the
+//! The helper's source is vMix's Outputs 2 to 4 over NDI on this PC in the
+//! studio's build (D34) and, in a development run, the simulated one, or
+//! vMix's in a run that `npm run app -- --vmix-pictures` started and nothing
+//! else (D31 to D33): the engine says which on each want, and a development
+//! build's helper takes vMix's only when its own environment holds the
 //! switch as well.
 
 use serde::{Deserialize, Serialize};
@@ -39,14 +40,16 @@ pub const STATE_INTERVAL: Duration = Duration::from_secs(1);
 /// development run's pictures helper for vMix's Outputs 2 to 4 over NDI, a
 /// hardware test the owner asks for and attends. Only that command sets it:
 /// every other run sets it to `0`, the lanes refuse it, the tests remove it,
-/// and a studio build never reads it. The engine reads it in its own
+/// and a studio build never reads it and withholds it from the engine and
+/// the helper. The engine reads it in its own
 /// environment and says the source on each want; the helper reads it again
 /// in its own.
 pub const VMIX_PICTURES_ENV: &str = "SSE_VMIX_PICTURES";
 
 /// NDI's library for that run, by its full path: the NDI SDK's own file,
 /// whose hash `npm run app` checks against the pin
-/// (`native/pictures-link/ndi-library.json`) before the run starts.
+/// (`native/pictures-link/ndi-library.json`) before the run starts. A
+/// studio build's helper never reads it: it loads the library beside it.
 pub const NDI_LIBRARY_ENV: &str = "SSE_NDI_LIBRARY";
 
 /// Only `1` asks for vMix's pictures; the value is trimmed first, as the
@@ -127,8 +130,9 @@ pub enum HelperSource {
     /// Test pictures of its own: the vMix inputs of `SIMULATED_VMIX_INPUTS`.
     #[default]
     Simulated,
-    /// vMix's Outputs 2 to 4 over NDI on this PC (`VMIX_OUTPUTS`): only in a
-    /// development run started with `npm run app -- --vmix-pictures` (D33).
+    /// vMix's Outputs 2 to 4 over NDI on this PC (`VMIX_OUTPUTS`): in the
+    /// studio's build (D34), and in a development run only when it was
+    /// started with `npm run app -- --vmix-pictures` (D33).
     Vmix,
 }
 
@@ -183,8 +187,8 @@ pub struct ReceivedCamera {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum HelperProblem {
-    /// It was told vMix's pictures and does not take them: it was started
-    /// without the switch in its own environment, or it is a studio build.
+    /// It was told vMix's pictures and does not take them: it is a
+    /// development build started without the switch in its own environment.
     NotAllowed,
     /// NDI's library was not given, is not the SDK's file, or did not load.
     NoLibrary,

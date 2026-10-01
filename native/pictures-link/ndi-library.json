@@ -1,5 +1,5 @@
 {
-  "about": "NDI's library for the pictures helper: the NDI SDK's own file, never in git. npm run app -- --vmix-pictures loads it from the SDK's folder only when its hash is this one (scripts/ndi-library.mjs). A newer SDK is taken by changing this pin, on the owner's word.",
+  "about": "NDI's library for the pictures helper: the NDI SDK's own file, never in git. npm run app -- --vmix-pictures loads it from the SDK's folder, and npm run release copies it into the build, only when its hash is this one (scripts/ndi-library.mjs); the studio build's helper holds its copy to the same hash. A newer SDK is taken by changing this pin, on the owner's word.",
   "file": "Processing.NDI.Lib.x64.dll",
   "version": "6.3.2.0",
   "sha256": "2b6602075868ba4401f82f417d72424805d69b11ca86078023d0d489ff45dd84"
