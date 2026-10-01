@@ -279,9 +279,6 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
     // in the link's future, the mark is never due on its own here.)
     let link = crate::rme_console_link::shared_console_link();
     link.lock().expect("link").mark_reports_lost(u64::MAX / 2);
-    // TotalMix was out of touch just before (2026-10-01): the mark is written
-    // before the Sync's `aligned`, which then stands.
-    link.lock().expect("link").mark_out_of_touch(31);
 
     let result = sync_audio_console_with_timing(test_dir.db_path().as_path(), fast_pull_timing())
         .expect("the pull should complete against the fake console");
@@ -293,18 +290,6 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
         !link.lock().expect("link").take_reports_lost(),
         "the pull's flushes took the lost-reports mark before `aligned`"
     );
-    assert_eq!(
-        link.lock().expect("link").take_out_of_touch(),
-        None,
-        "the pull's flushes took the out-of-touch mark before `aligned`"
-    );
-    {
-        let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
-            .expect("settings should load");
-        let snapshot = read_audio_snapshot(&settings);
-        assert_eq!(snapshot.console_state_confidence, "aligned");
-        assert_eq!(snapshot.last_action_status, "succeeded");
-    }
     assert_eq!(
         result.pulled_values, 13,
         "every modelled parameter counts, EQ detail does not"
@@ -364,6 +349,74 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
         .find(|entry| entry.id == "audio-mix-phones-a")
         .expect("phones a");
     assert!((phones_a.volume - fader_curve::fader_db_to_lin(-16.6)).abs() < 1e-6);
+}
+
+/// TotalMix out of touch, then a Sync (2026-10-01): the Sync's own dump ends
+/// the quiet and marks the console link; only the Sync flushes, so its flush
+/// writes `assumed` and its `aligned` follows, and no mark is left to
+/// overturn it.
+#[test]
+fn a_sync_whose_dump_ends_a_quiet_still_ends_aligned() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let _serial = serialize_shared_link();
+    let mut fake = FakeTotalMix::bind();
+    let mut slot = crate::rme_totalmix_osc::bind_test_global_slot(fake.port);
+    slot.declare_quiet_for_test();
+    fake.start(slot.local_port(), studio_dump_script(), false, true);
+    let test_dir = pull_test_db("console-pull-after-quiet", fake.port);
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    crate::rme_totalmix_osc::mark_console_link_slot(true);
+
+    // A pump that never flushes: only the Sync's own flush can take the mark.
+    let stop = Arc::new(AtomicBool::new(false));
+    let marked = Arc::new(AtomicBool::new(false));
+    let pump = {
+        let stop = stop.clone();
+        let marked = marked.clone();
+        std::thread::spawn(move || {
+            let mut slot = slot;
+            while !stop.load(Ordering::Relaxed) {
+                crate::rme_totalmix_osc::pump_global_slot_without_flush_for_test(
+                    &mut slot,
+                    "127.0.0.1",
+                );
+                let link = crate::rme_console_link::shared_console_link();
+                if link.lock().expect("link").out_of_touch_for_test().is_some() {
+                    marked.store(true, Ordering::SeqCst);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        })
+    };
+
+    let result = sync_audio_console_with_timing(test_dir.db_path().as_path(), fast_pull_timing())
+        .expect("the pull should complete against the fake console");
+    stop.store(true, Ordering::Relaxed);
+    pump.join().expect("the pump should end");
+    assert!(
+        marked.load(Ordering::SeqCst),
+        "the dump's first datagram marked the console link"
+    );
+    assert_eq!(result.console_state_confidence, "aligned");
+    let link = crate::rme_console_link::shared_console_link();
+    assert_eq!(
+        link.lock().expect("link").take_out_of_touch(),
+        None,
+        "the Sync's flush took the mark"
+    );
+    flush_console_link(test_dir.db_path().as_path()).expect("a later flush should succeed");
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(snapshot.last_action_status, "succeeded");
 }
 
 #[test]
@@ -828,6 +881,11 @@ fn console_disconnect_resets_confidence_to_unknown() {
 // TotalMix out of touch on remote 4 (the walk of 2026-10-01).
 // ---------------------------------------------------------------------------
 
+const OUT_OF_TOUCH_31: crate::rme_console_link::OutOfTouch = crate::rme_console_link::OutOfTouch {
+    secs: 31,
+    since_start: false,
+};
+
 #[test]
 fn out_of_touch_makes_a_verified_console_assumed_and_says_for_how_long() {
     let _link = serialize_shared_link();
@@ -841,7 +899,9 @@ fn out_of_touch_makes_a_verified_console_assumed_and_says_for_how_long() {
     )
     .expect("confidence should store");
     let link = crate::rme_console_link::shared_console_link();
-    link.lock().expect("link").mark_out_of_touch(31);
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
 
     let report =
         flush_console_link_at(test_dir.db_path().as_path(), 1_000).expect("the flush should write");
@@ -873,7 +933,9 @@ fn out_of_touch_never_lifts_an_unknown_console() {
     let test_dir = TestDir::new("console-out-of-touch-unknown");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let link = crate::rme_console_link::shared_console_link();
-    link.lock().expect("link").mark_out_of_touch(31);
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
 
     let report = flush_console_link_at(test_dir.db_path().as_path(), 1_000)
         .expect("the flush should succeed");
@@ -885,6 +947,51 @@ fn out_of_touch_never_lifts_an_unknown_console() {
     assert_eq!(snapshot.console_state_confidence, "unknown");
     assert_ne!(snapshot.last_action_status, "failed");
     assert!(!link.lock().expect("link").has_activity_at(u64::MAX));
+}
+
+#[test]
+fn out_of_touch_with_a_desk_this_flush_makes_unknown_is_not_written() {
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-out-of-touch-unread");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
+    link.lock().expect("link").mark_reports_lost(0);
+
+    let report = flush_console_link_at(test_dir.db_path().as_path(), u64::MAX / 2)
+        .expect("the flush should write");
+    assert!(report.desk_unread && !report.out_of_touch);
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert_ne!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_OUT_OF_TOUCH"),
+        "no out-of-touch sentence over an unread desk"
+    );
+}
+
+#[test]
+fn out_of_touch_since_the_start_has_a_sentence_of_its_own() {
+    let sentence = out_of_touch_sentence(crate::rme_console_link::OutOfTouch {
+        secs: 42,
+        since_start: true,
+    });
+    assert_eq!(
+        sentence,
+        "TotalMix answered only 42 s after Studio Control started, so a change made there before may be missing. Press Sync from TotalMix."
+    );
+    crate::operator_words::assert_operator_words(&sentence);
 }
 
 #[test]

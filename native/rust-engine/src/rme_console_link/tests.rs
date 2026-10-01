@@ -980,14 +980,19 @@ fn a_pull_keeps_every_name_the_dump_carried_as_sent_the_last_one_winning() {
 fn an_out_of_touch_mark_is_activity_until_a_flush_takes_it() {
     let mut link = ConsoleLinkState::default();
     assert!(!link.has_activity());
-    link.mark_out_of_touch(31);
-    link.mark_out_of_touch(5);
+    let mark = |secs, since_start| OutOfTouch { secs, since_start };
+    link.mark_out_of_touch(mark(31, false));
+    link.mark_out_of_touch(mark(5, true));
     assert!(link.has_activity());
-    assert_eq!(link.take_out_of_touch(), Some(31), "the longer quiet stays");
+    assert_eq!(
+        link.take_out_of_touch(),
+        Some(mark(31, false)),
+        "the longer quiet stays"
+    );
     assert!(!link.has_activity());
     assert_eq!(link.take_out_of_touch(), None);
 
-    link.mark_out_of_touch(7);
+    link.mark_out_of_touch(mark(7, false));
     link.reset_for_test();
     assert_eq!(link.take_out_of_touch(), None, "a reset clears the mark");
 }

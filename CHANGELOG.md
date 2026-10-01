@@ -109,7 +109,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 ### Fixed
 
 - A channel name with a letter beyond ASCII (`ö`) shows on the Console, and that channel's mute, gain and other values arrive with it; such a name lost the channel's whole report (#PR).
-- The daily database backup is written once a day; every start of the app wrote one more, so restarts pushed older days out of the 14 kept (#PR).
+- The daily database backup is written a day after the last one; every start of the app wrote one more, so restarts pushed older days out of the 14 kept (#PR).
 - A change sent in two parts no longer reads as unconfirmed when TotalMix answered both at once; a recall could leave the Console `ASSUMED` with sends that were in fact set (#282).
 - Enter in Lighting's empty search field no longer recalls a scene with its Recent list closed; a held Enter no longer confirms an armed key; a dialog no longer takes focus back every few seconds (#216).
 - Lighting's Undo works after Add fixture, and an Undo whose scene or fixture has been deleted says why and lets the older steps through (#216).

@@ -1300,11 +1300,12 @@ pub(crate) fn read_global_packets(
                 }
                 let heard_at = Instant::now();
                 slot.last_rx_at = Some(heard_at);
-                // TotalMix back after a quiet: the console link is marked
-                // before this datagram reaches it, so a Sync whose dump this
-                // is still writes aligned after the mark's assumed.
+                // TotalMix back after a quiet: the console link is marked at
+                // its first datagram, so the mark is there before a Sync whose
+                // dump follows has read the desk, and the Sync's aligned comes
+                // after it.
                 if let Some(back) = slot.quiet.heard(heard_at) {
-                    mark_console_out_of_touch(back.quiet_for.as_secs().max(1));
+                    mark_console_out_of_touch(&back);
                     log_event(LogLevel::Info, &back.line);
                 }
                 let read = osc_read::read_datagram(&buffer[..len]);
@@ -1367,12 +1368,15 @@ pub(crate) fn mark_console_link_slot(bound: bool) {
     }
 }
 
-/// TotalMix was out of touch on the Global remote for `secs` and is heard
-/// again: the next flush makes the Console assumed until a Sync.
-pub(crate) fn mark_console_out_of_touch(secs: u64) {
+/// TotalMix was out of touch on the Global remote and is heard again: the
+/// next flush makes the Console assumed until a Sync.
+fn mark_console_out_of_touch(back: &global_quiet::HeardAgain) {
     let link = crate::rme_console_link::shared_console_link();
     let mut link = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    link.mark_out_of_touch(secs);
+    link.mark_out_of_touch(crate::rme_console_link::OutOfTouch {
+        secs: back.quiet_for.as_secs().max(1),
+        since_start: back.since_start,
+    });
 }
 
 /// Advances the console link's clocks and sends the read-backs that are due
@@ -1592,6 +1596,17 @@ pub(crate) fn bind_test_global_slot(send_port: u16) -> GlobalOscSlot {
 impl GlobalOscSlot {
     pub(crate) fn local_port(&self) -> u16 {
         self.socket.local_addr().expect("slot address").port()
+    }
+
+    /// Three requests left unanswered past the start's grace: TotalMix is out
+    /// of touch until the slot next hears it.
+    pub(crate) fn declare_quiet_for_test(&mut self) {
+        let start = Instant::now();
+        let declared = (3..=5)
+            .map(|second| self.quiet.request_sent(start + Duration::from_secs(second)))
+            .last()
+            .flatten();
+        assert!(declared.is_some(), "the slot should be quiet");
     }
 }
 

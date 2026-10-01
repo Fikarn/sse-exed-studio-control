@@ -11,6 +11,12 @@
 //! remote 4 off never arrived, and the Console kept the old value as
 //! verified.
 //!
+//! A link that has just begun listening asks at once, as nothing has come
+//! yet; its first 3 s count as a running link's 3 s of quiet, so TotalMix
+//! slow to answer the first requests is not out of touch. TotalMix that does
+//! not answer at all is, and when it is heard the Console reads assumed with
+//! a sentence of its own: the desk has not been read since the start.
+//!
 //! The struct holds no socket and every method takes the time, so the tests
 //! need no sleeps. The lines it returns are for `engine.log`.
 
@@ -18,6 +24,9 @@ use std::time::{Duration, Instant};
 
 /// Requests in a row that may go unanswered before TotalMix counts as quiet.
 const UNANSWERED_FOR_QUIET: u32 = 2;
+/// The start's grace: requests in a link's first 3 s are not counted, as a
+/// running link asks only after 3 s of quiet.
+const START_GRACE: Duration = Duration::from_secs(3);
 /// How long after TotalMix is heard again what it sends is counted for the
 /// log: long enough for a full dump, which ends about 250 ms after its
 /// request.
@@ -32,7 +41,11 @@ pub(super) struct GlobalQuiet {
     listening_since: Instant,
     last_heard_at: Option<Instant>,
     last_request_at: Option<Instant>,
+    /// Every request since TotalMix was last heard, for the log.
     requests_since_heard: u32,
+    /// The requests that count towards a quiet: not those in the start's
+    /// grace.
+    unanswered: u32,
     quiet: bool,
     after: Option<AfterCount>,
 }
@@ -45,11 +58,13 @@ struct AfterCount {
     levels: u64,
 }
 
-/// TotalMix heard again after a quiet: for how long it was quiet, and the
-/// line for the log.
+/// TotalMix heard again after a quiet: for how long it was quiet, whether it
+/// had not been heard at all since the link began listening, and the line
+/// for the log.
 #[derive(Debug, PartialEq)]
 pub(super) struct HeardAgain {
     pub(super) quiet_for: Duration,
+    pub(super) since_start: bool,
     pub(super) line: String,
 }
 
@@ -61,6 +76,7 @@ impl GlobalQuiet {
             last_heard_at: None,
             last_request_at: None,
             requests_since_heard: 0,
+            unanswered: 0,
             quiet: false,
             after: None,
         }
@@ -71,11 +87,17 @@ impl GlobalQuiet {
     pub(super) fn request_sent(&mut self, now: Instant) -> Option<String> {
         self.requests_since_heard = self.requests_since_heard.saturating_add(1);
         self.last_request_at = Some(now);
-        if self.quiet || self.requests_since_heard <= UNANSWERED_FOR_QUIET {
+        let in_start_grace = self.last_heard_at.is_none()
+            && now.saturating_duration_since(self.listening_since) < START_GRACE;
+        if in_start_grace {
+            return None;
+        }
+        self.unanswered = self.unanswered.saturating_add(1);
+        if self.quiet || self.unanswered <= UNANSWERED_FOR_QUIET {
             return None;
         }
         self.quiet = true;
-        let unanswered = self.requests_since_heard - 1;
+        let unanswered = self.unanswered - 1;
         Some(match self.last_heard_at {
             Some(heard) => format!(
                 "TotalMix went quiet on remote 4 (port {}): nothing heard for {}, and {unanswered} requests for its values went unanswered. They go on once a second.",
@@ -94,6 +116,7 @@ impl GlobalQuiet {
     /// quiet and starts counting what it sends next.
     pub(super) fn heard(&mut self, now: Instant) -> Option<HeardAgain> {
         let requests = std::mem::take(&mut self.requests_since_heard);
+        self.unanswered = 0;
         let was_quiet = std::mem::take(&mut self.quiet);
         let since = self.last_heard_at.replace(now);
         if !was_quiet {
@@ -118,8 +141,9 @@ impl GlobalQuiet {
         };
         Some(HeardAgain {
             quiet_for,
+            since_start: since.is_none(),
             line: format!(
-                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests for its values went out meanwhile, the last {last_request} before. The Console asks for a Sync.",
+                "TotalMix heard on remote 4 (port {}) {when}; {requests} requests for its values went out meanwhile, the last {last_request} before.",
                 self.port
             ),
         })
@@ -199,22 +223,37 @@ mod tests {
     fn quiet_from_the_start_counts_from_when_the_link_began_listening() {
         let start = Instant::now();
         let mut quiet = GlobalQuiet::new(start, PORT);
-        assert_eq!(quiet.request_sent(start), None);
-        assert_eq!(quiet.request_sent(at(start, 1_000)), None);
+        // The first 3 s are the start's grace, as a running link's quiet.
+        for second in 0..3 {
+            assert_eq!(quiet.request_sent(at(start, second * 1_000)), None);
+        }
+        assert_eq!(quiet.request_sent(at(start, 3_000)), None);
+        assert_eq!(quiet.request_sent(at(start, 4_000)), None);
         assert_eq!(
-            quiet.request_sent(at(start, 2_000)),
+            quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 2.0 s ago, and 2 requests for its values went unanswered. They go on once a second."
+                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 2 requests for its values went unanswered. They go on once a second."
             ))
         );
         let back = quiet.heard(at(start, 31_400)).expect("heard after a quiet");
         assert_eq!(back.quiet_for, Duration::from_millis(31_400));
+        assert!(back.since_start);
         assert!(
             back.line
-                .starts_with("TotalMix heard on remote 4 (port 9004) for the first time, 31.4 s after the link began listening; 3 requests"),
+                .starts_with("TotalMix heard on remote 4 (port 9004) for the first time, 31.4 s after the link began listening; 6 requests"),
             "{}",
             back.line
         );
+    }
+
+    #[test]
+    fn totalmix_slow_to_answer_at_the_start_is_not_out_of_touch() {
+        let start = Instant::now();
+        let mut quiet = GlobalQuiet::new(start, PORT);
+        assert_eq!(quiet.request_sent(start), None);
+        assert_eq!(quiet.request_sent(at(start, 1_000)), None);
+        assert_eq!(quiet.request_sent(at(start, 2_000)), None);
+        assert_eq!(quiet.heard(at(start, 2_400)), None, "answered in the grace");
     }
 
     #[test]
@@ -230,9 +269,10 @@ mod tests {
         quiet.count(5, 5);
         let back = quiet.heard(at(start, 31_400)).expect("heard after a quiet");
         assert_eq!(back.quiet_for, Duration::from_millis(31_400));
+        assert!(!back.since_start);
         assert_eq!(
             back.line,
-            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests for its values went out meanwhile, the last 0.6 s before. The Console asks for a Sync."
+            "TotalMix heard on remote 4 (port 9004) again after 31.4 s quiet; 28 requests for its values went out meanwhile, the last 0.6 s before."
         );
         assert_eq!(quiet.heard(at(start, 31_450)), None, "once per quiet");
 

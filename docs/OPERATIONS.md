@@ -78,7 +78,7 @@ The state display reads `VERIFIED` when the probe has passed, meter data arrives
 
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
 
-TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. The state display says why the desk is assumed: TotalMix out of touch, or the changes TotalMix did not confirm.
+TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. When TotalMix was out of touch the state display says so and for how long; when it answered only some time after Studio Control started, it says that.
 
 ## Teleprompter
 

@@ -1685,10 +1685,10 @@ fn a_failing_flush_is_logged_once_a_minute_and_its_end_is_logged_once() {
 }
 
 /// TotalMix heard again after a quiet on the Global remote (the walk of
-/// 2026-10-01): the first datagram marks the console link before it reaches
-/// it, and only the first.
+/// 2026-10-01): the first datagram marks the console link, and only the
+/// first; the datagram itself is still read.
 #[test]
-fn the_first_datagram_after_a_quiet_marks_the_console_before_it_is_read() {
+fn the_first_datagram_after_a_quiet_marks_the_console_once() {
     use crate::rme_console_link::shared_console_link;
     let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
         .lock()
@@ -1703,17 +1703,9 @@ fn the_first_datagram_after_a_quiet_marks_the_console_before_it_is_read() {
         LOOPBACK,
     );
     let slot_port = slot.local_port();
-    // Three requests for TotalMix's values, none answered: out of touch.
-    let start = Instant::now();
-    assert_eq!(slot.quiet.request_sent(start), None);
-    assert_eq!(
-        slot.quiet.request_sent(start + Duration::from_secs(1)),
-        None
-    );
-    assert!(slot
-        .quiet
-        .request_sent(start + Duration::from_secs(2))
-        .is_some());
+    // Three requests for TotalMix's values past the start's grace, none
+    // answered: out of touch.
+    slot.declare_quiet_for_test();
 
     let level = encoder::encode(&OscPacket::Message(message(
         "/level/out/0",
@@ -1741,7 +1733,7 @@ fn the_first_datagram_after_a_quiet_marks_the_console_before_it_is_read() {
         .expect("link")
         .take_out_of_touch();
     assert!(
-        marked.is_some_and(|secs| secs >= 1),
+        marked.is_some_and(|mark| mark.secs >= 1 && mark.since_start),
         "the console link is marked: {marked:?}"
     );
     assert!(

@@ -126,5 +126,6 @@ Once the links are built, with the cameras on vMix's outputs:
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
 - [ ] After that first start, the Console's levels for Main Out, Phones 1 and Phones 2 read what TotalMix shows; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
+- [ ] A restart of the app with a daily backup less than a day old adds no `-daily` copy to the backups folder; `engine.log` says when the next daily is due.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.

@@ -251,18 +251,18 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
     expect(status.warningCode).toBeNull();
   });
 
-  it("says which change went unconfirmed while ASSUMED, and keeps the general sentence otherwise", () => {
-    const unconfirmed = "TotalMix did not confirm 1 change (input 8 mute). Press Sync to pull the console state.";
+  it("keeps the general ASSUMED sentence for unconfirmed changes and any other reason", () => {
+    // The unconfirmed changes' sentence names TotalMix's own channel numbers.
     expect(
       describeAudioStatus(
         passedWithTotalMix({
           consoleStateConfidence: "assumed",
           lastActionStatus: "failed",
           lastActionCode: "AUDIO_CONSOLE_UNCONFIRMED",
-          lastActionMessage: unconfirmed,
+          lastActionMessage: "TotalMix did not confirm 1 change (input 8 mute). Press Sync to pull the console state.",
         })
       ).warningBody
-    ).toBe(unconfirmed);
+    ).toContain("Showing the last state the desk confirmed.");
     const general = describeAudioStatus(
       passedWithTotalMix({
         consoleStateConfidence: "assumed",

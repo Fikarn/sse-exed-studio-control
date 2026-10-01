@@ -30,7 +30,7 @@ use std::path::Path;
 use crate::action_log::{ActionRecord, ActionSource, DOMAIN_AUDIO};
 use crate::rme_console_link::{
     link_now_ms, shared_console_link, ChannelFlag, ConsoleBus, ConsoleUpdate, ConsoleValue,
-    ControlRoomFunction, ParamKey, PendingSend,
+    ControlRoomFunction, OutOfTouch, ParamKey, PendingSend,
 };
 use crate::rme_totalmix_osc::{global_channel_surface, global_output_mix_target};
 
@@ -125,7 +125,7 @@ pub(crate) fn flush_console_link_at(
             ConsoleMarks {
                 connection_lost: link.take_connection_lost(),
                 desk_unread: link.take_reports_lost(),
-                out_of_touch_secs: link.take_out_of_touch(),
+                out_of_touch: link.take_out_of_touch(),
             },
             link.take_snapshot_slots_changed(),
         )
@@ -179,8 +179,8 @@ struct ConsoleMarks {
     connection_lost: bool,
     /// An earlier flush's write failed and dropped what the desk reported.
     desk_unread: bool,
-    /// TotalMix is heard again after this many seconds out of touch.
-    out_of_touch_secs: Option<u64>,
+    /// TotalMix is heard again after it was out of touch.
+    out_of_touch: Option<OutOfTouch>,
 }
 
 /// The persistence half of `flush_console_link`, for a caller that holds
@@ -197,7 +197,7 @@ fn apply_console_activity_locked(
     let ConsoleMarks {
         connection_lost,
         desk_unread,
-        out_of_touch_secs,
+        out_of_touch,
     } = marks;
     if updates.is_empty()
         && superseded.is_empty()
@@ -297,10 +297,12 @@ fn apply_console_activity_locked(
     // TotalMix is heard again after it was out of touch on remote 4: a change
     // made there meanwhile may never arrive (the walk of 2026-10-01), so a
     // known console is assumed until a Sync reads it whole. It comes after
-    // the unconfirmed sends, so its sentence is the one shown, and it never
-    // lifts an unknown console.
-    let out_of_touch = out_of_touch_secs.filter(|_| snapshot.console_state_confidence != "unknown");
-    if let Some(secs) = out_of_touch {
+    // the unconfirmed sends, so its sentence is the one shown. It never lifts
+    // an unknown console, nor marks one this flush makes unknown.
+    let out_of_touch = out_of_touch.filter(|_| {
+        snapshot.console_state_confidence != "unknown" && !connection_lost && !desk_unread
+    });
+    if let Some(mark) = out_of_touch {
         writes.push(confidence_setting(ConsoleConfidence::Assumed));
         writes.push((
             String::from(AUDIO_LAST_ACTION_STATUS_KEY),
@@ -312,10 +314,7 @@ fn apply_console_activity_locked(
         ));
         writes.push((
             String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
-            format!(
-                "TotalMix was out of touch for {}, so a change made there meanwhile may be missing. Press Sync from TotalMix.",
-                out_of_touch_words(secs)
-            ),
+            out_of_touch_sentence(mark),
         ));
     }
     // TotalMix reported the interface gone, or an earlier write failed and
@@ -341,6 +340,22 @@ fn apply_console_activity_locked(
 /// The last action's code when TotalMix was out of touch on remote 4; the
 /// Console's state display shows the sentence that goes with it.
 pub(crate) const AUDIO_CONSOLE_OUT_OF_TOUCH: &str = "AUDIO_CONSOLE_OUT_OF_TOUCH";
+
+/// The Console's sentence for an assumed desk after TotalMix was out of
+/// touch; one of its own when TotalMix answered only after Studio Control
+/// started.
+pub(crate) fn out_of_touch_sentence(mark: OutOfTouch) -> String {
+    let how_long = out_of_touch_words(mark.secs);
+    if mark.since_start {
+        format!(
+            "TotalMix answered only {how_long} after Studio Control started, so a change made there before may be missing. Press Sync from TotalMix."
+        )
+    } else {
+        format!(
+            "TotalMix was out of touch for {how_long}, so a change made there meanwhile may be missing. Press Sync from TotalMix."
+        )
+    }
+}
 
 /// How long TotalMix was out of touch, in the operator's words: seconds
 /// under two minutes, minutes under two hours, then hours.

@@ -551,6 +551,15 @@ struct OutstandingRequest {
     last_reply_at_ms: Option<u64>,
 }
 
+/// TotalMix heard again after it was out of touch on the Global remote: for
+/// how many seconds, and whether it had not been heard at all since the link
+/// began listening (the walk of 2026-10-01).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutOfTouch {
+    pub secs: u64,
+    pub since_start: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConsoleLinkSummary {
     pub slot_bound: bool,
@@ -579,9 +588,9 @@ pub struct ConsoleLinkState {
     connection_lost: bool,
     reports_lost: bool,
     reports_lost_retry_at_ms: u64,
-    /// TotalMix was out of touch on the Global remote for this many seconds
-    /// and is heard again: the next flush makes the Console assumed.
-    out_of_touch_secs: Option<u64>,
+    /// TotalMix was out of touch on the Global remote and is heard again: the
+    /// next flush makes the Console assumed.
+    out_of_touch: Option<OutOfTouch>,
     device: Option<String>,
     dsp_load: Option<f64>,
     last_echo_at_ms: Option<u64>,
@@ -1080,19 +1089,27 @@ impl ConsoleLinkState {
         !self.queued.is_empty()
             || !self.expired.is_empty()
             || self.connection_lost
-            || self.out_of_touch_secs.is_some()
+            || self.out_of_touch.is_some()
             || self.snapshot_slots_changed
     }
 
-    /// TotalMix is heard again after `secs` out of touch on the Global
+    /// TotalMix is heard again after it was out of touch on the Global
     /// remote. Two quiets before a flush keep the longer.
-    pub fn mark_out_of_touch(&mut self, secs: u64) {
-        self.out_of_touch_secs = Some(self.out_of_touch_secs.unwrap_or(0).max(secs));
+    pub fn mark_out_of_touch(&mut self, mark: OutOfTouch) {
+        if self.out_of_touch.is_none_or(|held| mark.secs > held.secs) {
+            self.out_of_touch = Some(mark);
+        }
     }
 
     /// Takes the out-of-touch mark, for the flush that writes it.
-    pub fn take_out_of_touch(&mut self) -> Option<u64> {
-        self.out_of_touch_secs.take()
+    pub fn take_out_of_touch(&mut self) -> Option<OutOfTouch> {
+        self.out_of_touch.take()
+    }
+
+    /// The out-of-touch mark, left in place.
+    #[cfg(test)]
+    pub fn out_of_touch_for_test(&self) -> Option<OutOfTouch> {
+        self.out_of_touch
     }
 
     /// One `/snapshot/load/N` report. Slots outside 1 to 8 and values
@@ -1300,7 +1317,7 @@ impl ConsoleLinkState {
         self.pull = None;
         self.connection_lost = false;
         self.reports_lost = false;
-        self.out_of_touch_secs = None;
+        self.out_of_touch = None;
         self.snapshot_slots = [SnapshotSlotState::Unknown; SNAPSHOT_SLOTS];
         self.snapshot_slot_seqs = [0; SNAPSHOT_SLOTS];
         self.snapshot_report_seq = 0;

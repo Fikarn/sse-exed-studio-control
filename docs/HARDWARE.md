@@ -40,7 +40,7 @@ Setup holds the TotalMix address `127.0.0.1`, the send port `7001` and the recei
 
 The engine listens on UDP `9001`–`9004`, bound to `127.0.0.1`, and reads only what comes from the TotalMix address. `netstat -an | findstr 900` shows the four ports.
 
-While nothing has come on remote 4 for 3 s, the engine asks TotalMix for its values (`/sendall 2`, `/sendstate`) once a second; TotalMix always answers `/sendstate`. Two requests in a row unanswered mean TotalMix is out of touch (remote 4 switched off, or TotalMix closed). When it is heard again the Console reads `ASSUMED` until a Sync or a load's read-back has read the desk (2026-10-01).
+While nothing has come on remote 4 for 3 s, the engine asks TotalMix for its values (`/sendall 2`, `/sendstate`) once a second; TotalMix always answers `/sendstate`. Two requests in a row unanswered mean TotalMix is out of touch (remote 4 switched off, or TotalMix closed); a link's first 3 s are a grace, as TotalMix may be slow to answer at a start. When it is heard again the Console reads `ASSUMED` until a Sync or a load's read-back has read the desk (2026-10-01).
 
 What the app never does:
 
@@ -109,7 +109,7 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - `All Off` and `Del Scene` ask as `REC`'s stop does: `OFF?` or `DEL?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, a mute and `Toggle` drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the two keys without showing it, so the build and the profile go together.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
-- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A request whose answer could not be written (Companion closed the connection, as at a Full Reset & Import) is one line a minute at most for each kind of failure, counting the rest. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
+- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A request whose answer could not be written (Companion closed the connection, as at a Full Reset & Import) is one line a minute at most for each kind of failure; the next line of that kind counts those between. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:

@@ -237,9 +237,10 @@ function formatAudioActionFailureTitle(snapshot: AudioSnapshot | null) {
     .trim();
 }
 
-// The hardware link's codes for why the desk is assumed: TotalMix was out of
-// touch on remote 4, or a change went unconfirmed.
-const ASSUMED_REASON_CODES = new Set(["AUDIO_CONSOLE_OUT_OF_TOUCH", "AUDIO_CONSOLE_UNCONFIRMED"]);
+// The hardware link's codes whose sentence says why the desk is assumed:
+// TotalMix was out of touch on remote 4. (The unconfirmed changes' sentence
+// names TotalMix's own channel numbers, so the general one stands for it.)
+const ASSUMED_REASON_CODES = new Set(["AUDIO_CONSOLE_OUT_OF_TOUCH"]);
 
 export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatusDescriptor {
   const lastActionFailed = String(snapshot?.lastActionStatus ?? "idle") === "failed";
@@ -325,9 +326,8 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.consoleStateConfidence ?? "unknown") === "assumed") {
-    // 2026-10-01 (the walk): when the hardware link says why the desk is
-    // assumed (TotalMix was out of touch, or a change went unconfirmed), its
-    // sentence is the one shown.
+    // 2026-10-01 (the walk): when the hardware link says the desk is assumed
+    // because TotalMix was out of touch, its sentence is the one shown.
     const reason =
       lastActionFailed &&
       ASSUMED_REASON_CODES.has(String(snapshot?.lastActionCode ?? "")) &&
