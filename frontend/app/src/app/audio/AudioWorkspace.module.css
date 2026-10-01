@@ -131,8 +131,8 @@
      (panel, border, accent, hot, talk, engaged-fill) and the six .audioShell
      --color-* overrides (surface-900/800/700, text-strong/muted/subtle). The
      --color-* names still resolve app-wide from :root in the generated tokens,
-     which is where the portaled AudioTextDialog always read them from; only
-     the audio-scoped overrides are gone.
+     which is where the portaled rename dialog (gone 2026-10-01) always read
+     them from; only the audio-scoped overrides are gone.
 
      What remains below is not alias residue — each is a real token with live
      consumers, so this block is no longer a bridge to be dismantled. */

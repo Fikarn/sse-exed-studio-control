@@ -102,26 +102,26 @@ async function runShellTestCommand(command: Record<string, JsonValue>, shellStat
         throw new Error("runCommissioningCheck requires a request object.");
       }
       return store.runCommissioningCheck(command.request as never);
-    case "recallAudioSnapshot":
-      if (typeof command.snapshotId !== "string" || !command.snapshotId.trim()) {
-        throw new Error("recallAudioSnapshot requires snapshotId.");
+    // 2026-10-01: the Console's snapshots are TotalMix's own; the lanes load
+    // one by its slot (the simulated console sends nothing).
+    case "loadAudioSnapshot":
+      if (typeof command.slot !== "number" || !Number.isInteger(command.slot)) {
+        throw new Error("loadAudioSnapshot requires a whole-number slot.");
       }
-      return store.recallAudioSnapshot(command.snapshotId);
-    case "createAudioSnapshot":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("createAudioSnapshot requires a request object.");
+      return store.loadAudioSnapshot(command.slot);
+    // 2026-10-01: the setup/support lane's saved-data marker is a lighting
+    // group (it was a Console snapshot the app kept): a group needs no
+    // fixture and reaches no device.
+    case "createLightingGroup":
+      if (typeof command.name !== "string" || !command.name.trim()) {
+        throw new Error("createLightingGroup requires a name.");
       }
-      return store.createAudioSnapshot(command.request as never);
-    case "updateAudioSnapshot":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("updateAudioSnapshot requires a request object.");
+      return store.createLightingGroup(command.name);
+    case "deleteLightingGroup":
+      if (typeof command.groupId !== "string" || !command.groupId.trim()) {
+        throw new Error("deleteLightingGroup requires groupId.");
       }
-      return store.updateAudioSnapshot(command.request as never);
-    case "deleteAudioSnapshot":
-      if (!command.request || typeof command.request !== "object" || Array.isArray(command.request)) {
-        throw new Error("deleteAudioSnapshot requires a request object.");
-      }
-      return store.deleteAudioSnapshot(command.request as never);
+      return store.deleteLightingGroup(command.groupId);
     case "recallLightingScene":
       if (typeof command.sceneId !== "string" || !command.sceneId.trim()) {
         throw new Error("recallLightingScene requires sceneId.");

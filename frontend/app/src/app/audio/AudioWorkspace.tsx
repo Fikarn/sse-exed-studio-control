@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { AudioSnapshot, ShellStore } from "@sse/engine-client";
-import { ConfirmDialog, ContextMenu, ShellRegion, type ContextMenuItem } from "@sse/design-system";
-import { Pencil, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ContextMenu, ShellRegion, type ContextMenuItem } from "@sse/design-system";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import styles from "./AudioWorkspace.module.css";
-import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS, AUDIO_RECALL_PULSE_MS } from "./audioConstants";
+import { audioSnapshotLoadKey } from "./audioArming";
+import { AUDIO_ARM_TIMEOUT_MS, AUDIO_DRAFT_CLEAR_MS } from "./audioConstants";
 import { useAudioArming } from "./hooks/useAudioArming";
 import { useAudioOptimisticSettings, type OptimisticAudioSettings } from "./hooks/useAudioOptimisticSettings";
 import { createAudioControlDraftStore } from "./audioControlDraftStore";
 import { AUDIO_FADER_UNITY, type AudioFeedbackTone } from "./audioFormatting";
-import { parseAudioRecallReport, type AudioRecallReport } from "./audioRecallReport";
+import { parseAudioLoadReport, type AudioLoadReport } from "./audioLoadReport";
 import {
   audioChannelSupportsPhase,
   buildAudioViewModel,
@@ -23,7 +24,6 @@ import { AudioFooter } from "./components/AudioFooter";
 import { AudioInspector } from "./components/AudioInspector";
 import { AudioMeterCanvasOverlay } from "./components/AudioMeterCanvasOverlay";
 import { AudioSignalCanvas } from "./components/AudioSignalCanvas";
-import { AudioTextDialog } from "./components/AudioTextDialog";
 import { type SnapshotRecord } from "../shellData";
 import { useLiveCallback } from "../shared/useLiveCallback";
 
@@ -62,17 +62,6 @@ interface AudioContextMenuState {
   y: number;
 }
 
-interface AudioTextDialogState {
-  currentName: string;
-  id: string;
-  kind: "channel" | "snapshot";
-}
-
-interface AudioDeleteSnapshotState {
-  id: string;
-  name: string;
-}
-
 const EMPTY_CHANNEL_GROUP_SELECTIONS: AudioChannelGroupSelections = {
   "hardware-inputs": [],
   "software-playback": [],
@@ -88,21 +77,16 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const [bankIndex, setBankIndex] = useState(0);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<AudioWorkspaceFeedback | null>(null);
-  // 2026-09 audit remediation, Slice 4: what the last recall pushed and what
-  // the console confirmed, incl. the 48V differences that need arming.
-  const [recallReport, setRecallReport] = useState<AudioRecallReport | null>(null);
-  const [recentlyRecalledSnapshotId, setRecentlyRecalledSnapshotId] = useState<string | null>(null);
+  // 2026-10-01: what the last TotalMix snapshot load read back from the desk.
+  const [loadReport, setLoadReport] = useState<AudioLoadReport | null>(null);
   const [contextMenu, setContextMenu] = useState<AudioContextMenuState | null>(null);
   const draftStoreRef = useRef<ReturnType<typeof createAudioControlDraftStore> | null>(null);
   if (!draftStoreRef.current) {
     draftStoreRef.current = createAudioControlDraftStore();
   }
   const draftStore = draftStoreRef.current;
-  const [textDialog, setTextDialog] = useState<AudioTextDialogState | null>(null);
-  const [deleteSnapshotDialog, setDeleteSnapshotDialog] = useState<AudioDeleteSnapshotState | null>(null);
   const [peakHoldEnabled, setPeakHoldEnabled] = useState(true);
   const [peakHoldResetToken, setPeakHoldResetToken] = useState(0);
-  const recallPulseTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!window.__SSE_TEST_RENDER_COUNTS__) {
@@ -123,13 +107,17 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   }, [activeChannelGroups, appSnapshot, audioSnapshotForView, bankIndex]);
 
+  // The slot TotalMix holds (active, or changed since its load), 2026-10-01: a
+  // load from anywhere else moves it, and an arm made against the old mix is
+  // dropped.
+  const loadedSnapshotSlot =
+    viewModel?.consoleSnapshots.find((entry) => entry.state === "active" || entry.state === "changed")?.slot ?? null;
   // The arm hook also owns the Esc that cancels an arm (new pages program,
   // Slice 3); the Console binds no other key.
   const { armedAction, armOrApplyAction, clearArmedAction } = useAudioArming({
     setFeedback,
     resetTriggers: {
-      lastRecalledSnapshotId: audioSnapshot?.lastRecalledSnapshotId,
-      lastSnapshotRecallAt: audioSnapshot?.lastSnapshotRecallAt,
+      loadedSnapshotSlot,
       selectedChannelId: viewModel?.selectedChannelId,
       selectedMixTargetId: viewModel?.selectedMixTargetId,
     },
@@ -143,28 +131,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   }, [bankIndex, viewModel]);
 
   useEffect(() => {
-    const recalledSnapshotId =
-      typeof audioSnapshot?.lastRecalledSnapshotId === "string" ? audioSnapshot.lastRecalledSnapshotId : null;
-
-    if (!recalledSnapshotId || !audioSnapshot?.lastSnapshotRecallAt) {
-      return;
-    }
-
-    setRecentlyRecalledSnapshotId(recalledSnapshotId);
-    if (recallPulseTimerRef.current !== null) {
-      window.clearTimeout(recallPulseTimerRef.current);
-    }
-    recallPulseTimerRef.current = window.setTimeout(() => {
-      setRecentlyRecalledSnapshotId(null);
-      recallPulseTimerRef.current = null;
-    }, AUDIO_RECALL_PULSE_MS);
-  }, [audioSnapshot?.lastRecalledSnapshotId, audioSnapshot?.lastSnapshotRecallAt]);
-
-  useEffect(() => {
     return () => {
-      if (recallPulseTimerRef.current !== null) {
-        window.clearTimeout(recallPulseTimerRef.current);
-      }
       draftStore.dispose();
     };
   }, [draftStore]);
@@ -250,77 +217,32 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
     });
   });
 
-  const recallSnapshot = useLiveCallback((snapshotId: string) => {
-    const snapshotName = viewModel?.snapshots.find((snapshot) => snapshot.id === snapshotId)?.name ?? "snapshot";
+  // 2026-10-01: the Console's snapshots are TotalMix's own. The first press
+  // arms; the second, after the dwell and inside the window, has TotalMix load
+  // the slot, and the store reads the console back as Sync does.
+  const loadSnapshot = useLiveCallback((slot: number) => {
+    const slotName = viewModel?.consoleSnapshots.find((entry) => entry.slot === slot)?.name ?? `Slot ${slot}`;
     armOrApplyAction(
       {
-        key: `snapshot-recall:${snapshotId}`,
-        label: `Recall ${snapshotName}`,
-        targetId: snapshotId,
-        targetKind: "snapshot-recall",
+        key: audioSnapshotLoadKey(slot),
+        // The panel's heading says "in TotalMix"; the row keeps room for
+        // "press again to apply".
+        label: `Load ${slotName}`,
+        targetId: String(slot),
+        targetKind: "snapshot-load",
         timeoutMs: AUDIO_ARM_TIMEOUT_MS,
       },
       () => {
-        void performAction(`audio-snapshot-${snapshotId}`, async () => {
-          const result = await store.recallAudioSnapshot(snapshotId);
-          setRecallReport(parseAudioRecallReport(result));
+        void performAction(`audio-snapshot-load-${slot}`, async () => {
+          const result = await store.loadAudioSnapshot(slot);
+          setLoadReport(parseAudioLoadReport(result));
         });
       }
     );
   });
 
-  const dismissRecallReport = useLiveCallback(() => {
-    setRecallReport(null);
-  });
-
-  const captureSnapshot = useLiveCallback(() => {
-    if (!viewModel) return;
-    const usedSlots = new Set(viewModel.snapshots.map((snapshot) => snapshot.oscIndex));
-    const slotIndex = Array.from({ length: 8 }, (_, index) => index).find((index) => !usedSlots.has(index));
-    if (slotIndex === undefined) {
-      setFeedback({
-        message: "All eight snapshot slots are full. Save over a slot or delete one first.",
-        tone: "info",
-      });
-      return;
-    }
-    void performAction("audio-snapshot-capture", async () => {
-      await store.createAudioSnapshot({
-        captureCurrentState: true,
-        name: `Snapshot ${slotIndex + 1}`,
-        oscIndex: slotIndex,
-      });
-    });
-  });
-
-  const saveSnapshot = useLiveCallback((snapshotId: string) => {
-    const snapshotName = viewModel?.snapshots.find((snapshot) => snapshot.id === snapshotId)?.name ?? "snapshot";
-    armOrApplyAction(
-      {
-        key: `snapshot-save:${snapshotId}`,
-        label: `Save current mix into ${snapshotName}`,
-        targetId: snapshotId,
-        targetKind: "snapshot-save",
-        timeoutMs: AUDIO_ARM_TIMEOUT_MS,
-      },
-      () => {
-        void performAction(`audio-snapshot-save-${snapshotId}`, async () => {
-          await store.updateAudioSnapshot({ snapshotId, captureCurrentState: true });
-        });
-      }
-    );
-  });
-
-  const renameSnapshot = useLiveCallback((snapshotId: string, currentName: string) => {
-    setTextDialog({ currentName, id: snapshotId, kind: "snapshot" });
-  });
-
-  const renameChannel = useLiveCallback((channelId: string, currentName: string) => {
-    setTextDialog({ currentName, id: channelId, kind: "channel" });
-  });
-
-  const deleteSnapshot = useLiveCallback((snapshotId: string, snapshotName: string) => {
-    setDeleteSnapshotDialog({ id: snapshotId, name: snapshotName });
+  const dismissLoadReport = useLiveCallback(() => {
+    setLoadReport(null);
   });
 
   const selectChannel = useLiveCallback((channelId: string | null) => {
@@ -369,12 +291,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
       );
     }
   );
-
-  // A recall never pushes 48V; the report lists each difference and this is
-  // the same armed flow the inspector uses.
-  const armPhantomFromRecall = useLiveCallback((channelId: string, channelName: string, phantom: boolean) => {
-    togglePhantom({ channelId, channelName, phantom });
-  });
 
   const updateChannelEq = useLiveCallback((request: AudioEqUpdate) => {
     void performAction(`audio-channel-eq-${request.channelId}`, async () => {
@@ -485,37 +401,10 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         label: contextMenuChannel.phase ? "Restore polarity" : "Flip polarity",
         onSelect: () => updateChannel({ channelId: contextMenuChannel.id, phase: !contextMenuChannel.phase }),
       },
-      {
-        disabled: !canMutate,
-        icon: Pencil,
-        id: "rename",
-        label: "Rename channel",
-        onSelect: () => renameChannel(contextMenuChannel.id, contextMenuChannel.name),
-      },
+      // No Rename (2026-10-01): the channels take TotalMix's names, and a
+      // channel is renamed in TotalMix.
     ];
-  }, [contextMenuChannel, renameChannel, resetChannelFaderToUnity, updateChannel, viewModel]);
-
-  const confirmTextDialog = useLiveCallback((nextName: string) => {
-    if (!textDialog) return;
-    const dialog = textDialog;
-    setTextDialog(null);
-    if (dialog.kind === "snapshot") {
-      void performAction(`audio-snapshot-rename-${dialog.id}`, async () => {
-        await store.updateAudioSnapshot({ snapshotId: dialog.id, name: nextName });
-      });
-      return;
-    }
-    updateChannel({ channelId: dialog.id, name: nextName });
-  });
-
-  const confirmDeleteSnapshot = useLiveCallback(() => {
-    if (!deleteSnapshotDialog) return;
-    const dialog = deleteSnapshotDialog;
-    setDeleteSnapshotDialog(null);
-    void performAction(`audio-snapshot-delete-${dialog.id}`, async () => {
-      await store.deleteAudioSnapshot({ snapshotId: dialog.id });
-    });
-  });
+  }, [contextMenuChannel, resetChannelFaderToUnity, updateChannel, viewModel]);
 
   if (!viewModel) {
     return (
@@ -556,19 +445,14 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          onCaptureSnapshot={captureSnapshot}
           onClearAllSolo={clearAllSolo}
           onClearClips={clearClips}
-          onDeleteSnapshot={deleteSnapshot}
+          onLoadSnapshot={loadSnapshot}
           onOpenSetup={openSetup}
-          onRecallSnapshot={recallSnapshot}
-          onRenameSnapshot={renameSnapshot}
           onRunAudioProbe={runAudioProbe}
-          onSaveSnapshot={saveSnapshot}
           onSelectMixTarget={selectMixTarget}
           onSync={syncAudio}
           onUpdateMixTarget={updateMixTarget}
-          recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
           setDraftValue={setDraftValue}
           viewModel={viewModel}
         />
@@ -590,9 +474,8 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onNextBank={nextBank}
           onOpenChannelMenu={openChannelContextMenu}
           onPreviousBank={previousBank}
-          recallReport={recallReport}
-          onDismissRecallReport={dismissRecallReport}
-          onArmPhantomFromRecall={armPhantomFromRecall}
+          loadReport={loadReport}
+          onDismissLoadReport={dismissLoadReport}
           onSelectChannel={selectChannel}
           onSelectChannelGroup={selectChannelGroup}
           onSelectMixTarget={selectMixTarget}
@@ -612,10 +495,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           commitMixTargetContinuous={commitMixTargetContinuous}
           draftStore={draftStore}
           getDraftValue={getDraftValue}
-          onRenameChannel={(channelId) => {
-            const channel = viewModel.channels.find((entry) => entry.id === channelId);
-            if (channel) renameChannel(channel.id, channel.name);
-          }}
           onResetPeakHolds={resetPeakHolds}
           onSelectMixTarget={selectMixTarget}
           onTogglePeakHold={togglePeakHold}
@@ -646,30 +525,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           onClose={() => setContextMenu(null)}
           x={contextMenu.x}
           y={contextMenu.y}
-        />
-      ) : null}
-
-      {textDialog ? (
-        <AudioTextDialog
-          busy={Boolean(busyAction?.includes(textDialog.id))}
-          confirmLabel="Rename"
-          fieldLabel={textDialog.kind === "snapshot" ? "Snapshot name" : "Channel name"}
-          initialValue={textDialog.currentName}
-          onCancel={() => setTextDialog(null)}
-          onConfirm={confirmTextDialog}
-          title={textDialog.kind === "snapshot" ? "Rename snapshot" : "Rename channel"}
-        />
-      ) : null}
-
-      {deleteSnapshotDialog ? (
-        <ConfirmDialog
-          body={`Delete "${deleteSnapshotDialog.name}" from the snapshot slots.`}
-          busy={busyAction === `audio-snapshot-delete-${deleteSnapshotDialog.id}`}
-          confirmLabel="Delete"
-          danger
-          onCancel={() => setDeleteSnapshotDialog(null)}
-          onConfirm={confirmDeleteSnapshot}
-          title="Delete snapshot"
         />
       ) : null}
     </div>

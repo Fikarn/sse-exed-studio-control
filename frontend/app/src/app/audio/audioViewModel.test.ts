@@ -7,6 +7,7 @@ import { getFixtureScenario } from "@sse/test-fixtures";
 import {
   audioBankSizes,
   buildAudioViewModel,
+  getAudioChannelGroup,
   toggleChannelGroupSelection,
   type AudioChannelGroup,
   type AudioChannelGroupSelections,
@@ -171,5 +172,69 @@ describe("the Inputs chips across banks", () => {
     const talent = click(both, "line");
     expect(talent["hardware-inputs"]).toEqual(["talent"]);
     expect(inputsOnBank(talent, 0).bankReadout).toBe("Bank 1 / 1 · ch 1-4 of 4");
+  });
+});
+
+// 2026-10-01 (the owner's decision, after the studio walk): the strips and the
+// snapshots carry TotalMix's names. Two strips may share a name, and a rename
+// in TotalMix must not move a strip to another chip, so a strip's group is
+// the channel's, by its id.
+describe("the Console under TotalMix's names", () => {
+  let audioSnapshot: AudioSnapshot;
+  beforeAll(async () => {
+    const transport = createFixtureTransport(getFixtureScenario("audio-populated"));
+    audioSnapshot = (await transport.request("audio.snapshot")) as unknown as AudioSnapshot;
+    await transport.dispose?.();
+  });
+  const none: AudioChannelGroupSelections = { "hardware-inputs": [], "software-playback": [] };
+  const viewModelOf = (snapshot: AudioSnapshot, activeChannelGroups = none) =>
+    buildAudioViewModel({ activeChannelGroups, appSnapshot: null, audioSnapshot: snapshot, bankIndex: 0 });
+
+  it("keeps every strip on its chip whatever TotalMix names it", () => {
+    const groupsOf = (snapshot: AudioSnapshot) =>
+      Object.fromEntries(viewModelOf(snapshot).channels.map((channel) => [channel.id, getAudioChannelGroup(channel)]));
+    const renamed: AudioSnapshot = {
+      ...audioSnapshot,
+      channels: audioSnapshot.channels.map((channel) => ({ ...channel, name: "AN 1", shortName: "AN 1" })),
+    };
+    expect(groupsOf(renamed)).toEqual(groupsOf(audioSnapshot));
+    expect(groupsOf(audioSnapshot)).toMatchObject({
+      "audio-input-9": "talent",
+      "audio-input-1": "line",
+      "audio-input-3": "remote",
+      "audio-playback-1-2": "bed",
+      "audio-playback-3-4": "fx",
+      "audio-playback-5-6": "remote",
+      "audio-playback-7-8": "bed",
+    });
+  });
+
+  it("lists TotalMix's eight slots, a slot without a name by its number", () => {
+    const viewModel = viewModelOf(audioSnapshot);
+    expect(viewModel.consoleSnapshots.map((entry) => [entry.slot, entry.name, entry.state])).toEqual([
+      [1, "Mix 1", "active"],
+      [2, "Interview", "off"],
+      [3, "Panel & Q&A", "off"],
+      [4, "Slot 4", "unknown"],
+      [5, "Slot 5", "unknown"],
+      [6, "Slot 6", "unknown"],
+      [7, "Slot 7", "unknown"],
+      [8, "Slot 8", "unknown"],
+    ]);
+    expect(viewModel.consoleSnapshotSource).toMatch(/^Names as TotalMix last saved them · .+/);
+  });
+
+  it("says why there are no names when TotalMix saved none, and nothing when there is nothing to say", () => {
+    const note = "TotalMix has not saved its mix names on this PC yet. It saves them when it closes.";
+    const noted = viewModelOf({
+      ...audioSnapshot,
+      consoleSnapshots: { ...audioSnapshot.consoleSnapshots, namesSavedAt: null, namesNote: note },
+    });
+    expect(noted.consoleSnapshotSource).toBe(note);
+    const silent = viewModelOf({
+      ...audioSnapshot,
+      consoleSnapshots: { ...audioSnapshot.consoleSnapshots, namesSavedAt: null, namesNote: null },
+    });
+    expect(silent.consoleSnapshotSource).toBeNull();
   });
 });

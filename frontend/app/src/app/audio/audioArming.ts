@@ -1,13 +1,13 @@
 /**
  * Shared types for the audio arm-then-apply safety pattern.
  *
- * Operator actions that can change the desk irreversibly (48V phantom,
- * snapshot recall, snapshot overwrite) arm first and apply only when the same
- * action target is activated a second time inside the timeout window. The
- * shape lives here so the workspace, signal canvas and snapshot deck can read
- * the same definition without crossing component boundaries.
+ * Operator actions that can change the desk irreversibly (48V phantom, a
+ * TotalMix snapshot load) arm first and apply only when the same action target
+ * is activated a second time inside the timeout window. The shape lives here so
+ * the workspace, signal canvas and snapshot deck can read the same definition
+ * without crossing component boundaries.
  */
-export type AudioArmedActionKind = "phantom" | "snapshot-recall" | "snapshot-save";
+export type AudioArmedActionKind = "phantom" | "snapshot-load";
 
 export interface AudioArmedAction {
   // Why: monotonic `performance.now()` reading at the moment the action was
@@ -21,4 +21,9 @@ export interface AudioArmedAction {
   targetId: string;
   targetKind: AudioArmedActionKind;
   timeoutMs: number;
+}
+
+/** The arm key of a TotalMix snapshot slot's load (1 to 8; 2026-10-01). */
+export function audioSnapshotLoadKey(slot: number) {
+  return `snapshot-load:${slot}`;
 }

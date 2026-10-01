@@ -16,8 +16,9 @@ import { AudioSnapshotKeys } from "./AudioSnapshotKeys";
 // The state display is first and never moves; below it the take-time keys
 // (dim and mono, Main Out's whatever the mix target, the mix target, the main
 // level, the master meter),
-// the snapshot keys and the standing actions. Arming renders in the display
-// and on the key, so nothing else moves (finding C1).
+// the snapshot keys (TotalMix's eight, since 2026-10-01) and the standing
+// actions. Arming renders in the display and on the key, so nothing else moves
+// (finding C1).
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
@@ -31,19 +32,14 @@ export interface AudioClusterProps {
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
-  onCaptureSnapshot: () => void;
   onClearAllSolo: () => void;
   onClearClips: () => void;
-  onDeleteSnapshot: (snapshotId: string, snapshotName: string) => void;
+  onLoadSnapshot: (slot: number) => void;
   onOpenSetup: () => void;
-  onRecallSnapshot: (snapshotId: string) => void;
-  onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
   onRunAudioProbe: () => void;
-  onSaveSnapshot: (snapshotId: string) => void;
   onSelectMixTarget: (mixTargetId: string) => void;
   onSync: () => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
-  recentlyRecalledSnapshotId: string | null;
   setDraftValue: (key: string, value: number) => void;
   viewModel: AudioWorkspaceViewModel;
 }
@@ -75,19 +71,14 @@ export function AudioCluster({
   commitMixTargetContinuous,
   draftStore,
   getDraftValue,
-  onCaptureSnapshot,
   onClearAllSolo,
   onClearClips,
-  onDeleteSnapshot,
+  onLoadSnapshot,
   onOpenSetup,
-  onRecallSnapshot,
-  onRenameSnapshot,
   onRunAudioProbe,
-  onSaveSnapshot,
   onSelectMixTarget,
   onSync,
   onUpdateMixTarget,
-  recentlyRecalledSnapshotId,
   setDraftValue,
   viewModel,
 }: AudioClusterProps) {
@@ -329,20 +320,13 @@ export function AudioCluster({
       </section>
 
       <AudioSnapshotKeys
-        actionsAllowed={viewModel.capabilities.canCaptureSnapshot}
-        lockedReason={lockedReason}
-        channels={viewModel.channels}
-        mixTargets={viewModel.mixTargets}
-        selectedMixTargetId={viewModel.selectedMixTargetId}
+        actionsAllowed={viewModel.capabilities.canRecallConsoleSnapshot}
+        lockedReason={status.warningBody ?? `The desk is ${status.label}.`}
         armedActionKey={armedAction?.key ?? null}
         busyAction={busyAction}
-        onCaptureSnapshot={onCaptureSnapshot}
-        onDeleteSnapshot={onDeleteSnapshot}
-        onRecallSnapshot={onRecallSnapshot}
-        onRenameSnapshot={onRenameSnapshot}
-        onSaveSnapshot={onSaveSnapshot}
-        recentlyRecalledSnapshotId={recentlyRecalledSnapshotId}
-        snapshots={viewModel.snapshots}
+        onLoadSnapshot={onLoadSnapshot}
+        slots={viewModel.consoleSnapshots}
+        source={viewModel.consoleSnapshotSource}
       />
 
       <Section title="Console" className={styles.actions} testId="audio-standing-actions">

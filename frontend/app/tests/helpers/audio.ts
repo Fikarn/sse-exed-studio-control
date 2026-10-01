@@ -103,13 +103,6 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
   expect(metrics.monitorMeter / metrics.clusterWidth, "monitor master meter is filled").toBeGreaterThan(0.8);
 }
 
-// Visual overhaul A, Slice 4a. Old: the action strip was a row under every
-// slot, asserted visible at rest and inside the tile's own box. New: it is in
-// the slot's float, so the check hovers the slot first and asserts the strip is
-// inside that float. Reason: the resting slot is the mock's name and last
-// recall; save / rename / delete come with the preview of what they change.
-// What the check is for is unchanged — the strip must never cover the slot's
-// name, mix shape or last recall.
 // Visual overhaul A, Slice 4c: the plate has no tab row — every section is
 // visible at once — so what used to be "click the EQ tab" is "bring the EQ
 // section into view". Sections keep the ids the tabs' panels had, prefixed
@@ -124,29 +117,39 @@ export async function revealPlateSection(
   return target;
 }
 
-export async function expectSnapshotActionsDoNotOverlapContent(page: Page, snapshotId: string) {
-  const tile = page.getByTestId(`audio-snapshot-${snapshotId}`);
-  const actions = tile.getByTestId(`audio-snapshot-actions-${snapshotId}`);
-  await expect(actions, `${snapshotId} action strip should rest hidden`).toBeHidden();
-  await tile.hover();
-  await expect(actions, `${snapshotId} action strip should be visible`).toBeVisible();
-
-  const floatBox = await readRequiredLocatorBox(tile.locator('[data-level="float"]'), `${snapshotId} slot float`);
-  const actionBox = await readRequiredLocatorBox(actions, `${snapshotId} action strip`);
-  expectInsideBox(actionBox, floatBox, `${snapshotId} action strip inside the slot float`);
-
-  // New pages program, Slice SW (D22): the mix-shape thumbnail is always drawn
-  // now (only the fallback size dropped it), so it is measured like the rest.
-  // Each box is read with its edges: `boxesIntersect` compares left / right /
-  // top / bottom, and the raw `boundingBox()` (x, y, width, height) it was given
-  // until this slice made every overlap test false.
-  for (const [locator, label] of [
-    [tile.getByTestId(`audio-snapshot-name-${snapshotId}`), "name"],
-    [tile.getByTestId(`audio-snapshot-thumb-${snapshotId}`), "thumbnail"],
-    [tile.getByTestId(`audio-snapshot-meta-${snapshotId}`), "status"],
-  ] as const) {
-    const contentBox = await readRequiredLocatorBox(locator, `${snapshotId} ${label}`);
-    expect(boxesIntersect(actionBox, contentBox), `${snapshotId} action strip overlaps ${label}`).toBe(false);
+// 2026-10-01 (the owner's decision, after the studio walk). Old:
+// `expectSnapshotActionsDoNotOverlapContent` hovered a slot and checked that
+// the save / rename / delete strip in its float never covered the slot's name,
+// mix shape or last recall. New: the slots are TotalMix's own eight, each one
+// key holding its name and what TotalMix reports of it, and the check is that
+// both sit inside the key, that neither collides with the other, and that the
+// line naming where the names come from sits inside the panel. Reason: the
+// strip, the float and the thumbnail went with the app's own snapshots.
+export async function expectSnapshotSlotsHoldTheirWords(page: Page) {
+  const deck = await readRequiredBox(page, "audio-snapshot-deck");
+  for (let slot = 1; slot <= 8; slot += 1) {
+    const keyBox = await readRequiredLocatorBox(page.getByTestId(`audio-snapshot-load-${slot}`), `slot ${slot} key`);
+    expectInsideBox(keyBox, deck, `slot ${slot} key inside the snapshot panel`);
+    const nameBox = await readRequiredLocatorBox(page.getByTestId(`audio-snapshot-name-${slot}`), `slot ${slot} name`);
+    const stateBox = await readRequiredLocatorBox(
+      page.getByTestId(`audio-snapshot-state-${slot}`),
+      `slot ${slot} state`
+    );
+    expectInsideBox(nameBox, keyBox, `slot ${slot} name inside its key`);
+    expectInsideBox(stateBox, keyBox, `slot ${slot} state inside its key`);
+    expect(boxesIntersect(nameBox, stateBox), `slot ${slot} name overlaps its state`).toBe(false);
+  }
+  const source = page.getByTestId("audio-snapshot-source");
+  if ((await source.count()) > 0) {
+    expectInsideBox(
+      await readRequiredLocatorBox(source, "snapshot names' source"),
+      deck,
+      "source line inside the panel"
+    );
+    expect(
+      await source.evaluate((node) => node.scrollWidth <= node.clientWidth),
+      "the source line holds its words"
+    ).toBe(true);
   }
 }
 
@@ -239,22 +242,20 @@ export async function expectAudioOverviewProcessingStack(page: Page, label: stri
   }
 }
 
-export async function readSnapshotThumbHeights(page: Page, snapshotId: string) {
-  return page
-    .getByTestId(`audio-snapshot-thumb-${snapshotId}`)
-    .locator("i")
-    .evaluateAll((bars) => bars.map((bar) => (bar as HTMLElement).style.height));
-}
-
-export async function saveAudioSnapshot(page: Page, snapshotId: string) {
-  const snapshotTile = page.getByTestId(`audio-snapshot-${snapshotId}`);
-  await snapshotTile.hover();
-  const saveButton = snapshotTile.getByTestId(`audio-snapshot-actions-${snapshotId}`).getByRole("button").first();
-  await expect(saveButton).toBeEnabled();
-  await saveButton.click();
-  await expect(saveButton).toHaveAttribute("data-armed", "true");
+// 2026-10-01: loads TotalMix's snapshot `slot` the operator's way, two presses
+// of its key with the dwell between them, and waits for the arm to go. Old:
+// `saveAudioSnapshot` armed and confirmed a save into the app's own snapshot
+// (and `readSnapshotThumbHeights` read its mix shape); both went with them.
+export async function loadAudioSnapshot(page: Page, slot: number) {
+  const tile = page.getByTestId(`audio-snapshot-slot-${slot}`);
+  const key = page.getByTestId(`audio-snapshot-load-${slot}`);
+  await expect(key).toBeEnabled();
+  await key.click();
+  await expect(tile).toHaveAttribute("data-armed", "true");
+  await expect(key).toContainText("LOAD?");
   await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // confirm after the arm dwell (Slice 7)
-  await saveButton.click();
+  await key.click();
+  await expect(tile).toHaveAttribute("data-armed", "false");
 }
 
 export async function expectSliderValueChanges(page: Page, label: string) {

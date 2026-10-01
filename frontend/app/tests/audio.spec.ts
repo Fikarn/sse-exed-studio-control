@@ -17,10 +17,9 @@ import {
   expectAudioStudioSideRailsFilled,
   expectAudioWorkspaceGeometry,
   expectSliderValueChanges,
-  expectSnapshotActionsDoNotOverlapContent,
-  readSnapshotThumbHeights,
+  expectSnapshotSlotsHoldTheirWords,
+  loadAudioSnapshot,
   revealPlateSection,
-  saveAudioSnapshot,
 } from "./helpers/audio";
 import {
   expectAspectRatio,
@@ -151,17 +150,27 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveCount(0);
   await expect(page.getByTestId("audio-tier-chip-playback-bed")).toBeVisible();
   await expect(page.getByTestId("audio-tier-chip-playback-remote")).toHaveCount(0);
-  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
+  // 2026-10-01 (the owner's decision, after the studio walk). Old: the panel
+  // held the app's own snapshots, a Capture key, empty slots, mix-shape
+  // thumbnails and a hover preview naming the TotalMix slot a recall would
+  // load. New: TotalMix's eight slots under the names TotalMix saved, what
+  // TotalMix reports of each, and where the names come from. Reason: the
+  // Console's snapshots follow TotalMix; the app keeps none.
+  const snapshotDeck = page.getByTestId("audio-snapshot-deck");
+  await expect(snapshotDeck).toContainText("in TotalMix");
   await expect(page.locator("[data-snapshot-slot]")).toHaveCount(8);
-  await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
-  await expect(page.getByTestId("audio-snapshot-thumb-snapshot-show-open")).toBeVisible();
-  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
-  await page.getByTestId("audio-snapshot-snapshot-open-rehearsal").hover();
-  await expect(
-    // Slice 8 (system §9): an empty slot recalls the desk's own OSC slot, so
-    // the preview names TotalMix rather than this workspace.
-    page.getByTestId("audio-snapshot-snapshot-open-rehearsal").getByText("TotalMix slot recall")
-  ).toBeVisible();
+  await expect(page.getByTestId("audio-snapshot-capture")).toHaveCount(0);
+  await expect(snapshotDeck.getByRole("button")).toHaveCount(8);
+  await expect(page.getByTestId("audio-snapshot-name-1")).toHaveText("Mix 1");
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("active");
+  await expect(page.getByTestId("audio-snapshot-slot-1")).toHaveAttribute("data-current", "true");
+  await expect(page.getByTestId("audio-snapshot-name-3")).toHaveText("Panel & Q&A");
+  await expect(page.getByTestId("audio-snapshot-state-3")).toHaveText("–");
+  await expect(page.getByTestId("audio-snapshot-name-6")).toHaveText("Slot 6");
+  await expect(page.getByTestId("audio-snapshot-state-6")).toHaveText("–");
+  await expect(page.getByTestId("audio-snapshot-load-6")).toHaveAttribute("aria-label", "Load Slot 6 in TotalMix");
+  await expect(page.getByTestId("audio-snapshot-load-6")).toHaveAttribute("title", "Press twice to load in TotalMix");
+  await expect(page.getByTestId("audio-snapshot-source")).toHaveText(/^Names as TotalMix last saved them · .+/);
   await expect(page.getByTestId("audio-signal-canvas").getByRole("button", { name: "Master" })).toHaveCount(0);
   await expect(page.getByTestId("audio-warning-band")).toHaveCount(0);
   await expect(page.getByTestId("audio-output-audio-mix-main")).toHaveAttribute("data-selected", "true");
@@ -223,6 +232,8 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // a click on its M key and two presses of snapshot key 3. Reason: the Console
   // binds no key of its own; each of these is the on-screen control that did
   // the same thing all along (the bank key is new with this slice).
+  // 2026-10-01: snapshot key 3 is TotalMix's slot 3, and two presses load it
+  // in TotalMix (it recalled the app's own snapshot).
   await page.getByTestId("audio-bank-next").click();
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("2 of 3");
 
@@ -235,13 +246,12 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(selectedStrip.getByRole("button", { name: /Mute/ })).toHaveAttribute("data-active", "true");
   await expect(selectedStrip.getByRole("button", { name: /Mute/ })).toHaveAttribute("aria-pressed", "true");
 
-  const interviewRecall = page.getByTestId("audio-snapshot-recall-snapshot-interview-block");
-  await interviewRecall.click();
-  await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // the confirm must come after the arm dwell (Slice 7)
-  await interviewRecall.click();
-  await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-current", "true");
-  await expect(page.getByTestId("audio-toolbar-current-snapshot")).toHaveText("Recalled Interview block");
+  await loadAudioSnapshot(page, 3);
+  await expect(page.getByTestId("audio-snapshot-slot-3")).toHaveAttribute("data-current", "true");
+  await expect(page.getByTestId("audio-snapshot-state-3")).toHaveText("active");
+  await expect(page.getByTestId("audio-snapshot-slot-1")).toHaveAttribute("data-current", "false");
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("–");
+  await expect(page.getByTestId("audio-load-report")).toContainText("Loaded Panel & Q&A in TotalMix");
 
   // Visual overhaul A, Slice 4c. Old: the plate was a tab strip and this
   // asserted the Preamp tab was selected and its panel visible. New: every
@@ -274,14 +284,16 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   expect(contextCountsAfterEscape["audio.settings.update"] ?? 0).toBe(
     contextCountsBefore["audio.settings.update"] ?? 0
   );
+  // 2026-10-01. Old: the menu's Rename opened a dialog that renamed the strip.
+  // New: no Rename, in the menu or on the plate. Reason: the strips take
+  // TotalMix's names, and a channel is renamed in TotalMix.
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
-  await expect(page.getByRole("menuitem", { name: "Rename" })).toBeEnabled();
-  await page.getByRole("menuitem", { name: "Rename" }).click();
-  const renameDialog = page.getByRole("dialog", { name: "Rename channel" });
-  await expect(renameDialog).toBeVisible();
-  await renameDialog.getByLabel("Channel name").fill("Renamed line 1");
-  await renameDialog.getByRole("button", { name: "Rename" }).click();
-  await expect(page.getByTestId("audio-strip-audio-input-1")).toContainText("Renamed line 1");
+  await expect(menu).toContainText("Reset to unity");
+  await expect(page.getByRole("menuitem", { name: /Rename/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByTestId("audio-plate-rename")).toHaveCount(0);
+  await expect(page.getByTestId("audio-inspector").getByRole("button", { name: /Rename/ })).toHaveCount(0);
   await expect
     .poll(() => page.evaluate(() => window.__SSE_TEST_NATIVE_DIALOG_COUNTS__))
     .toEqual({
@@ -378,11 +390,15 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // sentence says what happened and the code stands in the display's own code
   // slot. Reason: operator copy never leads with a raw fault code, and the
   // state display is the one place that has somewhere else to put it.
+  // 2026-10-01: the fixture's failure is a TotalMix snapshot load a
+  // development run refused (it was a recall of the app's own snapshot).
   const failedState = page.getByTestId("audio-state-display");
   await expect(failedState).toContainText("ACTION FAILED");
-  await expect(failedState).toContainText("Snapshot slot 3 did not match the current console layout.");
-  await expect(failedState).toContainText("AUDIO_SNAPSHOT_RECALL_FAILED");
-  await expect(failedState.locator("[data-state-code]")).toHaveText("AUDIO_SNAPSHOT_RECALL_FAILED");
+  await expect(failedState).toContainText(
+    "A development run never loads a mix in TotalMix; only the studio's build does."
+  );
+  await expect(failedState).toContainText("AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY");
+  await expect(failedState.locator("[data-state-code]")).toHaveText("AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY");
 
   await openFixture(page, "audio-loading");
   await expect(page.getByText("Loading the console…")).toBeVisible();
@@ -417,11 +433,19 @@ test("audio-not-verified outlines every console write on the bay and prints the 
   await expect(fader).toHaveAttribute("aria-disabled", "true");
   await expect(strip.getByRole("button", { name: "Mute Host" })).toBeDisabled();
   await expect(strip.getByRole("button", { name: "Solo Host" })).toBeDisabled();
+  // 2026-10-01: a TotalMix snapshot load is a console write, so the slots are
+  // locked the same way, with the same reason.
+  const loadKey = page.getByTestId("audio-snapshot-load-2");
+  await expect(loadKey).toHaveAttribute("aria-disabled", "true");
+  await expect(loadKey).toHaveAttribute("title", reason);
+  expect(await loadKey.evaluate((node) => getComputedStyle(node).borderStyle)).toBe("dashed");
 
   // The lock is the engine's, so it lifts the moment the probe passes.
   await page.getByTestId("audio-state-probe").click();
   await expect(page.getByTestId("audio-tier-lock-note-hardware-inputs")).toHaveCount(0);
   await expect(strip.getByTestId("audio-lane-gain-audio-input-9")).not.toHaveAttribute("aria-disabled", "true");
+  await expect(loadKey).not.toHaveAttribute("aria-disabled", "true");
+  await expect(loadKey).toHaveAttribute("title", "Press twice to load in TotalMix");
 });
 
 test("switches audio output targets without a full-domain refresh", async ({ page }) => {
@@ -652,28 +676,33 @@ test("fixture audio solo clear-all command clears all soloed channels in one com
   await transport.dispose();
 });
 
-test("honors reduced motion on audio snapshot pulse and hover transitions", async ({ page }) => {
+// 2026-10-01. Old: "honors reduced motion on audio snapshot pulse and hover
+// transitions": a recalled slot flashed, and its hover float faded in. New: the
+// one motion a snapshot key has is its arm's countdown bar, and reduced motion
+// stills it. Reason: the pulse and the float went with the app's own snapshots.
+test("honors reduced motion on a snapshot key's countdown", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await openFixture(page, "audio-populated");
 
-  const recalledTile = page.getByTestId("audio-snapshot-snapshot-interview-block");
-  await recalledTile.evaluate((node) => node.setAttribute("data-flash", "true"));
-  const animationMs = await recalledTile.evaluate((node) => {
-    const duration = getComputedStyle(node).animationDuration;
-    return duration.endsWith("ms") ? Number.parseFloat(duration) : Number.parseFloat(duration) * 1000;
-  });
-  expect(animationMs).toBeLessThanOrEqual(1);
-  const actions = page.getByTestId("audio-snapshot-actions-snapshot-interview-block");
-  const transitionMs = await actions.evaluate((node) => {
-    const duration = getComputedStyle(node).transitionDuration;
-    return duration.endsWith("ms") ? Number.parseFloat(duration) : Number.parseFloat(duration) * 1000;
-  });
-  expect(transitionMs).toBeLessThanOrEqual(1);
+  const interviewTile = page.getByTestId("audio-snapshot-slot-2");
+  await page.getByTestId("audio-snapshot-load-2").click();
+  await expect(interviewTile).toHaveAttribute("data-armed", "true");
+  const countdown = interviewTile.getByTestId("audio-arm-countdown");
+  await expect(countdown).toHaveCount(1);
+  expect(await countdown.evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
 });
 
-test("supports audio snapshot capture save rename and delete", async ({ page }) => {
+// 2026-10-01 (the owner's decision, after the studio walk). Old: "supports
+// audio snapshot capture save rename and delete": the app kept snapshots of its
+// own, captured into an empty slot, saved over, renamed and deleted through the
+// slot's float. New: the slots are TotalMix's own eight; a key arms, shows
+// LOAD? and the state display's armed row, Esc lets it go, and a second press
+// past the dwell loads the slot in TotalMix. Nothing captures, saves, renames
+// or deletes. Reason: the Console's snapshots and names follow TotalMix.
+test("loads one of TotalMix's snapshots with two presses, and keeps none of its own", async ({ page }) => {
   test.slow();
   await page.addInitScript(() => {
+    window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ = {};
     window.__SSE_TEST_NATIVE_DIALOG_COUNTS__ = { confirm: 0, prompt: 0 };
     window.prompt = () => {
       window.__SSE_TEST_NATIVE_DIALOG_COUNTS__!.prompt += 1;
@@ -685,83 +714,53 @@ test("supports audio snapshot capture save rename and delete", async ({ page }) 
     };
   });
   await openFixture(page, "audio-populated");
+  await expectWorkspaceMounted(page, "audio");
 
-  const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
-  await saveAudioSnapshot(page, "snapshot-show-open");
-  await expect(currentSnapshot.getByTestId("audio-snapshot-thumb-snapshot-show-open")).toHaveAttribute(
-    "data-has-contents",
-    "true"
-  );
-  const savedThumbBefore = await readSnapshotThumbHeights(page, "snapshot-show-open");
+  const deck = page.getByTestId("audio-snapshot-deck");
+  for (const name of [/Capture/, /Save/, /Rename/, /Delete/]) {
+    await expect(deck.getByRole("button", { name })).toHaveCount(0);
+  }
 
-  await expect(page.getByTestId("audio-snapshot-capture")).toBeEnabled();
-  await page.getByTestId("audio-snapshot-capture").click();
-  const capturedSlot = page.locator('[data-snapshot-slot="6"][data-slot-state="populated"]');
-  await expect(capturedSlot).toContainText("Snapshot 6");
-  await capturedSlot.hover();
-  await expect(capturedSlot.getByText("No change from the current mix")).toBeVisible();
-
-  await page.getByRole("slider", { name: "FX 3/4 send level" }).focus();
-  await page.keyboard.press("Enter");
-  const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
-  await expect(faderDialog).toBeVisible();
-  await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
-  // New pages program, Slice 3 (decision 8). Old: the key was found by "Set".
-  // New: by its whole name, "Set value". Reason: typed entry now also offers
-  // "Reset to 0 dB", which a name search for "Set" matches too.
-  await faderDialog.getByRole("button", { name: "Set value" }).click();
-  await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-no-send", "true");
-  await currentSnapshot.hover();
-  await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(currentSnapshot.getByText(/-∞ dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
-
-  await saveAudioSnapshot(page, "snapshot-show-open");
-  await expect
-    .poll(async () => readSnapshotThumbHeights(page, "snapshot-show-open"), {
-      message: "saved snapshot thumbnail should reflect the changed mix",
-    })
-    .not.toEqual(savedThumbBefore);
-  await page.mouse.move(1, 1);
-  // Visual overhaul A, Slice 4a. Old: the save / rename / delete keys were a
-  // row under every slot and were asserted visible with the pointer away. New:
-  // they live in the slot's float with the preview, so they appear on hover or
-  // keyboard focus. Reason: the resting slot is the mock's — the name and when
-  // it was last recalled — and the deliberate actions come with the preview of
-  // what they would change.
-  const snapshotActions = currentSnapshot.getByTestId("audio-snapshot-actions-snapshot-show-open");
-  await expect(snapshotActions).toBeHidden();
-  await currentSnapshot.hover();
-  await expect(snapshotActions).toBeVisible();
-  await expect(currentSnapshot.getByText("18 sources saved")).toBeVisible();
-  const recallSurface = currentSnapshot.locator("button").first();
+  const interviewTile = page.getByTestId("audio-snapshot-slot-2");
+  const interviewKey = page.getByTestId("audio-snapshot-load-2");
+  await expect(interviewKey).toHaveAttribute("aria-label", "Load Interview in TotalMix");
   // Visual overhaul A, Slice 4 (system §6): one focus ring, on keyboard focus
   // only — so the ring is asserted after a real Tab, not a programmatic focus.
-  await currentSnapshot.getByRole("button", { name: /Arm save|Apply save/ }).focus();
-  await page.keyboard.press("Shift+Tab");
-  const recallBox = await recallSurface.boundingBox();
-  expect(recallBox?.width ?? 0).toBeGreaterThan(40);
-  expect(recallBox?.height ?? 0).toBeGreaterThan(40);
-  expect(await recallSurface.evaluate((node) => getComputedStyle(node).outlineStyle)).not.toBe("none");
-  await recallSurface.click();
-  await expect(currentSnapshot).toHaveAttribute("data-armed", "true");
-  await expect(recallSurface).toHaveAttribute("data-armed", "true");
+  await page.getByTestId("audio-snapshot-load-1").focus();
+  await page.keyboard.press("Tab");
+  await expect(interviewKey).toBeFocused();
+  const keyBox = await interviewKey.boundingBox();
+  expect(keyBox?.width ?? 0).toBeGreaterThan(40);
+  expect(keyBox?.height ?? 0).toBeGreaterThan(40);
+  expect(await interviewKey.evaluate((node) => getComputedStyle(node).outlineStyle)).not.toBe("none");
+
+  // The first press arms: LOAD? on the key, the armed row in the state display.
+  // The state line gives way to the tag, so neither the key nor the panel
+  // moves (finding C1).
+  const keyAtRest = await readRequiredBox(page, "audio-snapshot-load-2");
+  const deckAtRest = await readRequiredBox(page, "audio-snapshot-deck");
+  await interviewKey.click();
+  await expect(interviewTile).toHaveAttribute("data-armed", "true");
+  await expect(interviewKey).toContainText("LOAD?");
+  const keyArmed = await readRequiredBox(page, "audio-snapshot-load-2");
+  const deckArmed = await readRequiredBox(page, "audio-snapshot-deck");
+  expect(Math.abs(keyArmed.height - keyAtRest.height), "the armed key keeps its height").toBeLessThanOrEqual(0.5);
+  expect(Math.abs(keyArmed.top - keyAtRest.top), "the armed key stays put").toBeLessThanOrEqual(0.5);
+  expect(Math.abs(deckArmed.height - deckAtRest.height), "the panel keeps its height").toBeLessThanOrEqual(0.5);
+  await expect(interviewKey).toHaveAttribute("aria-label", "Confirm load of Interview in TotalMix");
+  await expect(page.getByTestId("audio-state-display")).toContainText("Load Interview · press again to apply");
   await page.keyboard.press("Escape");
-  await expect(recallSurface).not.toHaveAttribute("data-armed", "true");
+  await expect(interviewTile).toHaveAttribute("data-armed", "false");
+  await expect(page.getByTestId("audio-state-display")).not.toContainText("press again to apply");
 
-  await capturedSlot.hover();
-  await capturedSlot.getByRole("button", { name: /Rename/ }).click();
-  const renameSnapshotDialog = page.getByRole("dialog", { name: "Rename snapshot" });
-  await expect(renameSnapshotDialog).toBeVisible();
-  await renameSnapshotDialog.getByLabel("Snapshot name").fill("Renamed snapshot");
-  await renameSnapshotDialog.getByRole("button", { name: "Rename" }).click();
-  await expect(capturedSlot).toContainText("Renamed snapshot");
-
-  await capturedSlot.hover();
-  await capturedSlot.getByRole("button", { name: /Delete/ }).click();
-  const deleteSnapshotDialog = page.getByRole("dialog", { name: "Delete snapshot" });
-  await expect(deleteSnapshotDialog).toBeVisible();
-  await deleteSnapshotDialog.getByRole("button", { name: "Delete" }).click();
-  await expect(page.getByTestId("audio-snapshot-empty-6")).toContainText("Empty");
+  await loadAudioSnapshot(page, 2);
+  await expect(interviewTile).toHaveAttribute("data-current", "true");
+  await expect(page.getByTestId("audio-snapshot-state-2")).toHaveText("active");
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("–");
+  expect(
+    await page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot.load"] ?? 0),
+    "one load for two presses"
+  ).toBe(1);
   await expect
     .poll(() => page.evaluate(() => window.__SSE_TEST_NATIVE_DIALOG_COUNTS__))
     .toEqual({
@@ -778,24 +777,9 @@ test("audio-no-send fixture marks FX playback as not feeding main", async ({ pag
   await expect(page.getByTestId("audio-routing-overlay")).toHaveCount(0);
 });
 
-test("shows numeric snapshot before and after preview text", async ({ page }) => {
-  await openFixture(page, "audio-populated");
-
-  const currentSnapshot = page.getByTestId("audio-snapshot-snapshot-show-open");
-  await saveAudioSnapshot(page, "snapshot-show-open");
-
-  await page.getByRole("slider", { name: "FX 3/4 send level" }).focus();
-  await page.keyboard.press("Enter");
-  const faderDialog = page.getByRole("dialog", { name: /Set FX 3\/4 send level/i });
-  await expect(faderDialog).toBeVisible();
-  await faderDialog.getByLabel("Fader level").fill("-65"); // off on RME's curve (2026-09 audit Slice 5)
-  // "Set value" by its whole name: "Reset to 0 dB" matches "Set" too (S3, decision 8).
-  await faderDialog.getByRole("button", { name: "Set value" }).click();
-
-  await currentSnapshot.hover();
-  await expect(currentSnapshot.getByText("FX 3/4")).toBeVisible();
-  await expect(currentSnapshot.getByText(/-∞ dB -> [+-]?\d+\.\d dB|[+-]?\d+\.\d dB -> [+-]?\d+\.\d dB/)).toBeVisible();
-});
+// 2026-10-01: "shows numeric snapshot before and after preview text" went with
+// the app's own snapshots. The app keeps none of a TotalMix snapshot's
+// contents, so a slot has no before and after to show.
 
 test("supports engine-backed audio EQ editing", async ({ page }) => {
   test.slow();
@@ -959,47 +943,30 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
 // shortcut overlay parity" went with the palette and the shortcut guide. Every
 // command it listed has an on-screen control (the inventory, section 3).
 
-test("snapshot recall reports the push and lists 48V differences without touching them", async ({ page }) => {
-  // 2026-09 audit remediation, Slice 4: a recall pushes the snapshot to the
-  // desk and reports what the console confirmed; 48V is never pushed and each
-  // difference gets its own armed confirm in the report band.
+// 2026-10-01. Old: "snapshot recall reports the push and lists 48V
+// differences without touching them": a recall pushed the app's own snapshot
+// and its band listed each 48 V difference with an Arm key. New: a load is
+// TotalMix's, the band says what the read-back brought, and it has nothing to
+// arm. Reason: 48 V does not switch with a TotalMix snapshot. The band for a
+// read-back that failed after the load went out (the reply's own sentence) is
+// covered by audioLoadReport.test.ts: the simulated console always reads back.
+test("a TotalMix snapshot load reports the read-back and leaves 48 V alone", async ({ page }) => {
   await openFixture(page, "audio-populated");
-  const hostStrip = page.getByTestId("audio-strip-audio-input-9");
-  // Visual overhaul A, Slice 4b. Old: the strip printed a read-only "48V"
-  // badge. New: 48 V is a hazard key on the strip that lights when it is on.
-  // Reason: the one control that can damage a source is on the strip, armed,
-  // where the operator can see and change it. What this test checks is
-  // unchanged: a recall lists the 48 V difference and never pushes it.
-  const hostPhantom = hostStrip.getByTestId("audio-lane-phantom-audio-input-9");
+  const hostPhantom = page.getByTestId("audio-lane-phantom-audio-input-9");
   await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
-  // New pages program, Slice 3 (D6). Old: Shift+3 armed, Shift+3 again
-  // recalled. New: snapshot key 3 is pressed twice. Reason: the Console binds
-  // no key; the snapshot key is the recall's on-screen control.
-  const interviewRecall = page.getByTestId("audio-snapshot-recall-snapshot-interview-block");
-  await interviewRecall.click();
-  await expect(page.getByTestId("audio-snapshot-snapshot-interview-block")).toHaveAttribute("data-armed", "true");
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
-  await interviewRecall.click();
-
-  const report = page.getByTestId("audio-recall-report");
+  await loadAudioSnapshot(page, 2);
+  const report = page.getByTestId("audio-load-report");
   await expect(report).toBeVisible();
-  await expect(report).toContainText("Recalled Interview block");
-  await expect(report).toContainText("values pushed");
-  await expect(report).toContainText("48 V differs on Host (snapshot off, desk on)");
-  // The 48 V key did not move: the recall listed it instead of pushing it.
+  await expect(report).toHaveAttribute("data-tone", "ok");
+  await expect(report).toContainText("Loaded Interview in TotalMix");
+  // The simulated console reads nothing back: the band says so in the hardware
+  // link's own words.
+  await expect(report).toContainText("on the simulated console; nothing was sent (test mode).");
+  await expect(report.getByRole("button")).toHaveCount(1);
   await expect(hostPhantom).toHaveAttribute("aria-pressed", "true");
 
-  const arm = page.getByTestId("audio-recall-arm-phantom-audio-input-9");
-  await expect(arm).toHaveText(/Arm 48 V off/);
-  await arm.click();
-  await expect(arm).toHaveAttribute("data-armed", "true");
-  await expect(arm).toHaveText(/Confirm 48 V off/);
-  await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50);
-  await arm.click();
-  await expect(hostStrip.getByText("48V", { exact: true })).toHaveCount(0);
-
-  await page.getByTestId("audio-recall-report-dismiss").click();
+  await page.getByTestId("audio-load-report-dismiss").click();
   await expect(report).toHaveCount(0);
 });
 
@@ -1203,7 +1170,7 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
     1,
     "the plate's preamp knob"
   );
-  await expectSnapshotActionsDoNotOverlapContent(page, "snapshot-show-open");
+  await expectSnapshotSlotsHoldTheirWords(page);
   await expectAudioInspectorPanelsFit(page);
 
   await page.getByTestId("audio-output-audio-mix-phones-a").click();

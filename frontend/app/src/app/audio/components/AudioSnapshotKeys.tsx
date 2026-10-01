@@ -1,19 +1,21 @@
-import { Pencil, Plus, Save, Trash2 } from "lucide-react";
-import { ArmKey, Key, Section } from "@sse/design-system";
+import { ArmKey, Section } from "@sse/design-system";
 
 import styles from "./AudioSnapshotKeys.module.css";
+import { audioSnapshotLoadKey } from "../audioArming";
 import { AUDIO_ARM_TIMEOUT_MS } from "../audioConstants";
-import { formatAudioDb, formatAudioRecallTime } from "../audioFormatting";
-import { SNAPSHOT_PLACEHOLDER_LEVELS, snapshotPreviewDiffs, snapshotThumbLevels } from "../audioSnapshotPreview";
-import type { AudioChannelEntry, AudioMixTargetEntry, AudioSnapshotEntry } from "../../shellData";
+import type { AudioConsoleSnapshotEntry } from "../../shellData";
 
 // Visual overhaul A, Slice 4: the eight snapshot slots as arm-then-apply keys
 // in the cluster. One press arms and the key itself carries the tag and the
-// countdown; a second press applies (the Console's dwell and window). The
-// slot keeps the mix-shape thumbnail, the "what changes if you load this"
-// preview and the save / rename / delete keys the retired deck carried.
+// countdown; a second press applies (the Console's dwell and window).
+// 2026-10-01 (the owner's decision, after the studio walk): the slots are
+// TotalMix's own eight, under the names TotalMix saved. The app keeps no
+// snapshots, so nothing here captures, saves, renames or deletes one, and no
+// key previews what a load would change: a press twice loads the slot in
+// TotalMix, and the card says what TotalMix reports of it.
 
 export interface AudioSnapshotKeysProps {
+  /** `capabilities.canRecallConsoleSnapshot`: a load is a console write. */
   actionsAllowed: boolean;
   /**
    * Why the slots are locked, in the desk's own words. Slice 8 (system §9):
@@ -22,16 +24,16 @@ export interface AudioSnapshotKeysProps {
   lockedReason?: string;
   armedActionKey: string | null;
   busyAction: string | null;
-  channels: readonly AudioChannelEntry[];
-  mixTargets: readonly AudioMixTargetEntry[];
-  onCaptureSnapshot: () => void;
-  onDeleteSnapshot: (snapshotId: string, snapshotName: string) => void;
-  onRecallSnapshot: (snapshotId: string) => void;
-  onRenameSnapshot: (snapshotId: string, snapshotName: string) => void;
-  onSaveSnapshot: (snapshotId: string) => void;
-  recentlyRecalledSnapshotId: string | null;
-  selectedMixTargetId: string | null;
-  snapshots: readonly AudioSnapshotEntry[];
+  onLoadSnapshot: (slot: number) => void;
+  slots: readonly AudioConsoleSnapshotEntry[];
+  /** Where the names come from; nothing under the grid when null. */
+  source: string | null;
+}
+
+// What the card says of a slot: TotalMix's own word while it holds the slot's
+// mix, a dash while it does not or has not said.
+function slotStateWord(state: AudioConsoleSnapshotEntry["state"]) {
+  return state === "active" || state === "changed" ? state : "–";
 }
 
 export function AudioSnapshotKeys({
@@ -39,199 +41,70 @@ export function AudioSnapshotKeys({
   lockedReason,
   armedActionKey,
   busyAction,
-  channels,
-  mixTargets,
-  onCaptureSnapshot,
-  onDeleteSnapshot,
-  onRecallSnapshot,
-  onRenameSnapshot,
-  onSaveSnapshot,
-  recentlyRecalledSnapshotId,
-  selectedMixTargetId,
-  snapshots,
+  onLoadSnapshot,
+  slots,
+  source,
 }: AudioSnapshotKeysProps) {
-  const slots = Array.from({ length: 8 }, (_, index) => snapshots.find((entry) => entry.oscIndex === index) ?? null);
-  const currentSnapshot = snapshots.find((entry) => entry.lastRecalled) ?? null;
-
   return (
-    <Section
-      title="Snapshots"
-      className={styles.deck}
-      testId="audio-snapshot-deck"
-      actions={
-        <Key
-          size="small"
-          testId="audio-snapshot-capture"
-          aria-label="Capture new snapshot"
-          disabled={!actionsAllowed || busyAction === "audio-snapshot-capture"}
-          onClick={onCaptureSnapshot}
-          title={
-            actionsAllowed
-              ? "Capture the current mix into the first empty slot"
-              : (lockedReason ?? "Snapshot capture is locked.")
-          }
-        >
-          <Plus size={13} strokeWidth={2} aria-hidden="true" />
-          Capture
-        </Key>
-      }
-    >
-      <span className={styles.visuallyHidden} data-testid="audio-toolbar-current-snapshot">
-        {currentSnapshot ? `Recalled ${currentSnapshot.name}` : "No recall yet"}
-      </span>
+    <Section title="Snapshots" detail="in TotalMix" className={styles.deck} testId="audio-snapshot-deck">
       <div className={styles.grid}>
-        {slots.map((snapshot, index) => {
-          if (!snapshot) {
-            return (
-              <div
-                key={`empty-${index}`}
-                className={styles.empty}
-                data-slot-state="empty"
-                data-snapshot-slot={index + 1}
-                data-testid={`audio-snapshot-empty-${index + 1}`}
-              >
-                <span className={styles.emptySlot}>{index + 1}</span>
-                <span className={styles.emptyWord}>Empty</span>
-              </div>
-            );
-          }
-          const recallArmed = armedActionKey === `snapshot-recall:${snapshot.id}`;
-          const saveArmed = armedActionKey === `snapshot-save:${snapshot.id}`;
-          const hasContents = snapshot.preview.hasContents;
-          const thumbLevels = snapshotThumbLevels(snapshot, selectedMixTargetId);
-          const previewDiffs = snapshotPreviewDiffs({ channels, mixTargets, selectedMixTargetId, snapshot });
-          const recallTime = formatAudioRecallTime(snapshot.lastRecalledAt);
+        {slots.map((entry) => {
+          const armed = armedActionKey === audioSnapshotLoadKey(entry.slot);
+          const current = entry.state === "active" || entry.state === "changed";
           return (
             <div
-              key={snapshot.id}
+              key={entry.slot}
               className={styles.slot}
-              data-armed={recallArmed}
-              data-current={snapshot.lastRecalled}
-              data-flash={recentlyRecalledSnapshotId === snapshot.id}
-              data-slot-state="populated"
-              data-snapshot-slot={index + 1}
-              data-testid={`audio-snapshot-${snapshot.id}`}
+              data-armed={armed}
+              data-current={current}
+              data-slot-state={entry.state}
+              data-snapshot-slot={entry.slot}
+              data-testid={`audio-snapshot-slot-${entry.slot}`}
             >
               <ArmKey
-                armed={recallArmed}
+                armed={armed}
+                armedWord="LOAD?"
                 timeoutMs={AUDIO_ARM_TIMEOUT_MS}
-                cap={String(index + 1)}
+                cap={String(entry.slot)}
                 className={styles.slotKey}
                 locked={!actionsAllowed}
                 reason={actionsAllowed ? undefined : (lockedReason ?? "The snapshot slots are locked.")}
                 take
-                testId={`audio-snapshot-recall-${snapshot.id}`}
-                aria-label={`${recallArmed ? "Apply recall" : "Arm recall"} ${snapshot.name}`}
-                disabled={busyAction === `audio-snapshot-${snapshot.id}`}
-                onClick={() => onRecallSnapshot(snapshot.id)}
+                testId={`audio-snapshot-load-${entry.slot}`}
+                aria-label={armed ? `Confirm load of ${entry.name} in TotalMix` : `Load ${entry.name} in TotalMix`}
+                title="Press twice to load in TotalMix"
+                disabled={busyAction === `audio-snapshot-load-${entry.slot}`}
+                onClick={() => onLoadSnapshot(entry.slot)}
               >
                 {/* The key's label is one column: the name on its own line so it
-                    is readable at a glance, the mix-shape thumbnail under it,
-                    then when the slot was last recalled. */}
+                    is readable at a glance, then what TotalMix reports of the
+                    slot. Armed, the state line gives way to the LOAD? tag
+                    before the name, and the key's fixed height keeps it the
+                    same size. */}
                 <span className={styles.slotBody}>
-                  <span className={styles.slotName} data-testid={`audio-snapshot-name-${snapshot.id}`}>
-                    {snapshot.name}
+                  <span className={styles.slotName} data-testid={`audio-snapshot-name-${entry.slot}`}>
+                    {entry.name}
                   </span>
-                  <span
-                    className={styles.slotThumb}
-                    data-has-contents={hasContents}
-                    data-testid={`audio-snapshot-thumb-${snapshot.id}`}
-                    title={hasContents ? "Captured mix-shape thumbnail" : "No captured contents"}
-                  >
-                    {(thumbLevels ?? SNAPSHOT_PLACEHOLDER_LEVELS).map((level, barIndex) => (
-                      <i
-                        key={`${snapshot.id}-thumb-${barIndex}`}
-                        style={{ height: `${Math.max(6, Math.round(level * 100))}%` }}
-                      />
-                    ))}
-                  </span>
-                  <span className={styles.slotMeta} data-testid={`audio-snapshot-meta-${snapshot.id}`}>
-                    {recallTime
-                      ? snapshot.lastRecalled
-                        ? `current · ${recallTime}`
-                        : `recalled ${recallTime}`
-                      : "not recalled yet"}
-                  </span>
+                  {armed ? null : (
+                    <span
+                      className={styles.slotState}
+                      data-state={entry.state}
+                      data-testid={`audio-snapshot-state-${entry.slot}`}
+                    >
+                      {slotStateWord(entry.state)}
+                    </span>
+                  )}
                 </span>
               </ArmKey>
-
-              {/* What this slot holds against the mix on the desk right now —
-                  the deck's preview, kept on the key. */}
-              <span className={styles.slotPreview} data-level="float" data-material="plate">
-                <strong>{snapshot.lastRecalled ? "Currently loaded" : "If you load this"}</strong>
-                {snapshot.lastRecalled ? null : (
-                  <small>
-                    {hasContents
-                      ? `${snapshot.preview.changedChannels.length + snapshot.preview.changedMixTargets.length} changes`
-                      : "TotalMix slot recall"}
-                  </small>
-                )}
-                <small>
-                  {hasContents
-                    ? `${snapshot.preview.channelCount} sources saved`
-                    : snapshot.lastRecalled
-                      ? "TotalMix slot only"
-                      : "No captured contents"}
-                </small>
-                {hasContents ? (
-                  previewDiffs.total > 0 ? (
-                    <>
-                      {previewDiffs.shown.map((diff) => (
-                        <small className={styles.slotPreviewLine} key={`${snapshot.id}-${diff.label}`}>
-                          <span>{diff.label}</span>
-                          <strong>
-                            {formatAudioDb(diff.before)} -&gt; {formatAudioDb(diff.after)}
-                          </strong>
-                        </small>
-                      ))}
-                      {previewDiffs.total > previewDiffs.shown.length ? (
-                        <small
-                          className={styles.slotPreviewOverflow}
-                          data-testid={`audio-snapshot-diff-overflow-${snapshot.id}`}
-                        >
-                          +{previewDiffs.total - previewDiffs.shown.length} more changes
-                        </small>
-                      ) : null}
-                    </>
-                  ) : (
-                    <small>No change from the current mix</small>
-                  )
-                ) : null}
-                <span className={styles.slotActions} data-testid={`audio-snapshot-actions-${snapshot.id}`}>
-                  <Key
-                    size="small"
-                    className={styles.slotAction}
-                    data-armed={saveArmed ? "true" : "false"}
-                    disabled={!actionsAllowed || busyAction === `audio-snapshot-save-${snapshot.id}`}
-                    aria-label={`${saveArmed ? "Apply save" : "Arm save"} ${snapshot.name}`}
-                    onClick={() => onSaveSnapshot(snapshot.id)}
-                  >
-                    <Save size={13} strokeWidth={1.8} aria-hidden="true" />
-                  </Key>
-                  <Key
-                    size="small"
-                    className={styles.slotAction}
-                    disabled={!actionsAllowed || busyAction === `audio-snapshot-rename-${snapshot.id}`}
-                    aria-label={`Rename ${snapshot.name}`}
-                    onClick={() => onRenameSnapshot(snapshot.id, snapshot.name)}
-                  >
-                    <Pencil size={13} strokeWidth={1.8} aria-hidden="true" />
-                  </Key>
-                  <Key
-                    size="small"
-                    className={styles.slotAction}
-                    disabled={!actionsAllowed || busyAction === `audio-snapshot-delete-${snapshot.id}`}
-                    aria-label={`Delete ${snapshot.name}`}
-                    onClick={() => onDeleteSnapshot(snapshot.id, snapshot.name)}
-                  >
-                    <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" />
-                  </Key>
-                </span>
-              </span>
             </div>
           );
         })}
       </div>
+      {source ? (
+        <span className={styles.source} data-testid="audio-snapshot-source">
+          {source}
+        </span>
+      ) : null}
     </Section>
   );
 }

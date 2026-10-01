@@ -2,14 +2,14 @@ import type { AudioSnapshot } from "@sse/engine-client";
 
 import {
   getAudioChannels,
+  getAudioConsoleSnapshots,
   getAudioMixTargets,
-  getAudioSnapshots,
   type AudioChannelEntry,
+  type AudioConsoleSnapshotEntry,
   type AudioMixTargetEntry,
-  type AudioSnapshotEntry,
   type SnapshotRecord,
 } from "../shellData";
-import { describeAudioStatus, formatMeterDb } from "./audioFormatting";
+import { describeAudioStatus, formatAudioDayTime, formatMeterDb } from "./audioFormatting";
 
 export type AudioTierId = "hardware-inputs" | "software-playback" | "hardware-outputs";
 export type AudioGroupTierId = Extract<AudioTierId, "hardware-inputs" | "software-playback">;
@@ -61,6 +61,10 @@ export interface AudioWorkspaceViewModel {
   channels: AudioChannelEntry[];
   clampedBankIndex: number;
   clippedChannels: AudioChannelEntry[];
+  /** TotalMix's eight snapshots, slot 1 first (2026-10-01). */
+  consoleSnapshots: AudioConsoleSnapshotEntry[];
+  /** Where the slots' names come from, for the line under them; null when there is nothing to say. */
+  consoleSnapshotSource: string | null;
   fadersPerBank: number;
   feedingChannelIds: string[];
   footerTelemetry: {
@@ -92,11 +96,9 @@ export interface AudioWorkspaceViewModel {
   selectedSourceLabel: string;
   selectedSourceMeta: string;
   selectedSourceTier: "inputs" | "playback" | "outputs" | "none";
-  selectedSnapshot: AudioSnapshotEntry | null;
   silentChannelIds: string[];
   soloedChannel: AudioChannelEntry | null;
   soloedChannels: AudioChannelEntry[];
-  snapshots: AudioSnapshotEntry[];
   softwarePlayback: AudioTierViewModel;
   softwarePlaybackBankSize: number;
   hardwareOutputs: AudioOutputTierViewModel;
@@ -110,7 +112,6 @@ export interface AudioWorkspaceViewModel {
     masterView: boolean;
     pfl: boolean;
     prePostSend: boolean;
-    snapshotCapture: boolean;
     soloSend: boolean;
   };
   visibleStripCount: number;
@@ -196,23 +197,25 @@ export function getChannelTierId(channel: AudioChannelEntry): AudioTierId {
   return channel.role === "playback-pair" ? "software-playback" : "hardware-inputs";
 }
 
+// A strip's group by the channel it is, not by its name (2026-10-01): the
+// names are TotalMix's now, two strips may share one, and a rename in TotalMix
+// must not move a strip to another chip. The groups are the studio's patch, as
+// the hardware link's own channel names said them: rear inputs 3 and 4 the
+// remotes, playback 1/2 and 7/8 the bed (programme and music), 3/4 the
+// effects, and the other playback pairs (N-1 and the spares) remote.
+const AUDIO_CHANNEL_GROUPS_BY_ID: Readonly<Record<string, AudioChannelGroup>> = {
+  "audio-input-3": "remote",
+  "audio-input-4": "remote",
+  "audio-playback-1-2": "bed",
+  "audio-playback-3-4": "fx",
+  "audio-playback-7-8": "bed",
+};
+
 export function getAudioChannelGroup(channel: AudioChannelEntry): AudioChannelGroup {
   if (channel.role === "front-preamp") {
     return "talent";
   }
-
-  if (channel.role !== "playback-pair") {
-    return channel.name.toLowerCase().includes("remote") ? "remote" : "line";
-  }
-
-  const channelLabel = `${channel.name} ${channel.shortName}`.toLowerCase();
-  if (channelLabel.includes("fx")) {
-    return "fx";
-  }
-  if (channelLabel.includes("program") || channelLabel.includes("music")) {
-    return "bed";
-  }
-  return "remote";
+  return AUDIO_CHANNEL_GROUPS_BY_ID[channel.id] ?? (channel.role === "playback-pair" ? "remote" : "line");
 }
 
 export function selectedChannelSendLevel(channel: AudioChannelEntry | null, mixTargetId: string | null) {
@@ -343,6 +346,17 @@ function activeGroupsForTier(
   return activeChannelGroups[tierId].filter((groupId) => available.has(groupId));
 }
 
+// The line under TotalMix's slots (2026-10-01): when TotalMix last saved the
+// names the slots carry, else the hardware link's sentence on why there are
+// none, else nothing.
+function consoleSnapshotSource(snapshot: AudioSnapshot): string | null {
+  const consoleSnapshots = snapshot.consoleSnapshots;
+  if (consoleSnapshots?.namesSavedAt) {
+    return `Names as TotalMix last saved them · ${formatAudioDayTime(consoleSnapshots.namesSavedAt)}`;
+  }
+  return consoleSnapshots?.namesNote?.trim() || null;
+}
+
 function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities"] {
   return (
     snapshot.capabilities ?? {
@@ -353,7 +367,6 @@ function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities
       canRecallConsoleSnapshot: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canEditProcessing: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canClearClips: snapshot.oscEnabled === true,
-      canCaptureSnapshot: snapshot.oscEnabled === true,
       canUseMasterView: snapshot.oscEnabled === true,
     }
   );
@@ -372,7 +385,7 @@ export function buildAudioViewModel({
 }): AudioWorkspaceViewModel {
   const channels = getAudioChannels(audioSnapshot);
   const mixTargets = getAudioMixTargets(audioSnapshot);
-  const snapshots = getAudioSnapshots(audioSnapshot);
+  const consoleSnapshots = getAudioConsoleSnapshots(audioSnapshot);
   const status = describeAudioStatus(audioSnapshot);
   const capabilities = audioCapabilities(audioSnapshot);
   const viewMode = audioSnapshot.viewMode === "master" ? "master" : "submix";
@@ -409,10 +422,6 @@ export function buildAudioViewModel({
   );
   const clampedBankIndex = Math.min(Math.max(0, bankIndex), totalBanks - 1);
   const bankStart = clampedBankIndex * hardwareInputBankSize;
-  const selectedSnapshot =
-    snapshots.find((entry) => entry.id === audioSnapshot.lastRecalledSnapshotId) ??
-    snapshots.find((entry) => entry.lastRecalled) ??
-    null;
   const feedingChannelIds = channels
     .filter((entry) => isChannelFeedingMixTarget(entry, selectedMixTargetId))
     .map((entry) => entry.id);
@@ -512,6 +521,8 @@ export function buildAudioViewModel({
     channels,
     clampedBankIndex,
     clippedChannels,
+    consoleSnapshots,
+    consoleSnapshotSource: consoleSnapshotSource(audioSnapshot),
     fadersPerBank,
     feedingChannelIds,
     footerTelemetry: {
@@ -556,11 +567,9 @@ export function buildAudioViewModel({
     selectedSourceLabel: selectedChannel?.name ?? selectedMixTarget?.name ?? "No source",
     selectedSourceMeta: selectedSourceMeta(selectedChannel, selectedMixTarget, selectedMixTargetId),
     selectedSourceTier: selectedTier,
-    selectedSnapshot,
     silentChannelIds,
     soloedChannel,
     soloedChannels,
-    snapshots,
     softwarePlayback,
     softwarePlaybackBankSize,
     sourceTiers: [hardwareInputs, softwarePlayback],
@@ -573,7 +582,6 @@ export function buildAudioViewModel({
       masterView: !capabilities.canUseMasterView,
       pfl: true,
       prePostSend: false,
-      snapshotCapture: !capabilities.canCaptureSnapshot,
       soloSend: false,
     },
     visibleStripCount,

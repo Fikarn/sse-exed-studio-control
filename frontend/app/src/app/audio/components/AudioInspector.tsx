@@ -39,7 +39,6 @@ export function AudioInspector({
   commitMixTargetContinuous,
   draftStore,
   getDraftValue,
-  onRenameChannel,
   onResetPeakHolds,
   onSelectMixTarget,
   onTogglePeakHold,
@@ -62,7 +61,6 @@ export function AudioInspector({
   commitMixTargetContinuous: (request: AudioMixTargetUpdate) => void;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
-  onRenameChannel: (channelId: string) => void;
   onResetPeakHolds: () => void;
   onSelectMixTarget: (mixTargetId: string) => void;
   onTogglePeakHold: () => void;
@@ -167,11 +165,8 @@ export function AudioInspector({
                 viewModel={viewModel}
               />
             }
-            action={
-              <Key size="small" testId="audio-plate-rename" onClick={() => onRenameChannel(selectedChannel.id)}>
-                Rename
-              </Key>
-            }
+            // No Rename key (2026-10-01): the strips take TotalMix's names, and
+            // a channel is renamed in TotalMix.
             testId="audio-plate-head"
           />
 

@@ -75,11 +75,11 @@ describe("useAudioArming dwell", () => {
     trigger();
     act(() =>
       hook.result.current.armOrApplyAction(
-        { ...candidate, key: "snapshot-recall:one", label: "Recall one", targetKind: "snapshot-recall" },
+        { ...candidate, key: "snapshot-load:1", label: "Load Mix 1 in TotalMix", targetKind: "snapshot-load" },
         apply
       )
     );
-    expect(hook.result.current.armedAction?.key).toBe("snapshot-recall:one");
+    expect(hook.result.current.armedAction?.key).toBe("snapshot-load:1");
     expect(apply).not.toHaveBeenCalled();
 
     advance(AUDIO_ARM_TIMEOUT_MS + 10);

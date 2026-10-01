@@ -11,16 +11,16 @@
  * the engine source.
  */
 
-// Why: arm-then-apply safety window for 48V, snapshot recall and snapshot
-// overwrite. After this window the armed candidate clears and the operator
-// must arm again.
+// Why: arm-then-apply safety window for 48V and a TotalMix snapshot load.
+// After this window the armed candidate clears and the operator must arm
+// again.
 // Source: previously inline at AudioWorkspace.tsx:103.
 export const AUDIO_ARM_TIMEOUT_MS = 4500;
 
 // Why: arm-then-apply minimum dwell. A second activation of the same armed
 // key inside this window is ignored and the arm stays, so a double-click or a
-// bounced pointer can never arm and apply a 48V change, a snapshot recall or a
-// snapshot overwrite in one motion. 350 ms is past any double-click interval
+// bounced pointer can never arm and apply a 48V change or a snapshot load in
+// one motion. 350 ms is past any double-click interval
 // and well inside AUDIO_ARM_TIMEOUT_MS. The dwell does not stop a held key: its
 // auto-repeat goes on past it (Windows starts repeating after about 500 ms by
 // default), so `useAudioArming` cancels a held Enter's repeats while something
@@ -36,19 +36,6 @@ export const AUDIO_ARM_MIN_DWELL_MS = 350;
 // only production consumer. Kept because audio-constants.spec.ts pins the
 // value; drop both together if no Console surface reclaims it.
 export const PROTOTYPE_MONITOR_LEVEL_DB = -12;
-
-// Why: snapshot thumbnail mini-meter visualisation density. 12 vertical bars
-// gives a readable preview at compact card sizes without overwhelming the
-// tile.
-// Source: previously inline at AudioSnapshotDeck.tsx:8.
-export const SNAPSHOT_THUMB_BAR_COUNT = 12;
-
-// Why: placeholder normalized levels rendered when a snapshot has no stored
-// thumb data. Hand-tuned to read as "muted recent material", not silence.
-// Source: previously inline at AudioSnapshotDeck.tsx:9.
-export const SNAPSHOT_PLACEHOLDER_LEVELS = [
-  0.26, 0.2, 0.32, 0.18, 0.28, 0.22, 0.3, 0.16, 0.24, 0.2, 0.28, 0.18,
-] as const;
 
 // Why: peak-hold duration aligned with the engine's `CONSOLE_PEAK_HOLD_MS`
 // in native/rust-engine/src/rme_totalmix_osc.rs:33 (1500 ms) and with IEC PPM
@@ -118,9 +105,3 @@ export const PREAMP_ROTATION_RANGE_DEG = 250;
 // negated so the knob centres on 0 dB at the asset's pointing-up midpoint.
 // Source: previously inline at AudioPreampControl.tsx:164.
 export const PREAMP_ROTATION_ORIGIN_DEG = -125;
-
-// Why: visual pulse duration applied to a snapshot tile after the engine
-// confirms a recall. Long enough for the operator to register the flash, short
-// enough that it doesn't overlap a subsequent recall.
-// Source: previously inline at AudioWorkspace.tsx:208.
-export const AUDIO_RECALL_PULSE_MS = 1500;

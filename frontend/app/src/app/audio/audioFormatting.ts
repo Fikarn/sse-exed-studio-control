@@ -179,13 +179,18 @@ export function meterFill(value: number) {
   return dbfsToMeterPercent(normalizedToDbfs(value)) / 100;
 }
 
-// A snapshot slot says when it was last recalled, and the desk reads the clock,
-// not the calendar — the tile is one line wide.
-export function formatAudioRecallTime(value: string | number | null | undefined) {
-  if (value === null || value === undefined || value === "") return null;
+// The day and the time, in the Console's date style without the year
+// (`formatAudioTimestamp`'s): when TotalMix last saved its snapshot names
+// (2026-10-01). The text as sent when it is not a time.
+export function formatAudioDayTime(value: string) {
   const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return String(value);
-  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(parsed);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+  }).format(parsed);
 }
 
 // Visual overhaul A, Slice 4b: what a locked bay says on each tier header —
@@ -321,7 +326,7 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
       warningBody:
-        "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting faders or recall.",
+        "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting the faders.",
       warningCode: null,
       warningTitle: "STATE ASSUMED",
     };
