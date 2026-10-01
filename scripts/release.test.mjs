@@ -10,6 +10,7 @@ import {
   BUILD_FILES,
   BUILD_RECORD_FILE,
   buildEnv,
+  buildMarkOf,
   buildName,
   buildsRoot,
   changedFilesOf,
@@ -23,6 +24,7 @@ import {
   releaseRefusal,
   schemaVersionOf,
   SHELL_FILE,
+  studioMarkOf,
   trialEnv,
   trialProblem,
   writeBuildRecord,
@@ -203,6 +205,31 @@ test("the trial start is read: the default folder, the engine beside the shell, 
   assert.match(trialProblem({ ...good, studioBuild: null }, expected), /built from no commit/);
 });
 
+test("a program's build mark is read as the engine reads it", () => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), "sse-release-test-"));
+  try {
+    const program = path.join(folder, "program.exe");
+    const studio = studioMarkOf(COMMIT);
+    const other = studioMarkOf("f".repeat(40));
+    const development = `studio-control-build:v1:D:${"-".repeat(40)}`;
+    assert.equal(studio, `studio-control-build:v1:S:${COMMIT}`);
+    const cases = [
+      ["the commit's mark, twice", `MZ\0${studio}\0junk\xff${studio}`, studio],
+      ["a development build's", `MZ${development}`, development],
+      ["no mark", "MZ\0studio control's strings", null],
+      // A stretch that begins like a mark and is not one is passed over.
+      ["a broken mark beside one", `studio-control-build:v1:S:${COMMIT.toUpperCase()} ${studio}`, studio],
+      ["two marks that differ", `${studio}\0${other}`, "conflicting"],
+    ];
+    for (const [what, bytes, mark] of cases) {
+      writeFileSync(program, Buffer.from(bytes, "latin1"));
+      assert.equal(buildMarkOf(program), mark, what);
+    }
+  } finally {
+    rmSync(folder, { force: true, recursive: true });
+  }
+});
+
 test("a build's record describes its folder, and a changed file is found", () => {
   const builds = mkdtempSync(path.join(os.tmpdir(), "sse-release-test-"));
   try {
@@ -260,6 +287,16 @@ test("a build's record describes its folder, and a changed file is found", () =>
       writeFileSync(recordPath, JSON.stringify({ ...written, files: { ...written.files, [elsewhere]: "0" } }));
       assert.throws(() => readBuildRecord(folder), /which is not a file of the folder/, elsewhere);
     }
+    // The helper and the library go together: one without the other is refused.
+    const { [NDI_LIBRARY_FILE]: _library, ...withoutLibrary } = written.files;
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutLibrary }));
+    rmSync(path.join(folder, NDI_LIBRARY_FILE));
+    assert.throws(() => readBuildRecord(folder), /the pictures helper without NDI's library/);
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutHelper }));
+    rmSync(path.join(folder, PICTURES_FILE));
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
+    assert.throws(() => readBuildRecord(folder), /NDI's library without the pictures helper/);
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
     writeFileSync(recordPath, JSON.stringify(written));
     assert.deepEqual(readBuildRecord(folder), written);
 

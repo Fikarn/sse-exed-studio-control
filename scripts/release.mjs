@@ -228,6 +228,25 @@ export function writeBuildRecord(folder, name, facts, now = new Date()) {
   return record;
 }
 
+/**
+ * The build mark the program at `file` carries, as the engine reads it before it starts the
+ * pictures helper (`build_marked_in`, native/protocol/rust/src/development.rs): the one
+ * well-formed mark, `null` when it carries none, `"conflicting"` when its marks differ.
+ */
+export function buildMarkOf(file) {
+  const marks = new Set(
+    readFileSync(file)
+      .toString("latin1")
+      .match(/studio-control-build:v1:(?:D:-{40}|S:[0-9a-f]{40})/g) ?? []
+  );
+  return marks.size > 1 ? "conflicting" : ([...marks][0] ?? null);
+}
+
+/** The mark of a studio build of `commit`. */
+export function studioMarkOf(commit) {
+  return `studio-control-build:v1:S:${commit}`;
+}
+
 /** The build's record when the folder is the build it describes; throws with the reason when not. */
 export function readBuildRecord(folder) {
   const recordPath = path.join(folder, BUILD_RECORD_FILE);
@@ -245,6 +264,15 @@ export function readBuildRecord(folder) {
     if (file !== path.win32.basename(file) || file !== path.posix.basename(file) || file === "." || file === "..") {
       throw new Error(`${recordPath} names ${JSON.stringify(file)}, which is not a file of the folder.`);
     }
+  }
+  // The pictures helper and NDI's library go together: a build holds both or neither.
+  const [helper, library] = [PICTURES_FILE, NDI_LIBRARY_FILE].map(
+    (file) => file in named || existsSync(path.join(folder, file))
+  );
+  if (helper !== library) {
+    throw new Error(
+      `${folder} holds ${helper ? "the pictures helper without NDI's library" : "NDI's library without the pictures helper"}: a build holds both or neither.`
+    );
   }
   // The shell and the engine always, whatever else the record names; the pictures helper and
   // NDI's library whenever they are in the folder, so that nothing the build runs goes
@@ -435,6 +463,14 @@ async function makeBuild() {
   if (copyRefused) {
     throw new Error(`The copy of NDI's library is not the pinned file: ${copyRefused}`);
   }
+  // The trial start and the lanes run with the simulated cameras and start no helper, so its
+  // mark is read here: the engine starts only a helper of its own build and commit.
+  const helperMark = buildMarkOf(path.join(unfinished, PICTURES_FILE));
+  if (helperMark !== studioMarkOf(before.commit)) {
+    throw new Error(
+      `The pictures helper is not this commit's studio build (its mark: ${helperMark ?? "none"}), so the engine would not start it.`
+    );
+  }
   say();
   say(`Copied to ${unfinished}, with NDI's library ${pin.version}. It gets its name once it has passed.`);
 
@@ -463,6 +499,10 @@ async function makeBuild() {
     ),
     ndiLibrary: pin.version,
   });
+  // The record vouches for the library only as the pinned file, whatever ran meanwhile.
+  if (record.files[NDI_LIBRARY_FILE] !== pin.sha256) {
+    throw new Error(`NDI's library in ${unfinished} is no longer the pinned file. The build was not named.`);
+  }
   // A folder of that name made meanwhile is not replaced: the rename fails.
   renameSync(unfinished, folder);
 
