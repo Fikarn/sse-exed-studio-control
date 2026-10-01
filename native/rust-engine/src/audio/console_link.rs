@@ -194,8 +194,9 @@ fn apply_console_activity_locked(
             applied += 1;
             // A confirmation of the app's own send is the app's action,
             // already recorded where it was asked for, not a change at
-            // TotalMix.
-            if !update.confirms_send {
+            // TotalMix; so is what the desk reports while a load in
+            // TotalMix is under way (the load's own row says it).
+            if !update.confirms_send && !update.during_load {
                 actions.extend(console_update_action(&snapshot, update));
             }
         }
@@ -203,10 +204,16 @@ fn apply_console_activity_locked(
     // A change made at TotalMix that a newer send of the app's replaces is not
     // written (the desk takes the app's value), but it happened: it is a row,
     // measured against what the app now holds.
-    if superseded.iter().any(|update| !update.confirms_send) {
+    if superseded
+        .iter()
+        .any(|update| !update.confirms_send && !update.during_load)
+    {
         let mut replaced_channels = channel_state.clone();
         let mut replaced_targets = mix_target_state.clone();
-        for update in superseded.iter().filter(|update| !update.confirms_send) {
+        for update in superseded
+            .iter()
+            .filter(|update| !update.confirms_send && !update.during_load)
+        {
             if apply_console_update(
                 &snapshot,
                 &mut replaced_channels,

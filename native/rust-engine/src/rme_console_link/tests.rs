@@ -343,6 +343,7 @@ fn readback_reply_with_a_different_value_is_adjusted_and_queued() {
             value: ConsoleValue::Db(44.0),
             adjusted: true,
             confirms_send: false,
+            during_load: false,
         }]
     );
     assert_eq!(link.summary(200).adjusted_sends, 1);

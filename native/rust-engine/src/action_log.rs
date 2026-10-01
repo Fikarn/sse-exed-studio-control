@@ -712,11 +712,14 @@ pub(crate) fn ui_actions(
                 let slot = result.pointer("/slot").and_then(Value::as_i64).unwrap_or(0);
                 format!("slot {slot}")
             });
-            vec![audio(
-                "console-snapshot-loaded",
-                &name,
-                format!("Console mix loaded in TotalMix: {name}"),
-            )]
+            // A load whose read-back failed went out, and nothing confirmed it
+            // (a UDP send is not a confirmation): the row says it was sent.
+            let detail = if text(result, "/consoleStateConfidence") == Some("unknown") {
+                format!("Console mix sent to TotalMix, not read back: {name}")
+            } else {
+                format!("Console mix loaded in TotalMix: {name}")
+            };
+            vec![audio("console-snapshot-loaded", &name, detail)]
         }
         "audio.solo.clearAll" => vec![audio(
             "solo-cleared",

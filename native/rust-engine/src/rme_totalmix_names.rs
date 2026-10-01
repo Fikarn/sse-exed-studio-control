@@ -44,6 +44,8 @@ use crate::storage_backups::civil_from_days;
 
 /// TotalMix's snapshot slots, `/snapshot/load/1` to `/snapshot/load/8`.
 pub const SNAPSHOT_SLOTS: usize = 8;
+/// The longest slot name kept, in characters, as for a channel's name.
+const NAME_LIMIT: usize = 50;
 
 const MEGABYTE: u64 = 1024 * 1024;
 /// The largest settings file read. TotalMix's is about 1.2 MB with one
@@ -178,7 +180,10 @@ fn snapshot_name(element: &BytesStart<'_>) -> Option<(usize, String)> {
         .chars()
         .filter(|character| !character.is_control())
         .collect();
-    let name = name.trim();
+    // Capped as a channel's name is (50 characters): a long or damaged name
+    // would run through every Console read, the key and Recent actions.
+    let name: String = name.trim().chars().take(NAME_LIMIT).collect();
+    let name = name.trim_end();
     (!name.is_empty()).then(|| (slot, name.to_string()))
 }
 

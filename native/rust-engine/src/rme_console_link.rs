@@ -489,6 +489,9 @@ pub struct ConsoleUpdate {
     /// report, so it lands after whatever the desk said about the parameter
     /// before it, but it is the app's own action, not a change at TotalMix.
     pub confirms_send: bool,
+    /// The desk reported it while a load in TotalMix was under way: it is the
+    /// load's, written like any report but not a change made at TotalMix.
+    pub during_load: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -510,7 +513,7 @@ impl ConsoleConnection {
 }
 
 /// TotalMix keeps eight snapshots, numbered 1 to 8 on its remote.
-pub const SNAPSHOT_SLOTS: usize = 8;
+pub use crate::rme_totalmix_names::SNAPSHOT_SLOTS;
 
 /// What TotalMix last said about one of its snapshot slots
 /// (`/snapshot/load/N`: 0 off, 2 active, 3 active and changed since it was
@@ -587,6 +590,9 @@ pub struct ConsoleLinkState {
     snapshot_report_seq: u64,
     /// A slot's state changed since the last flush took it.
     snapshot_slots_changed: bool,
+    /// A load in TotalMix is under way: from just before it is sent until
+    /// its read-back has been written.
+    load_in_progress: bool,
     confirmed_total: u64,
     adjusted_total: u64,
     external_total: u64,
@@ -903,6 +909,7 @@ impl ConsoleLinkState {
                     value: if pulling { parsed.value } else { sent },
                     adjusted: false,
                     confirms_send: true,
+                    during_load: self.load_in_progress,
                 });
                 return Classification::Confirmed;
             }
@@ -936,6 +943,7 @@ impl ConsoleLinkState {
                 value: parsed.value,
                 adjusted: true,
                 confirms_send: false,
+                during_load: self.load_in_progress,
             });
             return Classification::Adjusted;
         }
@@ -946,6 +954,7 @@ impl ConsoleLinkState {
             value: parsed.value,
             adjusted: false,
             confirms_send: false,
+            during_load: self.load_in_progress,
         });
         Classification::External
     }
@@ -1018,6 +1027,7 @@ impl ConsoleLinkState {
                     value: pending.value,
                     adjusted: false,
                     confirms_send: true,
+                    during_load: self.load_in_progress,
                 });
             }
         }
@@ -1087,9 +1097,8 @@ impl ConsoleLinkState {
     /// The desk loaded `slot` (1 to 8) without saying so, or the simulated
     /// console loaded it: that slot is active and every other slot the desk
     /// has reported is off. It is not a report, so the report count stays.
-    // This and the two readers below are for loading a TotalMix snapshot at
-    // the operator's second press, which is built next; until then only the
-    // tests call them.
+    // This and the two readers below serve the load at the operator's second
+    // press (`audio/load.rs`).
     pub fn mark_snapshot_loaded(&mut self, slot: usize) {
         if !(1..=SNAPSHOT_SLOTS).contains(&slot) {
             return;
@@ -1124,6 +1133,12 @@ impl ConsoleLinkState {
 
     /// Takes the mark that a slot's state changed, for the flush that reports
     /// it (the Console reads the slots again).
+    /// Marks the time a load in TotalMix is under way, so what the desk
+    /// reports meanwhile is taken as the load's (`ConsoleUpdate::during_load`).
+    pub fn set_load_in_progress(&mut self, on: bool) {
+        self.load_in_progress = on;
+    }
+
     pub fn take_snapshot_slots_changed(&mut self) -> bool {
         std::mem::take(&mut self.snapshot_slots_changed)
     }
@@ -1241,6 +1256,7 @@ impl ConsoleLinkState {
         self.snapshot_slot_seqs = [0; SNAPSHOT_SLOTS];
         self.snapshot_report_seq = 0;
         self.snapshot_slots_changed = false;
+        self.load_in_progress = false;
     }
 
     pub fn queue_for_test(&mut self, update: ConsoleUpdate) {

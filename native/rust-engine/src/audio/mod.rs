@@ -12,6 +12,14 @@ const RETIRED_TALKBACK_REFUSED_CODE: &str = "AUDIO_TALKBACK_REFUSED";
 /// How every message of the app's own snapshot recall began; the builds
 /// before 2026-10-01 wrote it, and nothing writes it now.
 const RETIRED_RECALL_MESSAGE_PREFIX: &str = "Recalled ";
+/// How the app's own snapshots' create, update and delete messages began.
+const RETIRED_SNAPSHOT_MESSAGE_PREFIX: &str = "Audio snapshot '";
+/// The codes only those builds' recall and rename wrote.
+const RETIRED_SNAPSHOT_CODES: [&str; 3] = [
+    "AUDIO_SNAPSHOT_NOT_FOUND",
+    "AUDIO_SNAPSHOT_RECALL_FAILED",
+    "AUDIO_CHANNEL_NAME_INVALID",
+];
 const AUDIO_LAST_ACTION_MESSAGE_KEY: &str = "app.audio.last_action_message";
 const AUDIO_CHANNEL_STATE_KEY: &str = "app.audio.channels_state";
 const AUDIO_MIX_TARGET_STATE_KEY: &str = "app.audio.mix_targets_state";

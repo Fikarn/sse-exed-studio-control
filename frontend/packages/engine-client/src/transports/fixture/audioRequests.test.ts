@@ -102,8 +102,10 @@ describe("the fixture double's TotalMix snapshots", () => {
     const unverified = createFixtureTransport(getFixtureScenario("audio-not-verified"));
     await expect(unverified.request("audio.snapshot.load", { slot: 1 })).rejects.toThrow("Audio is not verified yet");
     const transport = await verifiedConsole();
-    await expect(transport.request("audio.snapshot.load", { slot: 9 })).rejects.toThrow("AUDIO_SNAPSHOT_SLOT_INVALID");
-    await expect(transport.request("audio.snapshot.load", {})).rejects.toThrow("AUDIO_SNAPSHOT_SLOT_INVALID");
+    await expect(transport.request("audio.snapshot.load", { slot: 9 })).rejects.toMatchObject({
+      code: "INVALID_PARAMS",
+    });
+    await expect(transport.request("audio.snapshot.load", {})).rejects.toMatchObject({ code: "INVALID_PARAMS" });
   });
 
   it("refuses a channel rename: the channels are named in TotalMix", async () => {

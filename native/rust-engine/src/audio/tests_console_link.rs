@@ -525,6 +525,7 @@ fn console_echo_updates_channel_and_mix_target_state() {
         value,
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     };
     let updates = vec![
         update(
@@ -683,6 +684,7 @@ fn a_flush_whose_write_fails_marks_the_desk_unread_for_the_next_write() {
         value: ConsoleValue::Flag(true),
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     });
 
     // A database the flush cannot open: its folder does not exist.
@@ -1082,6 +1084,7 @@ fn console_changes_record_source_console() {
         value,
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     };
     let settings = list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX)
         .expect("settings should load");
@@ -1169,6 +1172,7 @@ fn channel_names_from_totalmix_are_stored_and_shown() {
         value: ConsoleValue::Text(String::from(value)),
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     };
     let long = "N".repeat(51);
     let updates = vec![
@@ -1326,6 +1330,7 @@ fn a_changed_snapshot_slot_is_reported_by_the_flush_and_shown() {
         value: ConsoleValue::Text(String::from("Main Out")),
         adjusted: false,
         confirms_send: false,
+        during_load: false,
     });
     assert!(!flush().changed());
 

@@ -121,6 +121,54 @@ fn a_saved_recall_message_reads_as_no_action() {
         failed.last_action_code.as_deref(),
         Some("AUDIO_CONSOLE_UNCONFIRMED")
     );
+
+    // The old snapshot requests' and the old rename's last actions go too.
+    let last = |status: &str, code: &str, message: &str| {
+        read_audio_snapshot(&HashMap::from([
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from(status),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::from(code)),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from(message),
+            ),
+        ]))
+    };
+    for (status, code, message) in [
+        (
+            "failed",
+            "AUDIO_SNAPSHOT_NOT_FOUND",
+            "Snapshot 'x' no longer exists.",
+        ),
+        (
+            "failed",
+            "AUDIO_SNAPSHOT_RECALL_FAILED",
+            "The push could not send.",
+        ),
+        (
+            "failed",
+            "AUDIO_CHANNEL_NAME_INVALID",
+            "Audio channel names must be 1-50 characters.",
+        ),
+        (
+            "succeeded",
+            "",
+            "Audio snapshot 'Talk' was created on slot 6.",
+        ),
+    ] {
+        let retired = last(status, code, message);
+        assert_eq!(retired.last_action_status, "idle", "{message}");
+        assert_eq!(retired.last_action_message, None, "{message}");
+    }
+    // A load's own failure for a slot TotalMix named "Recalled …" stays.
+    let named = last(
+        "failed",
+        "AUDIO_SYNC_NO_ECHO",
+        "Recalled show was sent to TotalMix; TotalMix did not answer.",
+    );
+    assert_eq!(named.last_action_status, "failed");
 }
 
 // The same build could leave a refused talkback as the Console's last action.

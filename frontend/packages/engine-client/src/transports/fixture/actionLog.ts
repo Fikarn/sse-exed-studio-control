@@ -319,7 +319,12 @@ export function uiActions(method: RequestMethod, params: JsonValue, result: Json
     case "audio.snapshot.load": {
       // A slot TotalMix saved no name for is named by its number; the rows never say "snapshot".
       const name = text(result, ["name"]) ?? `slot ${wholeNumber(result, ["slot"])}`;
-      return [audio("console-snapshot-loaded", name, `Console mix loaded in TotalMix: ${name}`)];
+      // A load whose read-back failed went out, and nothing confirmed it: the row says it was sent.
+      const detail =
+        text(result, ["consoleStateConfidence"]) === "unknown"
+          ? `Console mix sent to TotalMix, not read back: ${name}`
+          : `Console mix loaded in TotalMix: ${name}`;
+      return [audio("console-snapshot-loaded", name, detail)];
     }
     case "audio.solo.clearAll":
       return [audio("solo-cleared", "Console", "Every solo cleared")];

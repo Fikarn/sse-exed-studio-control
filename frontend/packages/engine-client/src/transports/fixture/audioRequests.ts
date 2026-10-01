@@ -20,6 +20,7 @@ import {
 } from "./audioConsole";
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
+import { EngineRequestError } from "../engineRequestError";
 
 /** The `audio.*` requests that change the console: settings, sync, TotalMix's snapshots, channels. */
 export function handleFixtureAudioRequest(
@@ -153,9 +154,14 @@ export function handleFixtureAudioRequest(
       // Mirrors the engine's load on the simulated console (2026-10-01,
       // `audio/load.rs`): TotalMix's own snapshot, by its slot; nothing is
       // sent, the slot becomes active and the read-back is the console's own.
+      // The parameters' shape first, as the hardware link's parse does.
       const slot = params.slot;
-      if (typeof slot !== "number" || !Number.isInteger(slot) || slot < 1 || slot > CONSOLE_SNAPSHOT_SLOTS) {
-        throw new Error(`AUDIO_SNAPSHOT_SLOT_INVALID: TotalMix has slots 1 to 8; there is no slot ${String(slot)}.`);
+      if (slot === undefined) throw new EngineRequestError("INVALID_PARAMS", "slot is required");
+      if (typeof slot !== "number" || !Number.isInteger(slot)) {
+        throw new EngineRequestError("INVALID_PARAMS", "slot must be an integer");
+      }
+      if (slot < 1 || slot > CONSOLE_SNAPSHOT_SLOTS) {
+        throw new EngineRequestError("INVALID_PARAMS", `slot must be between 1 and ${CONSOLE_SNAPSHOT_SLOTS}`);
       }
       const audioSnapshot = ensureAudioActionAllowed(state);
       const loadedAt = new Date().toISOString();

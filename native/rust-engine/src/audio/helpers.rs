@@ -809,7 +809,7 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
             " Last console sync: {}{}.",
             timestamp,
             last_console_sync_reason
-                .map(|reason| format!(" ({reason})"))
+                .map(|reason| format!(" ({})", sync_reason_words(reason)))
                 .unwrap_or_default()
         ),
         None => String::from(" No console sync has been recorded yet."),
@@ -832,4 +832,18 @@ pub(super) fn audio_summary(context: AudioSummaryContext<'_>) -> String {
     };
 
     format!("{transport_summary}{sync_summary}{action_summary}")
+}
+
+/// What brought the console in line, in the operator's words: the saved
+/// reasons are codes, and some say "snapshot".
+fn sync_reason_words(reason: &str) -> &str {
+    match reason {
+        "console-pull" => "Sync from TotalMix",
+        "snapshot-load" => "a mix loaded in TotalMix",
+        "simulated-load" => "a mix loaded on the simulated console",
+        "simulated-sync" => "Sync on the simulated console",
+        // The builds before 2026-10-01 wrote these for their own recall.
+        "snapshot" | "snapshot-push" => "a recall",
+        other => other,
+    }
 }

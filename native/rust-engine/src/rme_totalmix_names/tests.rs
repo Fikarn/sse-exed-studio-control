@@ -181,6 +181,22 @@ fn a_name_of_white_space_only_names_nothing_and_a_name_is_trimmed() {
     );
 }
 
+// A slot's name is capped as a channel's is, 50 characters, and a cut never
+// leaves a space at its end.
+#[test]
+fn a_long_name_is_cut_to_fifty_characters() {
+    let long = "ä".repeat(49) + " and more";
+    let file = settings_file(&val("SnapshotName 2", &long));
+    let parsed = parse_snapshot_names(&file);
+    let name = parsed[2].as_deref().expect("a name");
+    assert_eq!(
+        name,
+        "ä".repeat(49),
+        "cut at 50 characters, the space dropped"
+    );
+    assert_eq!(name.chars().count(), 49);
+}
+
 #[test]
 fn windows_1252_bytes_are_read_as_windows_1252() {
     let mut bytes = b"\t<FirefaceUFXIII1>\n\t\t<General>\n".to_vec();

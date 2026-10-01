@@ -162,6 +162,9 @@ pub fn load_audio_console_snapshot_with(
         guard.snapshot_report_seq()
     };
 
+    // From here until the read-back is written, what the desk reports is the
+    // load's: written like any report, with no row "at TotalMix".
+    let _window = LoadWindow::open();
     if let Err(message) = send_console_snapshot_load(&config.send_host, config.send_port, slot) {
         record_audio_action_failure(db_path, "AUDIO_SNAPSHOT_LOAD_FAILED", &message)?;
         return Err(AudioCommandError::Rejected(
@@ -213,12 +216,38 @@ pub fn load_audio_console_snapshot_with(
                 reported,
             ))
         }
-        // The pull wrote the failure, with confidence `unknown`; the load
-        // itself went out, so the reply says it did.
+        // The pull wrote the failure; the load itself went out, so the reply
+        // says it did. The desk now holds a mix the app has not read: the
+        // Console's confidence is unknown, whichever way the read-back failed.
         Err(AudioCommandError::Rejected(_, message)) => {
+            {
+                let _state_guard = lock_audio_state();
+                persist_audio_state(db_path, &[confidence_setting(ConsoleConfidence::Unknown)])?;
+            }
             Ok(result(message, "unknown", 0, reported_after_send()))
         }
         Err(error) => Err(error),
+    }
+}
+
+/// Marks a load as under way on the console link, and clears the mark when
+/// dropped, whichever way the load ends.
+struct LoadWindow;
+
+impl LoadWindow {
+    fn open() -> Self {
+        if let Ok(mut link) = shared_console_link().lock() {
+            link.set_load_in_progress(true);
+        }
+        Self
+    }
+}
+
+impl Drop for LoadWindow {
+    fn drop(&mut self) {
+        let link = shared_console_link();
+        let mut link = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        link.set_load_in_progress(false);
     }
 }
 
@@ -270,10 +299,18 @@ fn slot_state_word(state: SnapshotSlotState) -> &'static str {
 /// At the start, off the request thread: the names TotalMix saved, so the
 /// Console shows them before the first Sync.
 pub fn refresh_console_snapshot_names_at_start(db_path: &Path) {
-    let simulated = load_audio_settings(db_path)
-        .map(|settings| audio_metering_is_simulated(&settings))
-        .unwrap_or(true);
-    thread::spawn(move || refresh_console_snapshot_names(simulated));
+    // Settings that cannot be read say nothing about the console: no names
+    // are worked out until the first Sync or load, and never the simulated
+    // console's test names on a real desk.
+    let Ok(settings) = load_audio_settings(db_path) else {
+        return;
+    };
+    let simulated = audio_metering_is_simulated(&settings);
+    thread::spawn(move || {
+        refresh_console_snapshot_names(simulated);
+        // A page that read before the names were worked out reads again.
+        crate::engine_events::emit_audio_changed("console-names");
+    });
 }
 
 /// Looks at the names TotalMix saved again (only a studio build on the real

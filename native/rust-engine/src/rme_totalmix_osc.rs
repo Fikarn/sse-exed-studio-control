@@ -1434,7 +1434,7 @@ pub(crate) fn send_console_snapshot_load(
     send_port: i64,
     slot: usize,
 ) -> Result<usize, String> {
-    if !(1..=8).contains(&slot) {
+    if !(1..=crate::rme_totalmix_names::SNAPSHOT_SLOTS).contains(&slot) {
         return Err(format!("TotalMix has no slot {slot}."));
     }
     let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;

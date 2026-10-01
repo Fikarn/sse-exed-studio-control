@@ -32,10 +32,19 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     // next action writes over it. The app's own snapshot recall went on
     // 2026-10-01 the same way: a last action it wrote ("Recalled Snapshot 5:
     // … unconfirmed") would describe a recall this build cannot make.
-    let retired_refusal = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY).as_deref()
-        == Some(RETIRED_TALKBACK_REFUSED_CODE);
+    let saved_code = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY);
+    let retired_refusal = saved_code.as_deref() == Some(RETIRED_TALKBACK_REFUSED_CODE)
+        || saved_code
+            .as_deref()
+            .is_some_and(|code| RETIRED_SNAPSHOT_CODES.contains(&code));
+    // A load's own failure begins with the slot's name, which TotalMix may
+    // have named "Recalled …": that sentence says it was sent to TotalMix.
     let retired_recall = read_optional_setting(settings, AUDIO_LAST_ACTION_MESSAGE_KEY)
-        .is_some_and(|message| message.starts_with(RETIRED_RECALL_MESSAGE_PREFIX));
+        .is_some_and(|message| {
+            (message.starts_with(RETIRED_RECALL_MESSAGE_PREFIX)
+                && !message.contains(" was sent to TotalMix; "))
+                || message.starts_with(RETIRED_SNAPSHOT_MESSAGE_PREFIX)
+        });
     let last_action = |key: &str| {
         read_optional_setting(settings, key).filter(|_| !retired_refusal && !retired_recall)
     };

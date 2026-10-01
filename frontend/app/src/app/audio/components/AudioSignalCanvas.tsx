@@ -80,7 +80,9 @@ export function AudioSignalCanvas({
           data-testid="audio-load-report"
           role="status"
         >
-          <strong>Loaded {loadReport.name} in TotalMix</strong>
+          <strong>
+            {loadReport.readBack ? "Loaded" : "Sent"} {loadReport.name} {loadReport.readBack ? "in" : "to"} TotalMix
+          </strong>
           <span>{loadReport.line}</span>
           <span className={styles.warningRecoveryActions}>
             <button

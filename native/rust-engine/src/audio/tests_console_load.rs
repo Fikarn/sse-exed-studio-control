@@ -238,6 +238,20 @@ fn a_load_sends_one_datagram_and_the_desk_is_read_back() {
         Some("snapshot-load")
     );
     assert_eq!(state.last_action_status, "succeeded");
+    // What the load changed is the load's: slot 3 muted Host, and no row
+    // says that happened at TotalMix (the load's own row is the screen's).
+    let console_rows: Vec<String> = crate::action_log::list_recent_actions(&db, 50)
+        .expect("the action log should list")
+        .into_iter()
+        .filter(|entry| entry.source == "console")
+        .map(|entry| entry.detail)
+        .collect();
+    assert!(console_rows.is_empty(), "{console_rows:?}");
+    assert!(
+        !state.summary.to_lowercase().contains("snapshot"),
+        "{}",
+        state.summary
+    );
 }
 
 #[test]

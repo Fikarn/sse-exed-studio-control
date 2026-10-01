@@ -156,11 +156,7 @@ export function normalizeConsoleSnapshots(value: JsonObject | null): JsonObject 
   };
 }
 
-/**
- * The simulated console's load (`mark_snapshot_loaded`): the slot is active,
- * and every other slot TotalMix had reported is off; a slot never reported
- * stays unknown.
- */
+/** A transport change: another address may be another desk, so every slot is unknown again. */
 export function forgetConsoleSnapshotStates(audioSnapshot: JsonObject) {
   const consoleSnapshots = normalizeConsoleSnapshots(asRecord(audioSnapshot.consoleSnapshots));
   consoleSnapshots.slots = asArray(consoleSnapshots.slots).map((entry) => ({
@@ -170,6 +166,11 @@ export function forgetConsoleSnapshotStates(audioSnapshot: JsonObject) {
   audioSnapshot.consoleSnapshots = consoleSnapshots;
 }
 
+/**
+ * The simulated console's load (`mark_snapshot_loaded`): the slot is active,
+ * and every other slot TotalMix had reported is off; a slot never reported
+ * stays unknown.
+ */
 export function markConsoleSnapshotLoaded(audioSnapshot: JsonObject, slot: number) {
   const consoleSnapshots = normalizeConsoleSnapshots(asRecord(audioSnapshot.consoleSnapshots));
   consoleSnapshots.slots = asArray(consoleSnapshots.slots).map((entry) => {
