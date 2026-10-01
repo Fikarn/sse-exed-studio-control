@@ -87,7 +87,9 @@ export function snapshotProblem(domain: DomainKey, value: JsonValue | undefined)
       return firstProblem(
         listProblem(value, "channels", { ids: true }),
         listProblem(value, "mixTargets", { ids: true }),
-        listProblem(value, "snapshots", { ids: true, optional: true })
+        // TotalMix's eight snapshots (2026-10-01): the Console maps over the slots.
+        objectProblem(value, "consoleSnapshots"),
+        isRecord(value.consoleSnapshots) ? listProblem(value.consoleSnapshots, "slots", { ids: false }) : null
       );
     case "prompter":
       return firstProblem(

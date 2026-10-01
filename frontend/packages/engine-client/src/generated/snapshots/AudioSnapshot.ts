@@ -2,8 +2,8 @@
 import type { AudioCapabilitySnapshot } from "./AudioCapabilitySnapshot";
 import type { AudioChannelSnapshot } from "./AudioChannelSnapshot";
 import type { AudioConsoleLinkSnapshot } from "./AudioConsoleLinkSnapshot";
+import type { AudioConsoleSnapshots } from "./AudioConsoleSnapshots";
 import type { AudioMixTargetSnapshot } from "./AudioMixTargetSnapshot";
-import type { AudioSceneSnapshot } from "./AudioSceneSnapshot";
 
 export type AudioSnapshot = {
   status: string;
@@ -29,12 +29,14 @@ export type AudioSnapshot = {
   consoleLink: AudioConsoleLinkSnapshot;
   lastConsoleSyncAt: string | null;
   lastConsoleSyncReason: string | null;
-  lastRecalledSnapshotId: string | null;
-  lastSnapshotRecallAt: string | null;
   lastActionStatus: string;
   lastActionCode: string | null;
   lastActionMessage: string | null;
   channels: Array<AudioChannelSnapshot>;
   mixTargets: Array<AudioMixTargetSnapshot>;
-  snapshots: Array<AudioSceneSnapshot>;
+  /**
+   * TotalMix's own eight snapshots (2026-10-01): the Console lists and
+   * loads these; the app keeps no snapshots of its own.
+   */
+  consoleSnapshots: AudioConsoleSnapshots;
 };

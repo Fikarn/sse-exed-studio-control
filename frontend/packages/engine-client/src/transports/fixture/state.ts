@@ -19,7 +19,7 @@ import {
   normalizeAudioEq,
   buildAudioDynamics,
   buildAudioSendModes,
-  buildAudioSnapshotPreview,
+  normalizeConsoleSnapshots,
   refreshAudioCapabilities,
 } from "./audioConsole";
 // The attribute is for Node, which loads this file as it is for the page tests.
@@ -720,10 +720,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
     typeof audioSnapshotRecord.lastConsoleSyncAt === "string" ? audioSnapshotRecord.lastConsoleSyncAt : null;
   audioSnapshotRecord.lastConsoleSyncReason =
     typeof audioSnapshotRecord.lastConsoleSyncReason === "string" ? audioSnapshotRecord.lastConsoleSyncReason : null;
-  audioSnapshotRecord.lastRecalledSnapshotId =
-    typeof audioSnapshotRecord.lastRecalledSnapshotId === "string" ? audioSnapshotRecord.lastRecalledSnapshotId : null;
-  audioSnapshotRecord.lastSnapshotRecallAt =
-    typeof audioSnapshotRecord.lastSnapshotRecallAt === "string" ? audioSnapshotRecord.lastSnapshotRecallAt : null;
   audioSnapshotRecord.lastActionStatus = asString(audioSnapshotRecord.lastActionStatus, "idle");
   audioSnapshotRecord.lastActionCode =
     typeof audioSnapshotRecord.lastActionCode === "string" ? audioSnapshotRecord.lastActionCode : null;
@@ -773,20 +769,8 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
         1
       ),
     }));
-  audioSnapshotRecord.snapshots = asArray(audioSnapshotRecord.snapshots)
-    .map((entry) => asRecord(entry))
-    .filter((entry): entry is JsonObject => entry !== null)
-    .sort((left, right) => asNumber(left.order) - asNumber(right.order))
-    .map((entry) => ({
-      ...entry,
-      lastRecalled: asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id),
-      lastRecalledAt:
-        asString(audioSnapshotRecord.lastRecalledSnapshotId) === asString(entry.id)
-          ? audioSnapshotRecord.lastSnapshotRecallAt
-          : null,
-      contents: asRecord(entry.contents) ?? null,
-      preview: asRecord(entry.preview) ?? buildAudioSnapshotPreview(Boolean(asRecord(entry.contents))),
-    }));
+  // TotalMix's eight snapshots (2026-10-01): always eight, as the hardware link reports them.
+  audioSnapshotRecord.consoleSnapshots = normalizeConsoleSnapshots(asRecord(audioSnapshotRecord.consoleSnapshots));
   const mixTargets = audioSnapshotRecord.mixTargets
     .map((entry) => asRecord(entry))
     .filter((entry): entry is JsonObject => entry !== null);

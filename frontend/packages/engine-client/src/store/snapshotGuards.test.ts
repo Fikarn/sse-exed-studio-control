@@ -67,9 +67,21 @@ describe("snapshotProblem", () => {
     expect(snapshotProblem("prompterGlass", { paragraphs: [] })).toBe("look is not an object");
   });
 
+  it("checks TotalMix's snapshot slots the Console maps over (2026-10-01)", () => {
+    const consoleSnapshots = {
+      slots: [{ slot: 1, name: "Mix 1", state: "active" }],
+      namesSavedAt: null,
+      namesNote: null,
+    };
+    expect(snapshotProblem("audio", { channels: [], mixTargets: [], consoleSnapshots })).toBeNull();
+    expect(snapshotProblem("audio", { channels: [], mixTargets: [] })).toBe("consoleSnapshots is not an object");
+    expect(snapshotProblem("audio", { channels: [], mixTargets: [], consoleSnapshots: {} })).toBe(
+      "slots is not a list"
+    );
+  });
+
   it("leaves optional lists optional", () => {
     expect(snapshotProblem("lighting", { fixtures: [], groups: [], scenes: [] })).toBeNull();
-    expect(snapshotProblem("audio", { channels: [], mixTargets: [] })).toBeNull();
   });
 });
 

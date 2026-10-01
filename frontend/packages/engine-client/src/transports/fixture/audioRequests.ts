@@ -8,8 +8,9 @@ import {
   refreshAudioCapabilities,
   ensureAudioActionAllowed,
   ensureAudioEditAllowed,
-  captureFixtureAudioScene,
-  buildAudioSnapshotPreview,
+  CONSOLE_SNAPSHOT_SLOTS,
+  forgetConsoleSnapshotStates,
+  markConsoleSnapshotLoaded,
   fixtureAudioChannel,
   normalizeAudioEq,
   normalizeLowCutSlope,
@@ -20,7 +21,7 @@ import {
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
 
-/** The `audio.*` requests that change the console: settings, sync, console mixes, channels. */
+/** The `audio.*` requests that change the console: settings, sync, TotalMix's snapshots, channels. */
 export function handleFixtureAudioRequest(
   context: FixtureRequestContext,
   method: RequestMethod,
@@ -98,8 +99,9 @@ export function handleFixtureAudioRequest(
         audioSnapshot.consoleStateConfidence = "unknown";
         audioSnapshot.lastConsoleSyncAt = null;
         audioSnapshot.lastConsoleSyncReason = null;
-        audioSnapshot.lastRecalledSnapshotId = null;
-        audioSnapshot.lastSnapshotRecallAt = null;
+        // As the hardware link: another address may be another desk, so
+        // TotalMix's slot states are forgotten.
+        forgetConsoleSnapshotStates(audioSnapshot);
       }
 
       audioSnapshot.lastActionStatus = "succeeded";
@@ -147,162 +149,39 @@ export function handleFixtureAudioRequest(
         connection: "simulated",
       };
     }
-    case "audio.snapshot.recall": {
+    case "audio.snapshot.load": {
+      // Mirrors the engine's load on the simulated console (2026-10-01,
+      // `audio/load.rs`): TotalMix's own snapshot, by its slot; nothing is
+      // sent, the slot becomes active and the read-back is the console's own.
+      const slot = params.slot;
+      if (typeof slot !== "number" || !Number.isInteger(slot) || slot < 1 || slot > CONSOLE_SNAPSHOT_SLOTS) {
+        throw new Error(`AUDIO_SNAPSHOT_SLOT_INVALID: TotalMix has slots 1 to 8; there is no slot ${String(slot)}.`);
+      }
       const audioSnapshot = ensureAudioActionAllowed(state);
-      const snapshotId = asString(params.snapshotId).trim();
-      const snapshots = asArray(audioSnapshot.snapshots)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      const snapshot = snapshots.find((entry) => asString(entry.id) === snapshotId);
-      if (!snapshot) {
-        throw new Error(`Audio snapshot '${snapshotId}' is not exposed by the fixture transport.`);
-      }
-
-      // Mirrors the engine's recall push (Slice 4): every captured console
-      // value is "pushed" and confirmed by the fixture console, 48V is never
-      // pushed (kept at the console's value and listed).
-      const recalledAt = new Date().toISOString();
-      const snapshotName = asString(snapshot.name, snapshotId);
-      const phantomDifferences: JsonObject[] = [];
-      let pushed = 0;
-      const contents = asRecord(snapshot.contents);
-      if (contents) {
-        const sceneChannels = asRecord(contents.channels) ?? {};
-        const sceneMixTargets = asRecord(contents.mixTargets) ?? {};
-        for (const channel of asArray(audioSnapshot.channels).map((entry) => asRecord(entry))) {
-          if (!channel) continue;
-          const stateEntry = asRecord(sceneChannels[asString(channel.id)]);
-          if (!stateEntry) continue;
-          const currentPhantom = channel.phantom === true;
-          const targetPhantom = stateEntry.phantom === true;
-          if (asString(channel.role) === "front-preamp" && currentPhantom !== targetPhantom) {
-            phantomDifferences.push({
-              channelId: asString(channel.id),
-              channelName: asString(channel.name, asString(channel.id)),
-              current: currentPhantom,
-              target: targetPhantom,
-            });
-          }
-          Object.assign(channel, cloneJson(stateEntry));
-          channel.phantom = currentPhantom;
-          // mute + three sends + solo (+ gain/phase/instrument/autoset on a preamp)
-          pushed += asString(channel.role) === "front-preamp" ? 9 : 5;
-        }
-        for (const mixTarget of asArray(audioSnapshot.mixTargets).map((entry) => asRecord(entry))) {
-          if (!mixTarget) continue;
-          const stateEntry = asRecord(sceneMixTargets[asString(mixTarget.id)]);
-          if (!stateEntry) continue;
-          Object.assign(mixTarget, cloneJson(stateEntry));
-          pushed += asString(mixTarget.id) === "audio-mix-main" ? 4 : 2;
-        }
-      }
-      const phantomNote =
-        phantomDifferences.length > 0
-          ? ` · 48V differs on ${phantomDifferences.map((entry) => asString(entry.channelName)).join(", ")}`
-          : "";
-      const summary =
-        pushed > 0
-          ? `Recalled ${snapshotName}: ${pushed} values pushed, ${pushed} confirmed${phantomNote}.`
-          : `Recalled ${snapshotName}: the snapshot has no captured console state, nothing was pushed.`;
-      audioSnapshot.lastRecalledSnapshotId = snapshotId;
-      audioSnapshot.lastSnapshotRecallAt = recalledAt;
+      const loadedAt = new Date().toISOString();
+      const consoleSnapshots = markConsoleSnapshotLoaded(audioSnapshot, slot);
+      const slotEntry = asRecord(asArray(consoleSnapshots.slots)[slot - 1]);
+      const name = typeof slotEntry?.name === "string" ? slotEntry.name : null;
+      const summary = `Loaded ${name ?? `slot ${slot}`} on the simulated console; nothing was sent (test mode).`;
       audioSnapshot.consoleStateConfidence = "aligned";
-      if (pushed > 0) {
-        audioSnapshot.lastConsoleSyncReason = "snapshot-push";
-        audioSnapshot.lastConsoleSyncAt = recalledAt;
-      }
+      audioSnapshot.lastConsoleSyncAt = loadedAt;
+      audioSnapshot.lastConsoleSyncReason = "simulated-load";
       audioSnapshot.lastActionStatus = "succeeded";
       audioSnapshot.lastActionCode = null;
       audioSnapshot.lastActionMessage = summary;
       state.audioSnapshot = audioSnapshot;
       synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-snapshot-recalled" });
+      emit("audio.changed", { reason: "snapshot-loaded" });
       return {
-        recalled: true,
-        snapshotId,
-        snapshotName,
-        recalledAt,
+        loaded: true,
+        slot,
+        name,
+        loadedAt,
         summary,
         consoleStateConfidence: "aligned",
-        pushed,
-        confirmed: pushed,
-        adjusted: 0,
-        unconfirmed: 0,
-        phantomDifferences,
+        pulledValues: 0,
+        totalMixReported: false,
       };
-    }
-    case "audio.snapshot.create": {
-      const audioSnapshot = ensureAudioEditAllowed(state);
-      const name = asString(params.name).trim() || "Snapshot";
-      const oscIndex = clampNumber(Math.round(asNumber(params.oscIndex, 0)), 0, 7);
-      const snapshots = asArray(audioSnapshot.snapshots)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      const snapshot = {
-        id: `audio-snapshot-custom-${Date.now()}`,
-        name,
-        oscIndex,
-        order: snapshots.length,
-        lastRecalled: false,
-        lastRecalledAt: null,
-        contents: asBoolean(params.captureCurrentState, false) ? captureFixtureAudioScene(audioSnapshot) : null,
-        preview: buildAudioSnapshotPreview(asBoolean(params.captureCurrentState, false)),
-      };
-      snapshots.push(snapshot);
-      audioSnapshot.snapshots = snapshots;
-      audioSnapshot.lastActionStatus = "succeeded";
-      audioSnapshot.lastActionCode = null;
-      audioSnapshot.lastActionMessage = `Created ${name}`;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-snapshot-created" });
-      return { snapshot: cloneJson(snapshot), summary: `Audio snapshot '${name}' was created.` };
-    }
-    case "audio.snapshot.update": {
-      const audioSnapshot = ensureAudioEditAllowed(state);
-      const snapshotId = asString(params.snapshotId).trim();
-      const snapshots = asArray(audioSnapshot.snapshots)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      const snapshot = snapshots.find((entry) => asString(entry.id) === snapshotId);
-      if (!snapshot) throw new Error(`Audio snapshot '${snapshotId}' is not exposed by the fixture transport.`);
-      if (typeof params.name === "string" && params.name.trim()) {
-        snapshot.name = params.name.trim();
-      }
-      if (typeof params.oscIndex === "number") {
-        snapshot.oscIndex = clampNumber(Math.round(params.oscIndex), 0, 7);
-      }
-      if (asBoolean(params.captureCurrentState, false)) {
-        snapshot.contents = captureFixtureAudioScene(audioSnapshot);
-        snapshot.preview = buildAudioSnapshotPreview(true);
-      }
-      audioSnapshot.snapshots = snapshots;
-      audioSnapshot.lastActionStatus = "succeeded";
-      audioSnapshot.lastActionCode = null;
-      audioSnapshot.lastActionMessage = `Updated ${asString(snapshot.name, snapshotId)}`;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-snapshot-updated" });
-      return { snapshot: cloneJson(snapshot), summary: `Audio snapshot '${asString(snapshot.name)}' was updated.` };
-    }
-    case "audio.snapshot.delete": {
-      const audioSnapshot = ensureAudioEditAllowed(state);
-      const snapshotId = asString(params.snapshotId).trim();
-      const snapshots = asArray(audioSnapshot.snapshots)
-        .map((entry) => asRecord(entry))
-        .filter((entry): entry is JsonObject => entry !== null);
-      audioSnapshot.snapshots = snapshots.filter((entry) => asString(entry.id) !== snapshotId);
-      if (asString(audioSnapshot.lastRecalledSnapshotId) === snapshotId) {
-        audioSnapshot.lastRecalledSnapshotId = null;
-        audioSnapshot.lastSnapshotRecallAt = null;
-      }
-      audioSnapshot.lastActionStatus = "succeeded";
-      audioSnapshot.lastActionCode = null;
-      audioSnapshot.lastActionMessage = `Deleted ${snapshotId}`;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-snapshot-deleted" });
-      return { deleted: true, snapshotId, summary: `Audio snapshot '${snapshotId}' was deleted.` };
     }
     case "audio.clip.clear": {
       const audioSnapshot = ensureAudioEditAllowed(state);
@@ -340,12 +219,13 @@ export function handleFixtureAudioRequest(
       return cloneJson(state.audioSnapshot);
     }
     case "audio.channel.update": {
-      // Mirrors the engine gate: hardware-facing fields need a passed audio
-      // probe; a rename is app-local and stays allowed.
-      const touchesConsole = ["gain", "fader", "mute", "solo", "phantom", "phase", "pad", "instrument", "autoSet"].some(
-        (field) => params[field] !== undefined && params[field] !== null
-      );
-      const audioSnapshot = touchesConsole ? ensureAudioActionAllowed(state) : ensureAudioEditAllowed(state);
+      // Mirrors the engine (2026-10-01): the channels take TotalMix's names
+      // and are renamed in TotalMix, so a request that carries a name is
+      // refused; every other field needs a passed audio probe.
+      if ("name" in params) {
+        throw new Error("audio.channel.update takes no name: channels are named in TotalMix");
+      }
+      const audioSnapshot = ensureAudioActionAllowed(state);
       const channelId = asString(params.channelId).trim();
       const channels = asArray(audioSnapshot.channels)
         .map((entry) => asRecord(entry))
@@ -356,9 +236,6 @@ export function handleFixtureAudioRequest(
       }
 
       const role = asString(channel.role);
-      if (typeof params.name === "string" && params.name.trim()) {
-        channel.name = params.name.trim();
-      }
       if (typeof params.gain === "number") {
         if (role !== "front-preamp") {
           throw new Error("AUDIO_CHANNEL_FIELD_UNSUPPORTED: gain is only available on front preamps.");

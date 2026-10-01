@@ -1,10 +1,4 @@
 {
-  "app/src/app/audio/components/AudioDialog.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 1
-  },
   "app/src/app/audio/components/AudioInspector.module.css": {
     "colour": 4,
     "fontSize": 0,
