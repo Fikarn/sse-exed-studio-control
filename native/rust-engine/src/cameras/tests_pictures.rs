@@ -32,7 +32,7 @@ fn the_simulated_test_pictures_show_on_vmix_inputs_one_to_four() {
             "tone": "ok",
             "sentence": null,
             "source": "test pictures",
-            "note": "Test pictures stand in for vMix inputs 1 to 4. The cameras' own come with a later version, over NDI from vMix on this PC."
+            "note": "Test pictures stand in for vMix inputs 1 to 4. A studio build shows vMix's Outputs 2, 3 and 4 over NDI."
         })
     );
     for camera in [1, 2, 3] {
@@ -161,21 +161,21 @@ fn a_camera_that_is_not_held_speaks_before_the_pictures() {
     let _ = announced_changes();
 }
 
-// The studio's build before the pictures are built: no picture at all, and
-// the page says they come with a later version. The cameras read NOT SET UP
-// first.
+// A run with the real cameras and no helper (a development run without the
+// switch; a studio build has one): no picture at all, and the page says no
+// picture program runs. The cameras read NOT SET UP first.
 #[test]
-fn without_the_simulated_cameras_there_are_no_pictures_yet() {
-    let cameras = TestCameras::without_simulation("pictures-not-built");
+fn with_the_real_cameras_and_no_helper_there_are_no_pictures() {
+    let cameras = TestCameras::without_simulation("pictures-no-helper");
     assert_eq!(
         pictures(&cameras),
         json!({
             "state": "no-pictures",
             "word": "NO PICTURES",
             "tone": "attention",
-            "sentence": "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
-            "source": "not built yet",
-            "note": "The cameras' own pictures come with a later version, over NDI from vMix on this PC."
+            "sentence": "Studio Control starts no picture program in this run, so it shows no pictures.",
+            "source": "not started",
+            "note": "A studio build shows vMix's Outputs 2, 3 and 4 over NDI; a development run, its test pictures."
         })
     );
     for camera in [1, 2, 3] {
@@ -185,8 +185,8 @@ fn without_the_simulated_cameras_there_are_no_pictures_yet() {
                 "state": "no-pictures",
                 "word": "NO PICTURE",
                 "tone": "attention",
-                "detail": "not built yet",
-                "sentence": "No picture yet: the cameras' pictures come with a later version.",
+                "detail": "not started",
+                "sentence": "No picture in this run.",
                 "advice": null
             })
         );
@@ -338,7 +338,7 @@ fn a_helper_starting_stopped_or_missing_reads_no_pictures_and_why() {
         ),
         (
             HelperStatus::Missing,
-            "The picture program is not beside this build, so it shows no pictures. npm run app builds it.",
+            "The picture program beside this build is missing or not its own, so it shows no pictures.",
             "no picture program",
         ),
     ] {
@@ -410,7 +410,7 @@ fn vmix_s_outputs_read_live_with_their_output_size_and_rate() {
     assert_eq!(whole["source"], "vMix Outputs 2 to 4");
     assert_eq!(
         whole["note"],
-        "The pictures come over NDI from vMix's Outputs 2, 3 and 4 on this PC: CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4."
+        "Over NDI from vMix on this PC: CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4."
     );
     assert_eq!(cameras.health().word, "HELD");
 }

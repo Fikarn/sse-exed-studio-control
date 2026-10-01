@@ -20,13 +20,13 @@ import {
   NOT_CONFIRMED_SENTENCE,
   NO_LINK_SENTENCE,
   NO_PICTURES_SENTENCE,
-  NO_PICTURE_YET_SENTENCE,
   PICTURE_MISSING_DETAIL,
   PICTURE_SHOWING_DETAIL,
   PICTURE_WORDS,
   SIMULATED_VMIX_INPUTS,
   STATE_TONES,
   STATE_WORDS,
+  VMIX_NOT_SENDING_ADVICE,
   VMIX_OUTPUTS,
   addressInvalidRefusal,
   addressesNotRestoredSentence,
@@ -56,6 +56,7 @@ import {
   startedRecordingSentence,
   stoppedRecordingSentence,
   unreachableSentence,
+  vmixNothingDetail,
 } from "./camerasWords";
 import { openCamerasDouble } from "./camerasTestSupport";
 
@@ -333,8 +334,9 @@ function everyDoubleSentence(): string[] {
     unreachableSentence(CAM2, null),
     NO_LINK_SENTENCE,
     pictureMissingAdvice(7),
-    NO_PICTURE_YET_SENTENCE,
     NO_PICTURES_SENTENCE,
+    VMIX_NOT_SENDING_ADVICE,
+    vmixNothingDetail(3),
     picturesNote(true),
     picturesNote(false),
     addressesNotRestoredSentence([CAM2])!,
@@ -388,7 +390,7 @@ describe("the fixture double's picture words: the hardware link's (`pictures.rs`
     expect(PICTURE_SHOWING_DETAIL).toBe(rust("test picture"));
     expect(PICTURE_MISSING_DETAIL).toBe(rust("nothing received"));
     expect(pictureSourceWords(true)).toBe(rust("test pictures"));
-    expect(pictureSourceWords(false)).toBe(rust("not built yet"));
+    expect(pictureSourceWords(false)).toBe(rust("vMix Outputs 2 to 4"));
     // The simulated source's inputs are the helper's and the hardware link's alike: the
     // protocol crate holds them (`native/protocol/rust/src/pictures.rs`).
     const inputs = readFileSync(resolve(RUST_SRC, "../../protocol/rust/src/pictures.rs"), "utf-8").match(
@@ -407,16 +409,21 @@ describe("the fixture double's picture words: the hardware link's (`pictures.rs`
   it("speaks the pictures' sentences word for word", () => {
     expect(picturesNote(true)).toBe(
       rust(
-        "Test pictures stand in for vMix inputs {} to {}. The cameras' own come with a later version, over NDI from vMix on this PC.",
+        "Test pictures stand in for vMix inputs {} to {}. A studio build shows vMix's Outputs 2, 3 and 4 over NDI.",
         [SIMULATED_VMIX_INPUTS.first, SIMULATED_VMIX_INPUTS.last]
       )
     );
     expect(picturesNote(false)).toBe(
-      rust("The cameras' own pictures come with a later version, over NDI from vMix on this PC.")
+      rust("Over NDI from vMix on this PC: CAM 1 from Output {}, CAM 2 from Output {}, CAM 3 from Output {}.", [
+        ...VMIX_OUTPUTS,
+      ])
     );
-    expect(NO_PICTURE_YET_SENTENCE).toBe(rust("No picture yet: the cameras' pictures come with a later version."));
-    expect(NO_PICTURES_SENTENCE).toBe(
-      rust("Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.")
+    expect(NO_PICTURES_SENTENCE).toBe(rust("No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI."));
+    expect(VMIX_NOT_SENDING_ADVICE).toBe(
+      rust("Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs).")
+    );
+    expect(vmixNothingDetail(3)).toBe(
+      rust("vMix Output {output} · {what}", [], { output: VMIX_OUTPUTS[2], what: "nothing received" })
     );
     expect(pictureMissingAdvice(7)).toBe(
       rust("vMix sends other inputs: check that vMix input {vmix_input} is still there and live.", [], {

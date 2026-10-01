@@ -20,7 +20,7 @@ describe("the fixture double's pictures", () => {
       tone: "ok",
       sentence: null,
       source: "test pictures",
-      note: "Test pictures stand in for vMix inputs 1 to 4. The cameras' own come with a later version, over NDI from vMix on this PC.",
+      note: "Test pictures stand in for vMix inputs 1 to 4. A studio build shows vMix's Outputs 2, 3 and 4 over NDI.",
     });
     expect(shown.cameras.map((camera) => camera.picture)).toEqual([LIVE, LIVE, LIVE]);
     expect((await health()).check.word).toBe("HELD");
@@ -80,25 +80,25 @@ describe("the fixture double's pictures", () => {
     expect((await snapshot()).cameras[0]?.picture.state, "a released camera keeps its picture").toBe("showing");
   });
 
-  it("has no pictures yet without the simulated cameras, as the studio's build", async () => {
+  it("is the studio's build with vMix sending none of its outputs without the simulated cameras", async () => {
     const { snapshot, health } = openCamerasDouble({ simulated: false });
     const shown = await snapshot();
     expect(shown.pictures).toEqual({
       state: "no-pictures",
       word: "NO PICTURES",
       tone: "attention",
-      sentence: "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
-      source: "not built yet",
-      note: "The cameras' own pictures come with a later version, over NDI from vMix on this PC.",
+      sentence: "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI.",
+      source: "vMix Outputs 2 to 4",
+      note: "Over NDI from vMix on this PC: CAM 1 from Output 2, CAM 2 from Output 3, CAM 3 from Output 4.",
     });
     for (const camera of shown.cameras) {
       expect(camera.picture).toEqual({
         state: "no-pictures",
         word: "NO PICTURE",
         tone: "attention",
-        detail: "not built yet",
-        sentence: "No picture yet: the cameras' pictures come with a later version.",
-        advice: null,
+        detail: `vMix Output ${camera.camera + 1} · nothing received`,
+        sentence: `vMix is not sending ${camera.tag} over NDI.`,
+        advice: "Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs).",
       });
     }
     expect((await health()).check.word).toBe("NOT SET UP");

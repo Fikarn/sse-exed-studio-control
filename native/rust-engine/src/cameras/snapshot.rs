@@ -214,7 +214,7 @@ pub struct CameraPicture {
     pub tone: CameraTone,
     /// What arrives, as the page prints it: `test picture`, or vMix's
     /// output with its size and rate (`vMix Output 2 · 3840 × 2160 ·
-    /// 29.97`); `nothing received`, or why nothing can (`not built yet`),
+    /// 29.97`); `nothing received`, or why nothing can (`not started`),
     /// after the output with vMix's pictures.
     pub detail: String,
     /// Why no picture arrives, said in its place; `null` while it arrives.
@@ -237,7 +237,7 @@ pub struct CamerasPictures {
     /// The state display's sentence; `null` while every picture arrives.
     pub sentence: Option<String>,
     /// Where the pictures come from: `test pictures`, `vMix Outputs 2 to 4`,
-    /// `not built yet`.
+    /// `not started`.
     pub source: String,
     /// The Pictures section's fine print.
     pub note: String,

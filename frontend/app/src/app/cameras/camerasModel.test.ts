@@ -616,7 +616,7 @@ describe("the pictures", () => {
   it("says NO PICTURES when none arrives, and a read tells two pictures apart", async () => {
     const { transport, read } = openCameras();
     const showing = await read();
-    // No build has held cameras and no pictures yet; the page is ready for it all the same.
+    // Held cameras and no picture from vMix: the page is ready for it all the same.
     const none = {
       ...showing,
       pictures: {
@@ -624,25 +624,24 @@ describe("the pictures", () => {
         state: "no-pictures" as const,
         word: "NO PICTURES",
         tone: "attention" as const,
-        sentence:
-          "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
-        source: "not built yet",
+        sentence: "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI.",
+        source: "vMix Outputs 2 to 4",
       },
     };
     expect(camerasStateView(none)).toMatchObject({ camera: 1, word: "NO PICTURES", tone: "attention" });
-    expect(picturesWord(none)).toBe("none · not built yet");
+    expect(picturesWord(none)).toBe("none · vMix Outputs 2 to 4");
 
     const before = camerasFingerprint(showing);
     await transport.request("cameras.setup.update", { camera: 3, vmixInput: 9 });
     expect(camerasFingerprint(await read())).not.toBe(before);
   });
 
-  it("has no pictures yet without the simulated cameras, as the studio's build", async () => {
+  it("reads the studio's build with vMix sending nothing, without the simulated cameras", async () => {
     const { read } = openCameras({ simulated: false });
     const snapshot = await read();
     expect(snapshot.cameras.some(pictureShows)).toBe(false);
-    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "not built yet", word: "no picture" });
-    expect(picturesWord(snapshot)).toBe("none · not built yet");
+    expect(pictureRows(snapshot)[0]).toMatchObject({ detail: "vMix Output 2 · nothing received", word: "no picture" });
+    expect(picturesWord(snapshot)).toBe("none · vMix Outputs 2 to 4");
     expect(camerasStateView(snapshot)?.word, "the cameras speak first").toBe("NOT SET UP");
   });
 });

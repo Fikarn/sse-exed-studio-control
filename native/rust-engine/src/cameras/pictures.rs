@@ -4,20 +4,20 @@
 //! (`docs/design/boards/A-cameras-2.html`, the states `no-pictures` and
 //! `one-picture`).
 //!
-//! No studio build receives the cameras' own pictures yet: they come over
-//! NDI from vMix's Outputs 2 to 4 on this PC with the studio build's step
-//! (D31). Until then:
+//! The pictures come over NDI from vMix's Outputs 2 to 4 on this PC (D31):
 //!
-//! - a build without the simulated cameras (the studio's) reads
-//!   `NO PICTURES`, and says they come with a later version;
-//! - a development run has the pictures helper, which the hardware link
-//!   supervises (`pictures_helper.rs`): what it says it receives is what the
-//!   page shows, and while it starts, restarts or is missing, `NO PICTURES`
-//!   says so. Its source is the simulated one, or vMix's outputs in a run
-//!   started with `npm run app -- --vmix-pictures` (D33), whose words name
-//!   the outputs;
+//! - a studio build with the real cameras, and a development run started
+//!   with `npm run app -- --vmix-pictures` (D33), have the pictures helper
+//!   on vMix's outputs, which the hardware link supervises
+//!   (`pictures_helper.rs`): what it says it receives is what the page
+//!   shows, and while it starts, restarts or is missing, `NO PICTURES` says
+//!   so; their words name the outputs (D34);
+//! - a development run with the simulated cameras has it on the test card;
 //! - with the simulated cameras and no helper (the engine's unit tests, a
-//!   studio build's lanes) the simulated source's rule stands in for it.
+//!   studio build's trial start and lanes) the simulated source's rule
+//!   stands in for it;
+//! - a run with the real cameras and no helper (a development run without
+//!   the switch) reads `NO PICTURES`, and says no picture program runs.
 //!
 //! With vMix's pictures each camera's comes from its own output, fixed
 //! (CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4: `vmix_output`), and what
@@ -38,8 +38,8 @@ use studio_control_protocol::pictures::{
 /// Where this build's pictures come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PictureSource {
-    /// No build receives the cameras' own pictures yet.
-    NotBuilt,
+    /// No helper runs: a run with the real cameras that starts none.
+    NoHelper,
     /// The simulated source's rule, with no helper to ask.
     Simulated,
     /// The pictures helper: the source it is told, and what it last said.
@@ -49,8 +49,8 @@ pub(crate) enum PictureSource {
 /// Why no picture arrives at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Nothing {
-    /// The pictures are not built in this build.
-    NotBuilt,
+    /// No picture program runs in this run.
+    NoHelper,
     /// The helper started and has not said what it receives yet.
     Starting,
     /// The helper ended or went silent, and is started again.
@@ -70,10 +70,10 @@ impl Nothing {
     /// The state display's sentence.
     fn sentence(self) -> String {
         String::from(match self {
-            Self::NotBuilt => "Studio Control shows no pictures yet: they come with a later version, over NDI from vMix on this PC.",
+            Self::NoHelper => "Studio Control starts no picture program in this run, so it shows no pictures.",
             Self::Starting => "The pictures are starting.",
             Self::Stopped => "The pictures stopped. Studio Control starts them again.",
-            Self::NoProgram => "The picture program is not beside this build, so it shows no pictures. npm run app builds it.",
+            Self::NoProgram => "The picture program beside this build is missing or not its own, so it shows no pictures.",
             Self::NotSending => "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI.",
             Self::NotAllowed => "This run does not take vMix's pictures, so it shows none.",
             Self::NoLibrary => "NDI's library did not load, so there are no pictures from vMix.",
@@ -83,9 +83,7 @@ impl Nothing {
     /// In the picture's place.
     fn camera_sentence(self, tag: &str) -> String {
         match self {
-            Self::NotBuilt => {
-                String::from("No picture yet: the cameras' pictures come with a later version.")
-            }
+            Self::NoHelper => String::from("No picture in this run."),
             Self::NotSending => format!("vMix is not sending {tag} over NDI."),
             Self::Starting
             | Self::Stopped
@@ -107,7 +105,7 @@ impl Nothing {
     /// What arrives, in the Pictures rows (`PictureSource::detail`).
     fn detail(self) -> &'static str {
         match self {
-            Self::NotBuilt => "not built yet",
+            Self::NoHelper => "not started",
             Self::Starting => "starting",
             Self::Stopped => "stopped",
             Self::NoProgram => "no picture program",
@@ -123,7 +121,7 @@ impl PictureSource {
         match helper(&cameras.db_path) {
             Some((source, status)) => Self::Helper(source, status),
             None if cameras.simulated => Self::Simulated,
-            None => Self::NotBuilt,
+            None => Self::NoHelper,
         }
     }
 
@@ -135,7 +133,7 @@ impl PictureSource {
     /// Why no picture arrives at all; `None` when the source sends.
     fn nothing(&self) -> Option<Nothing> {
         match self {
-            Self::NotBuilt => Some(Nothing::NotBuilt),
+            Self::NoHelper => Some(Nothing::NoHelper),
             Self::Simulated => None,
             Self::Helper(_, HelperStatus::Starting) => Some(Nothing::Starting),
             Self::Helper(_, HelperStatus::Restarting) => Some(Nothing::Stopped),
@@ -207,7 +205,7 @@ impl PictureSource {
     /// say it.
     fn words(&self) -> &'static str {
         match self {
-            Self::NotBuilt => "not built yet",
+            Self::NoHelper => "not started",
             Self::Helper(HelperSource::Vmix, _) => "vMix Outputs 2 to 4",
             Self::Simulated | Self::Helper(HelperSource::Simulated, _) => "test pictures",
         }
@@ -216,17 +214,17 @@ impl PictureSource {
     /// The Pictures section's fine print.
     fn note(&self) -> String {
         match self {
-            Self::NotBuilt => String::from(
-                "The cameras' own pictures come with a later version, over NDI from vMix on this PC.",
+            Self::NoHelper => String::from(
+                "A studio build shows vMix's Outputs 2, 3 and 4 over NDI; a development run, its test pictures.",
             ),
             Self::Helper(HelperSource::Vmix, _) => format!(
-                "The pictures come over NDI from vMix's Outputs 2, 3 and 4 on this PC: CAM 1 from Output {}, CAM 2 from Output {}, CAM 3 from Output {}.",
+                "Over NDI from vMix on this PC: CAM 1 from Output {}, CAM 2 from Output {}, CAM 3 from Output {}.",
                 vmix_output(1).unwrap_or_default(),
                 vmix_output(2).unwrap_or_default(),
                 vmix_output(3).unwrap_or_default()
             ),
             Self::Simulated | Self::Helper(HelperSource::Simulated, _) => format!(
-                "Test pictures stand in for vMix inputs {} to {}. The cameras' own come with a later version, over NDI from vMix on this PC.",
+                "Test pictures stand in for vMix inputs {} to {}. A studio build shows vMix's Outputs 2, 3 and 4 over NDI.",
                 SIMULATED_VMIX_INPUTS.start(),
                 SIMULATED_VMIX_INPUTS.end()
             ),

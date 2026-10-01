@@ -151,18 +151,18 @@ The shell:
 
 ## Studio builds
 
-A studio build is a folder that holds the shell and the engine, both release builds that `npm run release` marked as the studio's, and `build.json`, which names the commit and the hash of each file. Every other build is a development build and keeps off the studio, a release build made by hand included.
+A studio build is a folder that holds the shell, the engine and the pictures helper, release builds that `npm run release` marked as the studio's, NDI's library (the SDK's own file, never in git), and `build.json`, which names the commit and the hash of each file. Every other build is a development build and keeps off the studio, a release build made by hand included.
 
 ```bash
 npm run release
 ```
 
-It needs a clean working tree and a commit that is on `origin/main`. It builds, copies the two files into `builds\<day>_<commit>\` beside the repository, and then tries the copy on scratch data with simulated devices: the shell starts the engine beside it, and the acceptance lane and the bridge lane run against that engine. It takes about ten minutes. A build is never overwritten and never deleted by a script.
+It needs a clean working tree, a commit that is on `origin/main`, and the NDI SDK's library that `native/pictures-link/ndi-library.json` pins (from `NDI_SDK_DIR`, or the SDK's own folder), held to its SHA-256 before the build and again on its copy. It builds, copies the three programs and the library into `builds\<day>_<commit>\` beside the repository, and then tries the copy on scratch data with simulated devices: the shell starts the engine beside it, and the acceptance lane and the bridge lane run against that engine. With the simulated cameras that engine starts no pictures helper and loads no library, so the helper and the library first run on the owner's walk. It prints the library's version: NDI asks that a release use an SDK no older than 30 days when a newer one is out. It takes about ten minutes. A build is never overwritten and never deleted by a script.
 
 To make a build the studio's:
 
 1. Close the studio app and start the new build's `sse-exed-tauri-shell.exe`. If its saved-data schema is newer, this start upgrades the studio's data, after a backup. An older build then refuses that data: going back means restoring the backup.
 2. Walk `docs/CHECKLIST.md`.
-3. `npm run release:verified -- <the build's name>`. It checks the folder against `build.json`, points `builds\Studio Control.cmd` at the build, adds a line to `builds\verified.txt` and tags the commit `verified/<name>`.
+3. `npm run release:verified -- <the build's name>`. It checks the folder against `build.json` (every file the record names; the shell, the engine, and the helper and the library whenever they are in the folder; a build made before the helper still verifies), points `builds\Studio Control.cmd` at the build, adds a line to `builds\verified.txt` and tags the commit `verified/<name>`.
 
 `builds\Studio Control.cmd` always starts the verified build. `STUDIO_BUILDS_DIR` names another builds folder.

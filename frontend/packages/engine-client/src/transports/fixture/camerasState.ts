@@ -28,7 +28,6 @@ import {
 } from "./camerasModel";
 import {
   NO_PICTURES_SENTENCE,
-  NO_PICTURE_YET_SENTENCE,
   PICTURE_MISSING_DETAIL,
   PICTURE_SHOWING_DETAIL,
   PICTURE_WORDS,
@@ -36,6 +35,7 @@ import {
   STATE_RANK,
   STATE_TONES,
   STATE_WORDS,
+  VMIX_NOT_SENDING_ADVICE,
   VMIX_OUTPUTS,
   heldSentence,
   noLinkRefusalSentence,
@@ -48,6 +48,7 @@ import {
   picturesNote,
   releasedSentence,
   unreachableSentence,
+  vmixNothingDetail,
 } from "./camerasWords";
 import type { MutableFixtureState } from "./state";
 
@@ -422,9 +423,10 @@ export function cameraSnapshot(cameras: FixtureCameras, camera: CameraNumber): C
 
 /**
  * A camera's picture, which is vMix's and not the camera's link's: whatever state the camera
- * is in. The double has no vMix: without the simulated cameras (the studio's build) none
- * arrives; the simulated cameras' test pictures stand in for vMix inputs 1 to 4, so a camera
- * whose saved input is another (a seed's) reads NO PICTURE while the others show.
+ * is in. The double has no vMix: without the simulated cameras (the studio's build) it is a
+ * studio build with vMix sending none of its outputs; the simulated cameras' test pictures
+ * stand in for vMix inputs 1 to 4, so a camera whose saved input is another (a seed's) reads
+ * NO PICTURE while the others show.
  */
 export function cameraPicture(cameras: FixtureCameras, camera: CameraNumber): CameraPicture {
   const vmixInput = cameras.held[camera].vmixInput;
@@ -433,9 +435,9 @@ export function cameraPicture(cameras: FixtureCameras, camera: CameraNumber): Ca
       state: "no-pictures",
       word: PICTURE_WORDS.noPicture,
       tone: "attention",
-      detail: pictureSourceWords(false),
-      sentence: NO_PICTURE_YET_SENTENCE,
-      advice: null,
+      detail: vmixNothingDetail(camera),
+      sentence: pictureMissingSentence(cameraModel(camera)),
+      advice: VMIX_NOT_SENDING_ADVICE,
     };
   }
   if (vmixInput >= SIMULATED_VMIX_INPUTS.first && vmixInput <= SIMULATED_VMIX_INPUTS.last) {

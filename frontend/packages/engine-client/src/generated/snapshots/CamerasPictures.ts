@@ -19,7 +19,7 @@ export type CamerasPictures = {
   sentence: string | null;
   /**
    * Where the pictures come from: `test pictures`, `vMix Outputs 2 to 4`,
-   * `not built yet`.
+   * `not started`.
    */
   source: string;
   /**
