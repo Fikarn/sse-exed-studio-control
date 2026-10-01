@@ -19,16 +19,19 @@
 //! - A receiver takes each frame, drops the first after a silence (vMix hands
 //!   over a stale one at each connect), refuses what the renderer cannot take,
 //!   and copies the rest into its camera's newest frame, which the draw loop
-//!   takes (`layer.rs`): the newest wins, and the buffers go round.
+//!   takes (`layer.rs`): the newest wins, and the buffers go round. Each frame
+//!   handed over wakes the draw loop, which draws in step with vMix's frames,
+//!   and the spaces between frames go to the minute's line (`vmix::Spacing`).
 //! - Every thread beats (`watch.rs`): one stuck in the library makes the
 //!   helper go silent, and the hardware link starts it again. When the helper
 //!   ends, its receivers and its search end first (`finish`), so no thread is
 //!   inside the library when the process goes.
 
+use crate::layer::Inbox;
 use crate::ndi_library::{Finder, Ndi, Receiver};
 use crate::ndi_sdk::Captured;
 use crate::vmix::{
-    self, Announced, CameraMinute, LibraryCounts, Received, Seen, Silence, SEARCH_SETTLES,
+    self, Announced, CameraMinute, LibraryCounts, Received, Seen, Silence, Spacing, SEARCH_SETTLES,
 };
 use crate::watch::Beats;
 use std::path::Path;
@@ -100,6 +103,8 @@ struct Shared {
     /// Why the search did not start, if it did not.
     search_failed: Mutex<Option<String>>,
     frames: Arc<Frames>,
+    /// Told of each frame handed over: it wakes the draw loop.
+    inbox: Arc<Inbox>,
     /// The search ends when this is set, and says so in `search_ended`.
     stop_search: AtomicBool,
     search_ended: AtomicBool,
@@ -152,8 +157,9 @@ pub struct Vmix {
 
 impl Vmix {
     /// Holds NDI's library to its pin, loads it and starts its search; says
-    /// on stderr which file and version it loaded.
-    pub fn start(library: &Path, beats: Arc<Beats>) -> Result<Self, String> {
+    /// on stderr which file and version it loaded. Each frame a receiver
+    /// hands over is said to `inbox`.
+    pub fn start(library: &Path, beats: Arc<Beats>, inbox: Arc<Inbox>) -> Result<Self, String> {
         // The search's first seconds are counted from here, so that they
         // overlap the check and the load: the engine hears the helper within
         // its five seconds either way.
@@ -175,6 +181,7 @@ impl Vmix {
             cameras: Default::default(),
             search_failed: Mutex::new(None),
             frames: Arc::new(Default::default()),
+            inbox,
             stop_search: AtomicBool::new(false),
             search_ended: AtomicBool::new(false),
         });
@@ -540,6 +547,7 @@ fn take_frames(
     who: &str,
 ) {
     let mut silence = Silence::default();
+    let mut spacing = Spacing::default();
     let mut spare: Vec<u8> = Vec::new();
     let mut counted = Instant::now();
     while !stop.load(Ordering::Acquire) {
@@ -561,25 +569,30 @@ fn take_frames(
                     }
                     Ok(_) if stale => {
                         camera.received.stale += 1;
+                        spacing.forget();
                         return;
                     }
                     Ok((checked, picture)) => {
                         camera.received.taken += 1;
                         camera.last_taken = Some(now);
                         camera.format = Some(checked.format);
+                        spacing.note(now, checked.sent, &checked.format, &mut camera.received);
                         (checked, picture)
                     }
                 }
             };
             spare.clear();
             spare.extend_from_slice(picture);
-            let mut newest = lock(&shared.frames[index]);
-            std::mem::swap(&mut newest.bytes, &mut spare);
-            newest.width = checked.width;
-            newest.height = checked.height;
-            newest.stride = checked.stride;
-            newest.sequence = newest.sequence.wrapping_add(1);
-            newest.arrived = Some(now);
+            {
+                let mut newest = lock(&shared.frames[index]);
+                std::mem::swap(&mut newest.bytes, &mut spare);
+                newest.width = checked.width;
+                newest.height = checked.height;
+                newest.stride = checked.stride;
+                newest.sequence = newest.sequence.wrapping_add(1);
+                newest.arrived = Some(now);
+            }
+            shared.inbox.landed();
         });
         if captured == Captured::Lost {
             shared.camera(index).received.errors += 1;

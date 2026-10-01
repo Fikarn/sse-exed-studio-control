@@ -7,6 +7,7 @@
 //! What the library hands over is `ndi_sdk.rs`'s; its calls are
 //! `ndi_library.rs`'s; the threads that make them are `receive.rs`'s.
 
+use crate::ndi_sdk::{Sent, TIME_UNDEFINED};
 use crate::sha256::{pinned_sha256, sha256_hex};
 use std::ffi::{c_int, OsString};
 use std::net::{IpAddr, SocketAddr, UdpSocket};
@@ -272,12 +273,132 @@ pub struct Received {
     pub errors: u64,
     /// Receivers made for it.
     pub connects: u64,
+    /// How far apart its frames landed here, and how far apart vMix sent
+    /// them by its own timestamps (`Spacing`).
+    pub landed: Spread,
+    pub sent: Spread,
+    /// Steps of vMix's timecode that were not one frame.
+    pub timecode_steps: u64,
 }
 
 impl Received {
     pub fn any(&self) -> bool {
         self.taken + self.stale + self.refused + self.errors + self.connects > 0
     }
+}
+
+/// Durations counted in five bins, with the longest: how far apart a
+/// camera's frames came, or how long one waited to be drawn.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Spread {
+    pub counts: [u64; 5],
+    pub longest: Duration,
+}
+
+/// The bins of the space between two frames, around vMix's 33.4 ms: two
+/// together, one early, on time (within about 8 ms), one late, and a frame
+/// or more missing.
+pub const GAP_EDGES: [Duration; 4] = [
+    Duration::from_millis(8),
+    Duration::from_millis(25),
+    Duration::from_millis(42),
+    Duration::from_millis(58),
+];
+
+impl Spread {
+    /// `value` in its bin: below the first edge, between two, or past the
+    /// last.
+    pub fn note(&mut self, value: Duration, edges: &[Duration; 4]) {
+        let bin = edges.iter().position(|edge| value < *edge).unwrap_or(4);
+        self.counts[bin] += 1;
+        self.longest = self.longest.max(value);
+    }
+
+    pub fn any(&self) -> bool {
+        self.counts.iter().any(|count| *count > 0)
+    }
+
+    /// "(under 8, 8–25, 25–42, 42–58, 58 ms or more) 0 / 2 / 1794 / 1 / 0,
+    /// the longest 44.0 ms".
+    pub fn words(&self, edges: &[Duration; 4]) -> String {
+        let ms = |edge: &Duration| edge.as_millis();
+        let counts: Vec<String> = self.counts.iter().map(u64::to_string).collect();
+        format!(
+            "(under {}, {}–{}, {}–{}, {}–{}, {} ms or more) {}, the longest {:.1} ms",
+            ms(&edges[0]),
+            ms(&edges[0]),
+            ms(&edges[1]),
+            ms(&edges[1]),
+            ms(&edges[2]),
+            ms(&edges[2]),
+            ms(&edges[3]),
+            ms(&edges[3]),
+            counts.join(" / "),
+            self.longest.as_secs_f64() * 1000.0
+        )
+    }
+}
+
+/// How far a step of vMix's timecode may be from one frame and still count
+/// as one: 1 ms, in the timecode's 100 ns.
+const TIMECODE_LEEWAY: u64 = 10_000;
+
+/// What a receiver keeps of the last frame it took, to measure the space to
+/// the next: when it landed, and vMix's own times of it.
+#[derive(Debug, Default)]
+pub struct Spacing {
+    last: Option<(Instant, Sent)>,
+}
+
+impl Spacing {
+    /// A frame taken at `now`, as vMix sent it at `format`'s rate: the
+    /// spaces from the one before are counted in `received`.
+    pub fn note(
+        &mut self,
+        now: Instant,
+        sent: Sent,
+        format: &PictureFormat,
+        received: &mut Received,
+    ) {
+        if let Some((landed, before)) = self.last {
+            received
+                .landed
+                .note(now.saturating_duration_since(landed), &GAP_EDGES);
+            let given = |time: i64| time != TIME_UNDEFINED;
+            if given(before.timestamp) && given(sent.timestamp) {
+                // A step back is not a space: it is left out.
+                if let Ok(step) = u64::try_from(sent.timestamp.saturating_sub(before.timestamp)) {
+                    received
+                        .sent
+                        .note(Duration::from_nanos(step.saturating_mul(100)), &GAP_EDGES);
+                }
+            }
+            if let Some(period) = frame_in_100ns(format) {
+                if given(before.timecode) && given(sent.timecode) {
+                    let step = sent.timecode.saturating_sub(before.timecode);
+                    if step.abs_diff(period) > TIMECODE_LEEWAY {
+                        received.timecode_steps += 1;
+                    }
+                }
+            }
+        }
+        self.last = Some((now, sent));
+    }
+
+    /// After a silence the next frame measures nothing.
+    pub fn forget(&mut self) {
+        self.last = None;
+    }
+}
+
+/// One frame at `format`'s rate, in 100 ns; none for an unknown rate.
+fn frame_in_100ns(format: &PictureFormat) -> Option<i64> {
+    let numerator = u64::from(format.rate_numerator);
+    if numerator == 0 {
+        return None;
+    }
+    let period = (10_000_000 * u64::from(format.rate_denominator) + numerator / 2) / numerator;
+    i64::try_from(period).ok()
 }
 
 /// The library's own counts of a receiver, since it was made.
@@ -326,15 +447,30 @@ pub fn minute_line(cameras: &[CameraMinute<'_>]) -> String {
                     )
                 },
             );
+            let received = camera.received;
+            let spacing = if received.landed.any() {
+                let sent = if received.sent.any() {
+                    received.sent.words(&GAP_EDGES)
+                } else {
+                    String::from("not said")
+                };
+                format!(
+                    "; frames apart as they landed {}; as vMix sent them {sent}; {} timecode steps not one frame",
+                    received.landed.words(&GAP_EDGES),
+                    received.timecode_steps
+                )
+            } else {
+                String::new()
+            };
             format!(
-                "CAM {} (Output {}, {listed}){format}: {} taken, {} stale, {} refused{refusal}, {} lost, {} connects; {library}",
+                "CAM {} (Output {}, {listed}){format}: {} taken, {} stale, {} refused{refusal}, {} lost, {} connects{spacing}; {library}",
                 camera.camera,
                 camera.output,
-                camera.received.taken,
-                camera.received.stale,
-                camera.received.refused,
-                camera.received.errors,
-                camera.received.connects,
+                received.taken,
+                received.stale,
+                received.refused,
+                received.errors,
+                received.connects,
             )
         })
         .collect();
@@ -582,16 +718,119 @@ mod tests {
         );
     }
 
+    const UHD: PictureFormat = PictureFormat {
+        width: 3840,
+        height: 2160,
+        rate_numerator: 30000,
+        rate_denominator: 1001,
+    };
+
+    /// vMix's times of a frame, in 100 ns.
+    fn sent(timecode: i64, timestamp: i64) -> Sent {
+        Sent {
+            timecode,
+            timestamp,
+        }
+    }
+
+    #[test]
+    fn a_spread_counts_each_value_in_its_bin() {
+        let mut spread = Spread::default();
+        assert!(!spread.any());
+        for ms in [0, 7, 8, 24, 33, 34, 41, 42, 57, 58, 70] {
+            spread.note(Duration::from_millis(ms), &GAP_EDGES);
+        }
+        assert_eq!(spread.counts, [2, 2, 3, 2, 2], "an edge is the bin above's");
+        assert_eq!(spread.longest, Duration::from_millis(70));
+        assert_eq!(
+            spread.words(&GAP_EDGES),
+            "(under 8, 8–25, 25–42, 42–58, 58 ms or more) 2 / 2 / 3 / 2 / 2, the longest 70.0 ms"
+        );
+    }
+
+    // The spaces between a camera's frames as they land here and as vMix
+    // stamped them, and its timecode's steps: what tells a sender that sends
+    // in bursts from a receiver that takes them so.
+    #[test]
+    fn the_spaces_between_frames_are_measured_as_they_landed_and_as_vmix_sent_them() {
+        let start = Instant::now();
+        let at = |ms: u64| start + Duration::from_millis(ms);
+        let period = 333_667;
+        let mut spacing = Spacing::default();
+        let mut received = Received::default();
+        // The first frame measures nothing.
+        spacing.note(at(0), sent(0, 1_000_000), &UHD, &mut received);
+        assert_eq!(received, Received::default());
+        // Even: on time both ways.
+        spacing.note(at(33), sent(period, 1_333_667), &UHD, &mut received);
+        // Two together here, sent a frame apart.
+        spacing.note(at(70), sent(2 * period, 1_667_334), &UHD, &mut received);
+        spacing.note(at(72), sent(3 * period, 2_001_001), &UHD, &mut received);
+        // A frame vMix never sent: its timecode skips one.
+        spacing.note(at(139), sent(5 * period, 2_668_335), &UHD, &mut received);
+        assert_eq!(received.landed.counts, [1, 0, 2, 0, 1]);
+        assert_eq!(received.sent.counts, [0, 0, 3, 0, 1]);
+        assert_eq!(received.timecode_steps, 1);
+        assert_eq!(received.landed.longest, Duration::from_millis(67));
+
+        // A step back of the timestamp is left out, and an undefined time
+        // measures nothing; the timecode's step back is not one frame.
+        let mut received = Received::default();
+        spacing.note(at(172), sent(4 * period, 2_000_000), &UHD, &mut received);
+        spacing.note(
+            at(205),
+            sent(TIME_UNDEFINED, TIME_UNDEFINED),
+            &UHD,
+            &mut received,
+        );
+        spacing.note(at(238), sent(6 * period, 2_667_334), &UHD, &mut received);
+        assert_eq!(received.landed.counts, [0, 0, 3, 0, 0]);
+        assert!(!received.sent.any());
+        assert_eq!(received.timecode_steps, 1, "the step back");
+
+        // After a silence the next frame starts afresh.
+        let mut received = Received::default();
+        spacing.forget();
+        spacing.note(at(5_000), sent(9 * period, 9_000_000), &UHD, &mut received);
+        assert_eq!(received, Received::default());
+
+        // Without a rate the timecode is not judged.
+        let mut received = Received::default();
+        let unknown = PictureFormat {
+            rate_numerator: 0,
+            rate_denominator: 0,
+            ..UHD
+        };
+        spacing.note(at(5_033), sent(1, 9_333_667), &unknown, &mut received);
+        assert_eq!(received.timecode_steps, 0);
+        assert_eq!(received.landed.counts, [0, 0, 1, 0, 0]);
+    }
+
+    #[test]
+    fn a_frame_is_one_period_of_its_rate() {
+        assert_eq!(frame_in_100ns(&UHD), Some(333_667));
+        let twenty_five = PictureFormat {
+            rate_numerator: 25,
+            rate_denominator: 1,
+            ..UHD
+        };
+        assert_eq!(frame_in_100ns(&twenty_five), Some(400_000));
+    }
+
     #[test]
     fn the_minute_line_says_each_camera() {
-        let received = Received {
+        let mut received = Received {
             taken: 1_798,
             stale: 1,
             refused: 2,
             last_refusal: Some(String::from("a frame in UYVA")),
             errors: 0,
             connects: 1,
+            ..Received::default()
         };
+        received.landed.note(Duration::from_millis(33), &GAP_EDGES);
+        received.landed.note(Duration::from_millis(2), &GAP_EDGES);
+        received.timecode_steps = 1;
         let line = minute_line(&[
             CameraMinute {
                 camera: 1,
@@ -622,7 +861,7 @@ mod tests {
         ]);
         assert_eq!(
             line,
-            "The pictures helper received from vMix in the last minute: CAM 1 (Output 2, listed) 3840 × 2160 · 29.97: 1798 taken, 1 stale, 2 refused (the last: a frame in UYVA), 0 lost, 1 connects; the library since connecting 1801 frames, 0 dropped, 0 queued, 1 connected; CAM 2 (Output 3, not listed): 0 taken, 0 stale, 0 refused, 0 lost, 0 connects; no receiver."
+            "The pictures helper received from vMix in the last minute: CAM 1 (Output 2, listed) 3840 × 2160 · 29.97: 1798 taken, 1 stale, 2 refused (the last: a frame in UYVA), 0 lost, 1 connects; frames apart as they landed (under 8, 8–25, 25–42, 42–58, 58 ms or more) 1 / 0 / 1 / 0 / 0, the longest 33.0 ms; as vMix sent them not said; 1 timecode steps not one frame; the library since connecting 1801 frames, 0 dropped, 0 queued, 1 connected; CAM 2 (Output 3, not listed): 0 taken, 0 stale, 0 refused, 0 lost, 0 connects; no receiver."
         );
         assert!(received.any());
         assert!(!Received::default().any());
