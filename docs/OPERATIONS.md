@@ -61,22 +61,24 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 - **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on.
 - **Gain.** `GAIN` on a preamp's strip opens typed entry, 0 to 75 dB. The plate's knob rides it.
 - **Solo and clip.** The cluster names the soloed strips, with `Clear all solo`. A clipped strip shows `CLIP`; `Clear clips` clears all.
-- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot twice (`LOAD?`) to load it in TotalMix; the Console then reads the desk. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
+- **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot, then again while it reads `LOAD?`, to load it in TotalMix; the Console then reads the desk. A double-click only arms it. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
 - **`Sync from TotalMix`** reads the desk and changes nothing on it.
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:
 
-| State           | It means                                  | Way out                 |
-| --------------- | ----------------------------------------- | ----------------------- |
-| `SYNC NEEDED`   | The desk is unread since the link changed | `Sync from TotalMix`    |
-| `ASSUMED`       | A change was not confirmed in 1.5 s       | `Sync from TotalMix`    |
-| `NOT VERIFIED`  | Probe not run; every control locked       | `Run audio probe`       |
-| `STALE`         | No meter data for half a second           | `Run audio probe`       |
-| `OFFLINE`       | Probe failed, or no meter data for 2 s    | `Run audio probe`       |
-| `DISCONNECTED`  | TotalMix reports the UFX III gone         | Check its USB and power |
-| `ACTION FAILED` | The last action failed                    | Any action that works   |
+| State           | It means                                                          | Way out                 |
+| --------------- | ----------------------------------------------------------------- | ----------------------- |
+| `SYNC NEEDED`   | The desk is unread since the link changed                         | `Sync from TotalMix`    |
+| `ASSUMED`       | A change was not confirmed in 1.5 s, or TotalMix was out of touch | `Sync from TotalMix`    |
+| `NOT VERIFIED`  | Probe not run; every control locked                               | `Run audio probe`       |
+| `STALE`         | No meter data for half a second                                   | `Run audio probe`       |
+| `OFFLINE`       | Probe failed, or no meter data for 2 s                            | `Run audio probe`       |
+| `DISCONNECTED`  | TotalMix reports the UFX III gone                                 | Check its USB and power |
+| `ACTION FAILED` | The last action failed                                            | Any action that works   |
 
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
+
+TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. The state display says why the desk is assumed: TotalMix out of touch, or the changes TotalMix did not confirm.
 
 ## Teleprompter
 

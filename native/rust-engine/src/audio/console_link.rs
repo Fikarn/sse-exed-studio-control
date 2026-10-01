@@ -15,6 +15,11 @@
 //! lost-reports mark), resets it to `unknown`. Nothing here ever raises confidence — only a complete pull
 //! may do that.
 //!
+//! TotalMix heard again after it was out of touch on remote 4 (switched off,
+//! or TotalMix closed; the walk of 2026-10-01) makes a known console
+//! `assumed` with `AUDIO_CONSOLE_OUT_OF_TOUCH`: a change made at TotalMix
+//! meanwhile may never arrive, and only a Sync reads the desk whole.
+//!
 //! Channel and output names come from TotalMix (2026-10-01) and are written
 //! like any change made there, without a row in Recent actions. TotalMix's
 //! snapshot slots stay on the link: a flush only reports that one changed.
@@ -49,6 +54,9 @@ pub struct ConsoleFlushReport {
     /// One of TotalMix's snapshot slots changed state (the link holds the
     /// slots; nothing is written): the Console reads them again.
     pub slots_changed: bool,
+    /// TotalMix is back after it was out of touch, and this flush made the
+    /// Console assumed.
+    pub out_of_touch: bool,
 }
 
 impl ConsoleFlushReport {
@@ -58,6 +66,7 @@ impl ConsoleFlushReport {
             || self.connection_lost
             || self.desk_unread
             || self.slots_changed
+            || self.out_of_touch
     }
 }
 
@@ -97,7 +106,7 @@ pub(crate) fn flush_console_link_at(
         return Ok(ConsoleFlushReport::default());
     }
     let _state_guard = lock_audio_state();
-    let (updates, superseded, expired, connection_lost, desk_unread, slots_changed) = {
+    let (updates, superseded, expired, marks, slots_changed) = {
         let mut link = lock_link();
         // A report or a confirmation of a parameter the app has sent again
         // since is older than that send: the desk takes the app's newer value,
@@ -113,26 +122,22 @@ pub(crate) fn flush_console_link_at(
             updates,
             superseded,
             link.take_expired(),
-            link.take_connection_lost(),
-            link.take_reports_lost(),
+            ConsoleMarks {
+                connection_lost: link.take_connection_lost(),
+                desk_unread: link.take_reports_lost(),
+                out_of_touch_secs: link.take_out_of_touch(),
+            },
             link.take_snapshot_slots_changed(),
         )
     };
     // A changed slot is reported, not written. A failed write drops the mark
     // with the rest: the desk-unread flush that follows is reported too, and
     // the Console then reads the slots as the link holds them.
-    let result = apply_console_activity_locked(
-        db_path,
-        &updates,
-        &superseded,
-        &expired,
-        connection_lost,
-        desk_unread,
-    )
-    .map(|report| ConsoleFlushReport {
-        slots_changed,
-        ..report
-    });
+    let result = apply_console_activity_locked(db_path, &updates, &superseded, &expired, marks)
+        .map(|report| ConsoleFlushReport {
+            slots_changed,
+            ..report
+        });
     if result.is_err() {
         // Under the state lock, so no Sync or recall writes `aligned` between
         // this failure and the mark. The retry is counted from the failure,
@@ -155,7 +160,27 @@ pub(crate) fn apply_console_activity(
     connection_lost: bool,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
     let _state_guard = lock_audio_state();
-    apply_console_activity_locked(db_path, updates, &[], expired, connection_lost, false)
+    apply_console_activity_locked(
+        db_path,
+        updates,
+        &[],
+        expired,
+        ConsoleMarks {
+            connection_lost,
+            ..ConsoleMarks::default()
+        },
+    )
+}
+
+/// The marks a flush takes from the console link besides its changes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct ConsoleMarks {
+    /// TotalMix reported the interface gone.
+    connection_lost: bool,
+    /// An earlier flush's write failed and dropped what the desk reported.
+    desk_unread: bool,
+    /// TotalMix is heard again after this many seconds out of touch.
+    out_of_touch_secs: Option<u64>,
 }
 
 /// The persistence half of `flush_console_link`, for a caller that holds
@@ -167,14 +192,17 @@ fn apply_console_activity_locked(
     updates: &[ConsoleUpdate],
     superseded: &[ConsoleUpdate],
     expired: &[PendingSend],
-    connection_lost: bool,
-    desk_unread: bool,
+    marks: ConsoleMarks,
 ) -> Result<ConsoleFlushReport, AudioCommandError> {
+    let ConsoleMarks {
+        connection_lost,
+        desk_unread,
+        out_of_touch_secs,
+    } = marks;
     if updates.is_empty()
         && superseded.is_empty()
         && expired.is_empty()
-        && !connection_lost
-        && !desk_unread
+        && marks == ConsoleMarks::default()
     {
         return Ok(ConsoleFlushReport::default());
     }
@@ -266,6 +294,30 @@ fn apply_console_activity_locked(
             ),
         ));
     }
+    // TotalMix is heard again after it was out of touch on remote 4: a change
+    // made there meanwhile may never arrive (the walk of 2026-10-01), so a
+    // known console is assumed until a Sync reads it whole. It comes after
+    // the unconfirmed sends, so its sentence is the one shown, and it never
+    // lifts an unknown console.
+    let out_of_touch = out_of_touch_secs.filter(|_| snapshot.console_state_confidence != "unknown");
+    if let Some(secs) = out_of_touch {
+        writes.push(confidence_setting(ConsoleConfidence::Assumed));
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+            String::from("failed"),
+        ));
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_CODE_KEY),
+            String::from(AUDIO_CONSOLE_OUT_OF_TOUCH),
+        ));
+        writes.push((
+            String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+            format!(
+                "TotalMix was out of touch for {}, so a change made there meanwhile may be missing. Press Sync from TotalMix.",
+                out_of_touch_words(secs)
+            ),
+        ));
+    }
     // TotalMix reported the interface gone, or an earlier write failed and
     // dropped what the desk reported: either way the app no longer knows what
     // the desk is set to.
@@ -282,7 +334,24 @@ fn apply_console_activity_locked(
         connection_lost,
         desk_unread,
         slots_changed: false,
+        out_of_touch: out_of_touch.is_some(),
     })
+}
+
+/// The last action's code when TotalMix was out of touch on remote 4; the
+/// Console's state display shows the sentence that goes with it.
+pub(crate) const AUDIO_CONSOLE_OUT_OF_TOUCH: &str = "AUDIO_CONSOLE_OUT_OF_TOUCH";
+
+/// How long TotalMix was out of touch, in the operator's words: seconds
+/// under two minutes, minutes under two hours, then hours.
+pub(crate) fn out_of_touch_words(secs: u64) -> String {
+    if secs < 120 {
+        format!("{secs} s")
+    } else if secs < 2 * 60 * 60 {
+        format!("{} min", secs / 60)
+    } else {
+        format!("{} h", secs / (60 * 60))
+    }
 }
 
 /// A confirmation carries the level the app sent, which travelled as a 32-bit

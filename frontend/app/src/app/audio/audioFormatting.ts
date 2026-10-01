@@ -237,6 +237,10 @@ function formatAudioActionFailureTitle(snapshot: AudioSnapshot | null) {
     .trim();
 }
 
+// The hardware link's codes for why the desk is assumed: TotalMix was out of
+// touch on remote 4, or a change went unconfirmed.
+const ASSUMED_REASON_CODES = new Set(["AUDIO_CONSOLE_OUT_OF_TOUCH", "AUDIO_CONSOLE_UNCONFIRMED"]);
+
 export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatusDescriptor {
   const lastActionFailed = String(snapshot?.lastActionStatus ?? "idle") === "failed";
   const meteringSource = String(snapshot?.meteringSource ?? snapshot?.adapterMode ?? "").toLowerCase();
@@ -321,11 +325,22 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.consoleStateConfidence ?? "unknown") === "assumed") {
+    // 2026-10-01 (the walk): when the hardware link says why the desk is
+    // assumed (TotalMix was out of touch, or a change went unconfirmed), its
+    // sentence is the one shown.
+    const reason =
+      lastActionFailed &&
+      ASSUMED_REASON_CODES.has(String(snapshot?.lastActionCode ?? "")) &&
+      typeof snapshot?.lastActionMessage === "string" &&
+      snapshot.lastActionMessage.trim().length > 0
+        ? snapshot.lastActionMessage
+        : null;
     return {
       bannerEligible: true,
       label: "ASSUMED",
       tone: "attention" satisfies StatusToneLike,
       warningBody:
+        reason ??
         "Showing the last state the desk confirmed. Press Sync from TotalMix to pull the current state before trusting the faders.",
       warningCode: null,
       warningTitle: "STATE ASSUMED",

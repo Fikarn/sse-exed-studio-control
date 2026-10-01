@@ -244,7 +244,10 @@ pub(super) fn pull_console_state(
         );
     }
 
+    // A failed pull writes unknown under the state lock: a metering flush that
+    // already read the console as known must not write assumed after it.
     if progress.control_messages == 0 {
+        let _state_guard = lock_audio_state();
         return Err(fail(
             db_path,
             "AUDIO_SYNC_NO_ECHO",
@@ -257,6 +260,7 @@ pub(super) fn pull_console_state(
         ));
     }
     if !complete {
+        let _state_guard = lock_audio_state();
         return Err(fail(
             db_path,
             "AUDIO_SYNC_INCOMPLETE",

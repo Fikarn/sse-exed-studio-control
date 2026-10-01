@@ -579,6 +579,9 @@ pub struct ConsoleLinkState {
     connection_lost: bool,
     reports_lost: bool,
     reports_lost_retry_at_ms: u64,
+    /// TotalMix was out of touch on the Global remote for this many seconds
+    /// and is heard again: the next flush makes the Console assumed.
+    out_of_touch_secs: Option<u64>,
     device: Option<String>,
     dsp_load: Option<f64>,
     last_echo_at_ms: Option<u64>,
@@ -1071,12 +1074,25 @@ impl ConsoleLinkState {
     }
 
     /// Whether a flush has anything to write or report: queued changes,
-    /// expired sends, a lost connection or a snapshot slot that changed.
+    /// expired sends, a lost connection, TotalMix back after being out of
+    /// touch, or a snapshot slot that changed.
     pub fn has_activity(&self) -> bool {
         !self.queued.is_empty()
             || !self.expired.is_empty()
             || self.connection_lost
+            || self.out_of_touch_secs.is_some()
             || self.snapshot_slots_changed
+    }
+
+    /// TotalMix is heard again after `secs` out of touch on the Global
+    /// remote. Two quiets before a flush keep the longer.
+    pub fn mark_out_of_touch(&mut self, secs: u64) {
+        self.out_of_touch_secs = Some(self.out_of_touch_secs.unwrap_or(0).max(secs));
+    }
+
+    /// Takes the out-of-touch mark, for the flush that writes it.
+    pub fn take_out_of_touch(&mut self) -> Option<u64> {
+        self.out_of_touch_secs.take()
     }
 
     /// One `/snapshot/load/N` report. Slots outside 1 to 8 and values
@@ -1284,6 +1300,7 @@ impl ConsoleLinkState {
         self.pull = None;
         self.connection_lost = false;
         self.reports_lost = false;
+        self.out_of_touch_secs = None;
         self.snapshot_slots = [SnapshotSlotState::Unknown; SNAPSHOT_SLOTS];
         self.snapshot_slot_seqs = [0; SNAPSHOT_SLOTS];
         self.snapshot_report_seq = 0;

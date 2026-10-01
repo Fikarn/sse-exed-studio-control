@@ -235,6 +235,55 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
     );
   });
 
+  it("says for how long TotalMix was out of touch while ASSUMED (2026-10-01)", () => {
+    const sentence =
+      "TotalMix was out of touch for 31 s, so a change made there meanwhile may be missing. Press Sync from TotalMix.";
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_OUT_OF_TOUCH",
+        lastActionMessage: sentence,
+      })
+    );
+    expect(status.label).toBe("ASSUMED");
+    expect(status.warningBody).toBe(sentence);
+    expect(status.warningCode).toBeNull();
+  });
+
+  it("says which change went unconfirmed while ASSUMED, and keeps the general sentence otherwise", () => {
+    const unconfirmed = "TotalMix did not confirm 1 change (input 8 mute). Press Sync to pull the console state.";
+    expect(
+      describeAudioStatus(
+        passedWithTotalMix({
+          consoleStateConfidence: "assumed",
+          lastActionStatus: "failed",
+          lastActionCode: "AUDIO_CONSOLE_UNCONFIRMED",
+          lastActionMessage: unconfirmed,
+        })
+      ).warningBody
+    ).toBe(unconfirmed);
+    const general = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_SYNC_NO_ECHO",
+        lastActionMessage: "TotalMix did not answer.",
+      })
+    ).warningBody;
+    expect(general).toContain("Showing the last state the desk confirmed.");
+    expect(
+      describeAudioStatus(
+        passedWithTotalMix({
+          consoleStateConfidence: "assumed",
+          lastActionStatus: "succeeded",
+          lastActionCode: "AUDIO_CONSOLE_OUT_OF_TOUCH",
+          lastActionMessage: "An older sentence.",
+        })
+      ).warningBody
+    ).toContain("Showing the last state the desk confirmed.");
+  });
+
   it("reads VERIFIED once the desk has been read", () => {
     expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "aligned" })).label).toBe("VERIFIED");
     expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "verified" })).label).toBe("VERIFIED");
