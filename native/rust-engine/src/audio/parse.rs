@@ -3,82 +3,14 @@ use serde_json::Value;
 use super::helpers::*;
 use super::types::*;
 
-pub fn parse_audio_snapshot_recall_request(
+/// `audio.snapshot.load`: TotalMix's snapshot slot, 1 to 8.
+pub fn parse_audio_snapshot_load_request(
     params: &Value,
-) -> Result<AudioSnapshotRecallRequest, String> {
-    let snapshot_id = params
-        .get("snapshotId")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| String::from("snapshotId is required"))?;
-
-    Ok(AudioSnapshotRecallRequest {
-        snapshot_id: String::from(snapshot_id),
-    })
-}
-
-pub fn parse_audio_snapshot_create_request(
-    params: &Value,
-) -> Result<AudioSnapshotCreateRequest, String> {
-    let name = optional_trimmed_string(params.get("name"), "name")?
-        .map(|value| validate_audio_snapshot_name(value, "name"))
-        .transpose()?
-        .ok_or_else(|| String::from("name is required"))?;
-    let osc_index = optional_integer_range(params.get("oscIndex"), "oscIndex", 0, 7)?
-        .ok_or_else(|| String::from("oscIndex is required"))?;
-    let capture_current_state =
-        optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
-
-    Ok(AudioSnapshotCreateRequest {
-        name,
-        osc_index,
-        capture_current_state,
-    })
-}
-
-pub fn parse_audio_snapshot_update_request(
-    params: &Value,
-) -> Result<AudioSnapshotUpdateRequest, String> {
-    let snapshot_id = params
-        .get("snapshotId")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| String::from("snapshotId is required"))?;
-    let name = optional_trimmed_string(params.get("name"), "name")?
-        .map(|value| validate_audio_snapshot_name(value, "name"))
-        .transpose()?;
-    let osc_index = optional_integer_range(params.get("oscIndex"), "oscIndex", 0, 7)?;
-    let capture_current_state =
-        optional_bool(params.get("captureCurrentState"), "captureCurrentState")?;
-
-    if name.is_none() && osc_index.is_none() && capture_current_state.is_none() {
-        return Err(String::from(
-            "audio.snapshot.update requires one or more supported fields",
-        ));
-    }
-
-    Ok(AudioSnapshotUpdateRequest {
-        snapshot_id: String::from(snapshot_id),
-        name,
-        osc_index,
-        capture_current_state,
-    })
-}
-
-pub fn parse_audio_snapshot_delete_request(
-    params: &Value,
-) -> Result<AudioSnapshotDeleteRequest, String> {
-    let snapshot_id = params
-        .get("snapshotId")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| String::from("snapshotId is required"))?;
-
-    Ok(AudioSnapshotDeleteRequest {
-        snapshot_id: String::from(snapshot_id),
+) -> Result<AudioSnapshotLoadRequest, String> {
+    let slot = optional_integer_range(params.get("slot"), "slot", 1, 8)?
+        .ok_or_else(|| String::from("slot is required"))?;
+    Ok(AudioSnapshotLoadRequest {
+        slot: slot as usize,
     })
 }
 
@@ -98,9 +30,14 @@ pub fn parse_audio_channel_update_request(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(String::from);
-    let name = optional_trimmed_string(params.get("name"), "name")?
-        .map(|value| validate_audio_snapshot_name(value, "name"))
-        .transpose()?;
+    // The channels take TotalMix's names (2026-10-01): a channel is renamed
+    // in TotalMix, and a request that still carries a name is refused rather
+    // than half applied.
+    if params.get("name").is_some() {
+        return Err(String::from(
+            "audio.channel.update takes no name: channels are named in TotalMix",
+        ));
+    }
     let gain = optional_gain(params.get("gain"), "gain")?;
     let fader = optional_level(params.get("fader"), "fader")?;
     let mute = optional_bool(params.get("mute"), "mute")?;
@@ -111,8 +48,7 @@ pub fn parse_audio_channel_update_request(
     let instrument = optional_bool(params.get("instrument"), "instrument")?;
     let auto_set = optional_bool(params.get("autoSet"), "autoSet")?;
 
-    if name.is_none()
-        && gain.is_none()
+    if gain.is_none()
         && fader.is_none()
         && mute.is_none()
         && solo.is_none()
@@ -130,7 +66,6 @@ pub fn parse_audio_channel_update_request(
     Ok(AudioChannelUpdateRequest {
         channel_id: String::from(channel_id),
         mix_target_id,
-        name,
         gain,
         fader,
         mute,
@@ -449,16 +384,6 @@ pub(super) fn optional_trimmed_string(
         }
         None => Ok(None),
     }
-}
-
-pub(super) fn validate_audio_snapshot_name(
-    value: String,
-    field_name: &str,
-) -> Result<String, String> {
-    if value.len() > 50 {
-        return Err(format!("{field_name} must be 50 characters or fewer"));
-    }
-    Ok(value)
 }
 
 pub(super) fn optional_nullable_trimmed_string(

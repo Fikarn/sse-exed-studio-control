@@ -175,6 +175,13 @@ pub enum ParamKey {
         channel: usize,
         output: usize,
     },
+    /// A channel's name as TotalMix shows it (`/input|playback|output/<ch>/name`,
+    /// a string in channel dumps and `/sendall`). Names are given at TotalMix
+    /// only: the app never sends one, so nothing reads it back.
+    ChannelName {
+        bus: ConsoleBus,
+        channel: usize,
+    },
     ControlRoom(ControlRoomFunction),
     StatusConnection,
     StatusDevice,
@@ -204,7 +211,8 @@ impl ParamKey {
                 Some(ReadbackRequest::Submix { output: *output })
             }
             Self::ControlRoom(_) => Some(ReadbackRequest::Settings),
-            Self::StatusConnection
+            Self::ChannelName { .. }
+            | Self::StatusConnection
             | Self::StatusDevice
             | Self::StatusDsp
             | Self::SnapshotLoad { .. } => None,
@@ -229,6 +237,7 @@ impl ParamKey {
                 channel,
                 output,
             } => format!("mix {} {} -> out {} solo", bus.mix_word(), channel, output),
+            Self::ChannelName { bus, channel } => format!("{} {} name", bus.word(), channel),
             Self::ControlRoom(function) => format!("control room {}", function.word()),
             Self::StatusConnection => String::from("status connection"),
             Self::StatusDevice => String::from("status device"),
@@ -351,6 +360,14 @@ pub fn parse_console_message(message: &OscMessage) -> Option<ConsoleMessage> {
                 channel: channel.parse().ok()?,
             },
             ConsoleValue::Db(numeric(arg)?),
+        ),
+        // A name is a string; anything else at a name's address is not one.
+        [bus_word, channel, "name"] => (
+            ParamKey::ChannelName {
+                bus: ConsoleBus::from_word(bus_word)?,
+                channel: channel.parse().ok()?,
+            },
+            ConsoleValue::Text(text(arg)?),
         ),
         [bus_word, channel, flag_word] => {
             let bus = ConsoleBus::from_word(bus_word)?;
@@ -492,6 +509,39 @@ impl ConsoleConnection {
     }
 }
 
+/// TotalMix keeps eight snapshots, numbered 1 to 8 on its remote.
+pub const SNAPSHOT_SLOTS: usize = 8;
+
+/// What TotalMix last said about one of its snapshot slots
+/// (`/snapshot/load/N`: 0 off, 2 active, 3 active and changed since it was
+/// loaded).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SnapshotSlotState {
+    /// The desk has not reported this slot since the link last knew it.
+    #[default]
+    Unknown,
+    Off,
+    Active,
+    /// Loaded, and something has been changed on the desk since.
+    Changed,
+}
+
+impl SnapshotSlotState {
+    /// The state a `/snapshot/load/N` value reports; `None` for any other
+    /// value (TotalMix sends 0, 2 and 3; 1 is only ever sent to it, to load).
+    fn from_report(value: f64) -> Option<Self> {
+        if value < 0.5 {
+            Some(Self::Off)
+        } else if (1.5..2.5).contains(&value) {
+            Some(Self::Active)
+        } else if (2.5..3.5).contains(&value) {
+            Some(Self::Changed)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct OutstandingRequest {
     requested_at_ms: u64,
@@ -511,7 +561,8 @@ pub struct ConsoleLinkSummary {
     pub confirmed_sends: u64,
     pub adjusted_sends: u64,
     pub external_changes: u64,
-    pub active_snapshot: Option<usize>,
+    /// TotalMix's eight snapshot slots, slot 1 first.
+    pub snapshot_slots: [SnapshotSlotState; SNAPSHOT_SLOTS],
 }
 
 #[derive(Debug, Default)]
@@ -528,71 +579,20 @@ pub struct ConsoleLinkState {
     device: Option<String>,
     dsp_load: Option<f64>,
     last_echo_at_ms: Option<u64>,
-    active_snapshot: Option<usize>,
+    snapshot_slots: [SnapshotSlotState; SNAPSHOT_SLOTS],
+    /// Per slot, the report count when the desk last reported it.
+    snapshot_slot_seqs: [u64; SNAPSHOT_SLOTS],
+    /// Counts every valid slot report, so a caller that sent something can
+    /// wait for a report that came after it.
+    snapshot_report_seq: u64,
+    /// A slot's state changed since the last flush took it.
+    snapshot_slots_changed: bool,
     confirmed_total: u64,
     adjusted_total: u64,
     external_total: u64,
     unconfirmed_total: u64,
     unconfirmed_addresses: Vec<String>,
     pull: Option<PullTracker>,
-    push: Option<PushTracker>,
-}
-
-/// Bookkeeping for one snapshot push (Slice 4): how each pushed parameter
-/// fared once its read-back came in.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PushProgress {
-    pub total: usize,
-    pub confirmed: usize,
-    pub adjusted: usize,
-    pub unconfirmed: usize,
-    /// Still waiting for a read-back.
-    pub pending: usize,
-    pub unconfirmed_names: Vec<String>,
-    pub adjusted_names: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PushTracker {
-    keys: Vec<ParamKey>,
-    confirmed: Vec<ParamKey>,
-    adjusted: Vec<ParamKey>,
-    unconfirmed: Vec<ParamKey>,
-}
-
-impl PushTracker {
-    fn progress(&self) -> PushProgress {
-        let settled = self.confirmed.len() + self.adjusted.len() + self.unconfirmed.len();
-        PushProgress {
-            total: self.keys.len(),
-            confirmed: self.confirmed.len(),
-            adjusted: self.adjusted.len(),
-            unconfirmed: self.unconfirmed.len(),
-            pending: self.keys.len().saturating_sub(settled),
-            unconfirmed_names: self.unconfirmed.iter().map(ParamKey::describe).collect(),
-            adjusted_names: self.adjusted.iter().map(ParamKey::describe).collect(),
-        }
-    }
-
-    fn note(&mut self, key: &ParamKey, outcome: Classification) {
-        if !self.keys.contains(key) {
-            return;
-        }
-        let bucket = match outcome {
-            Classification::Confirmed => &mut self.confirmed,
-            Classification::Adjusted => &mut self.adjusted,
-            _ => return,
-        };
-        if !bucket.contains(key) {
-            bucket.push(key.clone());
-        }
-    }
-
-    fn note_expired(&mut self, key: &ParamKey) {
-        if self.keys.contains(key) && !self.unconfirmed.contains(key) {
-            self.unconfirmed.push(key.clone());
-        }
-    }
 }
 
 /// Bookkeeping for one console pull (`/sendall 2` + `/sendstate`): what
@@ -660,12 +660,16 @@ impl PullTracker {
                 channel,
                 ..
             }
+            | ParamKey::ChannelName {
+                bus: ConsoleBus::Output,
+                channel,
+            }
             | ParamKey::OutputVolume { output: channel } => {
                 if !self.outputs_seen.contains(channel) {
                     self.outputs_seen.push(*channel);
                 }
             }
-            ParamKey::ChannelFlag { bus, channel, .. } => {
+            ParamKey::ChannelFlag { bus, channel, .. } | ParamKey::ChannelName { bus, channel } => {
                 if !self.channels_seen.contains(&(*bus, *channel)) {
                     self.channels_seen.push((*bus, *channel));
                 }
@@ -732,6 +736,24 @@ fn confirmable_by_absence(request: &ReadbackRequest, key: &ParamKey, value: &Con
     }
 }
 
+/// Whether a read-back burst that went quiet answers this pending send: the
+/// send's own read-back was asked at or before the request the burst
+/// completed. The link keeps one request per read-back, stamped with the time
+/// it was last asked, so when a second burst of sends to the same submix
+/// settles on a later check, its read-back restamps the request before the
+/// first reply has gone quiet. The first burst's sends were asked earlier and
+/// the desk had them before either request. Matched on the exact time (until
+/// 2026-10-01, a fault since #201), their off faders and solo-offs, which
+/// `/sendsubmix 2` never lists, expired as unconfirmed: on the studio desk 25
+/// of 122 values after a recall, and the Console fell to assumed. A send not
+/// yet asked is not answered: the desk may have dumped the submix before the
+/// send reached it.
+fn read_back_answers(pending: &PendingSend, asked_at_ms: u64) -> bool {
+    pending
+        .requested_at_ms
+        .is_some_and(|requested_at| requested_at <= asked_at_ms)
+}
+
 impl ConsoleLinkState {
     /// Records one outgoing command so its read-back can confirm it. Sending
     /// the same parameter again (a fader drag) restarts its clock and cancels
@@ -777,25 +799,6 @@ impl ConsoleLinkState {
             outputs_seen: Vec::new(),
             mix_nodes_seen: Vec::new(),
         });
-    }
-
-    /// Starts tracking a snapshot push for these parameters. Call before the
-    /// datagrams go out so no read-back is missed.
-    pub fn begin_push(&mut self, keys: Vec<ParamKey>) {
-        self.push = Some(PushTracker {
-            keys,
-            confirmed: Vec::new(),
-            adjusted: Vec::new(),
-            unconfirmed: Vec::new(),
-        });
-    }
-
-    pub fn push_progress(&self) -> Option<PushProgress> {
-        self.push.as_ref().map(PushTracker::progress)
-    }
-
-    pub fn finish_push(&mut self) -> Option<PushProgress> {
-        self.push.take().map(|tracker| tracker.progress())
     }
 
     pub fn pull_progress(&self, now_ms: u64) -> Option<PullProgress> {
@@ -859,6 +862,11 @@ impl ConsoleLinkState {
                 {
                     self.connection_lost = true;
                 }
+                if next == ConsoleConnection::Disconnected {
+                    // With the interface gone the desk's snapshots are not
+                    // known until it reports them again.
+                    self.forget_snapshot_slots();
+                }
                 self.connection = next;
                 return Classification::Status;
             }
@@ -871,12 +879,7 @@ impl ConsoleLinkState {
                 return Classification::Status;
             }
             (ParamKey::SnapshotLoad { number }, ConsoleValue::Number(value)) => {
-                // 0 = off, 2 = active, 3 = active but changed.
-                if *value >= 1.5 {
-                    self.active_snapshot = Some(*number);
-                } else if self.active_snapshot == Some(*number) {
-                    self.active_snapshot = None;
-                }
+                self.note_snapshot_report(*number, *value);
                 return Classification::Status;
             }
             _ => {}
@@ -888,9 +891,6 @@ impl ConsoleLinkState {
                 let sent = pending.value.clone();
                 self.pending.remove(&parsed.key);
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
-                if let Some(push) = self.push.as_mut() {
-                    push.note(&parsed.key, Classification::Confirmed);
-                }
                 // The desk holds the app's value now, and that is applied
                 // too: a report of this parameter that was waiting for a flush
                 // when the app wrote its own value (a change at TotalMix just
@@ -931,9 +931,6 @@ impl ConsoleLinkState {
             }
             self.pending.remove(&parsed.key);
             self.adjusted_total = self.adjusted_total.saturating_add(1);
-            if let Some(push) = self.push.as_mut() {
-                push.note(&parsed.key, Classification::Adjusted);
-            }
             self.queued.push(ConsoleUpdate {
                 key: parsed.key,
                 value: parsed.value,
@@ -1005,7 +1002,7 @@ impl ConsoleLinkState {
                 .iter()
                 .filter(|(key, pending)| {
                     request.covers(key)
-                        && pending.requested_at_ms == Some(outstanding.requested_at_ms)
+                        && read_back_answers(pending, outstanding.requested_at_ms)
                         && confirmable_by_absence(&request, key, &pending.value)
                 })
                 .map(|(key, _)| key.clone())
@@ -1015,9 +1012,6 @@ impl ConsoleLinkState {
                     continue;
                 };
                 self.confirmed_total = self.confirmed_total.saturating_add(1);
-                if let Some(push) = self.push.as_mut() {
-                    push.note(&key, Classification::Confirmed);
-                }
                 // Applied like a confirming reply (see `ingest`).
                 self.queued.push(ConsoleUpdate {
                     key,
@@ -1037,9 +1031,6 @@ impl ConsoleLinkState {
         for key in expired_keys {
             if let Some(pending) = self.pending.remove(&key) {
                 self.unconfirmed_total = self.unconfirmed_total.saturating_add(1);
-                if let Some(push) = self.push.as_mut() {
-                    push.note_expired(&key);
-                }
                 let description = pending.key.describe();
                 if !self.unconfirmed_addresses.contains(&description) {
                     if self.unconfirmed_addresses.len() >= MAX_UNCONFIRMED_ADDRESSES {
@@ -1056,10 +1047,85 @@ impl ConsoleLinkState {
         });
     }
 
-    /// Whether a flush has anything to write: queued changes, expired sends
-    /// or a lost connection.
+    /// Whether a flush has anything to write or report: queued changes,
+    /// expired sends, a lost connection or a snapshot slot that changed.
     pub fn has_activity(&self) -> bool {
-        !self.queued.is_empty() || !self.expired.is_empty() || self.connection_lost
+        !self.queued.is_empty()
+            || !self.expired.is_empty()
+            || self.connection_lost
+            || self.snapshot_slots_changed
+    }
+
+    /// One `/snapshot/load/N` report. Slots outside 1 to 8 and values
+    /// TotalMix does not send are ignored and do not count as reports.
+    fn note_snapshot_report(&mut self, slot: usize, value: f64) {
+        if !(1..=SNAPSHOT_SLOTS).contains(&slot) {
+            return;
+        }
+        let Some(state) = SnapshotSlotState::from_report(value) else {
+            return;
+        };
+        self.snapshot_report_seq = self.snapshot_report_seq.saturating_add(1);
+        self.snapshot_slot_seqs[slot - 1] = self.snapshot_report_seq;
+        if self.snapshot_slots[slot - 1] != state {
+            self.snapshot_slots[slot - 1] = state;
+            self.snapshot_slots_changed = true;
+        }
+    }
+
+    pub fn forget_snapshot_slots(&mut self) {
+        if self
+            .snapshot_slots
+            .iter()
+            .any(|state| *state != SnapshotSlotState::Unknown)
+        {
+            self.snapshot_slots = [SnapshotSlotState::Unknown; SNAPSHOT_SLOTS];
+            self.snapshot_slots_changed = true;
+        }
+    }
+
+    /// The desk loaded `slot` (1 to 8) without saying so, or the simulated
+    /// console loaded it: that slot is active and every other slot the desk
+    /// has reported is off. It is not a report, so the report count stays.
+    // This and the two readers below are for loading a TotalMix snapshot at
+    // the operator's second press, which is built next; until then only the
+    // tests call them.
+    pub fn mark_snapshot_loaded(&mut self, slot: usize) {
+        if !(1..=SNAPSHOT_SLOTS).contains(&slot) {
+            return;
+        }
+        for (index, state) in self.snapshot_slots.iter_mut().enumerate() {
+            if index + 1 == slot {
+                *state = SnapshotSlotState::Active;
+            } else if *state != SnapshotSlotState::Unknown {
+                *state = SnapshotSlotState::Off;
+            }
+        }
+        self.snapshot_slots_changed = true;
+    }
+
+    /// How many valid slot reports the desk has made: read it before sending,
+    /// then wait for a slot whose report count is higher.
+    pub fn snapshot_report_seq(&self) -> u64 {
+        self.snapshot_report_seq
+    }
+
+    /// The state of `slot` (1 to 8) and the report count of its last report
+    /// (0 when the desk never reported it); `None` outside 1 to 8.
+    pub fn snapshot_slot(&self, slot: usize) -> Option<(SnapshotSlotState, u64)> {
+        if !(1..=SNAPSHOT_SLOTS).contains(&slot) {
+            return None;
+        }
+        Some((
+            self.snapshot_slots[slot - 1],
+            self.snapshot_slot_seqs[slot - 1],
+        ))
+    }
+
+    /// Takes the mark that a slot's state changed, for the flush that reports
+    /// it (the Console reads the slots again).
+    pub fn take_snapshot_slots_changed(&mut self) -> bool {
+        std::mem::take(&mut self.snapshot_slots_changed)
     }
 
     pub fn take_queued(&mut self) -> Vec<ConsoleUpdate> {
@@ -1148,7 +1214,7 @@ impl ConsoleLinkState {
             confirmed_sends: self.confirmed_total,
             adjusted_sends: self.adjusted_total,
             external_changes: self.external_total,
-            active_snapshot: self.active_snapshot,
+            snapshot_slots: self.snapshot_slots,
         }
     }
 }
@@ -1160,17 +1226,21 @@ pub(crate) static SHARED_LINK_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[cfg(test)]
 impl ConsoleLinkState {
-    /// Forgets pending sends, queued updates and any pull, so a test starts
-    /// from a quiet link regardless of what ran before it.
+    /// Forgets pending sends, queued updates, any pull and the snapshot
+    /// slots, so a test starts from a quiet link regardless of what ran before
+    /// it.
     pub fn reset_for_test(&mut self) {
         self.pending.clear();
         self.outstanding.clear();
         self.queued.clear();
         self.expired.clear();
         self.pull = None;
-        self.push = None;
         self.connection_lost = false;
         self.reports_lost = false;
+        self.snapshot_slots = [SnapshotSlotState::Unknown; SNAPSHOT_SLOTS];
+        self.snapshot_slot_seqs = [0; SNAPSHOT_SLOTS];
+        self.snapshot_report_seq = 0;
+        self.snapshot_slots_changed = false;
     }
 
     pub fn queue_for_test(&mut self, update: ConsoleUpdate) {
@@ -1202,772 +1272,4 @@ pub fn register_outgoing_commands(messages: &[(String, OscType)]) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn msg(address: &str, value: OscType) -> OscMessage {
-        OscMessage {
-            addr: String::from(address),
-            args: vec![value],
-        }
-    }
-
-    fn f(value: f64) -> OscType {
-        OscType::Float(value as f32)
-    }
-
-    #[test]
-    fn parses_every_global_control_address_family() {
-        let cases: Vec<(&str, OscType, ParamKey, ConsoleValue)> = vec![
-            (
-                "/input/8/mute",
-                f(1.0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Input,
-                    channel: 8,
-                    flag: ChannelFlag::Mute,
-                },
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/input/8/48v",
-                OscType::Int(0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Input,
-                    channel: 8,
-                    flag: ChannelFlag::Phantom,
-                },
-                ConsoleValue::Flag(false),
-            ),
-            (
-                "/input/9/phase",
-                OscType::Bool(true),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Input,
-                    channel: 9,
-                    flag: ChannelFlag::Phase,
-                },
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/input/10/instrument",
-                f(1.0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Input,
-                    channel: 10,
-                    flag: ChannelFlag::Instrument,
-                },
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/input/11/autoset",
-                f(0.0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Input,
-                    channel: 11,
-                    flag: ChannelFlag::AutoSet,
-                },
-                ConsoleValue::Flag(false),
-            ),
-            (
-                "/input/8/gain",
-                f(41.0),
-                ParamKey::InputGain { channel: 8 },
-                ConsoleValue::Db(41.0),
-            ),
-            (
-                "/playback/6/mute",
-                f(1.0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Playback,
-                    channel: 6,
-                    flag: ChannelFlag::Mute,
-                },
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/output/8/mute",
-                f(0.0),
-                ParamKey::ChannelFlag {
-                    bus: ConsoleBus::Output,
-                    channel: 8,
-                    flag: ChannelFlag::Mute,
-                },
-                ConsoleValue::Flag(false),
-            ),
-            (
-                "/output/8/volume",
-                f(-16.6),
-                ParamKey::OutputVolume { output: 8 },
-                ConsoleValue::Db(-16.600_000_381_469_727),
-            ),
-            (
-                "/output/0/faderlin",
-                f(0.5),
-                ParamKey::OutputVolume { output: 0 },
-                ConsoleValue::Position(0.5),
-            ),
-            (
-                "/mix/pb/6/10/fader",
-                f(-61.974_41),
-                ParamKey::MixFader {
-                    bus: ConsoleBus::Playback,
-                    channel: 6,
-                    output: 10,
-                },
-                ConsoleValue::Db(f64::from(-61.974_41_f32)),
-            ),
-            (
-                "/mix/in/8/0/faderlin",
-                f(0.25),
-                ParamKey::MixFader {
-                    bus: ConsoleBus::Input,
-                    channel: 8,
-                    output: 0,
-                },
-                ConsoleValue::Position(0.25),
-            ),
-            (
-                "/mix/in/8/0/solo",
-                f(1.0),
-                ParamKey::MixSolo {
-                    bus: ConsoleBus::Input,
-                    channel: 8,
-                    output: 0,
-                },
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/controlroom/dim",
-                f(1.0),
-                ParamKey::ControlRoom(ControlRoomFunction::Dim),
-                ConsoleValue::Flag(true),
-            ),
-            (
-                "/controlroom/mainmono",
-                f(0.0),
-                ParamKey::ControlRoom(ControlRoomFunction::MainMono),
-                ConsoleValue::Flag(false),
-            ),
-            (
-                "/status/connection",
-                f(1.0),
-                ParamKey::StatusConnection,
-                ConsoleValue::Number(1.0),
-            ),
-            (
-                "/status/device",
-                OscType::String(String::from("Fireface UFX III (1)")),
-                ParamKey::StatusDevice,
-                ConsoleValue::Text(String::from("Fireface UFX III (1)")),
-            ),
-            (
-                "/status/dsp",
-                f(8.0),
-                ParamKey::StatusDsp,
-                ConsoleValue::Number(8.0),
-            ),
-            (
-                "/snapshot/load/3",
-                f(2.0),
-                ParamKey::SnapshotLoad { number: 3 },
-                ConsoleValue::Number(2.0),
-            ),
-        ];
-        for (address, value, key, expected) in cases {
-            let parsed = parse_console_message(&msg(address, value))
-                .unwrap_or_else(|| panic!("{address} should parse"));
-            assert_eq!(parsed.key, key, "{address}");
-            match (&parsed.value, &expected) {
-                (ConsoleValue::Db(a), ConsoleValue::Db(b))
-                | (ConsoleValue::Position(a), ConsoleValue::Position(b)) => {
-                    assert!((a - b).abs() < 1e-4, "{address}: {a} vs {b}")
-                }
-                (a, b) => assert_eq!(a, b, "{address}"),
-            }
-        }
-
-        for ignored in [
-            "/level/in/8",
-            "/level/out/0",
-            "/input/8/eq/band1freq",
-            "/input/8/dynamics/enable",
-            "/input/8/name",
-            "/output/8/talkbacksel",
-            "/controlroom/talkback",
-            "/controlroom/dimreduction",
-            "/mix/pb/6/10/balpan",
-            "/sendall",
-            "/durec/state",
-        ] {
-            assert!(
-                parse_console_message(&msg(ignored, f(1.0))).is_none(),
-                "{ignored} should be ignored"
-            );
-        }
-        assert!(parse_console_message(&msg("/output/8/48v", f(1.0))).is_none());
-        assert!(parse_console_message(&msg("/playback/6/phase", f(1.0))).is_none());
-    }
-
-    #[test]
-    fn outgoing_commands_share_keys_with_their_readbacks() {
-        let sent = parse_console_message(&msg("/mix/pb/6/10/faderlin", f(0.02))).unwrap();
-        let reported = parse_console_message(&msg("/mix/pb/6/10/fader", f(-61.974))).unwrap();
-        assert_eq!(sent.key, reported.key);
-        assert!(values_match(&sent.value, &reported.value));
-        assert_eq!(
-            sent.key.readback(),
-            Some(ReadbackRequest::Submix { output: 10 })
-        );
-        assert_eq!(
-            ReadbackRequest::Submix { output: 10 }.osc(),
-            vec![
-                (String::from("/sendsubmix/10"), OscType::Float(2.0)),
-                (String::from("/sendstate"), OscType::Float(1.0)),
-            ]
-        );
-        assert_eq!(
-            ReadbackRequest::Channel {
-                bus: ConsoleBus::Input,
-                channel: 8
-            }
-            .osc(),
-            vec![(String::from("/sendchan/input/8"), OscType::Float(1.0))]
-        );
-        assert_eq!(
-            ReadbackRequest::Settings.osc(),
-            vec![(String::from("/sendsettings"), OscType::Float(1.0))]
-        );
-        assert_eq!(
-            ParamKey::MixFader {
-                bus: ConsoleBus::Playback,
-                channel: 6,
-                output: 10
-            }
-            .describe(),
-            "mix pb 6 -> out 10 fader"
-        );
-    }
-
-    #[test]
-    fn readback_is_requested_once_the_send_settles() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(
-            &[
-                (String::from("/input/8/mute"), f(1.0)),
-                (String::from("/input/8/gain"), f(44.0)),
-            ],
-            0,
-        );
-        assert_eq!(link.pending_count(), 2);
-        assert!(link.due_readbacks(50).is_empty(), "too early");
-        let requests = link.due_readbacks(130);
-        assert_eq!(
-            requests,
-            vec![(String::from("/sendchan/input/8"), OscType::Float(1.0))],
-            "both parameters share one channel read-back"
-        );
-        assert!(link.due_readbacks(140).is_empty(), "requested only once");
-
-        // A fresh send of the same parameter restarts the clock.
-        link.register_outgoing(&[(String::from("/input/8/gain"), f(45.0))], 200);
-        assert!(link.due_readbacks(250).is_empty());
-        assert_eq!(link.due_readbacks(330).len(), 1);
-    }
-
-    #[test]
-    fn readback_reply_within_tolerance_confirms_the_send() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(
-            &[
-                (String::from("/input/8/mute"), f(1.0)),
-                (String::from("/mix/pb/6/10/faderlin"), f(0.02)),
-                (String::from("/output/0/faderlin"), f(0.5)),
-            ],
-            0,
-        );
-        link.due_readbacks(130);
-        assert_eq!(
-            link.ingest(&msg("/input/8/mute", f(1.0)), 160),
-            Classification::Confirmed
-        );
-        assert_eq!(
-            link.ingest(&msg("/mix/pb/6/10/fader", f(-61.974_41)), 160),
-            Classification::Confirmed
-        );
-        // Output 0 at position 0.5 is -12.13 dB on the RME curve.
-        assert_eq!(
-            link.ingest(&msg("/output/0/volume", f(-12.13)), 160),
-            Classification::Confirmed
-        );
-        assert_eq!(link.pending_count(), 0);
-        let summary = link.summary(200);
-        assert_eq!(summary.confirmed_sends, 3);
-        assert_eq!(summary.unconfirmed_sends, 0);
-        assert_eq!(summary.last_echo_age_ms, Some(40));
-        // 2026-09-22: each confirmation is queued as the app's own value (the
-        // position it sent, not the dB the desk reported), so a report the
-        // desk made before it cannot be written last. Was: "confirmations
-        // queue nothing".
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 3);
-        assert!(queued
-            .iter()
-            .all(|update| update.confirms_send && !update.adjusted));
-        let fader = queued
-            .iter()
-            .find(|update| matches!(update.key, ParamKey::MixFader { .. }))
-            .expect("the fader's confirmation");
-        assert!(
-            matches!(fader.value, ConsoleValue::Position(position) if (position - 0.02).abs() < 1e-6),
-            "the value the app sent: {:?}",
-            fader.value
-        );
-    }
-
-    #[test]
-    fn readback_reply_with_a_different_value_is_adjusted_and_queued() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/input/8/gain"), f(41.0))], 0);
-        link.due_readbacks(130);
-        assert_eq!(
-            link.ingest(&msg("/input/8/gain", f(44.0)), 160),
-            Classification::Adjusted
-        );
-        assert_eq!(link.pending_count(), 0);
-        let queued = link.take_queued();
-        assert_eq!(
-            queued,
-            vec![ConsoleUpdate {
-                key: ParamKey::InputGain { channel: 8 },
-                value: ConsoleValue::Db(44.0),
-                adjusted: true,
-                confirms_send: false,
-            }]
-        );
-        assert_eq!(link.summary(200).adjusted_sends, 1);
-    }
-
-    #[test]
-    fn stale_reply_does_not_override_a_newer_send() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.5))], 0);
-        link.due_readbacks(130);
-        // The operator keeps dragging before the first reply lands.
-        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.7))], 200);
-        assert_eq!(
-            link.ingest(&msg("/mix/pb/6/10/fader", f(-12.13)), 210),
-            Classification::Stale
-        );
-        assert_eq!(link.pending_count(), 1, "the newer send stays pending");
-        assert!(link.take_queued().is_empty());
-        // The second read-back confirms the final position (-3.85 dB).
-        assert_eq!(
-            link.due_readbacks(330).len(),
-            2,
-            "submix read-back plus its /sendstate marker"
-        );
-        assert_eq!(
-            link.ingest(&msg("/mix/pb/6/10/fader", f(-3.85)), 360),
-            Classification::Confirmed
-        );
-        assert_eq!(link.pending_count(), 0);
-    }
-
-    #[test]
-    fn unsolicited_message_is_an_external_change() {
-        let mut link = ConsoleLinkState::default();
-        assert_eq!(
-            link.ingest(&msg("/controlroom/dim", f(1.0)), 10),
-            Classification::External
-        );
-        assert_eq!(
-            link.ingest(&msg("/level/in/8", f(-20.0)), 11),
-            Classification::Ignored
-        );
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 1);
-        assert_eq!(
-            queued[0].key,
-            ParamKey::ControlRoom(ControlRoomFunction::Dim)
-        );
-        assert!(!queued[0].adjusted);
-        assert_eq!(link.summary(20).external_changes, 1);
-        assert_eq!(link.summary(20).last_echo_age_ms, Some(10));
-    }
-
-    #[test]
-    fn off_send_is_confirmed_by_absence_once_the_submix_reply_finishes() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.0))], 0);
-        assert_eq!(
-            link.due_readbacks(130),
-            vec![
-                (String::from("/sendsubmix/10"), OscType::Float(2.0)),
-                (String::from("/sendstate"), OscType::Float(1.0)),
-            ]
-        );
-        // The reply burst mentions another node on the same submix only.
-        assert_eq!(
-            link.ingest(&msg("/mix/pb/0/10/fader", f(-12.0)), 160),
-            Classification::External
-        );
-        link.tick(200);
-        assert_eq!(link.pending_count(), 1, "burst not quiet yet");
-        link.tick(250);
-        assert_eq!(link.pending_count(), 0, "absence confirms the off node");
-        assert_eq!(link.summary(250).confirmed_sends, 1);
-        assert_eq!(link.summary(250).unconfirmed_sends, 0);
-        // The other node is the desk's report; the off node's confirmation is
-        // queued after it as the value the app sent (2026-09-22).
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 2);
-        assert!(!queued[0].confirms_send);
-        assert!(queued[1].confirms_send);
-        assert_eq!(
-            queued[1].key,
-            ParamKey::MixFader {
-                bus: ConsoleBus::Playback,
-                channel: 6,
-                output: 10,
-            }
-        );
-        assert_eq!(queued[1].value, ConsoleValue::Position(0.0));
-    }
-
-    #[test]
-    fn off_send_on_an_empty_submix_is_confirmed_by_the_status_marker() {
-        // Live-verified: `/sendsubmix 2` for a bus with no active nodes sends
-        // nothing at all. Without the paired `/sendstate`, the first restore
-        // to "off" on the studio console expired as unconfirmed (2026-09-03).
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.0))], 0);
-        assert_eq!(link.due_readbacks(130).len(), 2);
-        // Only the status marker comes back.
-        assert_eq!(
-            link.ingest(&msg("/status/connection", f(1.0)), 160),
-            Classification::Status
-        );
-        link.ingest(
-            &msg("/status/device", OscType::String(String::from("UFX III"))),
-            161,
-        );
-        link.ingest(&msg("/status/dsp", f(8.0)), 162);
-        link.tick(200);
-        assert_eq!(link.pending_count(), 1, "quiet window not reached yet");
-        link.tick(250);
-        assert_eq!(
-            link.pending_count(),
-            0,
-            "empty burst + status confirms the off node"
-        );
-        let summary = link.summary(250);
-        assert_eq!(summary.confirmed_sends, 1);
-        assert_eq!(summary.unconfirmed_sends, 0);
-    }
-
-    #[test]
-    fn channel_readback_that_omits_a_parameter_confirms_it_by_absence() {
-        // The right side of a stereo-linked pair reports only its L/R
-        // parameters; a mute sent to it is never echoed (live, 2026-09-03).
-        let mut link = ConsoleLinkState::default();
-        link.begin_push(vec![ParamKey::ChannelFlag {
-            bus: ConsoleBus::Input,
-            channel: 3,
-            flag: ChannelFlag::Mute,
-        }]);
-        link.register_outgoing(&[(String::from("/input/3/mute"), f(0.0))], 0);
-        assert_eq!(
-            link.due_readbacks(130),
-            vec![(String::from("/sendchan/input/3"), OscType::Float(1.0))]
-        );
-        // The console answers for the channel, but only with L/R parameters.
-        assert_eq!(
-            link.ingest(&msg("/input/3/phase", f(0.0)), 160),
-            Classification::External
-        );
-        link.tick(200);
-        assert_eq!(link.pending_count(), 1, "burst not quiet yet");
-        link.tick(250);
-        assert_eq!(
-            link.pending_count(),
-            0,
-            "absent from the answered burst: confirmed"
-        );
-        let progress = link.finish_push().expect("push in progress");
-        assert_eq!(progress.confirmed, 1);
-        assert_eq!(progress.pending, 0);
-    }
-
-    #[test]
-    fn solo_off_on_an_unlisted_node_confirms_by_absence_but_a_fader_does_not() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(
-            &[
-                (String::from("/mix/in/8/0/solo"), f(0.0)),
-                (String::from("/mix/pb/6/0/faderlin"), f(0.3)),
-            ],
-            0,
-        );
-        assert_eq!(
-            link.due_readbacks(130).len(),
-            2,
-            "one submix read-back + status marker"
-        );
-        // Only the status marker answers: the submix has no active nodes.
-        link.ingest(&msg("/status/connection", f(1.0)), 160);
-        link.tick(250);
-        assert_eq!(
-            link.pending_count(),
-            1,
-            "solo-off confirmed, the audible fader is not"
-        );
-        link.tick(1_600);
-        assert_eq!(link.pending_count(), 0);
-        let summary = link.summary(1_600);
-        assert_eq!(summary.confirmed_sends, 1);
-        assert_eq!(summary.unconfirmed_sends, 1);
-        assert_eq!(
-            summary.unconfirmed_addresses,
-            vec![String::from("mix pb 6 -> out 0 fader")]
-        );
-    }
-
-    #[test]
-    fn non_off_send_absent_from_the_reply_expires_as_unconfirmed() {
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 0);
-        link.due_readbacks(130);
-        link.tick(1_000);
-        assert_eq!(link.pending_count(), 1);
-        link.tick(1_600);
-        assert_eq!(link.pending_count(), 0);
-        let expired = link.take_expired();
-        assert_eq!(expired.len(), 1);
-        assert_eq!(
-            expired[0].key,
-            ParamKey::ChannelFlag {
-                bus: ConsoleBus::Input,
-                channel: 8,
-                flag: ChannelFlag::Mute
-            }
-        );
-        let summary = link.summary(1_600);
-        assert_eq!(summary.unconfirmed_sends, 1);
-        assert_eq!(
-            summary.unconfirmed_addresses,
-            vec![String::from("input 8 mute")]
-        );
-        link.reset_unconfirmed();
-        assert_eq!(link.summary(1_700).unconfirmed_sends, 0);
-    }
-
-    #[test]
-    fn pull_applies_every_dump_value_even_when_it_confirms_a_pending_send() {
-        // Outside a pull a confirming reply is queued as the value the app
-        // sent (2026-09-22: the app's copy can be older than the desk's when a
-        // report was written after the app's own write; before, it was not
-        // queued at all). During a pull the dump is authoritative, so the
-        // value the desk reported is queued — otherwise a value that happened
-        // to match an in-flight send would never reach the database if the
-        // app's copy was stale.
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 0);
-        assert_eq!(
-            link.ingest(&msg("/input/8/mute", f(1.0)), 50),
-            Classification::Confirmed
-        );
-        let queued = link.take_queued();
-        assert_eq!(
-            queued.len(),
-            1,
-            "no pull: the confirmation, as the app's value"
-        );
-        assert!(queued[0].confirms_send);
-        assert_eq!(queued[0].value, ConsoleValue::Flag(true));
-
-        link.register_outgoing(&[(String::from("/input/8/mute"), f(1.0))], 100);
-        link.register_outgoing(&[(String::from("/input/8/gain"), f(41.0))], 100);
-        link.begin_pull(120);
-        assert_eq!(
-            link.ingest(&msg("/input/8/mute", f(1.0)), 150),
-            Classification::Confirmed
-        );
-        // A different value for a send made before the pull began is the
-        // console's word: the pull asked after the send. (A send made during
-        // the pull is the next test's case.)
-        assert_eq!(
-            link.ingest(&msg("/input/8/gain", f(33.0)), 151),
-            Classification::Adjusted
-        );
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 2);
-        assert_eq!(queued[0].value, ConsoleValue::Flag(true));
-        assert!(!queued[0].adjusted);
-        assert!(queued[0].confirms_send);
-        assert_eq!(queued[1].value, ConsoleValue::Db(33.0));
-        assert!(queued[1].adjusted);
-        assert!(!queued[1].confirms_send);
-
-        // A fader confirmed during a pull carries the dB the desk reported,
-        // not the position the app sent (0.5 is -12.13 dB on the RME curve).
-        link.register_outgoing(&[(String::from("/mix/pb/6/10/faderlin"), f(0.5))], 160);
-        assert_eq!(
-            link.ingest(&msg("/mix/pb/6/10/fader", f(-12.13)), 170),
-            Classification::Confirmed
-        );
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 1);
-        assert!(queued[0].confirms_send);
-        assert!(
-            matches!(queued[0].value, ConsoleValue::Db(_)),
-            "{:?}",
-            queued[0].value
-        );
-        assert_eq!(link.pending_count(), 0);
-    }
-
-    #[test]
-    fn a_dump_line_for_a_send_made_during_the_pull_does_not_answer_it() {
-        // 2026-09-23 (a finding recorded under 919047b): a dump line the desk
-        // sent before the app's send reached it, but read after the send was
-        // registered, was taken as the desk adjusting the send. It was written,
-        // the send was never read back, and Sync wrote aligned over a value
-        // the desk no longer held. Nothing asked the desk after the send, so
-        // the line is stale; the send's own read-back decides it.
-        let mut link = ConsoleLinkState::default();
-        link.begin_pull(100);
-        link.register_outgoing(&[(String::from("/input/8/gain"), f(41.0))], 150);
-        assert_eq!(
-            link.ingest(&msg("/input/8/gain", f(33.0)), 160),
-            Classification::Stale
-        );
-        assert_eq!(link.pending_count(), 1, "the send stays pending");
-        assert!(
-            link.take_queued().is_empty(),
-            "the older dump value is not written"
-        );
-
-        // The read-back, asked after the send, confirms the app's value.
-        let asked = 150 + READBACK_DELAY_MS;
-        assert!(!link.due_readbacks(asked).is_empty());
-        assert_eq!(
-            link.ingest(&msg("/input/8/gain", f(41.0)), asked + 20),
-            Classification::Confirmed
-        );
-        assert_eq!(link.pending_count(), 0);
-        link.take_queued();
-
-        // A different value that follows a read-back asked after the send is
-        // the desk's word, pull or not.
-        link.register_outgoing(&[(String::from("/input/8/gain"), f(45.0))], 400);
-        let asked = 400 + READBACK_DELAY_MS;
-        assert!(!link.due_readbacks(asked).is_empty());
-        assert_eq!(
-            link.ingest(&msg("/input/8/gain", f(47.0)), asked + 20),
-            Classification::Adjusted
-        );
-        let queued = link.take_queued();
-        assert_eq!(queued.len(), 1);
-        assert_eq!(queued[0].value, ConsoleValue::Db(47.0));
-        assert!(queued[0].adjusted);
-        link.finish_pull(asked + 40);
-    }
-
-    #[test]
-    fn a_send_stamped_in_the_pulls_own_millisecond_is_not_answered_by_the_dump() {
-        // The review of the fix above: the pull's time is stamped before its
-        // request leaves, in whole milliseconds, so a send stamped in the same
-        // millisecond may have left after the request. Its dump line may
-        // predate it, so it is stale; a send made the millisecond before the
-        // pull is still settled by the dump.
-        let mut link = ConsoleLinkState::default();
-        link.register_outgoing(&[(String::from("/input/2/mute"), f(1.0))], 99);
-        link.begin_pull(100);
-        link.register_outgoing(&[(String::from("/input/3/mute"), f(1.0))], 100);
-        assert_eq!(
-            link.ingest(&msg("/input/3/mute", f(0.0)), 101),
-            Classification::Stale
-        );
-        assert_eq!(
-            link.ingest(&msg("/input/2/mute", f(0.0)), 102),
-            Classification::Adjusted
-        );
-        link.finish_pull(103);
-    }
-
-    #[test]
-    fn pull_tracker_counts_the_dump_and_reports_quiet() {
-        let mut link = ConsoleLinkState::default();
-        assert!(link.pull_progress(0).is_none());
-        link.begin_pull(100);
-        let early = link.pull_progress(150).expect("pull in progress");
-        assert_eq!(early.control_messages, 0);
-        assert!(!early.is_complete(300), "nothing arrived yet");
-
-        // The dump: status first, then parameters, including an EQ detail
-        // message the app does not model (counts as traffic, not as parsed).
-        link.ingest(&msg("/status/connection", f(1.0)), 160);
-        link.ingest(&msg("/input/8/mute", f(0.0)), 170);
-        link.ingest(&msg("/input/8/gain", f(41.0)), 171);
-        link.ingest(&msg("/input/8/eq/band1freq", f(100.0)), 172);
-        link.ingest(&msg("/output/8/volume", f(-16.6)), 180);
-        link.ingest(&msg("/mix/in/8/8/fader", f(0.0)), 190);
-        link.ingest(&msg("/mix/pb/2/0/fader", f(-6.0)), 191);
-        link.ingest(&msg("/level/in/8", f(-20.0)), 400);
-
-        let progress = link.pull_progress(420).expect("pull in progress");
-        assert_eq!(progress.control_messages, 7, "levels are not dump traffic");
-        assert_eq!(progress.parsed_messages, 6);
-        assert!(progress.status_seen);
-        assert_eq!(progress.channels_seen, vec![(ConsoleBus::Input, 8)]);
-        assert_eq!(progress.outputs_seen, vec![8]);
-        assert_eq!(
-            progress.mix_nodes_seen,
-            vec![(ConsoleBus::Input, 8, 8), (ConsoleBus::Playback, 2, 0)]
-        );
-        assert_eq!(progress.last_message_age_ms, Some(229));
-        assert!(!progress.is_complete(300));
-        assert!(link.pull_progress(500).unwrap().is_complete(300));
-
-        let finished = link.finish_pull(500).expect("pull should finish");
-        assert_eq!(finished.parsed_messages, 6);
-        assert!(link.pull_progress(600).is_none());
-        // Traffic after the pull is no longer counted against it.
-        link.ingest(&msg("/input/9/mute", f(1.0)), 700);
-        assert!(link.finish_pull(700).is_none());
-    }
-
-    #[test]
-    fn status_messages_drive_the_link_state_only() {
-        let mut link = ConsoleLinkState::default();
-        assert_eq!(link.connection(), ConsoleConnection::Unknown);
-        assert_eq!(
-            link.ingest(&msg("/status/connection", f(1.0)), 5),
-            Classification::Status
-        );
-        assert_eq!(link.connection(), ConsoleConnection::Connected);
-        assert!(!link.take_connection_lost());
-        link.ingest(
-            &msg(
-                "/status/device",
-                OscType::String(String::from("Fireface UFX III (1)")),
-            ),
-            6,
-        );
-        link.ingest(&msg("/status/dsp", f(8.0)), 7);
-        link.ingest(&msg("/snapshot/load/2", f(2.0)), 8);
-        assert_eq!(
-            link.ingest(&msg("/status/connection", f(0.0)), 9),
-            Classification::Status
-        );
-        assert_eq!(link.connection(), ConsoleConnection::Disconnected);
-        assert!(link.take_connection_lost());
-        assert!(!link.take_connection_lost(), "flag is consumed once");
-        let summary = link.summary(10);
-        assert_eq!(summary.device.as_deref(), Some("Fireface UFX III (1)"));
-        assert_eq!(summary.dsp_load, Some(8.0));
-        assert_eq!(summary.active_snapshot, Some(2));
-        assert!(link.take_queued().is_empty(), "status never queues state");
-    }
-}
+mod tests;

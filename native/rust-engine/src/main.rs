@@ -28,6 +28,7 @@ mod pictures_helper;
 mod prompter;
 mod protocol;
 mod rme_console_link;
+mod rme_totalmix_names;
 mod rme_totalmix_osc;
 mod shell_settings;
 mod storage;

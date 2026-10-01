@@ -16,12 +16,10 @@ pub fn update_audio_channel(
     let app_settings = load_audio_settings(db_path)?;
     let snapshot = read_audio_snapshot(&app_settings);
 
-    // Gate first: anything that can reach TotalMix needs a verified console
-    // link, exactly like sync, recall and the Stream Deck path. A rename is
-    // app-local and stays allowed while the probe is pending.
-    if channel_request_touches_console(request) {
-        ensure_audio_action_allowed(db_path, &snapshot)?;
-    }
+    // Gate first: every field reaches TotalMix, so the request needs a
+    // verified console link, exactly like sync, a load and the Stream Deck
+    // path. (The channels' names are TotalMix's since 2026-10-01.)
+    ensure_audio_action_allowed(db_path, &snapshot)?;
 
     // Every field is validated BEFORE anything goes on the wire, so a request
     // carrying one unsupported field can never half-apply to the console.
@@ -41,18 +39,6 @@ pub fn update_audio_channel(
             )
         })?;
 
-    if let Some(name) = &request.name {
-        let trimmed = name.trim();
-        if trimmed.is_empty() || trimmed.len() > 50 {
-            let message = String::from("Audio channel names must be 1-50 characters.");
-            record_audio_action_failure(db_path, "AUDIO_CHANNEL_NAME_INVALID", &message)?;
-            return Err(AudioCommandError::Rejected(
-                "AUDIO_CHANNEL_NAME_INVALID",
-                message,
-            ));
-        }
-        next_state.name = Some(String::from(trimmed));
-    }
     if let Some(gain) = request.gain {
         if !channel_supports_gain_from_role(&snapshot, &request.channel_id) {
             let message = format!(
@@ -170,7 +156,6 @@ pub fn update_audio_channel(
             adapter_mode: snapshot.adapter_mode.clone(),
             channels: snapshot.channels.clone(),
             mix_targets: snapshot.mix_targets.clone(),
-            snapshots: snapshot.snapshots.clone(),
         },
         request,
     )
@@ -189,8 +174,9 @@ pub fn update_audio_channel(
     channel_state.insert(request.channel_id.clone(), next_state);
 
     // Console-state confidence is deliberately NOT written here: a UDP send
-    // is not a confirmation. Only a completed pull, a fully confirmed push, or
-    // the console-link echo tracker may move it (2026-09 audit remediation).
+    // is not a confirmation. Only a completed pull (a Sync, or the read-back
+    // after a load in TotalMix) or the console-link echo tracker may move it
+    // (2026-09 audit remediation).
     persist_audio_state(
         db_path,
         &[
@@ -223,18 +209,6 @@ pub fn update_audio_channel(
         })
 }
 
-fn channel_request_touches_console(request: &AudioChannelUpdateRequest) -> bool {
-    request.gain.is_some()
-        || request.fader.is_some()
-        || request.mute.is_some()
-        || request.solo.is_some()
-        || request.phantom.is_some()
-        || request.phase.is_some()
-        || request.pad.is_some()
-        || request.instrument.is_some()
-        || request.auto_set.is_some()
-}
-
 pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioCommandError> {
     let _state_guard = lock_audio_state();
     let app_settings = load_audio_settings(db_path)?;
@@ -257,7 +231,6 @@ pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioComman
             instrument: None,
             mix_target_id: None,
             mute: None,
-            name: None,
             pad: None,
             phantom: None,
             phase: None,
@@ -270,7 +243,6 @@ pub fn clear_all_audio_solo(db_path: &Path) -> Result<AudioSnapshot, AudioComman
                 adapter_mode: snapshot.adapter_mode.clone(),
                 channels: snapshot.channels.clone(),
                 mix_targets: snapshot.mix_targets.clone(),
-                snapshots: snapshot.snapshots.clone(),
             },
             &request,
         )
@@ -413,7 +385,6 @@ pub fn update_audio_channel_eq(
             adapter_mode: snapshot.adapter_mode.clone(),
             channels: snapshot.channels.clone(),
             mix_targets: snapshot.mix_targets.clone(),
-            snapshots: snapshot.snapshots.clone(),
         },
         request,
     )

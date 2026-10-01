@@ -1317,6 +1317,7 @@ pub(crate) fn flush_console_link_to_db(db_path: &std::path::Path) {
                 "unconfirmed": report.unconfirmed,
                 "connectionLost": report.connection_lost,
                 "deskUnread": report.desk_unread,
+                "slotsChanged": report.slots_changed,
             }));
         }
         Ok(_) => {}
@@ -1422,30 +1423,26 @@ pub(crate) fn send_console_pull_request(send_host: &str, send_port: i64) -> Resu
     send_osc_messages(send_host, port, &console_pull_messages())
 }
 
-/// Messages per burst and the pause between bursts when pushing a snapshot.
-/// A full recall is ~60 datagrams; TotalMix's own status cadence is slow, so
-/// the pacing keeps the desk's receive queue shallow.
-const RECALL_BURST_SIZE: usize = 48;
-const RECALL_BURST_PAUSE: Duration = Duration::from_millis(10);
-
-/// Pushes a snapshot to TotalMix phase by phase (mutes on, values, mutes off,
-/// control room), registering every command on the console link so its
-/// read-back can confirm it. Returns the number of datagrams sent.
-pub(crate) fn send_totalmix_recall_plan(
+/// Loads one of TotalMix's own snapshots, slot 1 to 8, over the Global OSC
+/// remote (`send_port + 3`): `/snapshot/load/N` with `1.0`, the only value
+/// TotalMix takes there. It replaces the whole mix on the desk, so it has one
+/// caller, `audio.snapshot.load`, which a studio build serves at the
+/// operator's second press; nothing at start, in a Sync, a restore or a
+/// keep-alive sends it. `/snapshot/save` is never sent.
+pub(crate) fn send_console_snapshot_load(
     send_host: &str,
     send_port: i64,
-    phases: &[Vec<(String, OscType)>],
+    slot: usize,
 ) -> Result<usize, String> {
-    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
-    let mut sent = 0usize;
-    for phase in phases {
-        for burst in phase.chunks(RECALL_BURST_SIZE) {
-            sent += send_osc_messages(send_host, port, burst)?;
-            crate::rme_console_link::register_outgoing_commands(burst);
-            thread::sleep(RECALL_BURST_PAUSE);
-        }
+    if !(1..=8).contains(&slot) {
+        return Err(format!("TotalMix has no slot {slot}."));
     }
-    Ok(sent)
+    let port = validated_command_port(send_port, GLOBAL_OSC_PORT_OFFSET)?;
+    send_osc_messages(
+        send_host,
+        port,
+        &[(format!("/snapshot/load/{slot}"), OscType::Float(1.0))],
+    )
 }
 
 /// Test stand-in for the metering thread's per-tick console-link work: read

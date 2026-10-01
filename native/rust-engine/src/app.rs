@@ -6,16 +6,14 @@ use crate::app_state::{
     APP_SETTINGS_PREFIX, COMMISSIONING_COMPLETED_KEY,
 };
 use crate::audio::{
-    clear_all_audio_solo, clear_audio_clips, create_audio_snapshot, delete_audio_snapshot,
+    clear_all_audio_solo, clear_audio_clips, load_audio_console_snapshot,
     parse_audio_channel_update_request, parse_audio_clip_clear_request,
     parse_audio_dynamics_update_request, parse_audio_eq_update_request,
     parse_audio_mix_target_update_request, parse_audio_send_mode_update_request,
-    parse_audio_settings_update_request, parse_audio_snapshot_create_request,
-    parse_audio_snapshot_delete_request, parse_audio_snapshot_recall_request,
-    parse_audio_snapshot_update_request, read_audio_snapshot, recall_audio_snapshot,
+    parse_audio_settings_update_request, parse_audio_snapshot_load_request, read_audio_snapshot,
     sync_audio_console, update_audio_channel, update_audio_channel_dynamics,
     update_audio_channel_eq, update_audio_channel_send_mode, update_audio_mix_target,
-    update_audio_settings, update_audio_snapshot, AudioCommandError,
+    update_audio_settings, AudioCommandError,
 };
 use crate::bootstrap::{bootstrap_runtime, recovery_runtime_context, RuntimeContext, RuntimePaths};
 use crate::cameras::{
@@ -109,6 +107,7 @@ impl EngineApp {
     pub fn bootstrap() -> EngineResult<Self> {
         let runtime = bootstrap_runtime()?;
         append_log(&runtime.log_file_path, "INFO", "Hardware link started")?;
+        crate::audio::refresh_console_snapshot_names_at_start(&runtime.db_path);
         Ok(Self { runtime })
     }
 
@@ -458,29 +457,11 @@ impl EngineApp {
             "audio.solo.clearAll" => {
                 self.run_audio_mutate(request.id, clear_all_audio_solo, "solo-cleared")
             }
-            "audio.snapshot.recall" => self.dispatch_audio_mutate(
+            "audio.snapshot.load" => self.dispatch_audio_mutate(
                 request,
-                parse_audio_snapshot_recall_request,
-                recall_audio_snapshot,
-                "snapshot-recalled",
-            ),
-            "audio.snapshot.create" => self.dispatch_audio_mutate(
-                request,
-                parse_audio_snapshot_create_request,
-                create_audio_snapshot,
-                "snapshot-created",
-            ),
-            "audio.snapshot.update" => self.dispatch_audio_mutate(
-                request,
-                parse_audio_snapshot_update_request,
-                update_audio_snapshot,
-                "snapshot-updated",
-            ),
-            "audio.snapshot.delete" => self.dispatch_audio_mutate(
-                request,
-                parse_audio_snapshot_delete_request,
-                delete_audio_snapshot,
-                "snapshot-deleted",
+                parse_audio_snapshot_load_request,
+                load_audio_console_snapshot,
+                "snapshot-loaded",
             ),
             "audio.channel.update" => self.dispatch_audio_mutate(
                 request,

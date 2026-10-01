@@ -1,9 +1,8 @@
 use crate::app_state::APP_SETTINGS_PREFIX;
 use crate::audio::fader_curve::fader_lin_to_db;
 use crate::audio::{
-    clear_all_audio_solo, ensure_audio_action_allowed, parse_audio_snapshot_recall_request,
-    read_audio_snapshot, recall_audio_snapshot, update_audio_channel, update_audio_mix_target,
-    update_audio_settings, AudioChannelUpdateRequest, AudioCommandError,
+    clear_all_audio_solo, ensure_audio_action_allowed, read_audio_snapshot, update_audio_channel,
+    update_audio_mix_target, update_audio_settings, AudioChannelUpdateRequest, AudioCommandError,
     AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest, AudioSnapshot,
 };
 use crate::control_surface::{
@@ -319,26 +318,10 @@ pub(crate) fn handle_audio_action_at(
 ) -> Result<Value, ControlSurfaceError> {
     // New pages program, Slice 2: `switchToDeckMode` left with Planning (it
     // stored the Planning setting `planning.deck_mode`, which nothing read);
-    // the page keys only turn Companion's page now.
+    // the page keys only turn Companion's page now. `recallSnapshot` left on
+    // 2026-10-01: the Console's snapshots are TotalMix's, and one loads only
+    // at a second press on screen, never at one press of a key.
     match action {
-        "recallSnapshot" => {
-            let (_, audio_snapshot) = current_audio_snapshot(db_path)?;
-            let Some(snapshot) = audio_snapshot.snapshots.first() else {
-                return Err(ControlSurfaceError::Rejected(String::from(
-                    "No audio snapshot is available.",
-                )));
-            };
-            let result = recall_audio_snapshot(
-                db_path,
-                &parse_audio_snapshot_recall_request(&json!({
-                    "snapshotId": snapshot.id
-                }))
-                .map_err(ControlSurfaceError::InvalidParams)?,
-            )
-            .map_err(map_audio_error)?;
-            emit_audio_changed();
-            Ok(json!({ "recalled": result.snapshot_name }))
-        }
         "dialTurn" => handle_audio_dial_turn(db_path, value, at),
         "dialPress" => handle_audio_dial_press(db_path, value),
         "stripTap" => handle_audio_strip_tap(db_path, value),
@@ -452,7 +435,6 @@ fn audio_channel_update_request(channel_id: &str) -> AudioChannelUpdateRequest {
     AudioChannelUpdateRequest {
         channel_id: String::from(channel_id),
         mix_target_id: None,
-        name: None,
         gain: None,
         fader: None,
         mute: None,

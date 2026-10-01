@@ -217,9 +217,14 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({ "name": "Host mic" }),
         ),
         (
-            "audio.snapshot.recall",
-            json!({ "snapshotId": "snap-1" }),
-            json!({ "snapshotName": "Panel", "recalled": true }),
+            "audio.snapshot.load",
+            json!({ "slot": 2 }),
+            json!({ "loaded": true, "slot": 2, "name": "Panel" }),
+        ),
+        (
+            "audio.snapshot.load",
+            json!({ "slot": 5 }),
+            json!({ "loaded": true, "slot": 5, "name": null }),
         ),
         ("audio.solo.clearAll", json!({}), json!({})),
         (
@@ -436,11 +441,6 @@ fn deck_examples() -> Vec<(&'static str, &'static str, Value)> {
             "/api/deck/light-action",
             "recallScene",
             json!({ "recalled": "Interview wide", "preview": false }),
-        ),
-        (
-            "/api/deck/audio-action",
-            "recallSnapshot",
-            json!({ "recalled": "Panel" }),
         ),
         (
             "/api/deck/audio-action",

@@ -241,7 +241,8 @@ const RECORDED_UI_METHODS: &[&str] = &[
     "audio.channel.update",
     "audio.mixTarget.update",
     "audio.settings.update",
-    "audio.snapshot.recall",
+    // TotalMix loads one of its own snapshots at the operator's second press.
+    "audio.snapshot.load",
     "audio.solo.clearAll",
     // The cameras (Slice 8): a take's start and stop, a format and a look
     // change, and who holds a camera.
@@ -291,11 +292,6 @@ const NOT_AN_ACTION_UI_METHODS: &[&str] = &[
     // are the app's own.
     "audio.sync",
     "audio.clip.clear",
-    // The Console's stored scenes: saving, renaming and deleting one changes
-    // no device — the recall does, and is a row.
-    "audio.snapshot.create",
-    "audio.snapshot.delete",
-    "audio.snapshot.update",
     // The lighting editor's bookkeeping: what a scene, a group or a palette
     // is, and the preview buffer, which never reaches the rig by itself.
     "lighting.editor.previewDiscard",
@@ -709,12 +705,17 @@ pub(crate) fn ui_actions(
             })
             .collect()
         }
-        "audio.snapshot.recall" => {
-            let name = text(result, "/snapshotName").unwrap_or("Console mix");
+        "audio.snapshot.load" => {
+            // A slot TotalMix saved no name for is named by its number; the
+            // rows never say "snapshot".
+            let name = text(result, "/name").map(String::from).unwrap_or_else(|| {
+                let slot = result.pointer("/slot").and_then(Value::as_i64).unwrap_or(0);
+                format!("slot {slot}")
+            });
             vec![audio(
-                "console-snapshot-recalled",
-                name,
-                format!("Console mix recalled: {name}"),
+                "console-snapshot-loaded",
+                &name,
+                format!("Console mix loaded in TotalMix: {name}"),
             )]
         }
         "audio.solo.clearAll" => vec![audio(
@@ -934,14 +935,6 @@ pub(crate) fn deck_actions(path: &str, action: &str, reply: &Value) -> Vec<Actio
             )]
         }
 
-        ("/api/deck/audio-action", "recallSnapshot") => {
-            let name = text(reply, "/recalled").unwrap_or("Console mix");
-            vec![audio(
-                "console-snapshot-recalled",
-                name,
-                format!("Console mix recalled: {name}"),
-            )]
-        }
         ("/api/deck/audio-action", "dialPress") => {
             let name = text(reply, "/name").unwrap_or("Strip");
             flag(reply, "mute")

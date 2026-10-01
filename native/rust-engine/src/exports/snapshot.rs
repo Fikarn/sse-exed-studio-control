@@ -353,7 +353,6 @@ fn control_description(actions: &[Value], fallback_label: &str, interaction: &st
         "resetCct" => String::from("Reset the selected light CCT."),
         "cctDown" => String::from("Lower the selected light CCT."),
         "cctUp" => String::from("Raise the selected light CCT."),
-        "recallSnapshot" => String::from("Recall the current audio snapshot."),
         "dialTurn" => format!(
             "Ride the level on strip {}.",
             value

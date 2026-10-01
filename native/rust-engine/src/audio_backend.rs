@@ -1,7 +1,7 @@
 use crate::audio::{
     default_audio_dynamics_snapshot, default_audio_eq_snapshot, default_audio_send_mode_snapshot,
     AudioChannelSnapshot, AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetSnapshot,
-    AudioMixTargetUpdateRequest, AudioScenePreviewSnapshot, AudioSceneSnapshot,
+    AudioMixTargetUpdateRequest,
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
 use crate::rme_totalmix_osc::{
@@ -28,7 +28,6 @@ pub struct AudioBackendInventory {
     pub adapter_mode: String,
     pub channels: Vec<AudioChannelSnapshot>,
     pub mix_targets: Vec<AudioMixTargetSnapshot>,
-    pub snapshots: Vec<AudioSceneSnapshot>,
 }
 
 struct AudioMeterFrame {
@@ -94,7 +93,6 @@ impl AudioBackend for SimulatedAudioBackend {
                 adapter_mode: String::from("simulated"),
                 channels: Vec::new(),
                 mix_targets: Vec::new(),
-                snapshots: Vec::new(),
             };
         }
 
@@ -314,38 +312,6 @@ impl AudioBackend for SimulatedAudioBackend {
                     mono: false,
                 },
             ],
-            snapshots: vec![
-                AudioSceneSnapshot {
-                    id: String::from("snapshot-default"),
-                    name: String::from("Default"),
-                    osc_index: 0,
-                    order: 0,
-                    last_recalled: false,
-                    last_recalled_at: None,
-                    contents: None,
-                    preview: empty_audio_scene_preview(),
-                },
-                AudioSceneSnapshot {
-                    id: String::from("snapshot-panel"),
-                    name: String::from("Panel"),
-                    osc_index: 1,
-                    order: 1,
-                    last_recalled: false,
-                    last_recalled_at: None,
-                    contents: None,
-                    preview: empty_audio_scene_preview(),
-                },
-                AudioSceneSnapshot {
-                    id: String::from("snapshot-broadcast"),
-                    name: String::from("Broadcast"),
-                    osc_index: 2,
-                    order: 2,
-                    last_recalled: false,
-                    last_recalled_at: None,
-                    contents: None,
-                    preview: empty_audio_scene_preview(),
-                },
-            ],
         }
     }
 
@@ -382,9 +348,6 @@ impl AudioBackend for SimulatedAudioBackend {
         }
 
         let mut changes = Vec::new();
-        if let Some(name) = &request.name {
-            changes.push(format!("name -> {}", name));
-        }
         if let Some(fader) = request.fader {
             let mix_target = request
                 .mix_target_id
@@ -709,16 +672,6 @@ fn clear_mix_target_meter(mix_target: &mut AudioMixTargetSnapshot) {
     mix_target.peak_hold = 0.0;
     mix_target.peak_hold_left = 0.0;
     mix_target.peak_hold_right = 0.0;
-}
-
-fn empty_audio_scene_preview() -> AudioScenePreviewSnapshot {
-    AudioScenePreviewSnapshot {
-        has_contents: false,
-        channel_count: 0,
-        mix_target_count: 0,
-        changed_channels: Vec::new(),
-        changed_mix_targets: Vec::new(),
-    }
 }
 
 fn default_send_modes() -> HashMap<String, crate::audio::AudioSendModeSnapshot> {
@@ -1086,7 +1039,6 @@ mod tests {
         assert_eq!(inventory.adapter_mode, "simulated");
         assert!(inventory.channels.is_empty());
         assert!(inventory.mix_targets.is_empty());
-        assert!(inventory.snapshots.is_empty());
     }
 
     #[test]
@@ -1096,7 +1048,6 @@ mod tests {
         assert_eq!(inventory.adapter_mode, "simulated");
         assert_eq!(inventory.channels.len(), 18);
         assert_eq!(inventory.mix_targets.len(), 3);
-        assert_eq!(inventory.snapshots.len(), 3);
     }
 
     #[test]
@@ -1110,7 +1061,6 @@ mod tests {
             &AudioChannelUpdateRequest {
                 channel_id: String::from("audio-input-9"),
                 mix_target_id: Some(String::from("audio-mix-main")),
-                name: None,
                 gain: None,
                 fader: Some(0.82),
                 mute: Some(true),

@@ -145,7 +145,6 @@ fn restore_support_backup_round_trips_native_archive() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-12"),
             mix_target_id: None,
-            name: None,
             gain: Some(40),
             fader: None,
             mute: None,
@@ -163,7 +162,6 @@ fn restore_support_backup_round_trips_native_archive() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-input-1"),
             mix_target_id: None,
-            name: None,
             gain: None,
             fader: None,
             mute: Some(true),
@@ -181,7 +179,6 @@ fn restore_support_backup_round_trips_native_archive() {
         &AudioChannelUpdateRequest {
             channel_id: String::from("audio-playback-1-2"),
             mix_target_id: Some(String::from("audio-mix-phones-a")),
-            name: None,
             gain: None,
             fader: Some(0.61),
             mute: Some(true),
@@ -265,8 +262,6 @@ fn restore_support_backup_round_trips_native_archive() {
     assert_eq!(audio.console_state_confidence, "unknown");
     assert!(audio.last_console_sync_at.is_none());
     assert!(audio.last_console_sync_reason.is_none());
-    assert!(audio.last_recalled_snapshot_id.is_none());
-    assert!(audio.last_snapshot_recall_at.is_none());
 
     let restored_front = audio
         .channels

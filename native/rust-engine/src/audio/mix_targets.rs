@@ -23,7 +23,6 @@ pub fn update_audio_mix_target(
             adapter_mode: snapshot.adapter_mode.clone(),
             channels: snapshot.channels.clone(),
             mix_targets: snapshot.mix_targets.clone(),
-            snapshots: snapshot.snapshots.clone(),
         },
         request,
     )

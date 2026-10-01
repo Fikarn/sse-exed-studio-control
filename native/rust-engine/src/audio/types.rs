@@ -46,10 +46,6 @@ pub struct AudioSnapshot {
     pub last_console_sync_at: Option<String>,
     #[serde(rename = "lastConsoleSyncReason")]
     pub last_console_sync_reason: Option<String>,
-    #[serde(rename = "lastRecalledSnapshotId")]
-    pub last_recalled_snapshot_id: Option<String>,
-    #[serde(rename = "lastSnapshotRecallAt")]
-    pub last_snapshot_recall_at: Option<String>,
     #[serde(rename = "lastActionStatus")]
     pub last_action_status: String,
     #[serde(rename = "lastActionCode")]
@@ -59,7 +55,41 @@ pub struct AudioSnapshot {
     pub channels: Vec<AudioChannelSnapshot>,
     #[serde(rename = "mixTargets")]
     pub mix_targets: Vec<AudioMixTargetSnapshot>,
-    pub snapshots: Vec<AudioSceneSnapshot>,
+    /// TotalMix's own eight snapshots (2026-10-01): the Console lists and
+    /// loads these; the app keeps no snapshots of its own.
+    #[serde(rename = "consoleSnapshots")]
+    pub console_snapshots: AudioConsoleSnapshots,
+}
+
+/// TotalMix's eight snapshot slots, as the desk reports them and under the
+/// names TotalMix last saved.
+#[derive(Debug, Serialize, Clone, PartialEq)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct AudioConsoleSnapshots {
+    /// Always eight, slot 1 first.
+    pub slots: Vec<AudioConsoleSnapshotSlot>,
+    /// When TotalMix last saved the names (its settings file's time), or
+    /// `null` when the names do not come from that file.
+    #[serde(rename = "namesSavedAt")]
+    pub names_saved_at: Option<String>,
+    /// Why there are no names to show, for the screen; `null` when there is
+    /// nothing to say.
+    #[serde(rename = "namesNote")]
+    pub names_note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts-rs", ts(export))]
+pub struct AudioConsoleSnapshotSlot {
+    /// 1 to 8, as TotalMix numbers them.
+    pub slot: i64,
+    /// The name TotalMix saved for the slot; `null` when it has none.
+    pub name: Option<String>,
+    /// `unknown` until TotalMix reported the slot, then `off`, `active` (the
+    /// one loaded) or `changed` (the active one, changed since it was loaded).
+    pub state: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -130,9 +160,6 @@ pub struct AudioConsoleLinkSnapshot {
     pub adjusted_sends: i64,
     #[serde(rename = "externalChanges")]
     pub external_changes: i64,
-    /// TotalMix's own active snapshot slot (1-based), when it reported one.
-    #[serde(rename = "activeConsoleSnapshot")]
-    pub active_console_snapshot: Option<i64>,
     #[serde(rename = "lastPullAt")]
     pub last_pull_at: Option<String>,
     #[serde(rename = "lastPullValues")]
@@ -153,7 +180,6 @@ impl Default for AudioConsoleLinkSnapshot {
             confirmed_sends: 0,
             adjusted_sends: 0,
             external_changes: 0,
-            active_console_snapshot: None,
             last_pull_at: None,
             last_pull_values: None,
         }
@@ -174,8 +200,6 @@ pub struct AudioCapabilitySnapshot {
     pub can_edit_processing: bool,
     #[serde(rename = "canClearClips")]
     pub can_clear_clips: bool,
-    #[serde(rename = "canCaptureSnapshot")]
-    pub can_capture_snapshot: bool,
     #[serde(rename = "canUseMasterView")]
     pub can_use_master_view: bool,
 }
@@ -284,23 +308,6 @@ pub struct AudioMixTargetSnapshot {
     pub mono: bool,
 }
 
-#[derive(Debug, Serialize, Clone)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioSceneSnapshot {
-    pub id: String,
-    pub name: String,
-    #[serde(rename = "oscIndex")]
-    pub osc_index: i64,
-    pub order: i64,
-    #[serde(rename = "lastRecalled")]
-    pub last_recalled: bool,
-    #[serde(rename = "lastRecalledAt")]
-    pub last_recalled_at: Option<String>,
-    pub contents: Option<AudioSceneContentsSnapshot>,
-    pub preview: AudioScenePreviewSnapshot,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
@@ -346,6 +353,10 @@ pub struct StoredAudioChannelState {
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
 pub struct StoredAudioMixTargetState {
+    /// The output's name: as TotalMix reported it, else the name shown when
+    /// the entry was written; `None` in state saved before outputs had one.
+    #[serde(default)]
+    pub name: Option<String>,
     #[serde(default)]
     pub volume: f64,
     #[serde(default)]
@@ -354,44 +365,6 @@ pub struct StoredAudioMixTargetState {
     pub dim: bool,
     #[serde(default)]
     pub mono: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(super) struct StoredAudioSnapshotState {
-    pub id: String,
-    pub name: String,
-    #[serde(rename = "oscIndex")]
-    pub osc_index: i64,
-    pub order: i64,
-    #[serde(default)]
-    pub contents: Option<AudioSceneContentsSnapshot>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioSceneContentsSnapshot {
-    #[serde(rename = "capturedAt")]
-    pub captured_at: Option<String>,
-    pub channels: HashMap<String, StoredAudioChannelState>,
-    #[serde(rename = "mixTargets")]
-    pub mix_targets: HashMap<String, StoredAudioMixTargetState>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioScenePreviewSnapshot {
-    #[serde(rename = "hasContents")]
-    pub has_contents: bool,
-    #[serde(rename = "channelCount")]
-    pub channel_count: i64,
-    #[serde(rename = "mixTargetCount")]
-    pub mix_target_count: i64,
-    #[serde(rename = "changedChannels")]
-    pub changed_channels: Vec<String>,
-    #[serde(rename = "changedMixTargets")]
-    pub changed_mix_targets: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -435,63 +408,25 @@ pub struct AudioSyncResult {
 }
 
 #[derive(Debug, Serialize)]
-pub struct AudioSnapshotCreateResult {
-    pub snapshot: AudioSceneSnapshot,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AudioSnapshotUpdateResult {
-    pub snapshot: AudioSceneSnapshot,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AudioSnapshotDeleteResult {
-    pub deleted: bool,
-    #[serde(rename = "snapshotId")]
-    pub snapshot_id: String,
-    pub summary: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AudioSnapshotRecallResult {
-    pub recalled: bool,
-    #[serde(rename = "snapshotId")]
-    pub snapshot_id: String,
-    #[serde(rename = "snapshotName")]
-    pub snapshot_name: String,
-    #[serde(rename = "recalledAt")]
-    pub recalled_at: String,
+pub struct AudioSnapshotLoadResult {
+    /// The load went to TotalMix (or, simulated, to the simulated console).
+    pub loaded: bool,
+    pub slot: i64,
+    /// The slot's name as TotalMix last saved it, when it has one.
+    pub name: Option<String>,
+    #[serde(rename = "loadedAt")]
+    pub loaded_at: String,
     pub summary: String,
     #[serde(rename = "consoleStateConfidence")]
     pub console_state_confidence: String,
-    /// Console parameters the recall pushed to TotalMix (0 when simulated or
-    /// when the snapshot carries no captured state).
-    pub pushed: i64,
-    /// Pushed parameters the console read back with the pushed value.
-    pub confirmed: i64,
-    /// Pushed parameters the console read back with a different value (the
-    /// console won; app state follows).
-    pub adjusted: i64,
-    /// Pushed parameters the console never confirmed.
-    pub unconfirmed: i64,
-    /// 48V is never pushed: these channels differ between the snapshot and
-    /// the console and each needs its own armed confirm.
-    #[serde(rename = "phantomDifferences")]
-    pub phantom_differences: Vec<PhantomDifference>,
-}
-
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
-pub struct PhantomDifference {
-    #[serde(rename = "channelId")]
-    pub channel_id: String,
-    #[serde(rename = "channelName")]
-    pub channel_name: String,
-    /// What the console has (kept in app state).
-    pub current: bool,
-    /// What the snapshot wanted.
-    pub target: bool,
+    /// Console parameters the read-back after the load could map to app
+    /// state (0 when simulated or when the read-back failed).
+    #[serde(rename = "pulledValues")]
+    pub pulled_values: i64,
+    /// TotalMix itself reported the slot as loaded. When it did not, the app
+    /// marks the slot active only after the desk was read back.
+    #[serde(rename = "totalMixReported")]
+    pub total_mix_reported: bool,
 }
 
 #[derive(Debug)]
@@ -500,36 +435,16 @@ pub enum AudioCommandError {
     Storage(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct AudioSnapshotRecallRequest {
-    pub snapshot_id: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AudioSnapshotCreateRequest {
-    pub name: String,
-    pub osc_index: i64,
-    pub capture_current_state: Option<bool>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AudioSnapshotUpdateRequest {
-    pub snapshot_id: String,
-    pub name: Option<String>,
-    pub osc_index: Option<i64>,
-    pub capture_current_state: Option<bool>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AudioSnapshotDeleteRequest {
-    pub snapshot_id: String,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AudioSnapshotLoadRequest {
+    /// TotalMix's slot, 1 to 8.
+    pub slot: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct AudioChannelUpdateRequest {
     pub channel_id: String,
     pub mix_target_id: Option<String>,
-    pub name: Option<String>,
     pub gain: Option<i64>,
     pub fader: Option<f64>,
     pub mute: Option<bool>,

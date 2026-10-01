@@ -1,0 +1,30 @@
+	<FirefaceUFXIII1>
+		<General>
+			<val e="Version" v="1200"/>
+			<val e="Current Preset" v="-1.00,-1.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,"/>
+			<val e="Mute Global" v="0.00,0.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,"/>
+			<val e="MainChannel" v="0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,"/>
+			<val e="SnapshotName 0" v="Mix 1"/>
+			<val e="LayoutName 0" v="Layout 1"/>
+			<val e="SnapshotName 1" v="Interview"/>
+			<val e="LayoutName 1" v="Wide"/>
+			<val e="SnapshotName 2" v="Panel &amp; Q&amp;A"/>
+			<val e="LayoutName 2" v="Layout 3"/>
+			<val e="SnapshotName 3" v=""/>
+			<val e="LayoutName 3" v="Layout 4"/>
+			<val e="LastLayoutPrest" v="-1"/>
+			<val e="MidiEnabled" v="0"/>
+			<val e="OSCEnabled" v="1"/>
+		</General>
+		<Inputs>
+			<val e="Stereo 00" v="1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,1.00,"/>
+			<val e="Name 00" v=""/>
+			<val e="Chan Mute 00" v="0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,"/>
+		</Inputs>
+	</FirefaceUFXIII1>
+	<Frame0>
+		<Cache1>
+			<val e="DeviceName" v="Fireface UFX III (1)"/>
+			<val e="SubType" v="1"/>
+		</Cache1>
+	</Frame0>

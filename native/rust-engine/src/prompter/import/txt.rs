@@ -145,7 +145,9 @@ pub(super) fn windows_1252_char(byte: u8) -> Option<char> {
     }
 }
 
-fn windows_1252(bytes: &[u8]) -> String {
+/// Bytes as Windows-1252, the five undefined bytes left out. Also used for
+/// TotalMix's settings file (`rme_totalmix_names`), which names no encoding.
+pub(crate) fn windows_1252(bytes: &[u8]) -> String {
     bytes
         .iter()
         .filter_map(|&byte| windows_1252_char(byte))

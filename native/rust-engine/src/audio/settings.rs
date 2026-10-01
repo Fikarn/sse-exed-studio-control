@@ -189,14 +189,11 @@ pub fn update_audio_settings(
             String::from(AUDIO_LAST_CONSOLE_SYNC_REASON_KEY),
             String::new(),
         ));
-        updates.push((
-            String::from(AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY),
-            String::new(),
-        ));
-        updates.push((
-            String::from(AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY),
-            String::new(),
-        ));
+        // TotalMix's slot states belong to the desk the link heard; another
+        // address may be another desk.
+        if let Ok(mut link) = crate::rme_console_link::shared_console_link().lock() {
+            link.forget_snapshot_slots();
+        }
         summary_parts.push(String::from("audio probe reset"));
     }
 

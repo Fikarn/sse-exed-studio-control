@@ -5,16 +5,21 @@ const DEFAULT_RECEIVE_PORT: i64 = 9001;
 const AUDIO_CONSOLE_STATE_CONFIDENCE_KEY: &str = "app.audio.console_state_confidence";
 const AUDIO_LAST_CONSOLE_SYNC_AT_KEY: &str = "app.audio.last_console_sync_at";
 const AUDIO_LAST_CONSOLE_SYNC_REASON_KEY: &str = "app.audio.last_console_sync_reason";
-const AUDIO_LAST_RECALLED_SNAPSHOT_ID_KEY: &str = "app.audio.last_recalled_snapshot_id";
-const AUDIO_LAST_SNAPSHOT_RECALL_AT_KEY: &str = "app.audio.last_snapshot_recall_at";
 const AUDIO_LAST_ACTION_STATUS_KEY: &str = "app.audio.last_action_status";
 const AUDIO_LAST_ACTION_CODE_KEY: &str = "app.audio.last_action_code";
 /// The code of a refusal only the builds before 2026-09-28 wrote (D26).
 const RETIRED_TALKBACK_REFUSED_CODE: &str = "AUDIO_TALKBACK_REFUSED";
+/// How every message of the app's own snapshot recall began; the builds
+/// before 2026-10-01 wrote it, and nothing writes it now.
+const RETIRED_RECALL_MESSAGE_PREFIX: &str = "Recalled ";
 const AUDIO_LAST_ACTION_MESSAGE_KEY: &str = "app.audio.last_action_message";
 const AUDIO_CHANNEL_STATE_KEY: &str = "app.audio.channels_state";
 const AUDIO_MIX_TARGET_STATE_KEY: &str = "app.audio.mix_targets_state";
-const AUDIO_SNAPSHOTS_STATE_KEY: &str = "app.audio.snapshots_state";
+// The app's own snapshots (`app.audio.snapshots_state`) and the recall's
+// markers (`app.audio.last_recalled_snapshot_id`,
+// `app.audio.last_snapshot_recall_at`) are no longer read or written since
+// 2026-10-01: the Console's snapshots are TotalMix's. Older saved data keeps
+// the rows, unread.
 const AUDIO_OSC_ENABLED_KEY: &str = "app.audio.osc_enabled";
 const AUDIO_SELECTED_CHANNEL_ID_KEY: &str = "app.audio.selected_channel_id";
 const AUDIO_SELECTED_MIX_TARGET_ID_KEY: &str = "app.audio.selected_mix_target_id";
@@ -26,7 +31,6 @@ const AUDIO_VIEW_MODE_KEY: &str = "app.audio.view_mode";
 const AUDIO_METERING_SOURCE_KEY: &str = "app.audio.metering_source";
 const AUDIO_LAST_CONSOLE_PULL_AT_KEY: &str = "app.audio.last_console_pull_at";
 const AUDIO_LAST_CONSOLE_PULL_VALUES_KEY: &str = "app.audio.last_console_pull_values";
-const AUDIO_CUSTOM_SNAPSHOT_ID_PREFIX: &str = "audio-snapshot-custom-";
 
 const DEFAULT_AUDIO_OSC_ENABLED: bool = true;
 const DEFAULT_AUDIO_EXPECTED_PEAK_DATA: bool = true;
@@ -40,12 +44,11 @@ mod clips;
 mod console_link;
 pub mod fader_curve;
 mod helpers;
+mod load;
 mod mix_targets;
 mod parse;
-mod recall;
 mod settings;
 mod snapshot;
-mod snapshots;
 mod sync;
 mod types;
 
@@ -53,12 +56,11 @@ pub use channels::*;
 pub use clips::*;
 pub use console_link::*;
 pub(crate) use helpers::{audio_metering_is_simulated, ensure_audio_action_allowed};
+pub use load::*;
 pub use mix_targets::*;
 pub use parse::*;
-pub use recall::PushTiming;
 pub use settings::*;
 pub use snapshot::*;
-pub use snapshots::*;
 pub use sync::*;
 pub use types::*;
 
@@ -66,5 +68,7 @@ pub use types::*;
 mod tests;
 #[cfg(test)]
 mod tests_console_link;
+#[cfg(test)]
+mod tests_console_load;
 #[cfg(test)]
 mod tests_console_ordering;
