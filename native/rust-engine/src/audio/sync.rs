@@ -232,10 +232,17 @@ pub(super) fn pull_console_state(
             channels_seen: Vec::new(),
             outputs_seen: Vec::new(),
             mix_nodes_seen: Vec::new(),
+            names: Vec::new(),
         });
 
     // Whatever arrived is console truth and stays, even when the pull fails.
     flush_console_link(db_path)?;
+    if progress.control_messages > 0 {
+        crate::diagnostics::log_event(
+            crate::diagnostics::LogLevel::Info,
+            &read_back_names_line(cause, &progress),
+        );
+    }
 
     if progress.control_messages == 0 {
         return Err(fail(
@@ -343,6 +350,40 @@ pub(super) fn pull_console_state(
         complete: true,
         connection,
     })
+}
+
+/// The line for `engine.log` after a read-back: every name TotalMix's dump
+/// carried, quoted as it was sent, its channels counted from 0 as TotalMix
+/// counts them. The studio walk of 2026-10-01 reads in it what TotalMix
+/// sends for a channel it names nothing, and how a name beyond ASCII comes
+/// through.
+pub(super) fn read_back_names_line(cause: PullCause<'_>, progress: &PullProgress) -> String {
+    let what = match cause {
+        PullCause::Sync => String::from("Sync's read-back"),
+        PullCause::Load { label } => format!("The read-back after loading {label}"),
+    };
+    if progress.names.is_empty() {
+        return format!(
+            "{what} carried no names ({} channels and {} outputs reported).",
+            progress.channels_seen.len(),
+            progress.outputs_seen.len()
+        );
+    }
+    let mut names = progress.names.clone();
+    names.sort_by_key(|(bus, channel, _)| (*bus, *channel));
+    let empty = names
+        .iter()
+        .filter(|(_, _, name)| name.trim().is_empty())
+        .count();
+    let listed: Vec<String> = names
+        .iter()
+        .map(|(bus, channel, name)| format!("{} {channel} {name:?}", bus.word()))
+        .collect();
+    format!(
+        "{what} carried {} names, {empty} of them empty (TotalMix counts from 0): {}.",
+        names.len(),
+        listed.join(", ")
+    )
 }
 
 /// `/sendall 2` lists only mix nodes above -65 dB, so a mapped node the dump

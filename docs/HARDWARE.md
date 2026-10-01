@@ -62,6 +62,15 @@ Measured on the studio's desk (2026-09), for whoever probes by hand or reads a l
 - 48 V does not switch when a TotalMix snapshot loads (the owner, 2026-10-01).
 - TotalMix's OSC carries no snapshot names. A studio build on the real console reads them from TotalMix's own settings file, `%LOCALAPPDATA%\TotalMixFX\last.<device>.xml` (`SnapshotName 0` to `7`; here `last.FirefaceUFXIII1.xml`), which TotalMix writes when it closes, so a name changed in TotalMix shows after TotalMix has closed once. Development builds and tests never read the file.
 - A channel's name comes in TotalMix's dumps as `/input|playback|output/<ch>/name`, and the Console shows it. A channel TotalMix sends no name for keeps the app's.
+- The OSC library reads a string only as UTF-8. A datagram it cannot read is lost, and in a bundle so is everything after the element it stopped at.
+
+What `engine.log` says of TotalMix, for the walk (2026-10-01):
+
+- `Load of slot N "<name>" sent to TotalMix:` whether TotalMix reported the load itself (and after how many ms) or the app marked the slot after the read-back, what the read-back brought or why it failed, and the eight slots' states after it. A load that was not sent says why, as a warning.
+- `TotalMix's names read from <path>`: how the file was found (by the device's name, or as the only `last.*.xml`), when TotalMix saved it, and the names it held. When there is no file, one line says where it looked; it is written again only when that changes.
+- `TotalMix's device:` the name on `/status/device` the first time the link hears it, and again when it changes, with the names file that name points to.
+- `Sync's read-back carried …` (or `The read-back after loading …`): every channel name the dump carried, quoted as TotalMix sent it, channels counted from 0.
+- `TotalMix sent N datagrams … that could not be read in full`: a warning at once, then once a minute at most, with the bytes where the reading stopped.
 
 ## Lights
 

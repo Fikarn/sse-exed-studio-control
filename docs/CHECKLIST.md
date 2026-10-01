@@ -35,10 +35,10 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
 - [ ] Remote 4 off, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED`, and `Sync from TotalMix` clears it.
 - [ ] A TotalMix fader at 0 dB and at −6 dB reads the same on the Console and on the Stream Deck.
-- [ ] The Console's Snapshots are TotalMix's eight, under the names TotalMix shows (after TotalMix has been closed once since they were named); the one loaded reads `active`, and `changed` once a fader moves in TotalMix.
-- [ ] A slot pressed twice loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. The log says whether TotalMix reported the load itself.
+- [ ] The Console's Snapshots are TotalMix's eight, under the names TotalMix shows (after TotalMix has been closed once since they were named); the one loaded reads `active`, and `changed` once a fader moves in TotalMix. `engine.log` names TotalMix's device (`TotalMix's device:`) and the names file it read (`TotalMix's names read from`).
+- [ ] A slot pressed twice loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. `engine.log`'s `Load of slot N` line says whether TotalMix reported the load itself.
 - [ ] An armed load moves nothing: the key reads `LOAD?` in amber with its countdown, the state display shows the armed row, and Esc clears both.
-- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`. The Console has no Rename and no Capture.
+- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`, also with a letter beyond ASCII (`ö`). `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
 - [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
 

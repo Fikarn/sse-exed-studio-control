@@ -504,13 +504,14 @@ fn a_file_past_the_limit_is_refused_unopened() {
     let reads = file_reads();
     let limit = file.len() as u64 - 1;
 
-    refresh_cache(
+    let line = refresh_cache(
         &cache,
         NamesSource::TotalMixFile,
         Some(dir.path()),
         Some(DEVICE),
         limit,
     );
+    assert_eq!(line, None, "a file that cannot be read has its own warning");
     let refused = lock(&cache).clone();
     assert_eq!(refused.names.names, names(&[]));
     assert_eq!(refused.names.saved_at, None);
@@ -574,6 +575,147 @@ fn a_development_run_and_the_simulated_console_through_the_shared_cache() {
     assert_eq!(nothing.names, names(&[]));
     assert_eq!(nothing.saved_at, None);
     assert_eq!(nothing.note.as_deref(), Some(NOTE_DEVELOPMENT_RUN));
+}
+
+fn refresh_line(cache: &Mutex<NamesCache>, dir: &Path, device: Option<&str>) -> Option<String> {
+    refresh_cache(
+        cache,
+        NamesSource::TotalMixFile,
+        Some(dir),
+        device,
+        SETTINGS_FILE_LIMIT,
+    )
+}
+
+#[test]
+fn the_log_names_the_file_how_it_was_found_when_it_was_saved_and_its_names() {
+    let dir = TestDir::new("log-read");
+    let file = settings_file(
+        &[
+            val("SnapshotName 0", "Mix 1"),
+            val("SnapshotName 7", "Röst & Gäst"),
+        ]
+        .concat(),
+    );
+    let path = dir.write(DEVICE_FILE, &file);
+    set_modified(&path, at(SAVED_SECONDS));
+    let cache = Mutex::new(NamesCache::default());
+
+    assert_eq!(
+        refresh_line(&cache, dir.path(), Some(DEVICE)),
+        Some(format!(
+            "TotalMix's names read from {} (the file of TotalMix's device \"Fireface UFX III (1)\"), saved {SAVED_TEXT}, {} bytes: 2 of 8 slots named: 1 \"Mix 1\", 8 \"Röst & Gäst\".",
+            path.display(),
+            file.len()
+        ))
+    );
+    // Nothing changed: no read, and no line.
+    assert_eq!(refresh_line(&cache, dir.path(), Some(DEVICE)), None);
+
+    // Saved again by TotalMix: read again, and a line again.
+    set_modified(&path, at(SAVED_SECONDS + 60));
+    let again = refresh_line(&cache, dir.path(), Some(DEVICE)).expect("a line");
+    assert!(again.contains("saved 2020-09-13T12:27:40Z"), "{again}");
+}
+
+#[test]
+fn the_log_says_when_the_file_was_taken_as_the_only_one() {
+    let dir = TestDir::new("log-only");
+    let path = dir.write("last.Other.xml", settings_file(""));
+    set_modified(&path, at(SAVED_SECONDS));
+
+    let cache = Mutex::new(NamesCache::default());
+    let unnamed = refresh_line(&cache, dir.path(), None).expect("a line");
+    assert!(
+        unnamed
+            .contains("(the only last.*.xml there; TotalMix has not said its device's name yet)"),
+        "{unnamed}"
+    );
+    assert!(unnamed.ends_with(": no slot named."), "{unnamed}");
+
+    let cache = Mutex::new(NamesCache::default());
+    let other = refresh_line(&cache, dir.path(), Some(DEVICE)).expect("a line");
+    assert!(
+        other.contains(
+            "(the only last.*.xml there; none is named for TotalMix's device \"Fireface UFX III (1)\")"
+        ),
+        "{other}"
+    );
+}
+
+#[test]
+fn the_log_says_where_it_looked_when_there_is_no_file_once() {
+    let dir = TestDir::new("log-none");
+    let cache = Mutex::new(NamesCache::default());
+
+    assert_eq!(
+        refresh_line(&cache, dir.path(), Some(DEVICE)),
+        Some(format!(
+            "TotalMix's names: in {} there is no {DEVICE_FILE} for TotalMix's device \"Fireface UFX III (1)\", and not one last.*.xml alone. {NOTE_NOT_SAVED}",
+            dir.path().display()
+        ))
+    );
+    // The same note again is not logged again.
+    assert_eq!(refresh_line(&cache, dir.path(), Some(DEVICE)), None);
+
+    let cache = Mutex::new(NamesCache::default());
+    let no_device = refresh_line(&cache, dir.path(), None).expect("a line");
+    assert!(
+        no_device.contains(
+            "there is not one last.*.xml alone, and TotalMix has not said its device's name yet."
+        ),
+        "{no_device}"
+    );
+
+    let cache = Mutex::new(NamesCache::default());
+    assert_eq!(
+        refresh_cache(
+            &cache,
+            NamesSource::TotalMixFile,
+            None,
+            Some(DEVICE),
+            SETTINGS_FILE_LIMIT,
+        ),
+        Some(format!(
+            "TotalMix's names: LOCALAPPDATA is not set, so TotalMix's folder is not known. {NOTE_NOT_SAVED}"
+        ))
+    );
+}
+
+#[test]
+fn the_test_names_and_a_development_run_are_logged_once() {
+    let cache = Mutex::new(NamesCache::default());
+    let fixture = |cache: &Mutex<NamesCache>| {
+        refresh_cache(cache, NamesSource::Fixture, None, None, SETTINGS_FILE_LIMIT)
+    };
+    assert_eq!(
+        fixture(&cache),
+        Some(String::from(
+            "TotalMix's names: the simulated console shows the test names (3 of 8 slots named: 1 \"Mix 1\", 2 \"Interview\", 3 \"Panel & Q&A\")."
+        ))
+    );
+    assert_eq!(fixture(&cache), None);
+
+    let nothing = |cache: &Mutex<NamesCache>| {
+        refresh_cache(
+            cache,
+            NamesSource::Nothing,
+            None,
+            Some(DEVICE),
+            SETTINGS_FILE_LIMIT,
+        )
+    };
+    assert_eq!(
+        nothing(&cache),
+        Some(format!("TotalMix's names: {NOTE_DEVELOPMENT_RUN}"))
+    );
+    assert_eq!(nothing(&cache), None);
+}
+
+#[test]
+fn a_device_names_its_settings_file() {
+    assert_eq!(settings_file_name(DEVICE).as_deref(), Some(DEVICE_FILE));
+    assert_eq!(settings_file_name(" (·) "), None);
 }
 
 #[test]

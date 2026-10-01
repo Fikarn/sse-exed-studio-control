@@ -1353,6 +1353,122 @@ fn foreign_datagrams_are_dropped_and_logged_once_per_minute() {
     remove_temp_log(&log_path);
 }
 
+/// A bundle of the console's whose middle element carries a name in
+/// Windows-1252 (`Röst`), which the OSC library refuses: its first element
+/// is read, the rest is left unread and logged.
+#[test]
+fn a_datagram_from_the_console_that_cannot_be_read_in_full_is_logged() {
+    let log_path = temp_log_path("global-unread");
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let mut slot = GlobalOscSlot {
+        send_port: 7014,
+        socket: bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        last_rx_at: None,
+        console: LOOPBACK,
+    };
+    let slot_port = slot.local_port();
+    let bundle = OscPacket::Bundle(rosc::OscBundle {
+        timetag: rosc::OscTime::from((0, 1)),
+        content: vec![
+            OscPacket::Message(message("/level/out/0", OscType::Float(-6.0))),
+            OscPacket::Message(message(
+                "/input/9/name",
+                OscType::String(String::from("Rxst")),
+            )),
+            OscPacket::Message(message("/level/out/1", OscType::Float(-6.0))),
+        ],
+    });
+    let mut bytes = encoder::encode(&bundle).expect("bundle should encode");
+    let at = bytes
+        .windows(4)
+        .position(|window| window == b"Rxst")
+        .expect("the name is in the bundle");
+    bytes[at + 1] = 0xF6;
+    // The refused element begins with its size, four bytes before its address.
+    let refused_at = bytes
+        .windows(13)
+        .position(|window| window == b"/input/9/name")
+        .expect("the address is in the bundle")
+        - 4;
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(Some(log_path.clone()));
+
+    sender
+        .send_to(&bytes, ("127.0.0.1", slot_port))
+        .expect("send should succeed");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while drops.unread_logged_at.is_none() && Instant::now() < deadline {
+        read_global_packets(&mut slot, &state, 1_000, &mut drops);
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let meters = state.lock().expect("state");
+    assert!(
+        meters.entry_for_surface_id("audio-mix-main").is_some(),
+        "the element before the refused one is read"
+    );
+    assert_eq!(
+        meters.diagnostics().packet_count,
+        1,
+        "the element after it is lost with it"
+    );
+    drop(meters);
+    let log = fs::read_to_string(&log_path).expect("the unread datagram should be logged");
+    assert_eq!(log.lines().count(), 1, "{log}");
+    assert!(log.contains(" WARN "), "{log}");
+    assert!(
+        log.contains(
+            "TotalMix sent 1 datagram on the Global OSC port that could not be read in full"
+        ),
+        "{log}"
+    );
+    assert!(
+        log.contains(&format!(
+            "the latest: a bundle with {} of its {} bytes left unread",
+            bytes.len() - refused_at,
+            bytes.len()
+        )),
+        "{log}"
+    );
+    assert!(log.contains("/input/9/name"), "{log}");
+    assert!(log.contains("R\\xf6st"), "{log}");
+    remove_temp_log(&log_path);
+}
+
+#[test]
+fn unread_datagrams_are_noted_at_once_then_once_a_minute_with_their_count() {
+    let mut drops = DroppedSourceLog::new(None);
+    let start = Instant::now();
+    let refused = "a datagram of 12 bytes refused (bad string)";
+
+    let first = drops
+        .unread_line_at(refused, b"/a\0\0,s\0\0\xe9\0\0\0", start)
+        .expect("the first is noted at once");
+    assert_eq!(
+        first,
+        "TotalMix sent 1 datagram on the Global OSC port that could not be read in full since the last such line; the latest: a datagram of 12 bytes refused (bad string); its bytes where the reading stopped: \"/a\\x00\\x00,s\\x00\\x00\\xe9\\x00\\x00\\x00\". Such datagrams are noted once a minute."
+    );
+    assert_eq!(
+        drops.unread_line_at(refused, b"x", start + Duration::from_secs(30)),
+        None
+    );
+    assert_eq!(
+        drops.unread_line_at(refused, b"y", start + Duration::from_secs(59)),
+        None
+    );
+    let later = drops
+        .unread_line_at(refused, &[b'z'; 200], start + Duration::from_secs(60))
+        .expect("a minute on, the next line");
+    assert!(
+        later.starts_with("TotalMix sent 3 datagrams on the Global OSC port"),
+        "{later}"
+    );
+    assert!(
+        later.contains(&format!("\"{}\" …. Such", "z".repeat(UNREAD_BYTES_SHOWN))),
+        "only the first bytes are shown: {later}"
+    );
+}
+
 #[test]
 fn classic_slots_read_the_console_address_only() {
     let log_path = temp_log_path("classic-drop");

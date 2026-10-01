@@ -47,7 +47,7 @@ pub const LOST_REPORTS_RETRY_MS: u64 = 2_000;
 const GAIN_MATCH_TOLERANCE_DB: f64 = 0.5;
 const MAX_UNCONFIRMED_ADDRESSES: usize = 20;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ConsoleBus {
     Input,
     Playback,
@@ -616,6 +616,9 @@ pub struct PullProgress {
     pub channels_seen: Vec<(ConsoleBus, usize)>,
     pub outputs_seen: Vec<usize>,
     pub mix_nodes_seen: Vec<(ConsoleBus, usize, usize)>,
+    /// Every name the dump carried, as TotalMix sent it (the last one for a
+    /// channel wins), for the log's line on what a read-back named.
+    pub names: Vec<(ConsoleBus, usize, String)>,
 }
 
 impl PullProgress {
@@ -640,6 +643,7 @@ struct PullTracker {
     channels_seen: Vec<(ConsoleBus, usize)>,
     outputs_seen: Vec<usize>,
     mix_nodes_seen: Vec<(ConsoleBus, usize, usize)>,
+    names: Vec<(ConsoleBus, usize, String)>,
 }
 
 impl PullTracker {
@@ -655,10 +659,16 @@ impl PullTracker {
             channels_seen: self.channels_seen.clone(),
             outputs_seen: self.outputs_seen.clone(),
             mix_nodes_seen: self.mix_nodes_seen.clone(),
+            names: self.names.clone(),
         }
     }
 
-    fn note_key(&mut self, key: &ParamKey) {
+    fn note(&mut self, key: &ParamKey, value: &ConsoleValue) {
+        if let (ParamKey::ChannelName { bus, channel }, ConsoleValue::Text(name)) = (key, value) {
+            self.names
+                .retain(|(seen_bus, seen_channel, _)| (seen_bus, seen_channel) != (bus, channel));
+            self.names.push((*bus, *channel, name.clone()));
+        }
         self.parsed_messages = self.parsed_messages.saturating_add(1);
         match key {
             ParamKey::ChannelFlag {
@@ -804,6 +814,7 @@ impl ConsoleLinkState {
             channels_seen: Vec::new(),
             outputs_seen: Vec::new(),
             mix_nodes_seen: Vec::new(),
+            names: Vec::new(),
         });
     }
 
@@ -828,7 +839,7 @@ impl ConsoleLinkState {
         };
         self.last_echo_at_ms = Some(now_ms);
         if let Some(tracker) = self.pull.as_mut() {
-            tracker.note_key(&parsed.key);
+            tracker.note(&parsed.key, &parsed.value);
         }
 
         let mut newest_request_at: Option<u64> = None;
@@ -877,7 +888,9 @@ impl ConsoleLinkState {
                 return Classification::Status;
             }
             (ParamKey::StatusDevice, ConsoleValue::Text(value)) => {
-                self.device = Some(value.clone());
+                if let Some(line) = self.note_device(value) {
+                    crate::diagnostics::log_event(crate::diagnostics::LogLevel::Info, &line);
+                }
                 return Classification::Status;
             }
             (ParamKey::StatusDsp, ConsoleValue::Number(value)) => {
@@ -1081,6 +1094,25 @@ impl ConsoleLinkState {
             self.snapshot_slots[slot - 1] = state;
             self.snapshot_slots_changed = true;
         }
+    }
+
+    /// Keeps the device's name TotalMix gives on `/status/device`, and returns
+    /// the line for `engine.log` the first time the link hears it and
+    /// whenever it changes. The names file is found by it, so the line names
+    /// that file too.
+    fn note_device(&mut self, device: &str) -> Option<String> {
+        if self.device.as_deref() == Some(device) {
+            return None;
+        }
+        let file = crate::rme_totalmix_names::settings_file_name(device)
+            .map(|name| format!("its names file is {name}"))
+            .unwrap_or_else(|| String::from("no names file is named after it"));
+        Some(match self.device.replace(device.to_string()) {
+            None => format!("TotalMix's device: {device:?} ({file})."),
+            Some(before) => {
+                format!("TotalMix's device is now {device:?}, was {before:?} ({file}).")
+            }
+        })
     }
 
     pub fn forget_snapshot_slots(&mut self) {

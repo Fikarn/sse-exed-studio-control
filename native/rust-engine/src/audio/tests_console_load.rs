@@ -449,3 +449,101 @@ fn the_load_sender_takes_slots_one_to_eight_and_sends_only_one() {
     assert_eq!(message.addr, "/snapshot/load/8");
     assert_eq!(message.args, vec![rosc::OscType::Float(1.0)]);
 }
+
+// ---------------------------------------------------------------------------
+// The walk's log lines (2026-10-01): a load, and the names a read-back carried.
+// ---------------------------------------------------------------------------
+
+fn slot_words(active: usize) -> Vec<String> {
+    (1..=8)
+        .map(|slot| String::from(if slot == active { "active" } else { "off" }))
+        .collect()
+}
+
+fn pulled(values: i64) -> AudioSyncResult {
+    AudioSyncResult {
+        synced: true,
+        synced_at: String::from("2026-10-01T18:00:00Z"),
+        summary: String::from("Loaded Mix 3 in TotalMix · Pulled 3120 values"),
+        console_state_confidence: String::from("aligned"),
+        pulled_values: values,
+        channels: 8,
+        mix_targets: 3,
+        complete: true,
+        connection: String::from("connected"),
+    }
+}
+
+#[test]
+fn the_load_s_log_line_says_who_reported_it_and_what_was_read_back() {
+    use super::load::{load_log_line, LoadReport};
+
+    assert_eq!(
+        load_log_line(
+            3,
+            Some("Mix 3"),
+            LoadReport::After { ms: 40 },
+            Ok(&pulled(3120)),
+            &slot_words(3),
+        ),
+        "Load of slot 3 \"Mix 3\" sent to TotalMix: TotalMix reported the load itself after 40 ms. Read back 3120 values (8 channels, 3 outputs); the Console reads aligned. Slots now: 1 off, 2 off, 3 active, 4 off, 5 off, 6 off, 7 off, 8 off."
+    );
+    let marked = load_log_line(5, None, LoadReport::Marked, Ok(&pulled(10)), &slot_words(5));
+    assert!(
+        marked.starts_with("Load of slot 5 (no name) sent to TotalMix: TotalMix said nothing of it, so the app marked the slot active after the read-back. "),
+        "{marked}"
+    );
+    let during = load_log_line(
+        1,
+        Some("Mix 1"),
+        LoadReport::DuringReadBack,
+        Ok(&pulled(10)),
+        &slot_words(1),
+    );
+    assert!(
+        during.contains(": TotalMix reported the load itself, during the read-back. "),
+        "{during}"
+    );
+    assert_eq!(
+        load_log_line(
+            2,
+            Some("Röst"),
+            LoadReport::NotMarked,
+            Err(String::from("AUDIO_SYNC_NO_ECHO: Slot 2 was sent to TotalMix; TotalMix did not answer.")),
+            &vec![String::from("unknown"); 8],
+        ),
+        "Load of slot 2 \"Röst\" sent to TotalMix: TotalMix said nothing of it, and the slot was not marked. The read-back failed (AUDIO_SYNC_NO_ECHO: Slot 2 was sent to TotalMix; TotalMix did not answer.); the Console's state is unknown. Slots now: 1 unknown, 2 unknown, 3 unknown, 4 unknown, 5 unknown, 6 unknown, 7 unknown, 8 unknown."
+    );
+}
+
+#[test]
+fn a_read_back_s_log_line_quotes_every_name_as_totalmix_sent_it() {
+    use super::sync::{read_back_names_line, PullCause};
+    use crate::rme_console_link::{ConsoleBus, PullProgress};
+
+    let mut progress = PullProgress {
+        started_at_ms: 0,
+        control_messages: 40,
+        parsed_messages: 30,
+        last_message_age_ms: Some(300),
+        status_seen: true,
+        channels_seen: vec![(ConsoleBus::Input, 0), (ConsoleBus::Input, 9)],
+        outputs_seen: vec![0],
+        mix_nodes_seen: Vec::new(),
+        names: vec![
+            (ConsoleBus::Output, 0, String::from("Main")),
+            (ConsoleBus::Input, 9, String::from("Röst")),
+            (ConsoleBus::Input, 0, String::new()),
+            (ConsoleBus::Playback, 2, String::from("VMIX \"Out\"")),
+        ],
+    };
+    assert_eq!(
+        read_back_names_line(PullCause::Sync, &progress),
+        "Sync's read-back carried 4 names, 1 of them empty (TotalMix counts from 0): input 0 \"\", input 9 \"Röst\", playback 2 \"VMIX \\\"Out\\\"\", output 0 \"Main\"."
+    );
+    progress.names.clear();
+    assert_eq!(
+        read_back_names_line(PullCause::Load { label: "Mix 3" }, &progress),
+        "The read-back after loading Mix 3 carried no names (2 channels and 1 outputs reported)."
+    );
+}
