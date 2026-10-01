@@ -32,9 +32,10 @@
 //      development build. With the simulated cameras the engine starts no
 //      pictures helper and no library is loaded: the helper first runs on
 //      the owner's walk;
-//   6. `build.json` is written and the folder gets its name. A run that
-//      failed leaves an `.unfinished` folder without a record, which
-//      `release:verified` refuses.
+//   6. `build.json` is written, its hash of NDI's library held to the pin,
+//      and the folder gets its name. A run that failed leaves an
+//      `.unfinished` folder, with no record or with one that names another
+//      folder, which `release:verified` refuses.
 //
 // Nothing here opens the studio's saved data or sends to a device. The
 // bridge lane's profile export reads Companion's own export at
@@ -252,7 +253,7 @@ export function readBuildRecord(folder) {
   const recordPath = path.join(folder, BUILD_RECORD_FILE);
   if (!existsSync(recordPath)) {
     throw new Error(
-      `${recordPath} is missing: that folder is not a build \`npm run release\` finished. A run that failed leaves a folder without a record.`
+      `${recordPath} is missing: that folder is not a build \`npm run release\` finished. A run that failed leaves an \`.unfinished\` folder.`
     );
   }
   const record = JSON.parse(readFileSync(recordPath, "utf8"));
