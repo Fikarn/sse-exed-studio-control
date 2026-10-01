@@ -29,7 +29,13 @@
 //! `refresh_totalmix_snapshot_names` looks at the file and reads it again only
 //! when its path, modified time or length changed since the last read: a
 //! refresh that finds nothing new costs one look at the file's metadata.
+//!
+//! `engine.log` gets one line whenever what the cache holds changes: each
+//! read of the file (its path, how it was found, when TotalMix saved it and
+//! the names it held), or the note when there are none (the studio walk of
+//! 2026-10-01 reads them).
 
+use std::ffi::OsStr;
 use std::fs::{self, File, Metadata};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -221,13 +227,8 @@ pub fn find_totalmix_settings_file(dir: &Path, device: Option<&str>) -> Option<P
 /// `find_totalmix_settings_file`, with the file's metadata from the same
 /// look: when the device's own file is there, that is one metadata call.
 fn locate_settings_file(dir: &Path, device: Option<&str>) -> Option<(PathBuf, Metadata)> {
-    if let Some(stem) = device
-        .map(settings_file_stem)
-        .filter(|stem| !stem.is_empty())
-    {
-        let named = dir.join(format!(
-            "{SETTINGS_FILE_PREFIX}{stem}{SETTINGS_FILE_SUFFIX}"
-        ));
+    if let Some(file_name) = device.and_then(settings_file_name) {
+        let named = dir.join(file_name);
         if let Some(metadata) = file_metadata(&named) {
             return Some((named, metadata));
         }
@@ -259,6 +260,13 @@ fn file_metadata(path: &Path) -> Option<Metadata> {
 /// stays, so the name can never reach outside the folder.
 fn settings_file_stem(device: &str) -> String {
     device.chars().filter(char::is_ascii_alphanumeric).collect()
+}
+
+/// The settings file TotalMix keeps for a device of this name,
+/// `last.FirefaceUFXIII1.xml`; `None` when the name holds no letter or digit.
+pub fn settings_file_name(device: &str) -> Option<String> {
+    let stem = settings_file_stem(device);
+    (!stem.is_empty()).then(|| format!("{SETTINGS_FILE_PREFIX}{stem}{SETTINGS_FILE_SUFFIX}"))
 }
 
 /// `last.<something>.xml`, in any case: Windows' file names ignore it.
@@ -354,59 +362,140 @@ pub fn refresh_totalmix_snapshot_names(source: NamesSource, device: Option<&str>
         NamesSource::TotalMixFile => totalmix_settings_dir(),
         NamesSource::Fixture | NamesSource::Nothing => None,
     };
-    refresh_cache(
+    if let Some(line) = refresh_cache(
         names_cache(),
         source,
         dir.as_deref(),
         device,
         SETTINGS_FILE_LIMIT,
-    );
+    ) {
+        crate::diagnostics::log_event(crate::diagnostics::LogLevel::Info, &line);
+    }
 }
 
 /// The refresh, over any cache and folder: the tests use their own. The file
 /// is looked at and read outside the lock, so `totalmix_snapshot_names` never
-/// waits on the disk.
+/// waits on the disk. Returns the line for `engine.log` when what the cache
+/// holds changed (a file that could not be read has its own warning).
 fn refresh_cache(
     cache: &Mutex<NamesCache>,
     source: NamesSource,
     dir: Option<&Path>,
     device: Option<&str>,
     limit: u64,
-) {
+) -> Option<String> {
     let last_read = lock(cache).read.clone();
-    if let Some(fresh) = refreshed(source, dir, device, last_read.as_ref(), limit) {
-        *lock(cache) = fresh;
-    }
+    let (fresh, line) = refreshed(source, dir, device, last_read.as_ref(), limit)?;
+    let mut held = lock(cache);
+    let changed = *held != fresh;
+    *held = fresh;
+    line.filter(|_| changed)
 }
 
-/// What a refresh puts in the cache; `None` when TotalMix's file is the one
-/// last read, unchanged.
+/// What a refresh puts in the cache, with the line that says so; `None` when
+/// TotalMix's file is the one last read, unchanged.
 fn refreshed(
     source: NamesSource,
     dir: Option<&Path>,
     device: Option<&str>,
     last_read: Option<&FileStamp>,
     limit: u64,
-) -> Option<NamesCache> {
+) -> Option<(NamesCache, Option<String>)> {
     match source {
-        NamesSource::Fixture => Some(NamesCache::without_file(fixture_names())),
-        NamesSource::Nothing => Some(NamesCache::without_file(TotalMixSnapshotNames::noted(
-            NOTE_DEVELOPMENT_RUN,
-        ))),
+        NamesSource::Fixture => {
+            let names = fixture_names();
+            let line = format!(
+                "TotalMix's names: the simulated console shows the test names ({}).",
+                slot_names_text(&names.names)
+            );
+            Some((NamesCache::without_file(names), Some(line)))
+        }
+        NamesSource::Nothing => Some((
+            NamesCache::without_file(TotalMixSnapshotNames::noted(NOTE_DEVELOPMENT_RUN)),
+            Some(format!("TotalMix's names: {NOTE_DEVELOPMENT_RUN}")),
+        )),
         NamesSource::TotalMixFile => {
             let Some((path, metadata)) = dir.and_then(|dir| locate_settings_file(dir, device))
             else {
-                return Some(NamesCache::without_file(TotalMixSnapshotNames::noted(
-                    NOTE_NOT_SAVED,
-                )));
+                return Some((
+                    NamesCache::without_file(TotalMixSnapshotNames::noted(NOTE_NOT_SAVED)),
+                    Some(not_found_line(dir, device)),
+                ));
             };
             let stamp = FileStamp::of(path, &metadata);
             if last_read == Some(&stamp) {
                 return None;
             }
-            Some(read_names(stamp, limit))
+            let found_by_device = device
+                .and_then(settings_file_name)
+                .is_some_and(|name| stamp.path.file_name() == Some(OsStr::new(&name)));
+            let read = read_names(stamp, limit);
+            let line = read.read.as_ref().map(|stamp| {
+                let how = match device {
+                    Some(device) if found_by_device => {
+                        format!("the file of TotalMix's device {device:?}")
+                    }
+                    Some(device) => format!(
+                        "the only last.*.xml there; none is named for TotalMix's device {device:?}"
+                    ),
+                    None => String::from(
+                        "the only last.*.xml there; TotalMix has not said its device's name yet",
+                    ),
+                };
+                format!(
+                    "TotalMix's names read from {} ({how}), saved {}, {} bytes: {}.",
+                    stamp.path.display(),
+                    read.names
+                        .saved_at
+                        .as_deref()
+                        .unwrap_or("at an unknown time"),
+                    stamp.len,
+                    slot_names_text(&read.names.names)
+                )
+            });
+            Some((read, line))
         }
     }
+}
+
+/// The line when no settings file is found: where the refresh looked, and
+/// the note the Console shows.
+fn not_found_line(dir: Option<&Path>, device: Option<&str>) -> String {
+    let Some(dir) = dir else {
+        return format!(
+            "TotalMix's names: LOCALAPPDATA is not set, so TotalMix's folder is not known. {NOTE_NOT_SAVED}"
+        );
+    };
+    let looked_for = match device.and_then(|device| Some((device, settings_file_name(device)?))) {
+        Some((device, name)) => {
+            format!("no {name} for TotalMix's device {device:?}, and not one last.*.xml alone")
+        }
+        None => String::from(
+            "not one last.*.xml alone, and TotalMix has not said its device's name yet",
+        ),
+    };
+    format!(
+        "TotalMix's names: in {} there is {looked_for}. {NOTE_NOT_SAVED}",
+        dir.display()
+    )
+}
+
+/// `3 of 8 slots named: 1 "Mix 1", 2 "Mix 2", 8 "Mix 8"`, each name as
+/// written, quoted; `no slot named` when none is.
+fn slot_names_text(names: &[Option<String>; SNAPSHOT_SLOTS]) -> String {
+    let named: Vec<String> = names
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| name.as_ref().map(|name| format!("{} {name:?}", index + 1)))
+        .collect();
+    if named.is_empty() {
+        return String::from("no slot named");
+    }
+    format!(
+        "{} of {SNAPSHOT_SLOTS} slots named: {}",
+        named.len(),
+        named.join(", ")
+    )
 }
 
 fn fixture_names() -> TotalMixSnapshotNames {
@@ -439,7 +528,10 @@ fn read_names(stamp: FileStamp, limit: u64) -> NamesCache {
         Err(reason) => {
             crate::diagnostics::log_event(
                 crate::diagnostics::LogLevel::Warn,
-                &format!("TotalMix's saved names could not be read: {reason}."),
+                &format!(
+                    "TotalMix's saved names could not be read from {}: {reason}.",
+                    stamp.path.display()
+                ),
             );
             NamesCache::without_file(TotalMixSnapshotNames::noted(NOTE_UNREADABLE))
         }

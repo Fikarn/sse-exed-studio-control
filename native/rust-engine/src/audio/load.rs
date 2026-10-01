@@ -15,6 +15,11 @@
 //! slot active itself when the desk said nothing. A read-back that fails
 //! after the load went out is no failed load: the desk has the mix, and the
 //! Console asks for a Sync.
+//!
+//! Each load on the real console writes one line to `engine.log`: whether
+//! TotalMix reported it or the app marked it, what the read-back brought,
+//! and the eight slots after it (the walk reads it); a load that was not sent
+//! writes why.
 
 use std::path::Path;
 use std::thread;
@@ -137,6 +142,7 @@ pub fn load_audio_console_snapshot_with(
         let message = String::from(
             "A development run never loads a mix in TotalMix; only the studio's build does.",
         );
+        log_not_sent(slot, name.as_deref(), &message);
         record_audio_action_failure(db_path, "AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY", &message)?;
         return Err(AudioCommandError::Rejected(
             "AUDIO_SNAPSHOT_LOAD_STUDIO_ONLY",
@@ -153,6 +159,7 @@ pub fn load_audio_console_snapshot_with(
                 config.receive_port + 3
             );
             drop(guard);
+            log_not_sent(slot, name.as_deref(), &message);
             record_audio_action_failure(db_path, "AUDIO_GLOBAL_OSC_UNBOUND", &message)?;
             return Err(AudioCommandError::Rejected(
                 "AUDIO_GLOBAL_OSC_UNBOUND",
@@ -166,6 +173,7 @@ pub fn load_audio_console_snapshot_with(
     // load's: written like any report, with no row "at TotalMix".
     let window = LoadWindow::open();
     if let Err(message) = send_console_snapshot_load(&config.send_host, config.send_port, slot) {
+        log_not_sent(slot, name.as_deref(), &message);
         record_audio_action_failure(db_path, "AUDIO_SNAPSHOT_LOAD_FAILED", &message)?;
         return Err(AudioCommandError::Rejected(
             "AUDIO_SNAPSHOT_LOAD_FAILED",
@@ -191,23 +199,47 @@ pub fn load_audio_console_snapshot_with(
     while !reported_after_send() && started.elapsed() < wait {
         thread::sleep(Duration::from_millis(timing.poll_ms.max(1)));
     }
+    let reported_in_wait = reported_after_send().then(|| started.elapsed().as_millis() as u64);
 
-    match pull_console_state(
+    let pulled = pull_console_state(
         db_path,
         &config,
         timing.pull,
         PullCause::Load { label: &label },
-    ) {
+    );
+    let reported = reported_after_send();
+    let report = match (reported_in_wait, reported, &pulled) {
+        (Some(ms), _, _) => LoadReport::After { ms },
+        (None, true, _) => LoadReport::DuringReadBack,
+        (None, false, Ok(_)) => LoadReport::Marked,
+        (None, false, Err(_)) => LoadReport::NotMarked,
+    };
+    if report == LoadReport::Marked {
+        // The desk answered the read-back but said nothing about the slot:
+        // what it now holds is the load's, so the slot is marked as TotalMix
+        // would have reported it.
+        if let Ok(mut guard) = link.lock() {
+            guard.mark_snapshot_loaded(slot);
+        }
+    }
+    let slots_now = console_snapshots_now()
+        .slots
+        .into_iter()
+        .map(|slot| slot.state)
+        .collect::<Vec<_>>();
+    crate::diagnostics::log_event(
+        crate::diagnostics::LogLevel::Info,
+        &load_log_line(
+            slot,
+            name.as_deref(),
+            report,
+            pulled.as_ref().map_err(failure_in_log),
+            &slots_now,
+        ),
+    );
+
+    match pulled {
         Ok(pulled) => {
-            let reported = reported_after_send();
-            if !reported {
-                // The desk answered the read-back but said nothing about the
-                // slot: what it now holds is the load's, so the slot is marked
-                // as TotalMix would have reported it.
-                if let Ok(mut guard) = link.lock() {
-                    guard.mark_snapshot_loaded(slot);
-                }
-            }
             // The read-back is written: what the desk reports from here on
             // is a change at TotalMix again, while the names file is read.
             drop(window);
@@ -227,9 +259,93 @@ pub fn load_audio_console_snapshot_with(
                 let _state_guard = lock_audio_state();
                 persist_audio_state(db_path, &[confidence_setting(ConsoleConfidence::Unknown)])?;
             }
-            Ok(result(message, "unknown", 0, reported_after_send()))
+            Ok(result(message, "unknown", 0, reported))
         }
         Err(error) => Err(error),
+    }
+}
+
+/// Whether TotalMix reported a load to the remote that sent it, for the log.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum LoadReport {
+    /// It reported the slot this long after the load went out.
+    After { ms: u64 },
+    /// It reported the slot only while the desk was read back.
+    DuringReadBack,
+    /// It said nothing, and the app marked the slot after the read-back.
+    Marked,
+    /// It said nothing, and the read-back failed: the slot was not marked.
+    NotMarked,
+}
+
+/// The line `engine.log` gets for a load that went out to TotalMix: the
+/// slot, whether TotalMix reported it, what the read-back brought or why it
+/// failed, and the eight slots' states after it.
+pub(super) fn load_log_line(
+    slot: usize,
+    name: Option<&str>,
+    report: LoadReport,
+    read_back: Result<&AudioSyncResult, String>,
+    slots_now: &[String],
+) -> String {
+    let reported = match report {
+        LoadReport::After { ms } => format!("TotalMix reported the load itself after {ms} ms"),
+        LoadReport::DuringReadBack => {
+            String::from("TotalMix reported the load itself, during the read-back")
+        }
+        LoadReport::Marked => String::from(
+            "TotalMix said nothing of it, so the app marked the slot active after the read-back",
+        ),
+        LoadReport::NotMarked => {
+            String::from("TotalMix said nothing of it, and the slot was not marked")
+        }
+    };
+    let read_back = match read_back {
+        Ok(pulled) => format!(
+            "Read back {} values ({} channels, {} outputs); the Console reads {}",
+            pulled.pulled_values,
+            pulled.channels,
+            pulled.mix_targets,
+            pulled.console_state_confidence
+        ),
+        Err(reason) => format!("The read-back failed ({reason}); the Console's state is unknown"),
+    };
+    let slots: Vec<String> = slots_now
+        .iter()
+        .enumerate()
+        .map(|(index, state)| format!("{} {state}", index + 1))
+        .collect();
+    format!(
+        "Load of {} sent to TotalMix: {reported}. {read_back}. Slots now: {}.",
+        slot_in_log(slot, name),
+        slots.join(", ")
+    )
+}
+
+/// A load that never reached TotalMix, in the log with its reason.
+fn log_not_sent(slot: usize, name: Option<&str>, reason: &str) {
+    crate::diagnostics::log_event(
+        crate::diagnostics::LogLevel::Warn,
+        &format!(
+            "Load of {} not sent to TotalMix: {reason}",
+            slot_in_log(slot, name)
+        ),
+    );
+}
+
+/// A read-back's failure as the log gives it: its code and its sentence.
+fn failure_in_log(error: &AudioCommandError) -> String {
+    match error {
+        AudioCommandError::Rejected(code, message) => format!("{code}: {message}"),
+        AudioCommandError::Storage(message) => format!("saved data: {message}"),
+    }
+}
+
+/// `slot 3 "Mix 3"`, or `slot 3 (no name)`: the log names a slot by both.
+fn slot_in_log(slot: usize, name: Option<&str>) -> String {
+    match name {
+        Some(name) => format!("slot {slot} {name:?}"),
+        None => format!("slot {slot} (no name)"),
     }
 }
 

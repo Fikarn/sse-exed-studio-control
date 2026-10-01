@@ -946,17 +946,62 @@ pub(crate) fn accept_source(source: SocketAddr, expected: IpAddr) -> bool {
 /// which since Slice 8 goes through the process-wide rotating writer when the
 /// path is the engine log (and appends directly to any other path, the temp
 /// log the tests read).
+///
+/// It also notes the console's own datagrams that could not be read in full
+/// (`record_unread`): the OSC library refuses a string that is not UTF-8,
+/// such as a name with letters beyond ASCII written in a Windows code page,
+/// and loses the rest of a bundle with it. The first is noted at once, then
+/// one line a minute at most with the count since the last line, and the
+/// bytes where the reading stopped (the studio walk of 2026-10-01 reads it).
 pub(crate) struct DroppedSourceLog {
     log_file_path: Option<PathBuf>,
     last_logged: HashMap<IpAddr, Instant>,
+    unread_logged_at: Option<Instant>,
+    unread_since: u64,
 }
+
+/// How many bytes of an unread datagram the log shows, from where its
+/// reading stopped.
+const UNREAD_BYTES_SHOWN: usize = 96;
 
 impl DroppedSourceLog {
     pub(crate) fn new(log_file_path: Option<PathBuf>) -> Self {
         Self {
             log_file_path,
             last_logged: HashMap::new(),
+            unread_logged_at: None,
+            unread_since: 0,
         }
+    }
+
+    fn record_unread(&mut self, what: &str, bytes: &[u8]) {
+        if let (Some(line), Some(path)) = (
+            self.unread_line_at(what, bytes, Instant::now()),
+            self.log_file_path.as_deref(),
+        ) {
+            let _ = append_log(path, "WARN", &line);
+        }
+    }
+
+    /// The line for a datagram from the console that could not be read in
+    /// full, when one is due; else it is counted for the next line.
+    fn unread_line_at(&mut self, what: &str, bytes: &[u8], now: Instant) -> Option<String> {
+        self.unread_since = self.unread_since.saturating_add(1);
+        if self
+            .unread_logged_at
+            .is_some_and(|last| now.duration_since(last) < DROPPED_SOURCE_LOG_INTERVAL)
+        {
+            return None;
+        }
+        self.unread_logged_at = Some(now);
+        let count = std::mem::take(&mut self.unread_since);
+        let shown = &bytes[..bytes.len().min(UNREAD_BYTES_SHOWN)];
+        Some(format!(
+            "TotalMix sent {count} datagram{} on the Global OSC port that could not be read in full since the last such line; the latest: {what}; its bytes where the reading stopped: \"{}\"{}. Such datagrams are noted once a minute.",
+            if count == 1 { "" } else { "s" },
+            shown.escape_ascii(),
+            if bytes.len() > shown.len() { " …" } else { "" }
+        ))
     }
 
     fn record(&mut self, source: SocketAddr, expected: IpAddr, receive_port: u16) {
@@ -1227,8 +1272,25 @@ pub(crate) fn read_global_packets(
                     continue;
                 }
                 slot.last_rx_at = Some(Instant::now());
-                if let Ok((_remainder, packet)) = decoder::decode_udp(&buffer[..len]) {
-                    route_global_packet(&packet, state, now_ms);
+                match decoder::decode_udp(&buffer[..len]) {
+                    Ok((remainder, packet)) => {
+                        route_global_packet(&packet, state, now_ms);
+                        // A bundle stops at the first element it cannot read
+                        // and hands back the rest: those elements are lost.
+                        if matches!(packet, OscPacket::Bundle(_)) && !remainder.is_empty() {
+                            drops.record_unread(
+                                &format!(
+                                    "a bundle with {} of its {len} bytes left unread",
+                                    remainder.len()
+                                ),
+                                remainder,
+                            );
+                        }
+                    }
+                    Err(error) => drops.record_unread(
+                        &format!("a datagram of {len} bytes refused ({error})"),
+                        &buffer[..len],
+                    ),
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,

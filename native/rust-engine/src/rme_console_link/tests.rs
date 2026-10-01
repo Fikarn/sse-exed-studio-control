@@ -951,6 +951,56 @@ fn channel_names_parse_as_text_and_are_external_changes() {
     assert_eq!(progress.outputs_seen, vec![10]);
 }
 
+#[test]
+fn a_pull_keeps_every_name_the_dump_carried_as_sent_the_last_one_winning() {
+    let mut link = ConsoleLinkState::default();
+    let name = |link: &mut ConsoleLinkState, address: &str, value: &str, at: u64| {
+        link.ingest(&msg(address, OscType::String(String::from(value))), at);
+    };
+    // Before the pull: not the pull's.
+    name(&mut link, "/input/0/name", "Before", 5);
+    link.begin_pull(10);
+    name(&mut link, "/input/9/name", "Boom", 11);
+    name(&mut link, "/input/0/name", "", 12);
+    name(&mut link, "/playback/0/name", "Windows Out", 13);
+    name(&mut link, "/input/9/name", "Röst", 14);
+    link.ingest(&msg("/input/9/mute", f(0.0)), 15);
+    let progress = link.finish_pull(30).expect("pull in progress");
+    assert_eq!(
+        progress.names,
+        vec![
+            (ConsoleBus::Input, 0, String::new()),
+            (ConsoleBus::Playback, 0, String::from("Windows Out")),
+            (ConsoleBus::Input, 9, String::from("Röst")),
+        ]
+    );
+}
+
+#[test]
+fn the_device_s_name_is_logged_when_first_heard_and_when_it_changes() {
+    let mut link = ConsoleLinkState::default();
+    assert_eq!(
+        link.note_device("Fireface UFX III (1)"),
+        Some(String::from(
+            "TotalMix's device: \"Fireface UFX III (1)\" (its names file is last.FirefaceUFXIII1.xml)."
+        ))
+    );
+    assert_eq!(link.note_device("Fireface UFX III (1)"), None);
+    assert_eq!(
+        link.note_device("UFX II"),
+        Some(String::from(
+            "TotalMix's device is now \"UFX II\", was \"Fireface UFX III (1)\" (its names file is last.UFXII.xml)."
+        ))
+    );
+    assert_eq!(
+        link.note_device("()"),
+        Some(String::from(
+            "TotalMix's device is now \"()\", was \"UFX II\" (no names file is named after it)."
+        ))
+    );
+    assert_eq!(link.summary(0).device.as_deref(), Some("()"));
+}
+
 // ---------------------------------------------------------------------------
 // TotalMix's eight snapshot slots (2026-10-01).
 // ---------------------------------------------------------------------------
