@@ -69,8 +69,8 @@
            looking        CAM 2 looked at big while the plate and the dials set CAM 1.
            one-to-one     the big picture at 1:1 around the loupe point.
            iso-list       CAM 1's ISO readout pressed: the values CAM 1 allows.
-           no-pictures    vMix sends no pictures (closed, or its NDI output off).
-           one-picture    vMix sends no picture for CAM 2 (input 2 gone or not live).
+           no-pictures    vMix sends no pictures (closed, or Outputs 2 to 4 not sent over NDI).
+           one-picture    vMix sends no picture for CAM 2 (Output 3 off or not sent over NDI).
            unreachable    CAM 3 at 172.16.16.30 does not answer.
            unreachable-recording  CAM 1's Bluetooth link drops mid-take: REC shows
                           the last report as doubt, STOP is locked, the recording is
@@ -1810,7 +1810,7 @@
           where: "Bluetooth",
           app: "the iPad",
           appLong: "the iPad (Bluetooth+)",
-          vmix: 1,
+          vmix: 2,
           src: "1920 × 1080 · 25p",
           iso: "400",
           isoList: ISO_POCKET,
@@ -1849,7 +1849,7 @@
           where: "172.16.16.85",
           app: "LUMIX Tether",
           appLong: "LUMIX Tether",
-          vmix: 2,
+          vmix: 3,
           src: "1920 × 1080 · 25p",
           iso: "800",
           shutter: "1/50",
@@ -1883,7 +1883,7 @@
           where: "172.16.16.30",
           app: "LUMIX Tether",
           appLong: "LUMIX Tether",
-          vmix: 3,
+          vmix: 4,
           src: "1920 × 1080 · 25p",
           iso: "1600",
           shutter: "1/50",
@@ -2051,7 +2051,7 @@
           label: "no pictures",
           tone: "attention",
           word: "NO PICTURES",
-          sub: "No pictures from vMix. Open vMix and turn on NDI for Cameras / Calls / Audio Inputs.",
+          sub: "No pictures from vMix. Open vMix and send Outputs 2, 3 and 4 over NDI.",
           meta: "The camera controls still work · 3 of 3 answering",
           actions: [["Look again", ""]],
           hero: 1,
@@ -2062,7 +2062,7 @@
           label: "one picture missing",
           tone: "attention",
           word: "PICTURE MISSING",
-          sub: "vMix sends no picture for CAM 2. Check that vMix input 2 is still there and live.",
+          sub: "vMix sends no picture for CAM 2. Check that vMix's Output 3 is on and sent over NDI.",
           meta: "CAM 2's controls still work · 2 of 3 pictures",
           actions: [["Look again", ""]],
           hero: 1,
@@ -2309,15 +2309,15 @@
           : "";
         return `<svg data-picture viewBox="0 0 276 270" aria-label="Waveform of ${CAMS[id].tag}">${g}${z}<path d="${d}" fill="#e8eef5" fill-opacity=".42"/>${lab}</svg>`;
       }
-      // no picture: either vMix sends nothing at all (closed, or its NDI output off), or one input is gone
+      // no picture: either vMix sends nothing at all (closed, or Outputs 2 to 4 not sent over NDI), or one output is not sent
       function noPic(id, big, s) {
         const c = CAMS[id];
         if (!big)
-          return `<span class="nopic"><span class="nw"><i class="lamp"></i>NO PICTURE</span><span class="nd">vMix input ${c.vmix} · nothing received</span></span>`;
+          return `<span class="nopic"><span class="nw"><i class="lamp"></i>NO PICTURE</span><span class="nd">vMix Output ${c.vmix} · nothing received</span></span>`;
         const nd =
           s.pics === false
-            ? `Either vMix is closed, or its NDI output for Cameras / Calls / Audio Inputs (Settings › Outputs) is off. The camera controls beside this picture still work.`
-            : `The other pictures arrive, so vMix is sending: check that vMix input ${c.vmix} is still there and live. ${c.tag}'s controls still work.`;
+            ? `Either vMix is closed, or its Outputs 2, 3 and 4 are not sent over NDI (Settings › Outputs). The camera controls beside this picture still work.`
+            : `The other pictures arrive, so vMix is sending: check that Output ${c.vmix} is on and sent over NDI (Settings › Outputs). ${c.tag}'s controls still work.`;
         return `<span class="nopic"><span class="nw"><i class="lamp"></i>NO PICTURE</span><span class="ns">vMix is not sending ${c.tag} over NDI.</span><span class="nd">${nd}</span></span>`;
       }
 
@@ -2502,7 +2502,7 @@
           .map((id) => {
             const c = CAMS[id],
               ok = picOK(s, id);
-            return `<div class="picrow"><span class="c">${c.tag}</span><span class="dt">vMix input ${c.vmix} · ${ok ? c.src : "nothing received"}</span><span class="lw ${ok ? "ok" : "amber"}"><i class="lamp ${ok ? "ok" : "amber"}"></i>${ok ? "live" : "none"}</span></div>`;
+            return `<div class="picrow"><span class="c">${c.tag}</span><span class="dt">vMix Output ${c.vmix} · ${ok ? c.src : "nothing received"}</span><span class="lw ${ok ? "ok" : "amber"}"><i class="lamp ${ok ? "ok" : "amber"}"></i>${ok ? "live" : "none"}</span></div>`;
           })
           .join("");
       }
@@ -2527,10 +2527,10 @@
         $("bayDesc").textContent = looking
           ? ""
           : !pics
-            ? `vMix input ${c.vmix} · no picture`
+            ? `vMix Output ${c.vmix} · no picture`
             : view === "1:1"
-              ? `vMix input ${c.vmix} · 1:1 · 1680 × 945 of 1920 × 1080`
-              : `vMix input ${c.vmix} · ${c.src} · shown at 87.5 %`;
+              ? `vMix Output ${c.vmix} · 1:1 · 1680 × 945 of 1920 × 1080`
+              : `vMix Output ${c.vmix} · ${c.src} · shown at 87.5 %`;
         const ln = $("lockNote");
         ln.className = "lock-note " + (st === "released" ? "amber" : st === "unreachable" ? "red" : "");
         ln.textContent =
@@ -2650,7 +2650,7 @@
             .join("")}</div>`;
         let h = "";
         // head
-        h += `<div class="insp-head"><h2><span class="c">${c.tag}</span> · ${c.name}</h2><div class="sub">${c.model} · vMix input ${c.vmix}</div></div>`;
+        h += `<div class="insp-head"><h2><span class="c">${c.tag}</span> · ${c.name}</h2><div class="sub">${c.model} · vMix Output ${c.vmix}</div></div>`;
         // connection (D13): one word per condition on every surface — HELD, RELEASED, UNREACHABLE.
         // Release is press-twice until D18 says whether LUMIX Tether needs a settings reset afterwards.
         const relArm = held && s.relArm && s.relArm.cam === id ? s.relArm : null;

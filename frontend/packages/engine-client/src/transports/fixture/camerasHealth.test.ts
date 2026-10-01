@@ -243,6 +243,7 @@ describe("the fixture double's cameras: the backup (format 7)", () => {
       address: null,
       paired: false,
       vmixInput: 1,
+      vmixOutput: 2,
       noLink: null,
     });
     expect(await camera(2)).toMatchObject({ state: "held", setup: { address: CAM2_ADDRESS, vmixInput: 12 } });

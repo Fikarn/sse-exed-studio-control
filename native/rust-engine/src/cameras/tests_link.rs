@@ -385,7 +385,7 @@ fn without_a_link_setup_takes_no_pairing_and_no_address() {
             camera["setup"],
             json!({
                 "setUp": false, "address": null, "paired": false, "vmixInput": index + 1,
-                "noLink": cannot
+                "vmixOutput": index + 2, "noLink": cannot
             })
         );
         assert_operator_words(no_link);

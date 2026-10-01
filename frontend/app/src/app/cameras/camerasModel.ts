@@ -598,19 +598,19 @@ export function pictureLock(camera: CameraSnapshot): string | null {
 export interface PictureRowView {
   camera: CameraNumber;
   tag: string;
-  /** `vMix input 2 · nothing received`. */
+  /** What arrives, in the hardware link's words: `vMix Output 3 · 3840 × 2160 · 29.97`, `test picture`. */
   detail: string;
   /** The lamp's word in the row's lower case: `live`, `no picture`. */
   word: string;
   tone: CameraTone;
 }
 
-/** The Pictures section's rows: each camera's vMix input and what arrives from it. */
+/** The Pictures section's rows: what arrives for each camera, as the hardware link says it. */
 export function pictureRows(snapshot: CamerasSnapshot): PictureRowView[] {
   return snapshot.cameras.map((camera) => ({
     camera: cameraNumber(camera),
     tag: camera.tag,
-    detail: `vMix input ${camera.setup.vmixInput} · ${camera.picture.detail}`,
+    detail: camera.picture.detail,
     word: camera.picture.word.toLowerCase(),
     tone: camera.picture.tone,
   }));

@@ -217,6 +217,9 @@ export function addressesNotRestoredSentence(models: readonly CameraModel[]): st
 /** The vMix inputs the simulated cameras' test pictures stand in for (`SIMULATED_VMIX_INPUTS`). */
 export const SIMULATED_VMIX_INPUTS = { first: 1, last: 4 } as const;
 
+/** The vMix output each camera's picture comes from, fixed (`VMIX_OUTPUTS`, D31): CAM 1's first. */
+export const VMIX_OUTPUTS = [2, 3, 4] as const;
+
 /** A picture that arrives, one that does not, and the three together when not every one does. */
 export const PICTURE_WORDS = {
   live: "LIVE",
@@ -225,7 +228,7 @@ export const PICTURE_WORDS = {
   noPictures: "NO PICTURES",
 } as const;
 
-/** What arrives, as the Pictures rows say it after the vMix input. */
+/** What arrives of a test picture, as the page prints it: alone, with no output before it. */
 export const PICTURE_SHOWING_DETAIL = "test picture";
 export const PICTURE_MISSING_DETAIL = "nothing received";
 

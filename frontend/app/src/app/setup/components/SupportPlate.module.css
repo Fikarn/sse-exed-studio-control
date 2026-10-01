@@ -41,6 +41,14 @@
   margin-top: 6px;
 }
 
+/* The camera pictures' build, step 3: NDI's attribution under About, as
+   words (the app opens no page outside it). */
+.fine {
+  margin: 6px 0 0;
+  color: var(--text-text2);
+  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+}
+
 .danger {
   margin-top: auto;
   flex: none;

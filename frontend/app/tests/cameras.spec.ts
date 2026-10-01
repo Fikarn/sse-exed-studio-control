@@ -436,7 +436,8 @@ test.describe("the Cameras page", () => {
     for (const camera of [2, 3]) {
       const small = page.getByTestId(`cameras-no-picture-${camera}`);
       await expect(small).toContainText("NO PICTURE");
-      await expect(small).toContainText(`vMix input ${camera} · not built yet`);
+      await expect(small).toContainText("not built yet");
+      await expect(small).not.toContainText("vMix input");
     }
     await expect(page.getByTestId("cameras-loupe-empty")).toHaveText("No picture to check");
     for (const key of [
@@ -450,13 +451,15 @@ test.describe("the Cameras page", () => {
     ]) {
       await expect(page.getByTestId(`cameras-${key}`), key).toHaveAttribute("aria-disabled", "true");
     }
-    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("vMix input 1 · not built yet");
+    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("not built yet");
+    // The plate names the camera's own vMix output, fixed: CAM 1's is Output 2.
+    await expect(page.getByTestId("cameras-plate-head")).toContainText("vMix Output 2");
     const pictures = page.getByTestId("cameras-pictures");
     await expect(pictures).toContainText("not built yet");
     await expect(pictures).toContainText(
       "The cameras' own pictures come with a later version, over NDI from vMix on this PC."
     );
-    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("vMix input 1 · not built yet");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("not built yet");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("no picture");
     await expect(page.getByTestId("cameras-footer")).toContainText("Pictures none · not built yet");
   });
@@ -473,10 +476,11 @@ test.describe("the Cameras page", () => {
     await expect(state(page)).toContainText("The camera controls still work · 3 of 3 held");
     await expect(page.getByTestId("shell-lamp-cameras")).toContainText("picture missing");
     await expect(page.getByTestId("cameras-no-picture-2")).toContainText("NO PICTURE");
-    await expect(page.getByTestId("cameras-no-picture-2")).toContainText("vMix input 7 · nothing received");
-    await expect(page.getByTestId("cameras-picture-row-2")).toContainText("vMix input 7 · nothing received");
+    await expect(page.getByTestId("cameras-no-picture-2")).toContainText("nothing received");
+    await expect(page.getByTestId("cameras-picture-row-2")).toContainText("nothing received");
+    await expect(page.getByTestId("cameras-picture-row-2")).not.toContainText("vMix input");
     await expect(page.getByTestId("cameras-picture-row-2")).toContainText("no picture");
-    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("vMix input 1 · test picture");
+    await expect(page.getByTestId("cameras-picture-row-1")).toContainText("test picture");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("live");
     await expect(page.getByTestId("cameras-footer")).toContainText("Pictures test pictures · 2 / 3 · CAM 2 missing");
     // CAM 1's picture arrives, and its aids work.
@@ -501,7 +505,8 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-view-one-to-one")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("cameras-zoom-4")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("cameras-loupe-empty")).toHaveText("No picture to check");
-    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("vMix input 7 · nothing received");
+    await expect(page.getByTestId("cameras-caption-detail")).toHaveText("nothing received");
+    await expect(page.getByTestId("cameras-plate-head")).toContainText("vMix Output 3");
     await expect(page.getByTestId("cameras-iso-value")).toContainText("800");
     await page.getByTestId("cameras-iso-up").click();
     await expect(page.getByTestId("cameras-iso-value")).toContainText("1000");
@@ -983,7 +988,7 @@ test.describe("Setup / Support's camera section", () => {
     await expect(page.getByTestId("setup-screen-cameras")).toBeVisible();
   });
 
-  test("takes an address, a pairing and a vMix input, and forgets a camera", async ({ page }) => {
+  test("takes an address and a pairing, names each camera's vMix output, and forgets a camera", async ({ page }) => {
     await openFixture(page, "setup-cameras");
     await expectWorkspaceMounted(page, "setup");
     await expect(page.getByTestId("setup-camera-3-state")).toHaveText("NOT SET UP");
@@ -1005,24 +1010,22 @@ test.describe("Setup / Support's camera section", () => {
     await expect(page.getByTestId("setup-feedback")).toContainText("172.16.16 is not the address of one machine.");
     await expect(page.getByTestId("setup-camera-2-state")).toHaveText("HELD");
 
-    await page.getByTestId("setup-camera-1-input").fill("7");
-    await page.getByTestId("setup-camera-1-save-input").click();
-    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 1's picture is vMix input 7.");
-    await page.getByTestId("setup-camera-1-input").fill("1001");
-    await expect(page.getByTestId("setup-camera-1-save-input")).toHaveAttribute(
-      "title",
-      "A vMix input is a whole number from 1 to 1000."
-    );
-    await page.getByTestId("setup-camera-1-input").fill("7");
-    await expect(page.getByTestId("setup-camera-1-save-input")).toHaveAttribute(
-      "title",
-      "This is the vMix input Setup holds for CAM 1."
-    );
+    // Each camera's picture comes from its own vMix output, fixed: named, never taken.
+    for (const [camera, output] of [
+      [1, 2],
+      [2, 3],
+      [3, 4],
+    ]) {
+      await expect(page.getByTestId(`setup-camera-${camera}-output`)).toHaveText(`vMix Output ${output}`);
+      await expect(page.getByTestId(`setup-camera-${camera}-input`)).toHaveCount(0);
+    }
+    await expect(page.getByTestId("setup-screen-cameras")).not.toContainText("vMix input");
 
     await page.getByTestId("setup-camera-1-forget").click();
+    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 1's pairing is forgotten.");
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("NOT SET UP");
     await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("not paired");
-    await expect(page.getByTestId("setup-camera-1-input")).toHaveValue("7");
+    await expect(page.getByTestId("setup-camera-1-output")).toHaveText("vMix Output 2");
     await page.getByTestId("setup-camera-1-pair").click();
     await expect(page.getByTestId("setup-camera-1-state")).toHaveText("HELD");
     await expect(page.getByTestId("setup-camera-1-paired")).toHaveText("paired");
@@ -1044,9 +1047,8 @@ test.describe("Setup / Support's camera section", () => {
     await expect(page.getByTestId("setup-camera-2-no-link")).toHaveText(
       "Studio Control cannot take CAM 2's address yet: its network link comes with a later version."
     );
-    // The vMix input stays.
-    await page.getByTestId("setup-camera-2-input").fill("12");
-    await page.getByTestId("setup-camera-2-save-input").click();
-    await expect(page.getByTestId("setup-feedback")).toContainText("CAM 2's picture is vMix input 12.");
+    await expect(page.getByTestId("setup-screen-cameras")).not.toContainText("vMix input");
+    // Each camera's output is named all the same.
+    await expect(page.getByTestId("setup-camera-2-output")).toHaveText("vMix Output 3");
   });
 });

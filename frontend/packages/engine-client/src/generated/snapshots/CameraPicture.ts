@@ -13,9 +13,10 @@ export type CameraPicture = {
   word: string;
   tone: CameraTone;
   /**
-   * What arrives, as the Pictures rows say it after the vMix input
-   * (`test picture`); `nothing received`, or why nothing can
-   * (`not built yet`).
+   * What arrives, as the page prints it: `test picture`, or vMix's
+   * output with its size and rate (`vMix Output 2 · 3840 × 2160 ·
+   * 29.97`); `nothing received`, or why nothing can (`not built yet`),
+   * after the output with vMix's pictures.
    */
   detail: string;
   /**

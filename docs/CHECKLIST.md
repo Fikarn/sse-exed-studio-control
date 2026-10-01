@@ -91,7 +91,8 @@ Until the links to the cameras are built:
 
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
 - [ ] Each picture's place reads `NO PICTURE` and says the pictures come with a later version; the footer reads `Pictures none · not built yet`. `Whole frame`, `1:1`, the aids and the loupe are locked, and say why.
-- [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and a vMix input is saved and still there after a restart.
+- [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
+- [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
 - [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC` and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
@@ -107,6 +108,7 @@ Once the links and the pictures are built:
 - [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds.
 - [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
+- [ ] With one of Outputs 2 to 4 not sent over NDI in vMix, that camera's place reads `NO PICTURE` and names the output to check.
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.
 - [ ] After `Release` the iPad reaches CAM 1 and LUMIX Tether reaches a BGH1; `Connect` takes the camera back.
 - [ ] Closing the app while CAM 1 records leaves it recording, and a restart changes no camera setting.

@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Added
 
+- Setup / Support's About names NDI's trademark and ndi.video: the cameras' pictures come over NDI (#277).
 - A Teleprompter page runs the take: PLAY, BACK, TOP, the speed in words a minute, steps by line, paragraph and cue. The prompter is paused after every start and stops by itself only at END (#225, #227).
 - The Teleprompter shows a copy of the glass, line for line, with the place and the time left. The Prompter XL's own window comes later (#226, #227).
 - Scripts come from a Word file (.docx), a text file or pasted text, read on this PC without Word. Each script keeps its last 20 versions, and a removed script can be restored (#225, #227).
@@ -40,6 +41,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- Setup / Support's `CAMERAS` names the vMix output each camera's picture comes from, CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4, and no longer takes a vMix input; the Cameras page names it too (`vMix Output 2 · 3840 × 2160 · 29.97`) (#277).
 - The Cameras page says when a picture does not arrive: its place reads `NO PICTURE` with the reason, and the state display `PICTURE MISSING` or `NO PICTURES`. Until the pictures are built, the studio's build shows `NO PICTURE` where the test pictures were (#264).
 - Lighting's `Undo` keeps its steps when you leave the page and come back; it forgot them. A restore or a restart of the hardware link still clears them (#263).
 - On the deck's LIGHTS page each dial's display follows its turn: the next light's name, intensity and colour temperature, the next scene. A change made on screen shows within a second. They followed only an arrival on the page. It reaches the deck with the next import of the profile (#262).

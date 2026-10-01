@@ -366,7 +366,7 @@ export function CamerasPlate({
     <div className={styles.plate} data-testid="cameras-plate" data-camera={camera.camera}>
       <PlateHead
         title={camera.tag}
-        sub={`${camera.model} · vMix input ${camera.setup.vmixInput}`}
+        sub={`${camera.model} · vMix Output ${camera.setup.vmixOutput}`}
         testId="cameras-plate-head"
       />
 

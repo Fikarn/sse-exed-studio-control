@@ -12,7 +12,8 @@ pub(crate) const CAMERA_NUMBERS: [u8; 3] = [1, 2, 3];
 /// The camera that records here (D10, D14), and the one selected after a
 /// start (D19).
 pub(crate) const RECORDING_CAMERA: u8 = 1;
-/// A vMix input is one of these (Setup; Slice 10 shows it).
+/// A saved vMix input is one of these (the request and the backup carry it;
+/// Setup no longer shows it).
 pub(crate) const VMIX_INPUT_MIN: u32 = 1;
 pub(crate) const VMIX_INPUT_MAX: u32 = 1000;
 

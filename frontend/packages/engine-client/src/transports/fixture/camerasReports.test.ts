@@ -84,6 +84,7 @@ describe("the fixture double's cameras: where they start", () => {
         address: null,
         paired: false,
         vmixInput: camera.camera,
+        vmixOutput: camera.camera + 1,
         noLink: null,
       });
       expect(camera.readAt).toBeNull();
@@ -117,7 +118,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tag: "CAM 1",
       model: "Blackmagic Pocket Cinema Camera 6K Pro",
       link: "bluetooth",
-      setup: { setUp: true, address: null, paired: true, vmixInput: 1, noLink: null },
+      setup: { setUp: true, address: null, paired: true, vmixInput: 1, vmixOutput: 2, noLink: null },
       state: "held",
       word: "HELD",
       tone: "ok",
@@ -167,7 +168,7 @@ describe("the fixture double's cameras: what each reports (board 2)", () => {
       tag: "CAM 2",
       model: "Panasonic LUMIX BGH1",
       link: "network",
-      setup: { setUp: true, address: CAM2_ADDRESS, paired: false, vmixInput: 2, noLink: null },
+      setup: { setUp: true, address: CAM2_ADDRESS, paired: false, vmixInput: 2, vmixOutput: 3, noLink: null },
       state: "held",
       word: "HELD",
       tone: "ok",

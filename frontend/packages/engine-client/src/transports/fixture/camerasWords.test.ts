@@ -27,6 +27,7 @@ import {
   SIMULATED_VMIX_INPUTS,
   STATE_TONES,
   STATE_WORDS,
+  VMIX_OUTPUTS,
   addressInvalidRefusal,
   addressesNotRestoredSentence,
   alreadyHeldRefusal,
@@ -395,6 +396,12 @@ describe("the fixture double's picture words: the hardware link's (`pictures.rs`
     );
     if (!inputs) throw new Error("pictures.rs's SIMULATED_VMIX_INPUTS is not a range any more; update this test");
     expect(SIMULATED_VMIX_INPUTS).toEqual({ first: Number(inputs[1]), last: Number(inputs[2]) });
+    // So are the cameras' fixed outputs (D31), which Setup and the plate name.
+    const outputs = readFileSync(resolve(RUST_SRC, "../../protocol/rust/src/pictures.rs"), "utf-8").match(
+      /const VMIX_OUTPUTS: \[u8; 3\] = \[(\d+), (\d+), (\d+)\];/
+    );
+    if (!outputs) throw new Error("pictures.rs's VMIX_OUTPUTS is not three outputs any more; update this test");
+    expect([...VMIX_OUTPUTS]).toEqual(outputs.slice(1, 4).map(Number));
   });
 
   it("speaks the pictures' sentences word for word", () => {
