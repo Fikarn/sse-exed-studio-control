@@ -834,6 +834,12 @@ fn a_load_on_the_simulated_console_marks_the_slot_and_sends_nothing() {
 // the live console refuses before anything leaves.
 #[test]
 fn a_development_build_never_loads_a_mix_in_totalmix() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("load-development");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     // Pointing the transport at the receiver resets the probe, so it passes after.
@@ -873,6 +879,12 @@ fn a_development_build_never_loads_a_mix_in_totalmix() {
 // A load writes to the desk, so it waits for the probe like any console write.
 #[test]
 fn a_load_waits_for_the_audio_probe() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let test_dir = TestDir::new("load-not-verified");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     let receiver = bind_console_probe_receiver(test_dir.db_path().as_path());
@@ -1453,6 +1465,17 @@ fn audio_settings_update_persists_selection_and_checklist_flags() {
 
 #[test]
 fn audio_settings_update_resets_probe_when_transport_changes() {
+    // Changing the TotalMix address forgets the slot states on the
+    // process-wide console link, so this runs one at a time with the tests
+    // that read them.
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // TotalMix's slot states belong to the desk the link heard.
+    crate::rme_console_link::shared_console_link()
+        .lock()
+        .expect("the link locks")
+        .mark_snapshot_loaded(2);
     let test_dir = TestDir::new("settings-transport-reset");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -1498,6 +1521,15 @@ fn audio_settings_update_resets_probe_when_transport_changes() {
     assert!(!snapshot.verified);
     assert_eq!(snapshot.metering_state, "disabled");
     assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert!(
+        snapshot
+            .console_snapshots
+            .slots
+            .iter()
+            .all(|slot| slot.state == "unknown"),
+        "another address may be another desk: {:?}",
+        snapshot.console_snapshots.slots
+    );
     assert!(snapshot.last_console_sync_at.is_none());
 
     let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)

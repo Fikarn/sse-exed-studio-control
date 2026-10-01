@@ -164,7 +164,7 @@ pub fn load_audio_console_snapshot_with(
 
     // From here until the read-back is written, what the desk reports is the
     // load's: written like any report, with no row "at TotalMix".
-    let _window = LoadWindow::open();
+    let window = LoadWindow::open();
     if let Err(message) = send_console_snapshot_load(&config.send_host, config.send_port, slot) {
         record_audio_action_failure(db_path, "AUDIO_SNAPSHOT_LOAD_FAILED", &message)?;
         return Err(AudioCommandError::Rejected(
@@ -208,6 +208,9 @@ pub fn load_audio_console_snapshot_with(
                     guard.mark_snapshot_loaded(slot);
                 }
             }
+            // The read-back is written: what the desk reports from here on
+            // is a change at TotalMix again, while the names file is read.
+            drop(window);
             refresh_console_snapshot_names(false);
             Ok(result(
                 pulled.summary,

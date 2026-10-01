@@ -247,6 +247,30 @@ fn a_load_sends_one_datagram_and_the_desk_is_read_back() {
         .map(|entry| entry.detail)
         .collect();
     assert!(console_rows.is_empty(), "{console_rows:?}");
+    // ... and once the load is done, a change made at TotalMix is a row again:
+    // the mark that silenced the load's reports was cleared.
+    crate::rme_console_link::shared_console_link()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .ingest(
+            &rosc::OscMessage {
+                addr: String::from("/input/8/mute"),
+                args: vec![rosc::OscType::Float(0.0)],
+            },
+            crate::rme_console_link::link_now_ms(),
+        );
+    flush_console_link(&db).expect("flush");
+    let rows_after: Vec<String> = crate::action_log::list_recent_actions(&db, 50)
+        .expect("the action log should list")
+        .into_iter()
+        .filter(|entry| entry.source == "console")
+        .map(|entry| entry.detail)
+        .collect();
+    assert_eq!(rows_after.len(), 1, "{rows_after:?}");
+    assert!(
+        rows_after[0].starts_with("Mute off at TotalMix"),
+        "{rows_after:?}"
+    );
     assert!(
         !state.summary.to_lowercase().contains("snapshot"),
         "{}",

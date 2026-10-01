@@ -1131,14 +1131,14 @@ impl ConsoleLinkState {
         ))
     }
 
-    /// Takes the mark that a slot's state changed, for the flush that reports
-    /// it (the Console reads the slots again).
     /// Marks the time a load in TotalMix is under way, so what the desk
     /// reports meanwhile is taken as the load's (`ConsoleUpdate::during_load`).
     pub fn set_load_in_progress(&mut self, on: bool) {
         self.load_in_progress = on;
     }
 
+    /// Takes the mark that a slot's state changed, for the flush that reports
+    /// it (the Console reads the slots again).
     pub fn take_snapshot_slots_changed(&mut self) -> bool {
         std::mem::take(&mut self.snapshot_slots_changed)
     }
