@@ -42,8 +42,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- The Console's Snapshots are TotalMix's own eight, under the names TotalMix last saved; `active` and `changed` say what TotalMix has loaded. Press a slot twice (`LOAD?`) to load it in TotalMix, and the Console then reads the desk (#PR).
-- The Console's strips and outputs carry TotalMix's names; a channel is renamed in TotalMix (#PR).
+- The Console's Snapshots are TotalMix's own eight, under the names TotalMix last saved; `active` and `changed` say what TotalMix has loaded. Press a slot twice (`LOAD?`) to load it in TotalMix, and the Console then reads the desk (#282).
+- The Console's strips and outputs carry TotalMix's names; a channel is renamed in TotalMix (#282).
 - Setup / Support's `CAMERAS` names the vMix output each camera's picture comes from, CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4, and no longer takes a vMix input; the Cameras page names it too (`vMix Output 2 · 3840 × 2160 · 29.97`) (#277).
 - The Cameras page says when a picture does not arrive: its place reads `NO PICTURE` with the reason, and the state display `PICTURE MISSING` or `NO PICTURES`. Until the pictures are built, the studio's build shows `NO PICTURE` where the test pictures were (#264).
 - Lighting's `Undo` keeps its steps when you leave the page and come back; it forgot them. A restore or a restart of the hardware link still clears them (#263).
@@ -95,7 +95,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Removed
 
-- The Console keeps no snapshots of its own: `Capture`, saving over a slot, renaming and deleting one, and a channel's `Rename` are gone; storing and naming happen in TotalMix. Snapshots captured in an older build stay in the saved data, unused (#PR).
+- The Console keeps no snapshots of its own: `Capture`, saving over a slot, renaming and deleting one, and a channel's `Rename` are gone; storing and naming happen in TotalMix. Snapshots captured in an older build stay in the saved data, unused (#282).
 - The recovery screen has no `Install & Update` card, and no page has an `Update folder` key: they belonged to the installer, which is gone (#240).
 - Talkback is gone: the Console has no Talkback key and the Stream Deck's AUDIO page no TALK key, whose place is empty. Export the profile again and import it with Full Reset & Import (#239).
 - The Graphite and Bone themes are gone, with their keys in Setup / Support: Studio Control has one look, Studio (#238).
@@ -107,7 +107,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
-- A change sent in two parts no longer reads as unconfirmed when TotalMix answered both at once; a recall could leave the Console `ASSUMED` with sends that were in fact set (#PR).
+- A change sent in two parts no longer reads as unconfirmed when TotalMix answered both at once; a recall could leave the Console `ASSUMED` with sends that were in fact set (#282).
 - Enter in Lighting's empty search field no longer recalls a scene with its Recent list closed; a held Enter no longer confirms an armed key; a dialog no longer takes focus back every few seconds (#216).
 - Lighting's Undo works after Add fixture, and an Undo whose scene or fixture has been deleted says why and lets the older steps through (#216).
 - Enter on a focused scene tile recalls the scene, and on a focused group chip switches the group; the Lighting page shows an Identify or Find flash ending (#204).
