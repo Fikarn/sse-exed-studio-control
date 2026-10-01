@@ -20,6 +20,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// The file name shape: `db-<timestamp>-<reason>.sqlite3`.
 const DATABASE_BACKUP_PREFIX: &str = "db-";
 const DATABASE_BACKUP_EXTENSION: &str = "sqlite3";
+/// How far apart the daily backups are.
+pub(crate) const DAILY_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 /// Why a database backup was written; the word ends the file name and picks
 /// the retention.
@@ -167,6 +169,18 @@ pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     (year, month, day)
 }
 
+/// Howard Hinnant's `days_from_civil`, the inverse of `civil_from_days`:
+/// (y, m, d) to days since 1970-01-01. Signed throughout, so a damaged
+/// date gives a wrong number rather than a panic; the caller reads it back.
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = year - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
 /// The copy is opened on its own, without the live connection's WAL and
 /// synchronous settings: a backup is one file in rollback-journal mode, so it
 /// can be copied, verified and restored without a `-wal` or `-shm` beside it.
@@ -254,6 +268,55 @@ pub(crate) fn snapshot_reason_of(file_name: &str) -> Option<SnapshotReason> {
     SnapshotReason::ALL
         .into_iter()
         .find(|reason| stem.ends_with(&format!("-{}", reason.as_str())))
+}
+
+/// How long the daily backup waits: until the newest daily backup is 24 h
+/// old, and not at all when there is none (2026-10-01: each start wrote a
+/// daily of its own, three in one day, and with fourteen kept, restarts ate
+/// into the two weeks of history). A newest daily dated ahead of `now` (the
+/// clock went back) cannot say when the next is due, so it holds nothing
+/// off: waiting for it would hold the dailies off until the clock passed it.
+pub(crate) fn daily_backup_wait(newest_daily_at: Option<SystemTime>, now: SystemTime) -> Duration {
+    newest_daily_at
+        .and_then(|written| now.duration_since(written).ok())
+        .map_or(Duration::ZERO, |age| {
+            DAILY_BACKUP_INTERVAL.saturating_sub(age)
+        })
+}
+
+/// When the newest daily backup in `backups_dir` was written, by its name;
+/// `None` when there is none, or the directory cannot be read.
+pub(crate) fn newest_daily_backup_at(backups_dir: &Path) -> Option<SystemTime> {
+    fs::read_dir(backups_dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_file())
+        .filter_map(|entry| daily_backup_written_at(entry.file_name().to_str()?))
+        .max()
+}
+
+/// When a daily backup was written, read from the UTC time in its name.
+/// The name is the engine's own record of that moment, and this module
+/// already takes name order for age order; a file's modified time changes
+/// with whatever touches the file. Any other file, and a name this module
+/// would not have written (a month 13, a damaged time), is `None`.
+fn daily_backup_written_at(file_name: &str) -> Option<SystemTime> {
+    let suffix = format!(
+        "-{}.{DATABASE_BACKUP_EXTENSION}",
+        SnapshotReason::Daily.as_str()
+    );
+    let stamp = file_name
+        .strip_prefix(DATABASE_BACKUP_PREFIX)?
+        .strip_suffix(suffix.as_str())?;
+    // `YYYY-MM-DDTHH-MM-SS-mmmZ`, as `file_timestamp` writes it.
+    let field = |at: usize, width: usize| stamp.get(at..at + width)?.parse::<i64>().ok();
+    let days = days_from_civil(field(0, 4)?, field(5, 2)?, field(8, 2)?);
+    let seconds = days * 86_400 + field(11, 2)? * 3_600 + field(14, 2)? * 60 + field(17, 2)?;
+    let millis = u64::try_from(seconds * 1_000 + field(20, 3)?).ok()?;
+    let written = UNIX_EPOCH + Duration::from_millis(millis);
+    // Read back: anything but the very text `file_timestamp` writes is not a
+    // time this module wrote.
+    (file_timestamp(written) == stamp).then_some(written)
 }
 
 #[cfg(test)]
@@ -350,6 +413,11 @@ mod tests {
             .expect("live journal mode should read");
         assert_eq!(live_mode, "wal", "the live database keeps its WAL");
         assert_eq!(newest_snapshot(&backups_dir), Some(path));
+        // The daily backup reads the time back from the name it wrote.
+        let written = newest_daily_backup_at(&backups_dir).expect("the daily is dated");
+        assert!(SystemTime::now()
+            .duration_since(written)
+            .is_ok_and(|age| age < Duration::from_secs(60)));
     }
 
     // 2026-09 production readiness, Slice 3 (F02): retention per reason,
@@ -436,6 +504,103 @@ mod tests {
             snapshot_reason_of(reserved.file_name().and_then(|n| n.to_str()).unwrap()),
             Some(SnapshotReason::Replaced)
         );
+    }
+
+    // 2026-10-01: each start wrote a daily of its own, three in one day. The
+    // daily backup now waits until the newest daily is 24 h old.
+    #[test]
+    fn the_daily_backup_waits_until_the_newest_daily_is_a_day_old() {
+        let now = UNIX_EPOCH + Duration::from_secs(1_790_850_420);
+        let hours = |count: u64| Duration::from_secs(count * 3_600);
+        assert_eq!(daily_backup_wait(None, now), Duration::ZERO);
+        assert_eq!(
+            daily_backup_wait(Some(now - hours(30)), now),
+            Duration::ZERO
+        );
+        assert_eq!(
+            daily_backup_wait(Some(now - hours(24)), now),
+            Duration::ZERO
+        );
+        assert_eq!(daily_backup_wait(Some(now - hours(23)), now), hours(1));
+        assert_eq!(
+            daily_backup_wait(Some(now - Duration::from_secs(1)), now),
+            hours(24) - Duration::from_secs(1)
+        );
+        assert_eq!(daily_backup_wait(Some(now), now), hours(24));
+        // Dated ahead of the clock: it holds nothing off, never a day or more.
+        assert_eq!(daily_backup_wait(Some(now + hours(2)), now), Duration::ZERO);
+        assert_eq!(
+            daily_backup_wait(Some(now + hours(24 * 365)), now),
+            Duration::ZERO
+        );
+    }
+
+    #[test]
+    fn a_daily_backup_is_dated_by_the_time_in_its_name() {
+        assert_eq!(
+            daily_backup_written_at("db-2020-09-13T12-26-40-123Z-daily.sqlite3"),
+            Some(UNIX_EPOCH + Duration::from_millis(1_600_000_000_123))
+        );
+        assert_eq!(
+            daily_backup_written_at("db-2000-02-29T00-00-00-000Z-daily.sqlite3"),
+            Some(UNIX_EPOCH + Duration::from_secs(951_782_400))
+        );
+        assert_eq!(
+            daily_backup_written_at("db-1970-01-01T00-00-00-000Z-daily.sqlite3"),
+            Some(UNIX_EPOCH)
+        );
+        for name in [
+            // Other reasons.
+            "db-2026-10-01T10-27-00-000Z-shutdown.sqlite3",
+            "db-2026-10-01T10-27-00-000Z-pre-migration.sqlite3",
+            "db-2026-10-01T10-27-00-000Z-pre-restore.sqlite3",
+            "db-2026-10-01T10-27-00-000Z-replaced.sqlite3",
+            // Names this module does not write.
+            "db-2026-13-01T10-27-00-000Z-daily.sqlite3",
+            "db-2026-02-29T10-27-00-000Z-daily.sqlite3",
+            "db-2026-10-01T24-00-00-000Z-daily.sqlite3",
+            "db-2026-10-01 10-27-00-000Z-daily.sqlite3",
+            "db-2026-10-01T10-27-00-000-daily.sqlite3",
+            "db-2026-10-01T10-27-00-0000Z-daily.sqlite3",
+            "db-+026-10-01T10-27-00-000Z-daily.sqlite3",
+            "db-2026-1Ö-01T10-27-00-000Z-daily.sqlite3",
+            "db-1969-12-31T23-59-59-999Z-daily.sqlite3",
+            "db-manual-daily.sqlite3",
+            "db-2026-10-01T10-27-00-000Z-daily.sqlite3-wal",
+            "support-backup-2026-10-01T10-27-00-000Z.json",
+        ] {
+            assert_eq!(daily_backup_written_at(name), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn the_newest_daily_backup_is_found_among_the_other_files() {
+        let test_dir = TestDir::new("storage-newest-daily");
+        let backups_dir = test_dir.path().join("backups");
+        assert_eq!(newest_daily_backup_at(&backups_dir), None);
+        fs::create_dir_all(&backups_dir).expect("backups dir should be created");
+        assert_eq!(newest_daily_backup_at(&backups_dir), None);
+
+        for name in [
+            "db-2026-09-30T10-27-00-000Z-daily.sqlite3",
+            "db-2026-10-01T10-27-00-000Z-daily.sqlite3",
+            // Newer, but not a daily, or not a name this module writes.
+            "db-2026-10-01T15-04-00-000Z-shutdown.sqlite3",
+            "db-2026-10-01T16-31-00-000Z-pre-restore.sqlite3",
+            "db-2026-10-02T00-00-00-000Z-replaced.sqlite3",
+            "db-2026-19-01T10-27-00-000Z-daily.sqlite3",
+            "db-manual-daily.sqlite3",
+            "support-backup-2026-10-02T00-00-00-000Z.json",
+        ] {
+            fs::write(backups_dir.join(name), b"x").expect("fake backup should write");
+        }
+        // A folder is not a backup, whatever its name.
+        fs::create_dir_all(backups_dir.join("db-2026-10-03T00-00-00-000Z-daily.sqlite3"))
+            .expect("folder should be created");
+
+        let newest = newest_daily_backup_at(&backups_dir).expect("a daily is found");
+        assert_eq!(file_timestamp(newest), "2026-10-01T10-27-00-000Z");
+        assert_eq!(newest, UNIX_EPOCH + Duration::from_secs(1_790_850_420));
     }
 
     #[test]

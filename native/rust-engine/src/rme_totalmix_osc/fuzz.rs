@@ -3,7 +3,8 @@
 //!
 //! Since Slice 6 only the console's own address is listened to, but what it
 //! sends is still bytes from outside the process: they go through `rosc`'s
-//! decoder and then into the meter state and the console link. These hold, for
+//! decoder, since 2026-10-01 also through the second reading (`osc_read`),
+//! and then into the meter state and the console link. These hold, for
 //! arbitrary bytes, for damaged copies of real packets and for every shape of
 //! level message, that nothing panics and that a level which is accepted is a
 //! level — between 0 and 1, never NaN.
@@ -12,10 +13,11 @@
 //! values of its own: the process-wide console link and meter state that other
 //! tests share are never touched.
 
+use super::osc_read::read_datagram;
 use super::*;
 use crate::rme_console_link::ConsoleLinkState;
 use proptest::prelude::*;
-use rosc::OscBundle;
+use rosc::{decoder, OscBundle};
 
 const BUSES: [RmeTotalMixBus; 3] = [
     RmeTotalMixBus::Input,
@@ -211,21 +213,55 @@ fn damaged(mut bytes: Vec<u8>, changes: &[Damage]) -> Vec<u8> {
     bytes
 }
 
+/// Arbitrary datagrams, and real packets with a few bytes damaged.
+fn datagram() -> impl Strategy<Value = Vec<u8>> {
+    prop_oneof![
+        proptest::collection::vec(any::<u8>(), 0..1024),
+        (packet(), proptest::collection::vec(damage(), 0..4)).prop_map(|(packet, changes)| {
+            damaged(encoder::encode(&packet).unwrap_or_default(), &changes)
+        }),
+    ]
+}
+
+/// How many messages a packet holds, in its bundles too.
+fn messages_in(packet: &OscPacket) -> usize {
+    match packet {
+        OscPacket::Message(_) => 1,
+        OscPacket::Bundle(bundle) => bundle.content.iter().map(messages_in).sum(),
+    }
+}
+
 proptest! {
-    /// Arbitrary datagrams, and real packets with a few bytes damaged: decoding
-    /// and everything done with the result never panics.
+    /// Arbitrary datagrams, and real packets with a few bytes damaged: decoding,
+    /// by the library and by the second reading, and everything done with the
+    /// result never panics.
     #[test]
-    fn osc_decode_never_panics(
-        bytes in prop_oneof![
-            proptest::collection::vec(any::<u8>(), 0..1024),
-            (packet(), proptest::collection::vec(damage(), 0..4)).prop_map(|(packet, changes)| {
-                damaged(encoder::encode(&packet).unwrap_or_default(), &changes)
-            }),
-        ],
-        now_ms in any::<u64>(),
-    ) {
+    fn osc_decode_never_panics(bytes in datagram(), now_ms in any::<u64>()) {
         if let Ok((_remainder, packet)) = decoder::decode_udp(&bytes) {
             ingest_everywhere(&packet, now_ms);
+        }
+        if let Some(packet) = read_datagram(&bytes).packet {
+            ingest_everywhere(&packet, now_ms);
+        }
+    }
+
+    /// The second reading (2026-10-01) keeps everything the library read: it
+    /// never reads fewer messages, and where the library reads a datagram in
+    /// full (its packet is the datagram's bytes again) it changes nothing.
+    /// Packets are compared by their bytes, as NaN is not equal to itself.
+    #[test]
+    fn the_second_reading_never_reads_less_than_rosc(bytes in datagram()) {
+        let read = read_datagram(&bytes);
+        if let Ok((_remainder, library)) = decoder::decode_udp(&bytes) {
+            let Some(again) = read.packet.as_ref() else {
+                return Err(TestCaseError::fail("what the library read is kept"));
+            };
+            prop_assert!(messages_in(again) >= messages_in(&library));
+            let library_bytes = encoder::encode(&library).ok();
+            if library_bytes.as_deref() == Some(bytes.as_slice()) {
+                prop_assert_eq!(encoder::encode(again).ok(), library_bytes);
+                prop_assert!(read.unread.is_none());
+            }
         }
     }
 

@@ -15,6 +15,7 @@ use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
+use std::hash::Hash;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -187,6 +188,8 @@ struct BridgeContext {
     token: String,
     port: u16,
     rejection_log: Mutex<HashMap<u16, RejectionTally>>,
+    /// The failed requests' lines, for each kind of failure.
+    failed_requests: Mutex<HashMap<ErrorKind, RejectionTally>>,
     /// The refused keys' lines, for each route and action: when the last was
     /// written, and how many were refused since without one.
     refused_keys: Mutex<HashMap<String, (Option<Instant>, u32)>>,
@@ -209,6 +212,7 @@ impl BridgeContext {
             token,
             port,
             rejection_log: Mutex::new(HashMap::new()),
+            failed_requests: Mutex::new(HashMap::new()),
             refused_keys: Mutex::new(HashMap::new()),
             keep_read_connections: false,
             cameras_simulated: false,
@@ -235,40 +239,7 @@ impl BridgeContext {
     }
 
     fn note_rejection_at(&self, status_code: u16, message: &str, now: Instant) {
-        let unwritten = {
-            let mut recent = self
-                .rejection_log
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            match recent.get_mut(&status_code) {
-                Some(tally)
-                    if now.saturating_duration_since(tally.last_written)
-                        < REJECTION_LOG_INTERVAL =>
-                {
-                    tally.unwritten += 1;
-                    None
-                }
-                Some(tally) => {
-                    let unwritten = tally.unwritten;
-                    *tally = RejectionTally {
-                        last_written: now,
-                        unwritten: 0,
-                    };
-                    Some(unwritten)
-                }
-                None => {
-                    recent.insert(
-                        status_code,
-                        RejectionTally {
-                            last_written: now,
-                            unwritten: 0,
-                        },
-                    );
-                    Some(0)
-                }
-            }
-        };
-        if let Some(unwritten) = unwritten {
+        if let Some(unwritten) = tally_line_due(&self.rejection_log, status_code, now) {
             let more = if unwritten == 0 {
                 String::new()
             } else {
@@ -283,13 +254,76 @@ impl BridgeContext {
             );
         }
     }
+
+    /// A request whose answer could not be written is logged as a refusal
+    /// is: at most once per kind of failure per minute, and the line counts
+    /// the failures of its kind that went unwritten since the one before. A
+    /// Full Reset & Import in Companion cut its open requests and wrote 33
+    /// identical lines in one second (2026-10-01).
+    fn note_request_failure(&self, error: &std::io::Error) {
+        self.note_request_failure_at(error, Instant::now());
+    }
+
+    fn note_request_failure_at(&self, error: &std::io::Error, now: Instant) {
+        if let Some(unwritten) = tally_line_due(&self.failed_requests, error.kind(), now) {
+            let more = if unwritten == 0 {
+                String::new()
+            } else {
+                format!(" ({unwritten} more of this kind since the last such line)")
+            };
+            let _ = append_log(
+                self.log_file_path.as_path(),
+                "WARN",
+                &format!("Control-surface bridge request failed: {error}{more}"),
+            );
+        }
+    }
 }
 
-/// When a refusal status was last written to the log, and how many refusals
-/// with it have gone unwritten since.
+/// When a line of one kind (a refusal's status, a failure's kind) was last
+/// written to the log, and how many of that kind have gone unwritten since.
 struct RejectionTally {
     last_written: Instant,
     unwritten: u64,
+}
+
+/// Whether the line for `key` is due, one a `REJECTION_LOG_INTERVAL` at
+/// most: `Some` with how many went unwritten since the last line of that
+/// key, or `None` when this one is only counted.
+fn tally_line_due<K: Eq + Hash>(
+    tallies: &Mutex<HashMap<K, RejectionTally>>,
+    key: K,
+    now: Instant,
+) -> Option<u64> {
+    let mut recent = tallies
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    match recent.get_mut(&key) {
+        Some(tally)
+            if now.saturating_duration_since(tally.last_written) < REJECTION_LOG_INTERVAL =>
+        {
+            tally.unwritten += 1;
+            None
+        }
+        Some(tally) => {
+            let unwritten = tally.unwritten;
+            *tally = RejectionTally {
+                last_written: now,
+                unwritten: 0,
+            };
+            Some(unwritten)
+        }
+        None => {
+            recent.insert(
+                key,
+                RejectionTally {
+                    last_written: now,
+                    unwritten: 0,
+                },
+            );
+            Some(0)
+        }
+    }
 }
 
 /// One acceptor, a bounded queue and a fixed pool of workers (F06). A
@@ -368,13 +402,7 @@ fn serve_queued_connections(
         }));
         match outcome {
             Ok(Ok(())) => {}
-            Ok(Err(error)) => {
-                let _ = append_log(
-                    context.log_file_path.as_path(),
-                    "WARN",
-                    &format!("Control-surface bridge request failed: {}", error.message()),
-                );
-            }
+            Ok(Err(error)) => context.note_request_failure(&error),
             Err(_) => {
                 let _ = append_log(
                     context.log_file_path.as_path(),
@@ -396,18 +424,20 @@ fn refuse_busy(mut stream: TcpStream, context: &BridgeContext) {
     context.note_rejection(response.status_code, error.message());
 }
 
+/// Only the answer's write can fail: mostly a client that closed the
+/// connection first.
 fn handle_control_surface_connection(
     mut stream: TcpStream,
     context: &BridgeContext,
     arrived: Instant,
-) -> Result<(), ControlSurfaceError> {
+) -> std::io::Result<()> {
     let deadline = Instant::now() + REQUEST_DEADLINE;
     let _ = stream.set_write_timeout(Some(RESPONSE_WRITE_TIMEOUT));
     let request = read_http_request(&mut stream, deadline);
     let response = respond_at(context, request, arrived);
     let written = write_http_response(&mut stream, response.status_code, &response.body);
     finish_connection(stream);
-    written.map_err(|error| ControlSurfaceError::Storage(error.to_string()))
+    written
 }
 
 /// Authorization runs before anything in the request is interpreted: an
@@ -1850,6 +1880,48 @@ mod tests {
         );
         assert!(
             lines[3].ends_with("(401): A bearer token is required. (1 more with this status since the last such line)"),
+            "{log}"
+        );
+    }
+
+    // 2026-10-01: Companion's Full Reset & Import cut its open requests, and
+    // the bridge wrote 33 identical lines in one second. A kind of failure is
+    // one line a minute at most, counting the rest; another kind has its own.
+    #[test]
+    fn a_failed_request_line_counts_the_failures_it_stood_for() {
+        let test_dir = TestDir::new("bridge-failed-request-count");
+        let log_path = test_dir.path().join("engine.log");
+        let context = BridgeContext::new(
+            test_dir.db_path(),
+            log_path.clone(),
+            TEST_TOKEN.to_string(),
+            38201,
+        );
+        // The system's own words differ between systems; the test's are fixed.
+        let reset = std::io::Error::new(ErrorKind::ConnectionReset, "closed by the remote host");
+        let start = Instant::now();
+        for failure in 0..33 {
+            context.note_request_failure_at(&reset, start + Duration::from_millis(failure * 30));
+        }
+        context.note_request_failure_at(
+            &std::io::Error::new(ErrorKind::ConnectionAborted, "aborted"),
+            start + Duration::from_secs(1),
+        );
+        context.note_request_failure_at(&reset, start + Duration::from_secs(61));
+
+        let log = fs::read_to_string(&log_path).expect("the failures were logged");
+        let lines: Vec<&str> = log
+            .lines()
+            .filter(|line| line.contains("Control-surface bridge request failed: "))
+            .collect();
+        assert_eq!(lines.len(), 3, "{log}");
+        assert!(
+            lines[0].ends_with("request failed: closed by the remote host"),
+            "{log}"
+        );
+        assert!(lines[1].ends_with("request failed: aborted"), "{log}");
+        assert!(
+            lines[2].ends_with("request failed: closed by the remote host (32 more of this kind since the last such line)"),
             "{log}"
         );
     }

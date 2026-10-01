@@ -6,7 +6,7 @@ use crate::diagnostics::{append_log, log_event, LogLevel};
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_OSC};
 use crate::protocol::{event_message, EVENT_AUDIO_CHANGED};
 use crate::storage::{enable_thread_read_connection, list_settings_by_prefix};
-use rosc::{decoder, encoder, OscMessage, OscPacket, OscType};
+use rosc::{encoder, OscMessage, OscPacket, OscType};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket};
@@ -21,6 +21,9 @@ use std::time::{Duration, Instant};
 // paths of both generations stay here because they share the meter state.
 mod classic_eq;
 mod global_commands;
+// A second reading for what the OSC library refuses in a datagram from
+// TotalMix, such as a name in Windows-1252 (the studio walk of 2026-10-01).
+mod osc_read;
 // Whether TotalMix is in touch on the Global remote (the walk of 2026-10-01).
 mod global_quiet;
 
@@ -956,11 +959,13 @@ pub(crate) fn accept_source(source: SocketAddr, expected: IpAddr) -> bool {
 /// log the tests read).
 ///
 /// It also notes the console's own datagrams that could not be read in full
-/// (`record_unread`): the OSC library refuses a string that is not UTF-8,
-/// such as a name with letters beyond ASCII written in a Windows code page,
-/// and loses the rest of a bundle with it. The first is noted at once, then
-/// one line a minute at most with the count since the last line, and the
-/// bytes where the reading stopped (the studio walk of 2026-10-01 reads it).
+/// (`record_unread`). The OSC library refuses a string that is not UTF-8,
+/// such as a name TotalMix writes in Windows-1252; since 2026-10-01 such a
+/// string is read again as Windows-1252 (`osc_read`), and the rest of its
+/// bundle is read. What is still noted is an element neither reading could
+/// read. The first is noted at once, then one line a minute at most with the
+/// count since the last line, and the bytes where the reading stopped (the
+/// studio walk of 2026-10-01 reads it).
 pub(crate) struct DroppedSourceLog {
     log_file_path: Option<PathBuf>,
     last_logged: HashMap<IpAddr, Instant>,
@@ -1200,16 +1205,17 @@ fn read_available_packets(
                         drops.record(source, slot.console, local_port_of(&slot.socket));
                         continue;
                     }
-                    match decoder::decode_udp(&buffer[..len]) {
-                        Ok((_remainder, packet)) => {
-                            if let Ok(mut state) = state.lock() {
-                                state.apply_packet(slot.bus, &packet, now_ms);
-                            }
+                    let read = osc_read::read_datagram(&buffer[..len]);
+                    if let Some(packet) = read.packet {
+                        if let Ok(mut state) = state.lock() {
+                            state.apply_packet(slot.bus, &packet, now_ms);
                         }
-                        Err(error) => log_event(
+                    }
+                    if let Some((what, _)) = read.unread {
+                        log_event(
                             LogLevel::Debug,
-                            &format!("RME TotalMix OSC decode failed: {error}"),
-                        ),
+                            &format!("RME TotalMix OSC decode failed: {what}"),
+                        );
                     }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
@@ -1301,26 +1307,13 @@ pub(crate) fn read_global_packets(
                     mark_console_out_of_touch(back.quiet_for.as_secs().max(1));
                     log_event(LogLevel::Info, &back.line);
                 }
-                match decoder::decode_udp(&buffer[..len]) {
-                    Ok((remainder, packet)) => {
-                        let (control, levels) = route_global_packet(&packet, state, now_ms);
-                        slot.quiet.count(control, levels);
-                        // A bundle stops at the first element it cannot read
-                        // and hands back the rest: those elements are lost.
-                        if matches!(packet, OscPacket::Bundle(_)) && !remainder.is_empty() {
-                            drops.record_unread(
-                                &format!(
-                                    "a bundle with {} of its {len} bytes left unread",
-                                    remainder.len()
-                                ),
-                                remainder,
-                            );
-                        }
-                    }
-                    Err(error) => drops.record_unread(
-                        &format!("a datagram of {len} bytes refused ({error})"),
-                        &buffer[..len],
-                    ),
+                let read = osc_read::read_datagram(&buffer[..len]);
+                if let Some(packet) = read.packet {
+                    let (control, levels) = route_global_packet(&packet, state, now_ms);
+                    slot.quiet.count(control, levels);
+                }
+                if let Some((what, bytes)) = read.unread {
+                    drops.record_unread(&what, bytes);
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,

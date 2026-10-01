@@ -51,14 +51,17 @@ use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use crate::storage::list_settings_by_prefix;
-use crate::storage_backups::{snapshot_database, SnapshotReason};
+use crate::storage_backups::{
+    daily_backup_wait, newest_daily_backup_at, snapshot_database, SnapshotReason,
+    DAILY_BACKUP_INTERVAL,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 const SIMULATED_AUDIO_METER_INTERVAL: Duration = Duration::from_millis(33);
 const SIMULATED_AUDIO_METER_CACHE_REFRESH: Duration = Duration::from_millis(500);
@@ -70,10 +73,10 @@ const CONSOLE_METER_POINT_POST_FADER: &str = "post-fader";
 const CONSOLE_PEAK_WARNING_DBFS: f64 = -3.0;
 const CONSOLE_OVER_DBFS: f64 = 0.0;
 /// Database backups the engine writes on its own (2026-09 production
-/// readiness, Slice 3 — F02): the first daily copy five minutes after start,
-/// then one every 24 h, plus one at every graceful shutdown.
+/// readiness, Slice 3 — F02): a daily copy, looked for first five minutes
+/// after start and written once the newest daily on disk is 24 h old, then
+/// one every 24 h, plus one at every graceful shutdown.
 const DATABASE_BACKUP_INITIAL_DELAY: Duration = Duration::from_secs(5 * 60);
-const DATABASE_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn meter_point_for_channel(channel: &AudioChannelSnapshot) -> &'static str {
     if channel.role == "playback-pair" {
@@ -380,21 +383,38 @@ fn write_database_backup(
     }
 }
 
+/// Before each daily copy the scheduler waits until the newest daily on disk
+/// is 24 h old, so a start writes no daily of its own (2026-10-01: three
+/// starts wrote three in one day). After a copy, or a failed one, the next
+/// is a day away, as before.
 fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
     let _ = thread::Builder::new()
         .name(String::from("database-backup"))
         .spawn(move || {
             thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
             loop {
+                sleep_until_daily_backup_due(&backups_dir);
                 write_database_backup(
                     &db_path,
                     &backups_dir,
                     &log_file_path,
                     SnapshotReason::Daily,
                 );
-                thread::sleep(DATABASE_BACKUP_INTERVAL);
+                thread::sleep(DAILY_BACKUP_INTERVAL);
             }
         });
+}
+
+/// Sleeps until the newest daily backup on disk is 24 h old, looking again
+/// after each sleep: a daily written meanwhile counts.
+fn sleep_until_daily_backup_due(backups_dir: &Path) {
+    loop {
+        let wait = daily_backup_wait(newest_daily_backup_at(backups_dir), SystemTime::now());
+        if wait.is_zero() {
+            return;
+        }
+        thread::sleep(wait);
+    }
 }
 
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
