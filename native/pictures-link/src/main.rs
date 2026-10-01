@@ -8,23 +8,24 @@
 //! closes: the engine stopped it, or went. It writes nothing else on stdout;
 //! a line it cannot read is said on stderr, which the engine logs.
 //!
-//! Its source is the one the engine names on each want. The simulated one:
-//! test pictures on vMix inputs 1 to 4 (`simulated_state`, `card.rs`). Or, in
-//! a development run started with `npm run app -- --vmix-pictures` and
-//! nowhere else, vMix's Outputs 2 to 4 over NDI on this PC (`receive.rs`,
-//! D31 to D33): a hardware test the owner asks for and attends. Two fences
-//! must both give way for that: the engine's word on the want, and the
-//! switch and NDI's library in this process's own environment
-//! (`vmix::permission`). With either missing it takes nothing from vMix and
-//! says why.
+//! A studio build of it takes vMix's Outputs 2 to 4 over NDI on this PC
+//! (`receive.rs`, D34) whatever a want names, with NDI's library from its
+//! own folder: the build's copy, held to the pin compiled into it
+//! (`vmix::permission`). A development build's source is the one the engine
+//! names on each want. The simulated one: test pictures on vMix inputs 1 to
+//! 4 (`simulated_state`, `card.rs`). Or, in a development run started with
+//! `npm run app -- --vmix-pictures` and nowhere else, vMix's outputs (D31 to
+//! D33): a hardware test the owner asks for and attends. Two fences must
+//! both give way for that: the engine's word on the want, and the switch
+//! and NDI's library in this process's own environment. With either missing
+//! it takes nothing from vMix and says why.
 //!
 //! While the Cameras page shows the pictures it draws them itself (D30): it
 //! connects to the shell's listener on 127.0.0.1, whose address and secret
 //! the engine tells it, is handed a composition surface over the page and
 //! told where each picture stands (`layer.rs`), and draws them on the
-//! graphics card (`renderer.rs`). It opens no device. A studio build does
-//! not start it until the studio build's step, and a studio build of it
-//! refuses to run.
+//! graphics card (`renderer.rs`). It opens no device. It carries its build's
+//! mark, and the engine starts only a helper of its own build.
 //!
 //! A thread that stops (a draw that hangs, a receiver stuck in NDI's
 //! library) makes it go silent (`watch.rs`), and the engine ends it and
@@ -56,6 +57,7 @@ mod watch;
 use layer::{Inbox, Pictures};
 use receive::Vmix;
 use std::io::{self, BufReader, Read, Write};
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::Arc;
@@ -71,18 +73,27 @@ use watch::{Beats, STALL};
 /// How often what was received goes to stderr, which the engine logs.
 const MINUTE: Duration = Duration::from_secs(60);
 
+/// What build this helper is, for the engine to read before it starts it
+/// (`studio_control_protocol::development::build_marked_in`), as the shell
+/// reads the engine's. `main` refers to it, so it stays in the program.
+static BUILD_MARK: [u8; studio_control_protocol::development::BUILD_MARK_LEN] =
+    studio_control_protocol::development::BUILD_MARK;
+
 fn main() -> ExitCode {
+    std::hint::black_box(&BUILD_MARK);
     let studio_build = studio_control_protocol::development::studio_build();
-    if studio_build {
-        eprintln!(
-            "The pictures helper is not in a studio build yet: it comes with the studio build's step."
-        );
-        return ExitCode::from(2);
-    }
+    // A studio build loads NDI's library from its own folder alone: the
+    // folder of this program, as the engine found it.
+    let own_folder = std::env::current_exe()
+        .ok()
+        .and_then(|program| program.parent().map(Path::to_path_buf));
     let beats = Arc::new(Beats::default());
     let inbox = Arc::new(Inbox::default());
     let mut sources = Sources::new(
-        vmix::permission(studio_build, |name| std::env::var_os(name)),
+        vmix::permission(studio_build, own_folder.as_deref(), |name| {
+            std::env::var_os(name)
+        }),
+        studio_build,
         Arc::clone(&beats),
         Arc::clone(&inbox),
     );
@@ -120,6 +131,9 @@ struct Wanted {
 /// take them.
 struct Sources {
     permission: Permission,
+    /// A studio build's helper takes vMix's pictures alone, whatever a want
+    /// says: it never draws the test card or says a test card arrives.
+    studio_build: bool,
     beats: Arc<Beats>,
     /// The draw loop's inbox, which vMix's receivers wake with each frame.
     inbox: Arc<Inbox>,
@@ -130,9 +144,15 @@ struct Sources {
 }
 
 impl Sources {
-    fn new(permission: Permission, beats: Arc<Beats>, inbox: Arc<Inbox>) -> Self {
+    fn new(
+        permission: Permission,
+        studio_build: bool,
+        beats: Arc<Beats>,
+        inbox: Arc<Inbox>,
+    ) -> Self {
         Self {
             permission,
+            studio_build,
             beats,
             inbox,
             vmix: None,
@@ -162,6 +182,16 @@ impl Sources {
             })
             .as_mut()
             .ok()
+    }
+
+    /// The source a want is served from: the one it names, but vMix's in a
+    /// studio build.
+    fn source_of(&self, asked: HelperSource) -> HelperSource {
+        if self.studio_build {
+            HelperSource::Vmix
+        } else {
+            asked
+        }
     }
 
     /// What the draw loop draws from, for a want: the receivers are made or
@@ -298,6 +328,7 @@ fn run(
                 source,
                 ..
             }))) => {
+                let source = sources.source_of(source);
                 orders.order(layer::Order::Want {
                     cameras: cameras.clone(),
                     showing,
@@ -382,7 +413,8 @@ mod tests {
     /// switch, so vMix's pictures are refused.
     fn sources() -> Sources {
         Sources::new(
-            vmix::permission(false, |_| None),
+            vmix::permission(false, None, |_| None),
+            false,
             Arc::new(Beats::default()),
             Arc::new(Inbox::default()),
         )
@@ -471,10 +503,11 @@ mod tests {
     #[test]
     fn vmix_s_pictures_without_the_sdk_s_library_are_refused() {
         let mut sources = Sources::new(
-            vmix::permission(false, |name| {
+            vmix::permission(false, None, |name| {
                 (name == studio_control_protocol::pictures::VMIX_PICTURES_ENV)
                     .then(|| std::ffi::OsString::from("1"))
             }),
+            false,
             Arc::new(Beats::default()),
             Arc::new(Inbox::default()),
         );
@@ -485,6 +518,34 @@ mod tests {
         let output = run_on(input, &mut sources);
         let FromHelper::State { problem, .. } = states(&output).pop().expect("a line");
         assert_eq!(problem, Some(HelperProblem::NoLibrary));
+        assert!(sources.vmix.is_none(), "nothing was loaded");
+    }
+
+    // A studio build's helper takes vMix's pictures alone: a want for the
+    // test card is served as vMix's, so it never says a test card arrives.
+    // Here it has no library beside it, and says so.
+    #[test]
+    fn a_studio_build_s_helper_serves_every_want_from_vmix() {
+        let mut sources = Sources::new(
+            vmix::permission(true, None, |_| None),
+            true,
+            Arc::new(Beats::default()),
+            Arc::new(Inbox::default()),
+        );
+        let input = concat!(
+            r#"{"type":"want","cameras":[{"camera":1,"vmixInput":1}],"source":"simulated"}"#,
+            "\n"
+        );
+        let output = run_on(input, &mut sources);
+        let FromHelper::State {
+            source,
+            problem,
+            cameras,
+            ..
+        } = states(&output).pop().expect("a line");
+        assert_eq!(source, HelperSource::Vmix);
+        assert_eq!(problem, Some(HelperProblem::NoLibrary));
+        assert!(!cameras[0].receiving, "no test card arrives");
         assert!(sources.vmix.is_none(), "nothing was loaded");
     }
 

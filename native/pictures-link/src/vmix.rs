@@ -28,28 +28,42 @@ pub const LIBRARY_FILE: &str = "Processing.NDI.Lib.x64.dll";
 /// Whether this helper may take vMix's pictures, and from which library.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Permission {
-    /// The switch is in its environment, and the library is named by its
-    /// full path as the SDK's file.
+    /// It may, from the library at this full path: in a studio build the
+    /// copy in its own folder, in a development run the SDK's file named by
+    /// the run.
     Allowed(PathBuf),
     /// It takes none, and why: for the state line and the log.
     Refused(HelperProblem, String),
 }
 
-/// The helper's own reading of its environment: the engine's word on the
-/// want line is one fence, this is the second. A studio build takes none of
-/// vMix's pictures until the studio build's step; a development build takes
-/// them only with `SSE_VMIX_PICTURES=1`, which `npm run app --
+/// The helper's own reading of what it may take: the engine's word on the
+/// want line is one fence, this is the second. A studio build takes vMix's
+/// pictures (D34) from the library beside it in `own_folder`, the build's
+/// copy, and reads nothing of its environment for it. A development build
+/// takes them only with `SSE_VMIX_PICTURES=1`, which `npm run app --
 /// --vmix-pictures` alone sets, and only from the SDK's library by its full
-/// path, never vMix's own copy.
+/// path, never vMix's own copy. Either way the file is held to the pin
+/// before it is loaded (`library_matches_pin`).
 pub fn permission(
     studio_build: bool,
+    own_folder: Option<&Path>,
     mut get_env: impl FnMut(&str) -> Option<OsString>,
 ) -> Permission {
     if studio_build {
-        return Permission::Refused(
-            HelperProblem::NotAllowed,
-            String::from("a studio build takes no pictures from vMix yet"),
-        );
+        let Some(folder) = own_folder else {
+            return Permission::Refused(
+                HelperProblem::NoLibrary,
+                String::from("this helper does not know its own folder"),
+            );
+        };
+        let library = folder.join(LIBRARY_FILE);
+        return match library_refusal(&library) {
+            Some(why) => Permission::Refused(
+                HelperProblem::NoLibrary,
+                format!("{}: {why}", library.display()),
+            ),
+            None => Permission::Allowed(library),
+        };
     }
     let switch = get_env(VMIX_PICTURES_ENV).and_then(|value| value.into_string().ok());
     if !switch.as_deref().is_some_and(vmix_pictures_requested) {
@@ -515,14 +529,16 @@ mod tests {
         assert_eq!(
             permission(
                 false,
+                None,
                 env(&[("SSE_VMIX_PICTURES", "1"), ("SSE_NDI_LIBRARY", path)])
             ),
             Permission::Allowed(library.clone())
         );
-        let refused = |studio: bool, pairs: &[(&str, &str)]| match permission(studio, env(pairs)) {
-            Permission::Refused(problem, _) => Some(problem),
-            Permission::Allowed(_) => None,
-        };
+        let refused =
+            |studio: bool, pairs: &[(&str, &str)]| match permission(studio, None, env(pairs)) {
+                Permission::Refused(problem, _) => Some(problem),
+                Permission::Allowed(_) => None,
+            };
         // The switch.
         for switch in [None, Some("0"), Some(""), Some("yes"), Some("true")] {
             let mut pairs = vec![("SSE_NDI_LIBRARY", path)];
@@ -535,13 +551,34 @@ mod tests {
                 "{switch:?}"
             );
         }
-        // A studio build, whatever its environment holds.
+        // A studio build takes the library beside it, and nothing its
+        // environment names; without a folder of its own, none.
+        let own = scratch_library("build");
+        let folder = own.parent().expect("its folder");
+        assert_eq!(
+            permission(
+                true,
+                Some(folder),
+                env(&[("SSE_VMIX_PICTURES", "0"), ("SSE_NDI_LIBRARY", path)])
+            ),
+            Permission::Allowed(own.clone())
+        );
         assert_eq!(
             refused(
                 true,
                 &[("SSE_VMIX_PICTURES", "1"), ("SSE_NDI_LIBRARY", path)]
             ),
-            Some(HelperProblem::NotAllowed)
+            Some(HelperProblem::NoLibrary),
+            "no folder of its own"
+        );
+        let empty = folder.with_file_name("empty");
+        std::fs::create_dir_all(&empty).expect("an empty folder");
+        assert!(
+            matches!(
+                permission(true, Some(&empty), env(&[("SSE_NDI_LIBRARY", path)])),
+                Permission::Refused(HelperProblem::NoLibrary, _)
+            ),
+            "no library beside it, whatever the environment names"
         );
         // The library.
         let other = library.with_file_name("other.dll");

@@ -1,10 +1,10 @@
-// NDI's library for the pictures helper (D17, D33): the NDI SDK's own
+// NDI's library for the pictures helper (D17, D33, D34): the NDI SDK's own
 // `Processing.NDI.Lib.x64.dll`, which the owner installed with the SDK after
 // accepting NDI's agreement. It is never put in git. A small tracked file,
 // `native/pictures-link/ndi-library.json`, pins its version and its SHA-256;
 // `npm run app -- --vmix-pictures` hands the helper the SDK's file only when
-// its hash is the pinned one, and the studio build's step will copy that same
-// file into the build.
+// its hash is the pinned one, and `npm run release` copies that same file
+// into the build, and holds the copy to the pin again.
 //
 // Where the SDK is: `NDI_SDK_DIR`, which the SDK's installer sets for the
 // machine, or its own default folder when a terminal started before the

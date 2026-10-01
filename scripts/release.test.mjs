@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import test from "node:test";
 
 import { hardenedLaneEnv } from "./native-runtime-harness.mjs";
 import {
+  BUILD_FILES,
   BUILD_RECORD_FILE,
   buildEnv,
   buildName,
@@ -15,6 +17,8 @@ import {
   isBuildName,
   laneEnv,
   launcherText,
+  NDI_LIBRARY_FILE,
+  PICTURES_FILE,
   readBuildRecord,
   releaseRefusal,
   schemaVersionOf,
@@ -207,8 +211,10 @@ test("a build's record describes its folder, and a changed file is found", () =>
     mkdirSync(folder);
     writeFileSync(path.join(folder, SHELL_FILE), "the shell");
     writeFileSync(path.join(folder, ENGINE_FILE), "the engine");
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
 
-    // A run that failed leaves the two files and no record.
+    // A run that failed leaves the files and no record.
     assert.throws(() => readBuildRecord(folder), /build\.json is missing/);
     const written = writeBuildRecord(
       folder,
@@ -218,7 +224,8 @@ test("a build's record describes its folder, and a changed file is found", () =>
     );
     assert.equal(written.name, name);
     assert.equal(written.builtAt, "2026-09-28T02:00:00.000Z");
-    assert.deepEqual(Object.keys(written.files), [SHELL_FILE, ENGINE_FILE]);
+    assert.deepEqual(Object.keys(written.files), BUILD_FILES);
+    assert.deepEqual(BUILD_FILES, [SHELL_FILE, ENGINE_FILE, PICTURES_FILE, NDI_LIBRARY_FILE]);
     assert.match(written.files[ENGINE_FILE], /^[0-9a-f]{64}$/);
     assert.deepEqual(readBuildRecord(folder), written);
     assert.deepEqual(JSON.parse(readFileSync(path.join(folder, BUILD_RECORD_FILE), "utf8")), written);
@@ -233,10 +240,51 @@ test("a build's record describes its folder, and a changed file is found", () =>
     assert.throws(() => readBuildRecord(folder), /does not describe the folder it is in/);
     writeFileSync(recordPath, JSON.stringify(written));
 
+    // Every file the record names is checked: the helper and the library too.
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "another library");
+    assert.throws(
+      () => readBuildRecord(folder),
+      /Processing\.NDI\.Lib\.x64\.dll is not the file build\.json describes/
+    );
+    writeFileSync(path.join(folder, NDI_LIBRARY_FILE), "NDI's library");
+    rmSync(path.join(folder, PICTURES_FILE));
+    assert.throws(() => readBuildRecord(folder), /studio-control-pictures\.exe is missing/);
+    writeFileSync(path.join(folder, PICTURES_FILE), "the pictures helper");
+    // A helper or a library in the folder is checked whatever the record names: a record
+    // that leaves one out does not vouch for it.
+    const { [PICTURES_FILE]: _helper, ...withoutHelper } = written.files;
+    writeFileSync(recordPath, JSON.stringify({ ...written, files: withoutHelper }));
+    assert.throws(() => readBuildRecord(folder), /studio-control-pictures\.exe is not the file build\.json describes/);
+    // A record names files of the folder, and nothing elsewhere.
+    for (const elsewhere of ["..\\studio-control-pictures.exe", "../x.exe", "C:\\x.exe", "sub/x.exe", ".."]) {
+      writeFileSync(recordPath, JSON.stringify({ ...written, files: { ...written.files, [elsewhere]: "0" } }));
+      assert.throws(() => readBuildRecord(folder), /which is not a file of the folder/, elsewhere);
+    }
+    writeFileSync(recordPath, JSON.stringify(written));
+    assert.deepEqual(readBuildRecord(folder), written);
+
     writeFileSync(path.join(folder, ENGINE_FILE), "another engine");
     assert.throws(() => readBuildRecord(folder), /studio-control-engine\.exe is not the file build\.json describes/);
     rmSync(path.join(folder, ENGINE_FILE));
     assert.throws(() => readBuildRecord(folder), /studio-control-engine\.exe is missing/);
+
+    // A build made before the pictures helper (two files) still verifies.
+    const older = path.join(builds, "2026-09-27_0123456");
+    mkdirSync(older);
+    writeFileSync(path.join(older, SHELL_FILE), "an older shell");
+    writeFileSync(path.join(older, ENGINE_FILE), "an older engine");
+    const hash = (file) =>
+      createHash("sha256")
+        .update(readFileSync(path.join(older, file)))
+        .digest("hex");
+    const twoFiles = {
+      name: "2026-09-27_0123456",
+      commit: COMMIT,
+      builtAt: "2026-09-27T12:00:00.000Z",
+      files: { [SHELL_FILE]: hash(SHELL_FILE), [ENGINE_FILE]: hash(ENGINE_FILE) },
+    };
+    writeFileSync(path.join(older, BUILD_RECORD_FILE), JSON.stringify(twoFiles));
+    assert.deepEqual(readBuildRecord(older), twoFiles);
 
     // A record copied into another folder does not describe it.
     const copy = path.join(builds, "2026-09-29_0000000");

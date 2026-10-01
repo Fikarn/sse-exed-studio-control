@@ -110,6 +110,7 @@ fn launch(program: &str, args: &[&str]) -> Launch {
     Launch {
         program: which(program),
         args: args.iter().map(|arg| String::from(*arg)).collect(),
+        ..Launch::default()
     }
 }
 
@@ -159,6 +160,7 @@ fn a_program_that_is_not_there_reads_missing_and_is_said_once() {
         Launch {
             program: cameras.path().with_file_name("no-such-helper"),
             args: Vec::new(),
+            ..Launch::default()
         },
         quick_times(),
         HelperSource::Simulated,
@@ -250,6 +252,7 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
                 String::from("-Command"),
                 format!("Write-Output '{line}'; [Console]::In.ReadToEnd() | Out-Null"),
             ],
+            ..Launch::default()
         }
     } else {
         Launch {
@@ -258,6 +261,7 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
                 String::from("-c"),
                 format!("echo '{line}'; cat > /dev/null"),
             ],
+            ..Launch::default()
         }
     };
     let helper = start_supervisor(
@@ -285,10 +289,13 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
     assert_eq!(helper_status(cameras.path()), None);
 }
 
-// D33: a development build with the simulated cameras starts a helper, on
-// vMix's pictures only when the switch was read; nothing else starts one.
+// D33, D34: a studio build with the real cameras takes vMix's pictures,
+// whatever its environment says; one with the simulated cameras (the
+// release's trial start and lanes) starts none. A development build starts
+// one only with the simulated cameras, on vMix's pictures only when the
+// switch was read.
 #[test]
-fn only_a_development_build_with_the_simulated_cameras_starts_a_helper_and_the_switch_picks_vmix() {
+fn the_studio_build_takes_vmix_s_pictures_and_its_simulated_runs_start_no_helper() {
     for (development, simulated, switch, source) in [
         (true, true, false, Some(HelperSource::Simulated)),
         (true, true, true, Some(HelperSource::Vmix)),
@@ -296,8 +303,8 @@ fn only_a_development_build_with_the_simulated_cameras_starts_a_helper_and_the_s
         (true, false, true, None),
         (false, true, false, None),
         (false, true, true, None),
-        (false, false, false, None),
-        (false, false, true, None),
+        (false, false, false, Some(HelperSource::Vmix)),
+        (false, false, true, Some(HelperSource::Vmix)),
     ] {
         assert_eq!(
             source_for(development, simulated, switch),
@@ -325,6 +332,7 @@ fn a_helper_on_vmix_s_pictures_is_told_so_on_every_want() {
                     "Write-Output '{line}'; while ($null -ne ($l = [Console]::In.ReadLine())) {{ [Console]::Error.WriteLine($l) }}"
                 ),
             ],
+            ..Launch::default()
         }
     } else {
         Launch {
@@ -333,6 +341,7 @@ fn a_helper_on_vmix_s_pictures_is_told_so_on_every_want() {
                 String::from("-c"),
                 format!("echo '{line}'; while read -r l; do echo \"$l\" >&2; done"),
             ],
+            ..Launch::default()
         }
     };
     let supervisor = start_supervisor(
@@ -491,6 +500,7 @@ fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
                     "Write-Output '{line}'; while ($null -ne ($l = [Console]::In.ReadLine())) {{ [Console]::Error.WriteLine($l) }}"
                 ),
             ],
+            ..Launch::default()
         }
     } else {
         Launch {
@@ -499,6 +509,7 @@ fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
                 String::from("-c"),
                 format!("echo '{line}'; while read -r l; do echo \"$l\" >&2; done"),
             ],
+            ..Launch::default()
         }
     };
     let helper = start_supervisor(
@@ -547,4 +558,65 @@ fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
     // The stand-in echoed the link's line, secret and all, into the log: the
     // supervisor itself never writes it anywhere but the helper's stdin.
     assert_eq!(log.matches(&"ab".repeat(32)).count(), 1, "{log}");
+}
+
+// The engine starts only a helper of its own build, as the helper's mark
+// says: a studio build's of its own commit, a development build's; none of
+// another kind or commit, and none without a mark.
+#[test]
+fn only_a_helper_of_the_engine_s_own_build_is_started() {
+    use studio_control_protocol::development::{build_mark_of, MarkedBuild, BUILD_MARK_LEN};
+    let folder = std::env::temp_dir().join(format!("sse-own-helper-{}", std::process::id()));
+    std::fs::create_dir_all(&folder).expect("a scratch folder");
+    let commit = "0123456789abcdef0123456789abcdef01234567";
+    let other = "fedcba9876543210fedcba9876543210fedcba98";
+    let program = |name: &str, mark: Option<[u8; BUILD_MARK_LEN]>| {
+        let path = folder.join(name);
+        let mut bytes = b"MZ a program".to_vec();
+        if let Some(mark) = mark {
+            bytes.extend_from_slice(&mark);
+        }
+        bytes.extend_from_slice(b" and the rest");
+        std::fs::write(&path, bytes).expect("a stand-in");
+        path
+    };
+    let studio = program("studio.exe", Some(build_mark_of(Some(commit))));
+    let development = program("development.exe", Some(build_mark_of(None)));
+    let another = program("another.exe", Some(build_mark_of(Some(other))));
+    let unmarked = program("unmarked.exe", None);
+
+    assert_eq!(own_helper(&studio, MarkedBuild::Studio(commit)), None);
+    assert_eq!(own_helper(&development, MarkedBuild::Development), None);
+    for (path, own, why) in [
+        (
+            &development,
+            MarkedBuild::Studio(commit),
+            "a development build's",
+        ),
+        (
+            &another,
+            MarkedBuild::Studio(commit),
+            "the studio build of fedcba9",
+        ),
+        (
+            &studio,
+            MarkedBuild::Development,
+            "the studio build of 0123456",
+        ),
+        (&unmarked, MarkedBuild::Studio(commit), "no build's mark"),
+        (&unmarked, MarkedBuild::Development, "no build's mark"),
+    ] {
+        let refused = own_helper(path, own).unwrap_or_else(|| panic!("{} refused", path.display()));
+        assert!(refused.contains(why), "{refused}");
+    }
+    assert!(own_helper(&folder.join("gone.exe"), MarkedBuild::Development).is_some());
+    let _ = std::fs::remove_dir_all(&folder);
+}
+
+// A studio build's helper never gets the development run's switch or
+// library from the engine's environment; a development helper needs both.
+#[test]
+fn a_studio_build_s_helper_gets_neither_development_variable() {
+    assert_eq!(withheld(true), Vec::<&str>::new());
+    assert_eq!(withheld(false), [VMIX_PICTURES_ENV, NDI_LIBRARY_ENV]);
 }

@@ -122,12 +122,9 @@ fn main() {
             restore_or_route_initial_window(&app_handle, &window);
             // The native layer the pictures helper draws the cameras'
             // pictures in, topmost on this window, once the window stands
-            // where it stays. A development build's alone until the studio
-            // build's step, like the helper itself.
+            // where it stays: in every build, the studio's included (D34).
             #[cfg(windows)]
-            if studio_control_protocol::development::development_build() {
-                shell_picture_layer::start(&app_handle, &window);
-            }
+            shell_picture_layer::start(&app_handle, &window);
             // The window's display is saved by the watch over the screens,
             // which starts now that the window stands on it, and by the
             // window commands: no longer at every move of the window, which
