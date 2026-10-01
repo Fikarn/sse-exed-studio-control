@@ -394,7 +394,7 @@ impl Spacing {
 /// One frame at `format`'s rate, in 100 ns; none for an unknown rate.
 fn frame_in_100ns(format: &PictureFormat) -> Option<i64> {
     let numerator = u64::from(format.rate_numerator);
-    if numerator == 0 {
+    if numerator == 0 || format.rate_denominator == 0 {
         return None;
     }
     let period = (10_000_000 * u64::from(format.rate_denominator) + numerator / 2) / numerator;
@@ -815,6 +815,14 @@ mod tests {
             ..UHD
         };
         assert_eq!(frame_in_100ns(&twenty_five), Some(400_000));
+        for (numerator, denominator) in [(0, 1001), (30000, 0), (0, 0)] {
+            let unknown = PictureFormat {
+                rate_numerator: numerator,
+                rate_denominator: denominator,
+                ..UHD
+            };
+            assert_eq!(frame_in_100ns(&unknown), None, "{numerator}/{denominator}");
+        }
     }
 
     #[test]

@@ -590,7 +590,9 @@ fn take_frames(
                 newest.height = checked.height;
                 newest.stride = checked.stride;
                 newest.sequence = newest.sequence.wrapping_add(1);
-                newest.arrived = Some(now);
+                // Handed over now, after the copy: the draw loop's wait for
+                // it is counted from here.
+                newest.arrived = Some(Instant::now());
             }
             shared.inbox.landed();
         });
