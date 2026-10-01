@@ -4,7 +4,7 @@ import { Key, LampWord, Segmented } from "@sse/design-system";
 import type { CameraNumber, CameraSnapshot, CamerasSnapshot, PicturePlaces } from "@sse/engine-client";
 
 import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
-import { CameraPicture, NO_AIDS, type PictureAids } from "./pictures/CameraPicture";
+import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
 import type { PictureFrames } from "./pictures/pictureFrames";
 import { usePicturePlaces } from "./pictures/picturePlaces";
 import {
@@ -38,12 +38,10 @@ import styles from "./CamerasBay.module.css";
 // aids and the loupe are locked. The camera's own controls still work.
 //
 // In the app's window the pictures helper draws the pictures over the page
-// (D30): the bay says where each picture stands and what it draws over one,
-// a small picture's chip (`picturePlaces.ts`). The aids and the loupe's
-// marker are not drawn there yet, so their keys are locked and say so.
-
-/** Why the aids' keys are locked where the pictures helper draws the pictures. */
-const AIDS_LATER = "Guides, peaking and zebras come with a later version.";
+// (D30): the bay says where each picture stands, its aids and where the
+// loupe looks, and what it draws over one, a small picture's chip
+// (`picturePlaces.ts`). The helper draws the aids and the marker with the
+// page's numbers (`pictureAids.ts`).
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
@@ -126,8 +124,7 @@ export function CamerasBay({
   const camera = cameraNumber(selected);
   const shows = pictureShows(selected);
   const lock = pictureLock(selected) ?? undefined;
-  const aidsDrawn = drawnBy === "page";
-  const aids = aidsDrawn ? aidsOn : NO_AIDS;
+  const aids = aidsOn;
   const part = bigRect(view, point);
   const loupe = loupeRect(point, zoom);
   const others = snapshot.cameras.filter((entry) => entry.camera !== selected.camera);
@@ -160,8 +157,8 @@ export function CamerasBay({
       mode="toggle"
       size="small"
       engaged={aids[aid]}
-      locked={!shows || !aidsDrawn}
-      reason={shows ? AIDS_LATER : lock}
+      locked={!shows}
+      reason={lock}
       testId={`cameras-aid-${aid}`}
       onClick={() => onToggleAid(aid)}
     >

@@ -16,7 +16,8 @@
 //! - helper to shell: `hello`, with its process, so the shell can hand it a
 //!   surface;
 //! - shell to helper: `surface`, the handle as it is in the helper's process,
-//!   and `scene`, at every change.
+//!   and `scene`, at every change: where each picture stands, which part of
+//!   it, the aids drawn over it and where the loupe looks.
 
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +59,14 @@ pub struct ReportedPicture {
     pub part: Part,
     /// Smoothed when scaled; the loupe shows each pixel as it is.
     pub smooth: bool,
+    /// The aids drawn over it: the big picture may have all three, the loupe
+    /// zebras and peaking, a small picture none.
+    pub guides: bool,
+    pub zebras: bool,
+    pub peaking: bool,
+    /// Where the loupe looks, in the picture's own pixels as `part` is,
+    /// drawn as a dashed frame (the big picture's, in the whole view).
+    pub marker: Option<Part>,
 }
 
 /// What the page reports, at every change and once a second.
@@ -103,6 +112,10 @@ pub struct PlacedPicture {
     pub at: PictureRect,
     pub part: Part,
     pub smooth: bool,
+    pub guides: bool,
+    pub zebras: bool,
+    pub peaking: bool,
+    pub marker: Option<Part>,
 }
 
 /// What the helper draws: the surface's size, the pictures in it and the
@@ -238,6 +251,11 @@ pub fn placement(report: &PlaceReport) -> Option<Placement> {
                 },
                 part: picture.part,
                 smooth: picture.smooth,
+                guides: picture.guides,
+                zebras: picture.zebras,
+                peaking: picture.peaking,
+                // A marker outside the picture is left out, not the picture.
+                marker: picture.marker.filter(part_fits),
             })
         })
         .take(MAX_PICTURES)
@@ -306,6 +324,9 @@ impl Scene {
             if !shows(&picture.at) || !part_fits(&picture.part) {
                 return Err(format!("CAM {}'s picture does not fit", picture.camera));
             }
+            if picture.marker.is_some_and(|marker| !part_fits(&marker)) {
+                return Err(format!("CAM {}'s marker does not fit", picture.camera));
+            }
         }
         if self.holes.iter().any(|hole| !fits(hole)) {
             return Err(String::from("a hole outside the surface"));
@@ -335,6 +356,14 @@ mod tests {
         height: 1080,
     };
 
+    /// Where the loupe looks at 2:1, in the whole view.
+    const LOUPE: Part = Part {
+        x: 818,
+        y: 472,
+        width: 284,
+        height: 136,
+    };
+
     /// The Cameras page at 2560 × 1440: the bay, the big picture, a small one
     /// with its chip, and the loupe.
     fn report(scale: f64) -> PlaceReport {
@@ -348,23 +377,30 @@ mod tests {
                     at: css(444.0, 138.0, 1680.0, 945.0),
                     part: WHOLE,
                     smooth: true,
+                    guides: true,
+                    zebras: true,
+                    peaking: true,
+                    marker: Some(LOUPE),
                 },
                 ReportedPicture {
                     camera: 2,
                     at: css(444.0, 1095.0, 544.0, 306.0),
                     part: WHOLE,
                     smooth: true,
+                    guides: false,
+                    zebras: false,
+                    peaking: false,
+                    marker: None,
                 },
                 ReportedPicture {
                     camera: 1,
                     at: css(1556.0, 1129.0, 568.0, 272.0),
-                    part: Part {
-                        x: 818,
-                        y: 472,
-                        width: 284,
-                        height: 136,
-                    },
+                    part: LOUPE,
                     smooth: false,
+                    guides: false,
+                    zebras: true,
+                    peaking: true,
+                    marker: None,
                 },
             ],
             holes: vec![css(454.0, 1105.0, 120.0, 28.0)],
@@ -399,6 +435,29 @@ mod tests {
         assert_eq!(placed.scene.check(), Ok(()));
     }
 
+    // The aids and the marker are the page's to say and pass as they are;
+    // a marker outside the picture is left out, and the picture kept.
+    #[test]
+    fn the_aids_and_the_loupe_s_marker_pass_to_the_scene() {
+        let placed = placement(&report(1.0)).expect("a placement");
+        let [hero, small, loupe] = placed.scene.pictures[..] else {
+            panic!("three pictures")
+        };
+        assert!(hero.guides && hero.zebras && hero.peaking);
+        assert_eq!(hero.marker, Some(LOUPE));
+        assert!(!small.guides && !small.zebras && !small.peaking);
+        assert_eq!(small.marker, None);
+        assert!(!loupe.guides && loupe.zebras && loupe.peaking);
+        assert_eq!(loupe.marker, None);
+
+        let mut outside = report(1.0);
+        outside.pictures[0].marker = Some(Part { x: 1800, ..LOUPE });
+        let placed = placement(&outside).expect("a placement");
+        assert_eq!(placed.scene.pictures.len(), 3, "the picture is kept");
+        assert_eq!(placed.scene.pictures[0].marker, None);
+        assert_eq!(placed.scene.check(), Ok(()));
+    }
+
     #[test]
     fn both_edges_are_rounded_so_neighbours_meet() {
         // At 125 % an edge at 444.5 CSS pixels is 555.625: 556. A rectangle
@@ -410,12 +469,20 @@ mod tests {
                 at: css(444.5, 100.0, 100.0, 50.0),
                 part: WHOLE,
                 smooth: true,
+                guides: false,
+                zebras: false,
+                peaking: false,
+                marker: None,
             },
             ReportedPicture {
                 camera: 2,
                 at: css(544.5, 100.0, 100.3, 50.0),
                 part: WHOLE,
                 smooth: true,
+                guides: false,
+                zebras: false,
+                peaking: false,
+                marker: None,
             },
         ];
         at_125.holes.clear();
@@ -471,6 +538,10 @@ mod tests {
             at: css(1000.0, 1095.0, 544.0, 306.0),
             part: WHOLE,
             smooth: true,
+            guides: false,
+            zebras: false,
+            peaking: false,
+            marker: None,
         });
         odd.holes = vec![css(0.0, 0.0, 10.0, 10.0), css(2100.0, 1400.0, 100.0, 100.0)];
         let placed = placement(&odd).expect("one picture is left");
@@ -508,6 +579,10 @@ mod tests {
                 at: css(444.0, 1091.0, 544.0, 306.0),
                 part: WHOLE,
                 smooth: true,
+                guides: false,
+                zebras: false,
+                peaking: false,
+                marker: None,
             },
             ReportedPicture {
                 camera: 1,
@@ -519,6 +594,10 @@ mod tests {
                     height: 136,
                 },
                 smooth: false,
+                guides: false,
+                zebras: false,
+                peaking: false,
+                marker: None,
             },
             // One that starts above and left of the bay.
             ReportedPicture {
@@ -526,6 +605,10 @@ mod tests {
                 at: css(400.0, 50.0, 544.0, 306.0),
                 part: WHOLE,
                 smooth: true,
+                guides: false,
+                zebras: false,
+                peaking: false,
+                marker: None,
             },
         ];
         let placed = placement(&cut).expect("a placement");
@@ -566,11 +649,20 @@ mod tests {
         let read: PlaceReport = serde_json::from_str(
             r#"{"showing":true,"scale":1,"bay":{"x":428,"y":76,"width":1712,"height":1344},
                 "pictures":[{"camera":1,"at":{"x":444,"y":138,"width":1680,"height":945},
-                "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true}],"holes":[]}"#,
+                "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,
+                "guides":false,"zebras":true,"peaking":false,"marker":null}],"holes":[]}"#,
         )
         .expect("a report");
         assert_eq!(read.pictures[0].at, css(444.0, 138.0, 1680.0, 945.0));
+        assert!(read.pictures[0].zebras && !read.pictures[0].guides);
+        assert_eq!(read.pictures[0].marker, None);
         assert!(serde_json::from_str::<PlaceReport>(r#"{"showing":true}"#).is_err());
+        // A page that says nothing of the aids is not one of this build's.
+        assert!(serde_json::from_str::<ReportedPicture>(
+            r#"{"camera":1,"at":{"x":0,"y":0,"width":1,"height":1},
+                "part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true}"#
+        )
+        .is_err());
     }
 
     #[test]
@@ -586,7 +678,7 @@ mod tests {
         let scene = placement(&report(1.0)).expect("a placement").scene;
         let line = to_line(&ToLayerHelper::Scene(scene.clone()));
         assert!(
-            line.starts_with(r#"{"type":"scene","width":1712,"height":1344,"pictures":[{"camera":1,"at":{"x":16,"y":62,"width":1680,"height":945},"part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true},"#),
+            line.starts_with(r#"{"type":"scene","width":1712,"height":1344,"pictures":[{"camera":1,"at":{"x":16,"y":62,"width":1680,"height":945},"part":{"x":0,"y":0,"width":1920,"height":1080},"smooth":true,"guides":true,"zebras":true,"peaking":true,"marker":{"x":818,"y":472,"width":284,"height":136}},"#),
             "{line}"
         );
         assert_eq!(
@@ -624,7 +716,16 @@ mod tests {
                         width: 1920,
                         height: 1080
                     },
-                    smooth: false
+                    smooth: false,
+                    guides: true,
+                    zebras: true,
+                    peaking: true,
+                    marker: Some(Part {
+                        x: 1919,
+                        y: 1079,
+                        width: 1920,
+                        height: 1080
+                    }),
                 };
                 MAX_PICTURES
             ],
@@ -655,6 +756,12 @@ mod tests {
         assert!(broken(&|scene| scene.pictures[0].part.width = 0));
         assert!(broken(&|scene| scene.pictures[0].part.y = 1));
         assert!(broken(&|scene| scene.holes[0].height = 0));
+        assert!(broken(
+            &|scene| scene.pictures[0].marker = Some(Part { x: 1, ..WHOLE })
+        ));
+        assert!(broken(
+            &|scene| scene.pictures[0].marker = Some(Part { width: 0, ..LOUPE })
+        ));
         assert!(broken(
             &|scene| scene.pictures = vec![scene.pictures[0]; MAX_PICTURES + 1]
         ));

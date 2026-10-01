@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 
 import type { CameraNumber } from "@sse/engine-client";
 
+import { CROSS_ALPHA, CROSS_ARM, GUIDE_ALPHA, GUIDE_WIDTH, MARKER_DASH, MARKER_WIDTH } from "./pictureAids";
 import { createPictureDrawer, type PictureDrawer } from "./pictureDrawer";
 import type { PictureFrames } from "./pictureFrames";
 import { PICTURE, type Rect } from "./pictureGeometry";
@@ -11,8 +12,9 @@ import styles from "./CameraPicture.module.css";
 // is signal, not chrome: it is marked `data-picture`, and the layout measures skip it.
 //
 // In the app's window the page draws nothing here (the camera pictures, D30): the
-// pictures helper draws the picture over this place, which the page reports with the
-// others (`picturePlaces.ts` reads `data-camera`, `data-part` and `data-pixels`).
+// pictures helper draws the picture, its aids and the loupe's marker over this place,
+// which the page reports with the others (`picturePlaces.ts` reads `data-camera`,
+// `data-part`, `data-pixels`, `data-aids` and `data-marker`).
 //
 // In a browser the page draws it with WebGL2 (`pictureDrawer.ts`), with the zebras and
 // the peaking laid over by the shader, and the guides and the loupe's marker on a canvas
@@ -51,8 +53,8 @@ export interface CameraPictureProps {
 function drawGuides(context: CanvasRenderingContext2D) {
   const { width, height } = PICTURE;
   context.save();
-  context.strokeStyle = "rgba(255, 255, 255, 0.45)";
-  context.lineWidth = 2;
+  context.strokeStyle = `rgba(255, 255, 255, ${GUIDE_ALPHA})`;
+  context.lineWidth = GUIDE_WIDTH;
   context.beginPath();
   for (const x of [width / 3, (width * 2) / 3]) {
     context.moveTo(x, 0);
@@ -63,12 +65,12 @@ function drawGuides(context: CanvasRenderingContext2D) {
     context.lineTo(width, y);
   }
   context.stroke();
-  context.strokeStyle = "rgba(255, 255, 255, 0.7)";
+  context.strokeStyle = `rgba(255, 255, 255, ${CROSS_ALPHA})`;
   context.beginPath();
-  context.moveTo(width / 2 - 30, height / 2);
-  context.lineTo(width / 2 + 30, height / 2);
-  context.moveTo(width / 2, height / 2 - 30);
-  context.lineTo(width / 2, height / 2 + 30);
+  context.moveTo(width / 2 - CROSS_ARM, height / 2);
+  context.lineTo(width / 2 + CROSS_ARM, height / 2);
+  context.moveTo(width / 2, height / 2 - CROSS_ARM);
+  context.lineTo(width / 2, height / 2 + CROSS_ARM);
   context.stroke();
   context.restore();
 }
@@ -76,8 +78,8 @@ function drawGuides(context: CanvasRenderingContext2D) {
 function drawMarker(context: CanvasRenderingContext2D, marker: Rect) {
   context.save();
   context.strokeStyle = "#ffffff";
-  context.lineWidth = 3;
-  context.setLineDash([14, 8]);
+  context.lineWidth = MARKER_WIDTH;
+  context.setLineDash([...MARKER_DASH]);
   context.strokeRect(marker.x, marker.y, marker.width, marker.height);
   context.restore();
 }
@@ -86,8 +88,27 @@ export function CameraPicture(props: CameraPictureProps) {
   return props.drawnBy === "helper" ? <PicturePlace {...props} /> : <DrawnPicture {...props} />;
 }
 
+/** The aids as `data-aids` says them: `guides zebras peaking`, those that are on. */
+const aidWords = ({ guides, zebras, peaking }: PictureAids) =>
+  [guides ? "guides" : "", zebras ? "zebras" : "", peaking ? "peaking" : ""].filter(Boolean).join(" ");
+
+/** The marker as `data-marker` says it, `x,y,width,height` in the picture's pixels; none without one. */
+const markerWords = (marker: Rect | null) =>
+  marker ? `${marker.x},${marker.y},${marker.width},${marker.height}` : undefined;
+
 /** A picture's place in the app's window: empty in the page, with the helper's picture over it. */
-function PicturePlace({ camera, part, width, height, pixels = false, label, className, testId }: CameraPictureProps) {
+function PicturePlace({
+  camera,
+  part,
+  width,
+  height,
+  aids = NO_AIDS,
+  marker = null,
+  pixels = false,
+  label,
+  className,
+  testId,
+}: CameraPictureProps) {
   return (
     <div
       className={[styles.view, className].filter(Boolean).join(" ")}
@@ -98,7 +119,8 @@ function PicturePlace({ camera, part, width, height, pixels = false, label, clas
       data-camera={camera}
       data-part={`${part.x},${part.y},${part.width},${part.height}`}
       data-pixels={pixels ? "" : undefined}
-      data-aids=""
+      data-aids={aidWords(aids)}
+      data-marker={markerWords(marker)}
       data-drawn="helper"
       data-testid={testId}
     />
@@ -197,7 +219,8 @@ function DrawnPicture({
       data-camera={camera}
       data-part={`${part.x},${part.y},${part.width},${part.height}`}
       data-pixels={pixels ? "" : undefined}
-      data-aids={[guides ? "guides" : "", zebras ? "zebras" : "", peaking ? "peaking" : ""].filter(Boolean).join(" ")}
+      data-aids={aidWords(aids)}
+      data-marker={markerWords(marker)}
       data-testid={testId}
     >
       <canvas ref={picture} className={styles.picture} width={width} height={height} />

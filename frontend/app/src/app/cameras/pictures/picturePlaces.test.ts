@@ -7,24 +7,37 @@ import { MAX_HOLES, MAX_PICTURES, buildPlaces, type MeasuredPicture, type Measur
 // `native/protocol/rust/src/picture_layer.rs`, whose tests use this layout.
 
 const WHOLE = { x: 0, y: 0, width: 1920, height: 1080 };
+/** Where the loupe looks at 2:1, in the whole view. */
+const LOUPE = { x: 818, y: 472, width: 284, height: 136 };
+const NO_AIDS = { guides: false, zebras: false, peaking: false, marker: null };
 
+// The big picture with every aid and the loupe's marker, the loupe with zebras and
+// peaking, a small picture with none.
 const hero: MeasuredPicture = {
   camera: 1,
   box: { x: 444, y: 138, width: 1680, height: 945 },
   part: WHOLE,
   smooth: true,
+  guides: true,
+  zebras: true,
+  peaking: true,
+  marker: LOUPE,
 };
 const tile: MeasuredPicture = {
   camera: 2,
   box: { x: 444, y: 1095, width: 544, height: 306 },
   part: WHOLE,
   smooth: true,
+  ...NO_AIDS,
 };
 const loupe: MeasuredPicture = {
   camera: 1,
   box: { x: 1556, y: 1129, width: 568, height: 272 },
-  part: { x: 818, y: 472, width: 284, height: 136 },
+  part: LOUPE,
   smooth: false,
+  ...NO_AIDS,
+  zebras: true,
+  peaking: true,
 };
 const chip = { x: 454, y: 1105, width: 120, height: 28 };
 
@@ -41,15 +54,24 @@ function layout(over: Partial<MeasuredPlaces> = {}): MeasuredPlaces {
 }
 
 describe("the page's report of its pictures", () => {
-  it("says each picture's box, part and smoothing, and the chip as a hole", () => {
+  it("says each picture's box, part, smoothing, aids and marker, and the chip as a hole", () => {
     expect(buildPlaces(layout())).toEqual({
       showing: true,
       scale: 1,
       bay: { x: 428, y: 76, width: 1712, height: 1344 },
       pictures: [
-        { camera: 1, at: hero.box, part: WHOLE, smooth: true },
-        { camera: 2, at: tile.box, part: WHOLE, smooth: true },
-        { camera: 1, at: loupe.box, part: loupe.part, smooth: false },
+        {
+          camera: 1,
+          at: hero.box,
+          part: WHOLE,
+          smooth: true,
+          guides: true,
+          zebras: true,
+          peaking: true,
+          marker: LOUPE,
+        },
+        { camera: 2, at: tile.box, part: WHOLE, smooth: true, ...NO_AIDS },
+        { camera: 1, at: loupe.box, part: LOUPE, smooth: false, ...NO_AIDS, zebras: true, peaking: true },
       ],
       holes: [chip],
     });
@@ -94,6 +116,10 @@ describe("the page's report of its pictures", () => {
       layout({ pictures: [{ ...loupe, part: { x: 818.4, y: 471.6, width: 284, height: 136 } }] })
     );
     expect(places.pictures[0]?.part).toEqual({ x: 818, y: 472, width: 284, height: 136 });
+    const marked = buildPlaces(
+      layout({ pictures: [{ ...hero, marker: { x: 817.6, y: 472.4, width: 283.5, height: 136.2 } }] })
+    );
+    expect(marked.pictures[0]?.marker).toEqual({ x: 818, y: 472, width: 284, height: 136 });
   });
 
   it("has the shell's bounds", async () => {
@@ -104,5 +130,9 @@ describe("the page's report of its pictures", () => {
     const source = readFileSync(resolve(here, "../../../../../../native/protocol/rust/src/picture_layer.rs"), "utf8");
     expect(source).toContain(`pub const MAX_PICTURES: usize = ${MAX_PICTURES};`);
     expect(source).toContain(`pub const MAX_HOLES: usize = ${MAX_HOLES};`);
+    // The aids and the marker are read as the page says them.
+    for (const field of ["pub guides: bool,", "pub zebras: bool,", "pub peaking: bool,", "pub marker: Option<Part>,"]) {
+      expect(source).toContain(field);
+    }
   });
 });

@@ -654,6 +654,9 @@ test.describe("the Cameras page", () => {
     const last = async () => (await places()).last;
     const boxOf = async (testId: string) => (await page.getByTestId(testId).boundingBox())!;
     const whole = { x: 0, y: 0, width: 1920, height: 1080 };
+    const noAids = { guides: false, zebras: false, peaking: false, marker: null };
+    // Where the loupe looks at 2:1: the big picture's marker in the whole view.
+    const loupePart = { x: 818, y: 472, width: 284, height: 136 };
 
     await expect.poll(async () => (await last())?.pictures.length).toBe(4);
     const first = (await last())!;
@@ -661,16 +664,24 @@ test.describe("the Cameras page", () => {
     expect(first.scale).toBe(1);
     expect(first.bay).toEqual(await boxOf("cameras-bay"));
     const [hero, tile2, tile3, loupe] = first.pictures;
-    expect(hero).toEqual({ camera: 1, at: await boxOf("cameras-hero-picture"), part: whole, smooth: true });
+    expect(hero).toEqual({
+      camera: 1,
+      at: await boxOf("cameras-hero-picture"),
+      part: whole,
+      smooth: true,
+      ...noAids,
+      marker: loupePart,
+    });
     expect(hero!.at).toMatchObject({ width: 1680, height: 945 });
-    expect(tile2).toMatchObject({ camera: 2, part: whole, smooth: true, at: { width: 544, height: 306 } });
-    expect(tile3).toMatchObject({ camera: 3, part: whole, smooth: true, at: { width: 544, height: 306 } });
+    expect(tile2).toMatchObject({ camera: 2, part: whole, smooth: true, at: { width: 544, height: 306 }, ...noAids });
+    expect(tile3).toMatchObject({ camera: 3, part: whole, smooth: true, at: { width: 544, height: 306 }, ...noAids });
     // The loupe shows each pixel as it is: 284 × 136 of the picture at 2:1, around its centre.
     expect(loupe).toEqual({
       camera: 1,
       at: await boxOf("cameras-loupe-picture"),
-      part: { x: 818, y: 472, width: 284, height: 136 },
+      part: loupePart,
       smooth: false,
+      ...noAids,
     });
     // Each small picture's chip is a hole in it.
     expect(first.holes).toHaveLength(2);
@@ -695,6 +706,19 @@ test.describe("the Cameras page", () => {
     await page.keyboard.press("Escape");
     await expect.poll(async () => (await last())?.pictures.length).toBe(4);
 
+    // The aids: the big picture all three, the loupe zebras and peaking, the small ones none.
+    for (const aid of ["guides", "zebras", "peaking"]) await page.getByTestId(`cameras-aid-${aid}`).click();
+    await expect
+      .poll(async () => (await last())?.pictures.map(({ guides, zebras, peaking }) => [guides, zebras, peaking]))
+      .toEqual([
+        [true, true, true],
+        [false, false, false],
+        [false, false, false],
+        [false, true, true],
+      ]);
+    for (const aid of ["guides", "zebras", "peaking"]) await page.getByTestId(`cameras-aid-${aid}`).click();
+    await expect.poll(async () => (await last())?.pictures[0]?.zebras).toBe(false);
+
     // Another camera selected, the 1:1 view, the loupe at 4:1.
     await page.getByTestId("cameras-key-2").click();
     await expect.poll(async () => (await last())?.pictures.map((picture) => picture.camera)).toEqual([2, 1, 3, 2]);
@@ -702,6 +726,8 @@ test.describe("the Cameras page", () => {
     await expect
       .poll(async () => (await last())?.pictures[0]?.part)
       .toEqual({ x: 120, y: 68, width: 1680, height: 945 });
+    // At 1:1 the big picture is where the loupe looks: no marker on it.
+    expect((await last())?.pictures[0]?.marker).toBeNull();
     await page.getByTestId("cameras-zoom-4").click();
     await expect
       .poll(async () => (await last())?.pictures[3]?.part)

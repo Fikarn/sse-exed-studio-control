@@ -655,9 +655,11 @@ fn the_helper_says_the_secret_and_hello_to_the_shell_s_listener_while_the_page_s
     use std::io::{BufRead, BufReader, Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
-    use studio_control_protocol::picture_layer::FromLayerHelper;
+    use studio_control_protocol::picture_layer::{
+        FromLayerHelper, Part, PictureRect, PlacedPicture, Scene, ToLayerHelper,
+    };
     use studio_control_protocol::pictures::{
-        from_line, HELPER_PROGRAM, LINK_ADDRESS_ENV, LINK_SECRET_ENV,
+        from_line, to_line, HELPER_PROGRAM, LINK_ADDRESS_ENV, LINK_SECRET_ENV,
     };
 
     assert!(
@@ -711,12 +713,39 @@ fn the_helper_says_the_secret_and_hello_to_the_shell_s_listener_while_the_page_s
     assert_ne!(pid, std::process::id(), "the helper's own process: {hello}");
 
     // A scene with no surface to draw it into: the helper takes it, draws
-    // nothing and says nothing.
-    writeln!(
-        stream,
-        r#"{{"type":"scene","width":1712,"height":1344,"pictures":[{{"camera":1,"at":{{"x":16,"y":62,"width":1680,"height":945}},"part":{{"x":0,"y":0,"width":1920,"height":1080}},"smooth":true}}],"holes":[]}}"#
-    )
-    .expect("a scene");
+    // nothing and says nothing. Written as the shell writes it, so that it is
+    // one the helper reads, aids and marker included.
+    let scene = ToLayerHelper::Scene(Scene {
+        width: 1712,
+        height: 1344,
+        pictures: vec![PlacedPicture {
+            camera: 1,
+            at: PictureRect {
+                x: 16,
+                y: 62,
+                width: 1680,
+                height: 945,
+            },
+            part: Part {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080,
+            },
+            smooth: true,
+            guides: true,
+            zebras: true,
+            peaking: true,
+            marker: Some(Part {
+                x: 818,
+                y: 472,
+                width: 284,
+                height: 136,
+            }),
+        }],
+        holes: Vec::new(),
+    });
+    writeln!(stream, "{}", to_line(&scene)).expect("a scene");
     // The timeout is the reading handle's own: on Windows a second handle
     // does not share it.
     lines

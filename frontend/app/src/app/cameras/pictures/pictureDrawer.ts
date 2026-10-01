@@ -1,6 +1,13 @@
 import type { PictureFrame } from "@sse/engine-client";
 
-import { PEAKING_STEP, ZEBRA_LEVEL } from "./pictureAids";
+import {
+  PEAKING_INK,
+  PEAKING_STEP,
+  STRIPE_DARK_ALPHA,
+  STRIPE_LIGHT_ALPHA,
+  STRIPE_PERIOD,
+  ZEBRA_LEVEL,
+} from "./pictureAids";
 import { PICTURE, type Rect } from "./pictureGeometry";
 
 // One view of a camera's picture, drawn with WebGL2 (the camera pictures, D28): the
@@ -92,8 +99,10 @@ void main() {
   }
 
   if (zebras == 1 && brightness(rgbAt(pixel)) >= zebraLevel) {
-    bool light = ((pixel.x + pixel.y) % 16) < 8;
-    rgb = light ? mix(rgb, vec3(1.0), 230.0 / 255.0) : mix(rgb, vec3(0.0), 153.0 / 255.0);
+    bool light = ((pixel.x + pixel.y) % ${STRIPE_PERIOD}) < ${STRIPE_PERIOD / 2};
+    rgb = light
+      ? mix(rgb, vec3(1.0), ${STRIPE_LIGHT_ALPHA}.0 / 255.0)
+      : mix(rgb, vec3(0.0), ${STRIPE_DARK_ALPHA}.0 / 255.0);
   }
   if (peaking == 1) {
     float level = brightness(rgbAt(pixel));
@@ -103,7 +112,7 @@ void main() {
       (pixel.x > 0 && abs(brightness(rgbAt(pixel - ivec2(1, 0))) - level) > peakingStep) ||
       (pixel.y < last.y && abs(brightness(rgbAt(pixel + ivec2(0, 1))) - level) > peakingStep) ||
       (pixel.y > 0 && abs(brightness(rgbAt(pixel - ivec2(0, 1))) - level) > peakingStep);
-    if (sharp) rgb = vec3(124.0, 196.0, 255.0) / 255.0;
+    if (sharp) rgb = vec3(${PEAKING_INK[0]}.0, ${PEAKING_INK[1]}.0, ${PEAKING_INK[2]}.0) / 255.0;
   }
   colour = vec4(rgb, 1.0);
 }`;
