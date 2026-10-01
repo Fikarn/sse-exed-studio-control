@@ -1128,34 +1128,61 @@ mod tests {
         let guide =
             |x: usize, y: usize, alpha: f64| near(at(&drawn, x, y), lifted(at(&base, x, y), alpha));
 
-        // The thirds: 2 pixels wide on 640 and 1280, 360 and 720, and nothing
-        // a few pixels off them.
+        // The thirds: 2 pixels wide on 640 and 1280, 360 and 720, the pixel
+        // on each side of the line covered and the next one not.
         for y in [100, 300, 900] {
-            assert!(
-                guide(639, y, aids::GUIDE_ALPHA) && guide(640, y, aids::GUIDE_ALPHA),
-                "x 640 at y {y}"
-            );
-            assert!(guide(1279, y, aids::GUIDE_ALPHA) && guide(1280, y, aids::GUIDE_ALPHA));
-            assert!(unmoved(636, y) && unmoved(644, y), "beside x 640 at y {y}");
+            for x in [639, 640, 1279, 1280] {
+                assert!(guide(x, y, aids::GUIDE_ALPHA), "the third at x {x}, y {y}");
+            }
+            for x in [638, 641, 1278, 1281] {
+                assert!(unmoved(x, y), "beside a third at x {x}, y {y}");
+            }
         }
-        assert!(guide(100, 359, aids::GUIDE_ALPHA) && guide(100, 720, aids::GUIDE_ALPHA));
-        assert!(unmoved(100, 355) && unmoved(100, 365));
+        for y in [359, 360, 719, 720] {
+            assert!(guide(100, y, aids::GUIDE_ALPHA), "the third at y {y}");
+        }
+        for y in [358, 361, 718, 721] {
+            assert!(unmoved(100, y), "beside a third at y {y}");
+        }
         // Where two thirds cross they are one path: drawn once.
         assert!(guide(640, 360, aids::GUIDE_ALPHA));
         // The cross at the centre, its arms 30 pixels each way.
         assert!(guide(940, 540, aids::CROSS_ALPHA) && guide(960, 520, aids::CROSS_ALPHA));
-        assert!(unmoved(925, 540) && unmoved(960, 505));
+        assert!(guide(930, 539, aids::CROSS_ALPHA) && guide(989, 540, aids::CROSS_ALPHA));
+        assert!(unmoved(929, 540) && unmoved(990, 540) && unmoved(940, 538) && unmoved(940, 541));
+        assert!(unmoved(960, 509) && unmoved(960, 570));
 
-        // The marker: white where a dash is along its top edge, from its top
-        // left corner, and the picture where a gap is.
-        for x in [823, 845, 867] {
-            assert_eq!(at(&drawn, x, 472), [255; 3], "a dash at x {x}");
+        // The marker: 3 pixels wide, centred on the loupe's edge, so the two
+        // rows at the edge are white, the one each side half, and the next
+        // the picture; dashed from its top left corner, 14 on and 8 off.
+        let half = |x: usize, y: usize| near(at(&drawn, x, y), lifted(at(&base, x, y), 0.5));
+        for x in [823, 831, 840, 845, 867] {
+            for y in [471, 472] {
+                assert_eq!(at(&drawn, x, y), [255; 3], "a dash at x {x}, y {y}");
+            }
+            assert!(half(x, 470) && half(x, 473), "the dash's edges at x {x}");
+            assert!(
+                unmoved(x, 469) && unmoved(x, 474),
+                "beside the dash at x {x}"
+            );
         }
-        for x in [836, 858] {
+        for x in [832, 836, 839, 858] {
             assert!(unmoved(x, 472), "a gap at x {x}");
         }
-        // Its left edge, and nothing inside it.
-        assert_eq!(at(&drawn, 818, 475), [255; 3]);
+        // Its left edge, the same across.
+        for y in [475, 540] {
+            assert_eq!(at(&drawn, 817, y), [255; 3]);
+            assert_eq!(at(&drawn, 818, y), [255; 3]);
+            assert!(
+                half(816, y) && half(819, y),
+                "the left edge's sides at y {y}"
+            );
+            assert!(
+                unmoved(815, y) && unmoved(820, y),
+                "beside the left edge at y {y}"
+            );
+        }
+        // Nothing inside it.
         assert!(unmoved(900, 540));
     }
 
