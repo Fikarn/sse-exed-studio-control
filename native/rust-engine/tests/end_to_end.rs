@@ -21,6 +21,9 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use studio_control_protocol::development::development_build;
+// No engine here is started with vMix's switch or NDI's library, whatever the
+// terminal holds (D33): each spawn removes them.
+use studio_control_protocol::pictures::{NDI_LIBRARY_ENV, VMIX_PICTURES_ENV};
 use studio_control_protocol::PROTOCOL_VERSION;
 
 fn engine_binary_path() -> PathBuf {
@@ -88,6 +91,8 @@ impl EngineProcess {
             .env("SSE_LIGHTS_SIMULATED", "1")
             .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
             .env("SSE_CAMERAS_SIMULATED", "1")
+            .env_remove(VMIX_PICTURES_ENV)
+            .env_remove(NDI_LIBRARY_ENV)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -496,6 +501,8 @@ fn a_development_build_is_refused_the_studios_folders() {
             .env("SSE_LIGHTS_SIMULATED", "1")
             .env("SSE_AUDIO_SIMULATED_INPUT_MODE", "1")
             .env("SSE_CAMERAS_SIMULATED", "1")
+            .env_remove(VMIX_PICTURES_ENV)
+            .env_remove(NDI_LIBRARY_ENV)
             .stdin(Stdio::null());
         if let Some(data_dir) = data_dir {
             command.env("SSE_APP_DATA_DIR", data_dir);
@@ -572,6 +579,8 @@ fn a_development_build_sets_its_own_switches() {
         .env_remove("SSE_LIGHTS_SIMULATED")
         .env_remove("SSE_AUDIO_SIMULATED_INPUT_MODE")
         .env_remove("SSE_CAMERAS_SIMULATED")
+        .env_remove(VMIX_PICTURES_ENV)
+        .env_remove(NDI_LIBRARY_ENV)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

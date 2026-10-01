@@ -13,11 +13,15 @@
 //!   A program that is not there is said once, and not looked for again.
 //! - It ends by itself when its stdin closes, so an engine that goes takes it
 //!   along; a graceful stop closes it first, and ends it if it lingers.
-//! - Only a development build with the simulated cameras starts it (step 1):
-//!   its one source is the simulated one. A studio build shows no pictures
-//!   until NDI is built (the owner, 2026-09-29). The engine's unit tests
-//!   start none; the lanes and the end-to-end tests run a development engine
-//!   from `target`, which starts the helper built beside it.
+//! - Only a development build with the simulated cameras starts it, and
+//!   tells it its source on every want (`source_for`): the simulated one, or
+//!   vMix's Outputs 2 to 4 over NDI when `npm run app -- --vmix-pictures`
+//!   set `SSE_VMIX_PICTURES=1` (D33), a hardware test the owner attends. The
+//!   helper checks that switch again in its own environment. A studio build
+//!   shows no pictures until the studio build's step (the owner,
+//!   2026-09-29). The engine's unit tests start none; the lanes and the
+//!   end-to-end tests run a development engine from `target`, which starts
+//!   the helper built beside it, never with the switch.
 //! - A stop never holds up the engine's own: it is asked for before the
 //!   shutdown backup and waited for after it, until the grace and a margin
 //!   have passed since it was asked for, so a helper that lingers is ended
@@ -53,8 +57,9 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use studio_control_protocol::pictures::{
-    from_line, is_link_secret, read_line_bounded, to_line, FromHelper, LinkSecret, ReceivedCamera,
-    ToHelper, WantedCamera, HELPER_PROGRAM, LINK_ADDRESS_ENV, LINK_SECRET_ENV,
+    from_line, is_link_secret, read_line_bounded, to_line, FromHelper, HelperProblem, HelperSource,
+    LinkSecret, ReceivedCamera, ToHelper, WantedCamera, HELPER_PROGRAM, LINK_ADDRESS_ENV,
+    LINK_SECRET_ENV,
 };
 
 /// A helper silent this long is ended and started again: five of its
@@ -116,6 +121,8 @@ pub(crate) enum HelperStatus {
     /// It says what it receives.
     Running {
         sending: bool,
+        /// Why it takes nothing at all, when it says so.
+        problem: Option<HelperProblem>,
         cameras: Vec<ReceivedCamera>,
     },
     /// It ended, or went silent: it is started again.
@@ -132,6 +139,9 @@ pub(crate) enum HelperStatus {
 /// with a database each never share one; and how to reach it.
 #[derive(Default)]
 struct Entry {
+    /// The source the helper is told; the simulated one until a supervisor
+    /// says otherwise.
+    source: HelperSource,
     status: Option<HelperStatus>,
     to_supervisor: Option<Sender<Message>>,
 }
@@ -145,13 +155,22 @@ fn helpers() -> MutexGuard<'static, HashMap<PathBuf, Entry>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// What the helper of this saved data is doing; `None` when no helper is
-/// supervised for it (a studio build, the engine's unit tests, an engine
-/// without the simulated cameras).
+/// What the helper of this saved data is doing, for the tests; `None` when
+/// no helper is supervised for it.
+#[cfg(test)]
 pub(crate) fn helper_status(db_path: &Path) -> Option<HelperStatus> {
     helpers()
         .get(db_path)
         .and_then(|entry| entry.status.clone())
+}
+
+/// The helper of this saved data: the source it is told, and what it is
+/// doing; `None` when no helper is supervised for it (a studio build, the
+/// engine's unit tests, an engine without the simulated cameras).
+pub(crate) fn helper(db_path: &Path) -> Option<(HelperSource, HelperStatus)> {
+    helpers()
+        .get(db_path)
+        .and_then(|entry| Some((entry.source, entry.status.clone()?)))
 }
 
 /// Takes a new status; a change is announced, the heartbeat's same status is
@@ -202,6 +221,15 @@ pub(crate) fn set_status_for_test(db_path: &Path, status: Option<HelperStatus>) 
             helpers.remove(db_path);
         }
     }
+}
+
+/// A test's helper is told vMix's pictures, and says `status`.
+#[cfg(test)]
+pub(crate) fn set_vmix_status_for_test(db_path: &Path, status: HelperStatus) {
+    let mut helpers = helpers();
+    let entry = helpers.entry(db_path.to_path_buf()).or_default();
+    entry.source = HelperSource::Vmix;
+    entry.status = Some(status);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,17 +429,36 @@ impl Drop for PicturesHelper {
     }
 }
 
+/// Which source a helper is started on, if one is started: only a
+/// development build with the simulated cameras starts one; it takes vMix's
+/// pictures when the build read `SSE_VMIX_PICTURES=1` (D33), and the test
+/// card otherwise. A studio build starts none until the studio build's step.
+pub(crate) fn source_for(
+    development_build: bool,
+    cameras_simulated: bool,
+    vmix_pictures: bool,
+) -> Option<HelperSource> {
+    match (development_build, cameras_simulated, vmix_pictures) {
+        (true, true, true) => Some(HelperSource::Vmix),
+        (true, true, false) => Some(HelperSource::Simulated),
+        _ => None,
+    }
+}
+
 /// Starts the helper's supervisor where the build has a helper to start: a
 /// development build with the simulated cameras. Elsewhere nothing starts.
 pub fn spawn_pictures_helper(
     db_path: PathBuf,
     log_file_path: PathBuf,
     cameras_simulated: bool,
+    vmix_pictures: bool,
     link: Option<Link>,
 ) -> Option<PicturesHelper> {
-    if !cameras_simulated || !studio_control_protocol::development::development_build() {
-        return None;
-    }
+    let source = source_for(
+        studio_control_protocol::development::development_build(),
+        cameras_simulated,
+        vmix_pictures,
+    )?;
     let program = std::env::current_exe().ok()?.with_file_name(HELPER_PROGRAM);
     Some(start_supervisor(
         db_path,
@@ -421,6 +468,7 @@ pub fn spawn_pictures_helper(
             args: Vec::new(),
         },
         TIMES,
+        source,
         link,
     ))
 }
@@ -430,11 +478,24 @@ fn start_supervisor(
     log_file_path: PathBuf,
     launch: Launch,
     times: Times,
+    source: HelperSource,
     link: Option<Link>,
 ) -> PicturesHelper {
     let (to_supervisor, messages) = mpsc::channel();
     let (say_ended, ended) = mpsc::channel();
-    helpers().entry(db_path.clone()).or_default().to_supervisor = Some(to_supervisor.clone());
+    {
+        let mut helpers = helpers();
+        let entry = helpers.entry(db_path.clone()).or_default();
+        entry.source = source;
+        entry.to_supervisor = Some(to_supervisor.clone());
+    }
+    if source == HelperSource::Vmix {
+        let _ = append_log(
+            &log_file_path,
+            "INFO",
+            "The pictures helper is told to take vMix's Outputs 2, 3 and 4 over NDI (npm run app -- --vmix-pictures): a hardware test the owner attends.",
+        );
+    }
     {
         let db_path = db_path.clone();
         let to_supervisor = to_supervisor.clone();
@@ -445,6 +506,7 @@ fn start_supervisor(
                     db_path,
                     log_file_path,
                     launch,
+                    source,
                     supervision: Supervision::new(times),
                     to_supervisor,
                     wanted: Wanted {
@@ -502,6 +564,8 @@ struct Supervisor {
     db_path: PathBuf,
     log_file_path: PathBuf,
     launch: Launch,
+    /// Where the helper's pictures come from, for the helper's whole life.
+    source: HelperSource,
     supervision: Supervision,
     to_supervisor: Sender<Message>,
     /// What the helper is told at every start and every change.
@@ -699,12 +763,14 @@ impl Supervisor {
         self.tell();
     }
 
-    /// Tells the running helper the cameras wanted, and whether frames are.
+    /// Tells the running helper the cameras wanted, whether the pictures
+    /// show, and where they come from.
     fn tell(&mut self) {
         let line = to_line(&ToHelper::Want {
             cameras: self.wanted.cameras.clone(),
             selected: self.wanted.selected,
             showing: self.showing(),
+            source: self.source,
         });
         self.write(line);
     }
@@ -725,10 +791,20 @@ impl Supervisor {
     fn hear(&mut self, line: &str) {
         match from_line::<FromHelper>(line) {
             Ok(FromHelper::State {
-                sending, cameras, ..
+                sending,
+                problem,
+                cameras,
+                ..
             }) => {
                 self.supervision.take(Happened::Heard(Instant::now()));
-                set_status(&self.db_path, HelperStatus::Running { sending, cameras });
+                set_status(
+                    &self.db_path,
+                    HelperStatus::Running {
+                        sending,
+                        problem,
+                        cameras,
+                    },
+                );
             }
             Err(why) => self.log(
                 "WARN",

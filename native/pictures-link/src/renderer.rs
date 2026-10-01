@@ -3,7 +3,8 @@
 //! Cameras page (`shell_picture_layer.rs` in the shell).
 //!
 //! Each camera's newest frame is uploaded once, as it arrives: UYVY, two
-//! pixels in a texel. One pass turns it into the camera's picture, 1920 ×
+//! pixels in a texel. A frame drawn before (a draw between two of vMix's
+//! frames) is drawn again from its picture, not uploaded again. One pass turns it into the camera's picture, 1920 ×
 //! 1080 in RGB (BT.709, video range), whatever size the frame has: a frame of
 //! 3840 × 2160 is averaged down to it, so the page's 1:1 view and its loupe
 //! mean what they say. A second pass draws each place of the scene from that
@@ -144,6 +145,8 @@ pub struct Renderer {
     constants: ID3D11Buffer,
     sources: [Option<Source>; 3],
     converted: [Option<Converted>; 3],
+    /// The count of the frame each camera's picture holds.
+    holds: [Option<u64>; 3],
     /// This process's own copy of the shell's surface handle.
     surface: HANDLE,
     chain: Option<Chain>,
@@ -204,6 +207,10 @@ impl Renderer {
             if picture.check().is_err() {
                 continue;
             }
+            if self.converted[index].is_some() && self.holds[index] == Some(picture.sequence) {
+                drawn[index] = true;
+                continue;
+            }
             let fits = self.sources[index].as_ref().is_some_and(|source| {
                 (source.width, source.height) == (picture.width, picture.height)
             });
@@ -219,6 +226,7 @@ impl Renderer {
                 convert(self, source, converted, picture);
                 drawn[index] = true;
             }
+            self.holds[index] = drawn[index].then_some(picture.sequence);
         }
         let chain = self.chain.as_ref().ok_or("no swap chain")?;
         compose(self, chain, scene, &drawn)
@@ -369,6 +377,7 @@ fn open_renderer(
                 factory,
                 sources: [None, None, None],
                 converted: [None, None, None],
+                holds: [None, None, None],
                 surface,
                 chain: None,
             })

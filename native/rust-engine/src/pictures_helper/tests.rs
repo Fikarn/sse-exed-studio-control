@@ -161,6 +161,7 @@ fn a_program_that_is_not_there_reads_missing_and_is_said_once() {
             args: Vec::new(),
         },
         quick_times(),
+        HelperSource::Simulated,
         None,
     );
     wait_for(&cameras, "missing", |status| {
@@ -192,6 +193,7 @@ fn a_helper_that_ends_by_itself_is_started_again() {
         log_of(&cameras),
         launch(program, args),
         quick_times(),
+        HelperSource::Simulated,
         None,
     );
     // Its start lasts a moment only: the log, not the status, says it came
@@ -221,6 +223,7 @@ fn a_silent_helper_is_ended_and_started_again() {
         log_of(&cameras),
         launch(program, args),
         quick_times(),
+        HelperSource::Simulated,
         None,
     );
     wait_for(&cameras, "restarting", |status| {
@@ -265,12 +268,13 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
             silence: PATIENCE,
             ..quick_times()
         },
+        HelperSource::Simulated,
         None,
     );
     wait_for(
         &cameras,
         "running",
-        |status| matches!(status, HelperStatus::Running { sending: true, cameras } if cameras.len() == 1),
+        |status| matches!(status, HelperStatus::Running { sending: true, cameras, .. } if cameras.len() == 1),
     );
     let stopping = Instant::now();
     helper.stop();
@@ -281,15 +285,114 @@ fn a_helper_that_speaks_is_running_and_stop_ends_it() {
     assert_eq!(helper_status(cameras.path()), None);
 }
 
+// D33: a development build with the simulated cameras starts a helper, on
+// vMix's pictures only when the switch was read; nothing else starts one.
+#[test]
+fn only_a_development_build_with_the_simulated_cameras_starts_a_helper_and_the_switch_picks_vmix() {
+    for (development, simulated, switch, source) in [
+        (true, true, false, Some(HelperSource::Simulated)),
+        (true, true, true, Some(HelperSource::Vmix)),
+        (true, false, false, None),
+        (true, false, true, None),
+        (false, true, false, None),
+        (false, true, true, None),
+        (false, false, false, None),
+        (false, false, true, None),
+    ] {
+        assert_eq!(
+            source_for(development, simulated, switch),
+            source,
+            "development {development}, simulated {simulated}, switch {switch}"
+        );
+    }
+}
+
+// The helper is told vMix's pictures on every want, and the log says so once.
+#[test]
+fn a_helper_on_vmix_s_pictures_is_told_so_on_every_want() {
+    let cameras = TestCameras::new("helper-vmix");
+    let line =
+        r#"{"type":"state","source":"vmix","sending":false,"problem":"notAllowed","cameras":[]}"#;
+    // A stand-in that says one state line and then writes each line it is
+    // told to its stderr, which the supervisor logs.
+    let launch = if cfg!(windows) {
+        Launch {
+            program: which("powershell"),
+            args: vec![
+                String::from("-NoProfile"),
+                String::from("-Command"),
+                format!(
+                    "Write-Output '{line}'; while ($null -ne ($l = [Console]::In.ReadLine())) {{ [Console]::Error.WriteLine($l) }}"
+                ),
+            ],
+        }
+    } else {
+        Launch {
+            program: which("sh"),
+            args: vec![
+                String::from("-c"),
+                format!("echo '{line}'; while read -r l; do echo \"$l\" >&2; done"),
+            ],
+        }
+    };
+    let supervisor = start_supervisor(
+        cameras.path().to_path_buf(),
+        log_of(&cameras),
+        launch,
+        Times {
+            silence: PATIENCE,
+            ..quick_times()
+        },
+        HelperSource::Vmix,
+        None,
+    );
+    wait_for(&cameras, "running", |status| {
+        matches!(
+            status,
+            HelperStatus::Running {
+                problem: Some(HelperProblem::NotAllowed),
+                ..
+            }
+        )
+    });
+    assert_eq!(
+        helper(cameras.path()).map(|(source, _)| source),
+        Some(HelperSource::Vmix)
+    );
+    showing(cameras.path());
+    let log = || std::fs::read_to_string(log_of(&cameras)).unwrap_or_default();
+    let started = Instant::now();
+    while !log().contains(r#""showing":true,"source":"vmix""#) {
+        assert!(started.elapsed() < PATIENCE, "{}", log());
+        thread::sleep(Duration::from_millis(20));
+    }
+    supervisor.stop();
+    let log = log();
+    assert!(
+        log.contains(r#""showing":false,"source":"vmix""#),
+        "the first want: {log}"
+    );
+    assert_eq!(
+        log.matches("told to take vMix's Outputs 2, 3 and 4")
+            .count(),
+        1,
+        "{log}"
+    );
+}
+
 #[test]
 fn without_the_simulated_cameras_no_helper_starts() {
     // A test build is a development build: it would look for the helper
-    // with the simulated cameras, and never without them.
+    // with the simulated cameras, and never without them, the switch or not.
     let cameras = TestCameras::new("helper-none");
-    assert!(
-        spawn_pictures_helper(cameras.path().to_path_buf(), log_of(&cameras), false, None)
-            .is_none()
-    );
+    assert!(spawn_pictures_helper(
+        cameras.path().to_path_buf(),
+        log_of(&cameras),
+        false,
+        true,
+        None
+    )
+    .is_none());
     assert_eq!(helper_status(cameras.path()), None);
 }
 
@@ -406,6 +509,7 @@ fn frames_are_wanted_while_the_page_shows_them_and_a_while_after() {
             silence: PATIENCE,
             ..quick_times()
         },
+        HelperSource::Simulated,
         Some(Link {
             address: String::from("127.0.0.1:9"),
             secret: LinkSecret("ab".repeat(32)),

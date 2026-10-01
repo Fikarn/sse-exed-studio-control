@@ -12,6 +12,10 @@ pub struct Picture<'a> {
     pub width: u32,
     pub height: u32,
     pub stride: u32,
+    /// Counts the camera's frames: a frame of the count the renderer drew
+    /// last is not uploaded again. Only Direct3D's renderer reads it.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub sequence: u64,
 }
 
 impl Picture<'_> {
@@ -54,6 +58,7 @@ mod tests {
             width,
             height,
             stride,
+            sequence: 0,
         }
     }
 

@@ -28,6 +28,7 @@ use std::time::SystemTime;
 use studio_control_protocol::development::{
     default_app_data_dir, development_build, host_platform, refuse_studio_folders, HostPlatform,
 };
+use studio_control_protocol::pictures::{vmix_pictures_requested, VMIX_PICTURES_ENV};
 
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "2";
 
@@ -47,6 +48,10 @@ pub struct RuntimePaths {
     /// program, Slice 8 — D15 rules 1–2): every test, lane and scratch run
     /// sets it, and nothing then reaches a camera.
     pub cameras_simulated: bool,
+    /// `SSE_VMIX_PICTURES=1` asked a development build for vMix's pictures
+    /// (D33): only `npm run app -- --vmix-pictures` sets it, for a hardware
+    /// test the owner attends. A studio build never reads it.
+    pub vmix_pictures: bool,
 }
 
 pub struct RuntimeContext {
@@ -176,6 +181,9 @@ where
         .is_some_and(|value| safe_start_requested(&value));
     let cameras_simulated = env_string("SSE_CAMERAS_SIMULATED", &mut get_env)
         .is_some_and(|value| crate::cameras::simulated_cameras_requested(&value));
+    let vmix_pictures = development_build()
+        && env_string(VMIX_PICTURES_ENV, &mut get_env)
+            .is_some_and(|value| vmix_pictures_requested(&value));
 
     Ok(RuntimePaths {
         protocol_version: String::from(SUPPORTED_PROTOCOL_VERSION),
@@ -187,6 +195,7 @@ where
         db_path,
         safe_start,
         cameras_simulated,
+        vmix_pictures,
     })
 }
 
@@ -952,6 +961,7 @@ mod tests {
             db_path: app_data_dir.join("studio-control.sqlite3"),
             safe_start: false,
             cameras_simulated: true,
+            vmix_pictures: false,
             app_data_dir,
         }
     }
@@ -1421,6 +1431,37 @@ mod tests {
         let runtime = bootstrap_runtime_from_paths(runtime_paths_for(&test_dir))
             .expect("a simulated start boots");
         assert!(runtime.cameras_simulated);
+    }
+
+    // D33: `SSE_VMIX_PICTURES=1` — read through the injected reader, and in
+    // a development build alone — asks for vMix's pictures; anything else,
+    // or nothing, is the test card. A test build is a development build.
+    #[test]
+    fn vmix_s_pictures_are_read_at_the_start_and_only_one_asks() {
+        let (base_name, base_value) = host_platform_base();
+        let resolved = |entries: &[(&str, &str)]| {
+            resolve_runtime_paths_from(current_runtime_platform(), env_fixture(entries))
+                .expect("paths should resolve")
+                .vmix_pictures
+        };
+        assert!(
+            !resolved(&[(base_name, base_value)]),
+            "unset: the test card"
+        );
+        for (value, asked) in [
+            ("1", true),
+            (" 1 ", true),
+            ("0", false),
+            ("", false),
+            ("true", false),
+            ("yes", false),
+        ] {
+            assert_eq!(
+                resolved(&[(base_name, base_value), ("SSE_VMIX_PICTURES", value)]),
+                asked,
+                "{value:?}"
+            );
+        }
     }
 
     // `SSE_SAFE_START=1` — read through the injected reader, like every

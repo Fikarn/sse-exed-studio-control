@@ -44,7 +44,7 @@ Two rules hold the design together:
 
 ## Safety
 
-- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console, the cameras and their pictures, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes ask the address they are given.
+- **Tests and development runs never reach a real device and never open the real saved data.** A development build sees to it, whoever starts it: it refuses the studio's folders, holds the lights and cuts their wire, simulates the console, the cameras and their pictures, and takes a bridge port of its own. `npm run app` starts one on saved data of its own. What is left is what a person presses for: Setup's probes ask the address they are given. The one exception is `npm run app -- --vmix-pictures`, a hardware test the owner asks for and attends: its pictures come over NDI from vMix's Outputs 2 to 4 on this PC (D33).
 - **Real devices are driven only by a studio build,** or by a hardware test the owner asked for and is present at. Only `npm run release` makes a studio build: every other build, a release build included, is a development build.
 - **Held lights stay held** until they are armed on screen. A development run always starts held.
 - **Cameras and the prompter** follow the rules in `docs/HARDWARE.md`.

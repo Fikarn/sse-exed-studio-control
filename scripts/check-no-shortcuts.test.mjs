@@ -278,33 +278,65 @@ const SHELL_UNSAFE = [
   })),
 ];
 
-// Where the pictures helper may use `unsafe`: the renderer's Direct3D calls (D30), a function
-// each, in a module compiled on Windows alone. The same rules as the shell's list.
+// Where the pictures helper may use `unsafe`: the renderer's Direct3D calls (D30) and NDI's
+// library's calls (D33), a function each, in modules compiled on Windows alone. The same rules
+// as the shell's list.
 const PICTURES_UNSAFE = [
-  [
-    "fn compile(",
-    "The shaders are compiled by a call of d3dcompiler that hands back blobs read by pointer and length.",
-  ],
-  ["fn open_renderer(", "The Direct3D device, its shaders, samplers and buffer are made by COM calls with out-values."],
-  ["fn open_chain(", "The swap chain is made on the composition surface whose handle the shell handed over."],
-  ["fn chain_target(", "The swap chain's buffer is taken and viewed as a render target by COM calls."],
-  ["fn resize_chain(", "The swap chain's buffers are resized by a COM call, with no view of them held."],
-  ["fn make_source(", "A camera's frame texture and its view are made by COM calls with out-values."],
-  ["fn make_converted(", "A camera's picture texture, its target and its view are made by COM calls."],
-  ["fn convert(", "A frame's bytes are uploaded by pointer and drawn into the camera's picture by COM calls."],
-  ["fn compose(", "The scene is drawn into the swap chain's buffer and presented by COM calls."],
-  ["fn read_statistics(", "The swap chain's present count is read by a COM call, for the minute's log line."],
-  [
-    "fn close_surface(",
-    "The helper's copy of the composition surface's handle is closed, once, by a call of kernel32.",
-  ],
-].map(([item, reason]) => ({
-  file: "src/renderer.rs",
-  item,
-  blocks: 1,
-  reason,
-  onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod renderer;/.test(main),
-}));
+  ...[
+    [
+      "fn compile(",
+      "The shaders are compiled by a call of d3dcompiler that hands back blobs read by pointer and length.",
+    ],
+    [
+      "fn open_renderer(",
+      "The Direct3D device, its shaders, samplers and buffer are made by COM calls with out-values.",
+    ],
+    ["fn open_chain(", "The swap chain is made on the composition surface whose handle the shell handed over."],
+    ["fn chain_target(", "The swap chain's buffer is taken and viewed as a render target by COM calls."],
+    ["fn resize_chain(", "The swap chain's buffers are resized by a COM call, with no view of them held."],
+    ["fn make_source(", "A camera's frame texture and its view are made by COM calls with out-values."],
+    ["fn make_converted(", "A camera's picture texture, its target and its view are made by COM calls."],
+    ["fn convert(", "A frame's bytes are uploaded by pointer and drawn into the camera's picture by COM calls."],
+    ["fn compose(", "The scene is drawn into the swap chain's buffer and presented by COM calls."],
+    ["fn read_statistics(", "The swap chain's present count is read by a COM call, for the minute's log line."],
+    [
+      "fn close_surface(",
+      "The helper's copy of the composition surface's handle is closed, once, by a call of kernel32.",
+    ],
+  ].map(([item, reason]) => ({
+    file: "src/renderer.rs",
+    item,
+    blocks: 1,
+    reason,
+    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod renderer;/.test(main),
+  })),
+  ...[
+    [
+      "fn load_functions(",
+      "NDI's library is loaded by its full path and never freed, and each function is taken by its name with its declared type.",
+    ],
+    ["fn start_library(", "The library is started and its version, a string it keeps, is copied."],
+    ["fn find_open(", "NDI's search is made from settings that live across the call."],
+    [
+      "fn find_look(",
+      "The search waits, and the list of sources it returns is copied, string by string, before the next call.",
+    ],
+    ["fn find_close(", "The search is destroyed once, from its owner's drop, on its own thread."],
+    ["fn receiver_open(", "A receiver is made from settings whose strings live for the receiver's whole life."],
+    [
+      "fn receiver_capture(",
+      "A frame is captured into owned out-values; its picture is read by pointer only within the size its checked rows give, and freed.",
+    ],
+    ["fn receiver_counters(", "The receiver's counts are read into owned out-values, for the minute's log line."],
+    ["fn receiver_close(", "The receiver is destroyed once, from its owner's drop, with none of its frames held."],
+  ].map(([item, reason]) => ({
+    file: "src/ndi_library.rs",
+    item,
+    blocks: 1,
+    reason,
+    onWindowsAlone: (_source, main) => /#\[cfg\(windows\)\]\s*\nmod ndi_library;/.test(main),
+  })),
+];
 
 const rustFiles = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -323,6 +355,11 @@ function crateSources(crate) {
     .map((file) => [path.relative(crateDir, file).split(path.sep).join("/"), readFileSync(file, "utf8")]);
 }
 
+// An unsafe block, function, impl, trait or extern block. A function pointer's type (`unsafe extern
+// "C" fn(…)`, with no name) is no unsafe code: only a call through it is, and that stands in a
+// listed block.
+const UNSAFE_ITEM = /\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b(?!\s*"[^"]*"\s*fn\s*\())/g;
+
 /**
  * `unsafe` is lifted for the functions of `allowances`, and nowhere else in the crate: its Rust
  * files name the lint once for each, in any form (allow, expect, warn, a crate-wide #![…], a
@@ -330,7 +367,7 @@ function crateSources(crate) {
  */
 function assertUnsafeOnlyWhereListed(sources, allowances, main) {
   const lintNames = (source) => (source.match(/\bunsafe_code\b/g) ?? []).length;
-  const unsafeItems = (source) => (source.match(/\bunsafe\s*(?:\{|fn\b|impl\b|trait\b|extern\b)/g) ?? []).length;
+  const unsafeItems = (source) => (source.match(UNSAFE_ITEM) ?? []).length;
   for (const [name, source] of sources) {
     const listed = allowances.filter((allowance) => allowance.file === name);
     assert.equal(lintNames(source), listed.length, `${name} names unsafe_code once for each of its allowances`);
@@ -440,16 +477,22 @@ test("the native shell switches the web view's own keys off, and uses unsafe whe
   assert.deepEqual(lintTable(helper, "lints.clippy"), lintTable(workspace, "workspace.lints.clippy"));
 });
 
-test("the pictures helper draws with Direct3D, and uses unsafe where its list says (D30)", () => {
+test("the pictures helper draws with Direct3D, receives with NDI, and uses unsafe where its list says (D30, D33)", () => {
   const sources = crateSources("pictures-link");
   const main = sources.find(([name]) => name === "src/main.rs")?.[1] ?? "";
   assertUnsafeOnlyWhereListed(sources, PICTURES_UNSAFE, main);
-  // A system without Direct3D has a renderer of its own, which draws nothing and uses no unsafe.
+  // A system without Direct3D has a renderer of its own, which draws nothing and uses no unsafe;
+  // a system without NDI a library of its own, which loads nothing.
   assert.ok(
     /#\[cfg\(not\(windows\)\)\]\s*\n#\[path = "renderer_none\.rs"\]\s*\nmod renderer;/.test(main),
     "main.rs has the renderer of a system without Direct3D"
   );
-  // The Direct3D calls come from the one windows crate, by these features and no others.
+  assert.ok(
+    /#\[cfg\(not\(windows\)\)\]\s*\n#\[path = "ndi_library_none\.rs"\]\s*\nmod ndi_library;/.test(main),
+    "main.rs has the library of a system without NDI"
+  );
+  // The Direct3D and library-loading calls come from the one windows crate, by these features and
+  // no others.
   assert.deepEqual(
     windowsFeatures("pictures-link"),
     [
@@ -459,9 +502,15 @@ test("the pictures helper draws with Direct3D, and uses unsafe where its list sa
       "Win32_Graphics_Direct3D11",
       "Win32_Graphics_Dxgi",
       "Win32_Graphics_Dxgi_Common",
+      "Win32_System_LibraryLoader",
     ],
-    "the helper's windows crate has the renderer's features"
+    "the helper's windows crate has the renderer's features and the library loader's"
   );
+  // A function pointer's type is not counted as unsafe code; a named unsafe function still is.
+  const pointer = 'struct F { f: unsafe extern "C" fn(*mut u8) -> bool }';
+  const named = 'unsafe extern "C" fn f() {}';
+  assert.equal((pointer.match(UNSAFE_ITEM) ?? []).length, 0);
+  assert.equal((named.match(UNSAFE_ITEM) ?? []).length, 1);
 });
 
 // The crates with a lint table of their own: `unsafe_code` at deny, lifted for a named list.
