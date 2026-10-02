@@ -14,11 +14,14 @@
 //! once the screens stand still.
 //!
 //! shell.log says which screens the shell sees, by the names Windows gives
-//! them, at the start and whenever they have changed; and it says when they
+//! them and with their refresh rates, at the start, whenever they have
+//! changed and whenever a rate has changed and stood for a look; a screen
+//! below 50 Hz is a warning beside it (fix E, 2026-10-02). It says when they
 //! do not stand still, when they cannot be read, and when a look fails.
 
 use crate::shell_displays::{
-    prompter_screen, read_display_paths, same_screens, screens_line, DisplayPath,
+    low_refresh_line, prompter_screen, read_display_paths, same_rates, same_screens, screens_line,
+    DisplayPath,
 };
 use crate::shell_prompter_window::PrompterWindow;
 use crate::shell_window_layout::{
@@ -63,6 +66,10 @@ pub(crate) struct DisplayWatch {
     changed_at: Option<Instant>,
     /// The looks in a row that each found the screens changed.
     changing: u32,
+    /// Whether this look found every rate as the look before did.
+    rates_stood: bool,
+    /// The screens as shell.log last said them.
+    said: Option<Vec<DisplayPath>>,
 }
 
 impl DisplayWatch {
@@ -91,6 +98,10 @@ impl DisplayWatch {
             .last
             .as_ref()
             .is_none_or(|last| same_screens(last, &screens));
+        self.rates_stood = self
+            .last
+            .as_ref()
+            .is_some_and(|last| same_rates(last, &screens));
         self.last = Some(screens);
         if !same {
             self.unsettled = true;
@@ -109,6 +120,22 @@ impl DisplayWatch {
             self.changing = 0;
             Screens::Settled
         }
+    }
+
+    /// Whether shell.log should say the screens again for their rates: a
+    /// rate is not the one it said last, and stood for a look. A screen that
+    /// changes its rate at every look is not said at every look.
+    pub(crate) fn rates_to_say(&self) -> bool {
+        self.rates_stood
+            && self
+                .said
+                .as_ref()
+                .is_some_and(|said| !same_rates(said, self.screens()))
+    }
+
+    /// shell.log has said the screens as the last look found them.
+    pub(crate) fn said(&mut self) {
+        self.said = self.last.clone();
     }
 
     /// A settled look whose hold could not look at the screens: the next
@@ -168,6 +195,16 @@ fn watch(app: &AppHandle, woken: &Receiver<()>) {
     }
 }
 
+/// The screens' line in shell.log, and the warning beside it while a screen
+/// runs below 50 Hz.
+fn say_the_screens(app: &AppHandle, displays: &mut DisplayWatch, line: &str) {
+    log_shell_line(app, line);
+    if let Some(low) = low_refresh_line(displays.screens()) {
+        log_shell_line(app, &low);
+    }
+    displays.said();
+}
+
 /// What a panic said.
 fn panic_words(reason: &(dyn Any + Send)) -> String {
     reason
@@ -201,8 +238,8 @@ fn look(
             );
             match looked {
                 Screens::Still => {
-                    if first {
-                        log_shell_line(app, &line);
+                    if first || displays.rates_to_say() {
+                        say_the_screens(app, displays, &line);
                     }
                     hold_while_the_screens_stand_still(app, displays.screens());
                 }
@@ -218,7 +255,7 @@ fn look(
                 }
                 Screens::Settling => {}
                 Screens::Settled => {
-                    log_shell_line(app, &line);
+                    say_the_screens(app, displays, &line);
                     if !hold_once_the_screens_changed(app, displays.screens()) {
                         log_shell_line(
                             app,
@@ -317,6 +354,39 @@ mod tests {
             "the hold runs again"
         );
         assert_eq!(watch.look(arrived, clock.tick()), Screens::Still);
+    }
+
+    // Fix E (2026-10-02): a refresh rate moves no window, but shell.log says
+    // it once it has stood for a look.
+    #[test]
+    fn a_change_of_rate_is_said_once_it_stood_for_a_look() {
+        let mut watch = DisplayWatch::default();
+        let mut clock = Clock::new();
+        assert_eq!(watch.look(the_studio(), clock.tick()), Screens::Still);
+        watch.said();
+        assert!(!watch.rates_to_say());
+
+        let mut at_thirty = the_studio();
+        at_thirty[0].refresh_hz = Some(30.0);
+        assert_eq!(
+            watch.look(at_thirty.clone(), clock.tick()),
+            Screens::Still,
+            "no window moves"
+        );
+        assert!(!watch.rates_to_say(), "not at the look that found it");
+        assert_eq!(watch.look(at_thirty.clone(), clock.tick()), Screens::Still);
+        assert!(watch.rates_to_say(), "once it stood");
+        watch.said();
+        assert_eq!(watch.look(at_thirty, clock.tick()), Screens::Still);
+        assert!(!watch.rates_to_say(), "said once");
+
+        // A screen that changes its rate at every look is not said each time.
+        for rate in [50.0, 60.0, 50.0, 60.0] {
+            let mut flapping = the_studio();
+            flapping[0].refresh_hz = Some(rate);
+            watch.look(flapping, clock.tick());
+            assert!(!watch.rates_to_say(), "{rate}");
+        }
     }
 
     // Where there is nothing to read (any system but Windows) every look
