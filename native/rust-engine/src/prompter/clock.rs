@@ -333,6 +333,15 @@ pub(crate) struct Motion {
     pub ramp_ms: f64,
     /// A jump's start on the glass, drawn over `JUMP_MOVE_MS`.
     pub move_from: Option<f64>,
+    /// The reading line's position at the anchor in the layout's pixels,
+    /// exactly, when the anchor was taken from a position (a new pace, a
+    /// play or pause, a layout). Words cannot say every position: between
+    /// two paragraphs the glass leaves half a line, where the words map to
+    /// the end of the line above, so an anchor kept in words moved the
+    /// text back by up to half a line at each new pace (the recording of
+    /// 2026-10-02: the text jumped while the speed dial turned). `None`
+    /// when the anchor is a place in words (a jump, new text, a new look).
+    pub pixel: Option<f64>,
 }
 
 impl Motion {
@@ -345,6 +354,7 @@ impl Motion {
             to_wpm: 0.0,
             ramp_ms: 0.0,
             move_from: None,
+            pixel: None,
         }
     }
 
@@ -465,14 +475,17 @@ impl GlassClock {
         self.paragraphs.len() as u32
     }
 
-    /// The anchor's position in the layout, when laid out.
+    /// The anchor's position in the layout, when laid out: the exact pixel
+    /// it was taken at, else its words' place in the layout.
     fn anchor_position(&self) -> Option<f64> {
         self.layout.as_ref().map(|layout| {
-            layout.position_of(
-                self.motion.paragraph,
-                self.motion.word_offset,
-                self.paragraph_count(),
-            )
+            self.motion.pixel.unwrap_or_else(|| {
+                layout.position_of(
+                    self.motion.paragraph,
+                    self.motion.word_offset,
+                    self.paragraph_count(),
+                )
+            })
         })
     }
 
@@ -547,6 +560,7 @@ impl GlassClock {
     fn rebase(&mut self, now: Instant) {
         let elapsed = self.motion.elapsed_ms(now);
         let (paragraph, word_offset) = self.words_at(now);
+        let pixel = self.position_at(now);
         let speed = self.motion.speed_at(elapsed);
         let ramp_left = (self.motion.ramp_ms - elapsed).max(0.0);
         self.motion = Motion {
@@ -557,6 +571,7 @@ impl GlassClock {
             to_wpm: self.motion.to_wpm,
             ramp_ms: ramp_left,
             move_from: None,
+            pixel,
         };
     }
 
@@ -613,6 +628,7 @@ impl GlassClock {
             to_wpm: speed,
             ramp_ms: 0.0,
             move_from: from,
+            pixel: None,
         };
     }
 
@@ -629,8 +645,12 @@ impl GlassClock {
     /// Stops the text where it is, at once: after a restore (D12).
     pub(crate) fn hold(&mut self, now: Instant) {
         let (paragraph, word_offset) = self.words_at(now);
+        let pixel = self.position_at(now);
         self.playing = false;
-        self.motion = Motion::resting(now, paragraph, word_offset);
+        self.motion = Motion {
+            pixel,
+            ..Motion::resting(now, paragraph, word_offset)
+        };
     }
 
     /// The glass is to be laid out again (a new look or size): the words at
@@ -638,6 +658,7 @@ impl GlassClock {
     /// new layout is reported.
     pub(crate) fn relayout(&mut self, now: Instant, layout_key: String) {
         self.rebase(now);
+        self.motion.pixel = None;
         self.layout = None;
         self.layout_key = layout_key;
     }
@@ -664,6 +685,7 @@ impl GlassClock {
         let (paragraph, word_offset) = self.clamped(place.paragraph, f64::from(place.word) + share);
         self.motion.paragraph = paragraph;
         self.motion.word_offset = word_offset;
+        self.motion.pixel = None;
         self.layout = None;
         self.layout_key = layout_key;
     }
@@ -688,6 +710,7 @@ impl GlassClock {
             to_wpm: self.motion.to_wpm,
             ramp_ms: (self.motion.ramp_ms - elapsed).max(0.0),
             move_from: None,
+            pixel: Some(position),
         };
         self.layout = Some(layout);
     }

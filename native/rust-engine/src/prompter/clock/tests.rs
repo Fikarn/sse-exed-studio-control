@@ -84,6 +84,7 @@ fn the_motion_follows_the_shared_cases() {
             to_wpm: number("toWpm"),
             ramp_ms: number("rampMs"),
             move_from: None,
+            pixel: None,
         };
         for point in case["at"].as_array().expect("points") {
             let elapsed = point["elapsedMs"].as_f64().expect("elapsedMs");
@@ -198,6 +199,84 @@ fn play_and_pause_ease_and_the_text_moves_at_the_pace() {
     assert!(close(stopped - at_second, per_ms * 150.0), "the ease down");
     assert_eq!(clock.position_at(after(now, 60_000)).unwrap(), stopped);
     assert!(!clock.playing);
+}
+
+// The recording of 2026-10-02: the speed dial turned while the reading line
+// crossed the half line between two paragraphs, and each new pace moved the
+// text back to the end of the paragraph above (the anchor was kept in words,
+// which cannot say a place between paragraphs).
+#[test]
+fn a_new_pace_never_moves_the_text_back() {
+    let now = Instant::now();
+    let paragraphs = script(4, 25);
+    let mut clock = laid_out_clock(now, paragraphs, 140);
+    clock.play(now);
+    let mut last = 0.0;
+    let mut in_a_gap = 0;
+    let mut speed = 140;
+    // A detent every 100 ms for 40 s, up for a second, then down.
+    for step in 1..=400_u64 {
+        let at = after(now, step * 100);
+        let before = clock.position_at(at).expect("laid out");
+        speed = if (step / 10) % 2 == 0 {
+            (speed + 5).min(300)
+        } else {
+            (speed - 5).max(40)
+        };
+        clock.set_speed(at, speed);
+        let then = clock.position_at(at).expect("laid out");
+        assert!(
+            close(then, before),
+            "a new pace keeps the text where it is: {before} became {then} at step {step}"
+        );
+        assert!(
+            then >= last - 1e-6,
+            "the text never moves back: {last} became {then} at step {step}"
+        );
+        // Paragraph 0 ends at 500 px; paragraph 1 starts at 550.
+        if (500.0..550.0).contains(&then) {
+            in_a_gap += 1;
+        }
+        last = then;
+    }
+    assert!(in_a_gap > 0, "the dial turned between two paragraphs");
+    // The anchor the views get carries the same position.
+    let at = after(now, 40_000);
+    assert!(close(
+        clock.anchor(at).position.expect("laid out"),
+        clock.position_at(at).expect("laid out")
+    ));
+}
+
+// A pause and a play between two paragraphs keep the text where it is too.
+#[test]
+fn a_pause_and_a_play_between_two_paragraphs_keep_the_text_where_it_is() {
+    let now = Instant::now();
+    let paragraphs = script(4, 25);
+    let mut clock = laid_out_clock(now, paragraphs, 140);
+    clock.play(now);
+    // Run until the reading line stands between paragraphs 0 and 1.
+    let mut at = now;
+    for step in 1..=20_000_u64 {
+        at = after(now, step * 10);
+        let position = clock.position_at(at).expect("laid out");
+        if (510.0..540.0).contains(&position) {
+            break;
+        }
+    }
+    let between = clock.position_at(at).expect("laid out");
+    assert!(
+        (510.0..540.0).contains(&between),
+        "found the gap: {between}"
+    );
+    clock.pause(at);
+    assert!(close(clock.position_at(at).expect("laid out"), between));
+    let rest = clock.position_at(after(at, 5_000)).expect("laid out");
+    clock.play(after(at, 5_000));
+    assert!(close(
+        clock.position_at(after(at, 5_000)).expect("laid out"),
+        rest
+    ));
 }
 
 // §5.4 and D19: the scroll stops when END reaches the reading line and the
