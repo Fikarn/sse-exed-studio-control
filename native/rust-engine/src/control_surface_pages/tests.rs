@@ -6,7 +6,7 @@
 //! display themselves (`*_at`), so none of them counts real time. The
 //! prompter reads its own clock.
 
-use super::{handle_page_action, CAMERA_ROUTE, PROMPTER_ROUTE, TEXTS_KEPT_FOR};
+use super::{handle_page_action, keys_on_their_way, CAMERA_ROUTE, PROMPTER_ROUTE, TEXTS_KEPT_FOR};
 use crate::cameras::deck::{CAMERA_LCD_KEYS, STOP_ARM_DWELL};
 use crate::cameras::model::Setting;
 use crate::cameras::runtime::with_bodies_unnoticed;
@@ -609,20 +609,29 @@ fn the_last_event_is_the_key_that_came_last() {
 
 // Companion asks for a dial's displays as it sends the detent: a display
 // asked for while the key is on its way waits for it, and says what the key
-// did (the review of #288).
+// did (the review of #288). The key is held at the prompter's lock until the
+// display has been asked: no sleep races a busy machine. Its save goes to the
+// saver's thread, as in the live app: written inline it waited for the disk
+// under the lock, up to 377 ms while the other tests wrote (2026-10-02).
 #[test]
 fn a_prompter_display_asked_for_during_a_key_follows_the_key() {
-    let prompter = TestPrompter::new("bridge-prompter-on-its-way");
+    let prompter = TestPrompter::with_saver("bridge-prompter-on-its-way");
     let script = prompter.script("Way", &["one two three four"]);
     prompter.call("prompter.putOn", json!({ "scriptId": script }));
     assert_eq!(display(prompter.path(), "prompter_speed"), "SPEED\\n140");
 
     let path = prompter.path().to_path_buf();
     let (held, holding) = std::sync::mpsc::channel();
+    let (release, released) = std::sync::mpsc::channel::<()>();
     let holder = std::thread::spawn(move || {
         crate::prompter::runtime::with_prompter(&path, "test", |_, _| {
             held.send(()).expect("the test waits");
-            std::thread::sleep(Duration::from_millis(60));
+            released
+                .recv_timeout(Duration::from_secs(10))
+                .expect("the test lets go");
+            // Long enough for the display below to be asked, well inside
+            // the display's wait for the key.
+            std::thread::sleep(Duration::from_millis(10));
             Ok(())
         })
         .expect("the prompter is held");
@@ -636,7 +645,18 @@ fn a_prompter_display_asked_for_during_a_key_follows_the_key() {
             json!({ "action": "speed", "value": "up" }),
         )
     });
-    std::thread::sleep(Duration::from_millis(20));
+    let until = Instant::now() + Duration::from_secs(10);
+    while keys_on_their_way()
+        .count
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(prompter.path())
+        .is_none_or(|on_their_way| *on_their_way == 0)
+    {
+        assert!(Instant::now() < until, "the key is on its way");
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    release.send(()).expect("the holder waits");
     assert_eq!(display(prompter.path(), "prompter_speed"), "SPEED\\n145");
     assert_eq!(detent.join().expect("the detent")["speedWpm"], 145);
     holder.join().expect("the holder lets go");

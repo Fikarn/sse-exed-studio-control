@@ -10,7 +10,7 @@
 
 use crate::prompter::saver::SaverCounts;
 use std::sync::{Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// The minute's figures so far.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -54,12 +54,56 @@ pub(crate) fn note_anchor() {
     minute().anchors += 1;
 }
 
+/// Whether the text plays, and when it last did, as the clock last saw it
+/// (fix D, 2026-10-02): the deck's bridge writes its own minute line for
+/// every minute in which the text played. A leaf lock.
+static PLAYING: Mutex<Playing> = Mutex::new(Playing {
+    now: false,
+    last: None,
+});
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Playing {
+    now: bool,
+    last: Option<Instant>,
+}
+
+impl Playing {
+    fn seen(self, playing: bool, at: Instant) -> Self {
+        Self {
+            now: playing,
+            last: if playing { Some(at) } else { self.last },
+        }
+    }
+
+    fn since(self, since: Instant) -> bool {
+        self.now || self.last.is_some_and(|at| at >= since)
+    }
+}
+
+fn playing() -> MutexGuard<'static, Playing> {
+    PLAYING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The clock's look at the text: whether it plays at `at`.
+pub(crate) fn note_playing(playing_now: bool, at: Instant) {
+    let mut seen = playing();
+    *seen = seen.seen(playing_now, at);
+}
+
+/// Whether the text played at any moment since `since`.
+pub(crate) fn played_since(since: Instant) -> bool {
+    playing().since(since)
+}
+
 /// The minute's figures, and the next minute starts from nothing.
 pub(crate) fn take() -> Minute {
     std::mem::take(&mut *minute())
 }
 
-fn milliseconds(duration: Duration) -> String {
+pub(crate) fn milliseconds(duration: Duration) -> String {
     let ms = duration.as_secs_f64() * 1000.0;
     if ms < 10.0 {
         format!("{ms:.1} ms")
@@ -68,7 +112,7 @@ fn milliseconds(duration: Duration) -> String {
     }
 }
 
-fn by(what: &str) -> String {
+pub(crate) fn by(what: &str) -> String {
     if what.is_empty() {
         String::new()
     } else {
@@ -119,6 +163,31 @@ mod tests {
         assert_eq!(
             line(&Minute::default(), SaverCounts::default()),
             "Prompter, the last minute: its lock held 0.0 ms at most, waited for 0.0 ms at most; 0 saved, 0 refused, 0 failed, the longest write 0.0 ms; 0 anchors sent."
+        );
+    }
+
+    #[test]
+    fn the_text_played_since_a_moment_when_it_plays_or_played_after_it() {
+        let start = Instant::now();
+        let minute_ago = start;
+        let never = Playing {
+            now: false,
+            last: None,
+        };
+        assert!(!never.since(minute_ago));
+
+        let played = never.seen(true, start + Duration::from_secs(5));
+        assert!(played.since(minute_ago), "it plays");
+        let paused = played.seen(false, start + Duration::from_secs(20));
+        assert!(paused.since(minute_ago), "it played after the moment");
+        assert!(
+            !paused.since(start + Duration::from_secs(60)),
+            "it last played before the moment"
+        );
+        let paused_again = paused.seen(false, start + Duration::from_secs(70));
+        assert_eq!(
+            paused_again.last, paused.last,
+            "a pause keeps when it last played"
         );
     }
 }
