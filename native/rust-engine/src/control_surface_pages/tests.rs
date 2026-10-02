@@ -609,10 +609,11 @@ fn the_last_event_is_the_key_that_came_last() {
 
 // Companion asks for a dial's displays as it sends the detent: a display
 // asked for while the key is on its way waits for it, and says what the key
-// did (the review of #288). The key is held at the prompter's lock until the
-// display has been asked: no sleep races a busy machine. Its save goes to the
-// saver's thread, as in the live app: written inline it waited for the disk
-// under the lock, up to 377 ms while the other tests wrote (2026-10-02).
+// did (the review of #288). The test waits until the key is on its way,
+// held at the prompter's lock, and lets it go just as the display is asked.
+// Its save goes to the saver's thread, as in the live app: written inline it
+// waited for the disk under the lock, up to 377 ms while the other tests
+// wrote (2026-10-02).
 #[test]
 fn a_prompter_display_asked_for_during_a_key_follows_the_key() {
     let prompter = TestPrompter::with_saver("bridge-prompter-on-its-way");

@@ -14,13 +14,13 @@ use crate::control_surface_minute::{BridgeMinute, Kind};
 use crate::control_surface_pool::{Next, Pool};
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
+use overflow::{accept, spawn_overflow};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -37,7 +37,7 @@ const MAX_HEADER_BYTES: usize = 8 * 1024;
 const MAX_BODY_BYTES: usize = 16 * 1024;
 const REQUEST_DEADLINE: Duration = Duration::from_secs(1);
 const RESPONSE_WRITE_TIMEOUT: Duration = Duration::from_secs(2);
-const BUSY_WRITE_TIMEOUT: Duration = Duration::from_millis(200);
+/// How long a connection is drained after its answer, in all.
 const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
@@ -62,14 +62,9 @@ const QUEUE_CAPACITY: usize = 96;
 /// Slots kept for presses when the queue is full (fix D, 2026-10-02): a
 /// refused press is lost, since Companion never sends one again.
 const PRESS_RESERVE: usize = 16;
-/// How long the overflow thread looks at a connection that found the queue
-/// full for the start of a press. Companion's bytes are there at once; an
-/// idle connection costs the overflow thread this, never the acceptor.
-const PRESS_PEEK_WAIT: Duration = Duration::from_millis(50);
-/// Connections that found the queue full and wait for the overflow thread.
-/// Past it a connection is dropped unanswered, and the minute counts it.
-const OVERFLOW_QUEUE: usize = 32;
-const BUSY_MESSAGE: &str = "The bridge is busy with other requests; retry shortly.";
+/// A display's read parked this long is answered before the unread
+/// connections (`control_surface_pool`).
+const PARKED_AT_MOST: Duration = Duration::from_millis(250);
 /// The bridge's minute line (`control_surface_minute`).
 const MINUTE_EVERY: Duration = Duration::from_secs(60);
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
@@ -259,6 +254,16 @@ impl BridgeContext {
         self.note_rejection_at(status_code, message, Instant::now());
     }
 
+    /// A connection closed unanswered: the queue and the overflow's line
+    /// were full. Counted as the refusals are, under a status of its own (0).
+    fn note_dropped(&self) {
+        self.note_rejection_at(
+            0,
+            "the queue and the line for the overflow were full",
+            Instant::now(),
+        );
+    }
+
     fn note_rejection_at(&self, status_code: u16, message: &str, now: Instant) {
         let unwritten = {
             let mut recent = self
@@ -294,18 +299,22 @@ impl BridgeContext {
             }
         };
         if let Some(unwritten) = unwritten {
-            let more = if unwritten == 0 {
-                String::new()
+            let line = if status_code == 0 {
+                let more = if unwritten == 0 {
+                    String::new()
+                } else {
+                    format!(" ({unwritten} more since the last such line)")
+                };
+                format!("Control-surface bridge closed a connection unanswered: {message}{more}")
             } else {
-                format!(" ({unwritten} more with this status since the last such line)")
+                let more = if unwritten == 0 {
+                    String::new()
+                } else {
+                    format!(" ({unwritten} more with this status since the last such line)")
+                };
+                format!("Control-surface bridge refused a request ({status_code}): {message}{more}")
             };
-            let _ = append_log(
-                self.log_file_path.as_path(),
-                "WARN",
-                &format!(
-                    "Control-surface bridge refused a request ({status_code}): {message}{more}"
-                ),
-            );
+            let _ = append_log(self.log_file_path.as_path(), "WARN", &line);
         }
     }
 }
@@ -338,7 +347,11 @@ fn run_control_surface_bridge(
     queue_capacity: usize,
 ) {
     let _ = listener.set_nonblocking(false);
-    let pool = Arc::new(Pool::<ParkedRead>::new(queue_capacity, PRESS_RESERVE));
+    let pool = Arc::new(Pool::<ParkedRead>::new(
+        queue_capacity,
+        PRESS_RESERVE,
+        PARKED_AT_MOST,
+    ));
 
     for index in 0..worker_count.max(1) {
         let worker_pool = Arc::clone(&pool);
@@ -362,19 +375,7 @@ fn run_control_surface_bridge(
             // moment is its arrival, not when a worker is free (the review of
             // #254), so a press that waited behind a burst is never taken for
             // a later one.
-            Ok(stream) => {
-                let arrived = Instant::now();
-                match pool.offer(stream, arrived) {
-                    Ok(depth) => context.minute().note_depth(depth),
-                    Err(stream) => {
-                        if overflow.try_send((stream, arrived)).is_err() {
-                            // The overflow thread is behind: dropped unanswered.
-                            context.minute().note_refused();
-                            context.note_rejection(503, BUSY_MESSAGE);
-                        }
-                    }
-                }
-            }
+            Ok(stream) => accept(&pool, &overflow, &context, stream, Instant::now()),
             Err(error) => {
                 let _ = append_log(
                     context.log_file_path.as_path(),
@@ -457,79 +458,6 @@ fn kind_of(request: &HttpRequest) -> Kind {
         "POST" if KEY_ROUTES.contains(&path) => Kind::Press,
         _ => Kind::Other,
     }
-}
-
-/// The overflow thread (fix D, 2026-10-02): a connection that found the
-/// queue full. It looks for the start of a press for `PRESS_PEEK_WAIT` at
-/// most; a press takes a slot kept for presses, anything else is answered
-/// 503 and drained as `finish_connection` drains, so the client reads its
-/// status rather than a reset. The acceptor never waits on it.
-fn spawn_overflow(
-    pool: Arc<Pool<ParkedRead>>,
-    context: Arc<BridgeContext>,
-) -> SyncSender<(TcpStream, Instant)> {
-    let (sender, receiver) = sync_channel::<(TcpStream, Instant)>(OVERFLOW_QUEUE);
-    let log_file_path = context.log_file_path.clone();
-    let spawned = thread::Builder::new()
-        .name(String::from("control-surface-overflow"))
-        .spawn(move || {
-            for (stream, arrived) in receiver {
-                let stream = if starts_a_press(&stream) {
-                    match pool.offer_press(stream, arrived) {
-                        Ok(depth) => {
-                            context.minute().note_depth(depth);
-                            continue;
-                        }
-                        Err(stream) => stream,
-                    }
-                } else {
-                    stream
-                };
-                context.minute().note_refused();
-                context.note_rejection(503, BUSY_MESSAGE);
-                answer_busy(stream);
-            }
-        });
-    if let Err(error) = spawned {
-        let _ = append_log(
-            log_file_path.as_path(),
-            "ERROR",
-            &format!("Control-surface bridge could not start its overflow thread: {error}"),
-        );
-    }
-    sender
-}
-
-/// Whether the connection's first bytes are a POST: a press, which is a
-/// POST to a page's route (a POST to another route is answered as one).
-fn starts_a_press(stream: &TcpStream) -> bool {
-    if stream.set_nonblocking(true).is_err() {
-        return false;
-    }
-    let until = Instant::now() + PRESS_PEEK_WAIT;
-    let mut head = [0_u8; 5];
-    let press = loop {
-        match stream.peek(&mut head) {
-            Ok(read) if read == head.len() => break &head == b"POST ",
-            Ok(0) => break false,
-            Ok(_) => {}
-            Err(error) if error.kind() == ErrorKind::WouldBlock => {}
-            Err(_) => break false,
-        }
-        if Instant::now() >= until {
-            break false;
-        }
-        thread::sleep(Duration::from_millis(1));
-    };
-    let _ = stream.set_nonblocking(false);
-    press
-}
-
-fn answer_busy(mut stream: TcpStream) {
-    let _ = stream.set_write_timeout(Some(BUSY_WRITE_TIMEOUT));
-    let response = HttpResponse::from_error(&ControlSurfaceError::Busy(String::from(BUSY_MESSAGE)));
-    let _ = write_http_response(&mut stream, response.status_code, &response.body);
-    finish_connection(stream);
 }
 
 /// Answers a request that was read, and counts it in the bridge's minute.
@@ -732,12 +660,20 @@ fn note_refused_key(
 /// our side and swallow (a bounded amount of) whatever the client is still
 /// sending before dropping the socket. Dropping with unread input makes the
 /// kernel send RST, and some clients then discard the status they were owed.
+/// `DRAIN_TIMEOUT` in all, however slowly the client sends (the review of
+/// #291: a timeout for each read let one byte every 200 ms hold a thread for
+/// hours).
 fn finish_connection(mut stream: TcpStream) {
     let _ = stream.shutdown(Shutdown::Write);
-    let _ = stream.set_read_timeout(Some(DRAIN_TIMEOUT));
+    let until = Instant::now() + DRAIN_TIMEOUT;
     let mut discarded = 0_usize;
     let mut chunk = [0_u8; 4096];
     while discarded < DRAIN_LIMIT_BYTES {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        let _ = stream.set_read_timeout(Some(left));
         match stream.read(&mut chunk) {
             Ok(0) | Err(_) => break,
             Ok(bytes_read) => discarded += bytes_read,
@@ -1129,6 +1065,8 @@ fn parse_json_body(body: &[u8]) -> Result<Value, ControlSurfaceError> {
 }
 
 // Property tests for the request reader and the query decoder (Slice 13).
+mod overflow;
+
 #[cfg(test)]
 mod fuzz;
 #[cfg(test)]

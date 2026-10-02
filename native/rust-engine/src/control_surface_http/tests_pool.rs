@@ -1,11 +1,14 @@
 //! The bridge's queue over the wire: its size, its refusals, and the order
 //! it answers in (fix D, 2026-10-02: a press before the displays' reads).
 
+use super::overflow::Overflow;
 use super::tests::{
     raw_request, start_test_bridge, start_test_bridge_with_context, status_of, TEST_TOKEN,
 };
 use super::*;
 use crate::control_surface::test_support::ready_audio_test_db;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::sync_channel;
 
 #[test]
 fn worker_pool_returns_503_when_saturated() {
@@ -235,13 +238,71 @@ fn a_refused_request_reads_its_503_while_it_is_still_sending() {
         body.len()
     );
     let mut stream = send(port, &head);
-    thread::sleep(Duration::from_millis(150));
-    for chunk in body.as_bytes().chunks(1_000) {
-        let _ = stream.write_all(chunk);
-        thread::sleep(Duration::from_millis(5));
-    }
+    // The refusal is written as soon as the overflow thread sees the
+    // request's start; the body comes well inside the drain's 250 ms.
+    thread::sleep(Duration::from_millis(50));
+    let _ = stream.write_all(body.as_bytes());
     let (status, _) = answer_of(stream);
     assert_eq!(status, 503);
+}
+
+// The review of #291: a timeout for each read let a client that sends a byte
+// every 200 ms hold the overflow thread for hours.
+#[test]
+fn a_drain_ends_within_its_time_however_slowly_the_client_sends() {
+    let listener = TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, 0)).expect("a port");
+    let mut client = TcpStream::connect(listener.local_addr().expect("address")).expect("connect");
+    let (server, _) = listener.accept().expect("accept");
+    let dripping = thread::spawn(move || {
+        for _ in 0..30 {
+            if client.write_all(b"x").is_err() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    });
+    let started = Instant::now();
+    finish_connection(server);
+    let took = started.elapsed();
+    assert!(took < Duration::from_millis(1_000), "{took:?}");
+    let _ = dripping.join();
+}
+
+// The review of #291: a press that waited for the overflow thread was
+// overtaken by a later press that found room in the queue.
+#[test]
+fn while_connections_wait_for_the_overflow_every_connection_goes_there_in_order() {
+    let test_dir = ready_audio_test_db("bridge-overflow-order");
+    let context = BridgeContext::new(
+        test_dir.db_path(),
+        test_dir.path().join("engine.log"),
+        TEST_TOKEN.to_string(),
+        0,
+    );
+    let pool = Pool::<ParkedRead>::new(8, 2, PARKED_AT_MOST);
+    let (sender, receiver) = sync_channel(4);
+    let overflow = Overflow {
+        sender,
+        waiting: Arc::new(AtomicUsize::new(0)),
+    };
+    let listener = TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, 0)).expect("a port");
+    let mut clients = Vec::new();
+    let mut connection = || {
+        clients.push(TcpStream::connect(listener.local_addr().expect("address")).expect("connect"));
+        listener.accept().expect("accept").0
+    };
+
+    // Nothing waits for the overflow thread: the queue has room.
+    accept(&pool, &overflow, &context, connection(), Instant::now());
+    assert_eq!(pool.depth(), 1);
+    assert!(receiver.try_recv().is_err());
+
+    // One waits there: the next goes behind it, though the queue has room.
+    overflow.waiting.store(1, Ordering::Release);
+    accept(&pool, &overflow, &context, connection(), Instant::now());
+    assert_eq!(pool.depth(), 1);
+    assert!(receiver.try_recv().is_ok());
+    assert_eq!(overflow.waiting.load(Ordering::Acquire), 2);
 }
 
 #[test]
