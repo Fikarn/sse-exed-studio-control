@@ -20,13 +20,17 @@
 //! Since 2026-10-02 the keys, the dials and the displays run on the
 //! prompter's memory alone: the place, the pace and the size go to the saver,
 //! and the strip's name is the prompter's, so a slow disk never holds the
-//! deck. A key's jump is saved at once, a dial's detent shortly after.
+//! deck. A key's jump is saved at once, a dial's detent shortly after. The
+//! displays take no lock of the prompter's: they read the frame it publishes
+//! whenever it lets go of its lock (`DeckFrame`) and work their text out from
+//! it at the moment they are asked, so they never wait for a key or the
+//! screen and are never stale.
 
-use crate::prompter::clock::{read_words_from, PrompterPlace};
+use crate::prompter::clock::{read_words_from, GlassClock, PrompterPlace};
 use crate::prompter::commands::{
     jump_request, nothing_on, pause_request, play_request, reply, speed_request, text_size_request,
 };
-use crate::prompter::runtime::{with_prompter, Prompter};
+use crate::prompter::runtime::{published_frame, with_prompter, Prompter};
 use crate::prompter::saver::Urgency;
 use crate::prompter::screen::PrompterScreenState;
 use crate::prompter::{PrompterError, PrompterReply};
@@ -55,16 +59,56 @@ const STRIP_LINE_CHARS: usize = 12;
 /// What the page's displays say, by their LCD keys.
 pub(crate) type DeckTexts = Vec<(&'static str, String)>;
 
-/// One key or dial of the PROMPTER page, and what the page's displays say
-/// after it. `action` and `value` are the profile's: `playPause`, `back`,
-/// `top`, `cue` with `previous` or `next`, `speed` with `up` or `down`,
-/// `line` and `paragraph` with `previous` or `next`, and `size` with `up`,
-/// `down` or `standard`.
+/// What the PROMPTER page's displays are made of: the prompter as it was
+/// when it last let go of its lock.
+#[derive(Debug, Clone)]
+pub(crate) struct DeckFrame {
+    glass: Option<GlassClock>,
+    name: String,
+    screen: PrompterScreenState,
+    size_px: u32,
+    size_shown_at: Option<Instant>,
+}
+
+impl DeckFrame {
+    pub(crate) fn of(prompter: &Prompter) -> Self {
+        Self {
+            glass: prompter.glass.clone(),
+            name: prompter.glass_name.clone(),
+            screen: prompter.screen.state(),
+            size_px: prompter.size_px,
+            size_shown_at: prompter.deck_size_shown_at,
+        }
+    }
+
+    /// The displays at `now`. The text moved on since the frame was taken is
+    /// worked out from its clock, which stops at `END` as the prompter's own
+    /// will.
+    pub(crate) fn texts_at(&self, now: Instant) -> DeckTexts {
+        let mut glass = self.glass.clone();
+        if let Some(glass) = glass.as_mut() {
+            glass.settle(now);
+        }
+        texts_of(
+            glass.as_ref(),
+            &self.name,
+            self.screen,
+            self.size_px,
+            self.size_shown_at,
+            now,
+        )
+    }
+}
+
+/// One key or dial of the PROMPTER page. `action` and `value` are the
+/// profile's: `playPause`, `back`, `top`, `cue` with `previous` or `next`,
+/// `speed` with `up` or `down`, `line` and `paragraph` with `previous` or
+/// `next`, and `size` with `up`, `down` or `standard`.
 pub(crate) fn handle_deck_action(
     db_path: &Path,
     action: &str,
     value: Option<&str>,
-) -> Result<(PrompterReply, DeckTexts), PrompterError> {
+) -> Result<PrompterReply, PrompterError> {
     let what = format!("deck {action}");
     with_prompter(db_path, &what, |prompter, now| {
         let jump = |to: &str| json!({ "to": to });
@@ -132,16 +176,23 @@ pub(crate) fn handle_deck_action(
         };
         // A take's controls cannot change `checks.prompter`
         // (`commands::changes_the_check`).
-        let reply: PrompterReply = reply(prompter, result, reason, None);
-        Ok((reply, texts(prompter, now)))
+        Ok(reply(prompter, result, reason, None))
     })
 }
 
-/// Every display of the PROMPTER page, as the prompter is now.
+/// Every display of the PROMPTER page, now, from the frame the prompter
+/// published. Before the prompter is loaded the first read loads it, once.
 pub(crate) fn deck_texts(db_path: &Path) -> Result<DeckTexts, PrompterError> {
-    with_prompter(db_path, "deck display", |prompter, now| {
-        Ok(texts(prompter, now))
-    })
+    let frame = match published_frame(db_path) {
+        Some(frame) => frame,
+        None => {
+            with_prompter(db_path, "deck display", |_, _| Ok(()))?;
+            published_frame(db_path).ok_or_else(|| {
+                PrompterError::Storage(String::from("The prompter could not be read."))
+            })?
+        }
+    };
+    Ok(frame.texts_at(Instant::now()))
 }
 
 /// `0:37`, `4:19`, `1:02:05`: whole seconds, as the page prints a time.
@@ -238,8 +289,15 @@ fn screen_words(state: PrompterScreenState) -> &'static str {
     }
 }
 
-fn texts(prompter: &Prompter, now: Instant) -> DeckTexts {
-    let Some(glass) = &prompter.glass else {
+fn texts_of(
+    glass: Option<&GlassClock>,
+    name: &str,
+    screen: PrompterScreenState,
+    size_px: u32,
+    size_shown_at: Option<Instant>,
+    now: Instant,
+) -> DeckTexts {
+    let Some(glass) = glass else {
         return vec![
             ("prompter_speed", String::from("SPEED\\n--")),
             ("prompter_place", String::from("PLACE\\n--")),
@@ -249,23 +307,20 @@ fn texts(prompter: &Prompter, now: Instant) -> DeckTexts {
             ("prompter_state_on", String::from("no")),
         ];
     };
-    let screen = prompter.screen.state();
     let at_end = glass.at_end(now);
     let speed = if screen.draws() {
         format!("SPEED\\n{}", glass.speed_wpm)
     } else {
         format!("SPEED {}\\n{}", glass.speed_wpm, screen_words(screen))
     };
-    let size_shown = prompter
-        .deck_size_shown_at
-        .is_some_and(|shown| now.saturating_duration_since(shown) < SIZE_SHOWN_FOR);
+    let size_shown =
+        size_shown_at.is_some_and(|shown| now.saturating_duration_since(shown) < SIZE_SHOWN_FOR);
     let left = if size_shown {
-        format!("SIZE\\n{} px", prompter.size_px)
+        format!("SIZE\\n{size_px} px")
     } else {
         format!("LEFT\\n{}", duration_text(glass.time_left(now).0))
     };
     // The name is the script's as a rename left it, from the prompter.
-    let name = &prompter.glass_name;
     let play = if glass.playing {
         "playing"
     } else if !screen.draws() || at_end || glass.layout.is_none() {

@@ -545,6 +545,12 @@ impl GlassClock {
         self.words_at(now).0 >= self.paragraph_count()
     }
 
+    /// Whether the text still moves at `now`: playing, or a pause's ease not
+    /// yet over.
+    pub(crate) fn moving(&self, now: Instant) -> bool {
+        self.motion.moving(self.motion.elapsed_ms(now))
+    }
+
     /// The first word of the line at the reading line: `BACK`'s "first line
     /// of the paragraph" is the line starting at word 0. Without a layout,
     /// the word at the reading line.
@@ -717,9 +723,16 @@ impl GlassClock {
 
     /// Stops the text at `END` once the reading line has reached it: `PLAY`
     /// goes out and the text stands there (§5.4). True when it stopped now.
+    /// A pause's ease that ran into `END` and is over stops there too, the
+    /// first time anyone looks (the review of #288: it stood past `END` and
+    /// nobody said so).
     pub(crate) fn settle(&mut self, now: Instant) -> bool {
+        if !self.at_end(now) {
+            return false;
+        }
         let moving = self.motion.moving(self.motion.elapsed_ms(now));
-        if !moving || !self.at_end(now) {
+        let resting_at_end = !moving && self.motion.paragraph >= self.paragraph_count();
+        if resting_at_end {
             return false;
         }
         self.playing = false;

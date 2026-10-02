@@ -533,3 +533,24 @@ fn a_place_is_kept_inside_its_script() {
     );
     assert!(speed_is_valid(140) && !speed_is_valid(142) && !speed_is_valid(35));
 }
+
+// A pause's ease that runs into END stops there, even when nobody looks
+// until the ease is over (the review of #288: the text stood past END, and
+// nobody said so).
+#[test]
+fn a_pause_that_eases_into_end_stops_there_when_looked_at_after() {
+    let now = Instant::now();
+    let paragraphs = script(2, 10);
+    let mut clock = laid_out_clock(now, paragraphs.clone(), 300);
+    clock.play(now);
+    let to_end = clock
+        .time_to_end_ms(now)
+        .expect("a moving clock reaches END") as u64;
+    let paused_at = after(now, to_end - 30);
+    clock.pause(paused_at);
+    let looked_at = after(paused_at, 400);
+    assert!(clock.at_end(looked_at), "the ease carries the text to END");
+    assert!(clock.settle(looked_at), "it stops there and says so");
+    assert_eq!(clock.motion.paragraph, paragraphs.len() as u32);
+    assert!(!clock.settle(after(looked_at, 100)), "once");
+}

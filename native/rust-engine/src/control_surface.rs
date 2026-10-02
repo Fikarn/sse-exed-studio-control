@@ -30,8 +30,10 @@ use crate::storage::{
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
@@ -534,7 +536,18 @@ pub(crate) fn deck_key_stamped(
     // preview; the row rides the transaction that stamps the last
     // event, so a key waits for the disk no more often than before.
     let actions = crate::action_log::deck_actions(path, action, reply);
-    if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions) {
+    // A PROMPTER key writes no row, and its last event is kept in memory
+    // (2026-10-02): the dial waits for no disk before the glass hears of it.
+    let order = LAST_EVENT_ORDER.fetch_add(1, Ordering::SeqCst);
+    if path == crate::control_surface_pages::PROMPTER_ROUTE && actions.is_empty() {
+        keep_last_event(db_path, order, last_event_value(path, action, value));
+        return (response, events);
+    }
+    let stamped = stamp_control_surface_last_event(db_path, path, action, value, &actions);
+    if stamped.is_ok() {
+        note_saved_last_event(db_path, order);
+    }
+    if let Err(error) = stamped {
         crate::diagnostics::log_event(
             crate::diagnostics::LogLevel::Warn,
             &format!(
@@ -576,6 +589,21 @@ fn deck_change_event(path: &str, action: &str) -> Option<DeckChange> {
     }
 }
 
+/// A key's last event as Setup's echo reads it: its route, action and value,
+/// and when, in epoch milliseconds.
+fn last_event_value(route: &str, action: &str, value: Option<&str>) -> Value {
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    json!({
+        "route": route,
+        "action": action,
+        "value": value,
+        "at": at,
+    })
+}
+
 fn stamp_control_surface_last_event(
     db_path: &Path,
     route: &str,
@@ -583,16 +611,7 @@ fn stamp_control_surface_last_event(
     value: Option<&str>,
     actions: &[crate::action_log::ActionRecord],
 ) -> Result<(), ControlSurfaceError> {
-    let at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0);
-    let event = json!({
-        "route": route,
-        "action": action,
-        "value": value,
-        "at": at,
-    });
+    let event = last_event_value(route, action, value);
     set_settings_owned_and(
         db_path,
         &[(String::from(LAST_EVENT_KEY), event.to_string())],
@@ -601,7 +620,52 @@ fn stamp_control_surface_last_event(
     .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
 }
 
+/// The order the keys of the deck came in, for every saved data: which of
+/// the saved and the kept last events is the later is told by it, not by the
+/// wall clock, which Windows may set back (the review of #288).
+static LAST_EVENT_ORDER: AtomicU64 = AtomicU64::new(1);
+
+/// For each saved data: the PROMPTER page's last key, kept in memory and not
+/// written (2026-10-02), and the order of the last key that was written; a
+/// restart forgets both.
+#[derive(Default)]
+struct LastEvents {
+    kept: Option<(u64, Value)>,
+    saved_order: u64,
+}
+
+static LAST_EVENTS: OnceLock<Mutex<HashMap<PathBuf, LastEvents>>> = OnceLock::new();
+
+fn last_events() -> MutexGuard<'static, HashMap<PathBuf, LastEvents>> {
+    LAST_EVENTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn keep_last_event(db_path: &Path, order: u64, event: Value) {
+    last_events().entry(db_path.to_path_buf()).or_default().kept = Some((order, event));
+}
+
+fn note_saved_last_event(db_path: &Path, order: u64) {
+    let mut events = last_events();
+    let events = events.entry(db_path.to_path_buf()).or_default();
+    events.saved_order = events.saved_order.max(order);
+}
+
+/// The last key of the deck: the PROMPTER page's kept in memory when it came
+/// after the last one written, else the saved one.
 pub fn control_surface_last_event(db_path: &Path) -> Value {
+    let kept = last_events().get(db_path).and_then(|events| {
+        events
+            .kept
+            .as_ref()
+            .filter(|(order, _)| *order > events.saved_order)
+            .map(|(_, event)| event.clone())
+    });
+    if let Some(kept) = kept {
+        return kept;
+    }
     list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .ok()
         .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())

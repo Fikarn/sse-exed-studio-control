@@ -8,9 +8,8 @@ use crate::prompter::deck::{deck_texts, handle_deck_action};
 use crate::prompter::runtime::{finish_saving, flush_saves, forget, saver_of};
 use crate::prompter::saver::{hooks, GlassSave, Urgency};
 use crate::prompter::store;
-use crate::prompter::test_support::TestPrompter;
+use crate::prompter::test_support::{hold_the_write_lock, TestPrompter};
 use crate::storage::open_connection;
-use rusqlite::TransactionBehavior;
 use serde_json::json;
 use std::path::Path;
 use std::thread;
@@ -30,31 +29,6 @@ fn glass_revision(path: &Path) -> i64 {
     store::read_prompter(&connection)
         .expect("the prompter reads")
         .glass_revision
-}
-
-/// Another writer holds SQLite's write lock for `held`, writing as it goes,
-/// as a slow disk under a recording holds it: every write of the saved data
-/// waits. It lets go by itself.
-fn hold_the_write_lock(path: &Path, held: Duration) -> thread::JoinHandle<()> {
-    let path = path.to_path_buf();
-    let (taken, taking) = std::sync::mpsc::channel();
-    let handle = thread::spawn(move || {
-        let mut connection = open_connection(&path).expect("a connection");
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .expect("the write lock");
-        transaction
-            .execute(
-                "INSERT OR REPLACE INTO app_settings(key, value, updated_at) VALUES ('test.writer', 'x', 'now')",
-                [],
-            )
-            .expect("a write");
-        taken.send(()).expect("the test waits");
-        thread::sleep(held);
-        transaction.commit().expect("the commit");
-    });
-    taking.recv().expect("the lock is taken");
-    handle
 }
 
 /// A script of eight paragraphs on the glass, laid out; its id.
