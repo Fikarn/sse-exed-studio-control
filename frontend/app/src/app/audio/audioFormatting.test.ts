@@ -235,6 +235,84 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
     );
   });
 
+  it("says for how long TotalMix was out of touch while ASSUMED (2026-10-01)", () => {
+    const sentence =
+      "TotalMix was out of touch for 31 s, so a change made there meanwhile may be missing. Press Sync from TotalMix.";
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_OUT_OF_TOUCH",
+        lastActionMessage: sentence,
+      })
+    );
+    expect(status.label).toBe("ASSUMED");
+    expect(status.warningBody).toBe(sentence);
+    expect(status.warningCode).toBeNull();
+  });
+
+  it("says the desk has not been read since the start while ASSUMED (2026-10-02)", () => {
+    const sentence = "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_UNREAD_SINCE_START",
+        lastActionMessage: sentence,
+      })
+    );
+    expect(status.label).toBe("ASSUMED");
+    expect(status.warningBody).toBe(sentence);
+    expect(status.warningCode).toBeNull();
+  });
+
+  it("does not ask for a Sync while the desk is unreachable", () => {
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        status: "attention",
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_UNREAD_SINCE_START",
+        lastActionMessage: "Studio Control has not read the desk since it started. Press Sync from TotalMix.",
+      })
+    );
+    expect(status.label).toBe("OFFLINE");
+    expect(status.warningBody).toContain("Run the audio probe");
+  });
+
+  it("keeps the general ASSUMED sentence for unconfirmed changes and any other reason", () => {
+    // The unconfirmed changes' sentence names TotalMix's own channel numbers.
+    expect(
+      describeAudioStatus(
+        passedWithTotalMix({
+          consoleStateConfidence: "assumed",
+          lastActionStatus: "failed",
+          lastActionCode: "AUDIO_CONSOLE_UNCONFIRMED",
+          lastActionMessage: "TotalMix did not confirm 1 change (input 8 mute). Press Sync to pull the console state.",
+        })
+      ).warningBody
+    ).toContain("Showing the last state the desk confirmed.");
+    const general = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_SYNC_NO_ECHO",
+        lastActionMessage: "TotalMix did not answer.",
+      })
+    ).warningBody;
+    expect(general).toContain("Showing the last state the desk confirmed.");
+    expect(
+      describeAudioStatus(
+        passedWithTotalMix({
+          consoleStateConfidence: "assumed",
+          lastActionStatus: "succeeded",
+          lastActionCode: "AUDIO_CONSOLE_OUT_OF_TOUCH",
+          lastActionMessage: "An older sentence.",
+        })
+      ).warningBody
+    ).toContain("Showing the last state the desk confirmed.");
+  });
+
   it("reads VERIFIED once the desk has been read", () => {
     expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "aligned" })).label).toBe("VERIFIED");
     expect(describeAudioStatus(passedWithTotalMix({ consoleStateConfidence: "verified" })).label).toBe("VERIFIED");

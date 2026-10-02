@@ -351,6 +351,70 @@ fn console_pull_ingests_a_fake_totalmix_dump() {
     assert!((phones_a.volume - fader_curve::fader_db_to_lin(-16.6)).abs() < 1e-6);
 }
 
+/// TotalMix out of touch, then a Sync (2026-10-01): the Sync's own dump ends
+/// the quiet and marks the console link; only the Sync flushes, so its flush
+/// writes `assumed` and its `aligned` follows, and no mark is left to
+/// overturn it.
+#[test]
+fn a_sync_whose_dump_ends_a_quiet_still_ends_aligned() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    let _serial = serialize_shared_link();
+    let mut fake = FakeTotalMix::bind();
+    let mut slot = crate::rme_totalmix_osc::bind_test_global_slot(fake.port);
+    slot.declare_quiet_for_test();
+    fake.start(slot.local_port(), studio_dump_script(), false, true);
+    let test_dir = pull_test_db("console-pull-after-quiet", fake.port);
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    crate::rme_totalmix_osc::mark_console_link_slot(true);
+
+    // A pump that never flushes: only the Sync's own flush can take the mark.
+    let stop = Arc::new(AtomicBool::new(false));
+    let pump = {
+        let stop = stop.clone();
+        std::thread::spawn(move || {
+            let mut slot = slot;
+            while !stop.load(Ordering::Relaxed) {
+                crate::rme_totalmix_osc::pump_global_slot_without_flush_for_test(
+                    &mut slot,
+                    "127.0.0.1",
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            slot
+        })
+    };
+
+    let result = sync_audio_console_with_timing(test_dir.db_path().as_path(), fast_pull_timing())
+        .expect("the pull should complete against the fake console");
+    stop.store(true, Ordering::Relaxed);
+    let slot = pump.join().expect("the pump should end");
+    // The quiet ended at the dump's first datagram, which marks the link.
+    assert!(
+        !slot.is_quiet_for_test(),
+        "the dump's first datagram ended the quiet"
+    );
+    assert_eq!(result.console_state_confidence, "aligned");
+    let link = crate::rme_console_link::shared_console_link();
+    assert_eq!(
+        link.lock().expect("link").take_out_of_touch(),
+        None,
+        "the Sync's flush took the mark"
+    );
+    flush_console_link(test_dir.db_path().as_path()).expect("a later flush should succeed");
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "aligned");
+    assert_eq!(snapshot.last_action_status, "succeeded");
+}
+
 #[test]
 fn console_pull_that_never_goes_quiet_is_incomplete() {
     let _serial = serialize_shared_link();
@@ -807,6 +871,210 @@ fn console_disconnect_resets_confidence_to_unknown() {
     let idle = apply_console_activity(test_dir.db_path().as_path(), &[], &[], false)
         .expect("idle flush should succeed");
     assert!(!idle.changed(), "an idle flush touches nothing");
+}
+
+// ---------------------------------------------------------------------------
+// TotalMix out of touch on remote 4 (the walk of 2026-10-01).
+// ---------------------------------------------------------------------------
+
+const OUT_OF_TOUCH_31: crate::rme_console_link::OutOfTouch =
+    crate::rme_console_link::OutOfTouch { secs: 31 };
+
+#[test]
+fn out_of_touch_makes_a_verified_console_assumed_and_says_for_how_long() {
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-out-of-touch");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
+
+    let report =
+        flush_console_link_at(test_dir.db_path().as_path(), 1_000).expect("the flush should write");
+    assert!(report.out_of_touch && report.changed());
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "assumed");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_OUT_OF_TOUCH")
+    );
+    let message = snapshot.last_action_message.unwrap_or_default();
+    assert_eq!(
+        message,
+        "TotalMix was out of touch for 31 s, so a change made there meanwhile may be missing. Press Sync from TotalMix."
+    );
+    crate::operator_words::assert_operator_words(&message);
+    assert!(
+        !link.lock().expect("link").has_activity_at(u64::MAX),
+        "the mark is written once"
+    );
+}
+
+#[test]
+fn out_of_touch_never_lifts_an_unknown_console() {
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-out-of-touch-unknown");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
+
+    let report = flush_console_link_at(test_dir.db_path().as_path(), 1_000)
+        .expect("the flush should succeed");
+    assert!(!report.out_of_touch);
+    assert!(!report.changed(), "an unknown console stays as it is");
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert_ne!(snapshot.last_action_status, "failed");
+    assert!(!link.lock().expect("link").has_activity_at(u64::MAX));
+}
+
+#[test]
+fn out_of_touch_with_a_desk_this_flush_makes_unknown_is_not_written() {
+    let _link = serialize_shared_link();
+    let test_dir = TestDir::new("console-out-of-touch-unread");
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(
+            super::helpers::ConsoleConfidence::Aligned,
+        )],
+    )
+    .expect("confidence should store");
+    let link = crate::rme_console_link::shared_console_link();
+    link.lock()
+        .expect("link")
+        .mark_out_of_touch(OUT_OF_TOUCH_31);
+    link.lock().expect("link").mark_reports_lost(0);
+
+    let report = flush_console_link_at(test_dir.db_path().as_path(), u64::MAX / 2)
+        .expect("the flush should write");
+    assert!(report.desk_unread && !report.out_of_touch);
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    let snapshot = read_audio_snapshot(&settings);
+    assert_eq!(snapshot.console_state_confidence, "unknown");
+    assert_ne!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_OUT_OF_TOUCH"),
+        "no out-of-touch sentence over an unread desk"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The Console after a start (the owner's decision, 2026-10-02).
+// ---------------------------------------------------------------------------
+
+fn start_test_db(label: &str, confidence: super::helpers::ConsoleConfidence) -> TestDir {
+    let test_dir = TestDir::new(label);
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(confidence)],
+    )
+    .expect("confidence should store");
+    test_dir
+}
+
+fn console_after_start(test_dir: &TestDir) -> AudioSnapshot {
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    read_audio_snapshot(&settings)
+}
+
+#[test]
+fn a_start_makes_a_verified_console_assumed_until_a_sync() {
+    let test_dir = start_test_db(
+        "console-start-aligned",
+        super::helpers::ConsoleConfidence::Aligned,
+    );
+    assert!(
+        mark_console_unread_at_start(test_dir.db_path().as_path()).expect("the mark should write")
+    );
+    let snapshot = console_after_start(&test_dir);
+    assert_eq!(snapshot.console_state_confidence, "assumed");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_UNREAD_SINCE_START")
+    );
+    let message = snapshot.last_action_message.unwrap_or_default();
+    assert_eq!(
+        message,
+        "Studio Control has not read the desk since it started. Press Sync from TotalMix."
+    );
+    crate::operator_words::assert_operator_words(&message);
+    // A Console closed while assumed, here with TotalMix out of touch, says
+    // the start's reason at the next start.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from(AUDIO_LAST_ACTION_CODE_KEY),
+            String::from("AUDIO_CONSOLE_OUT_OF_TOUCH"),
+        )],
+    )
+    .expect("the old reason should store");
+    assert!(mark_console_unread_at_start(test_dir.db_path().as_path()).expect("a second start"));
+    let again = console_after_start(&test_dir);
+    assert_eq!(again.console_state_confidence, "assumed");
+    assert_eq!(
+        again.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_UNREAD_SINCE_START")
+    );
+}
+
+#[test]
+fn a_start_leaves_an_unknown_console_and_the_simulated_one_as_they_are() {
+    let unknown = start_test_db(
+        "console-start-unknown",
+        super::helpers::ConsoleConfidence::Unknown,
+    );
+    assert!(!mark_console_unread_at_start(unknown.db_path().as_path()).expect("no mark"));
+    assert_eq!(
+        console_after_start(&unknown).console_state_confidence,
+        "unknown"
+    );
+
+    let simulated = start_test_db(
+        "console-start-simulated",
+        super::helpers::ConsoleConfidence::Aligned,
+    );
+    set_settings_owned(
+        simulated.db_path().as_path(),
+        &[(
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        )],
+    )
+    .expect("the simulated source should store");
+    assert!(!mark_console_unread_at_start(simulated.db_path().as_path()).expect("no mark"));
+    assert_eq!(
+        console_after_start(&simulated).console_state_confidence,
+        "aligned"
+    );
+}
+
+#[test]
+fn out_of_touch_reads_in_seconds_minutes_and_hours() {
+    assert_eq!(out_of_touch_words(31), "31 s");
+    assert_eq!(out_of_touch_words(119), "119 s");
+    assert_eq!(out_of_touch_words(120), "2 min");
+    assert_eq!(out_of_touch_words(7_199), "119 min");
+    assert_eq!(out_of_touch_words(7_200), "2 h");
 }
 
 #[test]

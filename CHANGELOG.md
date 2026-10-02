@@ -42,6 +42,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- After every start the Console reads `ASSUMED` until `Sync from TotalMix`, as TotalMix may have changed while the app was closed; it read `VERIFIED` from before (#284).
+- After TotalMix has been out of touch (its remote 4 switched off, or TotalMix closed), the Console reads `ASSUMED` once TotalMix answers again, says for how long, and asks for `Sync from TotalMix`; it read `VERIFIED` with values TotalMix no longer held (#284).
 - The Console's Snapshots are TotalMix's own eight, under the names TotalMix last saved; `active` and `changed` say what TotalMix has loaded. Press a slot twice (`LOAD?`) to load it in TotalMix, and the Console then reads the desk (#282).
 - The Console's strips and outputs carry TotalMix's names; a channel is renamed in TotalMix (#282).
 - Setup / Support's `CAMERAS` names the vMix output each camera's picture comes from, CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4, and no longer takes a vMix input; the Cameras page names it too (`vMix Output 2 · 3840 × 2160 · 29.97`) (#277).
@@ -107,6 +109,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
+- A channel name with a letter beyond ASCII (`ö`) shows on the Console, and that channel's mute, gain and other values arrive with it; such a name lost the channel's whole report (#284).
+- The daily database backup is written a day after the last one; every start of the app wrote one more, so restarts pushed older days out of the 14 kept (#284).
 - A change sent in two parts no longer reads as unconfirmed when TotalMix answered both at once; a recall could leave the Console `ASSUMED` with sends that were in fact set (#282).
 - Enter in Lighting's empty search field no longer recalls a scene with its Recent list closed; a held Enter no longer confirms an armed key; a dialog no longer takes focus back every few seconds (#216).
 - Lighting's Undo works after Add fixture, and an Undo whose scene or fixture has been deleted says why and lets the older steps through (#216).

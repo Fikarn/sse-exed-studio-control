@@ -667,12 +667,7 @@ fn service_console_link_reads_back_over_the_global_slot_and_confirms() {
         .set_nonblocking(true)
         .expect("slot socket should be non-blocking");
     let slot_port = socket.local_addr().expect("slot addr").port();
-    let mut slot = super::GlobalOscSlot {
-        send_port: fake_port,
-        socket,
-        last_rx_at: None,
-        console: LOOPBACK,
-    };
+    let mut slot = super::GlobalOscSlot::new(fake_port, socket, LOOPBACK);
     let key = ParamKey::ChannelFlag {
         bus: ConsoleBus::Input,
         channel: 11,
@@ -786,12 +781,7 @@ fn test_guard_drops_sends_to_real_totalmix_ports_only() {
 fn refresh_global_slot_sends_sendall_and_sendstate_to_the_slot_port() {
     let (receiver, port) = bind_test_receiver();
     let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("global slot socket should bind");
-    let slot = super::GlobalOscSlot {
-        send_port: port,
-        socket,
-        last_rx_at: None,
-        console: LOOPBACK,
-    };
+    let slot = super::GlobalOscSlot::new(port, socket, LOOPBACK);
 
     super::refresh_global_slot(&slot, "127.0.0.1");
 
@@ -1264,12 +1254,11 @@ fn foreign_datagrams_are_dropped_and_logged_once_per_minute() {
     let sender_port = local_port_of(&sender);
     // A slot commissioned for a console on the LAN: a loopback datagram is
     // foreign to it.
-    let mut slot = GlobalOscSlot {
-        send_port: 7014,
-        socket: bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
-        last_rx_at: None,
-        console: LAN_CONSOLE,
-    };
+    let mut slot = GlobalOscSlot::new(
+        7014,
+        bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        LAN_CONSOLE,
+    );
     let slot_port = slot.local_port();
     let level = encoder::encode(&OscPacket::Message(message(
         "/level/out/0",
@@ -1353,67 +1342,126 @@ fn foreign_datagrams_are_dropped_and_logged_once_per_minute() {
     remove_temp_log(&log_path);
 }
 
-/// A bundle of the console's whose middle element carries a name in
-/// Windows-1252 (`Röst`), which the OSC library refuses: its first element
-/// is read, the rest is left unread and logged.
-#[test]
-fn a_datagram_from_the_console_that_cannot_be_read_in_full_is_logged() {
-    let log_path = temp_log_path("global-unread");
-    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
-    let mut slot = GlobalOscSlot {
-        send_port: 7014,
-        socket: bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
-        last_rx_at: None,
-        console: LOOPBACK,
-    };
-    let slot_port = slot.local_port();
-    let bundle = OscPacket::Bundle(rosc::OscBundle {
-        timetag: rosc::OscTime::from((0, 1)),
+/// The Global slot's bundle of `/level/out/0`, `/level/in/0` (carrying
+/// `middle`) and `/level/out/1`, as bytes. Only levels, so a test reading it
+/// never reaches the process-wide console link.
+fn three_level_bundle(middle: OscType) -> Vec<u8> {
+    let bundle = OscPacket::Bundle(OscBundle {
+        timetag: OscTime::from((0, 1)),
         content: vec![
             OscPacket::Message(message("/level/out/0", OscType::Float(-6.0))),
-            OscPacket::Message(message(
-                "/input/9/name",
-                OscType::String(String::from("Rxst")),
-            )),
-            OscPacket::Message(message("/level/out/1", OscType::Float(-6.0))),
+            OscPacket::Message(message("/level/in/0", middle)),
+            OscPacket::Message(message("/level/out/1", OscType::Float(-7.0))),
         ],
     });
-    let mut bytes = encoder::encode(&bundle).expect("bundle should encode");
+    encoder::encode(&bundle).expect("bundle should encode")
+}
+
+/// Sends `bytes` to a Global slot of a console on loopback and reads it
+/// until `done` holds or two seconds pass.
+fn read_on_a_global_slot(
+    bytes: &[u8],
+    log_path: &std::path::Path,
+    done: impl Fn(&RmeTotalMixMeterState, &DroppedSourceLog) -> bool,
+) -> Arc<Mutex<RmeTotalMixMeterState>> {
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let mut slot = GlobalOscSlot::new(
+        7014,
+        bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        LOOPBACK,
+    );
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(Some(log_path.to_path_buf()));
+    sender
+        .send_to(bytes, ("127.0.0.1", slot.local_port()))
+        .expect("send should succeed");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        let finished = done(&state.lock().expect("state"), &drops);
+        if finished || Instant::now() >= deadline {
+            return state;
+        }
+        read_global_packets(&mut slot, &state, 1_000, &mut drops);
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// A bundle of the console's whose middle element carries a name in
+/// Windows-1252 (`Röst`), which the OSC library refuses: since 2026-10-01
+/// it is read again, and the element after it is read too. Nothing is
+/// logged.
+#[test]
+fn a_bundle_with_a_name_in_windows_1252_is_read_in_full() {
+    let log_path = temp_log_path("global-windows-1252");
+    let mut bytes = three_level_bundle(OscType::String(String::from("Rxst")));
     let at = bytes
         .windows(4)
         .position(|window| window == b"Rxst")
         .expect("the name is in the bundle");
     bytes[at + 1] = 0xF6;
-    // The refused element begins with its size, four bytes before its address.
-    let refused_at = bytes
-        .windows(13)
-        .position(|window| window == b"/input/9/name")
-        .expect("the address is in the bundle")
-        - 4;
-    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
-    let mut drops = DroppedSourceLog::new(Some(log_path.clone()));
 
-    sender
-        .send_to(&bytes, ("127.0.0.1", slot_port))
-        .expect("send should succeed");
-    let deadline = Instant::now() + Duration::from_secs(2);
-    while drops.unread_logged_at.is_none() && Instant::now() < deadline {
-        read_global_packets(&mut slot, &state, 1_000, &mut drops);
-        thread::sleep(Duration::from_millis(10));
-    }
+    let state = read_on_a_global_slot(&bytes, &log_path, |meters, _| {
+        meters.diagnostics().packet_count >= 3
+    });
 
     let meters = state.lock().expect("state");
-    assert!(
-        meters.entry_for_surface_id("audio-mix-main").is_some(),
-        "the element before the refused one is read"
-    );
+    let diagnostics = meters.diagnostics();
+    assert_eq!(diagnostics.packet_count, 3, "every element is read");
     assert_eq!(
-        meters.diagnostics().packet_count,
-        1,
-        "the element after it is lost with it"
+        diagnostics.unknown_packet_count, 1,
+        "the name is no level, yet it is read"
+    );
+    let main = meters
+        .entry_for_surface_id("audio-mix-main")
+        .expect("the levels reach the meters");
+    assert!((main.left_dbfs + 6.0).abs() < 0.001);
+    assert!(
+        (main.right_dbfs + 7.0).abs() < 0.001,
+        "the element after the name is read"
     );
     drop(meters);
-    let log = fs::read_to_string(&log_path).expect("the unread datagram should be logged");
+    let log = fs::read_to_string(&log_path).unwrap_or_default();
+    assert!(log.is_empty(), "nothing is logged: {log}");
+    remove_temp_log(&log_path);
+}
+
+/// A bundle of the console's whose middle element neither reading can read
+/// (a type tag TotalMix does not send): the element is skipped, the one
+/// after it is read, and the skipped element is logged from its size on.
+#[test]
+fn a_datagram_from_the_console_that_cannot_be_read_in_full_is_logged() {
+    let log_path = temp_log_path("global-unread");
+    let mut bytes = three_level_bundle(OscType::Float(-12.0));
+    // The middle element begins with its size, four bytes before its address.
+    let skipped_at = bytes
+        .windows(12)
+        .position(|window| window == b"/level/in/0\0")
+        .expect("the address is in the bundle")
+        - 4;
+    let size_bytes: [u8; 4] = bytes[skipped_at..skipped_at + 4]
+        .try_into()
+        .expect("four bytes");
+    let skipped = 4 + u32::from_be_bytes(size_bytes) as usize;
+    let tag_at = skipped_at + 4 + 12 + 1;
+    assert_eq!(&bytes[tag_at - 1..tag_at + 1], b",f");
+    bytes[tag_at] = b'x';
+
+    let state = read_on_a_global_slot(&bytes, &log_path, |_, drops| {
+        drops.unread_logged_at.is_some()
+    });
+
+    let meters = state.lock().expect("state");
+    assert_eq!(
+        meters.diagnostics().packet_count,
+        2,
+        "the elements before and after the skipped one are read"
+    );
+    let main = meters
+        .entry_for_surface_id("audio-mix-main")
+        .expect("the levels reach the meters");
+    assert!((main.right_dbfs + 7.0).abs() < 0.001);
+    drop(meters);
+    let log = fs::read_to_string(&log_path).expect("the unread element should be logged");
     assert_eq!(log.lines().count(), 1, "{log}");
     assert!(log.contains(" WARN "), "{log}");
     assert!(
@@ -1424,14 +1472,20 @@ fn a_datagram_from_the_console_that_cannot_be_read_in_full_is_logged() {
     );
     assert!(
         log.contains(&format!(
-            "the latest: a bundle with {} of its {} bytes left unread",
-            bytes.len() - refused_at,
+            "the latest: a bundle with {skipped} of its {} bytes left unread",
             bytes.len()
         )),
         "{log}"
     );
-    assert!(log.contains("/input/9/name"), "{log}");
-    assert!(log.contains("R\\xf6st"), "{log}");
+    let shown = &bytes[skipped_at..];
+    assert!(
+        log.contains(&format!(
+            "its bytes where the reading stopped: \"{}",
+            shown[..shown.len().min(UNREAD_BYTES_SHOWN)].escape_ascii()
+        )),
+        "the bytes from the skipped element's size on: {log}"
+    );
+    assert!(log.contains("/level/in/0\\x00,x"), "{log}");
     remove_temp_log(&log_path);
 }
 
@@ -1546,6 +1600,75 @@ fn classic_slots_read_the_console_address_only() {
     remove_temp_log(&log_path);
 }
 
+/// A classic slot's bundle with a channel's name in Windows-1252 (`Röst`)
+/// before the channel's levels. The OSC library stops at the name; since
+/// 2026-10-01 the levels after it are read too. The name is no level, and the
+/// classic parser leaves it.
+#[test]
+fn a_classic_slot_reads_the_levels_after_a_name_in_windows_1252() {
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let slot = BoundRmeSlot {
+        bus: RmeTotalMixBus::Input,
+        send_port: 7011,
+        socket: bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        console: LOOPBACK,
+    };
+    let mut bytes = encoder::encode(&OscPacket::Bundle(OscBundle {
+        timetag: OscTime::from((0, 1)),
+        content: vec![
+            OscPacket::Message(message(
+                "/1/trackname1",
+                OscType::String(String::from("Rxst")),
+            )),
+            OscPacket::Message(message("/1/level1Left", OscType::Float(0.25))),
+            OscPacket::Message(message("/1/level1Right", OscType::Float(0.5))),
+        ],
+    }))
+    .expect("bundle should encode");
+    let at = bytes
+        .windows(4)
+        .position(|window| window == b"Rxst")
+        .expect("the name is in the bundle");
+    bytes[at + 1] = 0xF6;
+    let Ok((_, OscPacket::Bundle(library))) = rosc::decoder::decode_udp(&bytes) else {
+        panic!("the library reads the bundle's start");
+    };
+    assert!(
+        library.content.is_empty(),
+        "the library alone stops at the name"
+    );
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+
+    sender
+        .send_to(&bytes, ("127.0.0.1", local_port_of(&slot.socket)))
+        .expect("send should succeed");
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while state.lock().expect("state").diagnostics().packet_count < 3 && Instant::now() < deadline {
+        read_available_packets(
+            std::slice::from_ref(&slot),
+            state.clone(),
+            1_000,
+            &mut drops,
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let meters = state.lock().expect("state");
+    let diagnostics = meters.diagnostics();
+    assert_eq!(diagnostics.packet_count, 3, "every element is read");
+    assert_eq!(diagnostics.unknown_packet_count, 1, "the name is no level");
+    assert_eq!(diagnostics.mapped_packet_count, 2);
+    let input = meters
+        .entry_for_surface_id("audio-input-9")
+        .expect("the levels reach the meters");
+    assert!((input.left - 0.25).abs() < 1e-9);
+    assert!(
+        (input.right - 0.5).abs() < 1e-9,
+        "the level after the name is read"
+    );
+}
+
 #[test]
 fn dropped_source_log_notes_a_source_once_a_minute() {
     let log_path = temp_log_path("rate-limit");
@@ -1627,5 +1750,130 @@ fn a_failing_flush_is_logged_once_a_minute_and_its_end_is_logged_once() {
         failures.failed(start + Duration::from_secs(61)),
         Some(0),
         "a new run starts with a line of its own and no old count"
+    );
+}
+
+/// TotalMix heard again after a quiet on the Global remote (the walk of
+/// 2026-10-01): the first datagram marks the console link, and only the
+/// first; the datagram itself is still read.
+#[test]
+fn the_first_datagram_after_a_quiet_marks_the_console_once() {
+    use crate::rme_console_link::shared_console_link;
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Ok(mut link) = shared_console_link().lock() {
+        link.reset_for_test();
+    }
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let mut slot = GlobalOscSlot::new(
+        7014,
+        bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        LOOPBACK,
+    );
+    let slot_port = slot.local_port();
+    // Three requests for TotalMix's values past the start's grace, none
+    // answered: out of touch.
+    slot.declare_quiet_for_test();
+
+    let level = encoder::encode(&OscPacket::Message(message(
+        "/level/out/0",
+        OscType::Float(-6.0),
+    )))
+    .expect("level should encode");
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+    let read_one = |slot: &mut GlobalOscSlot, drops: &mut DroppedSourceLog, expected: u64| {
+        sender
+            .send_to(&level, ("127.0.0.1", slot_port))
+            .expect("send should succeed");
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while state.lock().expect("state").diagnostics().packet_count < expected
+            && Instant::now() < deadline
+        {
+            read_global_packets(slot, &state, 1_000, drops);
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+
+    read_one(&mut slot, &mut drops, 1);
+    let marked = shared_console_link()
+        .lock()
+        .expect("link")
+        .take_out_of_touch();
+    assert!(
+        marked.is_some_and(|mark| mark.secs >= 1),
+        "the console link is marked: {marked:?}"
+    );
+    assert!(
+        state
+            .lock()
+            .expect("state")
+            .entry_for_surface_id("audio-mix-main")
+            .is_some(),
+        "the datagram itself is still read"
+    );
+
+    read_one(&mut slot, &mut drops, 2);
+    assert_eq!(
+        shared_console_link()
+            .lock()
+            .expect("link")
+            .take_out_of_touch(),
+        None,
+        "only the first datagram after a quiet marks it"
+    );
+}
+
+/// TotalMix heard for the first time after a start in which it did not
+/// answer: logged, and no mark, as every start makes the Console assumed
+/// already (the owner, 2026-10-02).
+#[test]
+fn a_first_hearing_after_the_start_marks_nothing() {
+    use crate::rme_console_link::shared_console_link;
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Ok(mut link) = shared_console_link().lock() {
+        link.reset_for_test();
+    }
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let mut slot = GlobalOscSlot::new(
+        7014,
+        bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        LOOPBACK,
+    );
+    let slot_port = slot.local_port();
+    // Never heard: three requests past the start's grace make it quiet.
+    let start = Instant::now();
+    let declared = (3..=5)
+        .map(|second| slot.quiet.request_sent(start + Duration::from_secs(second)))
+        .last()
+        .flatten();
+    assert!(declared.is_some_and(|line| line.contains("has not been heard")));
+
+    let level = encoder::encode(&OscPacket::Message(message(
+        "/level/out/0",
+        OscType::Float(-6.0),
+    )))
+    .expect("level should encode");
+    sender
+        .send_to(&level, ("127.0.0.1", slot_port))
+        .expect("send should succeed");
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while slot.is_quiet_for_test() && Instant::now() < deadline {
+        read_global_packets(&mut slot, &state, 1_000, &mut drops);
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!slot.is_quiet_for_test(), "the quiet ended");
+    assert_eq!(
+        shared_console_link()
+            .lock()
+            .expect("link")
+            .take_out_of_touch(),
+        None,
+        "a first hearing marks nothing"
     );
 }

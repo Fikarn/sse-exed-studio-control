@@ -51,14 +51,17 @@ use crate::protocol::{
     event_message, RequestEnvelope, EVENT_AUDIO_METERS, EVENT_ENGINE_STARTUP_FAILED,
 };
 use crate::storage::list_settings_by_prefix;
-use crate::storage_backups::{snapshot_database, SnapshotReason};
+use crate::storage_backups::{
+    daily_backup_wait, newest_daily_backup, snapshot_database, SnapshotReason,
+    DAILY_BACKUP_INTERVAL,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 const SIMULATED_AUDIO_METER_INTERVAL: Duration = Duration::from_millis(33);
 const SIMULATED_AUDIO_METER_CACHE_REFRESH: Duration = Duration::from_millis(500);
@@ -70,10 +73,10 @@ const CONSOLE_METER_POINT_POST_FADER: &str = "post-fader";
 const CONSOLE_PEAK_WARNING_DBFS: f64 = -3.0;
 const CONSOLE_OVER_DBFS: f64 = 0.0;
 /// Database backups the engine writes on its own (2026-09 production
-/// readiness, Slice 3 — F02): the first daily copy five minutes after start,
-/// then one every 24 h, plus one at every graceful shutdown.
+/// readiness, Slice 3 — F02): a daily copy, looked for first five minutes
+/// after start and written once the newest daily on disk is 24 h old, then
+/// one every 24 h, plus one at every graceful shutdown.
 const DATABASE_BACKUP_INITIAL_DELAY: Duration = Duration::from_secs(5 * 60);
-const DATABASE_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn meter_point_for_channel(channel: &AudioChannelSnapshot) -> &'static str {
     if channel.role == "playback-pair" {
@@ -380,11 +383,19 @@ fn write_database_backup(
     }
 }
 
+/// After a start the scheduler waits until the newest daily on disk is
+/// 24 h old, so a start writes no daily of its own (2026-10-01: three
+/// starts wrote three in one day), and says in the log when it must wait,
+/// so the walk can tell a start held off from a stopped thread. After a
+/// copy, or a failed one, the next is a day away: this thread is the only
+/// writer of dailies, and its sleep does not follow the wall clock, so a
+/// clock set back cannot hold the next one off.
 fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
     let _ = thread::Builder::new()
         .name(String::from("database-backup"))
         .spawn(move || {
             thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
+            sleep_until_daily_backup_due(&backups_dir, &log_file_path);
             loop {
                 write_database_backup(
                     &db_path,
@@ -392,9 +403,44 @@ fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_pat
                     &log_file_path,
                     SnapshotReason::Daily,
                 );
-                thread::sleep(DATABASE_BACKUP_INTERVAL);
+                thread::sleep(DAILY_BACKUP_INTERVAL);
             }
         });
+}
+
+/// Sleeps until the newest daily backup on disk is 24 h old, looking again
+/// after each sleep: a daily written meanwhile counts. A first look that
+/// must wait writes one INFO line to `log_file_path`; a later look writes
+/// none.
+fn sleep_until_daily_backup_due(backups_dir: &Path, log_file_path: &Path) {
+    let mut log_wait_to = Some(log_file_path);
+    loop {
+        let now = SystemTime::now();
+        let newest = newest_daily_backup(backups_dir, now);
+        let wait = daily_backup_wait(newest.as_ref().map(|daily| daily.written_at), now);
+        if wait.is_zero() {
+            return;
+        }
+        if let (Some(log_file_path), Some(newest)) = (log_wait_to.take(), &newest) {
+            let line = daily_backup_wait_line(wait, &newest.file_name);
+            let _ = append_log(log_file_path, "INFO", &line);
+        }
+        thread::sleep(wait);
+    }
+}
+
+/// The engine log's line when the daily backup must wait (review of
+/// 2026-10-01: nothing in the log showed the scheduler waiting). The wait
+/// is rounded up to the whole minute: the line comes only with a wait, so
+/// it never says 0 h 0 min, and the copy is never due before the time given.
+fn daily_backup_wait_line(wait: Duration, newest_daily: &str) -> String {
+    let minutes = wait.as_nanos().div_ceil(60_000_000_000);
+    format!(
+        "The next daily database backup is due in {} h {} min; \
+         the newest daily is {newest_daily}.",
+        minutes / 60,
+        minutes % 60
+    )
 }
 
 fn spawn_simulated_audio_meter_ticks(sender: Sender<Value>, db_path: PathBuf) {
@@ -672,5 +718,36 @@ mod tests {
         assert!(
             (payload["peakRightDbfs"].as_f64().unwrap() - normalized_to_dbfs(0.40)).abs() < 0.001
         );
+    }
+
+    // Review of 2026-10-01: the log says when the daily backup must wait.
+    #[test]
+    fn the_daily_backup_wait_line_gives_hours_and_minutes_rounded_up() {
+        let name = "db-2026-10-01T08-27-00-000Z-daily.sqlite3";
+        let line = |wait: Duration| daily_backup_wait_line(wait, name);
+        let minutes = |count: u64| Duration::from_secs(count * 60);
+        assert_eq!(
+            line(minutes(22 * 60)),
+            "The next daily database backup is due in 22 h 0 min; \
+             the newest daily is db-2026-10-01T08-27-00-000Z-daily.sqlite3."
+        );
+        let due_in = |wait: Duration| {
+            let line = line(wait);
+            let rest = line
+                .strip_prefix("The next daily database backup is due in ")
+                .expect("the line's start");
+            let (due, newest) = rest.split_once("; ").expect("the line's two parts");
+            assert_eq!(newest, format!("the newest daily is {name}."));
+            due.to_owned()
+        };
+        assert_eq!(due_in(minutes(59)), "0 h 59 min");
+        assert_eq!(due_in(minutes(58) + Duration::from_secs(1)), "0 h 59 min");
+        assert_eq!(
+            due_in(minutes(22 * 60) - Duration::from_secs(1)),
+            "22 h 0 min"
+        );
+        assert_eq!(due_in(minutes(90)), "1 h 30 min");
+        assert_eq!(due_in(Duration::from_millis(1)), "0 h 1 min");
+        assert_eq!(due_in(minutes(24 * 60)), "24 h 0 min");
     }
 }

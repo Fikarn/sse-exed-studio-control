@@ -30,15 +30,15 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Audio console
 
 - [ ] In TotalMix FX, remote 4 is `In Use` in `Global OSC` mode, port incoming 7004, port outgoing 9004, `Send changes` on, `Follow Submix` off.
-- [ ] The Console reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
+- [ ] After a start, with the Console last `VERIFIED` or `ASSUMED`, it reads `ASSUMED`, "Studio Control has not read the desk since it started. Press Sync from TotalMix.", and `engine.log` says `The Console reads assumed until a Sync`. After `Sync from TotalMix` it reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
 - [ ] A fader moved or a mute pressed in TotalMix shows on the Console within about a second.
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
-- [ ] Remote 4 off, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED`, and `Sync from TotalMix` clears it.
+- [ ] Remote 4 off for about 30 s, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED` and says TotalMix was out of touch for about 30 s; `Sync from TotalMix` clears it, and the fader shows TotalMix's value. `engine.log` says when remote 4 went quiet (`TotalMix went quiet on remote 4`), when it was heard again and after how long, and how many control values TotalMix sent in the 3 s after.
 - [ ] A TotalMix fader at 0 dB and at −6 dB reads the same on the Console and on the Stream Deck.
 - [ ] The Console's Snapshots are TotalMix's eight, under the names TotalMix shows (after TotalMix has been closed once since they were named); the one loaded reads `active`, and `changed` once a fader moves in TotalMix. `engine.log` names TotalMix's device (`TotalMix's device:`) and the names file it read (`TotalMix's names read from`).
-- [ ] A slot pressed twice loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. `engine.log`'s `Load of slot N` line says whether TotalMix reported the load itself.
+- [ ] A slot pressed, then pressed again once it reads `LOAD?` (a double-click only arms it), loads in TotalMix: TotalMix shows that snapshot, the slot reads `active`, the strips show what TotalMix now holds, the Console reads `VERIFIED`, and 48 V stays as it was. `engine.log`'s `Load of slot N` line says whether TotalMix reported the load itself.
 - [ ] An armed load moves nothing: the key reads `LOAD?` in amber with its countdown, the state display shows the armed row, and Esc clears both.
-- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`, also with a letter beyond ASCII (`ö`). `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
+- [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`, also with a letter beyond ASCII (`ö`), and that channel's mute still follows TotalMix. `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
 - [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
 
@@ -126,5 +126,6 @@ Once the links are built, with the cameras on vMix's outputs:
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
 - [ ] After that first start, the Console's levels for Main Out, Phones 1 and Phones 2 read what TotalMix shows; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
-- [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
+- [ ] Five minutes after a restart of the app with a daily backup less than a day old, the backups folder has no new `-daily` copy, and `engine.log` says when the next daily is due.
+- [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself; the Console then reads `ASSUMED` until `Sync from TotalMix`.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.
