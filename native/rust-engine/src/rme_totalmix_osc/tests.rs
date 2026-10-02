@@ -1802,7 +1802,7 @@ fn the_first_datagram_after_a_quiet_marks_the_console_once() {
         .expect("link")
         .take_out_of_touch();
     assert!(
-        marked.is_some_and(|mark| mark.secs >= 1 && mark.since_start),
+        marked.is_some_and(|mark| mark.secs >= 1),
         "the console link is marked: {marked:?}"
     );
     assert!(
@@ -1822,5 +1822,58 @@ fn the_first_datagram_after_a_quiet_marks_the_console_once() {
             .take_out_of_touch(),
         None,
         "only the first datagram after a quiet marks it"
+    );
+}
+
+/// TotalMix heard for the first time after a start in which it did not
+/// answer: logged, and no mark, as every start makes the Console assumed
+/// already (the owner, 2026-10-02).
+#[test]
+fn a_first_hearing_after_the_start_marks_nothing() {
+    use crate::rme_console_link::shared_console_link;
+    let _serial = crate::rme_console_link::SHARED_LINK_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Ok(mut link) = shared_console_link().lock() {
+        link.reset_for_test();
+    }
+    let sender = UdpSocket::bind(("127.0.0.1", 0)).expect("sender should bind");
+    let mut slot = GlobalOscSlot::new(
+        7014,
+        bind_receive_socket(LOOPBACK, 0).expect("slot should bind"),
+        LOOPBACK,
+    );
+    let slot_port = slot.local_port();
+    // Never heard: three requests past the start's grace make it quiet.
+    let start = Instant::now();
+    let declared = (3..=5)
+        .map(|second| slot.quiet.request_sent(start + Duration::from_secs(second)))
+        .last()
+        .flatten();
+    assert!(declared.is_some_and(|line| line.contains("has not been heard")));
+
+    let level = encoder::encode(&OscPacket::Message(message(
+        "/level/out/0",
+        OscType::Float(-6.0),
+    )))
+    .expect("level should encode");
+    sender
+        .send_to(&level, ("127.0.0.1", slot_port))
+        .expect("send should succeed");
+    let state = Arc::new(Mutex::new(RmeTotalMixMeterState::new()));
+    let mut drops = DroppedSourceLog::new(None);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while slot.is_quiet_for_test() && Instant::now() < deadline {
+        read_global_packets(&mut slot, &state, 1_000, &mut drops);
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(!slot.is_quiet_for_test(), "the quiet ended");
+    assert_eq!(
+        shared_console_link()
+            .lock()
+            .expect("link")
+            .take_out_of_touch(),
+        None,
+        "a first hearing marks nothing"
     );
 }

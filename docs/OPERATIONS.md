@@ -66,19 +66,19 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:
 
-| State           | It means                                                          | Way out                 |
-| --------------- | ----------------------------------------------------------------- | ----------------------- |
-| `SYNC NEEDED`   | The desk is unread since the link changed                         | `Sync from TotalMix`    |
-| `ASSUMED`       | A change was not confirmed in 1.5 s, or TotalMix was out of touch | `Sync from TotalMix`    |
-| `NOT VERIFIED`  | Probe not run; every control locked                               | `Run audio probe`       |
-| `STALE`         | No meter data for half a second                                   | `Run audio probe`       |
-| `OFFLINE`       | Probe failed, or no meter data for 2 s                            | `Run audio probe`       |
-| `DISCONNECTED`  | TotalMix reports the UFX III gone                                 | Check its USB and power |
-| `ACTION FAILED` | The last action failed                                            | Any action that works   |
+| State           | It means                                                                                    | Way out                 |
+| --------------- | ------------------------------------------------------------------------------------------- | ----------------------- |
+| `SYNC NEEDED`   | The desk is unread since the link changed                                                   | `Sync from TotalMix`    |
+| `ASSUMED`       | The app has just started, TotalMix was out of touch, or a change was not confirmed in 1.5 s | `Sync from TotalMix`    |
+| `NOT VERIFIED`  | Probe not run; every control locked                                                         | `Run audio probe`       |
+| `STALE`         | No meter data for half a second                                                             | `Run audio probe`       |
+| `OFFLINE`       | Probe failed, or no meter data for 2 s                                                      | `Run audio probe`       |
+| `DISCONNECTED`  | TotalMix reports the UFX III gone                                                           | Check its USB and power |
+| `ACTION FAILED` | The last action failed                                                                      | Any action that works   |
 
 The meters wait in `SYNC NEEDED`, `ASSUMED` and `ACTION FAILED`. The app never runs the probe by itself: `OFFLINE` stays after TotalMix is back, until you press `Run audio probe`. If it keeps failing, check TotalMix against [HARDWARE.md](HARDWARE.md).
 
-TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. When TotalMix was out of touch the state display says so and for how long; when it answered only some time after Studio Control started, it says that.
+TotalMix is out of touch when its remote 4 has stopped answering: remote 4 switched off in TotalMix, or TotalMix closed. Once it answers again the Console reads `ASSUMED` and says for how long, as a change made in TotalMix meanwhile may not have arrived; `Sync from TotalMix` reads the desk whole. When TotalMix was out of touch the state display says so and for how long, until the next action. After every start the Console reads `ASSUMED` until the first Sync, as TotalMix may have changed while the app was closed.
 
 ## Teleprompter
 

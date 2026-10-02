@@ -1303,9 +1303,12 @@ pub(crate) fn read_global_packets(
                 // TotalMix back after a quiet: the console link is marked at
                 // its first datagram, so the mark is there before a Sync whose
                 // dump follows has read the desk, and the Sync's aligned comes
-                // after it.
+                // after it. TotalMix first heard after the start marks
+                // nothing: the start has made the Console assumed already.
                 if let Some(back) = slot.quiet.heard(heard_at) {
-                    mark_console_out_of_touch(&back);
+                    if !back.since_start {
+                        mark_console_out_of_touch(&back);
+                    }
                     log_event(LogLevel::Info, &back.line);
                 }
                 let read = osc_read::read_datagram(&buffer[..len]);
@@ -1375,7 +1378,6 @@ fn mark_console_out_of_touch(back: &global_quiet::HeardAgain) {
     let mut link = link.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     link.mark_out_of_touch(crate::rme_console_link::OutOfTouch {
         secs: back.quiet_for.as_secs().max(1),
-        since_start: back.since_start,
     });
 }
 
@@ -1602,11 +1604,17 @@ impl GlobalOscSlot {
     /// of touch until the slot next hears it.
     pub(crate) fn declare_quiet_for_test(&mut self) {
         let start = Instant::now();
+        // Heard once, so the quiet is a running link's, not the start's.
+        self.quiet.heard(start);
         let declared = (3..=5)
             .map(|second| self.quiet.request_sent(start + Duration::from_secs(second)))
             .last()
             .flatten();
         assert!(declared.is_some(), "the slot should be quiet");
+    }
+
+    pub(crate) fn is_quiet_for_test(&self) -> bool {
+        self.quiet.is_quiet()
     }
 }
 

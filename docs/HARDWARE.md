@@ -40,7 +40,7 @@ Setup holds the TotalMix address `127.0.0.1`, the send port `7001` and the recei
 
 The engine listens on UDP `9001`–`9004`, bound to `127.0.0.1`, and reads only what comes from the TotalMix address. `netstat -an | findstr 900` shows the four ports.
 
-While nothing has come on remote 4 for 3 s, the engine asks TotalMix for its values (`/sendall 2`, `/sendstate`) once a second; TotalMix always answers `/sendstate`. Two requests in a row unanswered mean TotalMix is out of touch (remote 4 switched off, or TotalMix closed); a link's first 3 s are a grace, as TotalMix may be slow to answer at a start. When it is heard again the Console reads `ASSUMED` until a Sync or a load's read-back has read the desk (2026-10-01).
+While nothing has come on remote 4 for 3 s, the engine asks TotalMix for its values (`/sendall 2`, `/sendstate`) once a second; TotalMix always answers `/sendstate`. Two requests in a row unanswered mean TotalMix is out of touch (remote 4 switched off, or TotalMix closed); a link's first 3 s are a grace, as TotalMix may be slow to answer at a start. When it is heard again the Console reads `ASSUMED` until a Sync or a load's read-back has read the desk (2026-10-01). Every start on the real TotalMix makes a Console saved as `VERIFIED` read `ASSUMED` too, as TotalMix may have changed while the app was closed (the owner, 2026-10-02).
 
 What the app never does:
 
@@ -74,7 +74,7 @@ What `engine.log` says of TotalMix, for the walk (2026-10-01):
 - `TotalMix's device:` the name on `/status/device` the first time the link hears it, and again when it changes, with the names file that name points to.
 - `Sync's read-back carried …` (or `The read-back after loading …`): every channel name the dump carried, quoted as TotalMix sent it, channels counted from 0.
 - `TotalMix sent N datagrams … that could not be read in full`: a warning at once, then once a minute at most, with the bytes where the reading stopped.
-- `TotalMix went quiet on remote 4` (or `has not been heard on remote 4` since the start): a warning once two requests for its values went unanswered. `TotalMix heard on remote 4 … again after N s quiet`, then `In the 3 s after TotalMix was heard again … it sent N control values`: about 3,000 or more means it answered the request for its values; none means it did not, and only a Sync reads the desk.
+- `TotalMix went quiet on remote 4` (or `has not been heard on remote 4` since the start): a warning once two requests for its values went unanswered. `TotalMix heard on remote 4 … again after N s quiet` (or `for the first time, N s after the link began listening`), then `In the 3 s after TotalMix was heard again … it sent N control values`: about 3,000 or more means it answered the request for its values; none means it did not, and only a Sync reads the desk.
 
 ## Lights
 
@@ -109,7 +109,7 @@ Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Stu
 - `All Off` and `Del Scene` ask as `REC`'s stop does: `OFF?` or `DEL?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, a mute and `Toggle` drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the two keys without showing it, so the build and the profile go together.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
 - It stores a reply only in a custom variable that exists already, so the profile brings its own.
-- The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A request whose answer could not be written (Companion closed the connection, as at a Full Reset & Import) is one line a minute at most for each kind of failure; the next line of that kind counts those between. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
+- The bridge writes one refusal line a minute at most for each status; the next line of that status counts those between. A request whose answer could not be written (Companion closed the connection, as at a Full Reset & Import) is one line a minute at most for each kind of failure; the next line of that kind counts those between. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:

@@ -383,18 +383,19 @@ fn write_database_backup(
     }
 }
 
-/// Before each daily copy the scheduler waits until the newest daily on disk
-/// is 24 h old, so a start writes no daily of its own (2026-10-01: three
-/// starts wrote three in one day). After a copy, or a failed one, the next
-/// is a day away, as before. The first look after the start says in the log
-/// when it must wait, so the walk can tell a start held off from a stopped
-/// thread.
+/// After a start the scheduler waits until the newest daily on disk is
+/// 24 h old, so a start writes no daily of its own (2026-10-01: three
+/// starts wrote three in one day), and says in the log when it must wait,
+/// so the walk can tell a start held off from a stopped thread. After a
+/// copy, or a failed one, the next is a day away: this thread is the only
+/// writer of dailies, and its sleep does not follow the wall clock, so a
+/// clock set back cannot hold the next one off.
 fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_path: PathBuf) {
     let _ = thread::Builder::new()
         .name(String::from("database-backup"))
         .spawn(move || {
             thread::sleep(DATABASE_BACKUP_INITIAL_DELAY);
-            sleep_until_daily_backup_due(&backups_dir, Some(&log_file_path));
+            sleep_until_daily_backup_due(&backups_dir, &log_file_path);
             loop {
                 write_database_backup(
                     &db_path,
@@ -403,16 +404,16 @@ fn spawn_snapshot_scheduler(db_path: PathBuf, backups_dir: PathBuf, log_file_pat
                     SnapshotReason::Daily,
                 );
                 thread::sleep(DAILY_BACKUP_INTERVAL);
-                sleep_until_daily_backup_due(&backups_dir, None);
             }
         });
 }
 
 /// Sleeps until the newest daily backup on disk is 24 h old, looking again
-/// after each sleep: a daily written meanwhile counts. With `log_wait_to`,
-/// a first look that must wait writes one INFO line there; a later look
-/// writes none.
-fn sleep_until_daily_backup_due(backups_dir: &Path, mut log_wait_to: Option<&Path>) {
+/// after each sleep: a daily written meanwhile counts. A first look that
+/// must wait writes one INFO line to `log_file_path`; a later look writes
+/// none.
+fn sleep_until_daily_backup_due(backups_dir: &Path, log_file_path: &Path) {
+    let mut log_wait_to = Some(log_file_path);
     loop {
         let now = SystemTime::now();
         let newest = newest_daily_backup(backups_dir, now);

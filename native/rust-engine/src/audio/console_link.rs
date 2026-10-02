@@ -342,19 +342,54 @@ fn apply_console_activity_locked(
 pub(crate) const AUDIO_CONSOLE_OUT_OF_TOUCH: &str = "AUDIO_CONSOLE_OUT_OF_TOUCH";
 
 /// The Console's sentence for an assumed desk after TotalMix was out of
-/// touch; one of its own when TotalMix answered only after Studio Control
-/// started.
+/// touch.
 pub(crate) fn out_of_touch_sentence(mark: OutOfTouch) -> String {
-    let how_long = out_of_touch_words(mark.secs);
-    if mark.since_start {
-        format!(
-            "TotalMix answered only {how_long} after Studio Control started, so a change made there before may be missing. Press Sync from TotalMix."
-        )
-    } else {
-        format!(
-            "TotalMix was out of touch for {how_long}, so a change made there meanwhile may be missing. Press Sync from TotalMix."
-        )
+    format!(
+        "TotalMix was out of touch for {}, so a change made there meanwhile may be missing. Press Sync from TotalMix.",
+        out_of_touch_words(mark.secs)
+    )
+}
+
+/// The last action's code when the Console is assumed because Studio
+/// Control has not read the desk since it started.
+pub(crate) const AUDIO_CONSOLE_UNREAD_SINCE_START: &str = "AUDIO_CONSOLE_UNREAD_SINCE_START";
+
+/// The Console's sentence for it.
+pub(crate) const UNREAD_SINCE_START_SENTENCE: &str =
+    "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
+
+/// At a start on the real TotalMix (the owner's decision, 2026-10-02): a
+/// console saved as aligned is assumed until a Sync, as TotalMix may have
+/// changed while Studio Control was closed, and only a Sync reads the desk
+/// whole. A simulated console, and one already assumed or unknown, stay as
+/// they are. Returns whether the Console was marked.
+pub fn mark_console_unread_at_start(db_path: &Path) -> Result<bool, AudioCommandError> {
+    let _state_guard = lock_audio_state();
+    let settings = load_audio_settings(db_path)?;
+    if audio_metering_is_simulated(&settings)
+        || read_audio_snapshot(&settings).console_state_confidence != "aligned"
+    {
+        return Ok(false);
     }
+    persist_audio_state(
+        db_path,
+        &[
+            confidence_setting(ConsoleConfidence::Assumed),
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from("failed"),
+            ),
+            (
+                String::from(AUDIO_LAST_ACTION_CODE_KEY),
+                String::from(AUDIO_CONSOLE_UNREAD_SINCE_START),
+            ),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from(UNREAD_SINCE_START_SENTENCE),
+            ),
+        ],
+    )?;
+    Ok(true)
 }
 
 /// How long TotalMix was out of touch, in the operator's words: seconds

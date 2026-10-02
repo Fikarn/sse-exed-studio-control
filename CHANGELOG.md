@@ -42,6 +42,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- After every start the Console reads `ASSUMED` until `Sync from TotalMix`, as TotalMix may have changed while the app was closed; it read `VERIFIED` from before (#PR).
 - After TotalMix has been out of touch (its remote 4 switched off, or TotalMix closed), the Console reads `ASSUMED` once TotalMix answers again, says for how long, and asks for `Sync from TotalMix`; it read `VERIFIED` with values TotalMix no longer held (#PR).
 - The Console's Snapshots are TotalMix's own eight, under the names TotalMix last saved; `active` and `changed` say what TotalMix has loaded. Press a slot twice (`LOAD?`) to load it in TotalMix, and the Console then reads the desk (#282).
 - The Console's strips and outputs carry TotalMix's names; a channel is renamed in TotalMix (#282).

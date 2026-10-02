@@ -30,7 +30,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 ## Audio console
 
 - [ ] In TotalMix FX, remote 4 is `In Use` in `Global OSC` mode, port incoming 7004, port outgoing 9004, `Send changes` on, `Follow Submix` off.
-- [ ] The Console reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
+- [ ] After a start the Console reads `ASSUMED`, "Studio Control has not read the desk since it started. Press Sync from TotalMix.", and `engine.log` says `The Console reads assumed until a Sync`. After `Sync from TotalMix` it reads `VERIFIED`, its meters move with the sound, and its footer reads `Metering TotalMix · live`.
 - [ ] A fader moved or a mute pressed in TotalMix shows on the Console within about a second.
 - [ ] `Sync from TotalMix` says how many values it read and moves nothing in TotalMix.
 - [ ] Remote 4 off for about 30 s, a fader moved in TotalMix, remote 4 on again: the Console reads `ASSUMED` and says TotalMix was out of touch for about 30 s; `Sync from TotalMix` clears it, and the fader shows TotalMix's value. `engine.log` says when remote 4 went quiet (`TotalMix went quiet on remote 4`), when it was heard again and after how long, and how many control values TotalMix sent in the 3 s after.
@@ -126,6 +126,6 @@ Once the links are built, with the cameras on vMix's outputs:
 - [ ] After the first start on older saved data, the log's `Storage initialized` line names the new schema, and the backups folder holds a `pre-migration` copy from that start.
 - [ ] After that first start, the Console's levels for Main Out, Phones 1 and Phones 2 read what TotalMix shows; Lighting's fixtures, scenes and groups are all there.
 - [ ] A database backup verifies and restores: fixtures, scenes and deck bindings return.
-- [ ] A restart of the app with a daily backup less than a day old adds no `-daily` copy to the backups folder; `engine.log` says when the next daily is due.
+- [ ] Five minutes after a restart of the app with a daily backup less than a day old, the backups folder has no new `-daily` copy, and `engine.log` says when the next daily is due.
 - [ ] With `studio-control-engine.exe` ended in Task Manager, the screen reads `THE HARDWARE LINK STOPPED` and the hardware link starts again by itself.
 - [ ] Setup walks to Publish, and Support to Restore, without scrolling; the commissioning record and the archive row show.

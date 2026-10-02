@@ -376,10 +376,8 @@ fn a_sync_whose_dump_ends_a_quiet_still_ends_aligned() {
 
     // A pump that never flushes: only the Sync's own flush can take the mark.
     let stop = Arc::new(AtomicBool::new(false));
-    let marked = Arc::new(AtomicBool::new(false));
     let pump = {
         let stop = stop.clone();
-        let marked = marked.clone();
         std::thread::spawn(move || {
             let mut slot = slot;
             while !stop.load(Ordering::Relaxed) {
@@ -387,22 +385,20 @@ fn a_sync_whose_dump_ends_a_quiet_still_ends_aligned() {
                     &mut slot,
                     "127.0.0.1",
                 );
-                let link = crate::rme_console_link::shared_console_link();
-                if link.lock().expect("link").out_of_touch_for_test().is_some() {
-                    marked.store(true, Ordering::SeqCst);
-                }
                 std::thread::sleep(Duration::from_millis(5));
             }
+            slot
         })
     };
 
     let result = sync_audio_console_with_timing(test_dir.db_path().as_path(), fast_pull_timing())
         .expect("the pull should complete against the fake console");
     stop.store(true, Ordering::Relaxed);
-    pump.join().expect("the pump should end");
+    let slot = pump.join().expect("the pump should end");
+    // The quiet ended at the dump's first datagram, which marks the link.
     assert!(
-        marked.load(Ordering::SeqCst),
-        "the dump's first datagram marked the console link"
+        !slot.is_quiet_for_test(),
+        "the dump's first datagram ended the quiet"
     );
     assert_eq!(result.console_state_confidence, "aligned");
     let link = crate::rme_console_link::shared_console_link();
@@ -881,10 +877,8 @@ fn console_disconnect_resets_confidence_to_unknown() {
 // TotalMix out of touch on remote 4 (the walk of 2026-10-01).
 // ---------------------------------------------------------------------------
 
-const OUT_OF_TOUCH_31: crate::rme_console_link::OutOfTouch = crate::rme_console_link::OutOfTouch {
-    secs: 31,
-    since_start: false,
-};
+const OUT_OF_TOUCH_31: crate::rme_console_link::OutOfTouch =
+    crate::rme_console_link::OutOfTouch { secs: 31 };
 
 #[test]
 fn out_of_touch_makes_a_verified_console_assumed_and_says_for_how_long() {
@@ -981,17 +975,84 @@ fn out_of_touch_with_a_desk_this_flush_makes_unknown_is_not_written() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// The Console after a start (the owner's decision, 2026-10-02).
+// ---------------------------------------------------------------------------
+
+fn start_test_db(label: &str, confidence: super::helpers::ConsoleConfidence) -> TestDir {
+    let test_dir = TestDir::new(label);
+    initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[super::helpers::confidence_setting(confidence)],
+    )
+    .expect("confidence should store");
+    test_dir
+}
+
+fn console_after_start(test_dir: &TestDir) -> AudioSnapshot {
+    let settings = list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
+        .expect("settings should load");
+    read_audio_snapshot(&settings)
+}
+
 #[test]
-fn out_of_touch_since_the_start_has_a_sentence_of_its_own() {
-    let sentence = out_of_touch_sentence(crate::rme_console_link::OutOfTouch {
-        secs: 42,
-        since_start: true,
-    });
-    assert_eq!(
-        sentence,
-        "TotalMix answered only 42 s after Studio Control started, so a change made there before may be missing. Press Sync from TotalMix."
+fn a_start_makes_a_verified_console_assumed_until_a_sync() {
+    let test_dir = start_test_db(
+        "console-start-aligned",
+        super::helpers::ConsoleConfidence::Aligned,
     );
-    crate::operator_words::assert_operator_words(&sentence);
+    assert!(
+        mark_console_unread_at_start(test_dir.db_path().as_path()).expect("the mark should write")
+    );
+    let snapshot = console_after_start(&test_dir);
+    assert_eq!(snapshot.console_state_confidence, "assumed");
+    assert_eq!(snapshot.last_action_status, "failed");
+    assert_eq!(
+        snapshot.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_UNREAD_SINCE_START")
+    );
+    let message = snapshot.last_action_message.unwrap_or_default();
+    assert_eq!(
+        message,
+        "Studio Control has not read the desk since it started. Press Sync from TotalMix."
+    );
+    crate::operator_words::assert_operator_words(&message);
+    assert!(
+        !mark_console_unread_at_start(test_dir.db_path().as_path()).expect("a second start"),
+        "an assumed console is not marked again"
+    );
+}
+
+#[test]
+fn a_start_leaves_an_unknown_console_and_the_simulated_one_as_they_are() {
+    let unknown = start_test_db(
+        "console-start-unknown",
+        super::helpers::ConsoleConfidence::Unknown,
+    );
+    assert!(!mark_console_unread_at_start(unknown.db_path().as_path()).expect("no mark"));
+    assert_eq!(
+        console_after_start(&unknown).console_state_confidence,
+        "unknown"
+    );
+
+    let simulated = start_test_db(
+        "console-start-simulated",
+        super::helpers::ConsoleConfidence::Aligned,
+    );
+    set_settings_owned(
+        simulated.db_path().as_path(),
+        &[(
+            String::from(AUDIO_METERING_SOURCE_KEY),
+            String::from(crate::rme_totalmix_osc::SIMULATED_AUDIO_SOURCE),
+        )],
+    )
+    .expect("the simulated source should store");
+    assert!(!mark_console_unread_at_start(simulated.db_path().as_path()).expect("no mark"));
+    assert_eq!(
+        console_after_start(&simulated).console_state_confidence,
+        "aligned"
+    );
 }
 
 #[test]

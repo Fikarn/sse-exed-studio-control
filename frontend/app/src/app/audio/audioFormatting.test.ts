@@ -251,6 +251,21 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
     expect(status.warningCode).toBeNull();
   });
 
+  it("says the desk has not been read since the start while ASSUMED (2026-10-02)", () => {
+    const sentence = "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_UNREAD_SINCE_START",
+        lastActionMessage: sentence,
+      })
+    );
+    expect(status.label).toBe("ASSUMED");
+    expect(status.warningBody).toBe(sentence);
+    expect(status.warningCode).toBeNull();
+  });
+
   it("keeps the general ASSUMED sentence for unconfirmed changes and any other reason", () => {
     // The unconfirmed changes' sentence names TotalMix's own channel numbers.
     expect(

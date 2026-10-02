@@ -551,13 +551,12 @@ struct OutstandingRequest {
     last_reply_at_ms: Option<u64>,
 }
 
-/// TotalMix heard again after it was out of touch on the Global remote: for
-/// how many seconds, and whether it had not been heard at all since the link
-/// began listening (the walk of 2026-10-01).
+/// TotalMix heard again after it was out of touch on the Global remote, and
+/// for how many seconds (the walk of 2026-10-01). A start needs no mark: the
+/// Console is assumed after every start until a Sync.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OutOfTouch {
     pub secs: u64,
-    pub since_start: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1104,12 +1103,6 @@ impl ConsoleLinkState {
     /// Takes the out-of-touch mark, for the flush that writes it.
     pub fn take_out_of_touch(&mut self) -> Option<OutOfTouch> {
         self.out_of_touch.take()
-    }
-
-    /// The out-of-touch mark, left in place.
-    #[cfg(test)]
-    pub fn out_of_touch_for_test(&self) -> Option<OutOfTouch> {
-        self.out_of_touch
     }
 
     /// One `/snapshot/load/N` report. Slots outside 1 to 8 and values

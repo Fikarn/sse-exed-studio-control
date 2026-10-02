@@ -562,10 +562,61 @@ mod tests {
         );
     }
 
-    /// The deepest nesting a datagram can carry: each bundle inside a
-    /// bundle takes 20 bytes, so 101 of them fit the receive buffer's 2,048
-    /// bytes with a name in Windows-1252 at the bottom. Every level is read
-    /// again down to it, without a panic.
+    /// A bundle inside a bundle the library read, with an element neither
+    /// reading can read in the middle: the library drops the rest of the
+    /// inner bundle without a word; it is read again, the element skipped and
+    /// noted from its size field to the end of the inner bundle.
+    #[test]
+    fn a_skip_inside_a_bundle_the_library_read_is_noted() {
+        let gain = float("/level/out/0", -6.0);
+        let unreadable = message(b"/level/in/0", b",x", &[&(-6.0_f32).to_be_bytes()]);
+        let solo = float("/level/out/2", -8.0);
+        let inner = bundle(&[gain.clone(), unreadable.clone(), solo]);
+        let bytes = bundle(&[inner.clone(), float("/level/out/1", -7.0)]);
+
+        let library = decoder::decode_udp(&bytes).expect("the library reads it").1;
+        assert_eq!(
+            library,
+            bundled(vec![
+                bundled(vec![number("/level/out/0", -6.0)]),
+                number("/level/out/1", -7.0),
+            ]),
+            "the library drops the inner bundle's rest"
+        );
+
+        let read = read_datagram(&bytes);
+        assert_eq!(
+            read.packet,
+            Some(bundled(vec![
+                bundled(vec![
+                    number("/level/out/0", -6.0),
+                    number("/level/out/2", -8.0),
+                ]),
+                number("/level/out/1", -7.0),
+            ]))
+        );
+        let (what, from) = read.unread.expect("the skipped element is noted");
+        assert_eq!(
+            what,
+            format!(
+                "a bundle with {} of its {} bytes left unread",
+                4 + unreadable.len(),
+                bytes.len()
+            )
+        );
+        let inner_at = BUNDLE_HEADER_BYTES + 4;
+        let size_at = inner_at + BUNDLE_HEADER_BYTES + 4 + gain.len();
+        assert_eq!(
+            from,
+            &bytes[size_at..inner_at + inner.len()],
+            "from the element's size to the inner bundle's end"
+        );
+    }
+
+    /// The deepest nesting with a name in Windows-1252 at the bottom: each
+    /// bundle inside a bundle takes 20 bytes, so 101 of them fit the receive
+    /// buffer's 2,048 bytes. (An empty message at the bottom leaves room for
+    /// one more.) Every level is read again down to it, without a panic.
     #[test]
     fn the_deepest_bundle_that_fits_is_read_to_its_bottom() {
         let mut bytes = bundle(&[name("/input/8/name", b"B\xD6\xD6M")]);

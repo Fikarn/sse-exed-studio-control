@@ -14,8 +14,9 @@
 //! A link that has just begun listening asks at once, as nothing has come
 //! yet; its first 3 s count as a running link's 3 s of quiet, so TotalMix
 //! slow to answer the first requests is not out of touch. TotalMix that does
-//! not answer at all is, and when it is heard the Console reads assumed with
-//! a sentence of its own: the desk has not been read since the start.
+//! not answer at all is logged as such, and its first hearing marks nothing:
+//! the Console is assumed after every start until a Sync (the owner,
+//! 2026-10-02).
 //!
 //! The struct holds no socket and every method takes the time, so the tests
 //! need no sleeps. The lines it returns are for `engine.log`.
@@ -105,9 +106,10 @@ impl GlobalQuiet {
                 seconds(now.saturating_duration_since(heard))
             ),
             None => format!(
-                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {unanswered} requests for its values went unanswered. They go on once a second.",
+                "TotalMix has not been heard on remote 4 (port {}) since the link began listening {} ago, and {} requests for its values went unanswered. They go on once a second.",
                 self.port,
-                seconds(now.saturating_duration_since(self.listening_since))
+                seconds(now.saturating_duration_since(self.listening_since)),
+                self.requests_since_heard - 1
             ),
         })
     }
@@ -147,6 +149,12 @@ impl GlobalQuiet {
                 self.port
             ),
         })
+    }
+
+    /// Whether a quiet is declared and not yet ended.
+    #[cfg(test)]
+    pub(super) fn is_quiet(&self) -> bool {
+        self.quiet
     }
 
     /// Counts what TotalMix sent while the count after a quiet is open:
@@ -232,7 +240,7 @@ mod tests {
         assert_eq!(
             quiet.request_sent(at(start, 5_000)),
             Some(String::from(
-                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 2 requests for its values went unanswered. They go on once a second."
+                "TotalMix has not been heard on remote 4 (port 9004) since the link began listening 5.0 s ago, and 5 requests for its values went unanswered. They go on once a second."
             ))
         );
         let back = quiet.heard(at(start, 31_400)).expect("heard after a quiet");
