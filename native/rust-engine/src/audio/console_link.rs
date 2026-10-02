@@ -359,15 +359,18 @@ pub(crate) const UNREAD_SINCE_START_SENTENCE: &str =
     "Studio Control has not read the desk since it started. Press Sync from TotalMix.";
 
 /// At a start on the real TotalMix (the owner's decision, 2026-10-02): a
-/// console saved as aligned is assumed until a Sync, as TotalMix may have
-/// changed while Studio Control was closed, and only a Sync reads the desk
-/// whole. A simulated console, and one already assumed or unknown, stay as
-/// they are. Returns whether the Console was marked.
+/// console saved as aligned, or as assumed (from the last session, with
+/// its reason), is assumed until a Sync, saying so for this start, as
+/// TotalMix may have changed while Studio Control was closed and only a Sync
+/// reads the desk whole. Every start of the hardware link counts: a restart
+/// by itself, `Restart the hardware link…` and a database restore too. A
+/// simulated console, and an unknown one (it already asks for a Sync), stay
+/// as they are. Returns whether the Console was marked.
 pub fn mark_console_unread_at_start(db_path: &Path) -> Result<bool, AudioCommandError> {
     let _state_guard = lock_audio_state();
     let settings = load_audio_settings(db_path)?;
     if audio_metering_is_simulated(&settings)
-        || read_audio_snapshot(&settings).console_state_confidence != "aligned"
+        || read_audio_snapshot(&settings).console_state_confidence == "unknown"
     {
         return Ok(false);
     }

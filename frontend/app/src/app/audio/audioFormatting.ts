@@ -274,14 +274,21 @@ export function describeAudioStatus(snapshot: AudioSnapshot | null): AudioStatus
   }
 
   if (String(snapshot?.status ?? "not-verified") === "attention") {
+    // An assumed desk's sentence asks for a Sync, which an unreachable desk
+    // refuses: it is not this state's sentence.
+    const unreachableMessage =
+      typeof snapshot?.lastActionMessage === "string" &&
+      snapshot.lastActionMessage.trim().length > 0 &&
+      !ASSUMED_REASON_CODES.has(String(snapshot?.lastActionCode ?? ""))
+        ? snapshot.lastActionMessage
+        : null;
     return {
       bannerEligible: true,
       label: "OFFLINE",
       tone: "error" satisfies StatusToneLike,
       warningBody:
-        typeof snapshot?.lastActionMessage === "string" && snapshot.lastActionMessage.trim().length > 0
-          ? snapshot.lastActionMessage
-          : "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
+        unreachableMessage ??
+        "Audio may still pass, but the app cannot see or change the desk right now. Run the audio probe to check the link.",
       warningCode: null,
       warningTitle: "CONSOLE UNREACHABLE",
     };

@@ -266,6 +266,20 @@ describe("describeAudioStatus: SYNC NEEDED", () => {
     expect(status.warningCode).toBeNull();
   });
 
+  it("does not ask for a Sync while the desk is unreachable", () => {
+    const status = describeAudioStatus(
+      passedWithTotalMix({
+        status: "attention",
+        consoleStateConfidence: "assumed",
+        lastActionStatus: "failed",
+        lastActionCode: "AUDIO_CONSOLE_UNREAD_SINCE_START",
+        lastActionMessage: "Studio Control has not read the desk since it started. Press Sync from TotalMix.",
+      })
+    );
+    expect(status.label).toBe("OFFLINE");
+    expect(status.warningBody).toContain("Run the audio probe");
+  });
+
   it("keeps the general ASSUMED sentence for unconfirmed changes and any other reason", () => {
     // The unconfirmed changes' sentence names TotalMix's own channel numbers.
     expect(

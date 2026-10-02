@@ -1018,9 +1018,22 @@ fn a_start_makes_a_verified_console_assumed_until_a_sync() {
         "Studio Control has not read the desk since it started. Press Sync from TotalMix."
     );
     crate::operator_words::assert_operator_words(&message);
-    assert!(
-        !mark_console_unread_at_start(test_dir.db_path().as_path()).expect("a second start"),
-        "an assumed console is not marked again"
+    // A Console closed while assumed, here with TotalMix out of touch, says
+    // the start's reason at the next start.
+    set_settings_owned(
+        test_dir.db_path().as_path(),
+        &[(
+            String::from(AUDIO_LAST_ACTION_CODE_KEY),
+            String::from("AUDIO_CONSOLE_OUT_OF_TOUCH"),
+        )],
+    )
+    .expect("the old reason should store");
+    assert!(mark_console_unread_at_start(test_dir.db_path().as_path()).expect("a second start"));
+    let again = console_after_start(&test_dir);
+    assert_eq!(again.console_state_confidence, "assumed");
+    assert_eq!(
+        again.last_action_code.as_deref(),
+        Some("AUDIO_CONSOLE_UNREAD_SINCE_START")
     );
 }
 

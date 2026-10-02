@@ -1303,8 +1303,10 @@ pub(crate) fn read_global_packets(
                 // TotalMix back after a quiet: the console link is marked at
                 // its first datagram, so the mark is there before a Sync whose
                 // dump follows has read the desk, and the Sync's aligned comes
-                // after it. TotalMix first heard after the start marks
-                // nothing: the start has made the Console assumed already.
+                // after it. TotalMix heard for the first time since this slot
+                // was bound marks nothing: a start has made the Console
+                // assumed already (a rebind without a start, by Setup's probe,
+                // is the roadmap's open item).
                 if let Some(back) = slot.quiet.heard(heard_at) {
                     if !back.since_start {
                         mark_console_out_of_touch(&back);

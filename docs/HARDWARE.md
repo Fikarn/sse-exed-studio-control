@@ -74,6 +74,7 @@ What `engine.log` says of TotalMix, for the walk (2026-10-01):
 - `TotalMix's device:` the name on `/status/device` the first time the link hears it, and again when it changes, with the names file that name points to.
 - `Sync's read-back carried …` (or `The read-back after loading …`): every channel name the dump carried, quoted as TotalMix sent it, channels counted from 0.
 - `TotalMix sent N datagrams … that could not be read in full`: a warning at once, then once a minute at most, with the bytes where the reading stopped.
+- `The Console reads assumed until a Sync: Studio Control has not read the desk since it started.`: at each start of the hardware link on the real TotalMix with the Console last `VERIFIED` or `ASSUMED`.
 - `TotalMix went quiet on remote 4` (or `has not been heard on remote 4` since the start): a warning once two requests for its values went unanswered. `TotalMix heard on remote 4 … again after N s quiet` (or `for the first time, N s after the link began listening`), then `In the 3 s after TotalMix was heard again … it sent N control values`: about 3,000 or more means it answered the request for its values; none means it did not, and only a Sync reads the desk.
 
 ## Lights
