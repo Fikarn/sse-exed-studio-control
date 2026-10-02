@@ -545,6 +545,12 @@ impl GlassClock {
         self.words_at(now).0 >= self.paragraph_count()
     }
 
+    /// Whether the text still moves at `now`: playing, or a pause's ease not
+    /// yet over.
+    pub(crate) fn moving(&self, now: Instant) -> bool {
+        self.motion.moving(self.motion.elapsed_ms(now))
+    }
+
     /// The first word of the line at the reading line: `BACK`'s "first line
     /// of the paragraph" is the line starting at word 0. Without a layout,
     /// the word at the reading line.

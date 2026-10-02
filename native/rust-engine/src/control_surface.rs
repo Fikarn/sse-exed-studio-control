@@ -30,8 +30,9 @@ use crate::storage::{
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
 
 pub const DEFAULT_CONTROL_SURFACE_HOST: &str = "127.0.0.1";
@@ -534,6 +535,12 @@ pub(crate) fn deck_key_stamped(
     // preview; the row rides the transaction that stamps the last
     // event, so a key waits for the disk no more often than before.
     let actions = crate::action_log::deck_actions(path, action, reply);
+    // A PROMPTER key writes no row, and its last event is kept in memory
+    // (2026-10-02): the dial waits for no disk before the glass hears of it.
+    if path == crate::control_surface_pages::PROMPTER_ROUTE && actions.is_empty() {
+        keep_last_event(db_path, last_event_value(path, action, value));
+        return (response, events);
+    }
     if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions) {
         crate::diagnostics::log_event(
             crate::diagnostics::LogLevel::Warn,
@@ -576,6 +583,21 @@ fn deck_change_event(path: &str, action: &str) -> Option<DeckChange> {
     }
 }
 
+/// A key's last event as Setup's echo reads it: its route, action and value,
+/// and when, in epoch milliseconds.
+fn last_event_value(route: &str, action: &str, value: Option<&str>) -> Value {
+    let at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or(0);
+    json!({
+        "route": route,
+        "action": action,
+        "value": value,
+        "at": at,
+    })
+}
+
 fn stamp_control_surface_last_event(
     db_path: &Path,
     route: &str,
@@ -583,16 +605,7 @@ fn stamp_control_surface_last_event(
     value: Option<&str>,
     actions: &[crate::action_log::ActionRecord],
 ) -> Result<(), ControlSurfaceError> {
-    let at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0);
-    let event = json!({
-        "route": route,
-        "action": action,
-        "value": value,
-        "at": at,
-    });
+    let event = last_event_value(route, action, value);
     set_settings_owned_and(
         db_path,
         &[(String::from(LAST_EVENT_KEY), event.to_string())],
@@ -601,12 +614,37 @@ fn stamp_control_surface_last_event(
     .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
 }
 
+/// The PROMPTER page's last key for each saved data, kept in memory and not
+/// written (2026-10-02); a restart forgets it.
+static KEPT_LAST_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Value>>> = OnceLock::new();
+
+fn kept_last_events() -> MutexGuard<'static, HashMap<PathBuf, Value>> {
+    KEPT_LAST_EVENTS
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn keep_last_event(db_path: &Path, event: Value) {
+    kept_last_events().insert(db_path.to_path_buf(), event);
+}
+
+fn event_at(event: &Value) -> u64 {
+    event.get("at").and_then(Value::as_u64).unwrap_or(0)
+}
+
+/// The last key of the deck: the saved one, or the PROMPTER page's kept in
+/// memory when it is the later.
 pub fn control_surface_last_event(db_path: &Path) -> Value {
-    list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+    let saved = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .ok()
         .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
         .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
-        .unwrap_or(Value::Null)
+        .unwrap_or(Value::Null);
+    match kept_last_events().get(db_path) {
+        Some(kept) if saved.is_null() || event_at(kept) >= event_at(&saved) => kept.clone(),
+        _ => saved,
+    }
 }
 
 fn handle_light_action(

@@ -18,7 +18,8 @@ use crate::control_surface::{
     read_control_surface_lcd_text_at, ControlSurfaceError, KeyEvent,
 };
 use crate::engine_events::EMITTED;
-use crate::prompter::test_support::TestPrompter;
+use crate::prompter::deck::PROMPTER_LCD_KEYS;
+use crate::prompter::test_support::{hold_the_write_lock, TestPrompter};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -467,6 +468,92 @@ fn a_poll_reads_the_cameras_once_and_a_key_answers_its_own_displays() {
     );
     assert_eq!(iso(poll + within), "ISO\\n2000");
     assert!(cameras.nothing_sent(), "a read sends nothing");
+}
+
+// 2026-10-02: a PROMPTER display that waited for the prompter held a worker
+// of the bridge with it. The displays read the frame the prompter publishes,
+// so every one is answered while another thread holds the prompter.
+#[test]
+fn a_prompter_display_is_answered_while_the_prompter_is_held() {
+    let prompter = TestPrompter::new("bridge-prompter-held");
+    let script = prompter.script("Held", &["one two three four"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    assert_eq!(display(prompter.path(), "prompter_state_on"), "yes");
+
+    let path = prompter.path().to_path_buf();
+    let (held, holding) = std::sync::mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        crate::prompter::runtime::with_prompter(&path, "test", |_, _| {
+            held.send(()).expect("the test waits");
+            std::thread::sleep(Duration::from_millis(500));
+            Ok(())
+        })
+        .expect("the prompter is held");
+    });
+    holding.recv().expect("the prompter is held");
+    let started = Instant::now();
+    for key in PROMPTER_LCD_KEYS {
+        display(prompter.path(), key);
+    }
+    let took = started.elapsed();
+    holder.join().expect("the holder lets go");
+    assert!(
+        took < Duration::from_millis(250),
+        "the six displays took {took:?} behind a held prompter"
+    );
+}
+
+// The afternoon of 2026-10-02: a turn of the speed dial waited for the disk
+// three times before the glass heard of it. A PROMPTER key and the poll after
+// it wait for none: the place and pace go to the saver, and the key's last
+// event is kept in memory.
+#[test]
+fn a_prompter_key_and_its_displays_wait_for_no_disk() {
+    let prompter = TestPrompter::with_saver("bridge-prompter-disk");
+    let script = prompter.script("Disk", &["one two three four", "five six seven eight"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    prompter.lay_out(2, 100.0);
+    said();
+
+    let writer = hold_the_write_lock(prompter.path(), Duration::from_millis(600));
+    let started = Instant::now();
+    let answer = key(
+        prompter.path(),
+        PROMPTER_ROUTE,
+        json!({ "action": "speed", "value": "up" }),
+    );
+    for key in PROMPTER_LCD_KEYS {
+        display(prompter.path(), key);
+    }
+    let took = started.elapsed();
+    writer.join().expect("the writer lets go");
+    assert!(
+        took < Duration::from_millis(300),
+        "a detent and a poll took {took:?} behind a held disk"
+    );
+    assert_eq!(answer["speedWpm"], 145);
+    assert_eq!(said()[0].0, "prompter.changed");
+
+    // The last event is the PROMPTER key's, from memory; a later key that is
+    // written shows instead.
+    let kept = control_surface_last_event(prompter.path());
+    assert_eq!(kept["route"], PROMPTER_ROUTE);
+    assert_eq!(kept["action"], "speed");
+    let later = json!({
+        "route": "/api/deck/light-action",
+        "action": "allOff",
+        "value": null,
+        "at": kept["at"].as_u64().expect("an at") + 1,
+    });
+    crate::storage::set_settings_owned(
+        prompter.path(),
+        &[(
+            String::from("app.control_surface.last_event"),
+            later.to_string(),
+        )],
+    )
+    .expect("a saved last event");
+    assert_eq!(control_surface_last_event(prompter.path()), later);
 }
 
 #[test]

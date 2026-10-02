@@ -4,12 +4,14 @@
 use crate::prompter::clock::PrompterLayoutLine;
 use crate::prompter::model::{paragraph_word_count, PrompterParagraph};
 use crate::prompter::{handle_prompter_request, PrompterError, PrompterReply};
-use crate::storage::initialize_test_database;
+use crate::storage::{initialize_test_database, open_connection};
+use rusqlite::TransactionBehavior;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub(crate) struct TestPrompter {
     root: PathBuf,
@@ -134,6 +136,31 @@ impl Drop for TestPrompter {
         crate::prompter::runtime::forget(&self.db_path);
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+/// Another writer holds SQLite's write lock for `held`, writing as it goes,
+/// as a slow disk under a recording holds it: every write of the saved data
+/// waits. It lets go by itself.
+pub(crate) fn hold_the_write_lock(path: &Path, held: Duration) -> thread::JoinHandle<()> {
+    let path = path.to_path_buf();
+    let (taken, taking) = std::sync::mpsc::channel();
+    let handle = thread::spawn(move || {
+        let mut connection = open_connection(&path).expect("a connection");
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .expect("the write lock");
+        transaction
+            .execute(
+                "INSERT OR REPLACE INTO app_settings(key, value, updated_at) VALUES ('test.writer', 'x', 'now')",
+                [],
+            )
+            .expect("a write");
+        taken.send(()).expect("the test waits");
+        thread::sleep(held);
+        transaction.commit().expect("the commit");
+    });
+    taking.recv().expect("the lock is taken");
+    handle
 }
 
 pub(crate) fn layout_lines(

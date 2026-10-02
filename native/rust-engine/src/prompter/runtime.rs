@@ -12,14 +12,17 @@
 //! but the moment `prompter.changed` reports the stop.
 //!
 //! Since 2026-10-02 nothing under the prompter's lock waits for the disk on
-//! the take's path: the take's controls, the Stream Deck's keys and displays,
-//! and the clock open no connection and write nothing themselves. The
-//! requests that read or write scripts open their connection before they
-//! take the lock (`with_prompter_db`).
+//! the take's path: the take's controls, the Stream Deck's keys and the clock
+//! open no connection and write nothing themselves. The requests that read or
+//! write scripts open their connection before they take the lock
+//! (`with_prompter_db`). Whoever lets go of the lock publishes the deck's
+//! frame first (`deck::DeckFrame`), and the deck's displays read that, never
+//! the lock.
 
 use crate::diagnostics::{log_event, LogLevel};
 use crate::engine_events::emit_prompter_changed;
 use crate::prompter::clock::{GlassClock, PrompterAnchor, PrompterPlace};
+use crate::prompter::deck::DeckFrame;
 use crate::prompter::look::PrompterLook;
 use crate::prompter::minute;
 use crate::prompter::saver::{GlassSave, LookSave, Saver, Urgency};
@@ -38,6 +41,10 @@ use std::time::{Duration, Instant};
 pub(crate) const SAVE_EVERY: Duration = Duration::from_secs(1);
 /// The thread's longest sleep while nothing moves; any change wakes it.
 const IDLE_WAIT: Duration = Duration::from_secs(60);
+/// While a pause's ease runs the thread looks this often, so a text that
+/// eases into `END` stops there and says so at once (2026-10-02: the deck's
+/// displays used to catch it, and they no longer take the lock).
+const EASE_WAIT: Duration = Duration::from_millis(20);
 /// The prompter's minute line comes this often while the text plays.
 const MINUTE_EVERY: Duration = Duration::from_secs(60);
 /// Every start moves the look's revision on by this much, and saves that at
@@ -231,7 +238,11 @@ impl Prompter {
             return IDLE_WAIT;
         };
         if !glass.playing {
-            return IDLE_WAIT;
+            return if glass.moving(now) {
+                EASE_WAIT
+            } else {
+                IDLE_WAIT
+            };
         }
         let until_end = glass.time_to_end_ms(now).map_or(IDLE_WAIT, |milliseconds| {
             Duration::from_secs_f64(milliseconds.max(0.0) / 1000.0) + Duration::from_millis(1)
@@ -244,6 +255,9 @@ struct Entry {
     prompter: Mutex<Option<Prompter>>,
     wake: Condvar,
     saver: Arc<Saver>,
+    /// The deck's frame, as the prompter was when it last let go of its lock:
+    /// a leaf, never held while another lock is taken.
+    frame: Mutex<Option<Arc<DeckFrame>>>,
 }
 
 static PROMPTERS: OnceLock<Mutex<HashMap<PathBuf, Arc<Entry>>>> = OnceLock::new();
@@ -258,6 +272,7 @@ fn entry(db_path: &Path) -> Arc<Entry> {
             prompter: Mutex::new(None),
             wake: Condvar::new(),
             saver: Arc::new(Saver::new(db_path)),
+            frame: Mutex::new(None),
         })
     }))
 }
@@ -267,6 +282,26 @@ fn lock(entry: &Entry) -> MutexGuard<'_, Option<Prompter>> {
         .prompter
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// The deck's frame from the prompter as it is, published before the lock is
+/// let go.
+fn publish(entry: &Entry, prompter: Option<&Prompter>) {
+    let frame = prompter.map(|prompter| Arc::new(DeckFrame::of(prompter)));
+    *entry
+        .frame
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = frame;
+}
+
+/// The deck's frame as the prompter last published it; `None` before the
+/// prompter is loaded.
+pub(crate) fn published_frame(db_path: &Path) -> Option<Arc<DeckFrame>> {
+    entry(db_path)
+        .frame
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clone()
 }
 
 /// The prompter's lock, taken for `what`: how long it was waited for and
@@ -345,6 +380,7 @@ pub(crate) fn with_prompter<T>(
     let prompter = loaded(&entry, held.slot(), db_path, None, now)?;
     prompter.settle(now);
     let result = action(prompter, now);
+    publish(&entry, Some(prompter));
     drop(held);
     entry.wake.notify_all();
     result
@@ -364,6 +400,7 @@ pub(crate) fn with_prompter_db<T>(
     let prompter = loaded(&entry, held.slot(), db_path, Some(&connection), now)?;
     prompter.settle(now);
     let result = action(prompter, &mut connection, now);
+    publish(&entry, Some(prompter));
     drop(held);
     entry.wake.notify_all();
     result
@@ -419,6 +456,7 @@ pub(crate) fn forget(db_path: &Path) {
     let entry = entry(db_path);
     entry.saver.flush(Duration::from_secs(5));
     *lock(&entry) = None;
+    publish(&entry, None);
     entry.wake.notify_all();
 }
 
@@ -462,6 +500,7 @@ fn run_clock(db_path: &Path, entry: &Entry) {
             Some(prompter) => {
                 prompter.settle(now);
                 played |= prompter.glass.as_ref().is_some_and(|glass| glass.playing);
+                publish(entry, Some(prompter));
                 prompter.next_wake(Instant::now())
             }
             None => IDLE_WAIT,

@@ -1,10 +1,13 @@
 //! The PROMPTER and CAMERAS pages at the bridge (D5, D14). What a key does
 //! and what a display says is the prompter's and the cameras' own
 //! (`prompter::deck`, `cameras::deck`). This module hands a request over,
-//! turns a refusal into the bridge's answer, says what the screen is to hear
-//! of a key, and keeps a page's texts for a moment, so that one poll of the
-//! deck — every display at once, a connection each — costs one read, and a
-//! key's displays are answered by the key's own.
+//! turns a refusal into the bridge's answer, and says what the screen is to
+//! hear of a key. The CAMERAS page's texts are kept for a moment, so that one
+//! poll of the deck — every display at once, a connection each — costs one
+//! read, and a key's displays are answered by the key's own. The PROMPTER
+//! page's are worked out at each display from the frame the prompter
+//! publishes, which takes no lock of the prompter's (2026-10-02: a display
+//! that waited for the prompter held a worker of the bridge with it).
 
 use crate::cameras::deck::CAMERA_LCD_KEYS;
 use crate::cameras::CameraError;
@@ -25,8 +28,9 @@ pub(crate) const PROMPTER_ROUTE: &str = "/api/deck/prompter-action";
 /// The CAMERAS page's keys and dials.
 pub(crate) const CAMERA_ROUTE: &str = "/api/deck/camera-action";
 
-/// How long a page's texts answer its displays before they are read again:
-/// longer than one poll's burst, shorter than the second between two polls.
+/// How long the CAMERAS page's texts answer its displays before they are
+/// read again: longer than one poll's burst, shorter than the second between
+/// two polls.
 pub(crate) const TEXTS_KEPT_FOR: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -105,6 +109,13 @@ pub(crate) fn page_lcd_text(
     at: Instant,
 ) -> Option<Result<String, ControlSurfaceError>> {
     let page = page_of(key)?;
+    if page == Page::Prompter {
+        return Some(
+            crate::prompter::deck::deck_texts(db_path)
+                .map_err(prompter_error)
+                .and_then(|texts| text_of(texts, key)),
+        );
+    }
     let kept = kept(db_path, page);
     // Held while the texts are read: the other displays of the same poll
     // wait for this read instead of making their own.
@@ -128,17 +139,20 @@ pub(crate) fn page_lcd_text(
             }
         }
     }
-    let text = guard.as_ref().and_then(|kept| {
-        kept.texts
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, text)| text.clone())
-    });
-    Some(
-        text.ok_or_else(|| {
-            ControlSurfaceError::InvalidParams(format!("Unsupported LCD key: {key}"))
-        }),
-    )
+    let texts = guard
+        .as_ref()
+        .map(|kept| kept.texts.clone())
+        .unwrap_or_default();
+    Some(text_of(texts, key))
+}
+
+/// A display's text among a page's.
+fn text_of(texts: Texts, key: &str) -> Result<String, ControlSurfaceError> {
+    texts
+        .into_iter()
+        .find(|(name, _)| *name == key)
+        .map(|(_, text)| text)
+        .ok_or_else(|| ControlSurfaceError::InvalidParams(format!("Unsupported LCD key: {key}")))
 }
 
 /// What a key of the two pages answers, and what the screen is to hear of
@@ -157,9 +171,11 @@ pub(crate) struct PageAnswer {
 /// (`did`). The deck's `REC` counts its dwell and its 3 s from `at`; the
 /// prompter reads its own clock.
 ///
-/// The page's kept texts are held from before the key to after it: a display
-/// that is asked for meanwhile waits for the key, and is answered as the key
-/// left the page, from the key's own read.
+/// The CAMERAS page's kept texts are held from before the key to after it: a
+/// display that is asked for meanwhile waits for the key, and is answered as
+/// the key left the page, from the key's own read. The PROMPTER page keeps
+/// none: its displays read the frame the prompter publishes as the key lets
+/// go of the prompter's lock.
 pub(crate) fn handle_page_action(
     db_path: &Path,
     cameras_simulated: bool,
@@ -168,17 +184,14 @@ pub(crate) fn handle_page_action(
     value: Option<&str>,
     at: Instant,
 ) -> Option<Result<PageAnswer, ControlSurfaceError>> {
-    let page = match path {
-        PROMPTER_ROUTE => Page::Prompter,
-        CAMERA_ROUTE => Page::Cameras,
+    match path {
+        PROMPTER_ROUTE => return Some(prompter_key(db_path, action, value)),
+        CAMERA_ROUTE => {}
         _ => return None,
-    };
-    let kept = kept(db_path, page);
+    }
+    let kept = kept(db_path, Page::Cameras);
     let mut guard = lock(&kept);
-    let handled = match page {
-        Page::Prompter => prompter_key(db_path, action, value),
-        Page::Cameras => cameras_key(db_path, cameras_simulated, action, value, at),
-    };
+    let handled = cameras_key(db_path, cameras_simulated, action, value, at);
     Some(match handled {
         Ok((answer, events, texts)) => {
             *guard = Some(KeptTexts { at, texts });
@@ -197,8 +210,12 @@ pub(crate) fn handle_page_action(
 /// displays say after it.
 type Handled = Result<(Value, Vec<(&'static str, Value)>, Texts), ControlSurfaceError>;
 
-fn prompter_key(db_path: &Path, action: &str, value: Option<&str>) -> Handled {
-    let (reply, texts) = crate::prompter::deck::handle_deck_action(db_path, action, value)
+fn prompter_key(
+    db_path: &Path,
+    action: &str,
+    value: Option<&str>,
+) -> Result<PageAnswer, ControlSurfaceError> {
+    let reply = crate::prompter::deck::handle_deck_action(db_path, action, value)
         .map_err(prompter_error)?;
     let mut events = Vec::new();
     if let Some(reason) = reply.reason {
@@ -210,7 +227,10 @@ fn prompter_key(db_path: &Path, action: &str, value: Option<&str>) -> Handled {
     if reply.health_changed {
         events.push(health_event());
     }
-    Ok((answer(reply.result, reply.reason), events, texts))
+    Ok(PageAnswer {
+        answer: answer(reply.result, reply.reason),
+        events,
+    })
 }
 
 fn cameras_key(

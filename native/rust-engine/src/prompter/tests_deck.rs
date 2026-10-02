@@ -15,14 +15,13 @@ use std::time::Duration;
 fn press(prompter: &TestPrompter, action: &str, value: Option<&str>) -> Option<&'static str> {
     handle_deck_action(prompter.path(), action, value)
         .unwrap_or_else(|error| panic!("{action} {value:?} should succeed: {error:?}"))
-        .0
         .reason
 }
 
 /// A key or a dial that must be refused; its code and sentence.
 fn refused(prompter: &TestPrompter, action: &str, value: Option<&str>) -> (String, String) {
     match handle_deck_action(prompter.path(), action, value) {
-        Ok((reply, _)) => panic!(
+        Ok(reply) => panic!(
             "{action} {value:?} should be refused, answered {}",
             reply.result
         ),
@@ -153,12 +152,12 @@ fn the_strip_says_the_speed_the_place_the_time_left_and_the_name() {
 #[test]
 fn play_plays_or_pauses_by_what_the_glass_does() {
     let prompter = on_the_prompter("deck-play");
-    let (reply, texts) = handle_deck_action(prompter.path(), "playPause", None).expect("play");
+    let reply = handle_deck_action(prompter.path(), "playPause", None).expect("play");
     assert_eq!(reply.reason, Some("played"));
     assert!(reply.anchor.is_some(), "the views hear where the text is");
     assert!(!reply.health_changed);
-    // The key says what the displays read after it.
-    let texts: HashMap<&'static str, String> = texts.into_iter().collect();
+    // The displays read what the key left, at once.
+    let texts = displays(&prompter);
     assert_eq!(texts.len(), PROMPTER_LCD_KEYS.len());
     assert_eq!(texts["prompter_state_play"], "playing");
     assert_eq!(prompter.snapshot()["glass"]["playing"], true);
