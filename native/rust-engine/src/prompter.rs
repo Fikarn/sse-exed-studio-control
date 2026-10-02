@@ -20,6 +20,8 @@ pub(crate) mod store;
 #[cfg(test)]
 pub(crate) mod test_support;
 #[cfg(test)]
+mod tests_anchor;
+#[cfg(test)]
 mod tests_deck;
 #[cfg(test)]
 mod tests_glass;

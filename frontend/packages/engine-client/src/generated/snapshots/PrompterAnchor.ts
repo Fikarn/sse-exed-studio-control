@@ -43,4 +43,12 @@ export type PrompterAnchor = {
    * How old the anchor was when this was sent, in milliseconds.
    */
   ageMs: number;
+  /**
+   * The anchor's number (fix C, 2026-10-02). It rises whenever the anchor
+   * says something new and stays while it does not, whoever asks: a view
+   * keeps an anchor with the number it holds, takes a higher one and
+   * drops a lower one, which came late. It counts within one run of the
+   * hardware link: a view forgets it when the link stops.
+   */
+  revision: number;
 };

@@ -432,6 +432,12 @@ pub struct PrompterAnchor {
     /// How old the anchor was when this was sent, in milliseconds.
     #[serde(rename = "ageMs")]
     pub age_ms: f64,
+    /// The anchor's number (fix C, 2026-10-02). It rises whenever the anchor
+    /// says something new and stays while it does not, whoever asks: a view
+    /// keeps an anchor with the number it holds, takes a higher one and
+    /// drops a lower one, which came late. It counts within one run of the
+    /// hardware link: a view forgets it when the link stops.
+    pub revision: u64,
 }
 
 /// The clock of the script on the glass.
@@ -837,6 +843,7 @@ impl GlassClock {
                 0.0
             },
             age_ms: self.motion.elapsed_ms(now),
+            revision: 0,
         }
     }
 }

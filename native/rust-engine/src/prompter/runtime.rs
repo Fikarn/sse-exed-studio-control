@@ -31,6 +31,7 @@ use crate::prompter::store;
 use crate::prompter::PrompterError;
 use crate::storage::open_connection;
 use rusqlite::Connection;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
@@ -77,6 +78,17 @@ pub(crate) struct Prompter {
     saver: Arc<Saver>,
     /// When the place was last handed to the saver while the text scrolled.
     kept_at: Instant,
+    /// The anchors' numbers: the last one handed out, and what it said.
+    numbers: RefCell<AnchorNumbers>,
+}
+
+/// The last anchor number handed out, and the anchor it numbered (its age
+/// left out) with its motion's moment: the next anchor that says the same
+/// takes the same number, and any other the next one.
+#[derive(Default)]
+struct AnchorNumbers {
+    revision: u64,
+    last: Option<(PrompterAnchor, Instant)>,
 }
 
 /// The key of the layout the view must report for the glass as it is: the
@@ -124,6 +136,7 @@ impl Prompter {
             glass_text_differs,
             saver,
             kept_at: now,
+            numbers: RefCell::new(AnchorNumbers::default()),
         };
         prompter.keep_look(Urgency::Now);
         Ok(prompter)
@@ -133,13 +146,36 @@ impl Prompter {
         layout_key(self.glass_revision, self.look_revision)
     }
 
-    /// The glass's anchor as a view reads it at `now`, counted for the
-    /// minute line; `None` when nothing is on the glass.
+    /// The glass's anchor as a view reads it at `now`, numbered and counted
+    /// for the minute line; `None` when nothing is on the glass. Every anchor
+    /// the hardware link hands out comes from here, under the prompter's
+    /// lock, so the numbers follow the lock's order whichever thread sends
+    /// them (fix C, 2026-10-02).
     pub(crate) fn anchor(&self, now: Instant) -> Option<PrompterAnchor> {
         self.glass.as_ref().map(|glass| {
             minute::note_anchor();
-            glass.anchor(now)
+            let mut anchor = glass.anchor(now);
+            anchor.revision = self.number(&anchor, glass.motion.at);
+            anchor
         })
+    }
+
+    /// The number for `anchor`: the last one again when it says what the last
+    /// said, its age apart, on the same motion; else the next.
+    fn number(&self, anchor: &PrompterAnchor, motion_at: Instant) -> u64 {
+        let mut numbers = self.numbers.borrow_mut();
+        let mut said = anchor.clone();
+        said.age_ms = 0.0;
+        said.revision = 0;
+        let same = numbers
+            .last
+            .as_ref()
+            .is_some_and(|(last, at)| *last == said && *at == motion_at);
+        if !same {
+            numbers.revision += 1;
+            numbers.last = Some((said, motion_at));
+        }
+        numbers.revision
     }
 
     /// Hands the glass script's place and pace at `now` to the saver: where
