@@ -1,5 +1,7 @@
 import {
+  anchorOrder,
   EngineRequestError,
+  noteAnchorArrival,
   type EventEnvelope,
   type EventName,
   type GlassLink,
@@ -23,6 +25,14 @@ import type { PrompterGlassText } from "../app/teleprompter/glass/PrompterGlass"
 // - The hardware link's end stops the text where it stands: nothing scrolls
 //   by itself (D12), and with the hardware link gone nobody could pause it.
 //   Its start reads the glass again: it starts paused, at the saved place.
+// - Fix C (2026-10-02): every anchor carries the hardware link's number. An
+//   anchor with a higher number is drawn, one with the number already drawn
+//   leaves the text and its moment alone (a read that says the same), and a
+//   lower one, which came late from another thread, is dropped. The numbers
+//   count within one run of the hardware link: after its end or its start the
+//   follower hears no anchor until a read answers, and draws that read's
+//   anchor whatever its number; an answer from before the end or the start
+//   is not drawn, and the glass is read again.
 // - A read that fails is tried again in a second. A hardware link that
 //   answers and refuses is a problem the shell is told of.
 // - A page that cannot listen cannot follow the take: that is a problem the
@@ -93,8 +103,10 @@ export function followGlass(
   let view = NOTHING_DRAWN;
   /** When the anchor that is drawn came. */
   let anchorAt = 0;
-  /** The events heard: a read that an event overtook keeps the event's anchor. */
-  let heard = 0;
+  /** The hardware link's runs as the follower counts them: its end and its start each begin another. */
+  let run = 0;
+  /** Since the hardware link's end or start: no anchor is heard until a read answers, and its anchor is drawn whatever its number. */
+  let relinking = false;
   let reading = false;
   let again = false;
   let stopped = false;
@@ -123,20 +135,32 @@ export function followGlass(
       return;
     }
     reading = true;
-    const heardBefore = heard;
+    const runAsked = run;
     try {
       const snapshot = await link.readGlass();
       if (stopped) return;
+      // An answer from before the hardware link's end or start: read again.
+      if (runAsked !== run) {
+        again = true;
+        return;
+      }
       // It answered: a read that waited to be tried again is not needed.
       if (retry !== null) clearTimeout(retry);
       retry = null;
       const text = textOf(snapshot);
-      // An event that came while the glass was read is newer than what was
-      // read: its anchor stays, if it belongs to the text that was read.
-      const newer =
-        heard !== heardBefore && view.anchor !== null && text !== null && view.anchor.layoutKey === text.layoutKey;
-      if (!newer) anchorAt = now();
-      show({ text, anchor: newer ? view.anchor : snapshot.anchor, stoppedAfterMs: null, problem: deaf });
+      let anchor = view.anchor;
+      const next = snapshot.anchor;
+      if (next === null) {
+        anchor = null;
+      } else if (relinking || anchorOrder(view.anchor, next) === "take") {
+        // Newer than what is drawn (an event that came while the glass was
+        // read is not: its anchor stays), or the first answer of a run.
+        anchor = next;
+        anchorAt = now();
+        noteAnchorArrival(next, anchorAt);
+      }
+      relinking = false;
+      show({ text, anchor, stoppedAfterMs: null, problem: deaf });
     } catch (error) {
       if (stopped) return;
       if (error instanceof EngineRequestError && error.code !== "ENGINE_EXITED") {
@@ -163,21 +187,32 @@ export function followGlass(
       if (view.anchor !== null && view.stoppedAfterMs === null) {
         show({ stoppedAfterMs: Math.max(now() - anchorAt, 0) });
       }
+      run += 1;
+      relinking = true;
       readLater();
       return;
     }
     if (event.event === "engine.ready") {
-      heard += 1;
+      run += 1;
+      relinking = true;
       void read();
       return;
     }
     if (event.event !== "prompter.changed") return;
-    heard += 1;
+    // Since the end or the start, the read brings the truth.
+    if (relinking) {
+      void read();
+      return;
+    }
+    const heardAt = now();
     const anchor = anchorOf(event.payload);
     const reason = typeof event.payload.reason === "string" ? event.payload.reason : "";
     if (anchor !== null && view.text !== null && anchor.layoutKey === view.text.layoutKey) {
-      anchorAt = now();
-      show({ anchor, stoppedAfterMs: null });
+      if (anchorOrder(view.anchor, anchor) === "take") {
+        anchorAt = heardAt;
+        noteAnchorArrival(anchor, anchorAt);
+        show({ anchor, stoppedAfterMs: null });
+      }
       if (MOVES_THE_TEXT.has(reason)) return;
     }
     void read();

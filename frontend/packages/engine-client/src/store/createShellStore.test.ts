@@ -6,6 +6,8 @@ import { createFixtureTransport } from "../transports/fixtureTransport";
 import type { EventEnvelope, EventName, JsonValue } from "../generated/protocol";
 import type { EngineTransport } from "../types";
 import { createShellStore, prompterGlassIsStale } from "./createShellStore";
+import { anchorArrival } from "../prompter/anchorArrival";
+import type { PrompterAnchor } from "../generated/snapshots/PrompterAnchor";
 import { domainsForMethod } from "./domainRefresh";
 
 function recordingTransport(inner: EngineTransport, log: string[]): EngineTransport {
@@ -1234,6 +1236,75 @@ describe("createShellStore the Teleprompter", () => {
     await tick();
     expect(snapshotRequests()).toEqual(["prompter.glass.snapshot", "prompter.snapshot"]);
     expect(store.getSnapshot().prompterGlassSnapshot?.layoutKey).toBeNull();
+    await store.dispose();
+  });
+
+  // Fix C (2026-10-02): the page's copy keeps the anchor a read says again, with
+  // its moment, takes a newer one, and takes an event's newer anchor at once.
+  const playing = (revision: number, ageMs = 0) =>
+    ({ layoutKey: "g1-l0", revision, ageMs, playing: true }) as unknown as PrompterAnchor;
+  const withAnchor = (anchor: PrompterAnchor) => ({
+    ...prompter("g1-l0"),
+    glass: { layoutKey: "g1-l0", cues: [], anchor },
+  });
+  const anchorOf = (store: ReturnType<typeof createShellStore>) =>
+    store.getSnapshot().prompterSnapshot?.glass?.anchor ?? null;
+
+  it("keeps the copy's anchor while a read says the same, and takes a newer one", async () => {
+    const { answer, emit, transport } = supervisedTransport();
+    answer("prompter.snapshot", withAnchor(playing(4, 10)));
+    answer("prompter.glass.snapshot", text("g1-l0"));
+    const store = createShellStore(transport);
+    await store.initialize();
+    const first = anchorOf(store)!;
+    expect(anchorArrival(first)).not.toBeNull();
+
+    // A colour: the read says the same anchor, a second older.
+    answer("prompter.snapshot", withAnchor(playing(4, 1_010)));
+    emit(changed("prompter.changed", "look"));
+    await tick();
+    await tick();
+    expect(anchorOf(store)).toBe(first);
+
+    answer("prompter.snapshot", withAnchor(playing(5)));
+    emit(changed("prompter.changed", "speed"));
+    await tick();
+    await tick();
+    expect(anchorOf(store)?.revision).toBe(5);
+    await store.dispose();
+  });
+
+  it("takes a prompter event's newer anchor at once, and a late read does not take it back", async () => {
+    const { answer, emit, transport } = supervisedTransport();
+    answer("prompter.snapshot", withAnchor(playing(4)));
+    answer("prompter.glass.snapshot", text("g1-l0"));
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    answer("prompter.snapshot", withAnchor(playing(5)));
+    emit({ type: "event", event: "prompter.changed", payload: { reason: "played", anchor: playing(6) as never } });
+    expect(anchorOf(store)?.revision).toBe(6);
+    expect(anchorArrival(anchorOf(store)!)).not.toBeNull();
+    await tick();
+    await tick();
+    expect(anchorOf(store)?.revision).toBe(6);
+    await store.dispose();
+  });
+
+  it("takes the first read after the hardware link's start whatever its number", async () => {
+    const { answer, emit, transport } = supervisedTransport();
+    answer("prompter.snapshot", withAnchor(playing(40)));
+    answer("prompter.glass.snapshot", text("g1-l0"));
+    const store = createShellStore(transport);
+    await store.initialize();
+
+    emit({ type: "event", event: "engine.exited", payload: { graceful: true } });
+    emit({ type: "event", event: "engine.ready", payload: {} });
+    answer("prompter.snapshot", withAnchor({ ...playing(1), playing: false }));
+    emit(changed("prompter.changed", "screen"));
+    await tick();
+    await tick();
+    expect(anchorOf(store)?.revision).toBe(1);
     await store.dispose();
   });
 

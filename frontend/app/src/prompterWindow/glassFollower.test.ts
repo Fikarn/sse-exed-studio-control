@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  anchorArrival,
   EngineRequestError,
   type EventEnvelope,
   type EventName,
@@ -133,11 +134,11 @@ describe("followGlass", () => {
     follow(hardware.link);
     await settle();
     const reads = hardware.reads();
-    for (const reason of ["played", "speed", "jumped", "paused", "at-end", "laid-out"]) {
-      const moved = anchor({ playing: reason === "played", wordOffset: 3, position: 120 });
+    ["played", "speed", "jumped", "paused", "at-end", "laid-out"].forEach((reason, index) => {
+      const moved = anchor({ playing: reason === "played", wordOffset: 3, position: 120, revision: 2 + index });
       hardware.says("prompter.changed", changed(reason, moved));
       expect(last().anchor, reason).toEqual(moved);
-    }
+    });
     await settle();
     expect(hardware.reads()).toBe(reads);
   });
@@ -182,11 +183,13 @@ describe("followGlass", () => {
     await settle();
 
     hardware.holdReads();
-    hardware.answers(glass({ look: standardLook({ dimReadText: false }), anchor: anchor({ wordOffset: 1 }) }));
-    hardware.says("prompter.changed", changed("look", anchor({ wordOffset: 1 })));
+    hardware.answers(
+      glass({ look: standardLook({ dimReadText: false }), anchor: anchor({ wordOffset: 1, revision: 2 }) })
+    );
+    hardware.says("prompter.changed", changed("look", anchor({ wordOffset: 1, revision: 2 })));
     await settle();
-    // The take goes on while the read waits.
-    const newer = anchor({ wordOffset: 9, playing: true });
+    // The take goes on while the read waits: a higher number.
+    const newer = anchor({ wordOffset: 9, playing: true, revision: 3 });
     hardware.says("prompter.changed", changed("played", newer));
     hardware.release();
     await settle();
@@ -198,7 +201,14 @@ describe("followGlass", () => {
     const hardware = fakeLink(glass());
     follow(hardware.link);
     await settle();
-    const playing = anchor({ playing: true, fromWpm: 140, toWpm: 140, position: 0, pxPerReadWord: 10 });
+    const playing = anchor({
+      playing: true,
+      fromWpm: 140,
+      toWpm: 140,
+      position: 0,
+      pxPerReadWord: 10,
+      revision: 7,
+    });
     hardware.says("prompter.changed", changed("played", playing));
 
     now += 7_250;
@@ -216,8 +226,9 @@ describe("followGlass", () => {
     expect(last().stoppedAfterMs).toBe(7_250);
     expect(last().problem).toBeNull();
 
-    // Back, paused at the saved place.
-    const saved = anchor({ wordOffset: 16 });
+    // Back, paused at the saved place: a new run counts from 1 again, and its
+    // first answer is drawn whatever its number.
+    const saved = anchor({ wordOffset: 16, revision: 1 });
     hardware.answers(glass({ anchor: saved }));
     hardware.says("engine.ready", {});
     await settle();
@@ -227,6 +238,77 @@ describe("followGlass", () => {
     const after = hardware.reads();
     await vi.advanceTimersByTimeAsync(5_000);
     expect(hardware.reads()).toBe(after);
+  });
+
+  // Fix C (2026-10-02): the hardware link numbers its anchors under the
+  // prompter's lock, and sends them from several threads.
+  it("drops an anchor older than the one it draws", async () => {
+    const hardware = fakeLink(glass());
+    follow(hardware.link);
+    await settle();
+    const reads = hardware.reads();
+    const played = anchor({ playing: true, wordOffset: 4, revision: 5 });
+    hardware.says("prompter.changed", changed("played", played));
+    hardware.says("prompter.changed", changed("speed", anchor({ playing: true, toWpm: 145, revision: 4 })));
+    expect(last().anchor).toBe(played);
+    await settle();
+    expect(hardware.reads()).toBe(reads);
+  });
+
+  it("keeps the anchor it draws, and its moment, when a read says the same", async () => {
+    const hardware = fakeLink(glass());
+    follow(hardware.link);
+    await settle();
+    const played = anchor({ playing: true, fromWpm: 140, toWpm: 140, revision: 4 });
+    hardware.says("prompter.changed", changed("played", played));
+    expect(anchorArrival(played)).toBe(10_000);
+
+    // A colour: the read answers the same anchor, older by the time it took.
+    now += 1_000;
+    hardware.answers(glass({ look: standardLook({ textColour: "yellow" }), anchor: { ...played, ageMs: 1_000 } }));
+    hardware.says("prompter.changed", changed("look", { ...played, ageMs: 1_000 }));
+    await settle();
+    expect(last().text?.look.textColour).toBe("yellow");
+    expect(last().anchor).toBe(played);
+  });
+
+  it("draws no anchor between the hardware link's end and the first read after it", async () => {
+    const hardware = fakeLink(glass());
+    follow(hardware.link);
+    await settle();
+    const playing = anchor({ playing: true, revision: 6 });
+    hardware.says("prompter.changed", changed("played", playing));
+    hardware.answers(new Error("Engine is not running"));
+    now += 500;
+    hardware.says("engine.exited", { graceful: false });
+    expect(last().stoppedAfterMs).toBe(500);
+
+    // A late event of the run that ended moves nothing.
+    hardware.says("prompter.changed", changed("speed", anchor({ playing: true, toWpm: 145, revision: 9 })));
+    expect(last().anchor).toBe(playing);
+    expect(last().stoppedAfterMs).toBe(500);
+  });
+
+  it("draws no answer to a read asked before the hardware link's end, and reads again", async () => {
+    const hardware = fakeLink(glass());
+    follow(hardware.link);
+    await settle();
+    const playing = anchor({ playing: true, revision: 6 });
+    hardware.says("prompter.changed", changed("played", playing));
+
+    // A read asked now answers after the end, with the run that ended.
+    hardware.holdReads();
+    hardware.answers(glass({ anchor: anchor({ playing: true, revision: 8 }) }));
+    hardware.says("prompter.changed", changed("look", playing));
+    await settle();
+    const reads = hardware.reads();
+    hardware.says("engine.exited", { graceful: false });
+    hardware.answers(new Error("Engine is not running"));
+    hardware.release();
+    await settle();
+    expect(last().stoppedAfterMs).not.toBeNull();
+    expect(last().anchor).toBe(playing);
+    expect(hardware.reads()).toBeGreaterThan(reads);
   });
 
   it("says what the hardware link refused, and reads again", async () => {

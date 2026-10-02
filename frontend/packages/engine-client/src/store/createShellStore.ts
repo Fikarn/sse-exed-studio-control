@@ -9,9 +9,13 @@ import {
   type JsonValue,
 } from "../generated/protocol";
 import type { AudioSnapshot } from "../generated/snapshots/AudioSnapshot";
+import type { PrompterAnchor } from "../generated/snapshots/PrompterAnchor";
+import type { PrompterSnapshot } from "../generated/snapshots/PrompterSnapshot";
 import type { PrompterParagraph } from "../generated/snapshots/PrompterParagraph";
 import type { PrompterScriptSnapshot } from "../generated/snapshots/PrompterScriptSnapshot";
 import { transitionStartupState } from "../machines/startupMachine";
+import { noteAnchorArrival } from "../prompter/anchorArrival";
+import { anchorOrder } from "../prompter/anchorOrder";
 import { deriveRecoveryState } from "../machines/recoveryMachine";
 import { ALL_DOMAINS, DOMAIN_REQUESTS, domainsForEvent, domainsForMethod, type DomainKey } from "./domainRefresh";
 import { identifyFlashMoments } from "./identifyFlashes";
@@ -526,6 +530,14 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   // Slice 5 (F09): the launch the shell reported for this bootstrap, so an
   // `engine.exited` about a process the shell already replaced is ignored.
   let engineGeneration: number | null = null;
+  // Fix C (2026-10-02): the page's copy of the glass keeps an anchor a read
+  // says again and drops a late one (`anchorOrder`); a prompter event's newer
+  // anchor is taken at once. The numbers count within one run of the hardware
+  // link: its runs as the store counts them (its end and its start each begin
+  // another), the run the anchor it holds came in, and whether the link is up.
+  let prompterRun = 0;
+  let prompterAnchorRun = 0;
+  let prompterLinkUp = true;
   let automaticRestartTimeoutId: number | null = null;
   let automaticRestartsAt: number[] = [];
   let bootstrapGeneration = 0;
@@ -728,9 +740,19 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   };
 
   // Fetches `domains` side by side. A request that fails does not cost the
-  // others their answers: what arrived is returned with the failures beside it.
+  // others their answers: what arrived is returned with the failures beside it,
+  // when each answer came, and the hardware link's run they were asked in.
   const fetchDomains = async (domains: readonly DomainKey[], isCurrent: () => boolean) => {
-    const settled = await Promise.allSettled(domains.map((domain) => transport.request(DOMAIN_REQUESTS[domain])));
+    const run = prompterRun;
+    const arrivedAt = new Map<DomainKey, number>();
+    const settled = await Promise.allSettled(
+      domains.map((domain) =>
+        transport.request(DOMAIN_REQUESTS[domain]).then((value) => {
+          arrivedAt.set(domain, currentMonotonicTimestampMs());
+          return value;
+        })
+      )
+    );
     if (!isCurrent()) {
       return null;
     }
@@ -751,17 +773,71 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         failures.push(error);
       }
     });
-    return { accepted, failures };
+    return { accepted, failures, arrivedAt, run };
+  };
+
+  /**
+   * The prompter's snapshot as the page keeps it (fix C): the anchor it holds
+   * stays, the same object with the moment it came, while a read says the
+   * same, and against a late read; a newer one is taken and its moment noted.
+   * A read asked in a later run of the hardware link is taken whatever its
+   * number, one asked in an earlier run is not.
+   */
+  const keepPrompterAnchor = (
+    next: PrompterSnapshot | null,
+    arrivedAt: number,
+    run: number
+  ): PrompterSnapshot | null => {
+    const incoming = next?.glass?.anchor ?? null;
+    if (!next?.glass || !incoming) {
+      return next;
+    }
+    const held = state.prompterSnapshot?.glass?.anchor ?? null;
+    const keep =
+      held !== null &&
+      (run < prompterAnchorRun || (run === prompterAnchorRun && anchorOrder(held, incoming) !== "take"));
+    if (keep) {
+      return { ...next, glass: { ...next.glass, anchor: held } };
+    }
+    noteAnchorArrival(incoming, arrivedAt);
+    prompterAnchorRun = run;
+    return next;
+  };
+
+  /** A prompter event's anchor, taken at once when it is newer than the copy's (fix C). */
+  const takePrompterEventAnchor = (payload: Record<string, unknown> | null) => {
+    const glass = state.prompterSnapshot?.glass;
+    const anchor = payload?.anchor as PrompterAnchor | null | undefined;
+    if (!glass || !anchor || typeof anchor !== "object" || anchor.layoutKey !== glass.layoutKey) {
+      return;
+    }
+    if (!prompterLinkUp || prompterAnchorRun !== prompterRun || anchorOrder(glass.anchor, anchor) !== "take") {
+      return;
+    }
+    noteAnchorArrival(anchor, currentMonotonicTimestampMs());
+    setState({ ...state, prompterSnapshot: { ...state.prompterSnapshot!, glass: { ...glass, anchor } } });
   };
 
   // What a set of fetched snapshots changes in the state, and nothing else:
   // the lifecycle and the start-up failure are the bootstrap's to write, the
   // workspace follows the app snapshot only when that was fetched, and the
   // recovery state follows the health snapshot only when that was.
-  const snapshotsToState = (accepted: ReadonlyMap<DomainKey, JsonValue | null>): Partial<ShellState> => {
+  const snapshotsToState = (fetched: {
+    accepted: ReadonlyMap<DomainKey, JsonValue | null>;
+    arrivedAt: ReadonlyMap<DomainKey, number>;
+    run: number;
+  }): Partial<ShellState> => {
+    const { accepted } = fetched;
     const partial: Partial<Record<keyof ShellState, unknown>> = {};
     for (const [domain, value] of accepted) {
-      partial[DOMAIN_STATE_KEYS[domain]] = value;
+      partial[DOMAIN_STATE_KEYS[domain]] =
+        domain === "prompter"
+          ? keepPrompterAnchor(
+              value as PrompterSnapshot | null,
+              fetched.arrivedAt.get(domain) ?? currentMonotonicTimestampMs(),
+              fetched.run
+            )
+          : value;
     }
     if (accepted.has("health")) {
       partial.recovery = deriveRecoveryState(accepted.get("health") as JsonObject | null);
@@ -794,7 +870,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
           if (fetched) {
             setState({
               ...state,
-              ...snapshotsToState(fetched.accepted),
+              ...snapshotsToState(fetched),
               lastEvent: eventName ?? state.lastEvent,
             });
             if (fetched.accepted.has("audio")) {
@@ -1014,6 +1090,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
   const handleTransportEvent = (event: EventEnvelope<EventName>) => {
     if (event.event === "engine.ready") {
+      prompterRun += 1;
+      prompterLinkUp = true;
       pendingStartupGate?.resolve(event.payload);
       return;
     }
@@ -1038,6 +1116,8 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     // Handled before the refresh path below: the engine is gone, so there
     // is nothing to refresh from.
     if (event.event === "engine.exited") {
+      prompterRun += 1;
+      prompterLinkUp = false;
       handleEngineExited(event);
       return;
     }
@@ -1067,6 +1147,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
         }
         void refreshAudioSnapshot(event.event).catch(inBackground(`refresh audio after ${event.event}`));
         return;
+      }
+      if (event.event === "prompter.changed") {
+        takePrompterEventAnchor(payload);
       }
       // Slice 9 (F11): every other event refreshes the snapshots it names in
       // `EVENT_DOMAIN_REFRESH`. An event this build does not know — a newer
@@ -1152,7 +1235,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       }
 
       updateState({
-        ...snapshotsToState(health.accepted),
+        ...snapshotsToState(health),
         lifecycle: transitionStartupState("waiting-for-health-snapshot", {
           type: "health-loaded",
         }),
@@ -1190,9 +1273,9 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
 
       setState({
         ...state,
-        ...snapshotsToState(rest.accepted),
-        ...snapshotsToState(prompter.accepted),
-        ...snapshotsToState(cameras.accepted),
+        ...snapshotsToState(rest),
+        ...snapshotsToState(prompter),
+        ...snapshotsToState(cameras),
         lifecycle: transitionStartupState("waiting-for-app-snapshot", { type: "app-loaded" }),
         startupFailure: null,
         lastEvent: "engine.ready",

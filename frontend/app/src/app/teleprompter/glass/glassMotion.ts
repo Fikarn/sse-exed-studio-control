@@ -36,6 +36,37 @@ export function glassPosition(anchor: PrompterAnchor, layout: GlassLayout, elaps
   return position;
 }
 
+/** A small correction eases out over this long (fix C, 2026-10-02): the text glides onto a new course. */
+export const CORRECTION_MS = 150;
+/** A larger step is drawn at once: a new course the presenter must see, not a correction. */
+export const CORRECTION_MAX_PX = 24;
+/** A smaller one is no correction at all. */
+const CORRECTION_MIN_PX = 0.01;
+
+/**
+ * What the glass adds to a new anchor's course while it glides onto it: `by`
+ * glass pixels at `from` (the page's clock), fading to exactly 0 over
+ * `CORRECTION_MS`.
+ */
+export interface GlassCorrection {
+  by: number;
+  from: number;
+}
+
+/** What is left of `correction` at `at`: all of it at its start, exactly 0 from `CORRECTION_MS` on. */
+export function correctionLeft(correction: GlassCorrection | null, at: number): number {
+  if (!correction) return 0;
+  const share = (at - correction.from) / CORRECTION_MS;
+  if (share >= 1) return 0;
+  return correction.by * (1 - easeOut(share));
+}
+
+/** The correction from where the text is drawn to where a new anchor puts it, at `at`, when it is small; else none. */
+export function correctionFor(by: number, at: number): GlassCorrection | null {
+  const size = Math.abs(by);
+  return size > CORRECTION_MIN_PX && size <= CORRECTION_MAX_PX ? { by, from: at } : null;
+}
+
 /** Whether nothing moves any more: paused, its ease and its jump's move done. */
 export function glassSettled(anchor: PrompterAnchor, elapsedMs: number): boolean {
   return !anchor.playing && anchor.ageMs + elapsedMs >= Math.max(anchor.rampMs, anchor.moveMs);
