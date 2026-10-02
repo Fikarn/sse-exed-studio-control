@@ -69,7 +69,8 @@ fn lighting_fixture_catalog_is_built_once_and_resolves_as_before() {
     assert_eq!(definition.id, "aputure-infinimat-generic");
     assert_eq!(profile.mode_id, definition.default_mode_id);
 
-    // A definition the catalog lacks still falls back to the default.
+    // A definition the catalog lacks still resolves to the default: the
+    // chain of names ends at the default's id, which the catalog holds.
     let unknown = resolve_fixture_profile(Some("no-such-light"), None, None, None, "fixture-2");
     assert_eq!(unknown.definition_id, DEFAULT_FIXTURE_DEFINITION_ID);
     assert_eq!(
