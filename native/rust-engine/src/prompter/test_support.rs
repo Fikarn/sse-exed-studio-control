@@ -34,6 +34,18 @@ impl TestPrompter {
         prompter
     }
 
+    /// A test prompter whose saver writes on its own thread, as the live
+    /// app's does; it is finished before the folder goes, so Windows lets the
+    /// database go.
+    pub(crate) fn with_saver(label: &str) -> Self {
+        let prompter = Self::new(label);
+        assert!(
+            crate::prompter::runtime::saver_of(&prompter.db_path).start(),
+            "the saver's thread should start"
+        );
+        prompter
+    }
+
     /// The report the shell sends at its start when Windows sees the
     /// Prompter XL at its own size (Slice 5a): the glass is drawn, so the
     /// text may scroll. Every start forgets it (`runtime::forget`).
@@ -118,6 +130,7 @@ impl TestPrompter {
 
 impl Drop for TestPrompter {
     fn drop(&mut self) {
+        crate::prompter::runtime::saver_of(&self.db_path).finish(std::time::Duration::from_secs(5));
         crate::prompter::runtime::forget(&self.db_path);
         let _ = fs::remove_dir_all(&self.root);
     }

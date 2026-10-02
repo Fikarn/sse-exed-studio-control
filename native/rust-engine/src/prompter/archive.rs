@@ -65,6 +65,11 @@ pub(crate) struct PrompterRestoreOutcome {
     pub added: usize,
     /// Scripts it had whose archived text came back as an earlier version.
     pub earlier_versions: usize,
+    /// The archive's look and the take's size, written in the restore's
+    /// transaction and taken by the prompter's memory too
+    /// (`after_archive_restore`), so a write its saver had on the way cannot
+    /// leave the older look standing (2026-10-02).
+    pub look: Option<(PrompterLook, u32)>,
 }
 
 pub(crate) fn build_prompter_archive(connection: &Connection) -> EngineResult<PrompterArchive> {
@@ -162,8 +167,9 @@ pub(crate) fn restore_prompter_archive(
     };
     let relayout = stored.look.lays_out_differently(&look) || stored.size_px != size;
     if look != stored.look || size != stored.size_px {
-        store::write_look(transaction, &look, size, relayout)?;
+        store::write_restored_look(transaction, &look, size, relayout)?;
     }
+    outcome.look = Some((look, size));
     for script in &archive.scripts {
         if script.id.trim().is_empty() {
             continue;

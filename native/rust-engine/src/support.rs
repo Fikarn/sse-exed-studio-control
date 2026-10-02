@@ -216,6 +216,28 @@ pub struct SupportBackupRestoreSummary {
     /// (D3). Absent when nothing was left out.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// The look and size an archive brought back, for the prompter to take
+    /// (`prompter::after_archive_restore`); not part of the reply.
+    #[serde(skip)]
+    pub prompter_look: Option<(crate::prompter::look::PrompterLook, u32)>,
+}
+
+/// The prompter's saver writes what it holds before the saved data is read
+/// for a backup archive or copied before a restore, for at most this long
+/// (2026-10-02).
+const PROMPTER_FLUSH_WAIT: Duration = Duration::from_secs(2);
+
+/// What the prompter's saver holds is written first, so a copy of the saved
+/// data holds the newest place, pace and look; a flush that does not finish
+/// in time is a `WARN` line, and the copy holds what was written.
+fn flush_prompter_saves(runtime: &RuntimeContext) {
+    if !crate::prompter::flush_saves(&runtime.db_path, PROMPTER_FLUSH_WAIT) {
+        let _ = append_log(
+            &runtime.log_file_path,
+            "WARN",
+            "The prompter's newest place was not saved before the copy of the saved data.",
+        );
+    }
 }
 
 /// The answer to `support.backup.verify`: whether the file can be restored
@@ -842,6 +864,7 @@ fn restore_archive_backup(
         settings_restored,
         requires_restart: false,
         detail: (!detail.is_empty()).then(|| detail.join(" ")),
+        prompter_look: prompter_outcome.and_then(|outcome| outcome.look),
     })
 }
 
@@ -869,6 +892,7 @@ fn restore_database_backup(
         ));
     }
     let rollback_backup_path = if runtime.storage_ready {
+        flush_prompter_saves(runtime);
         let rollback = snapshot_database(
             &runtime.db_path,
             &runtime.backups_dir,
@@ -897,6 +921,7 @@ fn restore_database_backup(
         settings_restored: facts.settings_count,
         requires_restart: true,
         detail: planning_not_restored(facts.holds_planning_rows),
+        prompter_look: None,
     })
 }
 
@@ -960,6 +985,7 @@ fn write_support_backup_archive(
 }
 
 fn build_support_backup_archive(runtime: &RuntimeContext) -> EngineResult<SupportBackupArchive> {
+    flush_prompter_saves(runtime);
     let commissioning_snapshot = read_commissioning_snapshot(&runtime.db_path)?;
     let shell_settings_map = list_settings_by_prefix(&runtime.db_path, SHELL_SETTINGS_PREFIX)?;
     // Whether the light outputs are armed is the state of this workstation

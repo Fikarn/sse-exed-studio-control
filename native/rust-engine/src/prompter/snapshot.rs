@@ -1,13 +1,18 @@
 //! What the prompter reads out (`prompter.snapshot`, `prompter.glass.snapshot`
 //! and `prompter.script.snapshot`): only what the hardware link holds, never
 //! what a view drew.
+//!
+//! Since 2026-10-02 the glass's part comes from the prompter's memory, and
+//! the scripts' rows are read before the prompter's lock is taken; the glass
+//! script's row then takes the newest place and pace the saver holds, so a
+//! new pace reads at once although the disk has it a moment later.
 
 use crate::prompter::clock::{PrompterAnchor, PrompterPlace};
 use crate::prompter::look::PrompterLook;
 use crate::prompter::model::{cue_targets, PrompterParagraph};
 use crate::prompter::runtime::Prompter;
 use crate::prompter::screen::PrompterScreenSummary;
-use crate::prompter::store::{self, ScriptRow};
+use crate::prompter::store::{self, ScriptRow, StoredScript, VersionRow};
 use crate::prompter::PrompterError;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -233,31 +238,35 @@ pub(crate) fn natural_order(left: &str, right: &str) -> Ordering {
     }
 }
 
+/// The glass script's row with the newest place and pace the saver holds.
+fn with_kept_values(prompter: &Prompter, mut row: ScriptRow) -> ScriptRow {
+    if let Some((script_id, place, speed_wpm)) = prompter.kept_values() {
+        if script_id == row.id {
+            row.place = place;
+            row.speed_wpm = speed_wpm;
+        }
+    }
+    row
+}
+
+/// `prompter.snapshot`, from the scripts' rows read before the lock was
+/// taken.
 pub(crate) fn read_snapshot(
     prompter: &Prompter,
-    connection: &Connection,
+    rows: Vec<ScriptRow>,
     now: Instant,
-) -> Result<PrompterSnapshot, PrompterError> {
+) -> PrompterSnapshot {
     let glass_id = prompter.glass.as_ref().map(|glass| glass.script_id.clone());
-    let rows = store::list_scripts(connection)?;
-    let glass = match &prompter.glass {
-        Some(glass) => {
-            let script = store::read_script(connection, &glass.script_id)?;
-            let name = script
-                .as_ref()
-                .map_or_else(String::new, |script| script.name.clone());
-            let not_updated = script
-                .as_ref()
-                .is_some_and(|script| script.paragraphs != *glass.paragraphs);
-            // (`glass_edited_name` below reads the same fact for the check.)
+    let glass = match (&prompter.glass, prompter.anchor(now)) {
+        (Some(glass), Some(anchor)) => {
             let (time_left, estimated) = glass.time_left(now);
             let (length, _) = glass.length();
             Some(PrompterGlassSummary {
                 script_id: glass.script_id.clone(),
-                name,
+                name: prompter.glass_name.clone(),
                 layout_key: glass.layout_key.clone(),
                 laid_out: glass.layout.is_some(),
-                not_updated,
+                not_updated: prompter.glass_text_differs,
                 speed_wpm: glass.speed_wpm,
                 place: glass.place_at(now),
                 paragraph_count: glass.paragraph_count(),
@@ -267,13 +276,14 @@ pub(crate) fn read_snapshot(
                 length_seconds: length,
                 estimated,
                 cues: cues_of(&glass.paragraphs),
-                anchor: glass.anchor(now),
+                anchor,
             })
         }
-        None => None,
+        _ => None,
     };
+    let rows = rows.into_iter().map(|row| with_kept_values(prompter, row));
     let (removed, kept): (Vec<ScriptRow>, Vec<ScriptRow>) =
-        rows.into_iter().partition(|row| row.removed_at.is_some());
+        rows.partition(|row| row.removed_at.is_some());
     let mut scripts: Vec<PrompterScriptSummary> = kept
         .into_iter()
         .map(|row| {
@@ -291,44 +301,32 @@ pub(crate) fn read_snapshot(
             .cmp(&a.removed_at)
             .then_with(|| a.id.cmp(&b.id))
     });
-    Ok(PrompterSnapshot {
+    PrompterSnapshot {
         look: prompter.look,
         size_px: prompter.size_px,
         glass,
         scripts,
         removed,
         screen: prompter.screen.summary(),
-    })
+    }
 }
 
 /// The name of the script on the glass when it was edited after it went on
 /// (`NOT UPDATED`); `None` when it was not, or when nothing is on the glass.
-pub(crate) fn glass_edited_name(
-    prompter: &Prompter,
-    connection: &Connection,
-) -> Result<Option<String>, PrompterError> {
-    let Some(glass) = &prompter.glass else {
-        return Ok(None);
-    };
-    Ok(store::read_script(connection, &glass.script_id)?
-        .filter(|script| script.paragraphs != *glass.paragraphs)
-        .map(|script| script.name))
+pub(crate) fn glass_edited_name(prompter: &Prompter) -> Option<String> {
+    (prompter.glass.is_some() && prompter.glass_text_differs).then(|| prompter.glass_name.clone())
 }
 
-pub(crate) fn read_glass_snapshot(
-    prompter: &Prompter,
-    connection: &Connection,
-    now: Instant,
-) -> Result<PrompterGlassSnapshot, PrompterError> {
-    Ok(match &prompter.glass {
+pub(crate) fn read_glass_snapshot(prompter: &Prompter, now: Instant) -> PrompterGlassSnapshot {
+    match &prompter.glass {
         Some(glass) => PrompterGlassSnapshot {
-            name: store::read_script(connection, &glass.script_id)?.map(|script| script.name),
+            name: Some(prompter.glass_name.clone()),
             script_id: Some(glass.script_id.clone()),
             layout_key: Some(glass.layout_key.clone()),
             paragraphs: glass.paragraphs.as_ref().clone(),
             look: prompter.look,
             size_px: prompter.size_px,
-            anchor: Some(glass.anchor(now)),
+            anchor: prompter.anchor(now),
         },
         None => PrompterGlassSnapshot {
             script_id: None,
@@ -339,24 +337,48 @@ pub(crate) fn read_glass_snapshot(
             size_px: prompter.size_px,
             anchor: None,
         },
-    })
+    }
 }
 
-pub(crate) fn read_script_snapshot(
-    prompter: &Prompter,
+/// What `prompter.script.snapshot` reads from the disk, before the
+/// prompter's lock is taken.
+pub(crate) struct ScriptParts {
+    script: StoredScript,
+    row: ScriptRow,
+    versions: Vec<VersionRow>,
+}
+
+pub(crate) fn read_script_parts(
     connection: &Connection,
     script_id: &str,
-) -> Result<PrompterScriptSnapshot, PrompterError> {
+) -> Result<ScriptParts, PrompterError> {
     let script = crate::prompter::commands::existing_script(connection, script_id)?;
     let row = store::list_scripts(connection)?
         .into_iter()
         .find(|row| row.id == script_id)
         .ok_or_else(crate::prompter::commands::unknown_script)?;
+    let versions = store::list_versions(connection, script_id)?;
+    Ok(ScriptParts {
+        script,
+        row,
+        versions,
+    })
+}
+
+pub(crate) fn read_script_snapshot(
+    prompter: &Prompter,
+    parts: ScriptParts,
+) -> PrompterScriptSnapshot {
+    let ScriptParts {
+        script,
+        row,
+        versions,
+    } = parts;
     let on_prompter = prompter
         .glass
         .as_ref()
-        .is_some_and(|glass| glass.script_id == script_id);
-    let versions = store::list_versions(connection, script_id)?
+        .is_some_and(|glass| glass.script_id == row.id);
+    let versions = versions
         .into_iter()
         .map(|version| PrompterVersionSummary {
             id: u32::try_from(version.id).unwrap_or(u32::MAX),
@@ -365,12 +387,12 @@ pub(crate) fn read_script_snapshot(
             reason: version.reason,
         })
         .collect();
-    Ok(PrompterScriptSnapshot {
-        script: summary_of(row, on_prompter),
+    PrompterScriptSnapshot {
+        script: summary_of(with_kept_values(prompter, row), on_prompter),
         cues: cues_of(&script.paragraphs),
         paragraphs: script.paragraphs,
         versions,
-    })
+    }
 }
 
 #[cfg(test)]

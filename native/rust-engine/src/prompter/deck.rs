@@ -16,16 +16,20 @@
 //! dial's push (D12). While nothing is on the prompter every control is
 //! grey and refused (§9), the size dial too, which the screen's look sets
 //! at any time.
+//!
+//! Since 2026-10-02 the keys, the dials and the displays run on the
+//! prompter's memory alone: the place, the pace and the size go to the saver,
+//! and the strip's name is the prompter's, so a slow disk never holds the
+//! deck. A key's jump is saved at once, a dial's detent shortly after.
 
 use crate::prompter::clock::{read_words_from, PrompterPlace};
 use crate::prompter::commands::{
-    jump_request, nothing_on, pause_request, play_request, speed_request, text_size_request,
+    jump_request, nothing_on, pause_request, play_request, reply, speed_request, text_size_request,
 };
 use crate::prompter::runtime::{with_prompter, Prompter};
+use crate::prompter::saver::Urgency;
 use crate::prompter::screen::PrompterScreenState;
-use crate::prompter::store;
 use crate::prompter::{PrompterError, PrompterReply};
-use rusqlite::Connection;
 use serde_json::json;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -61,38 +65,37 @@ pub(crate) fn handle_deck_action(
     action: &str,
     value: Option<&str>,
 ) -> Result<(PrompterReply, DeckTexts), PrompterError> {
-    with_prompter(db_path, |prompter, connection, now| {
+    let what = format!("deck {action}");
+    with_prompter(db_path, &what, |prompter, now| {
         let jump = |to: &str| json!({ "to": to });
         let (result, reason) = match (action, value) {
             ("playPause", _) => {
                 if prompter.glass.as_ref().is_some_and(|glass| glass.playing) {
-                    pause_request(prompter, connection, now)?
+                    pause_request(prompter, now)?
                 } else {
-                    play_request(prompter, connection, now)?
+                    play_request(prompter, now)?
                 }
             }
-            ("back", _) => jump_request(prompter, connection, &jump("back"), now)?,
-            ("top", _) => jump_request(prompter, connection, &jump("top"), now)?,
+            ("back", _) => jump_request(prompter, &jump("back"), now, Urgency::Now)?,
+            ("top", _) => jump_request(prompter, &jump("top"), now, Urgency::Now)?,
             ("cue", Some("previous")) => {
-                jump_request(prompter, connection, &jump("previousCue"), now)?
+                jump_request(prompter, &jump("previousCue"), now, Urgency::Now)?
             }
-            ("cue", Some("next")) => jump_request(prompter, connection, &jump("nextCue"), now)?,
+            ("cue", Some("next")) => jump_request(prompter, &jump("nextCue"), now, Urgency::Now)?,
             ("line", Some("previous")) => {
-                jump_request(prompter, connection, &jump("previousLine"), now)?
+                jump_request(prompter, &jump("previousLine"), now, Urgency::Shortly)?
             }
-            ("line", Some("next")) => jump_request(prompter, connection, &jump("nextLine"), now)?,
+            ("line", Some("next")) => {
+                jump_request(prompter, &jump("nextLine"), now, Urgency::Shortly)?
+            }
             ("paragraph", Some("previous")) => {
-                jump_request(prompter, connection, &jump("previousParagraph"), now)?
+                jump_request(prompter, &jump("previousParagraph"), now, Urgency::Shortly)?
             }
             ("paragraph", Some("next")) => {
-                jump_request(prompter, connection, &jump("nextParagraph"), now)?
+                jump_request(prompter, &jump("nextParagraph"), now, Urgency::Shortly)?
             }
-            ("speed", Some("up")) => {
-                speed_request(prompter, connection, &json!({ "step": 1 }), now)?
-            }
-            ("speed", Some("down")) => {
-                speed_request(prompter, connection, &json!({ "step": -1 }), now)?
-            }
+            ("speed", Some("up")) => speed_request(prompter, &json!({ "step": 1 }), now)?,
+            ("speed", Some("down")) => speed_request(prompter, &json!({ "step": -1 }), now)?,
             ("size", Some(way @ ("up" | "down" | "standard"))) => {
                 if prompter.glass.is_none() {
                     return Err(nothing_on());
@@ -102,7 +105,7 @@ pub(crate) fn handle_deck_action(
                     "down" => json!({ "step": -1 }),
                     _ => json!({ "standard": true }),
                 };
-                let answer = text_size_request(prompter, connection, &params, now)?;
+                let answer = text_size_request(prompter, &params, now)?;
                 prompter.deck_size_shown_at = Some(now);
                 answer
             }
@@ -127,22 +130,17 @@ pub(crate) fn handle_deck_action(
                 )))
             }
         };
-        let reply = PrompterReply {
-            result,
-            reason,
-            anchor: prompter.glass.as_ref().map(|glass| glass.anchor(now)),
-            // A take's controls cannot change `checks.prompter`
-            // (`commands::changes_the_check`).
-            health_changed: false,
-        };
-        Ok((reply, texts(prompter, connection, now)))
+        // A take's controls cannot change `checks.prompter`
+        // (`commands::changes_the_check`).
+        let reply: PrompterReply = reply(prompter, result, reason, None);
+        Ok((reply, texts(prompter, now)))
     })
 }
 
 /// Every display of the PROMPTER page, as the prompter is now.
 pub(crate) fn deck_texts(db_path: &Path) -> Result<DeckTexts, PrompterError> {
-    with_prompter(db_path, |prompter, connection, now| {
-        Ok(texts(prompter, connection, now))
+    with_prompter(db_path, "deck display", |prompter, now| {
+        Ok(texts(prompter, now))
     })
 }
 
@@ -240,7 +238,7 @@ fn screen_words(state: PrompterScreenState) -> &'static str {
     }
 }
 
-fn texts(prompter: &Prompter, connection: &Connection, now: Instant) -> DeckTexts {
+fn texts(prompter: &Prompter, now: Instant) -> DeckTexts {
     let Some(glass) = &prompter.glass else {
         return vec![
             ("prompter_speed", String::from("SPEED\\n--")),
@@ -266,12 +264,8 @@ fn texts(prompter: &Prompter, connection: &Connection, now: Instant) -> DeckText
     } else {
         format!("LEFT\\n{}", duration_text(glass.time_left(now).0))
     };
-    // The name is the script's as it is now; a read that fails leaves the
-    // cell without one and the rest as it is.
-    let name = store::read_script_name(connection, &glass.script_id)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    // The name is the script's as a rename left it, from the prompter.
+    let name = &prompter.glass_name;
     let play = if glass.playing {
         "playing"
     } else if !screen.draws() || at_end || glass.layout.is_none() {
@@ -286,7 +280,7 @@ fn texts(prompter: &Prompter, connection: &Connection, now: Instant) -> DeckText
             place_text(&glass.paragraphs, glass.place_at(now)),
         ),
         ("prompter_left", left),
-        ("prompter_name", name_text(&name)),
+        ("prompter_name", name_text(name)),
         ("prompter_state_play", String::from(play)),
         ("prompter_state_on", String::from("yes")),
     ]

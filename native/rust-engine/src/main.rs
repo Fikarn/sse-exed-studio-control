@@ -73,6 +73,9 @@ const CONSOLE_OVER_DBFS: f64 = 0.0;
 /// readiness, Slice 3 — F02): the first daily copy five minutes after start,
 /// then one every 24 h, plus one at every graceful shutdown.
 const DATABASE_BACKUP_INITIAL_DELAY: Duration = Duration::from_secs(5 * 60);
+/// At a stop the prompter's saver writes what it holds within this, out of
+/// the two seconds the shell gives the whole stop (2026-10-02).
+const PROMPTER_SAVE_AT_STOP: Duration = Duration::from_millis(400);
 const DATABASE_BACKUP_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 
 fn meter_point_for_channel(channel: &AudioChannelSnapshot) -> &'static str {
@@ -596,15 +599,26 @@ fn main() -> io::Result<()> {
         );
     }
     spawn_snapshot_scheduler(db_path.clone(), backups_dir.clone(), log_file_path.clone());
-    // The Teleprompter's clock (new pages program, Slice 4): it stops the
-    // text at END and saves the place while the text scrolls.
-    prompter::spawn_prompter_clock(db_path.clone());
+    // The Teleprompter's clock and saver (new pages program, Slice 4;
+    // 2026-10-02): the clock stops the text at END and hands the place to the
+    // saver while the text scrolls; the saver writes it on its own thread.
+    prompter::start(db_path.clone());
 
     let served = serve_requests(&app, &mut reader, &output_sender);
     // The pictures helper is asked to stop now, and waited for after the
     // backup: the shell gives this whole stop two seconds.
     if let Some(helper) = &pictures_helper {
         helper.begin_stop();
+    }
+    // The prompter's place of this moment and what its saver holds are
+    // written, and its connection closed, before the shutdown's backup and
+    // checkpoint, whether the requests ended well or not.
+    if !prompter::finish_saving(&db_path, PROMPTER_SAVE_AT_STOP) {
+        let _ = append_log(
+            &log_file_path,
+            "WARN",
+            "The prompter's last place was not saved before the stop's backup.",
+        );
     }
     served?;
 

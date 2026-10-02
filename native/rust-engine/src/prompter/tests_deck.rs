@@ -310,7 +310,7 @@ fn the_size_dial_sets_the_size_and_the_strip_shows_it_for_a_moment() {
     assert_eq!(displays(&prompter)["prompter_left"], "SIZE\\n88 px");
 
     // Two seconds on, the time left is back.
-    with_prompter(prompter.path(), |prompter, _, _| {
+    with_prompter(prompter.path(), "test", |prompter, _| {
         prompter.deck_size_shown_at = prompter
             .deck_size_shown_at
             .and_then(|shown| shown.checked_sub(Duration::from_millis(2_001)));
