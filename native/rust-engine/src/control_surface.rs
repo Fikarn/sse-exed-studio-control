@@ -31,6 +31,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Instant;
@@ -537,11 +538,16 @@ pub(crate) fn deck_key_stamped(
     let actions = crate::action_log::deck_actions(path, action, reply);
     // A PROMPTER key writes no row, and its last event is kept in memory
     // (2026-10-02): the dial waits for no disk before the glass hears of it.
+    let order = LAST_EVENT_ORDER.fetch_add(1, Ordering::SeqCst);
     if path == crate::control_surface_pages::PROMPTER_ROUTE && actions.is_empty() {
-        keep_last_event(db_path, last_event_value(path, action, value));
+        keep_last_event(db_path, order, last_event_value(path, action, value));
         return (response, events);
     }
-    if let Err(error) = stamp_control_surface_last_event(db_path, path, action, value, &actions) {
+    let stamped = stamp_control_surface_last_event(db_path, path, action, value, &actions);
+    if stamped.is_ok() {
+        note_saved_last_event(db_path, order);
+    }
+    if let Err(error) = stamped {
         crate::diagnostics::log_event(
             crate::diagnostics::LogLevel::Warn,
             &format!(
@@ -614,37 +620,57 @@ fn stamp_control_surface_last_event(
     .map_err(|error| ControlSurfaceError::Storage(error.to_string()))
 }
 
-/// The PROMPTER page's last key for each saved data, kept in memory and not
-/// written (2026-10-02); a restart forgets it.
-static KEPT_LAST_EVENTS: OnceLock<Mutex<HashMap<PathBuf, Value>>> = OnceLock::new();
+/// The order the keys of the deck came in, for every saved data: which of
+/// the saved and the kept last events is the later is told by it, not by the
+/// wall clock, which Windows may set back (the review of #288).
+static LAST_EVENT_ORDER: AtomicU64 = AtomicU64::new(1);
 
-fn kept_last_events() -> MutexGuard<'static, HashMap<PathBuf, Value>> {
-    KEPT_LAST_EVENTS
+/// For each saved data: the PROMPTER page's last key, kept in memory and not
+/// written (2026-10-02), and the order of the last key that was written; a
+/// restart forgets both.
+#[derive(Default)]
+struct LastEvents {
+    kept: Option<(u64, Value)>,
+    saved_order: u64,
+}
+
+static LAST_EVENTS: OnceLock<Mutex<HashMap<PathBuf, LastEvents>>> = OnceLock::new();
+
+fn last_events() -> MutexGuard<'static, HashMap<PathBuf, LastEvents>> {
+    LAST_EVENTS
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn keep_last_event(db_path: &Path, event: Value) {
-    kept_last_events().insert(db_path.to_path_buf(), event);
+fn keep_last_event(db_path: &Path, order: u64, event: Value) {
+    last_events().entry(db_path.to_path_buf()).or_default().kept = Some((order, event));
 }
 
-fn event_at(event: &Value) -> u64 {
-    event.get("at").and_then(Value::as_u64).unwrap_or(0)
+fn note_saved_last_event(db_path: &Path, order: u64) {
+    let mut events = last_events();
+    let events = events.entry(db_path.to_path_buf()).or_default();
+    events.saved_order = events.saved_order.max(order);
 }
 
-/// The last key of the deck: the saved one, or the PROMPTER page's kept in
-/// memory when it is the later.
+/// The last key of the deck: the PROMPTER page's kept in memory when it came
+/// after the last one written, else the saved one.
 pub fn control_surface_last_event(db_path: &Path) -> Value {
-    let saved = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+    let kept = last_events().get(db_path).and_then(|events| {
+        events
+            .kept
+            .as_ref()
+            .filter(|(order, _)| *order > events.saved_order)
+            .map(|(_, event)| event.clone())
+    });
+    if let Some(kept) = kept {
+        return kept;
+    }
+    list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
         .ok()
         .and_then(|settings| settings.get(LAST_EVENT_KEY).cloned())
         .and_then(|serialized| serde_json::from_str::<Value>(&serialized).ok())
-        .unwrap_or(Value::Null);
-    match kept_last_events().get(db_path) {
-        Some(kept) if saved.is_null() || event_at(kept) >= event_at(&saved) => kept.clone(),
-        _ => saved,
-    }
+        .unwrap_or(Value::Null)
 }
 
 fn handle_light_action(

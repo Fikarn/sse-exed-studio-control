@@ -20,7 +20,7 @@ use crate::protocol::{EVENT_APP_CHANGED, EVENT_CAMERAS_CHANGED, EVENT_PROMPTER_C
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
 /// The PROMPTER page's keys and dials.
@@ -32,6 +32,83 @@ pub(crate) const CAMERA_ROUTE: &str = "/api/deck/camera-action";
 /// read again: longer than one poll's burst, shorter than the second between
 /// two polls.
 pub(crate) const TEXTS_KEPT_FOR: Duration = Duration::from_millis(250);
+
+/// A PROMPTER display asked for while a key of the page is on its way waits
+/// for the key this long at most, then answers from the prompter as it is
+/// (the review of #288: Companion asks for a dial's displays as it sends the
+/// detent, and the strip showed the pace from before it until the next poll).
+pub(crate) const KEY_WAITED_FOR: Duration = Duration::from_millis(100);
+
+/// The PROMPTER keys on their way, by saved data.
+struct KeysOnTheirWay {
+    count: Mutex<HashMap<PathBuf, u32>>,
+    done: Condvar,
+}
+
+fn keys_on_their_way() -> &'static KeysOnTheirWay {
+    static KEYS: OnceLock<KeysOnTheirWay> = OnceLock::new();
+    KEYS.get_or_init(|| KeysOnTheirWay {
+        count: Mutex::new(HashMap::new()),
+        done: Condvar::new(),
+    })
+}
+
+/// A PROMPTER key on its way, from before it takes the prompter's lock to
+/// after the prompter published what it did.
+struct KeyOnItsWay<'a> {
+    db_path: &'a Path,
+}
+
+fn key_on_its_way(db_path: &Path) -> KeyOnItsWay<'_> {
+    let keys = keys_on_their_way();
+    *keys
+        .count
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .entry(db_path.to_path_buf())
+        .or_insert(0) += 1;
+    KeyOnItsWay { db_path }
+}
+
+impl Drop for KeyOnItsWay<'_> {
+    fn drop(&mut self) {
+        let keys = keys_on_their_way();
+        let mut count = keys
+            .count
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(on_their_way) = count.get_mut(self.db_path) {
+            *on_their_way = on_their_way.saturating_sub(1);
+        }
+        drop(count);
+        keys.done.notify_all();
+    }
+}
+
+/// Waits, `KEY_WAITED_FOR` at most, until no PROMPTER key of this saved data
+/// is on its way.
+fn wait_for_keys(db_path: &Path) {
+    let keys = keys_on_their_way();
+    let until = Instant::now() + KEY_WAITED_FOR;
+    let mut count = keys
+        .count
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    while count
+        .get(db_path)
+        .is_some_and(|on_their_way| *on_their_way > 0)
+    {
+        let now = Instant::now();
+        if now >= until {
+            return;
+        }
+        count = keys
+            .done
+            .wait_timeout(count, until - now)
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .0;
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Page {
@@ -110,6 +187,7 @@ pub(crate) fn page_lcd_text(
 ) -> Option<Result<String, ControlSurfaceError>> {
     let page = page_of(key)?;
     if page == Page::Prompter {
+        wait_for_keys(db_path);
         return Some(
             crate::prompter::deck::deck_texts(db_path)
                 .map_err(prompter_error)
@@ -215,8 +293,10 @@ fn prompter_key(
     action: &str,
     value: Option<&str>,
 ) -> Result<PageAnswer, ControlSurfaceError> {
+    let on_its_way = key_on_its_way(db_path);
     let reply = crate::prompter::deck::handle_deck_action(db_path, action, value)
         .map_err(prompter_error)?;
+    drop(on_its_way);
     let mut events = Vec::new();
     if let Some(reason) = reply.reason {
         events.push((

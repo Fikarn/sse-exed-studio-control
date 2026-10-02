@@ -553,7 +553,93 @@ fn a_prompter_key_and_its_displays_wait_for_no_disk() {
         )],
     )
     .expect("a saved last event");
-    assert_eq!(control_surface_last_event(prompter.path()), later);
+    // Written behind the bridge's back, it is older than the kept key.
+    assert_eq!(control_surface_last_event(prompter.path()), kept);
+}
+
+// The last event is the key that came last, whichever page it was on: a key
+// that is written, then a PROMPTER key kept in memory, then a written one
+// again (the review of #288: the wall clock told them apart, and Windows may
+// set it back).
+#[test]
+fn the_last_event_is_the_key_that_came_last() {
+    let cameras = TestCameras::set_up("bridge-last-event");
+    let request = |method: &str, params: Value| {
+        crate::prompter::handle_prompter_request(cameras.path(), method, &params)
+            .unwrap_or_else(|error| panic!("{method} should succeed: {error:?}"))
+            .result
+    };
+    let script = request("prompter.script.create", json!({ "name": "Order" }))["scriptId"]
+        .as_str()
+        .expect("an id")
+        .to_string();
+    request("prompter.putOn", json!({ "scriptId": script }));
+
+    key(cameras.path(), CAMERA_ROUTE, json!({ "action": "rec" }));
+    assert_eq!(control_surface_last_event(cameras.path())["action"], "rec");
+    key(
+        cameras.path(),
+        PROMPTER_ROUTE,
+        json!({ "action": "speed", "value": "up" }),
+    );
+    assert_eq!(
+        control_surface_last_event(cameras.path())["action"],
+        "speed"
+    );
+    key(
+        cameras.path(),
+        CAMERA_ROUTE,
+        json!({ "action": "select", "value": "2" }),
+    );
+    assert_eq!(
+        control_surface_last_event(cameras.path())["action"],
+        "select"
+    );
+    key(
+        cameras.path(),
+        PROMPTER_ROUTE,
+        json!({ "action": "speed", "value": "down" }),
+    );
+    let last = control_surface_last_event(cameras.path());
+    assert_eq!(
+        (last["action"].clone(), last["value"].clone()),
+        (json!("speed"), json!("down"))
+    );
+}
+
+// Companion asks for a dial's displays as it sends the detent: a display
+// asked for while the key is on its way waits for it, and says what the key
+// did (the review of #288).
+#[test]
+fn a_prompter_display_asked_for_during_a_key_follows_the_key() {
+    let prompter = TestPrompter::new("bridge-prompter-on-its-way");
+    let script = prompter.script("Way", &["one two three four"]);
+    prompter.call("prompter.putOn", json!({ "scriptId": script }));
+    assert_eq!(display(prompter.path(), "prompter_speed"), "SPEED\\n140");
+
+    let path = prompter.path().to_path_buf();
+    let (held, holding) = std::sync::mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        crate::prompter::runtime::with_prompter(&path, "test", |_, _| {
+            held.send(()).expect("the test waits");
+            std::thread::sleep(Duration::from_millis(60));
+            Ok(())
+        })
+        .expect("the prompter is held");
+    });
+    holding.recv().expect("the prompter is held");
+    let path = prompter.path().to_path_buf();
+    let detent = std::thread::spawn(move || {
+        key(
+            &path,
+            PROMPTER_ROUTE,
+            json!({ "action": "speed", "value": "up" }),
+        )
+    });
+    std::thread::sleep(Duration::from_millis(20));
+    assert_eq!(display(prompter.path(), "prompter_speed"), "SPEED\\n145");
+    assert_eq!(detent.join().expect("the detent")["speedWpm"], 145);
+    holder.join().expect("the holder lets go");
 }
 
 #[test]
