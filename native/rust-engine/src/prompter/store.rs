@@ -1,12 +1,18 @@
 //! The prompter's saved data (schema 9, `storage.rs`): the scripts, their
 //! last versions and the prompter's one row. Only this file writes SQL for
 //! the prompter; every write is one transaction the caller commits.
+//!
+//! While Studio Control runs, the glass script's place and pace and the
+//! prompter's look are written by the saver alone (`saver.rs`), and by the
+//! transactions that change what the glass shows; a reader of those columns
+//! that wants the newest values asks the prompter or flushes the saver first.
 
 use crate::prompter::clock::PrompterPlace;
 use crate::prompter::look::PrompterLook;
 use crate::prompter::model::{read_word_count, PrompterParagraph};
+use crate::prompter::saver::{GlassSave, LookSave};
 use crate::storage::EngineResult;
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 /// Each script keeps its last 20 versions (the proposal §3.3).
 pub(crate) const VERSIONS_KEPT: i64 = 20;
@@ -72,6 +78,14 @@ pub(crate) struct StoredPrompter {
     pub glass_paragraphs: Option<Vec<PrompterParagraph>>,
     pub glass_revision: i64,
     pub look_revision: i64,
+}
+
+/// A write transaction that takes SQLite's write lock at once (2026-10-02).
+/// The saver writes beside the requests now, and a transaction that read
+/// before it wrote would be refused (`SQLITE_BUSY`) instead of waiting its
+/// turn; one begun this way waits as long as the busy timeout allows.
+pub(crate) fn begin(connection: &mut Connection) -> rusqlite::Result<Transaction<'_>> {
+    connection.transaction_with_behavior(TransactionBehavior::Immediate)
 }
 
 fn paragraphs_json(paragraphs: &[PrompterParagraph]) -> EngineResult<String> {
@@ -174,18 +188,6 @@ pub(crate) fn read_script(connection: &Connection, id: &str) -> EngineResult<Opt
 /// A new script's id: `script-` and sixteen hex digits from the system's
 /// randomness, so a script restored from another workstation's archive
 /// never takes an id this one has.
-/// A script's name, without its text: the Stream Deck's strip asks for it
-/// once a second.
-pub(crate) fn read_script_name(connection: &Connection, id: &str) -> EngineResult<Option<String>> {
-    Ok(connection
-        .query_row(
-            "SELECT name FROM prompter_scripts WHERE id = ?1",
-            [id],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?)
-}
-
 pub(crate) fn new_script_id() -> EngineResult<String> {
     let mut bytes = [0u8; 8];
     getrandom::fill(&mut bytes)
@@ -244,28 +246,46 @@ pub(crate) fn insert_script(
 }
 
 /// A script's new text and the place moved with it; `changed_at` moves on.
+/// The script on the glass keeps its place where it is (`None`): the place
+/// counts in the glass's text, and only the saver and the changes of the
+/// glass write it (2026-10-02; an edit used to write back a place it had read
+/// earlier, over a newer one).
 pub(crate) fn write_script_text(
     transaction: &Transaction<'_>,
     id: &str,
     paragraphs: &[PrompterParagraph],
-    place: PrompterPlace,
+    place: Option<PrompterPlace>,
 ) -> EngineResult<()> {
-    transaction.execute(
-        &format!(
-            "UPDATE prompter_scripts
-                SET paragraphs = ?2, paragraph_count = ?3, read_words = ?4,
-                    place_paragraph = ?5, place_word = ?6, changed_at = {NOW}
-              WHERE id = ?1"
-        ),
-        params![
-            id,
-            paragraphs_json(paragraphs)?,
-            paragraphs.len() as i64,
-            read_word_count(paragraphs) as i64,
-            i64::from(place.paragraph),
-            i64::from(place.word),
-        ],
-    )?;
+    let text = paragraphs_json(paragraphs)?;
+    let count = paragraphs.len() as i64;
+    let words = read_word_count(paragraphs) as i64;
+    match place {
+        Some(place) => transaction.execute(
+            &format!(
+                "UPDATE prompter_scripts
+                    SET paragraphs = ?2, paragraph_count = ?3, read_words = ?4,
+                        place_paragraph = ?5, place_word = ?6, changed_at = {NOW}
+                  WHERE id = ?1"
+            ),
+            params![
+                id,
+                text,
+                count,
+                words,
+                i64::from(place.paragraph),
+                i64::from(place.word),
+            ],
+        )?,
+        None => transaction.execute(
+            &format!(
+                "UPDATE prompter_scripts
+                    SET paragraphs = ?2, paragraph_count = ?3, read_words = ?4,
+                        changed_at = {NOW}
+                  WHERE id = ?1"
+            ),
+            params![id, text, count, words],
+        )?,
+    };
     Ok(())
 }
 
@@ -281,30 +301,52 @@ pub(crate) fn write_script_name(
     Ok(())
 }
 
-/// The place, saved about once a second while the text scrolls and at every
-/// stop, jump and change. It is not an edit: `changed_at` stays.
-pub(crate) fn write_script_place(
-    connection: &Connection,
+/// A script's place and pace, written by a change of the glass in its own
+/// transaction: the script it lets go of, the one it puts on, the text
+/// Update brings. It is not an edit: `changed_at` stays.
+pub(crate) fn write_script_values(
+    transaction: &Transaction<'_>,
     id: &str,
     place: PrompterPlace,
+    speed_wpm: u32,
 ) -> EngineResult<()> {
-    connection.execute(
-        "UPDATE prompter_scripts SET place_paragraph = ?2, place_word = ?3 WHERE id = ?1",
-        params![id, i64::from(place.paragraph), i64::from(place.word)],
+    transaction.execute(
+        "UPDATE prompter_scripts SET place_paragraph = ?2, place_word = ?3, speed_wpm = ?4
+          WHERE id = ?1",
+        params![
+            id,
+            i64::from(place.paragraph),
+            i64::from(place.word),
+            i64::from(speed_wpm)
+        ],
     )?;
     Ok(())
 }
 
-pub(crate) fn write_script_speed(
-    connection: &Connection,
-    id: &str,
-    speed_wpm: u32,
-) -> EngineResult<()> {
-    connection.execute(
-        "UPDATE prompter_scripts SET speed_wpm = ?2 WHERE id = ?1",
-        params![id, i64::from(speed_wpm)],
+/// The saver's write of the glass script's place and pace: it lands only
+/// while the glass still shows that script at the revision the values were
+/// taken at. Putting a script on, replacing, updating and clearing move the
+/// revision on in the transaction in which they write the places
+/// themselves, so a save taken before them is refused here, whichever
+/// reaches the disk first. True when it landed.
+pub(crate) fn write_glass_save(
+    transaction: &Transaction<'_>,
+    save: &GlassSave,
+) -> EngineResult<bool> {
+    let changed = transaction.execute(
+        "UPDATE prompter_scripts SET place_paragraph = ?3, place_word = ?4, speed_wpm = ?5
+          WHERE id = ?1
+            AND EXISTS (SELECT 1 FROM prompter_state
+                         WHERE id = 1 AND glass_script_id = ?1 AND glass_revision = ?2)",
+        params![
+            save.script_id,
+            save.glass_revision,
+            i64::from(save.place.paragraph),
+            i64::from(save.place.word),
+            i64::from(save.speed_wpm)
+        ],
     )?;
-    Ok(())
+    Ok(changed > 0)
 }
 
 pub(crate) fn write_script_removed(
@@ -490,27 +532,16 @@ pub(crate) fn write_glass(
     )?)
 }
 
-/// The look and the take's size; the look's revision moves on when the text
-/// has to be laid out again.
-pub(crate) fn write_look(
-    connection: &Connection,
-    look: &PrompterLook,
-    size_px: u32,
-    relayout: bool,
-) -> EngineResult<i64> {
-    connection.execute(
-        "UPDATE prompter_state
-            SET look = ?1, size_px = ?2, look_revision = look_revision + ?3
-          WHERE id = 1",
+/// The saver's write of the look, the take's size and the look's revision,
+/// whole: while Studio Control runs only the prompter's memory changes them.
+pub(crate) fn write_look_save(transaction: &Transaction<'_>, save: &LookSave) -> EngineResult<()> {
+    transaction.execute(
+        "UPDATE prompter_state SET look = ?1, size_px = ?2, look_revision = ?3 WHERE id = 1",
         params![
-            serde_json::to_string(look)?,
-            i64::from(size_px),
-            i64::from(relayout)
+            serde_json::to_string(&save.look)?,
+            i64::from(save.size_px),
+            save.look_revision
         ],
     )?;
-    Ok(connection.query_row(
-        "SELECT look_revision FROM prompter_state WHERE id = 1",
-        [],
-        |row| row.get(0),
-    )?)
+    Ok(())
 }

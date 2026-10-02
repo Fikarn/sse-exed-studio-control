@@ -65,6 +65,10 @@ pub(crate) struct PrompterRestoreOutcome {
     pub added: usize,
     /// Scripts it had whose archived text came back as an earlier version.
     pub earlier_versions: usize,
+    /// The archive's look and the take's size, for the prompter to take
+    /// (`after_archive_restore`): since 2026-10-02 only the prompter's memory
+    /// changes the look while Studio Control runs, and its saver writes it.
+    pub look: Option<(PrompterLook, u32)>,
 }
 
 pub(crate) fn build_prompter_archive(connection: &Connection) -> EngineResult<PrompterArchive> {
@@ -153,17 +157,13 @@ pub(crate) fn restore_prompter_archive(
     archive: &PrompterArchive,
 ) -> EngineResult<PrompterRestoreOutcome> {
     let mut outcome = PrompterRestoreOutcome::default();
-    let stored = store::read_prompter(transaction)?;
     let look = PrompterLook::from_stored(&serde_json::to_string(&archive.look)?);
     let size = if size_is_valid(archive.size_px) {
         archive.size_px
     } else {
         STANDARD_SIZE_PX
     };
-    let relayout = stored.look.lays_out_differently(&look) || stored.size_px != size;
-    if look != stored.look || size != stored.size_px {
-        store::write_look(transaction, &look, size, relayout)?;
-    }
+    outcome.look = Some((look, size));
     for script in &archive.scripts {
         if script.id.trim().is_empty() {
             continue;

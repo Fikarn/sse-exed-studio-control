@@ -167,7 +167,7 @@ On a published setup, a press on a step, on `Back to …` or on `Run all probes`
 
 **Backups.** `Export backup` writes a backup archive. `Verify latest` checks the newest backup and changes nothing. `Restore latest` restores it. The Support screen lists every backup: press one, then `Verify path` or `Restore path`. A restore asks first and says what it replaces: a database backup replaces all the saved data, a backup archive the settings, and adds its scripts. It keeps a copy of what it replaced. A database backup restarts the hardware link. Every restore comes back with the light outputs held: arm them with `Light outputs` when the rig should follow.
 
-**Diagnostics.** `Export diagnostics` writes a report. `Open the log` opens the log.
+**Diagnostics.** `Export diagnostics` writes a report. `Open the log` opens the log. While the text plays, the log gets one line a minute from the prompter, `Prompter, the last minute: …`: the longest its lock was held and waited for, and by what; what it saved, refused and failed to save, and its longest write; and how many anchors went to the glass and the page. After a take that stuttered, it says where the time went.
 
 **Recent actions** lists the last eight actions that changed what a device receives, and who did each: `Screen`, `Stream Deck`, `Console` (a switch thrown at TotalMix) or `Start-up`. Faders and dials are not listed.
 

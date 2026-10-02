@@ -3,6 +3,12 @@
 //! request and the clock thread never interleave. What the operator reads —
 //! a refusal, an import sentence — is written here.
 //!
+//! Since 2026-10-02 the take's controls, the look, the views' reports and the
+//! reads of the glass run on the prompter's memory alone and hand the place,
+//! the pace and the look to the saver (`saver.rs`); the requests that read or
+//! write scripts open their connection before they take the lock, and the
+//! lists are read before it.
+//!
 //! The rules the design sets (D11, D12, D19, D20): nothing but the
 //! operator's controls moves the place; only `TOP` pauses a scroll; at a
 //! script's end `PLAY` is refused until a jump moves the place back;
@@ -13,7 +19,6 @@
 //! refused while nothing is drawn on the glass, and a scroll pauses when the
 //! glass goes.
 
-use crate::diagnostics::{log_event, LogLevel};
 use crate::prompter::clock::{
     cue_after, cue_before, speed_is_valid, PrompterLayoutLine, PrompterPlace, SPEED_DEFAULT_WPM,
     SPEED_MAX_WPM, SPEED_MIN_WPM, SPEED_STEP_WPM,
@@ -29,15 +34,17 @@ use crate::prompter::model::{
     cue_targets, format_count, sanitize_text, word_count, PrompterParagraph, MAX_IMPORT_BYTES,
     MAX_SCRIPT_NAME_CHARS, MAX_SCRIPT_WORDS,
 };
-use crate::prompter::runtime::{with_prompter, Prompter};
+use crate::prompter::runtime::{with_prompter, with_prompter_db, Prompter};
+use crate::prompter::saver::Urgency;
 use crate::prompter::screen::{PrompterHealthCheck, PrompterScreen};
 use crate::prompter::snapshot::{
-    glass_edited_name, read_glass_snapshot, read_script_snapshot, read_snapshot,
+    glass_edited_name, read_glass_snapshot, read_script_parts, read_script_snapshot, read_snapshot,
 };
 use crate::prompter::store::{self, reason, NewScript, StoredScript};
 use crate::prompter::{PrompterError, PrompterReply};
+use crate::storage::open_connection;
 use base64::Engine as _;
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -51,30 +58,55 @@ pub(crate) fn handle_prompter_request(
     method: &str,
     params: &Value,
 ) -> Result<PrompterReply, PrompterError> {
-    with_prompter(db_path, |prompter, connection, now| {
-        let check_before = changes_the_check(method).then(|| checked(prompter, connection));
+    match method {
+        // The lists are read before the lock is taken; the glass script's row
+        // takes the newest place and pace from the prompter (2026-10-02: the
+        // page reads this after every event, a dial's detent too).
+        "prompter.snapshot" => {
+            let rows = store::list_scripts(&open_connection(db_path)?)?;
+            return with_prompter(db_path, method, |prompter, now| {
+                let result = serde_json::to_value(read_snapshot(prompter, rows, now))?;
+                Ok(reply(prompter, result, None, None))
+            });
+        }
+        "prompter.script.snapshot" => {
+            let parts = read_script_parts(&open_connection(db_path)?, script_id(params)?)?;
+            return with_prompter(db_path, method, |prompter, _| {
+                let result = serde_json::to_value(read_script_snapshot(prompter, parts))?;
+                Ok(reply(prompter, result, None, None))
+            });
+        }
+        _ => {}
+    }
+    if on_memory(method) {
+        return with_prompter(db_path, method, |prompter, now| {
+            let check_before = changes_the_check(method).then(|| health_check(prompter));
+            let (result, reason) = match method {
+                "prompter.glass.snapshot" => (
+                    serde_json::to_value(read_glass_snapshot(prompter, now))?,
+                    None,
+                ),
+                "prompter.paste.convert" => paste_convert_request(params)?,
+                "prompter.play" => play_request(prompter, now)?,
+                "prompter.pause" => pause_request(prompter, now)?,
+                "prompter.speed" => speed_request(prompter, params, now)?,
+                "prompter.jump" => jump_request(prompter, params, now, Urgency::Now)?,
+                "prompter.textSize" => text_size_request(prompter, params, now)?,
+                "prompter.look.update" => look_request(prompter, params, now)?,
+                "prompter.layout.report" => layout_request(prompter, params, now)?,
+                "prompter.screen.report" => screen_request(prompter, params, now)?,
+                other => return Err(unsupported(other)),
+            };
+            Ok(reply(prompter, result, reason, check_before))
+        });
+    }
+    with_prompter_db(db_path, method, |prompter, connection, now| {
+        let check_before = changes_the_check(method).then(|| health_check(prompter));
         let (result, reason) = match method {
-            "prompter.snapshot" => (
-                serde_json::to_value(read_snapshot(prompter, connection, now)?)?,
-                None,
-            ),
-            "prompter.glass.snapshot" => (
-                serde_json::to_value(read_glass_snapshot(prompter, connection, now)?)?,
-                None,
-            ),
-            "prompter.script.snapshot" => (
-                serde_json::to_value(read_script_snapshot(
-                    prompter,
-                    connection,
-                    script_id(params)?,
-                )?)?,
-                None,
-            ),
             "prompter.script.import" => import_request(prompter, connection, params, now)?,
             "prompter.script.paste" => paste_request(connection, params)?,
-            "prompter.paste.convert" => paste_convert_request(params)?,
             "prompter.script.create" => create_request(connection, params)?,
-            "prompter.script.rename" => rename_request(connection, params)?,
+            "prompter.script.rename" => rename_request(prompter, connection, params)?,
             "prompter.script.edit" => edit_request(prompter, connection, params)?,
             "prompter.script.remove" => remove_request(prompter, connection, params, true)?,
             "prompter.script.restore" => remove_request(prompter, connection, params, false)?,
@@ -85,45 +117,58 @@ pub(crate) fn handle_prompter_request(
             "prompter.putOn" => put_on_request(prompter, connection, params, now)?,
             "prompter.update" => update_request(prompter, connection, now)?,
             "prompter.clear" => clear_request(prompter, connection, now)?,
-            "prompter.play" => play_request(prompter, connection, now)?,
-            "prompter.pause" => pause_request(prompter, connection, now)?,
-            "prompter.speed" => speed_request(prompter, connection, params, now)?,
-            "prompter.jump" => jump_request(prompter, connection, params, now)?,
-            "prompter.textSize" => text_size_request(prompter, connection, params, now)?,
-            "prompter.look.update" => look_request(prompter, connection, params, now)?,
-            "prompter.layout.report" => layout_request(prompter, params, now)?,
-            "prompter.screen.report" => screen_request(prompter, connection, params, now)?,
-            other => {
-                return Err(PrompterError::Invalid(format!(
-                    "Unsupported method: {other}"
-                )))
-            }
+            other => return Err(unsupported(other)),
         };
-        let health_changed = match check_before {
-            Some(Some(before)) => checked(prompter, connection).as_ref() != Some(&before),
-            // The check could not be read before: say it may have changed.
-            Some(None) => true,
-            None => false,
-        };
-        Ok(PrompterReply {
-            result,
-            reason,
-            anchor: prompter.glass.as_ref().map(|glass| glass.anchor(now)),
-            health_changed,
-        })
+        Ok(reply(prompter, result, reason, check_before))
     })
 }
 
-/// `checks.prompter`: the worse of the Prompter XL's state and `NOT UPDATED`
-/// (Slice 5a, first step 3).
-fn health_check(
+/// The requests that run on the prompter's memory alone: the take's
+/// controls, the look, the views' reports and the glass's own read. They
+/// open no connection, so a slow disk never holds them (2026-10-02).
+fn on_memory(method: &str) -> bool {
+    matches!(
+        method,
+        "prompter.glass.snapshot"
+            | "prompter.paste.convert"
+            | "prompter.play"
+            | "prompter.pause"
+            | "prompter.speed"
+            | "prompter.jump"
+            | "prompter.textSize"
+            | "prompter.look.update"
+            | "prompter.layout.report"
+            | "prompter.screen.report"
+    )
+}
+
+fn unsupported(method: &str) -> PrompterError {
+    PrompterError::Invalid(format!("Unsupported method: {method}"))
+}
+
+/// A request's reply. The anchor is taken as the action ends, after any
+/// write it made, so its age counts the time the action took (2026-10-02: it
+/// was taken before, and a slow write sent the glass an anchor older than it
+/// said).
+pub(super) fn reply(
     prompter: &Prompter,
-    connection: &Connection,
-) -> Result<PrompterHealthCheck, PrompterError> {
-    Ok(PrompterHealthCheck::new(
-        &prompter.screen,
-        glass_edited_name(prompter, connection)?.as_deref(),
-    ))
+    result: Value,
+    reason: Option<&'static str>,
+    check_before: Option<PrompterHealthCheck>,
+) -> PrompterReply {
+    let health_changed = check_before.is_some_and(|before| health_check(prompter) != before);
+    PrompterReply {
+        result,
+        reason,
+        anchor: prompter.anchor(Instant::now()),
+        health_changed,
+    }
+}
+
+/// `checks.prompter`: the worse of the Prompter XL's state and `NOT UPDATED`
+/// (Slice 5a, first step 3), from the prompter's memory.
+fn health_check(prompter: &Prompter) -> PrompterHealthCheck {
+    PrompterHealthCheck::new(&prompter.screen, glass_edited_name(prompter).as_deref())
 }
 
 /// The requests that can change `checks.prompter` (the Prompter XL, or what
@@ -144,25 +189,9 @@ fn changes_the_check(method: &str) -> bool {
     )
 }
 
-/// The check for the before-and-after comparison. It never fails a request:
-/// a read that fails is a `WARN` line, and the request goes on (a pause above
-/// all must act on the glass whatever the disk does; `runtime.rs`).
-fn checked(prompter: &Prompter, connection: &Connection) -> Option<PrompterHealthCheck> {
-    health_check(prompter, connection)
-        .map_err(|error| {
-            log_event(
-                LogLevel::Warn,
-                &format!("Prompter: its check could not be read: {error:?}"),
-            );
-        })
-        .ok()
-}
-
 /// `checks.prompter` for `health.snapshot`.
 pub(crate) fn prompter_health_check(db_path: &Path) -> Result<PrompterHealthCheck, PrompterError> {
-    with_prompter(db_path, |prompter, connection, _| {
-        health_check(prompter, connection)
-    })
+    with_prompter(db_path, "health", |prompter, _| Ok(health_check(prompter)))
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +377,15 @@ fn on_glass(prompter: &Prompter, id: &str) -> bool {
         .is_some_and(|glass| glass.script_id == id)
 }
 
+/// The script on the glass has a new text (an edit, a file, a version
+/// brought back): `NOT UPDATED` follows whether it differs from the glass's.
+fn note_glass_text(prompter: &mut Prompter, paragraphs: &[PrompterParagraph]) {
+    prompter.glass_text_differs = prompter
+        .glass
+        .as_ref()
+        .is_some_and(|glass| glass.paragraphs.as_slice() != paragraphs);
+}
+
 // ---------------------------------------------------------------------------
 // Scripts
 // ---------------------------------------------------------------------------
@@ -389,15 +427,16 @@ fn import_request(
         PrompterError::Refused("PROMPTER_IMPORT_REFUSED", refusal.sentence(&file_name))
     })?;
     let mut sentence = import_sentence(&file_name, &imported);
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
+    let mut glass_text = false;
     let (id, name, reason) = match optional_text(params, "updateScriptId")? {
         Some(id) => {
             let script = kept_script(&transaction, id)?;
-            let place = if on_glass(prompter, id) {
-                script.place
-            } else {
-                map_place(&script.paragraphs, &imported.paragraphs, script.place).0
-            };
+            // The script on the glass keeps its place, which counts in the
+            // glass's text; any other script's place moves with its text.
+            glass_text = on_glass(prompter, id);
+            let place = (!glass_text)
+                .then(|| map_place(&script.paragraphs, &imported.paragraphs, script.place).0);
             store::keep_version(
                 &transaction,
                 id,
@@ -434,6 +473,9 @@ fn import_request(
         }
     };
     transaction.commit()?;
+    if glass_text {
+        note_glass_text(prompter, &imported.paragraphs);
+    }
     Ok((
         json!({ "scriptId": id, "name": name, "sentence": sentence }),
         Some(reason),
@@ -466,7 +508,7 @@ fn paste_request(connection: &mut Connection, params: &Value) -> Handled {
     let imported = read_paste(params)?;
     let id = store::new_script_id()?;
     let name = first_words(&imported.paragraphs);
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
     store::insert_script(
         &transaction,
         NewScript {
@@ -518,7 +560,7 @@ fn create_request(connection: &mut Connection, params: &Value) -> Handled {
         None => new_script_name(connection)?,
     };
     let id = store::new_script_id()?;
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
     store::insert_script(
         &transaction,
         NewScript {
@@ -540,14 +582,17 @@ fn create_request(connection: &mut Connection, params: &Value) -> Handled {
     ))
 }
 
-fn rename_request(connection: &mut Connection, params: &Value) -> Handled {
+fn rename_request(prompter: &mut Prompter, connection: &mut Connection, params: &Value) -> Handled {
     let id = script_id(params)?;
     let name = clean_name(text_param(params, "name")?)
         .ok_or_else(|| PrompterError::Invalid(String::from("name must hold a word.")))?;
     existing_script(connection, id)?;
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
     store::write_script_name(&transaction, id, &name)?;
     transaction.commit()?;
+    if on_glass(prompter, id) {
+        prompter.glass_name = name.clone();
+    }
     Ok((
         json!({ "scriptId": id, "name": name }),
         Some("script-renamed"),
@@ -562,14 +607,14 @@ fn edit_request(prompter: &mut Prompter, connection: &mut Connection, params: &V
     let id = script_id(params)?;
     let script = kept_script(connection, id)?;
     let paragraphs = edited_paragraphs(params)?;
-    let place = if on_glass(prompter, id) {
-        script.place
-    } else {
-        map_place(&script.paragraphs, &paragraphs, script.place).0
-    };
-    let transaction = connection.transaction()?;
+    let glass_text = on_glass(prompter, id);
+    let place = (!glass_text).then(|| map_place(&script.paragraphs, &paragraphs, script.place).0);
+    let transaction = store::begin(connection)?;
     store::write_script_text(&transaction, id, &paragraphs, place)?;
     transaction.commit()?;
+    if glass_text {
+        note_glass_text(prompter, &paragraphs);
+    }
     let changed_at = existing_script(connection, id)?.changed_at;
     Ok((
         json!({ "scriptId": id, "changedAt": changed_at }),
@@ -596,7 +641,7 @@ fn remove_request(
             ),
         ));
     }
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
     store::write_script_removed(&transaction, id, remove)?;
     transaction.commit()?;
     Ok((
@@ -623,7 +668,7 @@ fn delete_request(connection: &mut Connection, params: &Value) -> Handled {
             ),
         ));
     }
-    let transaction = connection.transaction()?;
+    let transaction = store::begin(connection)?;
     store::delete_script(&transaction, id)?;
     transaction.commit()?;
     Ok((json!({ "scriptId": id }), Some("script-deleted")))
@@ -650,12 +695,9 @@ fn bring_back_request(
                 ),
             )
         })?;
-    let place = if on_glass(prompter, id) {
-        script.place
-    } else {
-        map_place(&script.paragraphs, &paragraphs, script.place).0
-    };
-    let transaction = connection.transaction()?;
+    let glass_text = on_glass(prompter, id);
+    let place = (!glass_text).then(|| map_place(&script.paragraphs, &paragraphs, script.place).0);
+    let transaction = store::begin(connection)?;
     if !store::has_version_with(&transaction, id, &script.paragraphs)? {
         store::keep_version(
             &transaction,
@@ -666,6 +708,9 @@ fn bring_back_request(
     }
     store::write_script_text(&transaction, id, &paragraphs, place)?;
     transaction.commit()?;
+    if glass_text {
+        note_glass_text(prompter, &paragraphs);
+    }
     Ok((json!({ "scriptId": id }), Some("version-brought-back")))
 }
 
@@ -703,11 +748,7 @@ fn put_on_request(
                 format!("{} is already on the prompter.", script.name),
             ))
         }
-        Some(glass) => Some(
-            existing_script(connection, &glass.script_id)
-                .map(|shown| shown.name)
-                .unwrap_or_default(),
-        ),
+        Some(_) => Some(prompter.glass_name.clone()),
         None => None,
     };
     if let Some(shown) = &replaced {
@@ -720,14 +761,19 @@ fn put_on_request(
                 ),
             ));
         }
-        release_glass(prompter, connection, now);
     }
     let place = if script.place >= PrompterPlace::end_of(&script.paragraphs) {
         PrompterPlace::TOP
     } else {
         script.place.clamped(&script.paragraphs)
     };
-    let transaction = connection.transaction()?;
+    // One transaction (2026-10-02): the script let go of keeps its place and
+    // pace, the new one stands at its place, and the glass's revision moves
+    // on, so a save the saver still holds for the old glass is refused.
+    let transaction = store::begin(connection)?;
+    if replaced.is_some() {
+        release_glass(prompter, &transaction, now)?;
+    }
     store::keep_version(
         &transaction,
         id,
@@ -739,8 +785,8 @@ fn put_on_request(
         },
     )?;
     let revision = store::write_glass(&transaction, Some(id), Some(&script.paragraphs))?;
+    store::write_script_values(&transaction, id, place, script.speed_wpm)?;
     transaction.commit()?;
-    store::write_script_place(connection, id, place)?;
     prompter.glass_revision = revision;
     prompter.glass = Some(GlassClock::paused(
         now,
@@ -750,7 +796,9 @@ fn put_on_request(
         place,
         script.speed_wpm,
     ));
-    prompter.place_saved_as(Some(place), now);
+    prompter.glass_name = script.name.clone();
+    prompter.glass_text_differs = false;
+    prompter.glass_changed(now);
     let (action, sentence) = match &replaced {
         Some(shown) => (
             "replaced",
@@ -793,7 +841,11 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
     }
     let current = glass.place_at(now);
     let (place, moved) = map_place(&glass.paragraphs, &script.paragraphs, current);
-    let transaction = connection.transaction()?;
+    let speed = glass.speed_wpm;
+    // One transaction (2026-10-02): the new text on the glass at its next
+    // revision, with the place carried into it and the pace, so the text and
+    // its place are never paired wrongly on the disk.
+    let transaction = store::begin(connection)?;
     store::keep_version(
         &transaction,
         &script.id,
@@ -801,12 +853,15 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
         reason::UPDATED,
     )?;
     let revision = store::write_glass(&transaction, Some(&script.id), Some(&script.paragraphs))?;
+    store::write_script_values(&transaction, &script.id, place, speed)?;
     transaction.commit()?;
     prompter.glass_revision = revision;
     let key = prompter.layout_key();
     let glass = prompter.glass.as_mut().expect("checked above");
     glass.replace_text(now, Arc::new(script.paragraphs.clone()), key, place, !moved);
-    prompter.save_place(connection, now);
+    prompter.glass_name = script.name.clone();
+    prompter.glass_text_differs = false;
+    prompter.glass_changed(now);
     let mut sentence = format!("Updated {} on the prompter.", script.name);
     if moved {
         if place.paragraph >= script.paragraphs.len() as u32 {
@@ -824,46 +879,46 @@ fn update_request(prompter: &mut Prompter, connection: &mut Connection, now: Ins
     ))
 }
 
-/// The glass lets go of its script (a replace, a clear): the script keeps
-/// the place it was read to — where a pause's ease will stop — carried into
-/// its own text when it was edited since it went on (review of 2026-09-27:
-/// the place, counted in the glass's text, was saved against the edited text,
-/// so the next put-on started paragraphs off, or at the top). A save that
-/// fails is a `WARN` line, as every take save is.
-fn release_glass(prompter: &mut Prompter, connection: &Connection, now: Instant) {
+/// The glass lets go of its script (a replace, a clear), in the transaction
+/// that changes the glass: the script keeps the place it was read to — where
+/// a pause's ease will stop — carried into its own text when it was edited
+/// since it went on (review of 2026-09-27: the place, counted in the glass's
+/// text, was saved against the edited text, so the next put-on started
+/// paragraphs off, or at the top), and its pace.
+fn release_glass(
+    prompter: &Prompter,
+    transaction: &Transaction<'_>,
+    now: Instant,
+) -> Result<(), PrompterError> {
     let Some(glass) = prompter.glass.as_ref() else {
-        return;
+        return Ok(());
     };
     let read_to = glass.resting_place(now);
-    let place = match store::read_script(connection, &glass.script_id) {
+    let place = match store::read_script(transaction, &glass.script_id) {
         Ok(Some(script)) if script.paragraphs != *glass.paragraphs => {
             map_place(&glass.paragraphs, &script.paragraphs, read_to).0
         }
         _ => read_to,
     };
-    if let Err(error) = store::write_script_place(connection, &glass.script_id, place) {
-        log_event(
-            LogLevel::Warn,
-            &format!("Prompter: the place could not be saved: {error}"),
-        );
-    }
+    store::write_script_values(transaction, &glass.script_id, place, glass.speed_wpm)?;
+    Ok(())
 }
 
 /// `prompter.clear`: the glass goes black; the script keeps its place.
 fn clear_request(prompter: &mut Prompter, connection: &mut Connection, now: Instant) -> Handled {
-    let Some(glass) = prompter.glass.as_ref() else {
+    if prompter.glass.is_none() {
         return Err(nothing_on());
-    };
-    let name = existing_script(connection, &glass.script_id)
-        .map(|script| script.name)
-        .unwrap_or_default();
-    release_glass(prompter, connection, now);
-    let transaction = connection.transaction()?;
+    }
+    let name = prompter.glass_name.clone();
+    let transaction = store::begin(connection)?;
+    release_glass(prompter, &transaction, now)?;
     let revision = store::write_glass(&transaction, None, None)?;
     transaction.commit()?;
     prompter.glass_revision = revision;
     prompter.glass = None;
-    prompter.place_saved_as(None, now);
+    prompter.glass_name.clear();
+    prompter.glass_text_differs = false;
+    prompter.glass_changed(now);
     Ok((
         json!({ "action": "cleared", "name": name, "sentence": "Cleared the prompter." }),
         Some("cleared"),
@@ -887,11 +942,7 @@ fn glass_mut(prompter: &mut Prompter) -> Result<&mut GlassClock, PrompterError> 
     prompter.glass.as_mut().ok_or_else(nothing_on)
 }
 
-pub(super) fn play_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    now: Instant,
-) -> Handled {
+pub(super) fn play_request(prompter: &mut Prompter, now: Instant) -> Handled {
     if prompter.glass.is_none() {
         return Err(nothing_on());
     }
@@ -899,11 +950,9 @@ pub(super) fn play_request(
     if let Some(refusal) = prompter.screen.play_refusal() {
         return Err(refusal);
     }
+    let name = prompter.glass_name.clone();
     let glass = glass_mut(prompter)?;
     if glass.at_end(now) {
-        let name = existing_script(connection, &glass.script_id)
-            .map(|script| script.name)
-            .unwrap_or_default();
         return Err(PrompterError::Refused(
             "PROMPTER_AT_END",
             format!(
@@ -920,28 +969,18 @@ pub(super) fn play_request(
     Ok((json!({}), Some("played")))
 }
 
-pub(super) fn pause_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    now: Instant,
-) -> Handled {
+pub(super) fn pause_request(prompter: &mut Prompter, now: Instant) -> Handled {
     let glass = glass_mut(prompter)?;
     glass.pause(now);
     // Where the 0.3 s ease will stop the text, not where it was at the press
-    // (review of 2026-09-27).
-    let resting = glass.resting_place(now);
-    prompter.save_this_place(connection, resting);
+    // (review of 2026-09-27); written at once.
+    prompter.keep_place(now, Urgency::Now);
     Ok((json!({}), Some("paused")))
 }
 
 /// `prompter.speed { wpm? | step? }`: the pace in words a minute, 40–300 in
 /// steps of 5; `step` moves it that many steps and stops at the ends.
-pub(super) fn speed_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    params: &Value,
-    now: Instant,
-) -> Handled {
+pub(super) fn speed_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Handled {
     let wpm = whole_param(params, "wpm")?;
     let step = step_param(params)?;
     let glass = glass_mut(prompter)?;
@@ -962,13 +1001,9 @@ pub(super) fn speed_request(
         }
     };
     glass.set_speed(now, speed);
-    let id = glass.script_id.clone();
-    if let Err(error) = store::write_script_speed(connection, &id, speed) {
-        log_event(
-            LogLevel::Warn,
-            &format!("Prompter: the pace could not be saved: {error}"),
-        );
-    }
+    // The saver writes the pace within a second; the dial waits for no disk
+    // (2026-10-02).
+    prompter.keep_place(now, Urgency::Coalesced);
     Ok((json!({ "speedWpm": speed }), Some("speed")))
 }
 
@@ -976,12 +1011,13 @@ pub(super) fn speed_request(
 /// `previousLine`, `nextParagraph`, `previousParagraph`, `nextCue`,
 /// `previousCue`, `paragraph` (with `paragraph`, from 0) or `place` (with
 /// `paragraph` and `word`). A jump keeps the scroll as it was; only `top`
-/// pauses (§14).
+/// pauses (§14). The place reaches the disk as `urgency` says: at once for a
+/// key, shortly for a dial's detent.
 pub(super) fn jump_request(
     prompter: &mut Prompter,
-    connection: &mut Connection,
     params: &Value,
     now: Instant,
+    urgency: Urgency,
 ) -> Handled {
     let to = text_param(params, "to")?;
     let paragraph = whole_param(params, "paragraph")?;
@@ -992,7 +1028,7 @@ pub(super) fn jump_request(
     let (target_paragraph, target_offset) = match to {
         "top" => {
             glass.jump(now, 0, 0.0, true);
-            prompter.save_place(connection, now);
+            prompter.keep_place(now, urgency);
             return Ok((json!({}), Some("jumped")));
         }
         // §5 (answered in §14): the start of the paragraph at the reading
@@ -1067,19 +1103,14 @@ pub(super) fn jump_request(
         }
     };
     glass.jump(now, target_paragraph, target_offset, false);
-    prompter.save_place(connection, now);
+    prompter.keep_place(now, urgency);
     Ok((json!({}), Some("jumped")))
 }
 
 /// `prompter.textSize { sizePx? | step? | standard? }`: the take's size,
 /// 48–160 px in steps of 4; `standard: true` returns to the look's standard.
 /// The words at the reading line stay (§4.1).
-pub(super) fn text_size_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    params: &Value,
-    now: Instant,
-) -> Handled {
+pub(super) fn text_size_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Handled {
     let standard = params
         .get("standard")
         .and_then(Value::as_bool)
@@ -1106,19 +1137,21 @@ pub(super) fn text_size_request(
         }
     };
     let relayout = size != prompter.size_px;
-    set_look(prompter, connection, prompter.look, size, relayout, now)?;
+    set_look(
+        prompter,
+        prompter.look,
+        size,
+        relayout,
+        now,
+        Urgency::Coalesced,
+    );
     Ok((json!({ "sizePx": size }), Some("size")))
 }
 
 /// `prompter.look.update { …fields of the look }`: one press each (§10).
 /// When the standard size changes and the take's size was the standard, the
 /// take's size follows it.
-fn look_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    params: &Value,
-    now: Instant,
-) -> Handled {
+fn look_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Handled {
     let look = prompter
         .look
         .updated(params)
@@ -1129,30 +1162,31 @@ fn look_request(
         prompter.size_px
     };
     let relayout = prompter.look.lays_out_differently(&look) || size != prompter.size_px;
-    set_look(prompter, connection, look, size, relayout, now)?;
+    set_look(prompter, look, size, relayout, now, Urgency::Coalesced);
     Ok((json!({}), Some("look")))
 }
 
+/// The look and the take's size in memory, the look's revision moved on when
+/// the text must be laid out again; the saver writes the three together
+/// (2026-10-02: the size dial waited for a write a detent).
 fn set_look(
     prompter: &mut Prompter,
-    connection: &mut Connection,
     look: crate::prompter::look::PrompterLook,
     size_px: u32,
     relayout: bool,
     now: Instant,
-) -> Result<(), PrompterError> {
-    prompter.save_place(connection, now);
-    let revision = store::write_look(connection, &look, size_px, relayout)?;
+    urgency: Urgency,
+) {
     prompter.look = look;
     prompter.size_px = size_px;
-    prompter.look_revision = revision;
     if relayout {
+        prompter.look_revision += 1;
         let key = prompter.layout_key();
         if let Some(glass) = prompter.glass.as_mut() {
             glass.relayout(now, key);
         }
     }
-    Ok(())
+    prompter.keep_look(urgency);
 }
 
 /// `prompter.layout.report { layoutKey, lines, endTop }`: a view's layout of
@@ -1198,12 +1232,7 @@ fn layout_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Hand
 /// `PLAY` refused until the glass is back — and plugging back in leaves it
 /// paused (D12: nothing scrolls by itself). A report that changes nothing
 /// raises nothing.
-fn screen_request(
-    prompter: &mut Prompter,
-    connection: &mut Connection,
-    params: &Value,
-    now: Instant,
-) -> Handled {
+fn screen_request(prompter: &mut Prompter, params: &Value, now: Instant) -> Handled {
     let screen = PrompterScreen::from_report(params)?;
     if screen == prompter.screen {
         return Ok((json!({ "screen": screen.summary(), "paused": false }), None));
@@ -1213,8 +1242,7 @@ fn screen_request(
     if !prompter.screen.state().draws() {
         if let Some(glass) = prompter.glass.as_mut().filter(|glass| glass.playing) {
             glass.pause(now);
-            let resting = glass.resting_place(now);
-            prompter.save_this_place(connection, resting);
+            prompter.keep_place(now, Urgency::Now);
             paused = true;
         }
     }
@@ -1225,28 +1253,26 @@ fn screen_request(
 }
 
 /// Pauses the prompter where it is, at once, keeping the place: a restore
-/// never scrolls (D12). Used after an archive restore, which also brings the
-/// look back.
+/// never scrolls (D12). Used after an archive restore, which hands the look
+/// and size it brought back (`restored_look`): the prompter's memory takes
+/// them and the saver writes them, so a size the saver held from before the
+/// restore can never land over them (2026-10-02).
 pub(crate) fn after_archive_restore(
     db_path: &Path,
+    restored_look: Option<(crate::prompter::look::PrompterLook, u32)>,
 ) -> Result<Option<crate::prompter::clock::PrompterAnchor>, PrompterError> {
-    with_prompter(db_path, |prompter, connection, now| {
+    with_prompter(db_path, "after restore", |prompter, now| {
         if let Some(glass) = prompter.glass.as_mut() {
             glass.hold(now);
         }
-        prompter.save_place(connection, now);
-        let stored = store::read_prompter(connection)?;
-        let relayout =
-            stored.look.lays_out_differently(&prompter.look) || stored.size_px != prompter.size_px;
-        prompter.look = stored.look;
-        prompter.size_px = stored.size_px;
-        prompter.look_revision = stored.look_revision;
-        if relayout {
-            let key = prompter.layout_key();
-            if let Some(glass) = prompter.glass.as_mut() {
-                glass.relayout(now, key);
+        prompter.keep_place(now, Urgency::Now);
+        if let Some((look, size_px)) = restored_look {
+            if look != prompter.look || size_px != prompter.size_px {
+                let relayout =
+                    look.lays_out_differently(&prompter.look) || size_px != prompter.size_px;
+                set_look(prompter, look, size_px, relayout, now, Urgency::Now);
             }
         }
-        Ok(prompter.glass.as_ref().map(|glass| glass.anchor(now)))
+        Ok(prompter.anchor(Instant::now()))
     })
 }

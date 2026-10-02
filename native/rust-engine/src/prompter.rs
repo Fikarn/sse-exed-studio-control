@@ -10,8 +10,10 @@ pub(crate) mod deck;
 pub(crate) mod edits;
 pub(crate) mod import;
 pub(crate) mod look;
+pub(crate) mod minute;
 pub(crate) mod model;
 pub(crate) mod runtime;
+pub(crate) mod saver;
 pub(crate) mod screen;
 pub(crate) mod snapshot;
 pub(crate) mod store;
@@ -22,6 +24,8 @@ mod tests_deck;
 #[cfg(test)]
 mod tests_glass;
 #[cfg(test)]
+mod tests_saver;
+#[cfg(test)]
 mod tests_screen;
 #[cfg(test)]
 mod tests_scripts;
@@ -30,7 +34,7 @@ use crate::prompter::clock::PrompterAnchor;
 use serde_json::Value;
 
 pub(crate) use commands::{after_archive_restore, handle_prompter_request, prompter_health_check};
-pub(crate) use runtime::spawn_prompter_clock;
+pub(crate) use runtime::{finish_saving, flush_saves, start};
 
 /// A refused or failed `prompter.*` request.
 #[derive(Debug, Clone, PartialEq, Eq)]
