@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use serde::Serialize;
 
@@ -204,17 +205,24 @@ pub(super) struct ResolvedFixtureProfile {
 
 pub fn read_lighting_fixture_catalog_snapshot() -> LightingFixtureCatalogSnapshot {
     LightingFixtureCatalogSnapshot {
-        definitions: catalog_definitions(),
+        definitions: catalog_definitions().to_vec(),
     }
 }
 
-pub(super) fn catalog_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
-    let mut definitions = Vec::new();
-    definitions.extend(compatibility_definitions());
-    definitions.extend(aputure_verified_definitions());
-    definitions.extend(litepanels_verified_definitions());
-    definitions.extend(research_needed_definitions());
-    definitions
+/// The catalog, built once (2026-10-02). It is the program's own, never saved
+/// data, and building it anew for each fixture of each lighting read made
+/// every AUDIO and LIGHTS display of the deck cost the studio 11–22 ms and
+/// kept the light output's thread a third of a core busy.
+pub(super) fn catalog_definitions() -> &'static [LightingFixtureDefinitionSnapshot] {
+    static CATALOG: LazyLock<Vec<LightingFixtureDefinitionSnapshot>> = LazyLock::new(|| {
+        let mut definitions = Vec::new();
+        definitions.extend(compatibility_definitions());
+        definitions.extend(aputure_verified_definitions());
+        definitions.extend(litepanels_verified_definitions());
+        definitions.extend(research_needed_definitions());
+        definitions
+    });
+    &CATALOG
 }
 
 pub(super) fn resolve_fixture_profile(
@@ -224,9 +232,9 @@ pub(super) fn resolve_fixture_profile(
     legacy_kind: Option<&str>,
     fixture_id: &str,
 ) -> ResolvedFixtureProfile {
-    let definition =
-        resolve_fixture_definition(definition_id, fixture_type, legacy_kind, fixture_id);
-    let mode = resolve_fixture_mode(&definition, mode_id);
+    let definition = find_fixture_definition(definition_id, fixture_type, legacy_kind, fixture_id)
+        .unwrap_or_else(default_definition);
+    let mode = resolve_fixture_mode(definition, mode_id);
     ResolvedFixtureProfile {
         definition_id: definition.id.clone(),
         mode_id: mode.id.clone(),
@@ -248,7 +256,19 @@ pub(super) fn resolve_fixture_definition(
     legacy_kind: Option<&str>,
     fixture_id: &str,
 ) -> LightingFixtureDefinitionSnapshot {
-    let definitions = catalog_definitions();
+    find_fixture_definition(definition_id, fixture_type, legacy_kind, fixture_id)
+        .unwrap_or_else(default_definition)
+        .clone()
+}
+
+/// The catalog's definition these name, borrowed; `None` when the catalog has
+/// none by the id they resolve to.
+fn find_fixture_definition(
+    definition_id: Option<&str>,
+    fixture_type: Option<&str>,
+    legacy_kind: Option<&str>,
+    fixture_id: &str,
+) -> Option<&'static LightingFixtureDefinitionSnapshot> {
     let requested_id = definition_id
         .and_then(normalized_catalog_id)
         .or_else(|| fixture_type.and_then(resolve_fixture_alias))
@@ -257,10 +277,9 @@ pub(super) fn resolve_fixture_definition(
         .or_else(|| infer_fixture_definition_from_fixture_id(fixture_id))
         .unwrap_or_else(|| String::from(DEFAULT_FIXTURE_DEFINITION_ID));
 
-    definitions
-        .into_iter()
+    catalog_definitions()
+        .iter()
         .find(|definition| definition.id == requested_id)
-        .unwrap_or_else(default_fixture_definition)
 }
 
 pub(super) fn resolve_fixture_mode(
@@ -362,9 +381,11 @@ fn infer_fixture_definition_from_fixture_id(fixture_id: &str) -> Option<String> 
     }
 }
 
-fn default_fixture_definition() -> LightingFixtureDefinitionSnapshot {
-    compatibility_definitions()
-        .into_iter()
+/// The default definition, the compatibility set's: that set comes first in
+/// the catalog.
+fn default_definition() -> &'static LightingFixtureDefinitionSnapshot {
+    catalog_definitions()
+        .iter()
         .find(|definition| definition.id == DEFAULT_FIXTURE_DEFINITION_ID)
         .expect("default fixture definition should exist")
 }
