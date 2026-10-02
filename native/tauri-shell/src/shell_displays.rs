@@ -260,10 +260,35 @@ pub(crate) fn prompter_screen(paths: &[DisplayPath]) -> PrompterScreen {
     }
 }
 
-/// One line for shell.log: the screens that are on, each part of the desktop
-/// with the screens that show it, and what the Prompter XL is among them.
-/// The names are Windows' own, so the line also says what a screen is
-/// called that was expected under another name.
+/// Below this a screen's refresh rate is a warning in shell.log (fix E,
+/// 2026-10-02). Studio Control's windows draw at the main screen's rate: the
+/// studio's Samsung, a copy of the main screen, stood at 30 Hz, and the
+/// prompter's text scrolled at 30 frames a second, unevenly, with nothing in
+/// any log to say so.
+pub(crate) const LOW_REFRESH_HZ: f64 = 50.0;
+
+/// Rates closer than this are the same rate.
+const SAME_RATE_HZ: f64 = 0.01;
+
+/// A rate as shell.log says it: `60 Hz`, `59.95 Hz`, `29.97 Hz`.
+fn hz(rate: f64) -> String {
+    let text = format!("{rate:.2}");
+    format!("{} Hz", text.trim_end_matches('0').trim_end_matches('.'))
+}
+
+/// A screen's name in shell.log.
+fn name_of(path: &DisplayPath) -> &str {
+    if path.target.is_empty() {
+        "a screen without a name"
+    } else {
+        path.target.as_str()
+    }
+}
+
+/// One line for shell.log: the screens that are on, each with its refresh
+/// rate, each part of the desktop with the screens that show it, and what the
+/// Prompter XL is among them. The names are Windows' own, so the line also
+/// says what a screen is called that was expected under another name.
 pub(crate) fn screens_line(paths: &[DisplayPath]) -> String {
     let mut parts: Vec<&DisplayPath> = Vec::new();
     for path in paths {
@@ -277,12 +302,9 @@ pub(crate) fn screens_line(paths: &[DisplayPath]) -> String {
             let names = paths
                 .iter()
                 .filter(|path| path.source == part.source)
-                .map(|path| {
-                    if path.target.is_empty() {
-                        "a screen without a name"
-                    } else {
-                        path.target.as_str()
-                    }
+                .map(|path| match path.refresh_hz {
+                    Some(rate) => format!("{} ({})", name_of(path), hz(rate)),
+                    None => name_of(path).to_string(),
                 })
                 .collect::<Vec<_>>();
             format!(
@@ -304,7 +326,7 @@ pub(crate) fn screens_line(paths: &[DisplayPath]) -> String {
             path.width,
             path.height,
             path.refresh_hz
-                .map(|rate| format!(" at {} Hz", rate.round()))
+                .map(|rate| format!(" at {}", hz(rate)))
                 .unwrap_or_default()
         ),
     };
@@ -316,6 +338,44 @@ pub(crate) fn screens_line(paths: &[DisplayPath]) -> String {
             screens.join("; ")
         )
     }
+}
+
+/// The warning shell.log gets beside the screens' line while a screen runs
+/// below `LOW_REFRESH_HZ`, or none.
+pub(crate) fn low_refresh_line(paths: &[DisplayPath]) -> Option<String> {
+    let low = paths
+        .iter()
+        .filter_map(|path| {
+            let rate = path.refresh_hz?;
+            (rate < LOW_REFRESH_HZ).then(|| format!("{} at {}", name_of(path), hz(rate)))
+        })
+        .collect::<Vec<_>>();
+    (!low.is_empty()).then(|| {
+        format!(
+            "A screen runs below {}: {}. Studio Control's windows draw at the main screen's rate, and below it the prompter's text does not scroll smoothly. Set every screen to 60 Hz in Windows' display settings (59.94 or 59.95 Hz where 60 is not offered).",
+            hz(LOW_REFRESH_HZ),
+            low.join(", ")
+        )
+    })
+}
+
+/// Whether every screen runs at the rate it ran at. Only screens that are
+/// the same ones (`same_screens`) are compared; a screen that is not in both
+/// lists is a change of the screens, said as one.
+pub(crate) fn same_rates(before: &[DisplayPath], now: &[DisplayPath]) -> bool {
+    fn same(one: Option<f64>, other: Option<f64>) -> bool {
+        match (one, other) {
+            (Some(one), Some(other)) => (one - other).abs() < SAME_RATE_HZ,
+            (None, None) => true,
+            _ => false,
+        }
+    }
+    now.iter().all(|path| {
+        before
+            .iter()
+            .filter(|other| other.source == path.source && other.target == path.target)
+            .all(|other| same(other.refresh_hz, path.refresh_hz))
+    })
 }
 
 /// Whether the screens are the same ones, standing where they stood: the
@@ -572,13 +632,13 @@ pub(crate) mod tests {
     fn the_logs_line_names_the_screens_and_says_what_the_prompter_xl_is() {
         assert_eq!(
             screens_line(&the_studio()),
-            "The screens: SAMSUNG and CS2731 2560×1440 at 0,0 (duplicated); HP E273q 2560×1440 at 2560,0. The Prompter XL is not connected."
+            "The screens: SAMSUNG (59.95 Hz) and CS2731 (59.95 Hz) 2560×1440 at 0,0 (duplicated); HP E273q (59.95 Hz) 2560×1440 at 2560,0. The Prompter XL is not connected."
         );
         let mut screens = the_studio();
         screens.push(prompter(r"\\.\DISPLAY4", (5120, 0)));
         assert_eq!(
             screens_line(&screens),
-            "The screens: SAMSUNG and CS2731 2560×1440 at 0,0 (duplicated); HP E273q 2560×1440 at 2560,0; Prompter XL 1920×1080 at 5120,0. The Prompter XL is connected, 1920×1080 at 60 Hz."
+            "The screens: SAMSUNG (59.95 Hz) and CS2731 (59.95 Hz) 2560×1440 at 0,0 (duplicated); HP E273q (59.95 Hz) 2560×1440 at 2560,0; Prompter XL (60 Hz) 1920×1080 at 5120,0. The Prompter XL is connected, 1920×1080 at 60 Hz."
         );
         let copy = vec![
             path(r"\\.\DISPLAY1", (0, 0), "HP E273q"),
@@ -590,12 +650,62 @@ pub(crate) mod tests {
         ];
         assert_eq!(
             screens_line(&copy),
-            "The screens: HP E273q and Prompter XL 2560×1440 at 0,0 (duplicated); a screen without a name 2560×1440 at 2560,0. The Prompter XL is duplicated."
+            "The screens: HP E273q (59.95 Hz) and Prompter XL 2560×1440 at 0,0 (duplicated); a screen without a name (59.95 Hz) 2560×1440 at 2560,0. The Prompter XL is duplicated."
         );
         assert_eq!(
             screens_line(&[]),
             "The screens: none was read. The Prompter XL is not connected."
         );
+    }
+
+    // Fix E (2026-10-02): the Samsung at 30 Hz made the prompter's text
+    // scroll at 30 frames a second, and no log said so.
+    #[test]
+    fn a_screen_below_fifty_hz_is_a_warning_naming_it() {
+        assert_eq!(low_refresh_line(&the_studio()), None);
+        let mut at_thirty = the_studio();
+        at_thirty[0].refresh_hz = Some(30.0);
+        assert_eq!(
+            screens_line(&at_thirty),
+            "The screens: SAMSUNG (30 Hz) and CS2731 (59.95 Hz) 2560×1440 at 0,0 (duplicated); HP E273q (59.95 Hz) 2560×1440 at 2560,0. The Prompter XL is not connected."
+        );
+        assert_eq!(
+            low_refresh_line(&at_thirty).as_deref(),
+            Some("A screen runs below 50 Hz: SAMSUNG at 30 Hz. Studio Control's windows draw at the main screen's rate, and below it the prompter's text does not scroll smoothly. Set every screen to 60 Hz in Windows' display settings (59.94 or 59.95 Hz where 60 is not offered).")
+        );
+        let mut two_low = at_thirty.clone();
+        two_low[2].refresh_hz = Some(29.97);
+        two_low[2].target = String::new();
+        assert!(low_refresh_line(&two_low)
+            .expect("a warning")
+            .contains("SAMSUNG at 30 Hz, a screen without a name at 29.97 Hz."));
+        let mut unknown = the_studio();
+        unknown[0].refresh_hz = None;
+        assert_eq!(
+            low_refresh_line(&unknown),
+            None,
+            "a rate Windows does not give is no warning"
+        );
+    }
+
+    #[test]
+    fn a_rate_is_the_same_to_a_hundredth_of_a_hertz() {
+        let studio = the_studio();
+        assert!(same_rates(&studio, &studio));
+        let mut nudged = the_studio();
+        nudged[1].refresh_hz = Some(59.955);
+        assert!(same_rates(&studio, &nudged));
+        let mut at_thirty = the_studio();
+        at_thirty[0].refresh_hz = Some(30.0);
+        assert!(!same_rates(&studio, &at_thirty));
+        let mut unknown = the_studio();
+        unknown[2].refresh_hz = None;
+        assert!(!same_rates(&studio, &unknown));
+        assert_eq!(hz(59.951), "59.95 Hz");
+        assert_eq!(hz(60.0), "60 Hz");
+        assert_eq!(hz(59.94), "59.94 Hz");
+        assert_eq!(hz(29.97), "29.97 Hz");
+        assert_eq!(hz(50.0), "50 Hz");
     }
 
     // On the workstation a screen is on whenever the tests run, so the list
