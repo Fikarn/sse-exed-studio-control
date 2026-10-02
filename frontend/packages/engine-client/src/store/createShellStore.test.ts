@@ -1291,17 +1291,45 @@ describe("createShellStore the Teleprompter", () => {
     await store.dispose();
   });
 
-  it("takes the first read after the hardware link's start whatever its number", async () => {
+  it("follows the hardware link's numbers again after it stopped and was started again", async () => {
+    vi.useFakeTimers();
+    try {
+      const { answer, emit, transport } = supervisedTransport();
+      answer("prompter.snapshot", withAnchor(playing(40)));
+      answer("prompter.glass.snapshot", text("g1-l0"));
+      const store = createShellStore(transport);
+      await store.initialize();
+
+      // It stops, and is started again on its own a second later: its numbers
+      // begin at 1. This double sends no engine.ready: the ping answers.
+      emit(exited(1));
+      answer("prompter.snapshot", withAnchor({ ...playing(1), playing: false }));
+      await vi.advanceTimersByTimeAsync(1_000);
+      await settle(() => store.getSnapshot().lifecycle === "ready");
+      expect(anchorOf(store)?.revision).toBe(1);
+
+      // Its events are taken at once again.
+      emit({ type: "event", event: "prompter.changed", payload: { reason: "played", anchor: playing(2) as never } });
+      expect(anchorOf(store)?.revision).toBe(2);
+      await store.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("takes the first read after a start it did not make whatever its number", async () => {
     const { answer, emit, transport } = supervisedTransport();
     answer("prompter.snapshot", withAnchor(playing(40)));
     answer("prompter.glass.snapshot", text("g1-l0"));
     const store = createShellStore(transport);
     await store.initialize();
 
-    emit({ type: "event", event: "engine.exited", payload: { graceful: true } });
+    // A new hardware link while the page is ready: an event comes before
+    // the read, and waits for it.
     emit({ type: "event", event: "engine.ready", payload: {} });
     answer("prompter.snapshot", withAnchor({ ...playing(1), playing: false }));
-    emit(changed("prompter.changed", "screen"));
+    emit({ type: "event", event: "prompter.changed", payload: { reason: "played", anchor: playing(41) as never } });
+    expect(anchorOf(store)?.revision).toBe(40);
     await tick();
     await tick();
     expect(anchorOf(store)?.revision).toBe(1);

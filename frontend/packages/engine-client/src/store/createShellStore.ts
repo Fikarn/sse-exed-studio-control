@@ -533,11 +533,12 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   // Fix C (2026-10-02): the page's copy of the glass keeps an anchor a read
   // says again and drops a late one (`anchorOrder`); a prompter event's newer
   // anchor is taken at once. The numbers count within one run of the hardware
-  // link: its runs as the store counts them (its end and its start each begin
-  // another), the run the anchor it holds came in, and whether the link is up.
+  // link. A stop and a restart need nothing here: events and reads count only
+  // while the store is ready, and a bootstrap starts from no anchor. A start
+  // the store did not make (`engine.ready` while ready) begins another run,
+  // and the first read asked in it is taken whatever its number.
   let prompterRun = 0;
   let prompterAnchorRun = 0;
-  let prompterLinkUp = true;
   let automaticRestartTimeoutId: number | null = null;
   let automaticRestartsAt: number[] = [];
   let bootstrapGeneration = 0;
@@ -811,7 +812,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     if (!glass || !anchor || typeof anchor !== "object" || anchor.layoutKey !== glass.layoutKey) {
       return;
     }
-    if (!prompterLinkUp || prompterAnchorRun !== prompterRun || anchorOrder(glass.anchor, anchor) !== "take") {
+    if (prompterAnchorRun !== prompterRun || anchorOrder(glass.anchor, anchor) !== "take") {
       return;
     }
     noteAnchorArrival(anchor, currentMonotonicTimestampMs());
@@ -1091,7 +1092,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
   const handleTransportEvent = (event: EventEnvelope<EventName>) => {
     if (event.event === "engine.ready") {
       prompterRun += 1;
-      prompterLinkUp = true;
       pendingStartupGate?.resolve(event.payload);
       return;
     }
@@ -1116,8 +1116,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     // Handled before the refresh path below: the engine is gone, so there
     // is nothing to refresh from.
     if (event.event === "engine.exited") {
-      prompterRun += 1;
-      prompterLinkUp = false;
       handleEngineExited(event);
       return;
     }

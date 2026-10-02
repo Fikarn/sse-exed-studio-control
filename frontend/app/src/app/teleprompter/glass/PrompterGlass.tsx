@@ -328,9 +328,15 @@ export function PrompterGlass({
     const { anchor: current, receivedAt } = anchorRef.current;
     const stands = stoppedAfterMs !== null;
     const elapsed = !current || still ? 0 : stands ? stoppedAfterMs : Math.max(at - receivedAt, 0);
-    const left = !current || still || stands ? 0 : correctionLeft(correctionRef.current, at);
+    // A text that stands keeps what was left of a glide when it stopped.
+    const left = !current || still ? 0 : correctionLeft(correctionRef.current, stands ? receivedAt + elapsed : at);
     if (left === 0) correctionRef.current = null;
-    const position = (current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0)) + left;
+    let position = current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0);
+    if (current && left !== 0) {
+      // A glide never carries the text past END.
+      const ownPixels = current.layoutKey === layout.key && current.position !== null;
+      position = Math.min(position + left, ownPixels ? (current.endPosition ?? layout.endTop) : layout.endTop);
+    }
     const frame = glassFrame(layout, metrics, position);
     columnElement.style.transform = `translate3d(0, ${frame.shift}px, 0)`;
     if (readRef.current) readRef.current.style.height = `${frame.readHeight}px`;
