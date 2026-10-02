@@ -44,6 +44,7 @@ export function storyAnchor(overrides: Partial<PrompterAnchor> = {}): PrompterAn
     moveFromPosition: null,
     moveMs: 0,
     ageMs: 0,
+    revision: 1,
     ...overrides,
   };
 }

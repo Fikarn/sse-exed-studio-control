@@ -154,6 +154,8 @@ export interface FixturePrompter {
   /** The glass script's place as last saved, and when. */
   savedPlace: PrompterPlace | null;
   savedAt: number;
+  /** The anchors' numbers (fix C, `runtime.rs`): the last one handed out, and what it said. */
+  numbers: { revision: number; last: string | null };
   /** The clock's timer: it stops the text at `END` and says so. */
   timer: ReturnType<typeof setTimeout> | null;
   emit: ((event: EventName, payload?: JsonObject) => void) | null;
@@ -178,6 +180,7 @@ export function fixturePrompter(state: MutableFixtureState): FixturePrompter {
       nextScriptNumber: 1,
       savedPlace: null,
       savedAt: Date.now(),
+      numbers: { revision: 0, last: null },
       timer: null,
       emit: null,
     };
@@ -343,7 +346,21 @@ export function placeSavedAs(prompter: FixturePrompter, place: PrompterPlace | n
 }
 
 export function glassAnchor(prompter: FixturePrompter, now: number): PrompterAnchor | null {
-  return prompter.glass ? prompter.glass.anchor(now) : null;
+  return prompter.glass ? numberedAnchor(prompter, prompter.glass, now) : null;
+}
+
+/**
+ * The glass's anchor at `now`, numbered as the hardware link numbers it (`Prompter::anchor`,
+ * fix C): the last number again when it says what the last said, its age apart, on the same
+ * motion; else the next. Every anchor the double hands out comes from here.
+ */
+export function numberedAnchor(prompter: FixturePrompter, glass: GlassClock, now: number): PrompterAnchor {
+  const anchor = glass.anchor(now);
+  const said = JSON.stringify({ ...anchor, ageMs: 0, revision: 0, motionAt: glass.motion.at });
+  if (prompter.numbers.last !== said) {
+    prompter.numbers = { revision: prompter.numbers.revision + 1, last: said };
+  }
+  return { ...anchor, revision: prompter.numbers.revision };
 }
 
 /**
@@ -356,7 +373,7 @@ export function settlePrompter(prompter: FixturePrompter, now: number) {
   const glass = prompter.glass;
   if (!glass) return;
   const stopped = glass.settle(now);
-  if (stopped) prompter.emit?.("prompter.changed", { reason: "at-end", anchor: glass.anchor(now) });
+  if (stopped) prompter.emit?.("prompter.changed", { reason: "at-end", anchor: numberedAnchor(prompter, glass, now) });
   if (stopped || (glass.playing && now - prompter.savedAt >= SAVE_EVERY_MS)) savePlace(prompter, now);
 }
 

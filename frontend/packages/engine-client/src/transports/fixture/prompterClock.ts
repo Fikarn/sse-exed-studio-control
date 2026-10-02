@@ -520,6 +520,8 @@ export class GlassClock {
       moveFromPosition: this.motion.moveFrom,
       moveMs: this.motion.moveFrom !== null ? JUMP_MOVE_MS : 0,
       ageMs: this.elapsedMs(now),
+      // Numbered by the prompter that hands it out (`numberedAnchor`).
+      revision: 0,
     };
   }
 }

@@ -180,6 +180,36 @@ describe("the fixture double's prompter: what the glass shows", () => {
     await call("prompter.clear");
     expect(events[1]?.payload).toEqual({ reason: "cleared", anchor: null });
   });
+
+  // Fix C (2026-10-02, `prompter/tests_anchor.rs`): the double numbers its anchors as the
+  // hardware link does. A read of an unchanged glass carries the number the last change
+  // did, what leaves the motion alone keeps it, every change takes the next, and the number
+  // keeps rising across a clear and a put-on.
+  it("numbers its anchors as the hardware link does", async () => {
+    const { call, events, script, glass, layOut } = openPrompterDouble();
+    const numberOf = (anchor: unknown) => (anchor as JsonObject).revision as number;
+    const lastEvent = () => numberOf(events.at(-1)?.payload.anchor);
+    const talk = await script("Talk", ["One two three four.", "Five six seven."]);
+    await call("prompter.putOn", { scriptId: talk });
+    await layOut(2, 100);
+    const laidOut = lastEvent();
+    expect(numberOf((await glass()).anchor)).toBe(laidOut);
+    expect(numberOf((await call("prompter.glass.snapshot")).anchor)).toBe(laidOut);
+
+    await call("prompter.speed", { wpm: 150 });
+    expect(lastEvent(), "a pace while paused").toBe(laidOut);
+    await call("prompter.play");
+    const played = lastEvent();
+    expect(played).toBe(laidOut + 1);
+    expect(numberOf((await glass()).anchor), "a read while playing").toBe(played);
+    await call("prompter.pause");
+    expect(lastEvent()).toBe(played + 1);
+
+    await call("prompter.clear");
+    const other = await script("Other", ["Goodbye."]);
+    await call("prompter.putOn", { scriptId: other });
+    expect(lastEvent()).toBeGreaterThan(played + 1);
+  });
 });
 
 describe("the fixture double's prompter: the take", () => {

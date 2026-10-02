@@ -23,7 +23,14 @@ import {
 } from "./prompterModel";
 import { MAX_SCRIPT_TEXT_BYTES, scriptTextBytes } from "./prompterImport";
 import { prompterHealthCheck, screenSummary, wholeStatusPart } from "./prompterScreen";
-import { findScript, listScripts, listVersions, type FixturePrompter, type StoredScript } from "./prompterState";
+import {
+  findScript,
+  listScripts,
+  listVersions,
+  numberedAnchor,
+  type FixturePrompter,
+  type StoredScript,
+} from "./prompterState";
 
 // What the double's prompter reads out (`native/rust-engine/src/prompter/snapshot.rs`):
 // only what the hardware link holds, never what a view drew; and how it answers a
@@ -187,7 +194,7 @@ function glassSummary(prompter: FixturePrompter, glass: GlassClock, now: number)
     lengthSeconds,
     estimated,
     cues: cueTargets(glass.paragraphs),
-    anchor: glass.anchor(now),
+    anchor: numberedAnchor(prompter, glass, now),
   };
 }
 
@@ -244,7 +251,7 @@ export function readGlassSnapshot(prompter: FixturePrompter, now: number): Promp
     paragraphs: glass ? cloneParagraphs(glass.paragraphs) : [],
     look: { ...prompter.look },
     sizePx: prompter.sizePx,
-    anchor: glass ? glass.anchor(now) : null,
+    anchor: glass ? numberedAnchor(prompter, glass, now) : null,
   };
 }
 
