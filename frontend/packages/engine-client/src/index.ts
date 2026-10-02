@@ -12,6 +12,8 @@ export {
   faderLinToDb,
 } from "./audio/faderCurve";
 export { positionAt, speedAt, wordsAdvanced } from "./prompter/motion";
+export { anchorOrder, type AnchorOrder } from "./prompter/anchorOrder";
+export { anchorArrival, noteAnchorArrival } from "./prompter/anchorArrival";
 export type { PrompterMotion, PrompterMotionAnchor } from "./prompter/motion";
 export { EngineRequestError } from "./transports/engineRequestError";
 export { createTauriGlassLink, glassLinkOver, PROMPTER_WINDOW_LABEL } from "./transports/glassLink";

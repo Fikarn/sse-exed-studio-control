@@ -9,7 +9,13 @@ import {
   type ReactNode,
 } from "react";
 
-import type { PrompterAnchor, PrompterLayoutLine, PrompterLook, PrompterParagraph } from "@sse/engine-client";
+import {
+  anchorArrival,
+  type PrompterAnchor,
+  type PrompterLayoutLine,
+  type PrompterLook,
+  type PrompterParagraph,
+} from "@sse/engine-client";
 
 import { useLiveCallback } from "../../shared/useLiveCallback";
 
@@ -25,7 +31,14 @@ import {
   type MeasuredParagraph,
 } from "./glassLayout";
 import { GLASS_ITALIC_FAMILY, registerGlassItalic } from "./glassFont";
-import { glassFrame, glassPosition, glassSettled } from "./glassMotion";
+import {
+  correctionFor,
+  correctionLeft,
+  glassFrame,
+  glassPosition,
+  glassSettled,
+  type GlassCorrection,
+} from "./glassMotion";
 import { glassParagraphs, type GlassParagraph, type GlassWord } from "./glassText";
 import styles from "./PrompterGlass.module.css";
 
@@ -56,6 +69,15 @@ import styles from "./PrompterGlass.module.css";
 // hardware link's, and the glass only draws the last anchor it was given with
 // the time since it came. Between frames it touches no React state: each frame
 // moves the text column with a transform.
+//
+// Fix C (2026-10-02): the time counts from when the anchor came (the store or
+// the follower notes it, `anchorArrival`), not from React's commit, and each
+// frame is drawn at the frame's own time. When a new anchor puts the text a
+// little off where it is drawn (a press that came a moment late), the text
+// glides there over 0.15 s instead of stepping; a jump, a new picture, the
+// first anchor, the first one placed by the hardware link's pixels (it
+// replaces the glass's own placing by the words, a part of a pixel off) and a
+// still or standing glass are drawn at once.
 
 /** What is on the glass: the text as it went on, the look and the take's size. */
 export interface PrompterGlassText {
@@ -89,6 +111,12 @@ export interface PrompterGlassProps {
    * (D12). `null` draws the anchor as it runs.
    */
   stoppedAfterMs?: number | null;
+  /**
+   * When the anchor came, on the page's clock (`performance.now()`). Without
+   * it, the moment noted with the anchor (`anchorArrival`), else the moment
+   * the glass got it.
+   */
+  anchorAt?: number | null;
   label?: string;
   testId?: string;
 }
@@ -222,6 +250,7 @@ export function PrompterGlass({
   onLayout,
   still = false,
   stoppedAfterMs = null,
+  anchorAt = null,
   label,
   testId,
 }: PrompterGlassProps) {
@@ -280,35 +309,57 @@ export function PrompterGlass({
   });
   const againRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
+  /** The glide onto the last anchor's course, while it lasts. */
+  const correctionRef = useRef<GlassCorrection | null>(null);
+  /** The last frame painted: in which layout, and whether by the anchor's course or a still or standing glass. */
+  const paintedRef = useRef<{ layout: GlassLayout | null; course: boolean }>({ layout: null, course: false });
+  /** The last frame's time: the frames' times never go back. */
+  const drawnAtRef = useRef(0);
 
   const report = useLiveCallback((layout: PrompterGlassLayoutReport) => onLayout?.(layout));
 
-  // One frame: where the anchor puts the text now, drawn by a transform. It
-  // answers whether the text has come to rest.
-  const draw = useLiveCallback((): boolean => {
+  // One frame at `at`: where the anchor puts the text then, and what is left
+  // of a glide onto it, drawn by a transform. It answers whether the text has
+  // come to rest.
+  const draw = useLiveCallback((at: number): boolean => {
     const layout = layoutRef.current;
     const columnElement = columnRef.current;
     if (!layout || !metrics || !columnElement) return true;
     const { anchor: current, receivedAt } = anchorRef.current;
     const stands = stoppedAfterMs !== null;
-    const elapsed = !current || still ? 0 : stands ? stoppedAfterMs : performance.now() - receivedAt;
-    const position = current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0);
+    const elapsed = !current || still ? 0 : stands ? stoppedAfterMs : Math.max(at - receivedAt, 0);
+    // A text that stands keeps what was left of a glide when it stopped.
+    const left = !current || still ? 0 : correctionLeft(correctionRef.current, stands ? receivedAt + elapsed : at);
+    if (left === 0) correctionRef.current = null;
+    let position = current ? glassPosition(current, layout, elapsed) : (layout.lines[0]?.top ?? 0);
+    if (current && left !== 0) {
+      // A glide never carries the text past END.
+      const ownPixels = current.layoutKey === layout.key && current.position !== null;
+      position = Math.min(position + left, ownPixels ? (current.endPosition ?? layout.endTop) : layout.endTop);
+    }
     const frame = glassFrame(layout, metrics, position);
     columnElement.style.transform = `translate3d(0, ${frame.shift}px, 0)`;
     if (readRef.current) readRef.current.style.height = `${frame.readHeight}px`;
-    return still || stands || !current || glassSettled(current, elapsed);
+    paintedRef.current = { layout, course: current !== null && !still && !stands };
+    return still || stands || !current || (glassSettled(current, elapsed) && left === 0);
   });
 
-  // Draws now, and on every frame after it until the text rests; nothing runs
-  // while the text stands still (system §6: nothing animates at rest).
+  // Draws now, and on every frame after it, at the frame's own time, until the
+  // text rests; nothing runs while the text stands still (system §6: nothing
+  // animates at rest).
   const run = useLiveCallback(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
-    const step = () => {
-      frameRef.current = null;
-      if (!draw()) frameRef.current = requestAnimationFrame(step);
+    const drawAt = (time: number) => {
+      const at = Math.max(time, drawnAtRef.current);
+      drawnAtRef.current = at;
+      return draw(at);
     };
-    if (!draw()) frameRef.current = requestAnimationFrame(step);
+    const step = (time: number) => {
+      frameRef.current = null;
+      if (!drawAt(time)) frameRef.current = requestAnimationFrame(step);
+    };
+    if (!drawAt(performance.now())) frameRef.current = requestAnimationFrame(step);
   });
 
   const measure = useLiveCallback((): GlassLayout | null => {
@@ -319,6 +370,8 @@ export function PrompterGlass({
     }
     const layout = measureColumn(columnElement, layoutKey, metrics, glassText);
     layoutRef.current = layout;
+    // A layout measured again is another picture: no glide carries over.
+    correctionRef.current = null;
     run();
     return layout;
   });
@@ -366,12 +419,42 @@ export function PrompterGlass({
     };
   }, [layoutKey, glassText, geometry, sizePx, measure, measureAndReport, reportAgainIfAsked]);
 
-  // A new anchor: drawn from the moment it came.
+  // A new anchor: drawn from the moment it came. When it puts the text a
+  // little off where the last frame drew it on the same picture, the text
+  // glides there instead of stepping.
+  const takeAnchor = useLiveCallback((next: PrompterAnchor | null, nextAt: number | null) => {
+    const at = performance.now();
+    const receivedAt = nextAt ?? (next ? anchorArrival(next) : null) ?? at;
+    const before = anchorRef.current;
+    const layout = layoutRef.current;
+    const painted = paintedRef.current;
+    let correction: GlassCorrection | null = null;
+    if (
+      next &&
+      before.anchor &&
+      layout &&
+      painted.course &&
+      painted.layout === layout &&
+      !still &&
+      stoppedAfterMs === null &&
+      next.layoutKey === before.anchor.layoutKey &&
+      before.anchor.position !== null &&
+      next.position !== null &&
+      next.moveFromPosition === null
+    ) {
+      const drawn =
+        glassPosition(before.anchor, layout, Math.max(at - before.receivedAt, 0)) +
+        correctionLeft(correctionRef.current, at);
+      correction = correctionFor(drawn - glassPosition(next, layout, Math.max(at - receivedAt, 0)), at);
+    }
+    correctionRef.current = correction;
+    anchorRef.current = { anchor: next, receivedAt };
+  });
   useLayoutEffect(() => {
-    anchorRef.current = { anchor, receivedAt: performance.now() };
+    takeAnchor(anchor, anchorAt);
     run();
     reportAgainIfAsked();
-  }, [anchor, run, reportAgainIfAsked]);
+  }, [anchor, anchorAt, takeAnchor, run, reportAgainIfAsked]);
 
   // The reading line, the dimming, a still or a text that stands: drawn again, the anchor's moment kept.
   useLayoutEffect(() => {

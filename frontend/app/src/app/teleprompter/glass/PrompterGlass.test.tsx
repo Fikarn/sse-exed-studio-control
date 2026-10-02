@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { noteAnchorArrival, type PrompterAnchor } from "@sse/engine-client";
+
 import { INTERVIEW_INTRO, paragraph, standardLook, storyAnchor } from "./glassStoryScript";
 import { PrompterGlass, type PrompterGlassText } from "./PrompterGlass";
 
@@ -305,5 +307,225 @@ describe("PrompterGlass", () => {
       />
     );
     expect(column.parentElement!.children).toHaveLength(2);
+  });
+});
+
+// Fix C (2026-10-02): the time counts from when the anchor came, each frame is
+// drawn at its own time, and a small step onto a new course glides.
+describe("PrompterGlass's time", () => {
+  /** Playing at 60 words a minute, 10 px a word, from `position` in this layout. */
+  function playing(overrides: Partial<PrompterAnchor> = {}): PrompterAnchor {
+    return storyAnchor({
+      layoutKey: "g1-l0",
+      place: { paragraph: 0, word: 0 },
+      wordOffset: 0,
+      position: 0,
+      endPosition: 5_000,
+      pxPerReadWord: 10,
+      playing: true,
+      fromWpm: 60,
+      toWpm: 60,
+      ...overrides,
+    });
+  }
+
+  /** The frames asked for, run by hand at the times a test gives them. */
+  function frames() {
+    let asked: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      asked.push(callback);
+      return asked.length;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    return {
+      at: (time: number) => {
+        const now = asked;
+        asked = [];
+        now.forEach((callback) => callback(time));
+      },
+      pending: () => asked.length,
+    };
+  }
+
+  function glassAt(container: HTMLElement) {
+    const column = container.querySelector<HTMLElement>("[data-p]")!.parentElement!;
+    return () => Number(/translate3d\(0, (-?[\d.]+)px, 0\)/.exec(column.style.transform)?.[1]);
+  }
+
+  it("draws an anchor from the moment it came, not from when the glass got it", () => {
+    layOut();
+    const now = 5_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    frames();
+    const fresh = playing();
+    const { container, rerender } = render(<PrompterGlass text={text()} anchor={fresh} width={1920} anchorAt={now} />);
+    const shift = glassAt(container);
+    const start = shift();
+
+    // Came four seconds ago: four words on.
+    const earlier = playing({ revision: 2 });
+    noteAnchorArrival(earlier, 1_000);
+    rerender(<PrompterGlass text={text()} anchor={earlier} width={1920} />);
+    expect(start - shift()).toBeCloseTo(40);
+  });
+
+  it("draws each frame at the frame's own time", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    const { container } = render(<PrompterGlass text={text()} anchor={playing()} width={1920} anchorAt={1_000} />);
+    const shift = glassAt(container);
+    const start = shift();
+    now = 2_012;
+    frame.at(2_000);
+    expect(start - shift()).toBeCloseTo(10, 3);
+  });
+
+  it("never draws a frame earlier than the one before it", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={playing({ revision: 1 })} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+
+    // An anchor on the same course, drawn at once at the page's time.
+    now = 2_012;
+    rerender(<PrompterGlass text={text()} anchor={playing({ revision: 2 })} width={1920} anchorAt={1_000} />);
+    expect(start - shift()).toBeCloseTo(10.12, 3);
+    // The frame after it began a moment earlier: the text does not go back.
+    frame.at(2_000);
+    expect(start - shift()).toBeCloseTo(10.12, 3);
+  });
+
+  it("glides a small step onto the new course and comes to rest on it exactly", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    const first = playing({ revision: 1 });
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={first} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+    now = 2_000;
+    frame.at(2_000);
+    expect(start - shift()).toBeCloseTo(10);
+
+    // The new course stands 3 px further on, and pauses after its ease.
+    const next = playing({ revision: 2, position: 13, playing: false, fromWpm: 60, toWpm: 0, rampMs: 300 });
+    rerender(<PrompterGlass text={text()} anchor={next} width={1920} anchorAt={2_000} />);
+    expect(start - shift(), "where it was drawn").toBeCloseTo(10, 1);
+    now = 2_075;
+    frame.at(2_075);
+    const midway = start - shift();
+    const course = (elapsed: number) => 13 + (60 * elapsed - (60 * elapsed * elapsed) / (2 * 0.3)) / 6;
+    expect(midway).toBeGreaterThan(10.5);
+    expect(midway).toBeLessThan(course(0.075));
+    now = 2_150;
+    frame.at(2_150);
+    expect(start - shift(), "on the course").toBeCloseTo(course(0.15), 6);
+    now = 2_400;
+    frame.at(2_400);
+    expect(start - shift()).toBeCloseTo(course(0.3), 6);
+    expect(frame.pending(), "nothing animates at rest").toBe(0);
+  });
+
+  it("draws a large step and a jump at once", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={playing({ revision: 1 })} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+    now = 2_000;
+    frame.at(2_000);
+
+    // 40 px ahead: a new course, drawn at once.
+    rerender(
+      <PrompterGlass text={text()} anchor={playing({ revision: 2, position: 50 })} width={1920} anchorAt={2_000} />
+    );
+    expect(start - shift()).toBeCloseTo(50);
+
+    // A jump draws its own move from where it says it starts.
+    const jump = playing({ revision: 3, position: 400, moveFromPosition: 52, moveMs: 200 });
+    rerender(<PrompterGlass text={text()} anchor={jump} width={1920} anchorAt={2_000} />);
+    expect(start - shift()).toBeCloseTo(52);
+  });
+
+  it("never glides past END", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    // 600 px a second, 10 px before END.
+    const fast = (overrides: Partial<PrompterAnchor>) =>
+      playing({ pxPerReadWord: 600, endPosition: 5_000, ...overrides });
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={fast({ revision: 1, position: 4_990 })} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+
+    // A press that came a moment late: its course is 5 px behind, and
+    // reaches END while the glide still carries the text ahead of it.
+    rerender(
+      <PrompterGlass text={text()} anchor={fast({ revision: 2, position: 4_985 })} width={1920} anchorAt={1_000} />
+    );
+    for (const at of [1_010, 1_025, 1_050, 1_100, 1_200]) {
+      now = at;
+      frame.at(at);
+      expect(start - shift(), `at ${at}`).toBeLessThanOrEqual(10 + 1e-9);
+    }
+    expect(start - shift()).toBeCloseTo(10, 6);
+  });
+
+  it("stands where a glide had the text when the hardware link stopped", () => {
+    layOut();
+    let now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    const frame = frames();
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={playing({ revision: 1 })} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+    now = 2_000;
+    frame.at(2_000);
+
+    // 3 px ahead: a glide, and the link stops 50 ms into it.
+    const next = playing({ revision: 2, position: 13 });
+    rerender(<PrompterGlass text={text()} anchor={next} width={1920} anchorAt={2_000} />);
+    now = 2_050;
+    frame.at(2_050);
+    const drawn = start - shift();
+    rerender(<PrompterGlass text={text()} anchor={next} width={1920} anchorAt={2_000} stoppedAfterMs={50} />);
+    expect(start - shift()).toBeCloseTo(drawn, 6);
+  });
+
+  it("draws the first anchor placed by the hardware link's pixels at once", () => {
+    layOut();
+    const now = 1_000;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    frames();
+    // Paused, placed by the words until the layout is reported.
+    const byWords = playing({ revision: 1, position: null, playing: false, fromWpm: 0, toWpm: 0 });
+    const { container, rerender } = render(
+      <PrompterGlass text={text()} anchor={byWords} width={1920} anchorAt={1_000} />
+    );
+    const shift = glassAt(container);
+    const start = shift();
+
+    const byPixels = playing({ revision: 2, position: 3, playing: false, fromWpm: 0, toWpm: 0 });
+    rerender(<PrompterGlass text={text()} anchor={byPixels} width={1920} anchorAt={1_000} />);
+    expect(start - shift()).toBeCloseTo(3);
   });
 });

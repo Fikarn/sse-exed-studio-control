@@ -107,6 +107,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
+- The prompter's text no longer steps back when a press and the glass's own read cross, or after the hardware link restarts: the glass and the Teleprompter's copy draw only the newest place, and glide over a small correction (#289, #290).
 - The prompter's text no longer jumps when the deck's dials are turned while vMix records to the same drive: the place, pace and size are saved by a writer of their own, and the deck's PROMPTER keys and displays wait for no disk. Closing Studio Control now saves the last place (#287, #288).
 - The Stream Deck's AUDIO and LIGHTS displays are read about ten times faster, which leaves the deck's link more room while the prompter plays, and the lights' output no longer keeps a processor core busy (#286).
 - The prompter's text no longer jumps back or hangs when the speed is turned, the dial pushed or play pressed while a paragraph break, or the run to `END`, passes the reading line; it moved back by up to half a line, and up to half a screen before `END`.
