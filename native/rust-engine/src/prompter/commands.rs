@@ -149,7 +149,8 @@ fn unsupported(method: &str) -> PrompterError {
 /// A request's reply. The anchor is taken as the action ends, after any
 /// write it made, so its age counts the time the action took (2026-10-02: it
 /// was taken before, and a slow write sent the glass an anchor older than it
-/// said).
+/// said). Only a reply with a reason carries one: it goes out with
+/// `prompter.changed`, and a read's anchors are in its result.
 pub(super) fn reply(
     prompter: &Prompter,
     result: Value,
@@ -160,7 +161,7 @@ pub(super) fn reply(
     PrompterReply {
         result,
         reason,
-        anchor: prompter.anchor(Instant::now()),
+        anchor: reason.and_then(|_| prompter.anchor(Instant::now())),
         health_changed,
     }
 }

@@ -532,6 +532,29 @@ pub(crate) fn write_glass(
     )?)
 }
 
+/// An archive restore's look and size, in its own transaction; the look's
+/// revision moves on when the text must be laid out again. The prompter takes
+/// them too (`after_archive_restore`), so a write the saver had on its way
+/// cannot leave the older look standing.
+pub(crate) fn write_restored_look(
+    transaction: &Transaction<'_>,
+    look: &PrompterLook,
+    size_px: u32,
+    relayout: bool,
+) -> EngineResult<()> {
+    transaction.execute(
+        "UPDATE prompter_state
+            SET look = ?1, size_px = ?2, look_revision = look_revision + ?3
+          WHERE id = 1",
+        params![
+            serde_json::to_string(look)?,
+            i64::from(size_px),
+            i64::from(relayout)
+        ],
+    )?;
+    Ok(())
+}
+
 /// The saver's write of the look, the take's size and the look's revision,
 /// whole: while Studio Control runs only the prompter's memory changes them.
 pub(crate) fn write_look_save(transaction: &Transaction<'_>, save: &LookSave) -> EngineResult<()> {

@@ -72,7 +72,7 @@ fn on_the_glass(prompter: &TestPrompter, name: &str) -> String {
 // The afternoon of 2026-10-02: one write that took 449 ms held every turn of
 // the dial behind it, and the glass jumped back 17 px and forward 14 px.
 #[test]
-fn a_turn_of_the_speed_dial_and_the_displays_wait_for_no_disk() {
+fn a_turn_of_the_speed_dial_waits_for_no_disk() {
     let prompter = TestPrompter::with_saver("saver-dial");
     let id = on_the_glass(&prompter, "Dial");
     let writer = hold_the_write_lock(prompter.path(), Duration::from_millis(600));
@@ -80,11 +80,11 @@ fn a_turn_of_the_speed_dial_and_the_displays_wait_for_no_disk() {
     let started = Instant::now();
     handle_deck_action(prompter.path(), "speed", Some("up")).expect("the dial turns");
     handle_deck_action(prompter.path(), "speed", Some("up")).expect("the dial turns");
-    let texts = deck_texts(prompter.path()).expect("the displays read");
     let took = started.elapsed();
+    let texts = deck_texts(prompter.path()).expect("the displays read");
     assert!(
         took < Duration::from_millis(300),
-        "two detents and the displays took {took:?} behind a held disk"
+        "two detents took {took:?} behind a held disk"
     );
     assert!(texts
         .iter()
@@ -120,6 +120,53 @@ fn the_newest_place_reaches_the_disk_after_a_write_on_its_way() {
     assert_eq!(stored(&prompter, &id).0.paragraph, 3);
     hooks::release_writes(&saver);
     assert_eq!(stored(&prompter, &id).0.paragraph, 2);
+}
+
+// A save the saver took before an Update of the same script, and wrote
+// after it, is refused: the place stays the one Update carried into the new
+// text (the review of #287: a put-on refuses by the script alone, an Update
+// only by the glass's revision).
+#[test]
+fn a_save_taken_before_an_update_is_refused() {
+    let prompter = TestPrompter::new("saver-update");
+    let id = on_the_glass(&prompter, "Updated");
+    prompter.call(
+        "prompter.jump",
+        json!({ "to": "paragraph", "paragraph": 2 }),
+    );
+    let saver = saver_of(prompter.path());
+    let revision = glass_revision(prompter.path());
+    prompter.edit(
+        &id,
+        &[
+            "A new first paragraph.",
+            "Paragraph 1 has a few words in it.",
+            "Paragraph 2 has a few words in it.",
+            "Paragraph 3 has a few words in it.",
+        ],
+    );
+
+    hooks::hold_writes(&saver);
+    saver.keep_glass(
+        GlassSave {
+            script_id: id.clone(),
+            glass_revision: revision,
+            place: PrompterPlace {
+                paragraph: 6,
+                word: 0,
+            },
+            speed_wpm: 140,
+        },
+        Urgency::Now,
+    );
+    let taken = hooks::take(&saver).expect("a write to make");
+    prompter.call("prompter.update", json!({}));
+    let updated = stored(&prompter, &id);
+    hooks::write(&saver, taken);
+    assert_eq!(stored(&prompter, &id), updated);
+    assert_eq!(updated.0.paragraph, 3, "the place moved with its words");
+    assert_eq!(saver.take_counts().refused, 1);
+    hooks::release_writes(&saver);
 }
 
 // A save the saver took before a put-on, and wrote after it, is refused: the
@@ -160,25 +207,94 @@ fn a_save_taken_before_the_glass_changed_is_refused() {
 }
 
 // An edit of the script on the glass leaves its place alone: it used to write
-// back the place it had read, over a newer one waiting to be written.
+// back the place it had read, over one the saver wrote meanwhile. Here the
+// saver's write lands between the edit's read and its write.
 #[test]
 fn an_edit_of_the_script_on_the_glass_keeps_the_newest_place() {
     let prompter = TestPrompter::new("saver-edit");
     let id = on_the_glass(&prompter, "Edited");
-    let saver = saver_of(prompter.path());
-
-    hooks::hold_writes(&saver);
-    prompter.call(
-        "prompter.jump",
-        json!({ "to": "paragraph", "paragraph": 4 }),
-    );
+    let path = prompter.path().to_path_buf();
+    let script = id.clone();
+    let (taken, taking) = std::sync::mpsc::channel();
+    let saver = thread::spawn(move || {
+        let mut connection = open_connection(&path).expect("a connection");
+        let transaction = store::begin(&mut connection).expect("the write lock");
+        transaction
+            .execute(
+                "UPDATE prompter_scripts SET place_paragraph = 7, place_word = 0 WHERE id = ?1",
+                [&script],
+            )
+            .expect("the place");
+        taken.send(()).expect("the test waits");
+        thread::sleep(Duration::from_millis(300));
+        transaction.commit().expect("the commit");
+    });
+    taking.recv().expect("the lock is taken");
     prompter.edit(&id, &["A new first paragraph.", "And a second."]);
-    hooks::release_writes(&saver);
+    saver.join().expect("the write lands");
 
-    assert_eq!(stored(&prompter, &id).0.paragraph, 4);
+    assert_eq!(stored(&prompter, &id).0.paragraph, 7);
     let glass = &prompter.snapshot()["glass"];
     assert_eq!(glass["notUpdated"], true);
     assert_eq!(glass["name"], "Edited");
+}
+
+// A value handed over while a write is on its way waits its own time: it
+// does not take the due of the value the write took (the review of #287:
+// with a slow disk the saver wrote back to back).
+#[test]
+fn a_value_handed_over_during_a_write_waits_its_own_second() {
+    let prompter = TestPrompter::new("saver-coalesce");
+    let id = on_the_glass(&prompter, "Coalesced");
+    let saver = saver_of(prompter.path());
+    let revision = glass_revision(prompter.path());
+    let save = |speed_wpm: u32| GlassSave {
+        script_id: id.clone(),
+        glass_revision: revision,
+        place: PrompterPlace::TOP,
+        speed_wpm,
+    };
+
+    hooks::hold_writes(&saver);
+    saver.keep_glass(save(145), Urgency::Now);
+    let taken = hooks::take_due(&saver).expect("due at once");
+    saver.keep_glass(save(150), Urgency::Coalesced);
+    assert!(
+        hooks::take_due(&saver).is_none(),
+        "the newer value waits a second from the write on its way"
+    );
+    hooks::write(&saver, taken);
+    assert!(hooks::take_due(&saver).is_none());
+    hooks::release_writes(&saver);
+    assert_eq!(stored(&prompter, &id).1, 150);
+}
+
+// A flush returns as soon as nothing waits, when the last value handed over
+// equals the one last written. (The review of #287 found the saver could let
+// such a value go without waking a flush; it now wakes every waiter each time
+// it goes back to sleep. That race is too narrow to force here.)
+#[test]
+fn a_flush_returns_promptly_when_the_last_value_was_written_already() {
+    let prompter = TestPrompter::with_saver("saver-flush");
+    let id = on_the_glass(&prompter, "Flushed");
+    let saver = saver_of(prompter.path());
+    let revision = glass_revision(prompter.path());
+    let save = |speed_wpm: u32| GlassSave {
+        script_id: id.clone(),
+        glass_revision: revision,
+        place: PrompterPlace::TOP,
+        speed_wpm,
+    };
+    saver.keep_glass(save(140), Urgency::Now);
+    assert!(flush_saves(prompter.path(), Duration::from_secs(5)));
+
+    saver.keep_glass(save(145), Urgency::Coalesced);
+    saver.keep_glass(save(140), Urgency::Coalesced);
+    let started = Instant::now();
+    assert!(flush_saves(prompter.path(), Duration::from_secs(5)));
+    let took = started.elapsed();
+    assert!(took < Duration::from_secs(1), "the flush took {took:?}");
+    assert_eq!(stored(&prompter, &id).1, 140);
 }
 
 // The lists show a new pace at once, although the disk has it a moment

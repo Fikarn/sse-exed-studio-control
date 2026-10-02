@@ -99,14 +99,33 @@ pub(crate) struct SaverCounts {
 struct Slot<T> {
     /// The newest value not yet written, and when it is due.
     pending: Option<(T, Instant)>,
+    /// The pending value is the one a write on its way took. A newer value
+    /// that takes its place does not inherit its due (the review of #287:
+    /// while the disk was slow every hand-off was due at once, and the saver
+    /// wrote back to back instead of once a second).
+    taken: bool,
     /// The value last written, so an equal one is not written again.
     written: Option<T>,
+}
+
+impl<T> Slot<T> {
+    /// `value` waits, due at `due` or at the waiting value's due when that
+    /// is sooner and not yet taken.
+    fn hand_over(&mut self, value: T, due: Instant) {
+        let due = match &self.pending {
+            Some((_, earlier)) if !self.taken => due.min(*earlier),
+            _ => due,
+        };
+        self.pending = Some((value, due));
+        self.taken = false;
+    }
 }
 
 impl<T> Default for Slot<T> {
     fn default() -> Self {
         Self {
             pending: None,
+            taken: false,
             written: None,
         }
     }
@@ -122,10 +141,11 @@ struct State {
     /// A write is on its way.
     writing: bool,
     /// The stop was asked for: everything pending is written, then the
-    /// thread closes its connection and ends.
+    /// thread closes its connection and ends. Hand-offs from here on are
+    /// ignored.
     stopping: bool,
-    /// After the stop, hand-offs are ignored.
     stopped: bool,
+    /// When the last write began: a coalesced save waits a second from it.
     last_write_at: Option<Instant>,
     retry_at: Option<Instant>,
     failures: u32,
@@ -195,16 +215,11 @@ impl Saver {
     pub(crate) fn keep_glass(&self, save: GlassSave, urgency: Urgency) {
         let now = Instant::now();
         let mut state = self.lock();
-        if state.stopped {
+        if state.stopping || state.stopped {
             return;
         }
         let due = due_at(&state, urgency, now);
-        let due = state
-            .glass
-            .pending
-            .as_ref()
-            .map_or(due, |(_, earlier)| due.min(*earlier));
-        state.glass.pending = Some((save, due));
+        state.glass.hand_over(save, due);
         self.handed_over(state);
     }
 
@@ -212,16 +227,11 @@ impl Saver {
     pub(crate) fn keep_look(&self, save: LookSave, urgency: Urgency) {
         let now = Instant::now();
         let mut state = self.lock();
-        if state.stopped {
+        if state.stopping || state.stopped {
             return;
         }
         let due = due_at(&state, urgency, now);
-        let due = state
-            .look
-            .pending
-            .as_ref()
-            .map_or(due, |(_, earlier)| due.min(*earlier));
-        state.look.pending = Some((save, due));
+        state.look.hand_over(save, due);
         self.handed_over(state);
     }
 
@@ -240,6 +250,9 @@ impl Saver {
         let mut state = self.lock();
         state.glass.pending = None;
         state.glass.written = None;
+        drop(state);
+        // A flush that waits for the slot to empty hears of it.
+        self.changed.notify_all();
     }
 
     /// The glass script's newest values: what waits, else what was last
@@ -261,7 +274,8 @@ impl Saver {
 
     /// Writes everything pending now and waits for it, up to `within`: before
     /// a backup, an export or a restore reads the saved data. True when
-    /// nothing is left unwritten.
+    /// nothing is left unwritten. Without the thread the write is made here,
+    /// and `within` does not bound it.
     pub(crate) fn flush(&self, within: Duration) -> bool {
         let mut state = self.lock();
         if !state.threaded {
@@ -287,7 +301,8 @@ impl Saver {
 
     /// At a stop: writes everything pending, then the thread closes its
     /// connection and ends, up to `within`; hand-offs after this are
-    /// ignored. True when it was done in time.
+    /// ignored. True when it was done in time. Without the thread the write
+    /// is made here, and `within` does not bound it.
     pub(crate) fn finish(&self, within: Duration) -> bool {
         let mut state = self.lock();
         if !state.threaded {
@@ -355,6 +370,10 @@ impl Saver {
                     break ready;
                 }
                 let wait = next_wake(&state, now);
+                // What the thread let go of without a write (a value equal
+                // to the last one written) is told to a flush that waits for
+                // it (the review of #287).
+                self.changed.notify_all();
                 state = self
                     .changed
                     .wait_timeout(state, wait)
@@ -362,7 +381,11 @@ impl Saver {
                     .0;
             };
             let Some(batch) = batch else {
+                // The connection is closed with the saver's lock let go: a
+                // close may fold the write-ahead log into the file.
+                drop(state);
                 drop(connection.take());
+                let mut state = self.lock();
                 state.stopped = true;
                 state.threaded = false;
                 drop(state);
@@ -472,7 +495,13 @@ fn take_batch(state: &mut State, now: Option<Instant>) -> Option<Batch> {
         .as_ref()
         .filter(|(_, at)| due(at))
         .map(|(value, _)| value.clone());
-    (glass.is_some() || look.is_some()).then_some(Batch { glass, look })
+    if glass.is_none() && look.is_none() {
+        return None;
+    }
+    state.glass.taken = glass.is_some();
+    state.look.taken = look.is_some();
+    state.last_write_at = Some(Instant::now());
+    Some(Batch { glass, look })
 }
 
 /// One write: the place and pace, the look, or both, in one transaction.
@@ -501,9 +530,13 @@ fn finish_batch(
     started: Instant,
 ) -> Option<String> {
     state.counts.longest = state.counts.longest.max(started.elapsed());
+    state.glass.taken = false;
+    state.look.taken = false;
     match outcome {
         Ok(landed) => {
-            state.counts.saved += 1;
+            if landed || batch.look.is_some() {
+                state.counts.saved += 1;
+            }
             if let Some(glass) = &batch.glass {
                 if !landed {
                     state.counts.refused += 1;
@@ -529,7 +562,6 @@ fn finish_batch(
                 }
                 state.look.written = Some(look.clone());
             }
-            state.last_write_at = Some(Instant::now());
             state.failures = 0;
             state.retry_at = None;
             None
@@ -572,6 +604,14 @@ pub(crate) mod hooks {
     pub(crate) fn take(saver: &Saver) -> Option<Taken> {
         let mut state = saver.lock();
         let batch = take_batch(&mut state, None)?;
+        state.writing = true;
+        Some(Taken(batch))
+    }
+
+    /// What the thread would take now: only what is due.
+    pub(crate) fn take_due(saver: &Saver) -> Option<Taken> {
+        let mut state = saver.lock();
+        let batch = take_batch(&mut state, Some(Instant::now()))?;
         state.writing = true;
         Some(Taken(batch))
     }
