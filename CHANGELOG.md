@@ -107,6 +107,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
+- The Stream Deck's AUDIO and LIGHTS displays are read about ten times faster, which leaves the deck's link more room while the prompter plays, and the lights' output no longer keeps a processor core busy (#286).
 - The prompter's text no longer jumps back or hangs when the speed is turned, the dial pushed or play pressed while a paragraph break, or the run to `END`, passes the reading line; it moved back by up to half a line, and up to half a screen before `END`.
 - A change sent in two parts no longer reads as unconfirmed when TotalMix answered both at once; a recall could leave the Console `ASSUMED` with sends that were in fact set (#282).
 - Enter in Lighting's empty search field no longer recalls a scene with its Recent list closed; a held Enter no longer confirms an armed key; a dialog no longer takes focus back every few seconds (#216).

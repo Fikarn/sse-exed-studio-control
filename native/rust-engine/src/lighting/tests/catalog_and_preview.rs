@@ -38,6 +38,47 @@ fn lighting_fixture_catalog_contains_verified_and_research_entries() {
     assert_eq!(research_needed.modes[0].channel_count, 0);
 }
 
+// 2026-10-02: the catalog was built anew for each fixture of each lighting
+// read, which made every AUDIO and LIGHTS display of the deck cost the studio
+// 11–22 ms. It is built once now, and a fixture resolves as before.
+#[test]
+fn lighting_fixture_catalog_is_built_once_and_resolves_as_before() {
+    use super::fixture_catalog::{
+        catalog_definitions, resolve_fixture_definition, resolve_fixture_profile,
+    };
+
+    assert!(
+        std::ptr::eq(catalog_definitions(), catalog_definitions()),
+        "the catalog should be built once"
+    );
+    assert_eq!(
+        read_lighting_fixture_catalog_snapshot().definitions.len(),
+        catalog_definitions().len()
+    );
+
+    let profile = resolve_fixture_profile(
+        Some("aputure-infinimat-generic"),
+        None,
+        None,
+        None,
+        "fixture-1",
+    );
+    let definition =
+        resolve_fixture_definition(Some("aputure-infinimat-generic"), None, None, "fixture-1");
+    assert_eq!(profile.definition_id, "aputure-infinimat-generic");
+    assert_eq!(definition.id, "aputure-infinimat-generic");
+    assert_eq!(profile.mode_id, definition.default_mode_id);
+
+    // A definition the catalog lacks still resolves to the default: the
+    // chain of names ends at the default's id, which the catalog holds.
+    let unknown = resolve_fixture_profile(Some("no-such-light"), None, None, None, "fixture-2");
+    assert_eq!(unknown.definition_id, DEFAULT_FIXTURE_DEFINITION_ID);
+    assert_eq!(
+        resolve_fixture_definition(Some("no-such-light"), None, None, "fixture-2").id,
+        DEFAULT_FIXTURE_DEFINITION_ID
+    );
+}
+
 #[test]
 fn lighting_fixture_catalog_modes_have_valid_channel_maps() {
     let catalog = read_lighting_fixture_catalog_snapshot();
