@@ -299,6 +299,12 @@ pub fn read_deck_displays(
     cameras_simulated: bool,
     at: Instant,
 ) -> Result<Value, ControlSurfaceError> {
+    // The moment before the reads (the review of #293): of two answers that
+    // cross, the one read later is the newer whatever finished first.
+    let at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_millis() as u64)
+        .unwrap_or(0);
     let mut texts: HashMap<&str, String> =
         crate::control_surface_pages::page_texts(db_path, cameras_simulated, at)?
             .into_iter()
@@ -326,10 +332,6 @@ pub fn read_deck_displays(
             }
         }
     }
-    let at_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|since| since.as_millis() as u64)
-        .unwrap_or(0);
     Ok(json!({
         "sse": DECK_DISPLAYS_MARK,
         "at": at_ms,
