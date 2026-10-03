@@ -44,6 +44,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 
 ## Stream Deck
 
+- [ ] The new profile is imported before the deck is used on the new build, not before the build is on: an old build with the new profile greys the whole deck (`/api/deck/displays` answers `400`), `PHONES` answers `400` and `RECALL` recalls at once.
 - [ ] After Companion's Full Reset & Import of the new profile (Companion 5's own format, 2026-10-03), the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, and the deck follows the app's page to each of the four.
 - [ ] In Companion's Surfaces, "Horizontal Swipe Changes Page" is off for the deck (the reset turns it off; the profile cannot carry it): a swipe along the strip turns no page. If it is on, turn it off.
 - [ ] No key and no cell has a top bar, a yellow border while pressed or a status icon; the images fill each key and each strip cell, not letterboxed.
@@ -55,12 +56,12 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, `RECALL` reads `PREVIEW` in blue, the INTENSITY and CCT values are blue, and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
 - [ ] `ALL OFF` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.
-- [ ] A quick double press on `PLAY`, `DIM`, a mute (a dial's push) or the `LIGHT` dial's push switches once.
+- [ ] A quick double press on `PLAY`, `DIM`, `PHONES`, a mute (a dial's push) or the `LIGHT` dial's push switches once.
 - [ ] On LIGHTS, a turn of the LIGHT dial shows the next light's name, intensity and colour temperature, at once or within a second; a turn of INTENSITY, CCT or SCENE changes its own cell the same way; a light changed on screen shows on the strip within a second.
 - [ ] A fast spin of the LIGHT dial: the strip catches up within a second of stopping, and `engine.log` has no line that the bridge refused a request (`503`).
-- [ ] On AUDIO, `MAIN OUT` is amber while the dials send into Main Out; `PHONES` goes to `PHONES 1`, `PHONES 2`, `PHONES 1`, amber; `BANK` reads the bank, `DIM` reads `-20 dB` in amber, `SOLO` reads how many are on. The strip shows each strip's name, its level and a bar that follows the fader; a muted strip reads `MUTED` and its bar turns ember. A slow turn steps one step a detent, a fast spin further; a turn never sets a gain.
+- [ ] On AUDIO, `MAIN OUT` is amber while the dials send into Main Out; `PHONES` goes to `PHONES 1`, `PHONES 2`, `PHONES 1`, amber; `BANK` reads the bank, `DIM` reads `-20 dB` in amber, `SOLO` reads how many are on. The strip shows each strip's name, its level and a bar that follows the fader; a muted strip reads `MUTED` and its bar turns ember. A slow turn steps one step a detent, a fast spin further; a turn never sets a gain. While the Console is locked (TotalMix not verified) every AUDIO key is dark with grey words, `MAIN OUT`, `PHONES` and `DIM` too.
 - [ ] With Companion closed, the header's Surface lamp reads `no deck`, amber, within about 5 s, and nothing locks; started again, it reads `ready`.
-- [ ] With the app closed, the deck's keys and cells turn grey and show no values within about 5 s; with the app started again they come back by themselves.
+- [ ] With the app closed, the deck's keys and cells turn grey and show no values within about 5 s; with the app started again they come back by themselves. Turned by its page key to another page than the app's before the app was closed, the deck stays on that page when it comes back: it turns only when the app's page changes.
 
 - [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
 
