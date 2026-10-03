@@ -9,20 +9,25 @@
 //! | Bottom | PLAY | CAM 1 | CAM 2  | CAM 3      |
 //!
 //! The camera keys sit over the strip that shows the selected camera: pick,
-//! look and turn in one place. The selected camera has a white outline, not
-//! an amber fill (F1): amber means "switched on" on the screen. The state
-//! words take the screen's colours; red stays REC's.
+//! look and turn in one place. The selected camera has the Beige keyline,
+//! not an amber fill (F1): a fill means "switched on" on the screen. The
+//! state words take the screen's colours and lamps; Coral is REC's and an
+//! unreachable camera's.
 
 use super::common::{camera, page_key, play_key, rec_key};
 use super::model::{
-    cell, dark_key, dial, key_with_value, reads, shown, shown_head, Control, Prop, DECK_DOUBT_INK,
-    DECK_GREY_INK, DECK_LIVE_BG, DECK_SELECT_LINE, FILL, VALUE,
+    cell, dark_key, dial, key_with_value, reads, shown, shown_head, CellValue, Control, Element,
+    ElementKind, Prop, ART, BANK_LINE, DECK_FACE, DECK_INK_4, STATE_LINE, VALUE,
 };
 
+/// The selected camera's keyline, over its key's picture.
+const SELECTED: &str = "selected";
+
 /// `CAM n`: selects it; the dials, the strip, the plate and the big picture
-/// follow, and REC stays CAM 1's. Under its name its state, in the screen's
-/// words and colours: `HELD` green, `UNREACHABLE` amber, `RELEASED` and
-/// `NOT SET UP` grey.
+/// follow, and REC stays CAM 1's. A lamp and its name, and under it its
+/// state in the screen's words and colours: `HELD` Green, `RELEASED` and
+/// `NOT SET UP` Yellow, `UNREACHABLE` Coral. The state is live text only
+/// when it is none of the pictures'.
 fn camera_key(
     col: u8,
     label: &'static str,
@@ -35,51 +40,64 @@ fn camera_key(
         _ => "key_cam_3",
     };
     let state = |word: &str| reads(display, word);
-    key_with_value(
-        1,
-        col,
-        label,
-        Prop::text(label),
-        Prop::Expr(shown(display)),
-        art,
-    )
-    .on_press(camera("select", Some(number)))
-    .rule(
-        state("HELD"),
-        vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
-    )
-    .rule(
-        state("UNREACHABLE"),
-        vec![(VALUE, "color", Prop::colour(DECK_DOUBT_INK))],
-    )
-    .rule(
-        format!("{} || {}", state("RELEASED"), state("NOT SET UP")),
-        vec![(VALUE, "color", Prop::colour(DECK_GREY_INK))],
-    )
-    .rule(
-        reads("camera_state_selected", number),
-        vec![
-            (FILL, "borderWidth", Prop::Fixed(4.into())),
-            (FILL, "borderColor", Prop::colour(DECK_SELECT_LINE)),
-        ],
-    )
-    .grey_without_the_link()
+    let hidden = || vec![(VALUE, "enabled", Prop::flag(false))];
+    key_with_value(1, col, label, Prop::Expr(shown(display)), art, STATE_LINE)
+        .element(
+            Element::new(
+                SELECTED,
+                ElementKind::Image {
+                    image: "key_selected",
+                },
+                [0.0, 0.0, 100.0, 100.0],
+            )
+            .hidden(),
+        )
+        .on_press(camera("select", Some(number)))
+        .shows_and(state("HELD"), &format!("{art}_held"), DECK_FACE, hidden())
+        .shows_and(
+            state("RELEASED"),
+            &format!("{art}_released"),
+            DECK_FACE,
+            hidden(),
+        )
+        .shows_and(
+            state("NOT SET UP"),
+            &format!("{art}_not_set_up"),
+            DECK_FACE,
+            hidden(),
+        )
+        .shows_and(
+            state("UNREACHABLE"),
+            &format!("{art}_unreachable"),
+            DECK_FACE,
+            hidden(),
+        )
+        .rule(
+            reads("camera_state_selected", number),
+            vec![(SELECTED, "enabled", Prop::flag(true))],
+        )
+        .grey_without_the_link()
 }
 
 /// A cell of the strip: what the dial under it sets on the selected camera,
-/// by the bank, over the camera's value. Amber while the camera does not
-/// answer (its last values), grey while it is released or not set up.
+/// by the bank, over the camera's value. Doubt while the camera does not
+/// answer (its last values): a dashed Yellow keyline on the value. The
+/// fourth ink while it is released or not set up.
 fn camera_cell(col: u8, label: &'static str, display: &'static str) -> Control {
     cell(
         col,
         label,
         "what the dial under it sets on the selected camera, and its value",
-        Prop::Expr(shown_head(display)),
+        Some(Prop::Expr(shown_head(display))),
         display,
         "cell_camera_dial",
+        CellValue::Number,
     )
-    .inked(reads("camera_state_dials", "doubt"), DECK_DOUBT_INK)
-    .inked(reads("camera_state_dials", "locked"), DECK_GREY_INK)
+    .rule(
+        reads("camera_state_dials", "doubt"),
+        vec![(ART, "base64Image", Prop::image("cell_camera_dial_doubt"))],
+    )
+    .inked(reads("camera_state_dials", "locked"), DECK_INK_4)
     .grey_without_the_link()
 }
 
@@ -100,28 +118,39 @@ fn camera_dial(col: u8, label: &'static str, number: &'static str) -> Control {
 }
 
 pub(super) fn camera_controls() -> Vec<Control> {
+    let bank = |word: &str| reads("camera_key_bank", word);
+    let hidden = || vec![(VALUE, "enabled", Prop::flag(false))];
     vec![
         rec_key(),
-        // EXPOSURE, COLOUR or FOCUS: nothing reaches a camera.
+        // EXPOSURE, COLOUR or FOCUS, with a pip a bank: nothing reaches a
+        // camera. The word is live only when it is none of the pictures'.
         key_with_value(
             0,
             1,
             "BANK",
-            Prop::text("BANK"),
             Prop::Expr(shown("camera_key_bank")),
             "key_camera_bank",
+            BANK_LINE,
         )
         .on_press(camera("bank", None))
+        .shows_and(
+            bank("EXPOSURE"),
+            "key_camera_bank_exposure",
+            DECK_FACE,
+            hidden(),
+        )
+        .shows_and(
+            bank("COLOUR"),
+            "key_camera_bank_colour",
+            DECK_FACE,
+            hidden(),
+        )
+        .shows_and(bank("FOCUS"), "key_camera_bank_focus", DECK_FACE, hidden())
         .grey_without_the_link(),
         // Kept free: a one-press AUTO could go here once the camera links are
         // built and reviewed.
         dark_key(0, 2),
-        page_key(
-            "PROMPTER \u{203a}",
-            "PROMPTER\n\u{203a}",
-            "prompter",
-            "key_page_prompter",
-        ),
+        page_key("PROMPTER \u{203a}", "prompter", "key_page_prompter"),
         play_key(),
         camera_key(1, "CAM 1", "1", "camera_key_1"),
         camera_key(2, "CAM 2", "2", "camera_key_2"),

@@ -1,45 +1,74 @@
 //! What a deck page is made of (2026-10-03, the Companion 5 profile): a
 //! control is a key, a cell of the touch strip or a dial, what a press, a
 //! push or a turn of it sends, and how it is drawn — layers of a background,
-//! an image from the profile's image library, its words and its live values,
-//! and the rules that colour them from the bridge's state words. The profile
-//! (`companion.rs`) and the page model Setup draws (`snapshot.rs`) are both
-//! read off these, and neither reads the other's JSON.
+//! an image from the profile's image library, and the live values over it,
+//! and the rules that pick its image and colour its values from the bridge's
+//! state words. The profile (`companion.rs`) and the page model Setup draws
+//! (`snapshot.rs`) are both read off these, and neither reads the other's
+//! JSON.
+//!
+//! The look (2026-10-03, the visual overhaul): the image draws every fixed
+//! word of a key or a cell, in the brand's faces, with a picture for each
+//! state the deck shows (`scripts/deck-assets.py`); a rule on a word the
+//! bridge already sends picks the picture. Only what changes freely is
+//! Companion's own text: values, names, the take's length, a count. A
+//! control's `label` stays its name for Setup's map and Companion's editor;
+//! the deck never draws it as text.
 
 use serde_json::Value;
 
-// The deck's palette: the app's Console vocabulary, mirrored on the
-// hardware. The brand's palette replaces it later; these are today's.
-pub(super) const DECK_WHITE: u32 = 0x00FF_FFFF;
+// The deck's palette: the screen's (docs/DESIGN.md §4, the tokens'
+// `core.json`), and the hardware's black glass. Nothing else is drawn; the
+// tests hold every colour of the profile to `DECK_PALETTE`.
+/// The black glass: a key that does nothing, and the words on a lit fill.
 pub(super) const DECK_BLACK: u32 = 0x0000_0000;
-pub(super) const DECK_AMBER_BG: u32 = 0x00E8_B13D;
-pub(super) const DECK_AMBER_INK: u32 = 0x0024_1D0B;
-pub(super) const DECK_WARN_BG: u32 = 0x00FF_D33D;
-pub(super) const DECK_WARN_INK: u32 = 0x002A_2206;
-pub(super) const DECK_MUTED_INK: u32 = 0x00E0_7A63;
-pub(super) const DECK_GREY_INK: u32 = 0x006D_675A;
-pub(super) const DECK_BANK_TINT_BG: u32 = 0x004A_3A12;
-/// Live: running now (the prompter's text scrolls), and a scene the rig
-/// holds, and a camera that is held. The screen's green.
-pub(super) const DECK_LIVE_BG: u32 = 0x003D_DC7A;
-pub(super) const DECK_LIVE_INK: u32 = 0x0004_200F;
-/// A hazard that is on (`REC` while CAM 1 records): the word in the screen's
-/// red under a red lamp, on a dark key, never a red fill (D19).
-pub(super) const DECK_HAZARD_INK: u32 = 0x00FF_6B6B;
-/// Doubt: what a device last reported before it stopped answering.
-pub(super) const DECK_DOUBT_INK: u32 = DECK_AMBER_BG;
-/// Preview: what the deck changes is staged, not on the rig. The screen's
-/// blue for preview (2026-10-03: the deck had no blue until RECALL said
-/// PREVIEW and the LIGHTS values turned blue).
-pub(super) const DECK_PREVIEW_INK: u32 = 0x007C_C4FF;
-/// The selected camera's outline (2026-10-03, F1): white, not an amber fill.
-pub(super) const DECK_SELECT_LINE: u32 = DECK_WHITE;
-/// The AUDIO strip's bar, as the images drew it: amber, and ember while the
-/// strip is muted; the unity mark in cream at about half strength (Companion
-/// keeps a colour's alpha inverted in its top byte).
-pub(super) const DECK_BAR: u32 = 0x00E8_B13D;
-pub(super) const DECK_BAR_MUTED: u32 = 0x00C2_5742;
-pub(super) const DECK_UNITY_MARK: u32 = 0x73F7_E7BD;
+/// The face of a key at rest.
+pub(super) const DECK_FACE: u32 = 0x0011_1A17;
+/// A black display well: the touch strip.
+pub(super) const DECK_WELL: u32 = 0x0004_0706;
+/// Beige Light, the main ink: a value.
+pub(super) const DECK_INK: u32 = 0x00F6_F5E8;
+/// The second ink: a live line under a key's word.
+pub(super) const DECK_INK_2: u32 = 0x00C5_C7B9;
+/// The quiet ink: a dial's name over its value, a disabled key's reason.
+pub(super) const DECK_INK_3: u32 = 0x008D_9389;
+/// The fourth ink: what cannot act or is not known.
+pub(super) const DECK_INK_4: u32 = 0x0059_625C;
+/// A fader's cap.
+pub(super) const DECK_CAP: u32 = 0x00D8_D7C5;
+/// Live and on: the prompter's text scrolls, the rig holds the scene.
+pub(super) const DECK_GREEN: u32 = 0x0099_BA92;
+/// Engaged and attention: the mix target, a strip muted, a scene unsaved, a
+/// Console that is not verified.
+pub(super) const DECK_YELLOW: u32 = 0x00F2_DE6F;
+/// The armed form: the second press does it.
+pub(super) const DECK_BURGUNDY: u32 = 0x0067_1919;
+/// Information: Preview.
+pub(super) const DECK_BLUE: u32 = 0x003A_87E5;
+/// The page keys.
+pub(super) const DECK_DARK_GREEN: u32 = 0x0000_4932;
+
+/// Every colour the deck may draw: the screen's palette by its token names.
+#[cfg(test)]
+pub(super) const DECK_PALETTE: [(&str, u32); 17] = [
+    ("black", DECK_BLACK),
+    ("face", DECK_FACE),
+    ("well", DECK_WELL),
+    ("line", 0x0021_2D28),
+    ("line-2", 0x0036_453E),
+    ("ink", DECK_INK),
+    ("ink-2", DECK_INK_2),
+    ("ink-3", DECK_INK_3),
+    ("ink-4", DECK_INK_4),
+    ("cap", DECK_CAP),
+    ("green", DECK_GREEN),
+    ("yellow", DECK_YELLOW),
+    ("coral", 0x00FF_7D55),
+    ("burgundy", DECK_BURGUNDY),
+    ("beige", 0x00ED_EBD1),
+    ("blue", DECK_BLUE),
+    ("dark-green", DECK_DARK_GREEN),
+];
 
 /// Where a control is on the deck: a key (rows 0 and 1), a cell of the touch
 /// strip (row 2, over its dial) or a dial (row 3, which Companion never
@@ -102,6 +131,11 @@ impl Prop {
     pub(super) fn flag(on: bool) -> Self {
         Self::Fixed(Value::from(on))
     }
+
+    /// An image of the profile's library, by its name.
+    pub(super) fn image(name: &str) -> Self {
+        Self::Expr(format!("$(image:{name})"))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -143,6 +177,12 @@ impl Element {
         self.enabled = Prop::Expr(when);
         self
     }
+
+    /// Not drawn until a rule says so.
+    pub(super) fn hidden(mut self) -> Self {
+        self.enabled = Prop::flag(false);
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,8 +191,9 @@ pub(super) enum ElementKind {
     Fill { colour: Prop },
     /// An image of the profile's library, by its name.
     Image { image: &'static str },
-    /// Words: a fixed label or a live value. `size` is Companion's, a
-    /// percentage of the element's height.
+    /// Words: a live value (a fixed label is the image's). `size` is
+    /// Companion's, a percentage of the element's height: a box `h` px high
+    /// draws `size * h / 120` px type.
     Text {
         text: Prop,
         size: f64,
@@ -222,7 +263,7 @@ impl Control {
         self
     }
 
-    /// The text elements of the control, for a rule that greys them all.
+    /// The text elements of the control, for a rule that inks them all.
     fn texts(&self) -> Vec<&'static str> {
         self.elements
             .iter()
@@ -231,7 +272,16 @@ impl Control {
             .collect()
     }
 
-    /// Every word of the control in `colour` while `when` holds.
+    /// The image the control shows at rest; the pictures of its states are
+    /// named after it (`<art>_locked`, `<art>_off`).
+    pub(super) fn art(&self) -> Option<&'static str> {
+        self.elements.iter().find_map(|element| match element.kind {
+            ElementKind::Image { image } if element.id == ART => Some(image),
+            _ => None,
+        })
+    }
+
+    /// Every live text of the control in `colour` while `when` holds.
     pub(super) fn inked(self, when: impl Into<String>, colour: u32) -> Self {
         let set = self
             .texts()
@@ -241,43 +291,69 @@ impl Control {
         self.rule(when, set)
     }
 
-    /// A fill and every word in its ink while `when` holds.
-    pub(super) fn filled(self, when: impl Into<String>, fill: u32, ink: u32) -> Self {
-        self.filled_and(when, fill, ink, Vec::new())
+    /// The picture `image` on a background of `fill` while `when` holds: a
+    /// state of the key (`DIM` on, `OFF?` asking).
+    pub(super) fn shows(self, when: impl Into<String>, image: &str, fill: u32) -> Self {
+        self.shows_and(when, image, fill, Vec::new())
     }
 
-    /// A fill, every word in its ink, and `more`, while `when` holds: one
-    /// rule (`OFF?` and `STOP?` change their word too).
-    pub(super) fn filled_and(
+    /// The picture, its background, and `more`, while `when` holds: one rule.
+    pub(super) fn shows_and(
         self,
         when: impl Into<String>,
+        image: &str,
         fill: u32,
-        ink: u32,
         more: Vec<(&'static str, &'static str, Prop)>,
     ) -> Self {
-        let mut set: Vec<(&'static str, &'static str, Prop)> =
-            vec![(FILL, "color", Prop::colour(fill))];
+        let mut set: Vec<(&'static str, &'static str, Prop)> = vec![
+            (ART, "base64Image", Prop::image(image)),
+            (FILL, "color", Prop::colour(fill)),
+        ];
+        set.extend(more);
+        self.rule(when, set)
+    }
+
+    /// The locked form while `when` holds (the AUDIO keys while the Console
+    /// is locked): the key's `<art>_locked` picture, a dashed edge and its
+    /// words in the fourth ink, and any live text in that ink. It comes
+    /// after the key's state rules, so a state the hardware link still sends
+    /// shows nothing while it cannot act; only the lost link's comes after.
+    pub(super) fn locked_while(self, when: impl Into<String>) -> Self {
+        let art = self.art().expect("a locked key has an image");
+        let mut set: Vec<(&'static str, &'static str, Prop)> = vec![
+            (ART, "base64Image", Prop::image(&format!("{art}_locked"))),
+            (FILL, "color", Prop::colour(DECK_FACE)),
+        ];
         set.extend(
             self.texts()
                 .into_iter()
-                .map(|id| (id, "color", Prop::colour(ink))),
+                .map(|id| (id, "color", Prop::colour(DECK_INK_4))),
         );
-        set.extend(more);
         self.rule(when, set)
     }
 
     /// Grey, and every value gone, while the deck has not heard the hardware
     /// link for a while (`companion.rs`, `deck_link`): what it showed is no
-    /// longer known. Last, so it wins over every other rule.
+    /// longer known. A key shows its `<art>_off` picture, its words in the
+    /// fourth ink; a cell keeps its dial's name, which does not change. Last,
+    /// so it wins over every other rule.
     pub(super) fn grey_without_the_link(self) -> Self {
-        let mut set: Vec<(&'static str, &'static str, Prop)> =
-            vec![(FILL, "color", Prop::colour(DECK_BLACK))];
+        let mut set: Vec<(&'static str, &'static str, Prop)> = Vec::new();
+        match self.place {
+            Place::Cell(_) => set.push((FILL, "color", Prop::colour(DECK_WELL))),
+            _ => {
+                let art = self.art().expect("a key has an image");
+                set.push((ART, "base64Image", Prop::image(&format!("{art}_off"))));
+                set.push((FILL, "color", Prop::colour(DECK_FACE)));
+            }
+        }
         for element in &self.elements {
             match element.kind {
                 ElementKind::Text { .. } => {
-                    set.push((element.id, "color", Prop::colour(DECK_GREY_INK)))
+                    set.push((element.id, "color", Prop::colour(DECK_INK_4)))
                 }
-                // The marks on the art: the bar, its unity mark, the lamp.
+                // The marks over the picture: the bar, its unity mark, the
+                // lamp, the selection's keyline.
                 ElementKind::Gauge { .. } => set.push((element.id, "enabled", Prop::flag(false))),
                 ElementKind::Fill { .. } | ElementKind::Image { .. }
                     if element.id != FILL && element.id != ART =>
@@ -319,25 +395,71 @@ pub(super) fn link_lost() -> String {
     String::from("$(expression:deck_link) == 'lost'")
 }
 
-fn text(id: &'static str, text: Prop, bounds: [f64; 4], size: f64, align: Align) -> Element {
+/// Where a key's live text sits, over its picture, and its size: the
+/// pictures leave its place free (`scripts/deck-assets.py`). Every box
+/// keeps inside a keyline (12 to 108 px across), so a long word shrinks
+/// rather than cross it.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Line {
+    bounds: [f64; 4],
+    size: f64,
+    colour: u32,
+}
+
+/// Under the key's word, where a sub-word would be (the take's length, the
+/// time left, `LAST KNOWN`): 22 px, its middle 79 px down.
+pub(super) const SUB_LINE: Line = Line {
+    bounds: [10.0, 54.0, 80.0, 24.0],
+    size: 92.0,
+    colour: DECK_INK_2,
+};
+/// Between `SOLO` and `Clear all`: the count, 20 px.
+pub(super) const MIDDLE_LINE: Line = Line {
+    bounds: [10.0, 36.0, 80.0, 22.0],
+    size: 91.0,
+    colour: DECK_INK_2,
+};
+/// Where a bank key's picture draws its bank: the word when it is none of
+/// the pictures', 20 px.
+pub(super) const BANK_LINE: Line = Line {
+    bounds: [10.0, 38.0, 80.0, 24.0],
+    size: 83.0,
+    colour: DECK_INK,
+};
+/// Where a camera key's picture draws its state: the word when it is none of
+/// the pictures', 20 px.
+pub(super) const STATE_LINE: Line = Line {
+    bounds: [10.0, 52.0, 80.0, 24.0],
+    size: 83.0,
+    colour: DECK_INK_2,
+};
+
+fn text(
+    id: &'static str,
+    text: Prop,
+    bounds: [f64; 4],
+    size: f64,
+    colour: u32,
+    align: Align,
+) -> Element {
     Element::new(
         id,
         ElementKind::Text {
             text,
             size,
-            colour: Prop::colour(DECK_WHITE),
+            colour: Prop::colour(colour),
             align,
         },
         bounds,
     )
 }
 
-fn base(place: Place, label: &'static str, art: &'static str) -> Control {
+fn base(place: Place, label: &'static str, art: &'static str, fill: u32) -> Control {
     Control::new(place, label)
         .element(Element::new(
             FILL,
             ElementKind::Fill {
-                colour: Prop::colour(DECK_BLACK),
+                colour: Prop::colour(fill),
             },
             [0.0, 0.0, 100.0, 100.0],
         ))
@@ -348,148 +470,113 @@ fn base(place: Place, label: &'static str, art: &'static str) -> Control {
         ))
 }
 
-/// A key with one word, or words on two lines, filling it: `ALL ON`, `TOP`.
-/// Companion's own type draws the words over the key's image until the
-/// brand's label images take their place.
-pub(super) fn key(
-    row: u8,
-    col: u8,
-    label: &'static str,
-    words: &str,
-    art: &'static str,
-) -> Control {
-    base(Place::Key { row, col }, label, art).element(text(
-        LABEL,
-        Prop::text(words),
-        [0.0, 0.0, 100.0, 100.0],
-        28.0,
-        Align::Center,
-    ))
+/// A key its picture draws whole: `ALL ON`, `TOP`, `DIM`.
+pub(super) fn key(row: u8, col: u8, label: &'static str, art: &'static str) -> Control {
+    base(Place::Key { row, col }, label, art, DECK_FACE)
 }
 
-/// A key with its word over a live value: `BANK` over `INPUTS`.
+/// A key with a live text over its picture: `PLAY` over the time left.
 pub(super) fn key_with_value(
     row: u8,
     col: u8,
     label: &'static str,
-    words: Prop,
     value: Prop,
     art: &'static str,
+    line: Line,
 ) -> Control {
-    base(Place::Key { row, col }, label, art)
-        .element(text(
-            LABEL,
-            words,
-            [0.0, 22.0, 100.0, 34.0],
-            70.0,
-            Align::Center,
-        ))
-        .element(text(
-            VALUE,
-            value,
-            [0.0, 56.0, 100.0, 26.0],
-            72.0,
-            Align::Center,
-        ))
+    key(row, col, label, art).element(text(
+        VALUE,
+        value,
+        line.bounds,
+        line.size,
+        line.colour,
+        Align::Center,
+    ))
 }
 
-/// A key whose image holds a glyph at its top (the AUDIO page's): its words
-/// under the glyph, and a live value under them.
-pub(super) fn glyph_key(
-    row: u8,
-    col: u8,
-    label: &'static str,
-    words: Prop,
-    value: Option<Prop>,
-    art: &'static str,
-) -> Control {
-    let control = base(Place::Key { row, col }, label, art);
-    match value {
-        Some(value) => control
-            .element(text(
-                LABEL,
-                words,
-                [0.0, 40.0, 100.0, 30.0],
-                70.0,
-                Align::Center,
-            ))
-            .element(text(
-                VALUE,
-                value,
-                [0.0, 70.0, 100.0, 24.0],
-                72.0,
-                Align::Center,
-            )),
-        None => control.element(text(
-            LABEL,
-            words,
-            [0.0, 42.0, 100.0, 50.0],
-            48.0,
-            Align::Center,
-        )),
-    }
-}
-
-/// `REC`'s lamp, over its art and under its words.
+/// `REC`'s lamp, over its picture, and the take's length under its word.
 pub(super) fn lamp_key(row: u8, col: u8, label: &'static str, value: Prop) -> Control {
-    base(Place::Key { row, col }, label, "key_rec")
+    key(row, col, label, "key_rec")
         .element(Element::new(
             LAMP,
             ElementKind::Image { image: "lamp_off" },
             [0.0, 0.0, 100.0, 100.0],
         ))
         .element(text(
-            LABEL,
-            Prop::text("REC"),
-            [0.0, 40.0, 100.0, 32.0],
-            75.0,
-            Align::Center,
-        ))
-        .element(text(
             VALUE,
             value,
-            [0.0, 70.0, 100.0, 24.0],
-            72.0,
+            SUB_LINE.bounds,
+            SUB_LINE.size,
+            SUB_LINE.colour,
             Align::Center,
         ))
 }
 
-/// A key that does nothing: dark, whatever Companion's own settings say.
+/// The page key: the next page's tab word on Dark Green, with a pip a page.
+pub(super) fn page_key_base(row: u8, col: u8, label: &'static str, art: &'static str) -> Control {
+    base(Place::Key { row, col }, label, art, DECK_DARK_GREEN)
+}
+
+/// A key that does nothing: the black glass, whatever Companion's own
+/// settings say.
 pub(super) fn dark_key(row: u8, col: u8) -> Control {
-    base(Place::Key { row, col }, "", "key_dark")
+    base(Place::Key { row, col }, "", "key_dark", DECK_BLACK)
+}
+
+/// What a cell's value is, for its size: a number with its unit (38 px), a
+/// name (30 px), or an AUDIO strip's level under the strip's name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CellValue {
+    Number,
+    Name,
+    Strip,
 }
 
 /// A cell of the touch strip: the dial's name over its value (two lines).
-/// `head` is the name: a fixed word, or a display's live line above its
-/// value. It only shows: a tap does nothing.
+/// The name is the picture's when it is a fixed word (`INTENSITY`), else
+/// (`head`) a display's live line above its value (`LIGHT 2/4`). It only
+/// shows: a tap does nothing.
 pub(super) fn cell(
     col: u8,
     label: &'static str,
     shows: &'static str,
-    head: Prop,
+    head: Option<Prop>,
     display: &str,
     art: &'static str,
+    value: CellValue,
 ) -> Control {
-    let head_id = if matches!(head, Prop::Fixed(_)) {
-        LABEL
-    } else {
-        HEAD
+    let mut control = base(Place::Cell(col), label, art, DECK_WELL);
+    // The head 20 px in the quiet ink, its box from 4 to 34 px down; a
+    // strip's name 24 px in the main ink, from 2 to 32 px.
+    let (head_bounds, head_size, head_colour) = match value {
+        CellValue::Strip => ([6.0, 2.0, 88.0, 30.0], 96.0, DECK_INK),
+        _ => ([6.0, 4.0, 88.0, 30.0], 80.0, DECK_INK_3),
     };
-    let mut control = base(Place::Cell(col), label, art)
-        .element(text(
-            head_id,
+    if let Some(head) = head {
+        control = control.element(text(
+            HEAD,
             head,
-            [6.0, 4.0, 88.0, 34.0],
-            62.0,
-            Align::Left,
-        ))
-        .element(text(
-            VALUE,
-            Prop::Expr(shown(display)),
-            [6.0, 38.0, 88.0, 46.0],
-            80.0,
+            head_bounds,
+            head_size,
+            head_colour,
             Align::Left,
         ));
+    }
+    // The value from 36 to 92 px down; a strip's level from 32 to 78 px,
+    // over its bar.
+    let (value_bounds, value_size) = match value {
+        CellValue::Number => ([6.0, 36.0, 88.0, 56.0], 81.0),
+        CellValue::Name => ([6.0, 36.0, 88.0, 56.0], 64.0),
+        CellValue::Strip => ([6.0, 32.0, 88.0, 46.0], 89.0),
+    };
+    control = control.element(text(
+        VALUE,
+        Prop::Expr(shown(display)),
+        value_bounds,
+        value_size,
+        DECK_INK,
+        Align::Left,
+    ));
     control.shows = Some(shows);
     control
 }
@@ -508,6 +595,7 @@ pub(super) fn dial(
         Prop::text(label),
         [0.0, 0.0, 100.0, 100.0],
         30.0,
+        DECK_INK,
         Align::Center,
     ));
     control.press = press;
