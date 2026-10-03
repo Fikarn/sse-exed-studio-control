@@ -535,11 +535,16 @@ fn run_clock(db_path: &Path, entry: &Entry) {
         let mut wait = match held.slot().as_mut() {
             Some(prompter) => {
                 prompter.settle(now);
-                played |= prompter.glass.as_ref().is_some_and(|glass| glass.playing);
+                let playing = prompter.glass.as_ref().is_some_and(|glass| glass.playing);
+                played |= playing;
+                minute::note_playing(playing, now);
                 publish(entry, Some(prompter));
                 prompter.next_wake(Instant::now())
             }
-            None => IDLE_WAIT,
+            None => {
+                minute::note_playing(false, now);
+                IDLE_WAIT
+            }
         };
         let line = (now.saturating_duration_since(minute_from) >= MINUTE_EVERY).then(|| {
             minute_from = now;

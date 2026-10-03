@@ -10,16 +10,18 @@ use crate::control_surface::{
     handle_deck_http_action_at, read_control_surface_context, read_deck_lcd_text,
     ControlSurfaceBridgeInfo, ControlSurfaceError, DEFAULT_CONTROL_SURFACE_HOST,
 };
+use crate::control_surface_minute::{BridgeMinute, Kind};
+use crate::control_surface_pool::{Next, Pool};
 use crate::diagnostics::append_log;
 use crate::health::{report as report_health, SubsystemState, SUBSYSTEM_BRIDGE};
+use overflow::{accept, spawn_overflow};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, Receiver, TrySendError};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -35,7 +37,7 @@ const MAX_HEADER_BYTES: usize = 8 * 1024;
 const MAX_BODY_BYTES: usize = 16 * 1024;
 const REQUEST_DEADLINE: Duration = Duration::from_secs(1);
 const RESPONSE_WRITE_TIMEOUT: Duration = Duration::from_secs(2);
-const BUSY_WRITE_TIMEOUT: Duration = Duration::from_millis(200);
+/// How long a connection is drained after its answer, in all.
 const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
@@ -57,6 +59,14 @@ const WORKER_COUNT: usize = 4;
 /// detent, and is worked off about one detent at a time behind the lighting
 /// lock.
 const QUEUE_CAPACITY: usize = 96;
+/// Slots kept for presses when the queue is full (fix D, 2026-10-02): a
+/// refused press is lost, since Companion never sends one again.
+const PRESS_RESERVE: usize = 16;
+/// A display's read parked this long is answered before the unread
+/// connections (`control_surface_pool`).
+const PARKED_AT_MOST: Duration = Duration::from_millis(250);
+/// The bridge's minute line (`control_surface_minute`).
+const MINUTE_EVERY: Duration = Duration::from_secs(60);
 const REJECTION_LOG_INTERVAL: Duration = Duration::from_secs(60);
 /// A key a page refuses is a line of its own, one a second at most for each
 /// key: a dial's turn is many refused detents (the review of #254).
@@ -141,6 +151,7 @@ pub fn start_control_surface_bridge(
                 .with_cameras_simulated(cameras_simulated)
                 .keeping_read_connections(),
             );
+            spawn_minute_line(Arc::clone(&context));
             thread::spawn(move || {
                 run_control_surface_bridge(listener, context, WORKER_COUNT, QUEUE_CAPACITY)
             });
@@ -199,6 +210,8 @@ struct BridgeContext {
     /// reads every camera as having no link, and never shows a simulated
     /// camera as a real one.
     cameras_simulated: bool,
+    /// This bridge's minute so far (fix D, 2026-10-02). A leaf lock.
+    minute: Mutex<BridgeMinute>,
 }
 
 impl BridgeContext {
@@ -212,7 +225,14 @@ impl BridgeContext {
             refused_keys: Mutex::new(HashMap::new()),
             keep_read_connections: false,
             cameras_simulated: false,
+            minute: Mutex::new(BridgeMinute::default()),
         }
+    }
+
+    fn minute(&self) -> MutexGuard<'_, BridgeMinute> {
+        self.minute
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     fn with_cameras_simulated(mut self, cameras_simulated: bool) -> Self {
@@ -232,6 +252,16 @@ impl BridgeContext {
     /// minute" while every request was being refused (2026-09-22).
     fn note_rejection(&self, status_code: u16, message: &str) {
         self.note_rejection_at(status_code, message, Instant::now());
+    }
+
+    /// A connection closed unanswered: the queue and the overflow's line
+    /// were full. Counted as the refusals are, under a status of its own (0).
+    fn note_dropped(&self) {
+        self.note_rejection_at(
+            0,
+            "the queue and the line for the overflow were full",
+            Instant::now(),
+        );
     }
 
     fn note_rejection_at(&self, status_code: u16, message: &str, now: Instant) {
@@ -269,18 +299,22 @@ impl BridgeContext {
             }
         };
         if let Some(unwritten) = unwritten {
-            let more = if unwritten == 0 {
-                String::new()
+            let line = if status_code == 0 {
+                let more = if unwritten == 0 {
+                    String::new()
+                } else {
+                    format!(" ({unwritten} more since the last such line)")
+                };
+                format!("Control-surface bridge closed a connection unanswered: {message}{more}")
             } else {
-                format!(" ({unwritten} more with this status since the last such line)")
+                let more = if unwritten == 0 {
+                    String::new()
+                } else {
+                    format!(" ({unwritten} more with this status since the last such line)")
+                };
+                format!("Control-surface bridge refused a request ({status_code}): {message}{more}")
             };
-            let _ = append_log(
-                self.log_file_path.as_path(),
-                "WARN",
-                &format!(
-                    "Control-surface bridge refused a request ({status_code}): {message}{more}"
-                ),
-            );
+            let _ = append_log(self.log_file_path.as_path(), "WARN", &line);
         }
     }
 }
@@ -292,10 +326,20 @@ struct RejectionTally {
     unwritten: u64,
 }
 
-/// One acceptor, a bounded queue and a fixed pool of workers (F06). A
-/// connection that finds the queue full is answered 503 by the acceptor and
-/// closed, so a burst can never grow the thread count. A worker that panics
-/// inside a handler logs and carries on serving.
+/// A display's read, read and parked until no connection waits unread.
+struct ParkedRead {
+    stream: TcpStream,
+    arrived: Instant,
+    request: HttpRequest,
+}
+
+/// One acceptor, a bounded queue and a fixed pool of workers (F06), so a
+/// burst can never grow the thread count. The workers read a connection
+/// before they answer it and answer a press at once, while a display's read
+/// waits behind every connection still unread (`control_surface_pool`, fix D,
+/// 2026-10-02). A connection that finds the queue full goes to the overflow
+/// thread: a press takes a slot kept for presses, anything else is answered
+/// 503. A worker that panics inside a handler logs and carries on serving.
 fn run_control_surface_bridge(
     listener: TcpListener,
     context: Arc<BridgeContext>,
@@ -303,18 +347,18 @@ fn run_control_surface_bridge(
     queue_capacity: usize,
 ) {
     let _ = listener.set_nonblocking(false);
-    // A connection is queued with the moment it arrived: a key's moment is
-    // its arrival, not when a worker is free (the review of #254), so a press
-    // that waited behind a burst is never taken for a later one.
-    let (sender, receiver) = sync_channel::<(TcpStream, Instant)>(queue_capacity.max(1));
-    let receiver = Arc::new(Mutex::new(receiver));
+    let pool = Arc::new(Pool::<ParkedRead>::new(
+        queue_capacity,
+        PRESS_RESERVE,
+        PARKED_AT_MOST,
+    ));
 
     for index in 0..worker_count.max(1) {
-        let receiver = Arc::clone(&receiver);
+        let worker_pool = Arc::clone(&pool);
         let worker_context = Arc::clone(&context);
         let spawned = thread::Builder::new()
             .name(format!("control-surface-worker-{index}"))
-            .spawn(move || serve_queued_connections(&receiver, &worker_context));
+            .spawn(move || serve_queued_connections(&worker_pool, &worker_context));
         if let Err(error) = spawned {
             let _ = append_log(
                 context.log_file_path.as_path(),
@@ -323,16 +367,15 @@ fn run_control_surface_bridge(
             );
         }
     }
+    let overflow = spawn_overflow(Arc::clone(&pool), Arc::clone(&context));
 
     for incoming in listener.incoming() {
         match incoming {
-            Ok(stream) => match sender.try_send((stream, Instant::now())) {
-                Ok(()) => {}
-                Err(TrySendError::Full((stream, _)))
-                | Err(TrySendError::Disconnected((stream, _))) => {
-                    refuse_busy(stream, &context);
-                }
-            },
+            // A connection is queued with the moment it arrived: a key's
+            // moment is its arrival, not when a worker is free (the review of
+            // #254), so a press that waited behind a burst is never taken for
+            // a later one.
+            Ok(stream) => accept(&pool, &overflow, &context, stream, Instant::now()),
             Err(error) => {
                 let _ = append_log(
                     context.log_file_path.as_path(),
@@ -343,31 +386,26 @@ fn run_control_surface_bridge(
             }
         }
     }
+    pool.close();
 }
 
-/// One worker: serves queued connections until the acceptor goes away. The
-/// engine's workers keep one read connection each for their settings reads
-/// (2026-09 production readiness, Slice 10 — F18).
-fn serve_queued_connections(
-    receiver: &Mutex<Receiver<(TcpStream, Instant)>>,
-    context: &BridgeContext,
-) {
+/// One worker: serves the queue until the acceptor goes away. The engine's
+/// workers keep one read connection each for their settings reads (2026-09
+/// production readiness, Slice 10 — F18).
+fn serve_queued_connections(pool: &Pool<ParkedRead>, context: &BridgeContext) {
     if context.keep_read_connections {
         crate::storage::enable_thread_read_connection();
     }
     loop {
-        let next = receiver
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .recv();
-        let Ok((stream, arrived)) = next else {
+        let next = pool.next();
+        if matches!(next, Next::Closed) {
             break;
-        };
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            handle_control_surface_connection(stream, context, arrived)
-        }));
+        }
+        let outcome =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| serve_next(next, context)));
         match outcome {
-            Ok(Ok(())) => {}
+            Ok(Ok(Some(read))) => pool.park(read),
+            Ok(Ok(None)) => {}
             Ok(Err(error)) => {
                 let _ = append_log(
                     context.log_file_path.as_path(),
@@ -386,28 +424,108 @@ fn serve_queued_connections(
     }
 }
 
-fn refuse_busy(mut stream: TcpStream, context: &BridgeContext) {
-    let _ = stream.set_write_timeout(Some(BUSY_WRITE_TIMEOUT));
-    let error = ControlSurfaceError::Busy(String::from(
-        "The bridge is busy with other requests; retry shortly.",
-    ));
-    let response = HttpResponse::from_error(&error);
-    let _ = write_http_response(&mut stream, response.status_code, &response.body);
-    context.note_rejection(response.status_code, error.message());
+/// Reads an unread connection, and answers it unless it is a display's
+/// read, which it hands back to be parked; answers a parked read.
+fn serve_next(
+    next: Next<ParkedRead>,
+    context: &BridgeContext,
+) -> Result<Option<ParkedRead>, ControlSurfaceError> {
+    let (stream, arrived, request) = match next {
+        Next::Unread(mut stream, arrived) => {
+            let deadline = Instant::now() + REQUEST_DEADLINE;
+            match read_http_request(&mut stream, deadline) {
+                Ok(request) if kind_of(&request) == Kind::Display => {
+                    return Ok(Some(ParkedRead {
+                        stream,
+                        arrived,
+                        request,
+                    }));
+                }
+                request => (stream, arrived, request),
+            }
+        }
+        Next::Parked(read) => (read.stream, read.arrived, Ok(read.request)),
+        Next::Closed => return Ok(None),
+    };
+    answer_connection(stream, context, arrived, request).map(|()| None)
 }
 
-fn handle_control_surface_connection(
+/// What a request is, for the queue and the minute.
+fn kind_of(request: &HttpRequest) -> Kind {
+    let (path, _) = split_target(&request.target);
+    match request.method.as_str() {
+        "GET" if path == "/api/deck/lcd" => Kind::Display,
+        "POST" if KEY_ROUTES.contains(&path) => Kind::Press,
+        _ => Kind::Other,
+    }
+}
+
+/// Answers a request that was read, and counts it in the bridge's minute.
+fn answer_connection(
     mut stream: TcpStream,
     context: &BridgeContext,
     arrived: Instant,
+    request: Result<HttpRequest, ControlSurfaceError>,
 ) -> Result<(), ControlSurfaceError> {
-    let deadline = Instant::now() + REQUEST_DEADLINE;
+    let began = Instant::now();
+    let (kind, what) = match &request {
+        Ok(request) => {
+            let (path, _) = split_target(&request.target);
+            (
+                kind_of(request),
+                format!(
+                    "{} {}",
+                    request.method,
+                    path.trim_start_matches("/api/deck/")
+                ),
+            )
+        }
+        Err(_) => (Kind::Other, String::from("unread")),
+    };
     let _ = stream.set_write_timeout(Some(RESPONSE_WRITE_TIMEOUT));
-    let request = read_http_request(&mut stream, deadline);
     let response = respond_at(context, request, arrived);
     let written = write_http_response(&mut stream, response.status_code, &response.body);
+    {
+        let mut minute = context.minute();
+        if response.status_code == 408 {
+            minute.note_timed_out();
+        } else {
+            minute.note_served(
+                kind,
+                &what,
+                began.saturating_duration_since(arrived),
+                began.elapsed(),
+            );
+        }
+    }
     finish_connection(stream);
     written.map_err(|error| ControlSurfaceError::Storage(error.to_string()))
+}
+
+/// The bridge's minute line (`control_surface_minute`): one line for a
+/// minute that had a refusal, a timeout or a slow request, and for every
+/// minute in which the prompter played.
+fn spawn_minute_line(context: Arc<BridgeContext>) {
+    let spawned = thread::Builder::new()
+        .name(String::from("control-surface-minute"))
+        .spawn({
+            let context = Arc::clone(&context);
+            move || loop {
+                let from = Instant::now();
+                thread::sleep(MINUTE_EVERY);
+                let minute = std::mem::take(&mut *context.minute());
+                if minute.worth_a_line(crate::prompter::minute::played_since(from)) {
+                    let _ = append_log(context.log_file_path.as_path(), "INFO", &minute.line());
+                }
+            }
+        });
+    if let Err(error) = spawned {
+        let _ = append_log(
+            context.log_file_path.as_path(),
+            "ERROR",
+            &format!("Control-surface bridge could not start its minute line: {error}"),
+        );
+    }
 }
 
 /// Authorization runs before anything in the request is interpreted: an
@@ -542,12 +660,20 @@ fn note_refused_key(
 /// our side and swallow (a bounded amount of) whatever the client is still
 /// sending before dropping the socket. Dropping with unread input makes the
 /// kernel send RST, and some clients then discard the status they were owed.
+/// `DRAIN_TIMEOUT` in all, however slowly the client sends (the review of
+/// #291: a timeout for each read let one byte every 200 ms hold a thread for
+/// hours).
 fn finish_connection(mut stream: TcpStream) {
     let _ = stream.shutdown(Shutdown::Write);
-    let _ = stream.set_read_timeout(Some(DRAIN_TIMEOUT));
+    let until = Instant::now() + DRAIN_TIMEOUT;
     let mut discarded = 0_usize;
     let mut chunk = [0_u8; 4096];
     while discarded < DRAIN_LIMIT_BYTES {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        let _ = stream.set_read_timeout(Some(left));
         match stream.read(&mut chunk) {
             Ok(0) | Err(_) => break,
             Ok(bytes_read) => discarded += bytes_read,
@@ -939,8 +1065,12 @@ fn parse_json_body(body: &[u8]) -> Result<Value, ControlSurfaceError> {
 }
 
 // Property tests for the request reader and the query decoder (Slice 13).
+mod overflow;
+
 #[cfg(test)]
 mod fuzz;
+#[cfg(test)]
+mod tests_pool;
 
 #[cfg(test)]
 mod tests {
@@ -949,7 +1079,8 @@ mod tests {
     use crate::control_surface::test_support::{ready_audio_test_db, TestDir};
     use std::io::Cursor;
 
-    const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    pub(super) const TEST_TOKEN: &str =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     impl<T: AsRef<[u8]>> RequestSource for Cursor<T> {}
 
@@ -1384,7 +1515,16 @@ mod tests {
         );
     }
 
-    fn start_test_bridge(test_dir: &TestDir, workers: usize, queue: usize) -> u16 {
+    pub(super) fn start_test_bridge(test_dir: &TestDir, workers: usize, queue: usize) -> u16 {
+        start_test_bridge_with_context(test_dir, workers, queue).0
+    }
+
+    /// A test bridge, and its context for a look at its minute.
+    pub(super) fn start_test_bridge_with_context(
+        test_dir: &TestDir,
+        workers: usize,
+        queue: usize,
+    ) -> (u16, Arc<BridgeContext>) {
         let listener = TcpListener::bind((DEFAULT_CONTROL_SURFACE_HOST, 0))
             .expect("an ephemeral loopback port");
         let port = listener.local_addr().expect("local address").port();
@@ -1397,13 +1537,14 @@ mod tests {
             )
             .with_cameras_simulated(true),
         );
-        thread::spawn(move || run_control_surface_bridge(listener, context, workers, queue));
-        port
+        let bridge_context = Arc::clone(&context);
+        thread::spawn(move || run_control_surface_bridge(listener, bridge_context, workers, queue));
+        (port, context)
     }
 
     /// Sends raw bytes and returns everything the bridge answered before it
     /// closed the connection.
-    fn raw_request(port: u16, request: &str) -> String {
+    pub(super) fn raw_request(port: u16, request: &str) -> String {
         let mut stream = TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect");
         stream
             .set_read_timeout(Some(Duration::from_secs(5)))
@@ -1414,7 +1555,7 @@ mod tests {
         String::from_utf8_lossy(&response).into_owned()
     }
 
-    fn status_of(response: &str) -> u16 {
+    pub(super) fn status_of(response: &str) -> u16 {
         response
             .split_whitespace()
             .nth(1)
@@ -1522,121 +1663,6 @@ mod tests {
         assert!(
             control_surface_last_event(test_dir.db_path().as_path()).is_null(),
             "no refused request reached a handler"
-        );
-    }
-
-    #[test]
-    fn worker_pool_returns_503_when_saturated() {
-        let test_dir = ready_audio_test_db("bridge-saturated");
-        let port = start_test_bridge(&test_dir, 1, 1);
-
-        // One idle connection occupies the only worker; the next fills the only
-        // queue slot; the third finds the queue full.
-        let _busy_worker =
-            TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect");
-        thread::sleep(Duration::from_millis(200));
-        let _queued = TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect");
-        thread::sleep(Duration::from_millis(200));
-
-        let refused = raw_request(port, "");
-        assert_eq!(status_of(&refused), 503, "{refused}");
-
-        // Once the idle connections time out (408) the pool serves again.
-        let host = format!("127.0.0.1:{port}");
-        let mut last = String::new();
-        for _ in 0..12 {
-            thread::sleep(Duration::from_millis(500));
-            last = raw_request(
-                port,
-                &format!(
-                    "GET /api/deck/context HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
-                ),
-            );
-            if status_of(&last) == 200 {
-                break;
-            }
-        }
-        assert_eq!(
-            status_of(&last),
-            200,
-            "the pool must recover after the idle connections time out: {last}"
-        );
-    }
-
-    // 2026-09-22, found on the studio workstation after the profile was
-    // imported with its token: the exported profile's once-a-second LCD poll
-    // sends a request per audio LCD key all at once, and a queue of 16 turned
-    // the last five away every second — the same five keys each time. The
-    // engine's own pool must hold the deck's worst instant, the poll meeting
-    // the press that sends the most.
-    #[test]
-    fn the_pool_holds_the_decks_worst_instant() {
-        let worst = crate::exports::deck_worst_instant_requests();
-        // The numbers the queue was sized for. A profile that sends more
-        // changes them here, and the queue with them. Since 2026-09-29 the
-        // LIGHTS page's four dial displays are polled, and arriving on LIGHTS
-        // refreshes nothing (it was 43, 4, 17): the instant is the same size.
-        assert_eq!(
-            (worst.poll, worst.follow, worst.press, worst.total()),
-            (47, 0, 17, 64)
-        );
-        // The instant and the largest press again must fit: a key pressed
-        // while the instant waits is not turned away.
-        assert!(
-            WORKER_COUNT + QUEUE_CAPACITY >= worst.total() + worst.press,
-            "{} requests at the worst instant and a press of {} more do not fit {WORKER_COUNT} workers and a queue of {QUEUE_CAPACITY}",
-            worst.total(),
-            worst.press
-        );
-        let test_dir = ready_audio_test_db("bridge-deck-burst");
-        let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);
-        let host = format!("127.0.0.1:{port}");
-
-        // What the instant asks for: every display of the poll, the LIGHTS
-        // page's among them, and a press's worth of displays more.
-        let polled = crate::exports::polled_lcd_keys();
-        let keys: Vec<&str> = polled
-            .iter()
-            .copied()
-            .chain(polled.iter().copied().take(worst.press))
-            .collect();
-        assert_eq!(keys.len(), worst.total());
-
-        // Every connection is open before any request is sent, so no worker can
-        // finish one and make room: the whole burst waits at once.
-        let mut streams: Vec<TcpStream> = keys
-            .iter()
-            .map(|_| TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect"))
-            .collect();
-        thread::sleep(Duration::from_millis(200));
-        for (stream, key) in streams.iter_mut().zip(&keys) {
-            let request = format!(
-                "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
-            );
-            let _ = stream.write_all(request.as_bytes());
-            let _ = stream.shutdown(Shutdown::Write);
-        }
-        let statuses: Vec<(&str, u16)> = streams
-            .into_iter()
-            .zip(&keys)
-            .map(|(mut stream, key)| {
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(5)))
-                    .expect("read timeout");
-                let mut response = Vec::new();
-                let _ = stream.read_to_end(&mut response);
-                (*key, status_of(&String::from_utf8_lossy(&response)))
-            })
-            .collect();
-        let unserved: Vec<&(&str, u16)> = statuses
-            .iter()
-            .filter(|(_, status)| *status != 200)
-            .collect();
-        assert!(
-            unserved.is_empty(),
-            "{} of {} requests at the deck's worst instant were not served: {unserved:?}",
-            unserved.len(),
-            keys.len()
         );
     }
 
