@@ -1,6 +1,6 @@
 import { useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { Key, LampWord, Readout, Tooltip } from "@sse/design-system";
+import { Key, LampWord, Readout } from "@sse/design-system";
 
 import styles from "./AudioMixerLane.module.css";
 import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
@@ -194,45 +194,44 @@ export function AudioChannelLane({
         )}
       </div>
 
+      {/* Visual overhaul B: no tooltip on M and S. They are take-time keys with
+          take-time keys above (48 V, gain) and below (the fader), and their
+          names already say "Mute <name>" (DESIGN.md §9). */}
       <div className={styles.stripKeys}>
-        <Tooltip content={`Mute ${channel.name}`}>
-          <Key
-            mode="toggle"
-            cap="M"
-            engaged={channel.mute}
-            locked={!actionsAllowed}
-            reason={lockedReason}
-            take
-            className={styles.stripKey}
-            data-control="mute"
-            data-active={channel.mute}
-            aria-label={`Mute ${channel.name}`}
-            aria-pressed={channel.mute}
-            onClick={(event) => {
-              event.stopPropagation();
-              onUpdateChannel({ channelId: channel.id, mute: !channel.mute });
-            }}
-          />
-        </Tooltip>
-        <Tooltip content={`Solo ${channel.name}`}>
-          <Key
-            mode="toggle"
-            cap="S"
-            engaged={channel.solo}
-            locked={!actionsAllowed}
-            reason={lockedReason}
-            take
-            className={styles.stripKey}
-            data-control="solo"
-            data-active={channel.solo}
-            aria-label={`Solo ${channel.name}`}
-            aria-pressed={channel.solo}
-            onClick={(event) => {
-              event.stopPropagation();
-              onUpdateChannel({ channelId: channel.id, solo: !channel.solo });
-            }}
-          />
-        </Tooltip>
+        <Key
+          mode="toggle"
+          cap="M"
+          engaged={channel.mute}
+          locked={!actionsAllowed}
+          reason={lockedReason}
+          take
+          className={styles.stripKey}
+          data-control="mute"
+          data-active={channel.mute}
+          aria-label={`Mute ${channel.name}`}
+          aria-pressed={channel.mute}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateChannel({ channelId: channel.id, mute: !channel.mute });
+          }}
+        />
+        <Key
+          mode="toggle"
+          cap="S"
+          engaged={channel.solo}
+          locked={!actionsAllowed}
+          reason={lockedReason}
+          take
+          className={styles.stripKey}
+          data-control="solo"
+          data-active={channel.solo}
+          aria-label={`Solo ${channel.name}`}
+          aria-pressed={channel.solo}
+          onClick={(event) => {
+            event.stopPropagation();
+            onUpdateChannel({ channelId: channel.id, solo: !channel.solo });
+          }}
+        />
       </div>
 
       {channel.clip ? (

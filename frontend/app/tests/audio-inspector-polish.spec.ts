@@ -98,25 +98,26 @@ test("EQ Band 2 locks the band-type selector via the capability flag", async ({ 
   await expect(bellButton).toBeDisabled();
 });
 
-test("mute / solo buttons carry design-system tooltips", async ({ page }) => {
+// Visual overhaul B (DESIGN.md §9): no tooltip covers a take-time control. The
+// strip's M and S are take-time keys between take-time keys (48 V and gain
+// above, the fader below), so they carry no tooltip: their names say what
+// they do. New pages program, Slice 3 (D6): "Mute Host", no key hint.
+test("mute / solo keys say what they do in their names, with no tooltip over the strip", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const strip = page.getByTestId("audio-strip-audio-input-9");
-  const muteButton = strip.getByRole("button", { name: /Mute Host/ });
+  const muteButton = strip.getByRole("button", { name: /^Mute Host$/ });
   await expect(muteButton).toBeVisible();
-  // The Tooltip primitive wraps the trigger inside <span class="wrapper"><span
-  // class="trigger">…</span><span role="tooltip">…</span></span>. Assert
-  // the role="tooltip" sibling exists and carries the expected text.
-  // New pages program, Slice 3 (D6). Old: "Mute Host (M)". New: "Mute Host".
-  // Reason: the M key went, and its hint with it.
-  const tooltip = muteButton.locator('xpath=ancestor::span[1]/following-sibling::*[@role="tooltip"]').first();
-  await expect(tooltip).toHaveText("Mute Host");
+  await expect(strip.getByRole("button", { name: /^Solo Host$/ })).toBeVisible();
+  await muteButton.hover();
+  await page.waitForTimeout(800);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
 });
 
-// New pages program, Slice SW: a strip key's tooltip opens inwards across its
-// keys row and holds its words. It used to be as narrow as its key, so
-// "Playback" spilled out of it — at the lane's last strip, past the lane, which
-// then scrolled 4 px: a scrollbar under Playback at 2560 × 1440.
-test("a strip key's tooltip holds its words inside the strip, and the lane does not scroll", async ({ page }) => {
+// New pages program, Slice SW: hovering the lane's last strip once made its
+// keys' tooltips spill past the lane, which then scrolled 4 px: a scrollbar
+// under Playback at 2560 × 1440. Visual overhaul B: no tooltip opens there,
+// and the lane still never scrolls.
+test("hovering a strip's keys opens nothing over the strip, and the lane does not scroll", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const lane = page.getByTestId("audio-tier-lanes-software-playback");
   await expect(lane).toBeVisible();
@@ -128,15 +129,8 @@ test("a strip key's tooltip holds its words inside the strip, and the lane does 
   for (const name of [/^Mute Playback 11\/12$/, /^Solo Playback 11\/12$/]) {
     const key = lastStrip.getByRole("button", { name });
     await key.hover();
-    const tooltip = key.locator('xpath=ancestor::span[1]/following-sibling::*[@role="tooltip"]').first();
-    await expect(tooltip).toHaveCSS("opacity", "1");
-    const [bubble, strip] = await Promise.all([tooltip.boundingBox(), lastStrip.boundingBox()]);
-    expect(bubble!.x, `${name} tooltip starts inside the strip`).toBeGreaterThanOrEqual(strip!.x - 0.5);
-    expect(bubble!.x + bubble!.width, `${name} tooltip ends inside the strip`).toBeLessThanOrEqual(
-      strip!.x + strip!.width + 0.5
-    );
-    const words = await tooltip.evaluate((node) => ({ client: node.clientWidth, scroll: node.scrollWidth }));
-    expect(words.scroll, `${name} tooltip holds its words`).toBeLessThanOrEqual(words.client);
+    await page.waitForTimeout(800);
+    await expect(page.getByRole("tooltip"), `${name} opens no tooltip`).toHaveCount(0);
     const shown = await readScroll();
     expect(shown.scroll, `the lane does not scroll while ${name} shows its tooltip`).toBeLessThanOrEqual(shown.client);
   }

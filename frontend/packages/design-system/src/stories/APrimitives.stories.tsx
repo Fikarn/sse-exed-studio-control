@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Bell, Ellipsis, Lightbulb, Pencil, Pin, Plus, Save, Trash2 } from "lucide-react";
 
 import { Button } from "../components/Button";
+import { ColorPicker } from "../components/ColorPicker";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Drawer } from "../components/Drawer";
 import { Footer } from "../components/Footer";
@@ -10,21 +11,26 @@ import { IconButton } from "../components/IconButton";
 import { ArmKey, Key, Segmented } from "../components/Key";
 import { LampChip } from "../components/LampChip";
 import { LampWord, Latch, LatchSlot } from "../components/LampWord";
+import { Menu, type MenuEntry } from "../components/Menu";
 import { Meter } from "../components/Meter";
 import { DegradedState, EmptyState, LoadingState } from "../components/OperationalState";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../components/Plate";
+import { Popover } from "../components/Popover";
 import { SegmentedControl } from "../components/SegmentedControl";
 import { Groove, Slider } from "../components/Slider";
 import { StateDisplay } from "../components/StateDisplay";
 import { StatusBadge } from "../components/StatusBadge";
 import { Toast } from "../components/Toast";
+import { Tooltip } from "../components/Tooltip";
+import type { UseArmResult } from "../components/useArm";
 import { Field, Readout, Screen } from "../components/Well";
 
 // Every primitive in the Atrium look (visual overhaul 2026-10-03, pull request
 // 1; `docs/DESIGN.md`). Each board is a column-wrapping row of cards at the
 // cluster's inner width, on the one surface, and fits 2560×1440 without
 // scrolling. The page tests measure every board (ui-contract.spec.ts) and
-// capture the Sheet, which holds them all (storybook.spec.ts).
+// capture the Sheet, which holds them all, and the board of the menus and
+// overlays open (storybook.spec.ts).
 
 /** A card stands at the cluster's inner width (424 less its 24 px gutters). */
 const CARD_WIDTH = 376;
@@ -154,10 +160,10 @@ function KeyCards() {
           <ArmKey hazard armed={false} timeoutMs={3000} cap="REC" hint="press twice to stop" take />
         </div>
         <div style={row}>
-          <ArmKey armed timeoutMs={4500} secondsLeft={3.9} cap="3" take>
+          <ArmKey armed timeoutMs={4500} secondsLeft={3.9} progress={3.9 / 4.5} cap="3" take>
             Interview block
           </ArmKey>
-          <ArmKey hazard armed timeoutMs={3000} secondsLeft={2.1} cap="STOP?" take />
+          <ArmKey hazard armed timeoutMs={3000} secondsLeft={2.1} progress={2.1 / 3} cap="STOP?" take />
         </div>
       </Card>
       <Card title="Segmented · default, small, locked, an armed choice">
@@ -663,6 +669,228 @@ function Sheet() {
   );
 }
 
+// Visual overhaul B: the menus and overlays, open at rest (DESIGN.md §9). Each
+// stands beside what opened it, over empty surface, so the measures read its
+// own pixels: the ⋯ menu with its head, values, toggles, a disabled item with
+// its reason and the destructive item at rest; the same item armed in place
+// (a still countdown); a menu with groups of choices; a popover; a list of
+// values in a popover; the tooltip, which takes another side rather than
+// cover a take-time key; the colour-tag picker.
+
+const overlayBoard: CSSProperties = {
+  position: "relative",
+  height: "100vh",
+  overflow: "hidden",
+  background: "var(--material-bg)",
+  color: "var(--text-text)",
+  font: "var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui)",
+};
+
+function At({ x, y, children }: { x: number; y: number; children: ReactNode }) {
+  return (
+    <div style={{ position: "absolute", left: x, top: y, display: "flex", flexDirection: "column", gap: 12 }}>
+      {children}
+    </div>
+  );
+}
+
+const STRIP_ITEMS: MenuEntry[] = [
+  { id: "level", label: "Set fader level…", value: "−3.8 dB", onSelect: () => undefined },
+  { id: "send", label: "Set Main Out send to 0 dB", onSelect: () => undefined },
+  { id: "gain", label: "Set preamp gain…", value: "32 dB", onSelect: () => undefined },
+  { kind: "divider" },
+  { kind: "check", id: "hiz", label: "Hi-Z", checked: false, onCheckedChange: () => undefined },
+  { kind: "check", id: "polarity", label: "Flip polarity", checked: false, onCheckedChange: () => undefined },
+  { kind: "check", id: "autoset", label: "AutoSet", checked: true, onCheckedChange: () => undefined },
+  { id: "clip", label: "Clear clip", onSelect: () => undefined, disabledReason: "no clip held" },
+];
+
+const STAGE_ITEMS: MenuEntry[] = [
+  { kind: "label", id: "show", label: "Show" },
+  { kind: "radio", id: "rig", label: "Rig", checked: true, onSelect: () => undefined },
+  { kind: "radio", id: "coverage", label: "Coverage", checked: false, onSelect: () => undefined },
+  { kind: "radio", id: "photometric", label: "Photometric", checked: false, onSelect: () => undefined },
+  { kind: "label", id: "frame", label: "Frame" },
+  { kind: "radio", id: "fit", label: "Fit room", checked: true, onSelect: () => undefined },
+  { kind: "radio", id: "fill", label: "Fill screen", checked: false, onSelect: () => undefined },
+  { kind: "radio", id: "actual", label: "100 %", checked: false, onSelect: () => undefined, value: "1 : 1" },
+  { kind: "divider" },
+  { id: "add", label: "Add fixture…", onSelect: () => undefined },
+  { id: "clear", label: "Clear selection", onSelect: () => undefined, disabledReason: "nothing selected" },
+];
+
+const PHANTOM = {
+  id: "phantom",
+  label: "Turn 48 V off…",
+  armedLabel: "Press again to turn 48 V off",
+  onConfirm: () => undefined,
+};
+
+/** The surface's arm, held with the strip's 48 V armed (a board does not run it). */
+const HELD_ARM: UseArmResult = {
+  armed: { key: "menu:phantom", label: "Turn 48 V off", armedAt: 0, timeoutMs: 4500 },
+  armOrApply: () => undefined,
+  cancel: () => false,
+  clear: () => undefined,
+  remainingMs: () => 2700,
+};
+
+const ISO_VALUES = ["200", "400", "800", "1600"];
+
+const valueRow: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  width: "100%",
+  minHeight: 36,
+  padding: "0 12px",
+  border: 0,
+  borderRadius: "var(--radius-base)",
+  background: "transparent",
+  color: "var(--text-text)",
+  font: "var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui)",
+};
+
+function OverlaysOpen() {
+  const [stripKey, setStripKey] = useState<HTMLElement | null>(null);
+  const [bandKey, setBandKey] = useState<HTMLElement | null>(null);
+  const [isoKey, setIsoKey] = useState<HTMLElement | null>(null);
+  const none = () => undefined;
+  return (
+    <div style={overlayBoard}>
+      <At x={40} y={40}>
+        <span style={caption}>The ⋯ on an object, and its menu</span>
+        <div style={{ ...row, width: 352, justifyContent: "space-between" }}>
+          <span style={{ font: "var(--font-weight-bold) var(--font-size-word) / 1 var(--font-family-ui)" }}>Host</span>
+          <span ref={setStripKey} style={{ display: "inline-flex" }}>
+            <IconButton icon={Ellipsis} label="Host menu" title={undefined} aria-haspopup="menu" aria-expanded />
+          </span>
+        </div>
+      </At>
+      <Menu
+        open={stripKey !== null}
+        anchor={stripKey}
+        placement="bottom-end"
+        onClose={none}
+        head={{ title: "Host", detail: "Preamp 1 · mic" }}
+        items={STRIP_ITEMS}
+        destructive={PHANTOM}
+      />
+
+      <At x={560} y={40}>
+        <span style={caption}>Its destructive item, armed in place</span>
+      </At>
+      <Menu
+        open
+        anchor={{ x: 560, y: 72 }}
+        onClose={none}
+        head={{ title: "Host", detail: "Preamp 1 · mic" }}
+        items={STRIP_ITEMS}
+        destructive={PHANTOM}
+        arm={HELD_ARM}
+        armedProgress={0.6}
+      />
+
+      <At x={1080} y={40}>
+        <span style={caption}>A menu with groups of choices, at the pointer</span>
+      </At>
+      <Menu open anchor={{ x: 1080, y: 72 }} onClose={none} head={{ title: "Stage" }} items={STAGE_ITEMS} />
+
+      <At x={1600} y={40}>
+        <span style={caption}>A popover beside its key</span>
+        <span ref={setBandKey} style={{ display: "inline-flex" }}>
+          <Key size="small" selected aria-expanded>
+            Band 2
+          </Key>
+        </span>
+      </At>
+      <Popover
+        open={bandKey !== null}
+        anchor={bandKey}
+        onClose={none}
+        title="Band 2 · Bell"
+        initialFocus="panel"
+        width={320}
+      >
+        <Readouts
+          rows={[
+            { label: "Frequency", value: "1.6 kHz" },
+            { label: "Gain", value: "0.0 dB" },
+            { label: "Q", value: "1.2" },
+          ]}
+        />
+      </Popover>
+
+      <At x={2080} y={40}>
+        <span style={caption}>A list of values in a popover</span>
+        <span ref={setIsoKey} style={{ display: "inline-flex" }}>
+          <Key size="small" aria-expanded>
+            ISO 400
+          </Key>
+        </span>
+      </At>
+      <Popover open={isoKey !== null} anchor={isoKey} onClose={none} label="ISO" initialFocus="panel" width={240}>
+        <div role="listbox" aria-label="ISO values">
+          {ISO_VALUES.map((value) => (
+            <div
+              key={value}
+              role="option"
+              aria-selected={value === "400"}
+              style={{ ...valueRow, background: value === "400" ? "var(--material-hover)" : "transparent" }}
+            >
+              <span>{value}</span>
+              {value === "400" ? <span style={quiet}>now</span> : null}
+            </div>
+          ))}
+        </div>
+      </Popover>
+
+      <At x={40} y={1040}>
+        <span style={caption}>The tooltip takes another side rather than cover a take-time key</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: 352, marginTop: 72 }}>
+          <Tooltip content="Faders set the sends into this mix" placement="bottom" open>
+            <Key size="small">Main Out</Key>
+          </Tooltip>
+          <Key mode="toggle" cap="Dim" hint="−20 dB" layout="stack" size="tall" take>
+            {null}
+          </Key>
+        </div>
+      </At>
+
+      <At x={560} y={1040}>
+        <span style={caption}>The colour-tag picker</span>
+      </At>
+      <ColorPicker
+        x={560}
+        y={1072}
+        swatches={[
+          { index: 0, name: "Sage", hex: "#99BA92" },
+          { index: 1, name: "Sand", hex: "#EDEBD1" },
+          { index: 2, name: "Sun", hex: "#F2DE6F" },
+          { index: 3, name: "Ember", hex: "#FF7D55" },
+          { index: 4, name: "Sky", hex: "#3A87E5" },
+          { index: 5, name: "Moss", hex: "#5E8A6A" },
+          { index: 6, name: "Clay", hex: "#CAA363" },
+          { index: 7, name: "Slate", hex: "#8D9389" },
+        ]}
+        selectedIndex={2}
+        onSelect={none}
+        onClose={none}
+        ariaLabel="Pick a color tag for scene Warm wash"
+      />
+
+      <At x={1080} y={1040}>
+        <span style={caption}>An armed key with a still countdown</span>
+        <div style={row}>
+          <ArmKey armed timeoutMs={4500} progress={0.6} cap="Save" take>
+            Warm wash
+          </ArmKey>
+        </div>
+      </At>
+    </div>
+  );
+}
+
 const meta = {
   title: "Design System/A primitives",
   parameters: { layout: "fullscreen" },
@@ -705,3 +933,4 @@ export const PlateAndOverlaysBoard: Story = {
   ),
 };
 export const WholeSheet: Story = { name: "Sheet", render: () => <Sheet /> };
+export const MenusAndOverlaysOpenBoard: Story = { name: "Menus and overlays, open", render: () => <OverlaysOpen /> };

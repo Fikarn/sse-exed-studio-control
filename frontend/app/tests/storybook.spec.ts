@@ -12,8 +12,9 @@ import { liveAudioMasks } from "./helpers/liveAudioMasks";
 // at `/iframe.html?id=<id>&viewMode=story`; the baselines are under
 // `tests/__visual__/storybook.spec.ts-snapshots/`.
 //
-// Of the A primitives only the Sheet is captured: it holds every primitive,
-// and `ui-contract.spec.ts` measures each of their pages. The shell's stories
+// Of the A primitives the Sheet is captured, which holds every primitive at
+// rest, and the boards of the overlays held open (their names end ", open");
+// `ui-contract.spec.ts` measures every one of their pages. The shell's stories
 // are gone (2026-09-28): `visual-review.spec.ts` captures the same boards
 // from the same fixtures.
 //
@@ -41,7 +42,7 @@ const index = JSON.parse(readFileSync(indexPath, "utf-8")) as StorybookIndex;
 const A_PRIMITIVES = "Design System/A primitives";
 const stories: StoryEntry[] = Object.values(index.entries)
   .map((entry) => ({ id: entry.id, name: entry.name, title: entry.title }))
-  .filter((story) => story.title !== A_PRIMITIVES || story.name.startsWith("Sheet"));
+  .filter((story) => story.title !== A_PRIMITIVES || story.name.startsWith("Sheet") || story.name.endsWith(", open"));
 
 for (const story of stories) {
   test(`${story.title} — ${story.name}`, async ({ page }) => {

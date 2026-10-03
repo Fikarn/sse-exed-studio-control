@@ -110,7 +110,7 @@ Nothing on an idle surface animates. Hover changes an edge or a colour, never a 
 
 ## 7. The components
 
-Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page.
+Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page; the board "Menus and overlays, open" holds the floating layers open.
 
 - **Shell**: the header (the product's name, tabs, one `LampChip` per subsystem showing its worst state, latch chips, the clock) and the `Footer`.
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, `Section`, the take-time keys.
@@ -118,7 +118,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
 - **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
-- **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`; the menus and the tooltip follow (section 9).
+- **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
 - **Setup**: `StepKey`, `ProbeRow`, the Support sections.
 
 ## 8. State words
@@ -142,6 +142,17 @@ Every state word is the hardware link's, in capitals with its lamp. Its sentence
 - **Every action is reachable from a visible control: a key, or the ⋯ menu on its object.** Right-click on an object opens the same menu as its ⋯; nothing is right-click only. Controls used during a take stay keys, never menu items. A menu's head names its object; its items show their current value in words at the right; a disabled item says why; a destructive item sits last, in coral, and arms in place.
 - **Hints are tooltips**, except where a press cannot be undone or arms something: "press again", a countdown, 48 V, `LOAD?` and a lock's reason stay on screen. No tooltip covers a take-time control.
 - No surface shows a key, a key glyph or a key hint. The keyboard does only what it does in any program: Tab, Enter or Space on the focused control, typing, the arrows on a focused slider or list, and Esc on a dialog, a menu or an armed key.
+
+### Menus, popovers and tooltips
+
+- **The menu** (`Menu`). A head row naming its object in PT Sans Bold (a name keeps its case), with a quiet sub-line. Rows 36 px high in PT Sans 16. An item's current value stands at the right in the quiet ink; a toggle says its value in words (`on`, `off`). Choices stand in a group under a quiet label, the chosen one marked. Dividers are one hairline. A disabled item is in the quiet ink with its reason at the right, and the arrows pass over it. The destructive item is last, after a divider, in coral, and ends in "…": its first press turns it into the armed form in place (Burgundy, "Press again to …", the countdown bar) while the menu stays open, the second press does it, and moving to another item, the window running out or Esc disarms it. No icons, no submenus, no key hints.
+- **The ⋯** (`MenuButton`). A square key at its object's right; the menu hangs under it, towards the object, and the focus comes back to the ⋯ when it closes. A right-click on the object opens the same menu at the pointer. A menu opened from the keyboard puts the focus on its first item.
+- **Where a layer goes.** Beside what opened it: it flips to the other side when its side has no room, and slides along its side to stay 8 px inside the screen. At the pointer a menu opens down and to the right, and to the left at the screen's right edge.
+- **The popover** (`Popover`). Values edited beside their key, the key staying visible. A title in PT Sans Bold over a hairline. It is never a dialog: nothing behind it is blocked, a press outside or Esc closes it, and the focus goes back to its key. A list of values in it is a `listbox`.
+- **The tooltip** (`Tooltip`). Beige with black text, PT Sans 14. It opens when the pointer rests for half a second (at once when it comes from another tooltip, and at once on keyboard focus), stays while the pointer moves onto it, and closes on Esc, a press or when the pointer leaves. It never covers a control used during a take (`take`, marked `data-take`): it takes another side, and when every side would cover one it does not open. Its sentence is always its control's description, so nothing is lost when it does not open.
+- **Esc, in order.** The shell's own dialog takes it first. Then the layer that holds the focus: a menu with an armed item disarms it and stays open, and the next Esc closes the menu; a popover, a dialog or a drawer closes. A layer that takes an Esc keeps it, and an armed key on the page is disarmed only by an Esc no layer took: one Esc, one layer. A tooltip that shows closes on every Esc and lets it go on.
+- **Layers.** Every floating layer is drawn in a portal on the body, above the meters' canvas: toasts, then dialogs, then menus and popovers (`--z-palette`, above a dialog's scrim, so a ⋯ in a drawer works), then the tooltip.
+- **Over the cameras' pictures.** The pictures are drawn by a native layer over the page, which leaves a hole where a floating layer stands: a `menu`, a `listbox`, a `tooltip` that shows, or anything marked `data-level="float"` (`floatingLayers`), each counted once, at most eight. A hole is square: a rounded corner or the shadow over a picture is covered by the picture. A `dialog` anywhere hides every picture, and so do more than eight floating layers over them, so a picture never covers what the operator should see. The menu, the popover and the tooltip are never dialogs.
 
 ## 10. Measures
 
