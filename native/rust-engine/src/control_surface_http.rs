@@ -1671,6 +1671,9 @@ mod tests {
     // the same words as the displays read one by one.
     #[test]
     fn the_deck_reads_every_display_in_one_answer() {
+        // The lighting preview is one for the process: no other test may
+        // switch it between the answer and the reads it is compared with.
+        let _preview_guard = crate::lighting::shared_preview_test_guard();
         let test_dir = ready_audio_test_db("bridge-displays");
         let port = start_test_bridge(&test_dir, 2, 4);
         let host = format!("127.0.0.1:{port}");
