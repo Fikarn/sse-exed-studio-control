@@ -14,9 +14,10 @@
 //! mid-take would pause the presenter at line one.
 
 use super::common::{page_key, play_key, prompter, rec_key};
-use super::model::{cell, dark_key, dial, key, reads, Control, Prop, DECK_GREY_INK};
+use super::model::{cell, dark_key, dial, key, reads, CellValue, Control, DECK_FACE, DECK_INK_4};
 
-/// While nothing is on the prompter, every control of the page is grey (§9).
+/// While nothing is on the prompter, every control of the page is disabled
+/// (§9): a key's picture in the fourth ink, a cell's value too.
 fn nothing_on() -> String {
     reads("prompter_state_on", "no")
 }
@@ -29,9 +30,9 @@ fn take_key(
     action: &'static str,
     value: Option<&'static str>,
 ) -> Control {
-    key(row, col, label, label, art)
+    key(row, col, label, art)
         .on_press(prompter(action, value))
-        .inked(nothing_on(), DECK_GREY_INK)
+        .shows(nothing_on(), &format!("{art}_off"), DECK_FACE)
         .grey_without_the_link()
 }
 
@@ -42,8 +43,8 @@ fn prompter_cell(
     display: &'static str,
     art: &'static str,
 ) -> Control {
-    cell(col, label, shows, Prop::text(label), display, art)
-        .inked(nothing_on(), DECK_GREY_INK)
+    cell(col, label, shows, None, display, art, CellValue::Number)
+        .inked(nothing_on(), DECK_INK_4)
         .grey_without_the_link()
 }
 
@@ -61,12 +62,7 @@ pub(super) fn prompter_controls() -> Vec<Control> {
         ),
         take_key(0, 2, "CUE \u{25b8}", "key_cue_next", "cue", Some("next")),
         // The last page of the ring: its page key goes round to the first.
-        page_key(
-            "LIGHTS \u{203a}",
-            "LIGHTS\n\u{203a}",
-            "lights",
-            "key_page_lights",
-        ),
+        page_key("LIGHTS \u{203a}", "lights", "key_page_lights"),
         play_key(),
         take_key(1, 1, "BACK", "key_back", "back", None),
         // Free: it keeps TOP clear of a slip.

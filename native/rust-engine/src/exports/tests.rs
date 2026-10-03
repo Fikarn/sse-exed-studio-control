@@ -4,6 +4,7 @@ use super::companion::{
     LINK_LOST_AFTER_SECONDS, RAW,
 };
 use super::images::deck_images;
+use super::model::{DECK_FACE, DECK_INK_4, DECK_PALETTE};
 use super::profile::streamdeck_surface_id_from;
 use super::snapshot::build_control_surface_snapshot;
 use crate::control_surface::{DisplayShape, DECK_DISPLAYS, DECK_DISPLAYS_MARK};
@@ -138,12 +139,50 @@ fn layer<'a>(control: &'a Value, id: &str) -> &'a Value {
         .unwrap_or(&Value::Null)
 }
 
-/// The words a key or a cell draws as its fixed label.
-fn words(control: &Value) -> Option<String> {
-    let label = layer(control, "label");
-    (label["text"]["isExpression"] == false)
-        .then(|| label["text"]["value"].as_str().map(String::from))
+/// The picture a key or a cell shows at rest, by its name.
+fn art(control: &Value) -> Option<String> {
+    layer(control, "art")["base64Image"]["value"]
+        .as_str()
+        .and_then(|value| value.strip_prefix("$(image:"))
+        .and_then(|value| value.strip_suffix(')'))
+        .map(String::from)
+}
+
+/// Every image a control draws, by its name: its layers' and its rules'.
+fn images_of(control: &Value) -> BTreeSet<String> {
+    let text = control.to_string();
+    let marker = "$(image:";
+    text.match_indices(marker)
+        .map(|(at, _)| {
+            let rest = &text[at + marker.len()..];
+            rest[..rest.find(')').expect("a closed reference")].to_string()
+        })
+        .collect()
+}
+
+/// The pictures a control's rules swap in for its layer `id`, by the rule's
+/// condition.
+fn swaps(control: &Value, id: &str) -> Vec<(String, String)> {
+    control["feedbacks"]
+        .as_array()
+        .into_iter()
         .flatten()
+        .flat_map(|feedback| {
+            let when = feedback["options"]["expression"]["value"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            feedback["styleOverrides"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(move |change| {
+                    change["elementId"] == id && change["elementProperty"] == "base64Image"
+                })
+                .filter_map(|change| change["override"]["value"].as_str())
+                .map(move |image| (when.clone(), image.to_string()))
+        })
+        .collect()
 }
 
 // 2026-09 production readiness, Slice 2 (finding F01): the profile is the
@@ -344,67 +383,64 @@ fn every_display_is_on_the_strip_and_no_dial_shows_anything() {
     }
 }
 
-/// The approved layout's words, by page, row and column (`""`: dark).
+/// The approved layout, by page, row and column: the picture each key shows
+/// at rest, which draws its words (`""`: dark). Its name is the page
+/// model's (`control_surface_snapshot_matches_the_deck_page_model`).
 const LAYOUT: [(&str, [[&str; 4]; 2]); 4] = [
     (
         "1",
         [
-            ["REC", "ALL ON", "SAVE", "AUDIO\n\u{203a}"],
-            ["REC_PLAY", "ALL OFF", "", "RECALL"],
+            ["key_rec", "key_all_on", "key_save", "key_page_audio"],
+            ["key_play", "key_all_off", "", "key_recall"],
         ],
     ),
     (
         "2",
         [
-            ["REC", "MAIN\nOUT", "PHONES", "CAMERAS\n\u{203a}"],
-            ["REC_PLAY", "BANK", "DIM", "SOLO"],
+            ["key_rec", "key_main_out", "key_phones", "key_page_cameras"],
+            ["key_play", "key_audio_bank", "key_dim", "key_solo"],
         ],
     ),
     (
         "3",
         [
-            ["REC", "BANK", "", "PROMPTER\n\u{203a}"],
-            ["REC_PLAY", "CAM 1", "CAM 2", "CAM 3"],
+            ["key_rec", "key_camera_bank", "", "key_page_prompter"],
+            ["key_play", "key_cam_1", "key_cam_2", "key_cam_3"],
         ],
     ),
     (
         "4",
         [
-            ["REC", "\u{25c2} CUE", "CUE \u{25b8}", "LIGHTS\n\u{203a}"],
-            ["REC_PLAY", "BACK", "", "TOP"],
+            ["key_rec", "key_cue_back", "key_cue_next", "key_page_lights"],
+            ["key_play", "key_back", "", "key_top"],
         ],
     ),
 ];
 
 // The approved layout (2026-10-03): REC top left and PLAY under it on every
 // page, the page key top right, and the pages' own keys where the owner
-// approved them. A dark key is drawn dark and does nothing.
+// approved them, each drawn by its picture. A dark key is the black glass
+// and does nothing.
 #[test]
 fn the_four_pages_hold_the_approved_layout() {
     let config = profile();
     for (page, rows) in LAYOUT {
-        for (row, words_of_row) in rows.iter().enumerate() {
-            for (col, expected) in words_of_row.iter().enumerate() {
+        for (row, pictures) in rows.iter().enumerate() {
+            for (col, expected) in pictures.iter().enumerate() {
                 let key = control(&config, page, row as u8, col as u8);
                 let at = format!("{page}/{row}/{col}");
                 match *expected {
                     "" => {
                         assert_eq!(key["steps"]["0"]["action_sets"]["down"], json!([]), "{at}");
-                        assert_eq!(words(key), None, "{at}");
+                        assert_eq!(art(key).as_deref(), Some("key_dark"), "{at}");
+                        assert_eq!(key["feedbacks"], json!([]), "{at}");
                         assert_eq!(
-                            layer(key, "art")["base64Image"]["value"],
-                            "$(image:key_dark)"
+                            key["style"]["layers"].as_array().map(Vec::len),
+                            Some(3),
+                            "{at}: the canvas, the glass and its picture, nothing else"
                         );
                     }
-                    "REC_PLAY" => assert_eq!(words(key).as_deref(), Some("PLAY"), "{at}"),
-                    "PHONES" => assert_eq!(
-                        layer(key, "label")["text"]["isExpression"],
-                        true,
-                        "{at}: PHONES says which phones mix"
-                    ),
-                    words_expected => {
-                        assert_eq!(words(key).as_deref(), Some(words_expected), "{at}")
-                    }
+                    picture => assert_eq!(art(key).as_deref(), Some(picture), "{at}"),
                 }
             }
         }
@@ -432,6 +468,17 @@ fn the_four_pages_hold_the_approved_layout() {
                 "{what} follows the same rules on every page"
             );
         }
+    }
+    // PHONES says which phones mix is the target: its pictures name it.
+    let phones = swaps(control(&config, "2", 0, 2), "art");
+    for (word, picture) in [("phones-a", "key_phones_1"), ("phones-b", "key_phones_2")] {
+        assert!(
+            phones.contains(&(
+                format!("$(expression:deck_audio_state_target) == '{word}'"),
+                format!("$(image:{picture})")
+            )),
+            "PHONES shows {picture} for {word}: {phones:?}"
+        );
     }
 }
 
@@ -1084,6 +1131,13 @@ fn bridge_words(display: &str) -> Vec<String> {
         "camera_key_1" | "camera_key_2" | "camera_key_3" => {
             vec!["HELD", "UNREACHABLE", "RELEASED", "NOT SET UP"]
         }
+        // The bank's word under BANK, as `cameras::deck` says it.
+        "camera_key_bank" => {
+            return crate::cameras::snapshot::CameraDialBank::ALL
+                .iter()
+                .map(|bank| bank.key().to_uppercase())
+                .collect()
+        }
         "audio_state_target" => vec!["main", "phones-a", "phones-b"],
         "audio_state_bank" => vec!["inputs", "playback", "outputs"],
         "audio_state_dim" => vec!["on", "off"],
@@ -1156,6 +1210,18 @@ fn the_words_the_deck_tests_are_the_bridges_letter_for_letter() {
         ("audio_state_target", "phones-a"),
         ("audio_state_target", "phones-b"),
         ("light_key_off", "OFF?"),
+        // The pictures of the bank keys and the camera keys (2026-10-03, the
+        // deck's look): each picks its picture by the word it draws.
+        ("audio_state_bank", "inputs"),
+        ("audio_state_bank", "playback"),
+        ("audio_state_bank", "outputs"),
+        ("camera_key_bank", "EXPOSURE"),
+        ("camera_key_bank", "COLOUR"),
+        ("camera_key_bank", "FOCUS"),
+        ("camera_key_1", "HELD"),
+        ("camera_key_1", "RELEASED"),
+        ("camera_key_1", "NOT SET UP"),
+        ("camera_key_1", "UNREACHABLE"),
     ] {
         assert!(
             tested
@@ -1258,19 +1324,34 @@ fn every_key_and_cell_has_an_image_of_its_own_at_the_decks_size() {
         used, names,
         "every image is used, and every image used is there"
     );
+    // Every picture a key or a cell shows, at rest or in a state, is drawn at
+    // its own size: 120 x 120 on a key, 200 x 100 on a cell of the strip.
+    let sizes: BTreeMap<String, (u32, u32)> = deck_images()
+        .into_iter()
+        .map(|image| (image.name, (image.width, image.height)))
+        .collect();
     for page in ["1", "2", "3", "4"] {
         for row in 0..3_u8 {
             for col in 0..4_u8 {
-                let art = layer(control(&config, page, row, col), "art")["base64Image"]["value"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string();
-                let prefix = if row == 2 {
-                    "$(image:cell_"
+                let at = format!("{page}/{row}/{col}");
+                let control = control(&config, page, row, col);
+                let rest = art(control).unwrap_or_default();
+                let (prefix, size) = if row == 2 {
+                    ("cell_", (200, 100))
                 } else {
-                    "$(image:key_"
+                    ("key_", (120, 120))
                 };
-                assert!(art.starts_with(prefix), "{page}/{row}/{col}: {art}");
+                assert!(rest.starts_with(prefix), "{at}: {rest}");
+                for image in images_of(control) {
+                    assert_eq!(sizes.get(&image), Some(&size), "{at}: {image}");
+                }
+                // A rule swaps the picture of the control's own kind.
+                for (_, picture) in swaps(control, "art") {
+                    assert!(
+                        picture.starts_with(&format!("$(image:{prefix}")),
+                        "{at}: {picture}"
+                    );
+                }
             }
         }
     }
@@ -1317,15 +1398,20 @@ fn a_silence_turns_no_page_of_the_deck() {
 
 // The review of #293: on a locked Console the hardware link still sends the
 // mix target, the dim and the solos, and an AUDIO key kept its amber or
-// yellow fill under grey words. Its lock rule comes after its colour rules
-// and darkens the fill too; only the lost link's comes after it.
+// yellow fill under grey words. Its lock rule comes after its state rules
+// and shows the locked form, on the key's face; only the lost link's comes
+// after it, which shows the key disabled. Since the deck's look
+// (2026-10-03), the forms are pictures: `<key>_locked` (a dashed edge, the
+// words in the fourth ink) and `<key>_off`.
 #[test]
 fn every_audio_key_is_dark_and_grey_while_the_console_is_locked() {
     let config = profile();
     let locked = "$(expression:deck_audio_state_gated) == 'yes'";
     for (row, col) in [(0, 1), (0, 2), (1, 1), (1, 2), (1, 3)] {
         let key = control(&config, "2", row, col);
-        let filling: Vec<&Value> = key["feedbacks"]
+        let at = format!("2/{row}/{col}");
+        let rest = art(key).expect("a picture");
+        let picturing: Vec<&Value> = key["feedbacks"]
             .as_array()
             .expect("feedbacks")
             .iter()
@@ -1335,13 +1421,15 @@ fn every_audio_key_is_dark_and_grey_while_the_console_is_locked() {
                     .into_iter()
                     .flatten()
                     .any(|change| {
-                        change["elementId"] == "fill" && change["elementProperty"] == "color"
+                        change["elementId"] == "art" && change["elementProperty"] == "base64Image"
                     })
             })
             .collect();
-        let at = format!("2/{row}/{col}");
-        assert!(filling.len() >= 2, "{at}");
-        let [.., lock, lost] = filling.as_slice() else {
+        assert!(
+            picturing.len() >= 3,
+            "{at}: a state, the lock and the lost link"
+        );
+        let [.., lock, lost] = picturing.as_slice() else {
             panic!("{at}: no lock and lost rules");
         };
         assert_eq!(lock["options"]["expression"]["value"], locked, "{at}");
@@ -1349,23 +1437,224 @@ fn every_audio_key_is_dark_and_grey_while_the_console_is_locked() {
             lost["options"]["expression"]["value"], "$(expression:deck_link) == 'lost'",
             "{at}"
         );
-        for rule in [lock, lost] {
+        assert_eq!(
+            key["feedbacks"].as_array().and_then(|rules| rules.last()),
+            Some(*lost),
+            "{at}: the lost link's rule is the last"
+        );
+        for (rule, form) in [(lock, "locked"), (lost, "off")] {
             let changes = rule["styleOverrides"].as_array().expect("overrides");
-            assert!(changes
-                .iter()
-                .any(|change| change["elementId"] == "fill" && change["override"]["value"] == 0));
-            for text in ["label", "value"] {
-                if layer(key, text).is_null() {
-                    continue;
-                }
-                assert!(
-                    changes.iter().any(|change| change["elementId"] == text
-                        && change["override"]["value"] == 0x006D_675A),
-                    "{at}: {text} is grey"
-                );
+            let set = |id: &str, property: &str| {
+                changes
+                    .iter()
+                    .find(|change| {
+                        change["elementId"] == id && change["elementProperty"] == property
+                    })
+                    .map(|change| change["override"]["value"].clone())
+            };
+            assert_eq!(
+                set("art", "base64Image"),
+                Some(json!(format!("$(image:{rest}_{form})"))),
+                "{at}"
+            );
+            assert_eq!(set("fill", "color"), Some(json!(DECK_FACE)), "{at}");
+            if !layer(key, "value").is_null() {
+                assert_eq!(set("value", "color"), Some(json!(DECK_INK_4)), "{at}");
             }
         }
     }
+}
+
+// The deck's look (2026-10-03): the pictures draw every fixed word, in the
+// brand's faces. What Companion draws as text on a key or a cell is live —
+// a display's line, a value worked out from it — never a fixed word over a
+// picture that draws the same word; no rule sets a word either (`STOP?`,
+// `OFF?` are pictures now). Only the dials (row 3), which the deck never
+// draws, keep their names, for Companion's editor.
+#[test]
+fn no_key_or_cell_draws_a_fixed_word_over_its_picture() {
+    let config = profile();
+    for page in ["1", "2", "3", "4"] {
+        for row in 0..3_u8 {
+            for col in 0..4_u8 {
+                let at = format!("{page}/{row}/{col}");
+                let control = control(&config, page, row, col);
+                assert!(art(control).is_some(), "{at}: a picture");
+                for layer in control["style"]["layers"].as_array().expect("layers") {
+                    if layer["type"] == "text" {
+                        assert_eq!(layer["text"]["isExpression"], true, "{at}: {layer}");
+                        assert!(
+                            layer["text"]["value"]
+                                .as_str()
+                                .is_some_and(|text| text.contains("$(expression:deck_")),
+                            "{at}: {layer}"
+                        );
+                    }
+                }
+                assert!(
+                    layer(control, "label").is_null(),
+                    "{at}: the label is the picture's"
+                );
+                for feedback in control["feedbacks"].as_array().expect("feedbacks") {
+                    for change in feedback["styleOverrides"].as_array().expect("overrides") {
+                        assert_ne!(change["elementProperty"], "text", "{at}: {change}");
+                    }
+                }
+            }
+        }
+        for col in 0..4_u8 {
+            let dial = control(&config, page, 3, col);
+            assert!(art(dial).is_none() && images_of(dial).is_empty());
+        }
+    }
+    // The review's look items: no ASCII hyphen for a minus (DIM's −20 dB is
+    // the picture's), no word Companion draws in place of a picture.
+    let pages = config["pages"].to_string();
+    for gone in [
+        "-20 dB",
+        "'ON RIG'",
+        "'UNSAVED'",
+        "'PHONES 1'",
+        "STOP?",
+        "OFF?\"",
+    ] {
+        assert!(!pages.contains(gone), "the pages still draw {gone}");
+    }
+}
+
+// The deck's palette is the screen's (docs/DESIGN.md §4): every colour of
+// every layer and every rule is one of its tokens (a text's outline is
+// none). Today's khaki, amber, ember, the bank's brown tint and the white
+// are gone.
+#[test]
+fn every_colour_of_the_profile_is_the_screens_palette() {
+    fn colours<'a>(value: &'a Value, path: &str, into: &mut Vec<(String, &'a Value)>) {
+        match value {
+            Value::Object(map) => {
+                for (key, child) in map {
+                    let at = format!("{path}/{key}");
+                    if ["color", "borderColor", "outlineColor", "markerColor"]
+                        .contains(&key.as_str())
+                    {
+                        into.push((at.clone(), child));
+                    }
+                    if key == "styleOverrides" {
+                        for change in child.as_array().into_iter().flatten() {
+                            if ["color", "borderColor"]
+                                .contains(&change["elementProperty"].as_str().unwrap_or(""))
+                            {
+                                into.push((format!("{at}/override"), &change["override"]));
+                            }
+                        }
+                    }
+                    colours(child, &at, into);
+                }
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate() {
+                    colours(item, &format!("{path}/{index}"), into);
+                }
+            }
+            _ => {}
+        }
+    }
+    let config = profile();
+    let mut found = Vec::new();
+    colours(&config["pages"], "", &mut found);
+    assert!(found.len() > 300, "{}", found.len());
+    let palette: BTreeSet<u64> = DECK_PALETTE
+        .iter()
+        .map(|(_, colour)| u64::from(*colour))
+        .collect();
+    let mut used = BTreeSet::new();
+    for (at, colour) in found {
+        assert_eq!(colour["isExpression"], false, "{at}");
+        let value = colour["value"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("{at}: {colour}"));
+        if at.ends_with("/outlineColor") {
+            // Companion keeps a colour's alpha inverted: no outline.
+            assert_eq!(value, 0xFF00_0000, "{at}");
+            continue;
+        }
+        assert!(
+            palette.contains(&value),
+            "{at}: #{value:06X} is not the screen's"
+        );
+        used.insert(value);
+    }
+    for (name, colour) in [
+        ("face", DECK_FACE),
+        ("ink-4", DECK_INK_4),
+        ("yellow", 0x00F2_DE6F),
+        ("burgundy", 0x0067_1919),
+        ("dark-green", 0x0000_4932),
+    ] {
+        assert!(
+            used.contains(&u64::from(colour)),
+            "the deck no longer uses {name}"
+        );
+    }
+}
+
+// The deck's look changes nothing the bridge reads or says (2026-10-03):
+// the profile reads the same 48 display lines as before it, and `deck_link`.
+#[test]
+fn the_look_reads_the_displays_it_read_before() {
+    let config = profile();
+    let mut expected: BTreeSet<String> = [
+        "light_nav",
+        "light_nav_head",
+        "light_intensity",
+        "light_cct",
+        "scene_nav",
+        "scene_nav_head",
+        "light_key_off",
+        "scene_state",
+        "audio_state_target",
+        "audio_state_bank",
+        "audio_state_dim",
+        "audio_state_solo",
+        "audio_state_gated",
+        "camera_key_1",
+        "camera_key_2",
+        "camera_key_3",
+        "camera_key_bank",
+        "camera_key_rec",
+        "camera_state_selected",
+        "camera_state_rec",
+        "camera_state_dials",
+        "prompter_speed",
+        "prompter_line",
+        "prompter_place",
+        "prompter_size",
+        "prompter_left",
+        "prompter_state_play",
+        "prompter_state_on",
+        "link",
+    ]
+    .iter()
+    .map(|name| format!("deck_{name}"))
+    .collect();
+    for strip in 1..=4 {
+        for name in [
+            format!("audio_strip_{strip}"),
+            format!("audio_strip_{strip}_head"),
+            format!("audio_strip_{strip}_level"),
+            format!("camera_strip_{strip}"),
+            format!("camera_strip_{strip}_head"),
+        ] {
+            expected.insert(format!("deck_{name}"));
+        }
+    }
+    assert_eq!(expected.len(), 49);
+    assert_eq!(read_variables(&config), expected);
+    assert_eq!(
+        config["expressionVariables"]
+            .as_object()
+            .map(|variables| variables.len()),
+        Some(49)
+    );
 }
 
 // The bridge's worst instant (2026-10-03): the poll is one read of every

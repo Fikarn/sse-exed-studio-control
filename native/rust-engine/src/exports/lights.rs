@@ -13,8 +13,8 @@
 
 use super::common::{page_key, play_key, rec_key};
 use super::model::{
-    cell, dark_key, dial, key, key_with_value, reads, shown_head, Control, Prop, Step,
-    DECK_AMBER_BG, DECK_AMBER_INK, DECK_GREY_INK, DECK_LIVE_BG, DECK_PREVIEW_INK, LABEL, VALUE,
+    cell, dark_key, dial, key, reads, shown_head, CellValue, Control, Prop, Step, DECK_BLUE,
+    DECK_BURGUNDY, DECK_FACE, DECK_GREEN, DECK_YELLOW, VALUE,
 };
 
 /// The LIGHTS page's keys and dials.
@@ -34,44 +34,23 @@ fn previewing() -> String {
 }
 
 /// `RECALL`: the chosen scene onto the rig, with the Lighting page's Fade.
-/// Under its word: `ON RIG` (green) while the rig holds the chosen scene,
-/// `UNSAVED` (amber) while it was put on the rig and the rig changed since,
-/// `PREVIEW` (blue) while previewing; nothing when a press changes the rig.
-/// Grey with no scene.
+/// Under its word, with its lamp: `ON RIG` (Green) while the rig holds the
+/// chosen scene, `UNSAVED` (Yellow) while it was put on the rig and the rig
+/// changed since, `PREVIEW` (Blue) while previewing; "scene" when a press
+/// changes the rig. Disabled with no scene.
 fn recall_key() -> Control {
     let state = |word: &str| reads("scene_state", word);
-    let value = format!(
-        "{} ? 'ON RIG' : ({} ? 'UNSAVED' : ({} ? 'PREVIEW' : ''))",
-        state("live"),
-        state("unsaved"),
-        state("preview")
-    );
-    key_with_value(
-        1,
-        3,
-        "RECALL",
-        Prop::text("RECALL"),
-        Prop::Expr(value),
-        "key_recall",
-    )
-    .on_press(light("recallScene"))
-    .rule(
-        state("live"),
-        vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
-    )
-    .rule(
-        state("unsaved"),
-        vec![(VALUE, "color", Prop::colour(DECK_AMBER_BG))],
-    )
-    .rule(
-        state("preview"),
-        vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
-    )
-    .inked(state("none"), DECK_GREY_INK)
-    .grey_without_the_link()
+    key(1, 3, "RECALL", "key_recall")
+        .on_press(light("recallScene"))
+        .shows(state("live"), "key_recall_live", DECK_FACE)
+        .shows(state("unsaved"), "key_recall_unsaved", DECK_FACE)
+        .shows(state("preview"), "key_recall_preview", DECK_FACE)
+        .shows(state("none"), "key_recall_none", DECK_FACE)
+        .grey_without_the_link()
 }
 
-/// A value of the chosen light: blue while Preview is on.
+/// A value of the chosen light, under the dial's name: Blue while Preview
+/// is on.
 fn level_cell(
     col: u8,
     label: &'static str,
@@ -79,10 +58,10 @@ fn level_cell(
     display: &str,
     art: &'static str,
 ) -> Control {
-    cell(col, label, shows, Prop::text(label), display, art)
+    cell(col, label, shows, None, display, art, CellValue::Number)
         .rule(
             previewing(),
-            vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
+            vec![(VALUE, "color", Prop::colour(DECK_BLUE))],
         )
         .grey_without_the_link()
 }
@@ -91,31 +70,25 @@ pub(super) fn light_controls() -> Vec<Control> {
     let scene = |word: &str| reads("scene_state", word);
     vec![
         rec_key(),
-        key(0, 1, "ALL ON", "ALL ON", "key_all_on")
+        key(0, 1, "ALL ON", "key_all_on")
             .on_press(light("allOn"))
             .grey_without_the_link(),
         // Saves the rig as a new scene, `Scene N`, which the SCENE dial then
         // has chosen. One press (the owner's decision, 2026-09-28).
-        key(0, 2, "SAVE", "SAVE", "key_save")
+        key(0, 2, "SAVE", "key_save")
             .on_press(light("saveScene"))
             .grey_without_the_link(),
-        page_key(
-            "AUDIO \u{203a}",
-            "AUDIO\n\u{203a}",
-            "audio",
-            "key_page_audio",
-        ),
+        page_key("AUDIO \u{203a}", "audio", "key_page_audio"),
         play_key(),
-        // Asks first: `OFF?` in amber for 3 s, and a second press within them
-        // switches every fixture off (2026-09-28). ALL ON sits over it, as on
-        // a wall switch.
-        key(1, 1, "ALL OFF", "ALL OFF", "key_all_off")
+        // Destructive, in Coral, and it asks first: `OFF?` in the armed form
+        // for 3 s, and a second press within them switches every fixture off
+        // (2026-09-28). ALL ON sits over it, as on a wall switch.
+        key(1, 1, "ALL OFF", "key_all_off")
             .on_press(light("allOff"))
-            .filled_and(
+            .shows(
                 reads("light_key_off", "OFF?"),
-                DECK_AMBER_BG,
-                DECK_AMBER_INK,
-                vec![(LABEL, "text", Prop::text("OFF?"))],
+                "key_all_off_armed",
+                DECK_BURGUNDY,
             )
             .grey_without_the_link(),
         // Del Scene's place: deleting a scene stays on the screen, with its
@@ -126,9 +99,10 @@ pub(super) fn light_controls() -> Vec<Control> {
             0,
             "LIGHT",
             "the light the dials set, and its place among the lights",
-            Prop::Expr(shown_head("light_nav")),
+            Some(Prop::Expr(shown_head("light_nav"))),
             "light_nav",
             "cell_light",
+            CellValue::Name,
         )
         .grey_without_the_link(),
         level_cell(
@@ -149,21 +123,22 @@ pub(super) fn light_controls() -> Vec<Control> {
             3,
             "SCENE",
             "the chosen scene, and whether the rig holds it",
-            Prop::Expr(shown_head("scene_nav")),
+            Some(Prop::Expr(shown_head("scene_nav"))),
             "scene_nav",
             "cell_scene",
+            CellValue::Name,
         )
         .rule(
             scene("live"),
-            vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
+            vec![(VALUE, "color", Prop::colour(DECK_GREEN))],
         )
         .rule(
             scene("unsaved"),
-            vec![(VALUE, "color", Prop::colour(DECK_AMBER_BG))],
+            vec![(VALUE, "color", Prop::colour(DECK_YELLOW))],
         )
         .rule(
             scene("preview"),
-            vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
+            vec![(VALUE, "color", Prop::colour(DECK_BLUE))],
         )
         .grey_without_the_link(),
         dial(
