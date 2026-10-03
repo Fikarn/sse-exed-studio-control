@@ -7,16 +7,12 @@
 
   .state {
     align-items: center;
-    background: var(--elevation-plate-fill);
-    border: 1px solid var(--material-line);
-    border-radius: var(--radius-screen);
-    box-shadow: var(--elevation-plate);
+    border: 1px solid transparent;
+    border-radius: var(--radius-base);
     color: var(--text-text);
     display: grid;
     gap: 16px;
     grid-template-columns: auto minmax(0, 1fr) auto;
-    min-height: 88px;
-    padding: 20px;
     min-width: 0;
   }
 
@@ -26,14 +22,13 @@
       grid-template-columns: minmax(0, 1fr);
       justify-items: start;
       gap: 12px;
-      padding: 16px;
     }
   }
 
   .icon {
-    color: var(--text-text2);
-    height: 24px;
-    width: 24px;
+    color: var(--text-text3);
+    height: 20px;
+    width: 20px;
     flex: none;
   }
 
@@ -51,12 +46,12 @@
 
   .title {
     color: var(--text-text);
-    font: 600 var(--font-size-value) / 1.2 var(--font-family-ui);
+    font: 700 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
   }
 
   .message {
     color: var(--text-text2);
-    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
+    font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
   }
 
   .actions {
@@ -66,29 +61,39 @@
     flex-wrap: wrap;
   }
 
+  /* Empty: no box — a quiet title and message, and the one key that fills it. */
   .empty {
-    border-style: dashed;
-    border-color: var(--material-line2);
+    min-height: 88px;
+    padding: 16px;
   }
 
+  .empty .title {
+    color: var(--text-text2);
+  }
+
+  .empty .message {
+    color: var(--text-text3);
+  }
+
+  /* Degraded: a yellow keyline, as a latch. */
   .degraded {
-    border-color: var(--role-amber-text);
+    border-color: var(--role-yellow-line);
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 8px 8px 16px;
   }
 
   .degraded .icon {
-    color: var(--role-amber-text);
+    color: var(--role-yellow-text);
   }
 
+  /* Loading: no box, the host's geometry in still bars. Nothing animates at rest. */
   .loading {
     display: flex;
     flex-direction: column;
     gap: 12px;
     min-width: 0;
     padding: 16px;
-    border-radius: var(--radius-screen);
-    border: 1px solid var(--material-line);
-    background: var(--material-bay);
-    box-shadow: var(--elevation-bay);
   }
 
   .fill {
@@ -97,8 +102,8 @@
   }
 
   .loadingLabel {
-    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
-    color: var(--text-text2);
+    font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+    color: var(--text-text3);
   }
 
   .skeleton {
@@ -112,9 +117,8 @@
   .bone {
     display: block;
     height: var(--row-height, 40px);
-    border-radius: var(--radius-key);
-    background: var(--material-panel);
-    border: 1px solid var(--material-line);
+    border-radius: var(--radius-base);
+    background: var(--material-key);
   }
 
   .fill .bone:last-child {

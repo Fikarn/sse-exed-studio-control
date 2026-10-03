@@ -1,7 +1,7 @@
 @layer reset, tokens, primitives, components, utilities, overrides;
 
 @import "@sse/tokens/styles.css" layer(tokens);
-@import "@sse/tokens/wells.css" layer(tokens);
+@import "@sse/tokens/fonts.css" layer(tokens);
 
 @layer reset {
   *,
@@ -41,19 +41,10 @@
     font-size: var(--operator-font-size-md, var(--font-size-body));
     line-height: 1.4;
     letter-spacing: 0;
-    /*
-     * Activate Inter's stylistic alternates at the body level to match the
-     * v6 Direction D prototype (ss01 + cv01 + cv02 + cv11). Without these
-     * the variable Inter font renders the default letterforms instead of
-     * the design-tuned glyphs the prototype was designed against. Token
-     * overrides on individual elements (display font opsz, mono tnum/zero)
-     * still take precedence per the cascade.
-     */
-    font-feature-settings: "ss01", "cv01", "cv02", "cv11";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background: var(--color-background-950);
-    color: var(--color-text-strong);
+    background: var(--material-bg);
+    color: var(--text-text);
   }
 
   /* CHROME-08: pre-ready surfaces (startup / recovery / setup-recovery) have
@@ -76,10 +67,8 @@
   }
 
   body {
-    background:
-      radial-gradient(circle at top left, rgba(153, 186, 146, 0.1), transparent 34%),
-      linear-gradient(180deg, var(--color-background-900), var(--color-background-950));
-    color: var(--color-text-strong);
+    background: var(--material-bg);
+    color: var(--text-text);
   }
 
   button {
@@ -87,7 +76,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-primary-400);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 

@@ -1,3 +1,6 @@
+/* Atrium (docs/DESIGN.md): a key is a flat, matte face one step up from the
+   surface with a 1 px edge. No gradient, no glow, no shadow; colour only where
+   something is on, in danger or armed; selection is the Beige keyline. */
 @layer components {
   .key {
     appearance: none;
@@ -7,23 +10,29 @@
     justify-content: center;
     gap: 8px;
     min-height: 36px;
-    padding: 0 12px;
-    border-radius: var(--radius-key);
-    background: var(--elevation-key-fill);
-    border: 1px solid var(--material-line);
-    box-shadow: var(--elevation-key);
+    padding: 0 14px;
+    border-radius: var(--radius-base);
+    background: var(--material-key);
+    border: 1px solid var(--material-line2);
     color: var(--text-text);
-    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     cursor: pointer;
     white-space: nowrap;
-    transition:
-      border-color var(--motion-duration-press) var(--motion-easing-mech),
-      color var(--motion-duration-press) var(--motion-easing-mech);
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
-  /* Hover changes an edge, never a position (system §6). */
-  .key:hover {
-    border-color: var(--material-line2);
+  /* A key the page disables for a moment (busy): the quiet ink. A lit key
+     keeps its ink (the rules below win over this one). */
+  .key:where(:disabled) {
+    color: var(--text-text4);
+    cursor: not-allowed;
+  }
+
+  /* Hover brightens the edge of a key at rest, never its position (system
+     §6). A lit, armed, danger, locked or selected key keeps the edge its
+     state gives it. */
+  .key:hover:not(.engaged, .live, .primary, .danger, .locked, .armed, .selected, :disabled) {
+    border-color: var(--text-text4);
   }
 
   .key:focus-visible {
@@ -31,29 +40,36 @@
     outline-offset: 2px;
   }
 
-  .tall {
-    min-height: 64px;
-  }
-
+  /* Sizes: small 28, default 36, large 48, tall 64. */
   .small {
     min-height: 28px;
     padding: 0 10px;
     font-size: var(--font-size-label);
   }
 
-  .stack {
-    flex-direction: column;
-    gap: 8px;
+  .large {
+    min-height: 48px;
   }
 
+  .tall {
+    min-height: 64px;
+  }
+
+  .stack {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* The cap: the deck's word in SSE Adelia capitals. Never a value or a name
+     that keeps its case. */
   .cap {
-    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
-    letter-spacing: var(--font-tracking-cap);
+    font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
     text-transform: uppercase;
   }
 
-  .tall .cap {
-    font-size: var(--font-size-word);
+  .small .cap {
+    font-size: var(--font-size-body);
   }
 
   .label {
@@ -63,157 +79,211 @@
   }
 
   .hint {
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
     color: var(--text-text2);
     display: inline-flex;
     align-items: center;
     gap: 6px;
   }
 
-  /* Engaged: the lit amber fill with its bloom. */
+  /* Engaged: the lit yellow fill with black ink. */
   .engaged {
-    background: var(--elevation-key-lit-amber-fill);
-    border-color: var(--role-amber-ink);
-    color: var(--role-amber-ink);
-    box-shadow: var(--elevation-key-lit-amber);
+    background: var(--role-yellow-fill);
+    border-color: var(--role-yellow-fill);
+    color: var(--role-yellow-ink);
   }
 
   .engaged .hint {
-    color: var(--role-amber-ink);
-    border-color: var(--role-amber-ink);
+    color: var(--role-yellow-ink);
   }
 
   /* Live: the lit green fill, for exactly the hold. */
   .live {
-    background: var(--elevation-key-lit-green-fill);
-    border-color: var(--role-green-ink);
+    background: var(--role-green-fill);
+    border-color: var(--role-green-fill);
     color: var(--role-green-ink);
-    box-shadow: var(--elevation-key-lit-green);
   }
 
   .live .hint {
     color: var(--role-green-ink);
-    border-color: var(--role-green-ink);
   }
 
+  /* Primary: the one primary command, Beige Light with black ink. */
   .primary {
-    background: linear-gradient(180deg, var(--role-primary-fill-top), var(--role-primary-fill));
+    background: var(--role-primary-fill);
+    border-color: var(--role-primary-fill);
     color: var(--role-primary-ink);
-    border-color: transparent;
-    box-shadow: var(--elevation-key-primary);
   }
 
   .primary .hint {
     color: var(--role-primary-ink);
-    border-color: var(--role-primary-ink);
   }
 
-  /* Danger: a red keyline, never a red fill at rest; at most one per surface. */
+  /* Danger: the word and the edge in coral, never a coral fill at rest. */
   .danger {
-    color: var(--role-red-text);
-    border-color: var(--role-red-text);
+    color: var(--role-coral-text);
+    border-color: var(--role-coral-text);
   }
 
-  .danger:hover {
-    border-color: var(--role-red-text);
-  }
-
-  /* Hazard: 48 V on is a red lamp and word on a dark key. */
+  /* Hazard: a lamp and its word on the key (48 V on): coral while on, a
+     hollow lamp and the quiet word while off. */
   .hazard {
-    color: var(--role-red-text);
-    font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+    gap: 6px;
+    padding: 0 8px;
+    color: var(--text-text2);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+  }
+
+  .hazardOn {
+    color: var(--role-coral-text);
   }
 
   .hazardLamp {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
   }
 
   /* Locked: the engine refuses it — the form changes, not only the opacity. */
   .locked {
     opacity: 0.55;
     background: transparent;
-    box-shadow: none;
     border-style: dashed;
     border-color: var(--material-line2);
     cursor: not-allowed;
   }
 
-  .locked:hover {
-    border-color: var(--material-line2);
+  /* Without its fill the primary's black ink would vanish on the surface. */
+  .locked.primary {
+    color: var(--text-text);
   }
 
-  /* Segmented: a well holding transparent keys; the lit one is the choice. */
+  /* Selected: the Beige keyline, 2 px, the only colour selection has. The
+     edge is the first pixel and an inset outline the second, so the key keeps
+     its size and casts no shadow. Focus replaces the outline with the ring. */
+  .selected {
+    border-color: var(--accent);
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* Segmented: one outlined row of flat keys split by hairline rules; the lit
+     one is the choice. The group is as tall as a key of the keys' size, and
+     only its end keys are rounded, so a focus ring is never clipped. */
   .segmented {
     display: flex;
-    gap: 6px;
-    padding: 4px;
-    border-radius: var(--radius-screen);
-    background: var(--material-well);
-    border: 1px solid var(--material-line);
-    box-shadow: var(--elevation-well);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    background: var(--material-key);
   }
 
   .segmented .key {
     flex: 1;
-    min-height: 40px;
+    min-height: 34px;
+    border: 0;
+    border-left: 1px solid var(--material-line2);
+    border-radius: 0;
     background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-    color: var(--display-text);
+    color: var(--text-text2);
   }
 
-  .segmented .key .cap {
-    font-size: var(--font-size-body);
+  .segmented .key:first-child {
+    border-left: 0;
+    border-top-left-radius: var(--radius-base);
+    border-bottom-left-radius: var(--radius-base);
+  }
+
+  .segmented .key:last-child {
+    border-top-right-radius: var(--radius-base);
+    border-bottom-right-radius: var(--radius-base);
+  }
+
+  .segmented .small {
+    min-height: 26px;
+  }
+
+  .segmented .large {
+    min-height: 46px;
+  }
+
+  .segmented .tall {
+    min-height: 62px;
+  }
+
+  .segmented .key:where(:disabled) {
+    color: var(--text-text4);
+  }
+
+  /* Hover keeps the rules and lifts the word to the main ink. */
+  .segmented .key:hover {
+    border-color: var(--material-line2);
+  }
+
+  .segmented .key:hover:not(.engaged, .live, .locked, .armed, :disabled) {
+    color: var(--text-text);
+  }
+
+  /* A segment's cap is a choice's name (Main Out, Phones 1): PT Sans in its
+     own case, like the label. */
+  .segmented .cap {
+    font: inherit;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   .segmented .engaged {
-    background: var(--elevation-key-lit-amber-fill);
-    color: var(--role-amber-ink);
-    box-shadow: var(--elevation-key-lit-amber);
+    background: var(--role-yellow-fill);
+    color: var(--role-yellow-ink);
+  }
+
+  .segmented .live {
+    background: var(--role-green-fill);
+    color: var(--role-green-ink);
   }
 
   .segmented .locked {
-    border: 1px dashed transparent;
+    border-left-style: dashed;
   }
 
+  /* The current choice while the group is locked: its word in yellow. */
   .segmented .locked[data-engaged] {
-    border-color: var(--role-amber-text);
-    color: var(--role-amber-text);
-    background: transparent;
-    box-shadow: none;
+    color: var(--role-yellow-text);
   }
 
-  /* Armed: the key becomes a well with an amber keyline, the tag and the bar. */
+  .segmented .armed {
+    background: var(--role-burgundy-fill);
+    color: var(--role-burgundy-ink);
+  }
+
+  /* Armed: the one armed form. The Burgundy fill with Beige ink, the tag,
+     the label and the countdown bar along the bottom edge. The padding keeps
+     the box the pages were laid out for when the armed edge was 2 px. */
   .armed {
     flex-direction: column;
     align-items: flex-start;
+    justify-content: center;
     gap: 4px;
     overflow: hidden;
-    padding: 8px 12px 14px;
-    border: 2px solid var(--display-amber);
-    background: var(--material-well);
-    color: var(--display-text);
-    box-shadow: var(--elevation-key-armed);
+    padding: 9px 14px 15px;
+    background: var(--role-burgundy-fill);
+    border-color: var(--role-burgundy-fill);
+    color: var(--role-burgundy-ink);
   }
 
   .armedTag {
-    font: 600 var(--font-size-tick) / 1 var(--font-family-ui);
-    color: var(--display-amber);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
   }
 
   .armedLabel {
-    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   }
 
   .countdown {
     position: absolute;
     left: 0;
     bottom: 0;
-    height: 4px;
+    height: 3px;
     width: 100%;
-    background: var(--display-amber);
-    box-shadow: var(--elevation-bar);
+    background: var(--role-burgundy-ink);
     transform-origin: left;
     animation: aArmCountdown var(--arm-duration, 4500ms) linear forwards;
     pointer-events: none;

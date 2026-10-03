@@ -24,7 +24,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
   color: var(--text-text);
 }
 
@@ -42,7 +42,7 @@
 .stepStanding {
   grid-row: 1 / span 2;
   grid-column: 3;
-  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-text2);

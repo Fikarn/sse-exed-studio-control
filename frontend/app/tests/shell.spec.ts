@@ -140,9 +140,9 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
   // Mechanism: the layout provider stamps body as the scale host.
   await expect(page.locator('body[data-operator-scale-host][data-ui-scale="125"]')).toHaveCount(1);
 
-  // Consumer: a portaled dialog's title reads the A state step (24 px, visual
-  // overhaul A Slice 3; old: the 22 px title-lg token → 27.5px), so it must
-  // render at 24px * 1.25 = 30px rather than the unscaled 24px.
+  // Consumer: a portaled dialog's title reads the word step (20 px, docs/DESIGN.md
+  // section 3), so it must render at 20px * 1.25 = 25px rather than the
+  // unscaled 20px.
   await page.getByRole("button", { name: "Add fixture" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Add fixture" });
   await expect(dialog).toBeVisible();
@@ -150,7 +150,7 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
     .locator("h2")
     .first()
     .evaluate((node) => getComputedStyle(node).fontSize);
-  expect(titleSize).toBe("30px");
+  expect(titleSize).toBe("25px");
 });
 
 // GLO-09: latched cross-workspace state (audio SOLO, lighting scene drift)

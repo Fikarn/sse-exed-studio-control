@@ -6,11 +6,12 @@ import { Button, type ButtonVariant } from "./Button";
 import { Lamp } from "./Lamp";
 import styles from "./OperationalState.module.css";
 
-// Visual overhaul A, Slice 3 (findings H5, H6): EmptyState and DegradedState
-// are keylined plates that read as one row and stack to one column when the
+// The operational states (the Atrium look). EmptyState has no box: a quiet
+// title and message and the one key that fills it. DegradedState is a yellow
+// keyline, as a latch. Both read as one row and stack to one column when the
 // host is narrower than 320 px (a container query, so a narrow rail never
-// wraps one word per line). LoadingState is a skeleton drawn at the host's
-// geometry, with no animation — an idle surface stays still.
+// wraps one word per line). LoadingState is still bars in the key's face,
+// drawn at the host's geometry, with no animation — an idle surface stays still.
 
 export interface EmptyStateAction {
   label: string;

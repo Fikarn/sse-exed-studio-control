@@ -1,11 +1,11 @@
 @layer components {
+  /* The well: one step down, a 1 px edge, flat. */
   .meter {
     position: relative;
-    border-radius: var(--radius-ctl);
+    border-radius: var(--radius-base);
     overflow: hidden;
     background: var(--material-well);
     border: 1px solid var(--material-line);
-    box-shadow: var(--elevation-well);
     flex: none;
   }
 
@@ -47,21 +47,22 @@
     flex-direction: column;
   }
 
+  /* A bar's slot: one step up inside the black well, so an empty meter still
+     shows where its signal runs. */
   .bar {
     position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
     overflow: visible;
+    background: var(--material-bg);
   }
 
-  .ramp,
-  .glow {
+  .ramp {
     position: absolute;
   }
 
-  .vertical .ramp,
-  .vertical .glow {
+  .vertical .ramp {
     left: 0;
     right: 0;
     bottom: 0;
@@ -71,8 +72,7 @@
     background-position: bottom;
   }
 
-  .horizontal .ramp,
-  .horizontal .glow {
+  .horizontal .ramp {
     top: 0;
     bottom: 0;
     left: 0;
@@ -82,25 +82,10 @@
     background-position: left;
   }
 
-  .glow {
-    filter: blur(6px);
-    opacity: 0.55;
-  }
-
-  .vertical .glow {
-    left: -3px;
-    right: -3px;
-  }
-
-  .horizontal .glow {
-    top: -3px;
-    bottom: -3px;
-  }
-
+  /* The peak: a 2 px tick, no bloom. */
   .peak {
     position: absolute;
     background: var(--signal-peak);
-    box-shadow: var(--elevation-peak);
   }
 
   .vertical .peak {
@@ -117,6 +102,8 @@
     margin-left: -1px;
   }
 
+  /* The −18 dBFS reference: a 1 px tick drawn under the slots, so it shows at
+     their edges and between a stereo pair, never across the signal. */
   .reference {
     position: absolute;
     pointer-events: none;
@@ -126,16 +113,17 @@
     left: 0;
     right: 0;
     bottom: calc(14px + var(--meter-reference, 0.7) * (100% - 28px));
-    border-top: 1px dashed var(--display-text2);
+    border-top: 1px solid var(--text-text4);
   }
 
   .horizontal .reference {
     top: 0;
     bottom: 0;
     left: calc(var(--meter-reference, 0.7) * 100%);
-    border-left: 1px dashed var(--display-text2);
+    border-left: 1px solid var(--text-text4);
   }
 
+  /* The clip lamp: hollow at rest, coral when a clip is held; no glow. */
   .clip {
     position: absolute;
     top: 3px;
@@ -144,14 +132,13 @@
     height: 8px;
     margin-left: -4px;
     border-radius: var(--radius-pill);
-    background: var(--material-key-top);
+    background: transparent;
     border: 1px solid var(--material-line2);
   }
 
   .clipLit {
-    background: var(--display-red);
-    border-color: var(--display-red);
-    box-shadow: var(--elevation-lamp-red);
+    background: var(--role-coral-fill);
+    border-color: var(--role-coral-fill);
   }
 
   .stale .ramp,

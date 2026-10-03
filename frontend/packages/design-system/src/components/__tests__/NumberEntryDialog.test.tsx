@@ -1,4 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import { NumberEntryDialog } from "../NumberEntryDialog";
@@ -28,6 +31,22 @@ describe("NumberEntryDialog", () => {
     expect(screen.getByText("%")).toBeInTheDocument();
     expect(screen.getByText("0 to 100 %")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton")).toHaveValue(40);
+  });
+
+  // Visual overhaul 2026-10 (Atrium): the label over a field, the field a well
+  // holding the value in PT Sans whose edge turns Beige on focus; the unit
+  // and the range in the quiet ink; no retired colour or monospace token.
+  it("draws the field as a well whose edge turns Beige on focus", () => {
+    const css = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "NumberEntryDialog.module.css"),
+      "utf8"
+    );
+    expect(css).toMatch(
+      /\.form input \{[^}]*border: 1px solid var\(--material-line\);[^}]*background: var\(--material-well\)/
+    );
+    expect(css).toMatch(/\.form input:focus-visible \{\s*border-color: var\(--accent\);\s*\}/);
+    expect(css).toMatch(/\.form small \{\s*color: var\(--text-text3\)/);
+    expect(css).not.toMatch(/var\(--color-|--font-family-mono|--radius-key/);
   });
 
   it("snaps + clamps the typed value to the field step on confirm", () => {

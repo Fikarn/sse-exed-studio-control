@@ -5,7 +5,7 @@
 .plate {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
@@ -42,7 +42,7 @@
 .connectionDetail {
   overflow: hidden;
   color: var(--display-text2);
-  font: 500 var(--font-size-tick) / 1.25 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.25 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -50,11 +50,11 @@
 .fine {
   margin: 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
 }
 
 .fine[data-warn] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .foot {
@@ -71,7 +71,7 @@
 
 .setLabel {
   color: var(--text-text);
-  font: 500 var(--font-size-body) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.2 var(--font-family-ui);
 }
 
 .readout {
@@ -106,7 +106,7 @@ button.readout:focus-visible,
 }
 
 .readout b {
-  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -117,17 +117,17 @@ button.readout:focus-visible,
 
 .readout span {
   color: var(--display-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   white-space: nowrap;
 }
 
 /* Doubt: what the camera last reported, not a fact now. */
 .readout[data-doubt] {
-  border: 1px dashed var(--display-amber);
+  border: 1px dashed var(--display-yellow);
 }
 
 .readout[data-doubt] b {
-  color: var(--display-amber);
+  color: var(--display-yellow);
 }
 
 /* A value the camera does not report: its own sentence, across the row. */
@@ -141,7 +141,7 @@ button.readout:focus-visible,
   border-radius: var(--radius-key);
   background: var(--material-well);
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1.3 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
 }
 
 .step {
@@ -172,20 +172,20 @@ button.readout:focus-visible,
 
 .focusValue {
   color: var(--text-text);
-  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 .focusValue[data-doubt] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .nearFar {
   display: flex;
   justify-content: space-between;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
 }
 
 .choiceLabel {
@@ -195,13 +195,13 @@ button.readout:focus-visible,
   gap: 8px;
   min-height: 16px;
   color: var(--text-text);
-  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 .choiceValue {
   margin-left: auto;
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
 }
 
 .choices > * {
@@ -214,7 +214,7 @@ button.readout:focus-visible,
   min-height: 48px;
   white-space: normal;
   text-align: center;
-  font: 600 var(--font-size-label) / 1.15 var(--font-family-ui);
+  font: 700 var(--font-size-label) / 1.15 var(--font-family-ui);
 }
 
 /* A small pair in a label's row: On and Off. */

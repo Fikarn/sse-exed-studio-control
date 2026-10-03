@@ -24,10 +24,12 @@ export interface ToastProps {
 }
 
 /**
- * Single toast bubble — a floating plate (level +3) with a lamp and its word
- * (visual overhaul A, Slice 3). Tones: ok, attention (amber), info, error
- * (sticky failures, announced assertively). Stacks are rendered by the
- * consumer via a portal — this primitive is one tile.
+ * Single toast tile — the floating layer (`data-level="float"`: the raised
+ * surface, the menu's edge, the floating shadow) with a lamp beside its words
+ * (visual overhaul A, Slice 3; Atrium). Tones, carried by the lamp: ok,
+ * attention (yellow), info, error (sticky failures, announced assertively).
+ * Stacks are rendered by the consumer via a portal — this primitive is one
+ * tile.
  */
 export function Toast({ tone, message, title, action, onDismiss }: ToastProps) {
   return (

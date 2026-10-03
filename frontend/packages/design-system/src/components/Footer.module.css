@@ -1,3 +1,6 @@
+/* The 40 px footer (system §2, §7). Visual overhaul 2026-10 (Atrium): the one
+   flat base under a hairline; quiet `Label value` facts in PT Sans at label
+   size, 40 px apart; the action key at the right edge. */
 @layer components {
   .footer {
     display: flex;
@@ -6,12 +9,12 @@
     height: calc(var(--chrome-studio-footer) * var(--operator-ui-scale-factor, 1));
     padding: 0 24px;
     border-top: 1px solid var(--material-line);
-    background: linear-gradient(180deg, var(--material-bg), var(--material-panel));
-    color: var(--text-text2);
-    /* A line box that contains its descenders: at `/ 1` the mono values sat a
+    background: var(--material-bg);
+    color: var(--text-text3);
+    /* A line box that contains its descenders: at `/ 1` the values sat a
        pixel proud of their box, which reads as a clipped value to anything
        measuring the footer. */
-    font: 500 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+    font: 400 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
@@ -20,7 +23,7 @@
   .items {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 40px;
     min-width: 0;
     overflow: hidden;
   }
@@ -28,14 +31,17 @@
   .item {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 10px;
     min-width: 0;
   }
 
+  .label {
+    color: var(--text-text3);
+  }
+
   .value {
-    color: var(--text-text);
-    font-weight: 600;
-    font-family: var(--font-family-mono);
+    color: var(--text-text2);
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
   }
 

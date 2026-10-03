@@ -163,6 +163,11 @@ export function censusInPage() {
   const sizes = new Map();
   const fams = new Map();
   const weights = new Map();
+  // The faces the texts ask for (style, weight, family). The family count
+  // reads the declared name, which passes even when no file ever loaded; the
+  // faces are asked of the document's fonts below, so a face that failed to
+  // load (a missing file, an uninstalled SSE Adelia) is caught.
+  const faces = new Set();
   const textColors = new Set();
   const bgColors = new Set();
   const radii = new Map();
@@ -273,6 +278,7 @@ export function censusInPage() {
       .trim();
     fams.set(fam, (fams.get(fam) || 0) + 1);
     weights.set(cs.fontWeight, (weights.get(cs.fontWeight) || 0) + 1);
+    faces.add(`${cs.fontStyle}|${cs.fontWeight}|${fam}`);
     textColors.add(color);
     if (cs.textTransform === "uppercase") upper++;
     const seen = visibleBox(el, r);
@@ -331,6 +337,10 @@ export function censusInPage() {
       h: Math.round(r.height),
     };
   });
+  const facesUnloaded = [...faces].filter((face) => {
+    const [style, weight, family] = face.split("|");
+    return !document.fonts.check(`${style} ${weight} 16px "${family}"`);
+  });
   const runningAnims = document.getAnimations().filter((a) => a.playState === "running");
   const running = runningAnims.length;
   // Slice 9: name what is still moving on a board at rest.
@@ -351,6 +361,8 @@ export function censusInPage() {
     minFontSize: sizes.size ? Math.min(...sizes.keys()) : null,
     families: sortMap(fams),
     weights: sortMap(weights),
+    faces: [...faces].sort(),
+    facesUnloaded,
     uppercase: upper,
     textCount: texts.length,
     // The texts the contrast sampler skips as out of sight (`visibleBox`), so

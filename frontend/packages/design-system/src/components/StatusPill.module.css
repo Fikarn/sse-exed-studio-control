@@ -10,7 +10,7 @@
   color: var(--color-brand-text-primary);
   font-family: var(--font-family-mono);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0;
   font-feature-settings: "tnum", "zero";
   white-space: nowrap;

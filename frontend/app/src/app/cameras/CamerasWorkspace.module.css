@@ -18,5 +18,5 @@
 .waitingText {
   margin: 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
 }

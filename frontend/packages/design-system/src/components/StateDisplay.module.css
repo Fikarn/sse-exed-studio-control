@@ -1,41 +1,37 @@
 @layer components {
+  /* A black well of fixed height: the word's row, the sentence's room, the
+     foot. Flat: no tint, no shadow; the tone lives in the lamp and the word
+     (and, for an error, in the keyline round the whole display). */
   .display {
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     height: calc(var(--chrome-studio-state-display) * var(--operator-ui-scale-factor, 1));
     flex: none;
-    padding: 14px 16px;
-    border-radius: var(--radius-screen);
+    padding: 18px 18px 18px 24px;
+    border-radius: var(--radius-base);
     border: 1px solid var(--material-line);
     background: var(--material-well);
-    box-shadow: var(--elevation-well);
-    color: var(--display-text);
+    color: var(--text-text);
     overflow: hidden;
     min-width: 0;
   }
 
-  /* The state's own colour as a radial tint, at most 16 %. */
-  .ok {
-    background: var(--elevation-tint-ok), var(--material-well);
-  }
-
-  .attention {
-    background: var(--elevation-tint-attention), var(--material-well);
-  }
-
+  /* Error: a 2 px coral keyline round the display. The edge grows by 1 px and
+     the padding gives that pixel back, so nothing inside moves. */
   .error {
-    background: var(--elevation-tint-error), var(--material-well);
+    border: 2px solid var(--role-coral-text);
+    padding: 17px 17px 17px 23px;
   }
 
-  .info {
-    background: var(--elevation-tint-info), var(--material-well);
-  }
-
+  /* The word's row keeps its 40 px whatever the word's size, so a long word
+     that drops to the readout size moves nothing below it. */
   .top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
+    height: 40px;
+    margin-bottom: 12px;
     min-width: 0;
   }
 
@@ -45,94 +41,144 @@
   }
 
   .word {
-    font: 600 var(--font-size-state) / 1 var(--font-family-mono);
-    letter-spacing: var(--font-tracking-cap);
+    font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: 0;
     text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  /* A word longer than ten characters (NOT VERIFIED, SETUP REQUIRED). */
+  .word[data-long] {
+    font-size: var(--font-size-readout);
+  }
+
+  .ok .word {
+    color: var(--role-green-text);
+  }
+
+  .attention .word {
+    color: var(--role-yellow-text);
+  }
+
+  .error .word {
+    color: var(--role-coral-text);
+  }
+
+  .info .word {
+    color: var(--role-blue-text);
+  }
+
+  /* The sentence's room. A column that wraps: when the code does not fit
+     whole under the sentence it moves to a second column, past the right
+     edge, and is clipped, so it is never cut through the middle of a line. */
+  .story {
+    display: flex;
+    flex-flow: column wrap;
+    align-content: flex-start;
+    row-gap: 4px;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  /* The hardware link's voice: PT Serif italic, at most two lines. */
+  .sentence {
+    flex: none;
+    width: 100%;
+    font: italic var(--font-weight-regular) var(--font-size-word) / 26px var(--font-family-serif);
+    color: var(--text-text);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  .code {
+    flex: none;
+    width: 100%;
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+    color: var(--text-text3);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .ok .word {
-    color: var(--display-green);
-  }
-
-  .attention .word {
-    color: var(--display-amber);
-  }
-
-  .error .word {
-    color: var(--display-red);
-  }
-
-  .info .word {
-    color: var(--display-blue);
-  }
-
-  .sentence {
-    font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
-    color: var(--display-text);
+  /* The foot: the meta line (or the armed row) at the left, the way-out keys
+     at the right, on one row at the bottom of the display. */
+  .foot {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 12px;
     min-width: 0;
-  }
-
-  .code {
-    font: 500 var(--font-size-tick) / 1.3 var(--font-family-mono);
-    color: var(--display-text2);
   }
 
   .meta {
-    font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
-    color: var(--display-text2);
-    align-self: start;
+    flex: 1 1 auto;
     min-width: 0;
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .actions {
     display: flex;
+    align-items: center;
     gap: 8px;
-    align-self: end;
+    flex: none;
+    margin-left: auto;
   }
 
+  /* The one armed form: a Burgundy fill with Beige ink, as tall as a key,
+     the countdown bar along its bottom edge. */
   .armedRow {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: 10px;
-    row-gap: 6px;
-    border: 1px solid var(--display-amber);
-    border-radius: var(--radius-key);
-    padding: 6px 10px;
-    align-self: start;
+    column-gap: 8px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: var(--radius-base);
+    background: var(--role-burgundy-fill);
+    color: var(--role-burgundy-ink);
+    overflow: hidden;
   }
 
   .armedWord {
-    font: 600 var(--font-size-body) / 1 var(--font-family-mono);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
     letter-spacing: var(--font-tracking-cap);
-    color: var(--display-amber);
+    white-space: nowrap;
   }
 
   .armedText {
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
-    color: var(--display-text);
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   .armedSeconds {
-    font: 600 var(--font-size-body) / 1 var(--font-family-mono);
-    color: var(--display-amber);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
+  /* The countdown bar: 3 px along the bottom edge in the Beige ink, no glow. */
   .bar {
-    grid-column: 1 / -1;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: block;
-    height: 4px;
-    border-radius: var(--radius-pill);
-    background: var(--material-line2);
+    height: 3px;
     overflow: hidden;
   }
 
@@ -140,8 +186,7 @@
     display: block;
     height: 100%;
     width: calc(var(--arm-progress, 1) * 100%);
-    background: var(--display-amber);
-    box-shadow: var(--elevation-bar);
+    background: var(--role-burgundy-ink);
   }
 
   /* The armed row's own countdown: the bar runs the window down, so the

@@ -56,16 +56,16 @@
 /* A press that would unpublish the setup, armed: the armed key's amber
    keyline, without moving the key. */
 .step[data-armed="true"] {
-  border-color: var(--display-amber);
+  border-color: var(--display-yellow);
 }
 
 .step[data-armed="true"] .stepStanding {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .stepNumber {
   grid-row: 1 / span 2;
-  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
   color: var(--text-text2);
 }
 
@@ -74,7 +74,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 var(--font-size-value) / 1.2 var(--font-family-ui);
+  font: 700 var(--font-size-value) / 1.2 var(--font-family-ui);
 }
 
 .stepHint {
@@ -94,7 +94,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   color: var(--text-text2);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -102,7 +102,7 @@
 
 .step[data-current="true"] .stepStanding {
   color: var(--text-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ---- the three probes --------------------------------------------------- */
@@ -127,7 +127,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
   color: var(--display-text);
 }
 
@@ -145,18 +145,18 @@
 .probeStanding {
   grid-row: 1 / span 2;
   grid-column: 3;
-  font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--role-green-text);
 }
 
 .probeStanding[data-status="attention"] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .probeStanding[data-status="error"] {
-  color: var(--role-red-text);
+  color: var(--role-coral-text);
 }
 
 /* ---- the standing actions ----------------------------------------------- */

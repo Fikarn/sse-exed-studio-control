@@ -2,11 +2,14 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import styles from "./Plate.module.css";
 
-// Visual overhaul A, Slice 3 (system §7): the plate's sections — every
-// section visible at once, no tab row. PlateHead (title, sub, one key),
-// Section (title, count, header keys), Fields (a 2-column grid of Field
-// wells), Readouts (label · value rows), ControlRow (label, slider, value)
-// and Danger (the one red command, at the bottom).
+// The plate's sections (the Atrium look) — every section visible at once, no
+// tab row. PlateHead is the Dark Green title plate (the title in PT Sans,
+// keeping its case; the sub-line; one key). Section is the section head: the
+// title in SSE Adelia capitals over the 2 px heavy rule, the detail a quiet
+// sub-word, the keys at the right. Fields (a 2-column grid of Field wells),
+// Readouts (label · value rows on hairlines), ControlRow (label, slider, the
+// value with its unit at half size) and Danger (the destructive command, at
+// the bottom).
 
 export interface PlateHeadProps {
   title: ReactNode;
@@ -95,12 +98,14 @@ export interface ControlRowProps {
   detail?: ReactNode;
   /** The slider. */
   children: ReactNode;
-  /** The printed value, mono, 20 px, right-aligned. */
+  /** The printed value, PT Sans 20 px, right-aligned. */
   value?: ReactNode;
+  /** The value's unit (`dB`, `%`, `K`), printed after it at half size in the quiet ink. */
+  unit?: ReactNode;
   testId?: string;
 }
 
-export function ControlRow({ label, detail, children, value, testId }: ControlRowProps) {
+export function ControlRow({ label, detail, children, value, unit, testId }: ControlRowProps) {
   return (
     <div className={styles.controlRow} data-testid={testId}>
       <div className={styles.controlLabel}>
@@ -109,7 +114,13 @@ export function ControlRow({ label, detail, children, value, testId }: ControlRo
       </div>
       <div className={styles.control}>
         {children}
-        {value !== undefined ? <span className={styles.controlValue}>{value}</span> : null}
+        {value !== undefined ? (
+          <span className={styles.controlValue}>
+            {value}
+            {unit ? " " : null}
+            {unit ? <span className={styles.controlUnit}>{unit}</span> : null}
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -71,14 +71,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(
     page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
   ).toHaveCount(6);
-  // 2026-05-27 redesign: a single amber accent (#f5a524) replaces the
-  // per-output cyan (#5dc5e8). Read via the canonical --accent since
-  // 2026-09-09: --audio-accent was a plain `var(--accent)` alias kept for the
-  // dead AudioRail / AudioToolbar hosts, and went when they did. Same value,
-  // same guarded fact, now read from the source of truth.
+  // One accent for the Console, not a colour per output: the SSE palette's
+  // Yellow since the visual overhaul (2026-10-03; it was the amber #f5a524).
+  // Read from the Console's --accent, which the workspace re-points.
   await expect
-    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim()))
-    .toBe("#f5a524");
+    .poll(() =>
+      workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim().toLowerCase())
+    )
+    .toBe("#f2de6f");
   await expect(workspace.getByText("Main Out").first()).toBeVisible();
   await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
   // 2026-05-27 redesign: the dense context bar was slimmed; AudioSignalCanvas
@@ -134,14 +134,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-topbar-sync")).toContainText("Sync from TotalMix");
   await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("solo engaged");
-  // Visual overhaul A, Slice 4: the latch is one 40 px row in the cluster
-  // (old: a 36 px band across the bay).
+  // The latch is one row in the cluster, the latch slot's height (56 px,
+  // docs/DESIGN.md section 2), never a band across the bay.
   await expect
     .poll(async () => {
       const box = await page.getByTestId("audio-solo-warning-band").boundingBox();
       return Math.round(box?.height ?? 0);
     })
-    .toBeLessThanOrEqual(44);
+    .toBeLessThanOrEqual(56);
   await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear all solo" }).click();
   await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
@@ -207,15 +207,13 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await page.getByTestId("audio-output-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
-  // 2026-05-27 redesign: per-output accents collapsed to the single amber
-  // accent; phones-a no longer recolours the accent to #e8a341. Asserted on
-  // --accent since 2026-09-09 (see the note at the first check); the
-  // [data-output-role] rule that re-declared --audio-accent for phones-a/-b
-  // was deleted with the dead hosts, so this is the guard that keeps the
-  // "one accent for every output role" decision honest.
+  // One accent for every output role: a phones mix does not recolour it. The
+  // guard that keeps that decision honest (see the note at the first check).
   await expect
-    .poll(() => workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim()))
-    .toBe("#f5a524");
+    .poll(() =>
+      workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim().toLowerCase())
+    )
+    .toBe("#f2de6f");
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toContainText("Phones 1");
   await page.getByTestId("audio-output-audio-mix-main").click();
   await expect(page.locator('[data-source-tier="outputs"]')).toBeVisible();

@@ -1,8 +1,10 @@
-/* Visual overhaul A, Slice 2: the shell grid (system §2, plan D4). Header 56,
-   cluster 424, plate 416, footer 40 at 2560×1440, every value a chrome
-   token scaled by the operator UI scale; the material is the A model (chassis
-   floor, plates with a top sheen, a recessed bay). Every colour here is a
-   token, so the chrome has one source. */
+/* The shell grid (system §2, plan D4). Header 56, cluster 424, plate 416,
+   footer 40 at 2560×1440, every value a chrome token scaled by the operator
+   UI scale. Visual overhaul 2026-10 (Atrium): one flat, matte surface —
+   header, cluster, bay, plate and footer are all the base, parted by 1 px
+   hairlines (header bottom, cluster right, plate left, footer top). No
+   gradient, no sheen, no shadow. Every colour here is a token, so the chrome
+   has one source. */
 
 .shell {
   display: grid;
@@ -29,7 +31,7 @@
   min-width: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--material-line);
-  background: linear-gradient(180deg, var(--material-panel-top), var(--material-bg));
+  background: var(--material-bg);
 }
 
 .wordmark {
@@ -40,21 +42,22 @@
   white-space: nowrap;
 }
 
+/* The product name: a display word, SSE Adelia in capitals. */
 .product {
-  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
-  letter-spacing: -0.01em;
+  font: 700 var(--font-size-word) / 1 var(--font-family-display);
+  letter-spacing: var(--font-tracking-display);
+  text-transform: uppercase;
   color: var(--text-text);
 }
 
 .eyebrow {
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
-  letter-spacing: 0.02em;
-  color: var(--text-text2);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
 }
 
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 8px;
   margin-left: 12px;
   flex: none;
 }
@@ -68,9 +71,10 @@
   overflow: hidden;
 }
 
+/* The clock is read during a take: PT Sans at word size, tabular digits. */
 .clock {
   margin-left: 12px;
-  font: 500 var(--font-size-value) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   color: var(--text-text);
   white-space: nowrap;
@@ -105,8 +109,7 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  background: var(--elevation-plate-fill);
-  box-shadow: var(--elevation-plate);
+  background: var(--material-bg);
 }
 
 .cluster {
@@ -128,6 +131,5 @@
   min-width: 0;
   overflow: hidden;
   padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
-  background: var(--material-bay);
-  box-shadow: var(--elevation-bay);
+  background: var(--material-bg);
 }

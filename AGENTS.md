@@ -55,7 +55,7 @@ Two rules hold the design together:
 ## Product rules
 
 - Windows at 2560×1440, fullscreen, and nothing else.
-- No keyboard shortcuts. Every control has a place on screen.
+- No keyboard shortcuts. Every action is reachable from a visible control: a key, or the ⋯ menu on its object. Nothing is right-click only, and controls used during a take stay keys.
 - No scrolling in normal operation.
 - One theme, Studio.
 - Words on screen never include "engine", "backend", "transport", "IPC" or "snapshot" (the Console's own "snapshot" excepted). The screen calls the engine "the hardware link".

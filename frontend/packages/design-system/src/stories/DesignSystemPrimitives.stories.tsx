@@ -39,7 +39,7 @@ const dColumn: React.CSSProperties = {
 
 const dDisplayName: React.CSSProperties = {
   fontFamily: "var(--font-family-ui)",
-  fontWeight: 600,
+  fontWeight: 700,
   fontSize: 16,
 };
 
@@ -49,7 +49,7 @@ const dPreviewLabel: React.CSSProperties = {
   letterSpacing: "0.24em",
   textTransform: "uppercase",
   color: "var(--color-warning-500)",
-  fontWeight: 600,
+  fontWeight: 700,
 };
 
 const dModYellow: React.CSSProperties = {
@@ -58,7 +58,7 @@ const dModYellow: React.CSSProperties = {
   letterSpacing: "0.24em",
   textTransform: "uppercase",
   color: "var(--color-brand-yellow)",
-  fontWeight: 600,
+  fontWeight: 700,
 };
 
 const meta = {

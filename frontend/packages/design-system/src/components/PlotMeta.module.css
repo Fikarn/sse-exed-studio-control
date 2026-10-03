@@ -22,7 +22,7 @@
 
   .value {
     color: var(--color-brand-text-primary);
-    font-weight: 500;
+    font-weight: 400;
   }
 
   .selected {

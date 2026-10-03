@@ -32,7 +32,7 @@
   /* A little room around the numeral: at 12 px a bare glyph fills its box, and
      a mark read on the strip floor should have floor around it. */
   padding: 1px 3px;
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   color: var(--text-text2);
   white-space: nowrap;
 }

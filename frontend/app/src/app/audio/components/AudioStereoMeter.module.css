@@ -225,7 +225,7 @@
   grid-column: 1 / -1;
   grid-row: 2;
   color: var(--audio-caption-muted);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
@@ -247,7 +247,7 @@
      it `0` and `-60` hang off the top and bottom of the meter. */
   bottom: clamp(6px, var(--meter-scale-position, 0%), calc(100% - 6px));
   color: var(--audio-caption-muted);
-  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   transform: translateY(50%);
   white-space: nowrap;

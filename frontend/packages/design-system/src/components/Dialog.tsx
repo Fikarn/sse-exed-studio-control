@@ -28,10 +28,12 @@ function getFocusableElements(container: HTMLElement) {
   );
 }
 
-// Visual overhaul A, Slice 3 (system §5 level +3, §9): a dialog is a plate
-// that floats over the scrim with the one large blur, a 24 px title, the
-// sentence in body type and sentence-case verbs on keys. Focus moves in on
-// mount, stays inside on Tab, and returns on unmount; Escape closes.
+// Visual overhaul A, Slice 3 (system §5, §9), restyled 2026-10 (Atrium): a
+// dialog is the floating layer (`data-level="float"`: the raised surface, a
+// key's edge, the float shadow) over a flat scrim, with a 20 px PT Sans
+// title in sentence case, the sentence in body type and sentence-case verbs
+// on keys at the right. Focus moves in on mount, stays inside on Tab, and
+// returns on unmount; Escape closes.
 //
 // New pages program, Slice 3 review: focus moves in once per opening. The
 // effect used to run again whenever `onClose` changed, and callers pass an

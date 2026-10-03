@@ -1,73 +1,90 @@
+/* Atrium: an icon button is a square key (28 or 36) — the flat face, a 1 px
+   edge, no shadow — with the icon in the second ink. Hover brightens the edge
+   and the icon; pressed is the engaged key, the yellow fill with black ink. */
 @layer components {
   .button {
+    appearance: none;
     align-items: center;
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-key);
-    color: var(--color-studio-100);
+    background: var(--material-key);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    color: var(--text-text2);
     cursor: pointer;
     display: inline-grid;
     flex: 0 0 auto;
     justify-items: center;
-    min-width: var(--size-compact-control-height);
+    padding: 0;
     place-items: center;
     position: relative;
-    transition:
-      background-color var(--motion-duration-exit) ease,
-      border-color var(--motion-duration-exit) ease,
-      color var(--motion-duration-exit) ease;
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
-  .button:hover {
-    border-color: var(--color-surface-border-strong);
-    color: var(--color-studio-050);
+  .button:hover:not(.primary, .danger, :disabled, [aria-pressed="true"]) {
+    border-color: var(--text-text4);
+    color: var(--text-text);
   }
 
+  .button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Disabled reads as a locked key: dashed at 55 %, no face. */
   .button:disabled {
     cursor: not-allowed;
-    opacity: 0.52;
-  }
-
-  /* DES-07: tokenized off the raw rgba() literals (sage green = primary-500,
-     Tailwind red = danger-500) onto the shared semantic tokens via color-mix so
-     these states match their accent text and theme across Studio/Graphite/Bone. */
-  .button[aria-pressed="true"] {
-    background: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
-    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
-    color: var(--color-accent-green);
+    opacity: 0.55;
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--material-line2);
   }
 
   /* Visual overhaul A, Slice 11 (system §10: every enabled target is at least
-     24 px on its short side). Both of these asked for a size token that was
-     never generated — the sheet spelled it `--size-compactControlHeight`, and
-     Style Dictionary writes kebab-case — so `.sm` set nothing and a small icon
-     button fell back to the user agent's own padding: 32 × 22, two pixels under
-     the floor. The token exists now and `.sm` is the square it always said it
-     was. */
+     24 px on its short side). Atrium: the two squares are the key's own
+     heights, small 28 and default 36. */
   .sm {
-    height: var(--size-compact-control-height);
-    width: var(--size-compact-control-height);
+    height: 28px;
+    width: 28px;
   }
 
   .md {
-    height: var(--size-control-height);
-    width: var(--size-control-height);
+    height: 36px;
+    width: 36px;
+  }
+
+  .default {
+    background: var(--material-key);
   }
 
   .primary {
-    background: color-mix(in srgb, var(--color-primary-500) 16%, transparent);
-    border-color: color-mix(in srgb, var(--color-primary-500) 42%, transparent);
+    background: var(--role-primary-fill);
+    border-color: var(--role-primary-fill);
+    color: var(--role-primary-ink);
+  }
+
+  .primary:disabled {
+    color: var(--text-text);
   }
 
   .danger {
-    background: color-mix(in srgb, var(--color-danger-500) 12%, transparent);
-    border-color: color-mix(in srgb, var(--color-danger-500) 32%, transparent);
+    border-color: var(--role-coral-text);
+    color: var(--role-coral-text);
   }
 
   .ghost {
     background: transparent;
     border-color: transparent;
-    color: var(--color-studio-300);
+  }
+
+  /* A ghost takes the face and the edge only under the pointer. */
+  .ghost:hover:not(:disabled, [aria-pressed="true"]) {
+    background: var(--material-key);
+  }
+
+  /* Pressed: the engaged key, the lit yellow fill with black ink. */
+  .button[aria-pressed="true"] {
+    background: var(--role-yellow-fill);
+    border-color: var(--role-yellow-fill);
+    color: var(--role-yellow-ink);
   }
 
   .icon {
@@ -75,14 +92,14 @@
     width: 18px;
   }
 
+  /* A count that needs a look: a small yellow tag with black figures. */
   .badge {
     align-items: center;
-    background: var(--color-accent-amber);
-    border-radius: var(--radius-pill);
-    color: var(--color-background-950);
+    background: var(--role-yellow-fill);
+    border-radius: var(--radius-base);
+    color: var(--role-yellow-ink);
     display: inline-flex;
-    font-size: var(--font-size-tick);
-    font-weight: 700;
+    font: var(--font-weight-bold) var(--font-size-tick) / var(--font-line-height-tight) var(--font-family-ui);
     height: 16px;
     justify-content: center;
     min-width: 16px;

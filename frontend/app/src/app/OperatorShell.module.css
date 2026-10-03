@@ -39,7 +39,7 @@
 
 .cardTitle {
   margin: 0 0 6px;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -71,7 +71,7 @@
 }
 
 .checkHeading {
-  font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-body)) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-body)) / 1 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -110,18 +110,18 @@ button.lightingDmxDrawerCell {
 .metaLabel {
   margin-bottom: 8px;
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   text-transform: uppercase;
   letter-spacing: 0;
 }
 
 .metaValue {
-  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-value)) / 1.3 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--operator-font-size-lg, var(--font-size-value)) / 1.3 var(--font-family-mono);
   letter-spacing: 0;
 }
 
 .summaryValue {
-  font: var(--font-weight-semibold) var(--operator-font-size-title-md, 18px) / 1.2 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--operator-font-size-title-md, 18px) / 1.2 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -154,14 +154,14 @@ button.lightingDmxDrawerCell {
 
 .setupUtilityEyebrow {
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .setupUtilityTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-title-lg, 22px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -230,7 +230,7 @@ button.lightingDmxDrawerCell {
   /* Visual overhaul A, Slice 7: the chassis ink, which clears 4.5:1 on the
      plate in every theme (the retired subtle ink did not). */
   color: var(--text-text2);
-  font: var(--font-weight-medium) var(--operator-font-size-md, var(--font-size-body)) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--operator-font-size-md, var(--font-size-body)) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -239,14 +239,14 @@ button.lightingDmxDrawerCell {
 .setupIncidentSectionLabel,
 .setupIncidentMetaLabel {
   color: var(--text-text2);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .setupIncidentTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -285,7 +285,7 @@ button.lightingDmxDrawerCell {
 }
 
 .setupIncidentMetaValue {
-  font: var(--font-weight-semibold) var(--operator-font-size-lg, var(--font-size-value)) / 1.25 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--operator-font-size-lg, var(--font-size-value)) / 1.25 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -393,7 +393,7 @@ button.lightingDmxDrawerCell {
 .setupIncidentCheckTitle {
   /* SET-12: aligned with the support pilot's .checkTitle (strong text; Inter
      since 2026-09-28, when Fraunces went). */
-  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-ui);
   color: var(--color-text-strong);
   letter-spacing: 0;
 }
@@ -421,7 +421,7 @@ button.lightingDmxDrawerCell {
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-text-muted);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
 }
 
 .setupIncidentRailButton:hover {
@@ -433,14 +433,14 @@ button.lightingDmxDrawerCell {
    muted/ui defaults above without splitting them. */
 .setupIncidentBackupRow strong {
   display: block;
-  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-mono);
   color: var(--color-text-strong);
   letter-spacing: 0;
 }
 
 .setupIncidentBackupRow small {
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1.4 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1.4 var(--font-family-mono);
 }
 
 .stateShell {
@@ -462,14 +462,14 @@ button.lightingDmxDrawerCell {
 .stateEyebrow {
   margin-bottom: 8px;
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .stateTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-title-xl, 34px) / 1.05 var(--font-family-ui);
   letter-spacing: 0;
 }
 
@@ -486,7 +486,7 @@ button.lightingDmxDrawerCell {
 }
 
 .stepLabel {
-  font: var(--font-weight-semibold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--operator-font-size-md, var(--font-size-body)) / 1.3 var(--font-family-mono);
   letter-spacing: 0;
 }
 
@@ -524,7 +524,7 @@ button.lightingDmxDrawerCell {
 
 .pathKey {
   color: var(--color-text-subtle);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -567,7 +567,7 @@ button.lightingDmxDrawerCell {
 
 .dialogTitle {
   margin: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-title-lg, 28px) / 1.15 var(--font-family-ui);
   letter-spacing: 0;
 }
 

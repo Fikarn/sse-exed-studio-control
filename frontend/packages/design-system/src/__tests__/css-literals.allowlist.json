@@ -96,7 +96,7 @@
     "shadow": 0
   },
   "packages/design-system/src/components/ColorPicker.module.css": {
-    "colour": 5,
+    "colour": 4,
     "fontSize": 0,
     "radius": 0,
     "shadow": 3
@@ -119,12 +119,6 @@
     "radius": 0,
     "shadow": 1
   },
-  "packages/design-system/src/components/NumberEntryDialog.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 1
-  },
   "packages/design-system/src/components/PlotPill.module.css": {
     "colour": 0,
     "fontSize": 0,
@@ -135,12 +129,6 @@
     "colour": 0,
     "fontSize": 0,
     "radius": 3,
-    "shadow": 0
-  },
-  "packages/design-system/src/components/SegmentedControl.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 0,
     "shadow": 0
   },
   "packages/design-system/src/components/StatusDot.module.css": {

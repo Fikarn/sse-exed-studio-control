@@ -22,7 +22,7 @@
 }
 
 .tag {
-  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
   letter-spacing: var(--font-tracking-cap);
 }
 
@@ -31,7 +31,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -45,13 +45,13 @@
 
 .label {
   color: var(--display-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   letter-spacing: var(--font-tracking-eyebrow);
   text-transform: uppercase;
 }
 
 .value {
-  font: 600 var(--font-size-name) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-name) / 1 var(--font-family-mono);
 }
 
 .foot {
@@ -62,13 +62,13 @@
 }
 
 .locked {
-  color: var(--role-amber-text);
-  font: 500 var(--font-size-label) / 1.35 var(--font-family-ui);
+  color: var(--role-yellow-text);
+  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
 }
 
 .waiting {
   grid-column: 1 / -1;
   margin: 0;
   color: var(--display-text2);
-  font: 500 var(--font-size-body) / 1.4 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.4 var(--font-family-ui);
 }

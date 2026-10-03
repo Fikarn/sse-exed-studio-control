@@ -39,7 +39,7 @@
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .headCount {
@@ -169,7 +169,7 @@
 
 .masterName {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 17px;
   color: var(--color-brand-text-primary);
   white-space: nowrap;
@@ -245,7 +245,7 @@
   font-feature-settings: "tnum", "zero";
   font-size: var(--font-size-tick);
   color: var(--color-brand-green);
-  font-weight: 600;
+  font-weight: 700;
   min-width: 36px;
   text-align: right;
 }
@@ -329,7 +329,7 @@
   color: var(--color-danger-500);
   font-family: var(--font-family-ui);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0;
   cursor: pointer;
 }
@@ -524,7 +524,7 @@
 
 .tileName {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
   color: var(--color-brand-text-primary);
   white-space: nowrap;
@@ -543,7 +543,7 @@
   letter-spacing: 0;
   text-transform: uppercase;
   color: var(--color-brand-green);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .tileBadgeDot {
@@ -687,7 +687,7 @@
   background: transparent;
   border: none;
   padding: 0;
-  font: var(--font-weight-semibold) var(--operator-font-size-md, 12px) / 1.55 var(--font-family-ui);
+  font: var(--font-weight-bold) var(--operator-font-size-md, 12px) / 1.55 var(--font-family-ui);
   letter-spacing: 0;
   color: var(--color-brand-green);
   cursor: pointer;
@@ -695,7 +695,7 @@
 }
 
 .emptyAction:hover {
-  color: var(--color-brand-green-bright, var(--color-brand-green));
+  color: var(--color-brand-green);
 }
 
 .groupGrid {
@@ -814,7 +814,7 @@
 }
 
 .groupChipName {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .groupChipCount {
@@ -829,7 +829,7 @@
   font-size: var(--font-size-tick);
   color: var(--color-brand-green);
   font-feature-settings: "tnum", "zero";
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .groupChipLevelDrifted {
@@ -869,7 +869,7 @@
 
 .actionYellow {
   color: var(--color-brand-yellow);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .actionYellow:hover:not(:disabled) {
@@ -879,7 +879,7 @@
 
 .actionAlt {
   color: var(--color-brand-text-muted);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .actionAlt:hover:not(:disabled) {

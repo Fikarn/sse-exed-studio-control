@@ -78,7 +78,11 @@ export const STATE_DISPLAY_X_TOLERANCE_PX = 8;
 export const TARGETS = {
   minFontSize: 12,
   maxFontSizes: 8,
-  families: ["Inter", "JetBrains Mono"],
+  // The brand's faces (section 3). A picture (`data-picture`: the glass, a
+  // camera's picture) is the presenter's or the camera's and is not counted.
+  families: ["PT Sans", "PT Serif", "SSE Adelia"],
+  // PT Sans and PT Serif have these two weights, SSE Adelia only the second.
+  weights: ["400", "700"],
   minTarget: 24,
   minTake: 28,
 };
@@ -91,8 +95,12 @@ export const LIMITS = {
   minFontSize: TARGETS.minFontSize,
   /** At most this many type sizes on one board. */
   sizeCount: TARGETS.maxFontSizes,
-  /** Texts set in a family other than the two. */
+  /** Texts set in a family other than the brand's three. */
   offFamilyText: 0,
+  /** Texts set in a weight other than 400 and 700. */
+  offWeightText: 0,
+  /** Faces asked for that did not load (SSE Adelia is judged only where it is installed, on Windows). */
+  facesMissing: 0,
   radiiOff: 0,
   smallTargets: 0,
   smallTake: 0,

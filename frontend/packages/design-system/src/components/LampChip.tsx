@@ -2,10 +2,11 @@ import { Lamp, type LampTone } from "./Lamp";
 import type { SharedStatusTone } from "./statusTone";
 import styles from "./LampChip.module.css";
 
-// Visual overhaul A, Slice 2 (system §7): the header chip — a lamp, the
-// subsystem's name and its state word within 8 px. `attention` chips are
-// amber-keylined, `error` chips red; a latch (Solo, Scene unsaved) is an
-// attention chip that names a latched state rather than a subsystem, and a
+// Visual overhaul A, Slice 2 (system §7); Atrium: the header chip — the
+// subsystem's name in the quiet ink, then the lamp and its state word in SSE
+// Adelia in the tone's colour, within 8 px. No box at rest; a clickable chip
+// shows its edge under the pointer. A latch (Solo, Scene unsaved) is a chip
+// that names a latched state rather than a subsystem (`data-latch`), and a
 // green one (Prompter playing, new pages program Slice 6a) names something
 // running.
 export interface LampChipProps {
@@ -28,8 +29,8 @@ export const LampChip = ({ label, word, tone, latch, onClick, title, ariaLabel, 
   const classes = [styles.chip, styles[tone], className].filter(Boolean).join(" ");
   const content = (
     <>
-      <Lamp tone={lampToneFor(tone)} />
       <b className={styles.label}>{label}</b>
+      <Lamp tone={lampToneFor(tone)} />
       {word ? <span className={styles.word}>{word}</span> : null}
     </>
   );

@@ -222,7 +222,7 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
             y={ghost.y - 19}
             textAnchor="middle"
             fontSize={12}
-            fontWeight={600}
+            fontWeight={700}
             style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
           >
             {formatMeters(ghost.x)} m, {formatMeters(ghost.y)} m

@@ -45,11 +45,23 @@ describe("Tab", () => {
     expect(tab.querySelector("kbd")).toBeNull();
   });
 
-  it("marks the active tab as the current page and a machined key", () => {
+  it("marks the active tab as the current page (its `data-material` hook stays)", () => {
     render(<Tab id="audio" label="Audio" active />);
     const tab = screen.getByRole("button", { name: "Audio" });
     expect(tab).toHaveAttribute("aria-current", "page");
     expect(tab).toHaveAttribute("data-material", "key");
+  });
+
+  // Visual overhaul 2026-10 (Atrium): a tab has no box at rest; the active
+  // tab is the selection, the 2 px Beige keyline, in the main ink and bold;
+  // hover changes only the ink.
+  it("draws the active tab with the 2 px selection keyline and hover with ink only", () => {
+    const css = cssOf("Tab.module.css");
+    expect(css).toMatch(/\.tab \{[^}]*color: var\(--text-text3\)/);
+    expect(css).toMatch(/\.active \{[^}]*color: var\(--text-text\);[^}]*font-weight: 700/);
+    expect(css).toMatch(/\.active::after \{[^}]*border: 2px solid var\(--accent\)/);
+    expect(css).toMatch(/:hover \{\s*color: var\(--text-text2\);\s*\}/);
+    expect(css).not.toMatch(/--radius-key|--elevation-/);
   });
 
   it("a locked tab is aria-disabled, disabled and does not fire", () => {
@@ -119,6 +131,19 @@ describe("Footer", () => {
   // edge; with them gone the action pushes itself there.
   it("keeps the action key at the right edge", () => {
     expect(cssOf("Footer.module.css")).toMatch(/\.action \{[^}]*margin-left: auto/);
+  });
+
+  // Visual overhaul 2026-10 (Atrium): the footer is the flat base under a
+  // hairline; its facts are quiet PT Sans at label size, 40 px apart.
+  it("is the flat base under a hairline, with quiet facts 40 px apart", () => {
+    const css = cssOf("Footer.module.css");
+    expect(css).toMatch(
+      /\.footer \{[^}]*border-top: 1px solid var\(--material-line\);[^}]*background: var\(--material-bg\)/
+    );
+    expect(css).toMatch(/\.items \{[^}]*gap: 40px/);
+    expect(css).toMatch(/\.label \{\s*color: var\(--text-text3\)/);
+    expect(css).toMatch(/\.value \{[^}]*color: var\(--text-text2\)/);
+    expect(css).not.toMatch(/gradient\(|--font-family-mono|--material-panel/);
   });
 
   // Visual overhaul A, Slice 4a: a workspace that swaps its health bar for this

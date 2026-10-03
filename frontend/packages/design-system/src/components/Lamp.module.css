@@ -1,30 +1,35 @@
 @layer components {
+  /* A lamp is a circle and nothing else: no bloom, no ramp. Unlit it is
+     hollow (a 1 px ring in the quiet ink); lit it is filled with its tone. The
+     ring is a border, not an inset shadow, so the lamp carries no shadow. */
   .lamp {
     display: inline-block;
+    box-sizing: border-box;
     width: 8px;
     height: 8px;
     border-radius: var(--radius-pill);
-    background: var(--material-line2);
+    border: 1px solid var(--text-text3);
+    background: transparent;
     flex: none;
   }
 
   .ok {
+    border-color: var(--role-green-text);
     background: var(--role-green-text);
-    box-shadow: var(--elevation-lamp-green);
   }
 
   .attention {
-    background: var(--role-amber-text);
-    box-shadow: var(--elevation-lamp-amber);
+    border-color: var(--role-yellow-text);
+    background: var(--role-yellow-text);
   }
 
   .error {
-    background: var(--role-red-text);
-    box-shadow: var(--elevation-lamp-red);
+    border-color: var(--role-coral-text);
+    background: var(--role-coral-text);
   }
 
   .info {
+    border-color: var(--role-blue-text);
     background: var(--role-blue-text);
-    box-shadow: var(--elevation-lamp-blue);
   }
 }

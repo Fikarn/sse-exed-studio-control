@@ -2,14 +2,15 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import styles from "./Well.module.css";
 
-// Visual overhaul A, Slice 3 (system §5, §7): a well is a black backlit
-// display — whatever is printed on it uses the display inks
-// (the `.well, [data-well]` scope in wells.css). Readout, Field and Screen
-// are wells; Slider, Groove and Meter live in their own files.
+// The wells (the Atrium look): a black display one step down from the
+// surface, a 1 px hairline edge, the one radius, flat. Field and Screen are
+// wells; a Readout is the value itself in PT Sans, its unit at half size, a
+// dashed yellow keyline round it in doubt. Slider, Groove and Meter live in
+// their own files.
 
 export interface WellProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
-  /** 12 px radius for the state display, screens and plots; 8 px otherwise. */
+  /** Kept for the pages: every well takes the one radius now. */
   radius?: "key" | "screen";
 }
 
@@ -22,13 +23,15 @@ export function Well({ children, className, radius = "key", ...rest }: WellProps
 }
 
 export interface ReadoutProps extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
-  /** The printed value with sign and unit (`-3.8 dB`); `—` when empty. */
+  /** The printed value (`-3.8 dB`, or `-3.8` with `unit`); `—` when empty. */
   value?: ReactNode;
-  /** The desk has not confirmed this value: a dashed amber keyline. */
+  /** The value's unit (`dB`, `%`), printed after it at half size in the quiet ink. */
+  unit?: ReactNode;
+  /** The desk has not confirmed this value: a dashed yellow keyline round it. */
   doubt?: boolean;
   /** No signal to print: the readout prints `—`. */
   empty?: boolean;
-  /** 20 px word (default) or the 44 px hero. */
+  /** 20 px word (default), the 40 px hero, or the 16 px value. */
   size?: "word" | "hero" | "value";
   align?: "center" | "right";
   testId?: string;
@@ -36,6 +39,7 @@ export interface ReadoutProps extends Omit<HTMLAttributes<HTMLDivElement>, "chil
 
 export function Readout({
   value,
+  unit,
   doubt = false,
   empty = false,
   size = "word",
@@ -46,15 +50,7 @@ export function Readout({
 }: ReadoutProps) {
   return (
     <div
-      className={[
-        styles.well,
-        styles.key,
-        styles.readout,
-        styles[size],
-        styles[align],
-        doubt ? styles.doubt : "",
-        className,
-      ]
+      className={[styles.readout, styles[size], styles[align], doubt ? styles.doubt : "", className]
         .filter(Boolean)
         .join(" ")}
       data-well=""
@@ -63,7 +59,15 @@ export function Readout({
       data-testid={testId}
       {...rest}
     >
-      {empty ? "—" : value}
+      {empty ? (
+        "—"
+      ) : unit ? (
+        <span>
+          {value} <span className={styles.unit}>{unit}</span>
+        </span>
+      ) : (
+        value
+      )}
     </div>
   );
 }
@@ -92,7 +96,7 @@ export interface ScreenProps extends HTMLAttributes<HTMLDivElement> {
   children?: ReactNode;
   /** The screen's header row (title, sub, keys), above the picture. */
   head?: ReactNode;
-  /** A blue keyline: editing offline (PREVIEW). */
+  /** A blue edge: editing offline (PREVIEW). */
   info?: boolean;
   testId?: string;
 }

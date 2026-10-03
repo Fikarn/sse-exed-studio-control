@@ -48,7 +48,7 @@
   position: absolute;
   z-index: 1;
   color: var(--audio-caption-muted);
-  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   pointer-events: none;
 }
@@ -96,14 +96,14 @@
 
 .dynamicsReadoutCluster small {
   color: var(--audio-caption-muted);
-  font: var(--font-weight-medium) var(--audio-type-micro) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .dynamicsReadoutCluster strong {
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--font-size-tick) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
@@ -206,7 +206,7 @@
 
 .processingControl span {
   color: var(--fg-3);
-  font: var(--font-weight-semibold) var(--audio-type-micro) / 1 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--audio-type-micro) / 1 var(--font-family-mono);
   letter-spacing: 0;
   text-transform: uppercase;
 }
@@ -215,7 +215,7 @@
   justify-self: end;
   min-width: 0;
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0;
   white-space: nowrap;
 }

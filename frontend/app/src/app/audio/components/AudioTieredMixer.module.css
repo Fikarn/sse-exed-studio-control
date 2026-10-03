@@ -75,7 +75,7 @@
 }
 
 .tierTitle {
-  font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
   color: var(--text-text);
   flex: none;
 }
@@ -108,8 +108,8 @@
 
 /* The lock note stands on the tier the hand is reaching for. */
 .tierLockNote {
-  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--role-amber-text);
+  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--role-yellow-text);
   /* Visual overhaul A, Slice 10: a tier is as wide as its strips (the note at
      the top of this file), so nothing in its head may set that width. This note
      would not shrink, so a head carrying one ran 170 px wider than the four
@@ -124,7 +124,7 @@
 }
 
 .tierLockNote[data-tone="error"] {
-  color: var(--role-red-text);
+  color: var(--role-coral-text);
 }
 
 .tierChipRow {
@@ -141,14 +141,14 @@
   border-radius: var(--radius-ctl);
   background: transparent;
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   cursor: pointer;
 }
 
 .tierChip[data-active="true"] {
-  border-color: var(--role-amber-line);
-  background: var(--role-amber-fill-top);
-  color: var(--role-amber-text);
+  border-color: var(--role-yellow-line);
+  background: var(--role-yellow-fill-top);
+  color: var(--role-yellow-text);
 }
 
 .tierMeterEyebrow {
@@ -164,7 +164,7 @@
 .tierMeterSimChip {
   font-family: var(--font-mono);
   font-size: var(--audio-type-micro);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 2px 6px;
@@ -194,7 +194,7 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
   line-height: 1;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 4px 8px;

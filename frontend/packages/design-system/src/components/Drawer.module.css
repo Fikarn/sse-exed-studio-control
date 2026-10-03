@@ -1,3 +1,8 @@
+/* The drawer (system §5). Visual overhaul 2026-10 (Atrium): the floating
+   layer docked at the right edge under the header — the raised surface, a
+   1 px key edge on its open side, the float shadow (`data-level="float"`),
+   no backdrop blur. Docked to the screen's edge, its corners are square
+   (radius 0). It enters in 200 ms with an 8 px rise and a fade. */
 @layer components {
   .drawer {
     position: fixed;
@@ -10,7 +15,8 @@
     gap: 16px;
     padding: 20px 16px;
     border-left: 1px solid var(--material-line2);
-    background: var(--elevation-plate-fill);
+    border-radius: 0;
+    background: var(--material-raise);
     box-shadow: var(--elevation-float);
     color: var(--text-text);
     outline: none;
@@ -43,35 +49,47 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    min-width: 0;
   }
 
+  /* Sentence case in PT Sans: the title may hold a name, so it never wraps. */
   .title {
     margin: 0;
-    font: 600 var(--font-size-state) / 1.1 var(--font-family-mono);
-    letter-spacing: -0.01em;
+    min-width: 0;
+    font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
+    color: var(--text-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .actions {
     display: inline-flex;
     gap: 8px;
     align-items: center;
+    flex: none;
   }
 
+  /* Close: a small key — the key's face, a 1 px edge that brightens on hover. */
   .close {
     appearance: none;
-    min-height: 32px;
-    padding: 0 12px;
-    border-radius: var(--radius-key);
-    border: 1px solid var(--material-line);
-    background: var(--elevation-key-fill);
-    box-shadow: var(--elevation-key);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: var(--radius-base);
+    border: 1px solid var(--material-line2);
+    background: var(--material-key);
     color: var(--text-text);
-    font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+    font: 700 var(--font-size-label) / 1 var(--font-family-ui);
+    white-space: nowrap;
     cursor: pointer;
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
   .close:hover {
-    border-color: var(--material-line2);
+    border-color: var(--text-text4);
   }
 
   .close:focus-visible {
@@ -85,5 +103,7 @@
     gap: 16px;
     min-height: 0;
     overflow: auto;
+    color: var(--text-text2);
+    font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
   }
 }

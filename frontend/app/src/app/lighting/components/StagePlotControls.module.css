@@ -51,7 +51,7 @@
 }
 
 .renderModeGroup :global(button) {
-  min-width: var(--operator-stage-control-render-mode-width, 68px);
+  min-width: 68px;
   min-height: var(--operator-stage-control-height, 26px);
   padding: 0 calc(7px * var(--operator-ui-scale-factor, 1));
   font-family: var(--font-family-mono);
@@ -71,7 +71,7 @@
   cursor: pointer;
   font-family: var(--font-family-mono);
   font-size: var(--operator-font-size-xs, var(--font-size-tick));
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   transition:
@@ -177,7 +177,7 @@
   font-family: var(--font-family-mono);
   font-feature-settings: "tnum", "zero";
   font-size: var(--operator-font-size-xs, var(--font-size-tick));
-  font-weight: 600;
+  font-weight: 700;
   height: var(--operator-stage-control-height, 26px);
   letter-spacing: 0;
   line-height: 1;

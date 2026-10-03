@@ -1,55 +1,80 @@
+/* Atrium: the Segmented look. One outlined row (the key's face, a 1 px edge)
+   of flat segments split by hairline rules, PT Sans in the second ink; the
+   checked one is the lit yellow fill with black ink. Only the end segments
+   are rounded, so a focus ring is never clipped. */
 @layer components {
   .control {
-    align-items: center;
-    background: var(--color-surface-soft);
-    border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-key);
+    align-items: stretch;
+    background: var(--material-key);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
     display: inline-grid;
-    gap: 2px;
+    gap: 0;
     grid-auto-flow: column;
-    padding: 2px;
+    padding: 0;
   }
 
+  /* The row is as tall as a key: regular 36, compact 28. */
   .regular {
-    min-height: var(--size-control-height);
+    min-height: 36px;
   }
 
   .compact {
-    min-height: var(--size-compact-control-height);
+    min-height: 28px;
   }
 
   .segment {
+    appearance: none;
     align-items: center;
     background: transparent;
-    border: 1px solid transparent;
-    /* Slice 11: an inset segment used to sit 2 px inside its well's radius,
-       which computed to 6 px — a fifth radius. §5 allows four. */
-    border-radius: var(--radius-ctl);
-    color: var(--color-studio-300);
+    border: 0;
+    border-left: 1px solid var(--material-line2);
+    border-radius: 0;
+    color: var(--text-text2);
     cursor: pointer;
     display: inline-flex;
-    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-tick)) / 1 var(--font-family-mono);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     justify-content: center;
     letter-spacing: 0;
-    min-height: calc(var(--size-compact-control-height) - 6px);
+    margin: 0;
     min-width: 88px;
-    padding: 0 var(--space-5);
-    transition:
-      background-color var(--motion-duration-exit) ease,
-      border-color var(--motion-duration-exit) ease,
-      color var(--motion-duration-exit) ease;
-    text-transform: uppercase;
+    padding: 0 14px;
     white-space: nowrap;
   }
 
-  .segment[aria-checked="true"] {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: var(--color-surface-border-strong);
-    color: var(--color-studio-050);
+  .segment:first-child {
+    border-left: 0;
+    border-top-left-radius: var(--radius-base);
+    border-bottom-left-radius: var(--radius-base);
+  }
+
+  .segment:last-child {
+    border-top-right-radius: var(--radius-base);
+    border-bottom-right-radius: var(--radius-base);
+  }
+
+  .compact .segment {
+    font-size: var(--font-size-label);
+    padding: 0 10px;
+  }
+
+  /* Hover lifts the word to the main ink; nothing moves. */
+  .segment:hover:not(:disabled, [aria-checked="true"]) {
+    color: var(--text-text);
+  }
+
+  .segment:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .segment:disabled {
+    color: var(--text-text4);
     cursor: not-allowed;
-    opacity: 0.45;
+  }
+
+  .segment[aria-checked="true"] {
+    background: var(--role-yellow-fill);
+    color: var(--role-yellow-ink);
   }
 }

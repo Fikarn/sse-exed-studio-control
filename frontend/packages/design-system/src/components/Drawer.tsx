@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 
 import styles from "./Drawer.module.css";
 
-// Visual overhaul A, Slice 3 (system §5 level +3): a plate that floats over
-// the bay from the right — the only large blur on screen. Escape closes it,
-// focus moves in on open and back on close; it is not modal, so the
-// operator can keep riding the console beside it.
+// Visual overhaul A, Slice 3 (system §5), restyled 2026-10 (Atrium): the
+// floating layer (`data-level="float"`) docked over the bay at the right,
+// with a 20 px PT Sans title and a small Close key. Escape closes it, focus
+// moves in on open and back on close; it is not modal, so the operator can
+// keep riding the console beside it.
 export interface DrawerProps {
   open: boolean;
   title: ReactNode;

@@ -116,7 +116,7 @@
 
 .plotPillName {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: var(--operator-font-size-lg, 13px);
 }
 

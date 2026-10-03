@@ -46,7 +46,7 @@
 }
 
 .slotName {
-  font: 600 var(--font-size-name) / 1.1 var(--font-family-ui);
+  font: 700 var(--font-size-name) / 1.1 var(--font-family-ui);
   color: inherit;
   white-space: nowrap;
   overflow: hidden;
@@ -55,13 +55,13 @@
 }
 
 .slotState {
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   color: var(--text-text2);
 }
 
 /* Changed since it was loaded: doubt, so amber (system §4). */
 .slotState[data-state="changed"] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .slot[data-current="true"] .slotKey {
@@ -72,7 +72,7 @@
 .source {
   display: block;
   margin-top: 8px;
-  font: 500 var(--font-size-tick) / 1.25 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.25 var(--font-family-ui);
   color: var(--text-text2);
   white-space: nowrap;
   overflow: hidden;

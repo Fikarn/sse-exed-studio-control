@@ -42,12 +42,12 @@
   border-radius: var(--radius-key);
   background: var(--material-well);
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .speedReadout b {
   color: var(--display-text);
-  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
 }
 
 .steps {
@@ -89,7 +89,7 @@
   border-radius: var(--radius-ctl);
   background: none;
   color: var(--display-text);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   text-align: left;
   cursor: pointer;
 }
@@ -109,7 +109,7 @@
 
 .paragraphNumber {
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
   text-align: center;
 }
 
@@ -125,7 +125,7 @@
 
 .paragraphLength {
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
 }
 
 /* Open file… · Paste as a new script · New script, each as wide as its
@@ -150,7 +150,7 @@
 .reopened {
   margin: 0;
   color: var(--text-text);
-  font: 500 var(--font-size-body) / 1.45 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.45 var(--font-family-ui);
 }
 
 .fileInput {

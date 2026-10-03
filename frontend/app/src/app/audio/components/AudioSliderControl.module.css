@@ -235,7 +235,7 @@
   /* Slice 9 (system §5): a lit cap blooms at 14 px (amber). */
   box-shadow:
     0 2px 4px var(--material-shade),
-    0 0 14px var(--role-amber-bloom),
+    0 0 14px var(--role-yellow-bloom),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 

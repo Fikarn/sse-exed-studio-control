@@ -21,6 +21,11 @@ import {
 // everywhere.
 export const SAMPLES_CONTRAST = process.platform === "win32";
 
+// SSE Adelia is SSE's licensed face: it is installed on the studio PC and never
+// committed (docs/DESIGN.md section 3), so CI's runner falls back to PT Serif.
+// Whether it loaded is judged where it is installed.
+export const ADELIA_INSTALLED = process.platform === "win32";
+
 /**
  * Navigate a page to a fixture board and let it settle: hydration, fonts, then
  * one second for transitions to end so the idle animation count is honest.
@@ -90,6 +95,8 @@ export function summarize(c, contrast) {
   const smallTargets = enabled.filter((t) => t.minSide < TARGETS.minTarget);
   const smallTake = take.filter((t) => t.minSide < TARGETS.minTake);
   const offFamily = c.families.filter(([f]) => !TARGETS.families.includes(f)).reduce((n, [, k]) => n + k, 0);
+  const offWeight = c.weights.filter(([w]) => !TARGETS.weights.includes(String(w))).reduce((n, [, k]) => n + k, 0);
+  const facesMissing = c.facesUnloaded.filter((face) => ADELIA_INSTALLED || !face.endsWith("|SSE Adelia"));
   const regionsOff = [];
   const regionsPresent = [];
   for (const r of c.regions) {
@@ -107,6 +114,11 @@ export function summarize(c, contrast) {
     sizeCount: c.fontSizes.length,
     families: c.families.map(([f, n]) => `${f}:${n}`).join(" "),
     offFamilyText: offFamily,
+    weights: c.weights.map(([w, n]) => `${w}:${n}`).join(" "),
+    offWeightText: offWeight,
+    faces: c.faces.join(" "),
+    facesMissing: facesMissing.length,
+    facesMissingList: facesMissing.join(" "),
     uppercase: c.uppercase,
     bold: c.weights.filter(([w]) => parseInt(w, 10) >= 700).reduce((a, [, n]) => a + n, 0),
     targets: c.targets.length,
@@ -160,6 +172,11 @@ export function checkLimits(measures, limits) {
   atLeast("minFontSize");
   atMost("sizeCount");
   atMost("offFamilyText");
+  atMost("offWeightText");
+  if (measures.facesMissing > limits.facesMissing)
+    problems.push(
+      `facesMissing: ${measures.facesMissing} (${measures.facesMissingList}), and the limit is ${limits.facesMissing}`
+    );
   atMost("radiiOff");
   atMost("smallTargets");
   atMost("smallTake");
