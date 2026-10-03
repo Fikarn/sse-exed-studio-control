@@ -94,26 +94,20 @@ export function sceneMatchesFixtures(
 }
 
 /** Chrome-level live drift (GLO-09): a dirty preview session (engine-flagged)
- *  or the current rig diverging from the last-recalled scene. Deliberately
- *  ignores the lighting workspace's local inspector-selection state — the
- *  shell chip reports the operator-facing rig truth, while the workspace
- *  guard/title keep their richer selection-aware computation. */
+ *  or the rig no longer holding the live scene. Since 2026-10-03 the hardware
+ *  link decides the latter once, for the screen and the Stream Deck's RECALL
+ *  alike (`lighting.snapshot`'s `sceneState`, `unsaved`); until then this
+ *  page compared the fixtures itself. Deliberately ignores the lighting
+ *  workspace's local inspector-selection state — the shell chip reports the
+ *  operator-facing rig truth, while the workspace guard/title keep their
+ *  richer selection-aware computation. The catalog is no longer read. */
 export function computeLiveSceneDrift(
   lightingSnapshot: LightingSnapshot | null,
-  catalog: LightingFixtureCatalogSnapshot | null
+  _catalog?: LightingFixtureCatalogSnapshot | null
 ): boolean {
   if (!lightingSnapshot) return false;
   // The shell evaluates this on every snapshot state, including partial
-  // hydration where the typed arrays may not exist yet — stay defensive
-  // (the workspace only computes drift after the surface has hydrated).
+  // hydration where a field may not exist yet — stay defensive.
   if (lightingSnapshot.previewMode) return lightingSnapshot.previewDirty === true;
-  // Mirror the workspace's liveActiveSceneId precedence: the per-scene
-  // lastRecalled flag is the engine truth (fixture snapshots may omit the
-  // top-level lastRecalledSceneId field entirely).
-  const scenes = lightingSnapshot.scenes ?? [];
-  const scene =
-    scenes.find((entry) => entry.lastRecalled) ??
-    scenes.find((entry) => entry.id === lightingSnapshot.lastRecalledSceneId);
-  if (!scene || !Array.isArray(scene.fixtureStates)) return false;
-  return !sceneMatchesFixtures(lightingSnapshot.fixtures ?? [], scene, catalog);
+  return lightingSnapshot.sceneState === "unsaved";
 }

@@ -68,20 +68,20 @@ test("Setup's modes, steps and the Map's pages and deck keys answer clicks", asy
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
 
   // D5: the deck's pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, so page 1 opens on
-  // LIGHTS' first key, `Toggle`, and page 2 is AUDIO.
+  // LIGHTS' first key, `REC` (top left on every page since 2026-10-03), and page 2 is AUDIO.
   const deckKey = (label: string) =>
     page
       .getByTestId("setup-deck-keys")
       .locator("button")
       .filter({ has: page.getByText(label, { exact: true }) });
-  await expect(deckKey("Toggle")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("REC")).toHaveAttribute("data-selected", "true");
 
   await page.getByRole("button", { name: "AUDIO", exact: true }).click();
-  await expect(deckKey("MAIN")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("REC")).toHaveAttribute("data-selected", "true");
 
-  await deckKey("PH 1").click();
-  await expect(deckKey("PH 1")).toHaveAttribute("data-selected", "true");
-  await expect(deckKey("MAIN")).toHaveAttribute("data-selected", "false");
+  await deckKey("PHONES").click();
+  await expect(deckKey("PHONES")).toHaveAttribute("data-selected", "true");
+  await expect(deckKey("REC")).toHaveAttribute("data-selected", "false");
 
   await page.getByRole("button", { name: /^Back to Probe hardware/ }).click();
   await expect(page.getByRole("heading", { name: "Probe hardware" })).toBeVisible();

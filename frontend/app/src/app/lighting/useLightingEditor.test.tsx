@@ -172,6 +172,8 @@ function linkLikeRig(options: { previewMode?: boolean; highlight?: string[]; sol
       outputArmed: true,
       lastRecalledSceneId: null,
       lastSceneRecallAt: null,
+      sceneState: "none",
+      recallFadeMs: 0,
       lastActionStatus: "succeeded",
       lastActionCode: null,
       lastActionMessage: null,

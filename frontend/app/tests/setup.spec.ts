@@ -541,7 +541,7 @@ test("Runner and Support, the Map step and Restart the hardware link, by pointer
   await page.getByRole("dialog", { name: "Skip ahead?" }).getByRole("button", { name: "Skip ahead" }).click();
   await expect(page.getByRole("heading", { name: "Map bindings" })).toBeVisible();
   const map = page.getByTestId("setup-screen-map");
-  await expect(map.getByRole("button", { name: /^Toggle ?button$/ })).toHaveAttribute("data-selected", "true");
+  await expect(map.getByRole("button", { name: /^REC ?button$/ })).toHaveAttribute("data-selected", "true");
 
   // The page tabs name the page and nothing else (they printed "LIGHTS 1" and
   // "AUDIO 2", the number keys that chose them).
@@ -553,10 +553,10 @@ test("Runner and Support, the Map step and Restart the hardware link, by pointer
   // A deck page by its tab, a control by its key.
   await audio.click();
   await expect(audio).toHaveAttribute("data-active", "true");
-  await expect(map.getByRole("button", { name: /^MAIN ?button$/ })).toHaveAttribute("data-selected", "true");
-  await map.getByRole("button", { name: /^PH 1 ?button$/ }).click();
-  await expect(map.getByRole("button", { name: /^PH 1 ?button$/ })).toHaveAttribute("data-selected", "true");
-  await expect(map.getByText("Make Phones 1 the active mix target.")).toBeVisible();
+  await expect(map.getByRole("button", { name: /^REC ?button$/ })).toHaveAttribute("data-selected", "true");
+  await map.getByRole("button", { name: /^PHONES ?button$/ }).click();
+  await expect(map.getByRole("button", { name: /^PHONES ?button$/ })).toHaveAttribute("data-selected", "true");
+  await expect(map.getByText("Make the next phones mix the active mix target: Phones 1, then Phones 2.")).toBeVisible();
 
   // Back a step at a time with the back key.
   await page.getByTestId("setup-step-back").click();

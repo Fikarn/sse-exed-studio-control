@@ -6,9 +6,9 @@ import type { SetupPilot } from "../useSetupPilot";
 import { SetupMapVerifyStep } from "./SetupMapVerifyStep";
 
 // New pages program, Slice 2 (review): the Setup map draws each Stream Deck
-// key where the deck has it. LIGHTS starts at place 2 — place 1 held
-// `<< PROJ` until Planning left the deck — and drawing its keys one after
-// another put every one of them a place early, "AUDIO >>" included.
+// key where the deck has it. Drawing a page's keys one after another put
+// every key after a gap a place early. Since 2026-10-03 (the approved layout)
+// LIGHTS has a dark key at place 7, Del Scene's place, and RECALL after it.
 
 function key(pageId: string, position: number, label: string): ControlSurfaceControl {
   return {
@@ -22,16 +22,16 @@ function key(pageId: string, position: number, label: string): ControlSurfaceCon
   };
 }
 
-// The LIGHTS page as the hardware link's profile lays it out.
+// The LIGHTS page's keys as the hardware link's profile lays them out.
 const lights: ControlSurfacePage = {
   buttons: [
-    key("lights", 2, "Toggle"),
-    key("lights", 3, "All On"),
-    key("lights", 4, "All Off"),
-    key("lights", 5, "Save"),
-    key("lights", 6, "Recall"),
-    key("lights", 7, "Del Scene"),
-    key("lights", 8, "AUDIO >>"),
+    key("lights", 1, "REC"),
+    key("lights", 2, "ALL ON"),
+    key("lights", 3, "SAVE"),
+    key("lights", 4, "AUDIO \u203a"),
+    key("lights", 5, "PLAY"),
+    key("lights", 6, "ALL OFF"),
+    key("lights", 8, "RECALL"),
   ],
   dials: [],
   id: "lights",
@@ -62,18 +62,18 @@ afterEach(() => {
 });
 
 describe("SetupMapVerifyStep's deck keys", () => {
-  it("draws LIGHTS with its first key blank and AUDIO >> at row 2, column 4", () => {
+  it("draws LIGHTS with its dark key blank and RECALL at row 2, column 4", () => {
     const cells = renderMap(lights);
 
     expect(cells).toHaveLength(8);
-    expect(cells[0].hasAttribute("data-blank-key")).toBe(true);
-    expect(cells[0].getAttribute("aria-hidden")).toBe("true");
-    expect(cells[0].textContent).toBe("");
+    expect(cells[6].hasAttribute("data-blank-key")).toBe(true);
+    expect(cells[6].getAttribute("aria-hidden")).toBe("true");
+    expect(cells[6].textContent).toBe("");
     // Place p is row ceil(p / 4), column ((p - 1) % 4) + 1 on a four-key row.
-    expect(within(cells[1]).getByText("Toggle").tagName).toBe("SPAN");
-    expect(within(cells[3]).getByText("All Off").tagName).toBe("SPAN");
-    expect(within(cells[4]).getByText("Save").tagName).toBe("SPAN");
-    expect(within(cells[7]).getByText("AUDIO >>").tagName).toBe("SPAN");
+    expect(within(cells[0]).getByText("REC").tagName).toBe("SPAN");
+    expect(within(cells[3]).getByText("AUDIO \u203a").tagName).toBe("SPAN");
+    expect(within(cells[5]).getByText("ALL OFF").tagName).toBe("SPAN");
+    expect(within(cells[7]).getByText("RECALL").tagName).toBe("SPAN");
     expect(screen.getAllByRole("button", { name: /button$/ })).toHaveLength(7);
   });
 

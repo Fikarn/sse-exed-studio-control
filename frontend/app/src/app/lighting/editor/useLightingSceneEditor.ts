@@ -61,7 +61,17 @@ export function useLightingSceneEditor({
     [sceneThumbsRef, store]
   );
 
-  const [recallFadeMs, setRecallFadeMs] = useState(0);
+  // The Fade is the hardware link's, saved (2026-10-03): the Stream Deck's
+  // RECALL fades with it too, so the page shows and sets the one value.
+  const recallFadeMs = lightingSnapshot?.recallFadeMs ?? 0;
+  const setRecallFadeMs = useCallback(
+    (fadeMs: number) => {
+      void store.updateLightingSettings({ recallFadeMs: fadeMs }).catch((error: unknown) => {
+        reportError(error, "The Fade could not be saved.");
+      });
+    },
+    [reportError, store]
+  );
   const [recentSceneIds, setRecentSceneIds] = useState<readonly string[]>([]);
 
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);

@@ -100,10 +100,15 @@ describe("Setup's Verify step and the deck's four pages", () => {
     await waitFor(() => expect(pulsing()).toEqual([]));
     expect(tab("CAMERAS").getAttribute("data-active")).toBe("true");
 
-    press("/api/deck/prompter-action", "playPause");
+    press("/api/deck/prompter-action", "top");
     await waitFor(() => expect(tab("PROMPTER").getAttribute("data-active")).toBe("true"));
-    expect(pulsing()).toEqual(["PLAY"]);
-    expect(within(step()).getByText("Play or pause the prompter.")).toBeTruthy();
+    expect(pulsing()).toEqual(["TOP"]);
+    expect(within(step()).getByText("Go to the top, and pause.")).toBeTruthy();
+
+    // PLAY is on every page (2026-10-03): a press of it leaves the page alone.
+    press("/api/deck/prompter-action", "playPause");
+    await waitFor(() => expect(pulsing()).toEqual(["PLAY"]));
+    expect(tab("PROMPTER").getAttribute("data-active")).toBe("true");
 
     press("/api/deck/audio-action", "dialTurn", "2:up");
     await waitFor(() => expect(tab("AUDIO").getAttribute("data-active")).toBe("true"));
@@ -119,8 +124,8 @@ describe("Setup's Verify step and the deck's four pages", () => {
     await user.click(tab("AUDIO"));
     await user.click(within(step()).getByRole("button", { name: "DIM button" }));
 
-    press("/api/deck/audio-action", "stripTap", "3");
-    await waitFor(() => expect(pulsing()).toEqual(["Strip 3"]));
+    press("/api/deck/audio-action", "dialPress", "3");
+    await waitFor(() => expect(pulsing()).toEqual(["DIAL 3"]));
     expect(tab("AUDIO").getAttribute("data-active")).toBe("true");
     expect(within(step()).getByRole("button", { name: "DIM button" }).getAttribute("data-selected")).toBe("true");
     await store.dispose();

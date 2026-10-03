@@ -71,6 +71,8 @@ export function buildDefaultLightingSnapshot(): JsonObject {
     bridgeAnswering: null,
     bridgeSilentSince: null,
     outputArmed: true,
+    // The Lighting page's Fade (2026-10-03), the deck's RECALL's too.
+    recallFadeMs: 0,
     lastActionStatus: "idle",
     fixtures: [],
     groups: [],

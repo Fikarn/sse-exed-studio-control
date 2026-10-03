@@ -688,6 +688,7 @@ test("the contract and the bridge sources parse into methods, routes and LCD key
       "/api/deck/audio-action",
       "/api/deck/camera-action",
       "/api/deck/context",
+      "/api/deck/displays",
       "/api/deck/lcd",
       "/api/deck/light-action",
       "/api/deck/prompter-action",
@@ -706,7 +707,10 @@ test("the contract and the bridge sources parse into methods, routes and LCD key
     "camera_strip_4",
     "camera_state_dials",
     "prompter_speed",
+    "prompter_line",
+    "prompter_size",
     "prompter_state_play",
+    "scene_state",
   ]) {
     assert.ok(lcdKeys.has(key), `LCD key ${key}`);
   }

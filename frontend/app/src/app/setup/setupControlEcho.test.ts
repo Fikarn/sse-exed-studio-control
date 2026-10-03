@@ -124,14 +124,28 @@ describe("a press of every control of the deck's page model", () => {
     expect(model.map((page) => page.id)).toEqual(["lights", "audio", "cameras", "prompter"]);
 
     // Where two controls of a page send the same, the press is the first's: a key before a dial.
+    // REC and PLAY are on every page (2026-10-03): a press of one is the shown page's, when
+    // it has it, else the first page's.
     const first = new Map<string, { controlId: string; pageId: string }>();
+    const firstOnPage = new Map<string, { controlId: string; pageId: string }>();
+    const sent = (url: string, body: { action?: string; value?: string }) =>
+      `${url} ${body.action ?? ""} ${body.value ?? ""}`;
     let sending = 0;
     for (const page of model) {
       for (const control of [...page.buttons, ...page.dials]) {
         if (!control.body?.action || !control.url) continue;
         sending += 1;
-        const sent = `${control.url} ${control.body.action} ${control.body.value ?? ""}`;
-        if (!first.has(sent)) first.set(sent, { controlId: control.id, pageId: page.id });
+        const key = sent(control.url, control.body);
+        if (!first.has(key)) first.set(key, { controlId: control.id, pageId: page.id });
+        if (!firstOnPage.has(`${page.id} ${key}`)) {
+          firstOnPage.set(`${page.id} ${key}`, { controlId: control.id, pageId: page.id });
+        }
+      }
+    }
+    for (const page of model) {
+      for (const control of [...page.buttons, ...page.dials]) {
+        if (!control.body?.action || !control.url) continue;
+        const key = sent(control.url, control.body);
         const event = {
           route: control.url,
           action: control.body.action,
@@ -140,14 +154,14 @@ describe("a press of every control of the deck's page model", () => {
         };
         for (const shown of [...model.map((entry) => entry.id), null]) {
           expect(findEcho(model, event, shown), `${control.id} while ${shown ?? "no page"} is shown`).toEqual(
-            first.get(sent)
+            firstOnPage.get(`${shown} ${key}`) ?? first.get(key)
           );
         }
       }
     }
-    // 87 controls: four page keys, eight strip cells and two dials' pushes send nothing.
-    expect(sending).toBe(73);
-    // `Toggle` and the light dial's push, `Recall` and the scene dial's push, `PLAY` and the speed dial's push.
-    expect(sending - first.size).toBe(3);
+    // 93 controls (2026-10-03): four page keys, sixteen strip cells and two dials' pushes send nothing.
+    expect(sending).toBe(71);
+    // REC on four pages, PLAY on four pages and the speed dial's push, `RECALL` and the scene dial's push.
+    expect(sending - first.size).toBe(8);
   });
 });

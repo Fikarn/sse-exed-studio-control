@@ -56,6 +56,8 @@ export interface LightingSettingsUpdateRequest {
   selectedFixtureId?: string | null;
   /** 0–100 multiplier applied to every fixture's intensity in DMX output. */
   grandMaster?: number;
+  /** The Lighting page's Fade, in milliseconds, 0–10000: saved, and the deck's RECALL uses it too. */
+  recallFadeMs?: number;
 }
 
 export interface AudioSettingsUpdateRequest {
