@@ -111,13 +111,10 @@ pub(super) fn light_controls() -> Vec<Control> {
         // a wall switch.
         key(1, 1, "ALL OFF", "ALL OFF", "key_all_off")
             .on_press(light("allOff"))
-            .filled(
+            .filled_and(
                 reads("light_key_off", "OFF?"),
                 DECK_AMBER_BG,
                 DECK_AMBER_INK,
-            )
-            .rule(
-                reads("light_key_off", "OFF?"),
                 vec![(LABEL, "text", Prop::text("OFF?"))],
             )
             .grey_without_the_link(),

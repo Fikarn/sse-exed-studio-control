@@ -243,6 +243,18 @@ impl Control {
 
     /// A fill and every word in its ink while `when` holds.
     pub(super) fn filled(self, when: impl Into<String>, fill: u32, ink: u32) -> Self {
+        self.filled_and(when, fill, ink, Vec::new())
+    }
+
+    /// A fill, every word in its ink, and `more`, while `when` holds: one
+    /// rule (`OFF?` and `STOP?` change their word too).
+    pub(super) fn filled_and(
+        self,
+        when: impl Into<String>,
+        fill: u32,
+        ink: u32,
+        more: Vec<(&'static str, &'static str, Prop)>,
+    ) -> Self {
         let mut set: Vec<(&'static str, &'static str, Prop)> =
             vec![(FILL, "color", Prop::colour(fill))];
         set.extend(
@@ -250,6 +262,7 @@ impl Control {
                 .into_iter()
                 .map(|id| (id, "color", Prop::colour(ink))),
         );
+        set.extend(more);
         self.rule(when, set)
     }
 

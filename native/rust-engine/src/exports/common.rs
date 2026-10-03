@@ -51,9 +51,10 @@ pub(super) fn rec_key() -> Control {
                 (LABEL, "color", Prop::colour(DECK_HAZARD_INK)),
             ],
         )
-        .filled(rec("armed"), DECK_AMBER_BG, DECK_AMBER_INK)
-        .rule(
+        .filled_and(
             rec("armed"),
+            DECK_AMBER_BG,
+            DECK_AMBER_INK,
             vec![
                 (LABEL, "text", Prop::text("STOP?")),
                 (LAMP, "enabled", Prop::flag(false)),
