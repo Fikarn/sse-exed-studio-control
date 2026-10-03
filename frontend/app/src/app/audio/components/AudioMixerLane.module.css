@@ -114,38 +114,10 @@
   flex: none;
 }
 
-/* Each key sits in a tooltip wrapper, so the row shares its width with the
-   wrappers and the keys fill them. */
+/* The keys share the row's width. */
 .stripKeys > * {
   flex: 1;
   min-width: 0;
-}
-
-.stripKeys > * > :first-child {
-  display: block;
-  width: 100%;
-}
-
-/* New pages program, Slice SW: a key's tooltip opens inwards across the row —
-   Mute's from its left edge, Solo's from its right — as wide as its words, up
-   to the row. The rule above used to catch it too and make it as narrow as its
-   key, so its words spilled out of it: at a lane's last strip, past the lane,
-   which then had 4 px to scroll — a scrollbar under Playback at 2560 × 1440.
-   `translate` undoes the design system's centring shift; its fade and lift
-   stay. */
-.stripKeys > * > [role="tooltip"] {
-  width: max-content;
-  max-width: calc(200% + 6px);
-  translate: 50%;
-}
-
-.stripKeys > :first-child > [role="tooltip"] {
-  left: 0;
-}
-
-.stripKeys > :last-child > [role="tooltip"] {
-  left: auto;
-  right: 0;
 }
 
 .stripKey {

@@ -59,7 +59,10 @@ export const DEFAULT_ROOTS = [
 export const KEY_LISTENERS = {
   "frontend/packages/design-system/src/components/Dialog.tsx":
     "Esc closes the dialog and Tab stays inside it, while focus is in the dialog (D6)",
-  "frontend/packages/design-system/src/components/Drawer.tsx": "Esc closes the open drawer (D6)",
+  "frontend/packages/design-system/src/components/Drawer.tsx":
+    "Esc closes the open drawer, unless a menu or popover in it took the Esc first (D6)",
+  "frontend/packages/design-system/src/components/Tooltip.tsx":
+    "Esc closes an open tooltip and goes on to whatever else listens, registered only while a tooltip shows (WCAG 1.4.13, D6)",
   "frontend/packages/design-system/src/components/useArm.ts":
     "Esc cancels the armed key, and a held Enter's repeats never confirm it, registered only while a key is armed (D6)",
   "frontend/app/src/app/shared/ShellDialog.tsx":
@@ -74,12 +77,14 @@ export const KEY_LISTENERS = {
 export const KEY_HANDLERS = {
   "frontend/packages/design-system/src/components/ColorPicker.tsx":
     "the colour picker popup: the arrows, Home and End move over the swatches, Enter or Space picks one, Esc closes it (decision 11)",
-  "frontend/packages/design-system/src/components/ContextMenu.tsx":
-    "the right-click menu: the arrows, Home and End move over its items, Enter or Space picks one, Esc closes it (decision 11)",
   "frontend/packages/design-system/src/components/InlineRename.tsx":
     "the rename field: Enter confirms, Esc puts the old name back (decision 11)",
+  "frontend/packages/design-system/src/components/Menu.tsx":
+    "the menu (the ⋯ and right-click menus): the arrows, Home and End move over its items, Enter or Space presses one, Esc disarms its armed item and then closes it, Tab leaves it (decision 11, D6)",
   "frontend/packages/design-system/src/components/MultiValueSlider.tsx":
     "the bulk plate's value-or-change field: Enter applies what was typed, the field having no Apply key (decision 11)",
+  "frontend/packages/design-system/src/components/Popover.tsx":
+    "the popover beside a key: Esc closes it and gives the focus back to its key (D6)",
   "frontend/packages/design-system/src/components/ScrubLabel.tsx":
     "a focused scrub label is a slider: the arrows, Home, End, Page Up and Page Down (decision 9)",
   "frontend/packages/design-system/src/components/ScrubSlider.tsx":

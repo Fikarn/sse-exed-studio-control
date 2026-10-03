@@ -60,8 +60,6 @@
   "app/src/app/teleprompter/TeleprompterPlate.module.css": 13,
   "app/src/app/teleprompter/editor/ScriptEditor.module.css": 10,
   "packages/design-system/src/components/ChipStrip.module.css": 11,
-  "packages/design-system/src/components/ColorPicker.module.css": 17,
-  "packages/design-system/src/components/ContextMenu.module.css": 9,
   "packages/design-system/src/components/Crest.module.css": 2,
   "packages/design-system/src/components/InlineRename.module.css": 7,
   "packages/design-system/src/components/InspectorSection.module.css": 4,
@@ -74,6 +72,5 @@
   "packages/design-system/src/components/StatusDot.module.css": 8,
   "packages/design-system/src/components/StatusPill.module.css": 7,
   "packages/design-system/src/components/StatusPill.tsx": 4,
-  "packages/design-system/src/components/Surface.module.css": 7,
-  "packages/design-system/src/components/Tooltip.module.css": 5
+  "packages/design-system/src/components/Surface.module.css": 7
 }

@@ -105,8 +105,12 @@ describe("the page's report of its pictures", () => {
   it("holds no more than the scene does, and no picture without a size", () => {
     const many = Array.from({ length: 6 }, () => hero);
     expect(buildPlaces(layout({ pictures: many })).pictures).toHaveLength(MAX_PICTURES);
-    const holes = Array.from({ length: 12 }, (_, index) => ({ x: 500 + index, y: 200, width: 10, height: 10 }));
+    const holes = Array.from({ length: MAX_HOLES }, (_, index) => ({ x: 500 + index, y: 200, width: 10, height: 10 }));
     expect(buildPlaces(layout({ floating: holes })).holes).toHaveLength(MAX_HOLES);
+    // One more than the helper can leave clear hides the pictures: a picture is
+    // never drawn over a floating layer.
+    const tooMany = [...holes, { x: 520, y: 200, width: 10, height: 10 }];
+    expect(buildPlaces(layout({ floating: tooMany }))).toMatchObject({ showing: false, pictures: [], holes: [] });
     const unsized = { ...tile, box: { ...tile.box, width: 0 } };
     expect(buildPlaces(layout({ pictures: [unsized] })).showing).toBe(false);
   });

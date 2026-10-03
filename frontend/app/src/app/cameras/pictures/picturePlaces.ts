@@ -1,15 +1,19 @@
 import { useEffect, type RefObject } from "react";
 
+import { COVERING_LAYER_SELECTOR, floatingLayers } from "@sse/design-system";
 import type { PictureCamera, PicturePlaces, PlaceRect, PlacedPicture } from "@sse/engine-client";
 
 // Where the Cameras page's pictures stand (the camera pictures, D30). In the app's window
 // the pictures helper draws the pictures itself, in a layer over the page, and the page
 // is the one authority for what is where: it measures its own layout and says the bay's
 // box, each picture's box and part, its aids and where the loupe looks, and what it draws
-// over a picture (a small picture's chip, a message, a hint), which the helper leaves
-// clear. While anything stands over
-// the bay that the helper cannot leave a hole for (a dialog, the values list), or the
-// window is hidden, the page says it shows no picture, and the layer hides.
+// over a picture (a small picture's chip, a message, a tooltip, a menu, a popover), which
+// the helper leaves clear. The design system says what floats (`floatingLayers`): every
+// menu, list, tooltip and element of the floating layer, each counted once, and never a
+// dialog. While a dialog is open (the values list is one until it becomes a popover), or
+// more stands over the pictures than the helper can leave clear, or the window is hidden,
+// the page says it shows no picture, and the layer hides: a picture is never drawn over
+// something the operator should see.
 //
 // It says so at every change and once a second: the shell hides the layer when the page
 // has been silent for a while, since a page that is reloaded says no goodbye.
@@ -20,12 +24,6 @@ export const MAX_PICTURES = 4;
 export const MAX_HOLES = 8;
 /** How often the page says its places again when nothing moved. */
 const SAY_AGAIN_MS = 1000;
-
-/** What stands over a picture's place and is left clear by the helper. A hint is in the page all the time, and counts while it is shown. */
-const FLOATING =
-  '[data-picture-hole], [data-level="float"], [role="tooltip"][data-visible], [role="menu"], [role="listbox"]';
-/** What stands over the bay and hides every picture while it is there. */
-const COVERING = '[role="dialog"]';
 
 /** A picture as the page laid it out. */
 export interface MeasuredPicture {
@@ -86,12 +84,13 @@ export function buildPlaces(measured: MeasuredPlaces): PicturePlaces {
       peaking: picture.peaking,
       marker: picture.marker ? whole(picture.marker) : null,
     }));
+  const none = { showing: false, scale: measured.scale, bay: measured.bay, pictures: [], holes: [] };
   const showing = measured.visible && !measured.covered && pictures.length > 0;
-  if (!showing) return { showing: false, scale: measured.scale, bay: measured.bay, pictures: [], holes: [] };
-  // Only what stands over a picture: the layer is clear everywhere else already.
-  const holes = measured.floating
-    .filter((box) => pictures.some((picture) => overlaps(box, picture.at)))
-    .slice(0, MAX_HOLES);
+  if (!showing) return none;
+  // Only what stands over a picture: the layer is clear everywhere else already. More
+  // than the helper can leave clear hides the pictures rather than covering one.
+  const holes = measured.floating.filter((box) => pictures.some((picture) => overlaps(box, picture.at)));
+  if (holes.length > MAX_HOLES) return none;
   return { showing: true, scale: measured.scale, bay: measured.bay, pictures, holes };
 }
 
@@ -131,10 +130,10 @@ export function measurePlaces(bay: HTMLElement): MeasuredPlaces {
   return {
     scale: window.devicePixelRatio,
     visible: document.visibilityState === "visible",
-    covered: document.querySelector(COVERING) !== null,
+    covered: document.querySelector(COVERING_LAYER_SELECTOR) !== null,
     bay: boxOf(bay),
     pictures,
-    floating: Array.from(document.querySelectorAll(FLOATING), boxOf),
+    floating: floatingLayers(document).map(boxOf),
   };
 }
 
@@ -156,14 +155,26 @@ export function usePicturePlaces(bay: RefObject<HTMLElement | null>, place: ((pl
       place(places);
     };
     const changed = () => say(false);
-    // A dialog, a message or a hint comes and goes as nodes; a picture's part, camera,
-    // aids and marker are attributes of its place.
+    // A dialog, a message or a tooltip comes and goes as nodes; a picture's part, camera,
+    // aids and marker are attributes of its place; a floating layer that is placed, flips
+    // or arms an item in place says so in an attribute, and its words change as text.
     const mutations = new MutationObserver(changed);
     mutations.observe(document.body, {
       childList: true,
       subtree: true,
+      characterData: true,
       attributes: true,
-      attributeFilter: ["data-part", "data-camera", "data-pixels", "data-aids", "data-marker", "data-visible"],
+      attributeFilter: [
+        "data-part",
+        "data-camera",
+        "data-pixels",
+        "data-aids",
+        "data-marker",
+        "data-visible",
+        "data-placement",
+        "data-side",
+        "data-armed",
+      ],
     });
     const sizes = new ResizeObserver(changed);
     sizes.observe(element);

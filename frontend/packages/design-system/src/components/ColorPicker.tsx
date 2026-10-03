@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
-import { Check, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Check } from "lucide-react";
 
 import styles from "./ColorPicker.module.css";
+import { Popover } from "./Popover";
+
+// Visual overhaul B (DESIGN.md §5, §9): the colour-tag picker, a popover at
+// the pointer or under the key that opened it. The swatches are keys of the
+// tag's own colour (data, not the page's palette); the chosen one carries the
+// Beige keyline and a mark; "Clear color tag" is the last key. The arrows,
+// Home and End move over the keys, Enter or Space picks one; it closes on a
+// press outside or Esc and gives the focus back.
 
 export interface ColorPickerSwatch {
   /** Stable index — what gets persisted. */
@@ -23,7 +30,7 @@ export interface ColorPickerProps {
   /** Currently selected swatch index, or `null` for no color tag. */
   selectedIndex: number | null;
   /** Fires when the user picks a swatch (passes the swatch index) or clears
-   *  (passes `null`). The picker auto-closes after a selection. */
+   *  (passes `null`). The picker closes before it runs. */
   onSelect: (index: number | null) => void;
   /** Fires when the picker should close: outside click, Esc, or after a select. */
   onClose: () => void;
@@ -31,81 +38,24 @@ export interface ColorPickerProps {
   ariaLabel?: string;
 }
 
-const VIEWPORT_PADDING = 8;
+/** The Clear key's place in the roving order, after the swatches. */
+const CLEAR = -1;
 
-/**
- * Right-click style floating color picker. Renders an N-swatch grid plus a
- * "Clear" option. Mirrors `<ContextMenu>`'s mounting + positioning + outside-
- * click semantics so the two can be invoked from the same call sites without
- * surprising the user.
- *
- * Mount: portal to document.body so per-workspace overflow + transform
- * containers can't clip it. Position: clamps inside the viewport after
- * measuring (same as ContextMenu). Keyboard: Left / Right move the focused
- * swatch, Enter activates, Esc closes.
- */
 export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, ariaLabel }: ColorPickerProps) {
-  const dialogId = useId();
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [position, setPosition] = useState<{ left: number; top: number }>({ left: x, top: y });
-  // Focus index covers swatches first, then the Clear button at the end.
-  // -1 means Clear, 0..N-1 means swatch[i].
-  const initialFocus =
-    selectedIndex !== null && selectedIndex >= 0 && selectedIndex < swatches.length ? selectedIndex : 0;
-  const [focusIndex, setFocusIndex] = useState<number>(initialFocus);
+  const anchor = useMemo(() => ({ x, y }), [x, y]);
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const order = useMemo(() => [...swatches.map((swatch) => swatch.index), CLEAR], [swatches]);
+  const chosen = selectedIndex !== null && order.includes(selectedIndex) ? selectedIndex : (order[0] ?? CLEAR);
+  const [focusIndex, setFocusIndex] = useState<number>(chosen);
 
-  useLayoutEffect(() => {
-    const node = rootRef.current;
-    if (!node) return;
-    const rect = node.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let left = x;
-    let top = y;
-    if (left + rect.width + VIEWPORT_PADDING > vw) {
-      left = Math.max(VIEWPORT_PADDING, vw - rect.width - VIEWPORT_PADDING);
-    }
-    if (top + rect.height + VIEWPORT_PADDING > vh) {
-      top = Math.max(VIEWPORT_PADDING, vh - rect.height - VIEWPORT_PADDING);
-    }
-    setPosition({ left, top });
-  }, [x, y, swatches.length]);
-
-  useEffect(() => {
-    const handlePointer = (event: PointerEvent | MouseEvent) => {
-      if (!rootRef.current) return;
-      if (rootRef.current.contains(event.target as Node)) return;
-      onClose();
-    };
-    const handleScroll = () => onClose();
-    document.addEventListener("mousedown", handlePointer);
-    document.addEventListener("contextmenu", handlePointer);
-    window.addEventListener("scroll", handleScroll, true);
-    window.addEventListener("resize", handleScroll);
-    return () => {
-      document.removeEventListener("mousedown", handlePointer);
-      document.removeEventListener("contextmenu", handlePointer);
-      window.removeEventListener("scroll", handleScroll, true);
-      window.removeEventListener("resize", handleScroll);
-    };
-  }, [onClose]);
-
-  useEffect(() => {
-    rootRef.current?.focus();
+  const focusSlot = useCallback((index: number) => {
+    setFocusIndex(index);
+    gridRef.current?.querySelector<HTMLElement>(`[data-slot="${index}"]`)?.focus();
   }, []);
 
-  const stepFocus = useCallback(
-    (delta: 1 | -1) => {
-      setFocusIndex((current) => {
-        const total = swatches.length + 1; // swatches + Clear
-        const positions = Array.from({ length: total }, (_, i) => (i < swatches.length ? i : -1));
-        const currentSlot = positions.indexOf(current);
-        const nextSlot = (currentSlot + delta + total) % total;
-        return positions[nextSlot]!;
-      });
-    },
-    [swatches.length]
-  );
+  useEffect(() => {
+    setFocusIndex(chosen);
+  }, [chosen]);
 
   const activate = useCallback(
     (index: number | null) => {
@@ -115,99 +65,86 @@ export function ColorPicker({ x, y, swatches, selectedIndex, onSelect, onClose, 
     [onClose, onSelect]
   );
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const at = order.indexOf(focusIndex);
+    const go = (slot: number) => {
+      event.preventDefault();
+      event.stopPropagation();
+      focusSlot(order[(slot + order.length) % order.length]!);
+    };
     switch (event.key) {
       case "ArrowRight":
       case "ArrowDown":
-        event.preventDefault();
-        event.stopPropagation();
-        stepFocus(1);
+        go(at + 1);
         return;
       case "ArrowLeft":
       case "ArrowUp":
-        event.preventDefault();
-        event.stopPropagation();
-        stepFocus(-1);
+        go(at - 1);
         return;
       case "Home":
-        event.preventDefault();
-        event.stopPropagation();
-        setFocusIndex(0);
+        go(0);
         return;
       case "End":
-        event.preventDefault();
-        event.stopPropagation();
-        setFocusIndex(-1);
+        go(order.length - 1);
         return;
       case "Enter":
       case " ":
         event.preventDefault();
         event.stopPropagation();
-        activate(focusIndex);
-        return;
-      case "Escape":
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
+        if (event.repeat) return;
+        activate(focusIndex === CLEAR ? null : focusIndex);
         return;
       default:
+        // Esc goes on to the popover, which closes.
         return;
     }
   };
 
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      ref={rootRef}
-      id={dialogId}
-      role="dialog"
-      aria-label={ariaLabel ?? "Pick a color"}
-      tabIndex={-1}
-      className={styles.picker}
-      style={{ left: position.left, top: position.top }}
-      onKeyDown={handleKeyDown}
+  return (
+    <Popover
+      open
+      anchor={anchor}
+      onClose={() => onClose()}
+      label={ariaLabel ?? "Pick a color"}
+      placement="bottom-start"
     >
-      <div className={styles.swatches} role="group" aria-label="Color tag swatches">
-        {swatches.map((swatch) => {
-          const selected = selectedIndex === swatch.index;
-          const focused = focusIndex === swatch.index;
-          const className = [styles.swatch, selected ? styles.swatchSelected : "", focused ? styles.swatchFocused : ""]
-            .filter(Boolean)
-            .join(" ");
-          return (
-            <button
-              key={swatch.index}
-              type="button"
-              className={className}
-              style={{ background: swatch.hex }}
-              aria-label={`${swatch.name}${selected ? " (current)" : ""}`}
-              aria-pressed={selected}
-              onMouseEnter={() => setFocusIndex(swatch.index)}
-              onClick={(event) => {
-                event.stopPropagation();
-                activate(swatch.index);
-              }}
-            >
-              {selected ? <Check aria-hidden="true" size={11} strokeWidth={3} className={styles.checkIcon} /> : null}
-            </button>
-          );
-        })}
+      <div ref={gridRef} className={styles.picker} onKeyDown={onKeyDown}>
+        <div className={styles.swatches} role="group" aria-label="Color tag swatches">
+          {swatches.map((swatch) => {
+            const selected = selectedIndex === swatch.index;
+            return (
+              <button
+                key={swatch.index}
+                type="button"
+                className={styles.swatch}
+                data-slot={swatch.index}
+                data-selected={selected ? "" : undefined}
+                data-autofocus={swatch.index === chosen ? "" : undefined}
+                tabIndex={focusIndex === swatch.index ? 0 : -1}
+                style={{ background: swatch.hex }}
+                aria-label={`${swatch.name}${selected ? " (current)" : ""}`}
+                aria-pressed={selected}
+                onPointerEnter={() => focusSlot(swatch.index)}
+                onClick={() => activate(swatch.index)}
+              >
+                {selected ? <Check aria-hidden="true" size={16} strokeWidth={3} className={styles.checkIcon} /> : null}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className={styles.clear}
+          data-slot={CLEAR}
+          data-autofocus={chosen === CLEAR ? "" : undefined}
+          tabIndex={focusIndex === CLEAR ? 0 : -1}
+          aria-pressed={selectedIndex === null}
+          onPointerEnter={() => focusSlot(CLEAR)}
+          onClick={() => activate(null)}
+        >
+          Clear color tag
+        </button>
       </div>
-      <button
-        type="button"
-        className={[styles.clear, focusIndex === -1 ? styles.clearFocused : ""].filter(Boolean).join(" ")}
-        onMouseEnter={() => setFocusIndex(-1)}
-        onClick={(event) => {
-          event.stopPropagation();
-          activate(null);
-        }}
-        aria-pressed={selectedIndex === null}
-      >
-        <X aria-hidden="true" size={12} strokeWidth={1.75} />
-        <span>Clear color tag</span>
-      </button>
-    </div>,
-    document.body
+    </Popover>
   );
 }

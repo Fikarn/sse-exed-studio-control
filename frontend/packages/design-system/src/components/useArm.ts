@@ -74,6 +74,9 @@ export function useArm({
         return;
       }
       if (event.key !== "Escape") return;
+      // An Esc a layer above took (a dialog, a drawer, a menu) closes that
+      // layer only; the next Esc disarms. The Console's arm does the same.
+      if (event.defaultPrevented) return;
       event.preventDefault();
       setArmed(null);
       onDisarmRef.current?.(armed, "escape");

@@ -95,18 +95,6 @@
     "radius": 1,
     "shadow": 0
   },
-  "packages/design-system/src/components/ColorPicker.module.css": {
-    "colour": 4,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 3
-  },
-  "packages/design-system/src/components/ContextMenu.module.css": {
-    "colour": 0,
-    "fontSize": 1,
-    "radius": 0,
-    "shadow": 0
-  },
   "packages/design-system/src/components/InlineRename.module.css": {
     "colour": 0,
     "fontSize": 0,
