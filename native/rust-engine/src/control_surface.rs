@@ -4,10 +4,10 @@ use crate::bootstrap::RuntimeContext;
 #[cfg(test)]
 use crate::control_surface_audio::handle_audio_action;
 use crate::control_surface_audio::{
-    audio_deck_bank, audio_deck_dial_mode, audio_deck_gate_label, audio_key_lcd_text,
-    audio_state_value_text, audio_strip_key_index, audio_strip_lcd_text, audio_strip_level_text,
-    audio_strip_state_text, current_audio_snapshot, handle_audio_action_at,
-    resolve_audio_deck_strip, AudioDeckStrip,
+    audio_deck_bank, audio_deck_gate_label, audio_key_lcd_text, audio_state_value_text,
+    audio_strip_key_index, audio_strip_lcd_text, audio_strip_level_text, audio_strip_state_text,
+    current_audio_snapshot, handle_audio_action_at, resolve_audio_deck_strip, AudioDeckStrip,
+    AUDIO_DECK_DIAL_MODE,
 };
 use crate::control_surface_presses::{
     ask, asked_key_acted, asking_key_text, dwelling_press, end_arm, release_dwelling_press,
@@ -165,7 +165,7 @@ pub fn read_control_surface_context(db_path: &Path) -> Result<Value, ControlSurf
             "status": audio_snapshot.status,
             "gated": audio_deck_gate_label(&audio_snapshot).is_some(),
             "bank": bank,
-            "dialMode": audio_deck_dial_mode(&app_settings),
+            "dialMode": AUDIO_DECK_DIAL_MODE,
             "selectedMixTargetId": audio_snapshot.selected_mix_target_id,
             "selectedChannelId": audio_snapshot.selected_channel_id,
             "strips": strips,

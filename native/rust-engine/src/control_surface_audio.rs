@@ -14,7 +14,12 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const AUDIO_DECK_BANK_KEY: &str = "app.control_surface.audio.bank";
-const AUDIO_DECK_DIAL_MODE_KEY: &str = "app.control_surface.audio.dial_mode";
+/// The dials' mode, as the deck's displays and context report it: always
+/// `fader` since GAIN left the deck (2026-10-03). The review of #293: a gain
+/// mode an old profile's GAIN key saved (`app.control_surface.audio.dial_mode`)
+/// is no longer read, as it no longer turns the dials, so it is not reported
+/// either; the switch itself (`toggleDialMode`) is refused.
+pub(crate) const AUDIO_DECK_DIAL_MODE: &str = "fader";
 const AUDIO_DECK_BANK_CYCLE: &[&str] = &["inputs", "playback", "outputs"];
 const AUDIO_DECK_FADER_STEP: f64 = 0.01;
 const AUDIO_DECK_FAST_TURN_WINDOW: Duration = Duration::from_millis(80);
@@ -205,7 +210,7 @@ pub(crate) fn audio_state_value_text(
             .unwrap_or_else(|| String::from("main"))),
         "bank" => Ok(audio_deck_bank(app_settings)),
         "mode" => Ok(if audio_deck_bank(app_settings) == "inputs" {
-            audio_deck_dial_mode(app_settings)
+            String::from(AUDIO_DECK_DIAL_MODE)
         } else {
             String::from("n/a")
         }),
@@ -249,15 +254,10 @@ pub(crate) fn audio_key_lcd_text(
             _ => String::from("DIM\\n--"),
         },
         6 => {
+            // The old profile's GAIN key: off, as the dials never ride the
+            // gain (2026-10-03).
             if audio_deck_bank(app_settings) == "inputs" {
-                format!(
-                    "GAIN\\n{}",
-                    if audio_deck_dial_mode(app_settings) == "gain" {
-                        "ON"
-                    } else {
-                        "OFF"
-                    }
-                )
+                String::from("GAIN\\nOFF")
             } else {
                 String::from("GAIN\\nN/A")
             }
@@ -305,13 +305,15 @@ pub(crate) fn handle_audio_action_at(
     // the page keys only turn Companion's page now. `recallSnapshot` left on
     // 2026-10-01: the Console's snapshots are TotalMix's, and one loads only
     // at a second press on screen, never at one press of a key.
+    // `toggleDialMode`, the old profile's GAIN key, is refused since the
+    // review of #293 (2026-10-03), as `talkOn` is: the dials ride the level
+    // whatever it saved, so it switched nothing a deck could see.
     match action {
         "dialTurn" => handle_audio_dial_turn(db_path, value, at),
         "dialPress" => handle_audio_dial_press(db_path, value),
         "stripTap" => handle_audio_strip_tap(db_path, value),
         "setMixTarget" => handle_audio_set_mix_target(db_path, value),
         "cycleBank" => handle_audio_cycle_bank(db_path),
-        "toggleDialMode" => handle_audio_toggle_dial_mode(db_path),
         "dimToggle" => handle_audio_dim_toggle(db_path),
         "soloClearAll" => handle_audio_solo_clear_all(db_path),
         _ => Err(ControlSurfaceError::Unsupported(format!(
@@ -342,14 +344,6 @@ pub(crate) fn audio_deck_bank(settings: &HashMap<String, String>) -> String {
         .filter(|value| AUDIO_DECK_BANK_CYCLE.contains(&value.as_str()))
         .cloned()
         .unwrap_or_else(|| String::from("inputs"))
-}
-
-pub(crate) fn audio_deck_dial_mode(settings: &HashMap<String, String>) -> String {
-    settings
-        .get(AUDIO_DECK_DIAL_MODE_KEY)
-        .filter(|value| value.as_str() == "gain")
-        .cloned()
-        .unwrap_or_else(|| String::from("fader"))
 }
 
 fn parse_audio_strip_index(value: &str) -> Result<usize, ControlSurfaceError> {
@@ -698,22 +692,6 @@ fn handle_audio_cycle_bank(db_path: &Path) -> Result<Value, ControlSurfaceError>
     Ok(json!({ "bank": next }))
 }
 
-fn handle_audio_toggle_dial_mode(db_path: &Path) -> Result<Value, ControlSurfaceError> {
-    let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let next = if audio_deck_dial_mode(&app_settings) == "gain" {
-        String::from("fader")
-    } else {
-        String::from("gain")
-    };
-    set_settings_owned(
-        db_path,
-        &[(String::from(AUDIO_DECK_DIAL_MODE_KEY), next.clone())],
-    )
-    .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    Ok(json!({ "dialMode": next }))
-}
-
 fn handle_audio_dim_toggle(db_path: &Path) -> Result<Value, ControlSurfaceError> {
     let (_, snapshot) = current_audio_snapshot(db_path)?;
     ensure_audio_action_allowed(db_path, &snapshot).map_err(map_audio_error)?;
@@ -823,7 +801,6 @@ mod tests {
             )])),
             "inputs"
         );
-        assert_eq!(audio_deck_dial_mode(&HashMap::new()), "fader");
     }
 
     #[test]
@@ -1139,18 +1116,53 @@ mod tests {
         ));
     }
 
+    /// The setting the old profile's GAIN key saved, as an old build left it.
+    fn save_the_old_gain_mode(db_path: &Path) {
+        set_settings_owned(
+            db_path,
+            &[(
+                String::from("app.control_surface.audio.dial_mode"),
+                String::from("gain"),
+            )],
+        )
+        .expect("the old gain mode is saved");
+    }
+
     // 2026-10-03: GAIN left the deck. A dial mode the old profile's GAIN key
     // saved no longer turns the dials into preamp gain, where nothing on the
     // deck would show it: a turn rides the level, the strip shows the level.
+    // The review of #293: the mode reads `fader`, and the key's switch is
+    // refused (501) and saves nothing.
     #[test]
     fn a_saved_gain_mode_no_longer_turns_the_dials_into_gain() {
         let test_dir = ready_audio_test_db("gain-mode-gone");
         let db_path = test_dir.db_path();
-        assert_eq!(
-            handle_audio_action(db_path.as_path(), "toggleDialMode", None)
-                .expect("the old key's route is kept")["dialMode"],
-            "gain"
+        save_the_old_gain_mode(db_path.as_path());
+        let settings_before =
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).expect("settings");
+        let refused = handle_audio_action(db_path.as_path(), "toggleDialMode", None)
+            .expect_err("the GAIN key left the deck");
+        assert!(
+            matches!(refused, ControlSurfaceError::Unsupported(_)),
+            "{refused:?}"
         );
+        assert_eq!(refused.status_code(), 501);
+        assert_eq!(
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).expect("settings"),
+            settings_before,
+            "a refused GAIN key writes nothing"
+        );
+        let (app_settings, snapshot) =
+            current_audio_snapshot(db_path.as_path()).expect("the snapshot");
+        assert_eq!(
+            audio_state_value_text(&app_settings, &snapshot, "mode").expect("mode state"),
+            "fader"
+        );
+        assert_eq!(
+            audio_key_lcd_text(&app_settings, &snapshot, 6),
+            "GAIN\\nOFF"
+        );
+
         let before = audio_snapshot_for(&test_dir);
         let host = before
             .channels
@@ -1270,15 +1282,16 @@ mod tests {
             "muted strips carry the ember bar prefix"
         );
 
-        handle_audio_action(db_path.as_path(), "toggleDialMode", None).expect("gain mode");
+        save_the_old_gain_mode(db_path.as_path());
         let app_settings = settings();
         let live = snapshot(&app_settings);
         // GAIN left the deck (2026-10-03): the bar is the level, whatever the
-        // saved mode (fader 0.78 -> bucket 9, not the preamp's 34 dB).
+        // saved mode (fader 0.78 -> bucket 9, not the preamp's 34 dB), and the
+        // mode reads `fader` (the review of #293).
         assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "9");
         assert_eq!(
             audio_state_value_text(&app_settings, &live, "mode").expect("mode state"),
-            "gain"
+            "fader"
         );
 
         handle_audio_action(db_path.as_path(), "cycleBank", None).expect("to playback");

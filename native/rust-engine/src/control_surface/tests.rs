@@ -95,8 +95,14 @@ fn audio_strip_lcd_renders_live_state_and_mute_without_a_selection_mark() {
         "muted strip should say MUTED instead of a level: {text}"
     );
 
-    handle_audio_action(db_path.as_path(), "toggleDialMode", None)
-        .expect("the old GAIN key's route is kept");
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.control_surface.audio.dial_mode"),
+            String::from("gain"),
+        )],
+    )
+    .expect("the old GAIN key's mode, as an old build saved it");
     let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
         .expect("lcd text should render");
     assert_eq!(text, "HOST\\nMUTED", "a saved gain mode shows no gain");
@@ -311,6 +317,47 @@ fn the_talk_key_of_an_old_profile_is_refused_and_stores_nothing() {
     );
     assert!(control_surface_last_event(db_path.as_path()).is_null());
     assert!(recent_actions(db_path.as_path()).is_empty());
+}
+
+// The review of #293: the old profile's GAIN key is refused as its TALK key
+// is, and a gain mode an old build saved is reported nowhere: the context's
+// `dialMode` and the `audio_state_mode` display read `fader`.
+#[test]
+fn the_gain_key_of_an_old_profile_is_refused_and_stores_nothing() {
+    let test_dir = ready_audio_test_db("old-gain-key");
+    let db_path = test_dir.db_path();
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.control_surface.audio.dial_mode"),
+            String::from("gain"),
+        )],
+    )
+    .expect("the old GAIN key's mode, as an old build saved it");
+    let settings_before = list_settings_by_prefix(db_path.as_path(), "").expect("settings");
+
+    let refused = handle_control_surface_http_action(
+        db_path.as_path(),
+        "/api/deck/audio-action",
+        &json!({ "action": "toggleDialMode" }),
+    )
+    .expect_err("the GAIN key left the deck");
+    assert_eq!(refused.status_code(), 501, "{}", refused.message());
+    assert_eq!(
+        list_settings_by_prefix(db_path.as_path(), "").expect("settings"),
+        settings_before,
+        "a refused GAIN key writes nothing"
+    );
+    assert!(control_surface_last_event(db_path.as_path()).is_null());
+    assert!(recent_actions(db_path.as_path()).is_empty());
+
+    let context = read_control_surface_context(db_path.as_path()).expect("context should load");
+    assert_eq!(context["audio"]["dialMode"], "fader");
+    assert_eq!(
+        read_control_surface_lcd_text(db_path.as_path(), "audio_state_mode")
+            .expect("state should render"),
+        "fader"
+    );
 }
 
 #[test]
@@ -1331,6 +1378,48 @@ fn toggle_dim_and_a_mute_drop_a_second_press_within_the_dwell() {
             .count(),
         2
     );
+}
+
+// The review of #293: `PHONES` goes on to the next phones mix at each
+// press, so a bounce or a double press would land on the other one. It
+// dwells as `PLAY` does: a second press within 350 ms of the one that acted
+// is the same press, answered `kept`, and the target stays.
+#[test]
+fn phones_drops_a_second_press_within_the_dwell() {
+    let test_dir = ready_audio_test_db("phones-dwell");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment() + Duration::from_secs(10);
+    let press = |value: &str, at: Instant| {
+        handle_control_surface_http_action_at(
+            db_path,
+            "/api/deck/audio-action",
+            &json!({ "action": "setMixTarget", "value": value }),
+            at,
+        )
+        .unwrap_or_else(|error| panic!("{value} should succeed: {}", error.message()))
+    };
+    let target = || {
+        read_control_surface_lcd_text(db_path, "audio_state_target").expect("state should render")
+    };
+    assert_eq!(
+        press("phones", start)["selectedMixTargetId"],
+        "audio-mix-phones-a"
+    );
+    let kept = press("phones", start + Duration::from_millis(200));
+    assert_eq!(kept["did"], "kept", "{kept}");
+    assert_eq!(target(), "phones-a", "the same press moves nothing");
+    assert_eq!(
+        press("phones", start + Duration::from_millis(400))["selectedMixTargetId"],
+        "audio-mix-phones-b",
+        "a press after the dwell goes on"
+    );
+    // MAIN OUT does not dwell: a second press leaves it where it is anyway.
+    let main = start + Duration::from_secs(1);
+    assert_eq!(press("main", main)["selectedMixTargetId"], "audio-mix-main");
+    let again = press("main", main + Duration::from_millis(100));
+    assert_eq!(again["selectedMixTargetId"], "audio-mix-main", "{again}");
+    assert_eq!(target(), "main");
 }
 
 // The review of #254: an armed or kept press of `All Off` raises no
