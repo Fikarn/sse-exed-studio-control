@@ -249,6 +249,38 @@ describe("the fixture double's rig actions", () => {
     );
   });
 
+  // 2026-10-03: the Lighting page's Fade is saved in the hardware link, which
+  // the deck's RECALL reads too; and the hardware link says whether the rig
+  // holds the live scene (`sceneState`), which the shell's drift chip reads.
+  it("lighting.settings.update saves the Fade, and lighting.snapshot says whether the rig holds the live scene", async () => {
+    const { request, snapshot } = openDouble();
+    expect((await snapshot()).recallFadeMs).toBe(0);
+    expect(await request("lighting.settings.update", { recallFadeMs: 1499.6 })).toMatchObject({
+      recallFadeMs: 1500,
+      summary: "Native lighting settings updated: recall fade -> 1.5 s.",
+    });
+    expect((await snapshot()).recallFadeMs).toBe(1500);
+    expect(await request("lighting.settings.update", { recallFadeMs: 12_000 })).toMatchObject({ recallFadeMs: 10_000 });
+    await expect(request("lighting.settings.update", { recallFadeMs: "2" })).rejects.toThrow(
+      "recallFadeMs must be a number"
+    );
+
+    const scenes = (await snapshot()).scenes as JsonObject[];
+    const scene = scenes[0];
+    await request("lighting.scene.recall", { sceneId: scene.id as string });
+    expect((await snapshot()).sceneState).toBe("live");
+    const lit = ((scene.fixtureStates as JsonObject[]) ?? []).find((state) => state.on === true);
+    if (lit) {
+      await request("lighting.fixture.update", {
+        fixtureId: lit.fixtureId as string,
+        intensity: (lit.intensity as number) > 50 ? 10 : 90,
+      });
+      expect((await snapshot()).sceneState).toBe("unsaved");
+    }
+    await request("lighting.editor.previewMode", { enabled: true });
+    expect((await snapshot()).sceneState).toBe("preview");
+  });
+
   // 2026-09-23: the double refused `grandMaster` until then, so the Lighting
   // page's Grand master failed against it. The hardware link reads it as a
   // number, rounds it and clamps it to 0–100 (`parse.rs`), stores it and names

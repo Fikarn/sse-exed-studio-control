@@ -39,7 +39,11 @@ export function identifyBurstActive(burst: IdentifyBurst, nowMs: number): boolea
 export function lightingSceneState(snapshot: JsonObject): string {
   if (asBoolean(snapshot.previewMode, false)) return "preview";
   const scenes = lightingScenes(snapshot);
-  const lastRecalled = asString(snapshot.lastRecalledSceneId);
+  // A test scenario may mark the recalled scene by its flag alone, as the
+  // hardware link's scenes carry it (`lastRecalled`).
+  const lastRecalled =
+    asString(scenes.find((entry) => asBoolean(entry.lastRecalled, false))?.id) ||
+    asString(snapshot.lastRecalledSceneId);
   const scene =
     scenes.find((entry) => asString(entry.id) === lastRecalled && lastRecalled !== "") ??
     scenes.find((entry) => asString(entry.id) === asString(snapshot.selectedSceneId));

@@ -347,9 +347,12 @@ pub fn read_deck_displays(
 struct LightsAndAudio {
     app_settings: HashMap<String, String>,
     audio_snapshot: crate::audio::AudioSnapshot,
-    /// The rig as stored: the target of a running fade.
+    /// The rig as stored, a running fade not sampled.
     lighting_state: LightingEditorState,
     preview: LightingPreviewRuntimeState,
+    /// The chosen light's levels as the operator means them: the preview's
+    /// while previewing, else the stored ones with a running fade sampled.
+    chosen_levels: Option<LightingFixtureLevels>,
 }
 
 impl LightsAndAudio {
@@ -359,12 +362,18 @@ impl LightsAndAudio {
             .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
         let preview = shared_preview.clone();
         drop(shared_preview);
-        Ok(Self {
+        let mut displays = Self {
             audio_snapshot: read_audio_snapshot(&app_settings),
             lighting_state: load_lighting_editor_state(&app_settings),
             app_settings,
             preview,
-        })
+            chosen_levels: None,
+        };
+        let chosen_levels = displays.chosen_light().and_then(|(_, fixture)| {
+            read_lighting_fixture_levels(&displays.app_settings, &displays.preview, &fixture.id)
+        });
+        displays.chosen_levels = chosen_levels;
+        Ok(displays)
     }
 
     /// The light the deck has chosen, and its place among the rig's.
@@ -390,13 +399,6 @@ impl LightsAndAudio {
             scenes.iter().map(|scene| scene.id.as_str()),
         )?;
         scenes.iter().enumerate().find(|(_, scene)| scene.id == id)
-    }
-
-    /// The chosen light's levels as the operator means them: the preview's
-    /// while previewing, else the stored ones with a running fade sampled.
-    fn chosen_levels(&self) -> Option<LightingFixtureLevels> {
-        let (_, fixture) = self.chosen_light()?;
-        read_lighting_fixture_levels(&self.app_settings, &self.preview, &fixture.id)
     }
 }
 
@@ -430,12 +432,12 @@ fn lights_and_audio_lcd_text(
             ),
             None => String::from("LIGHT\\n--"),
         }),
-        "light_intensity" => Ok(match displays.chosen_levels() {
+        "light_intensity" => Ok(match displays.chosen_levels {
             Some(levels) if !levels.on => String::from("INTENSITY\\nOFF"),
             Some(levels) => format!("INTENSITY\\n{} %", levels.intensity),
             None => String::from("INTENSITY\\n--"),
         }),
-        "light_cct" => Ok(match displays.chosen_levels() {
+        "light_cct" => Ok(match displays.chosen_levels {
             Some(levels) => format!("CCT\\n{} K", levels.cct),
             None => String::from("CCT\\n--"),
         }),

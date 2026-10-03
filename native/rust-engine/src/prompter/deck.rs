@@ -8,8 +8,10 @@
 //!   decided under the lock, by what the glass does at that moment.
 //! - `BACK`, `TOP` and the two cue keys jump as the page's keys do; a jump
 //!   keeps the scroll as it was, and only `TOP` pauses.
-//! - The dials: speed (5 words a minute a detent), position (a line), text
-//!   size (4 px; a push returns to the standard) and paragraph.
+//! - The dials, left to right (2026-10-03): speed (5 words a minute a
+//!   detent), line, paragraph, and text size (4 px; a push returns to the
+//!   standard). Each cell of the strip shows its own dial's value; `PLAY`
+//!   shows the time left, on every page.
 //!
 //! Putting a script on, replacing, updating and clearing it stay on the
 //! screen (D14). Nothing here starts a scroll but `PLAY` and the speed
@@ -19,8 +21,7 @@
 //!
 //! Since 2026-10-02 the keys, the dials and the displays run on the
 //! prompter's memory alone: the place, the pace and the size go to the saver,
-//! and the strip's name is the prompter's, so a slow disk never holds the
-//! deck. A key's jump is saved at once, a dial's detent shortly after. The
+//! so a slow disk never holds the deck. A key's jump is saved at once, a dial's detent shortly after. The
 //! displays take no lock of the prompter's: they read the frame it publishes
 //! whenever it lets go of its lock (`DeckFrame`) and work their text out from
 //! it at the moment they are asked, so they never wait for a key or the
