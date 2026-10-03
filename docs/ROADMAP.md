@@ -276,7 +276,7 @@ Found on the studio walk of 2026-10-01:
 - [ ] **Tests with a deadline failed in two slow runs of the gate** (2026-09-28): the shell's `exit_watcher_fails_pending_and_emits_event`, then the engine's `recall_pushes_the_snapshot_and_the_console_confirms_it` and `a_glass_that_goes_pauses_the_scroll_and_its_return_leaves_it_paused`, in a run where the engine's tests took 120 s (11 s alone). Each passed on the next run. The gate runs below normal priority, so whatever is busy beside it takes its time; what was busy was not found.
 - [ ] **A capture lets a changed digit through.** The comparison allows 100 differing pixels, and `43` turned `42` in two places stayed under it (2026-09-28). The page tests that read the words are what catch such a change.
 - [x] **`native/protocol/v1.md` says mixer edits are accepted while `not-verified`;** the engine refuses them. The document is wrong. Corrected in #255 for `audio.channel.update` and `audio.mixTarget.update`.
-- [ ] **The deck's poll opens 47 connections a second** (43 until #262), one a display, which leaves about 5,000 closed sockets waiting in Windows at any time. One request for all the displays of a page would make it four. It needs a way to fill many Companion variables from one answer, tried on the real deck.
+- [x] **The deck's poll opens 47 connections a second** (43 until #262), one a display, which leaves about 5,000 closed sockets waiting in Windows at any time. Fixed in the Companion 5 profile (2026-10-03): one request a second reads every display (`GET /api/deck/displays`) into one custom variable, kept only when it is the bridge's own answer and the newer, and an expression variable reads each line out of it. To be tried on the real deck at the owner's import.
 - [ ] **A slow read of a camera would hold the bridge.** A display waits for its page's texts while they are read, so with a real link that answers slowly the poll's displays can hold all four workers. Measure it when the first real link is built.
 - [x] **A key the deck was refused leaves no line in the log.** The bridge logs what it refuses itself (a token, a full queue), not what a page refuses (`REC` while CAM 1 is released). Fixed in #254: one `WARN` line a refused key, with the key and the reason.
 - [x] **`PLAY`, `DIM`, a mute and `Toggle` on the deck have no dwell.** A press that arrives twice switches twice. `REC` has one. Fixed in #254: the bridge drops a second press within 350 ms, counted from the press that acted; each strip's mute has its own.
@@ -315,7 +315,7 @@ Four larger changes, each decided on its own:
 
 Two follow-ups from the visual overhaul were never decided. Decide or drop:
 
-- **F1** The Stream Deck marks the selected strip amber; on screen amber means engaged and a selection is neutral. Changing it means new deck drawings, new Companion colours and a profile import.
+- [x] **F1** The Stream Deck marks the selected strip amber; on screen amber means engaged and a selection is neutral. Settled by the deck's new layout (the owner, 2026-10-03): the AUDIO strip taps and the mark of the selected strip left the deck, and the selected camera has a white outline, not an amber fill. It reaches the deck with the next import.
 - **F2** Per-channel `ASSUMED` marks on the Console. The engine reports one confidence for the whole desk; single marks need a field for each channel and mix target.
 
 ## Done: the streamlining

@@ -6,6 +6,11 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ## [Unreleased]
 
+### Changed
+
+- The Stream Deck has a new layout, in Companion 5's own format: `REC` and `PLAY` on every page, the page key top right, every dial's name and value on the strip (the LIGHTS strip was black), no top bars. GAIN, Del Scene and the AUDIO strip taps leave the deck; `PHONES` goes round the phones mixes. It reaches the deck with the next export and Full Reset & Import.
+- The deck's `RECALL` fades with the Lighting page's `Fade`, which is now remembered, and says `ON RIG`, `UNSAVED` or `PREVIEW`; `REC` shows the take's length; the deck greys when it cannot hear the app. It reads all its displays in one request a second.
+
 ### Added
 
 - The Cameras page shows the three cameras' pictures from vMix's Outputs 2, 3 and 4 over NDI, with Guides, Peaking, Zebras and the loupe; NDI's library comes in the build's folder. With vMix closed, `NO PICTURES` says to open vMix and send the outputs (#278, #279).
