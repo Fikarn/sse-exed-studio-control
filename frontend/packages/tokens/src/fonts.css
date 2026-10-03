@@ -1,0 +1,51 @@
+/*
+ * The brand's faces (docs/DESIGN.md section 3).
+ *
+ * PT Sans and PT Serif are ParaType's, under the SIL Open Font License
+ * (fonts/OFL.txt), and are committed beside this file: the app runs offline.
+ *
+ * SSE Adelia is licensed to SSE and this repository is public, so its file is
+ * never committed. The pages use the copy installed on the studio PC, by its
+ * full name or its PostScript name; where it is missing (CI) the display
+ * family falls back to PT Serif (--font-family-display).
+ */
+
+@font-face {
+  font-family: "PT Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/PTSans-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "PT Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("./fonts/PTSans-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "PT Serif";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/PTSerif-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "PT Serif";
+  font-style: italic;
+  font-weight: 400;
+  font-display: block;
+  src: url("./fonts/PTSerif-Italic.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SSE Adelia";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: local("SSE Adelia Bold"), local("SSEAdelia-Bold");
+}

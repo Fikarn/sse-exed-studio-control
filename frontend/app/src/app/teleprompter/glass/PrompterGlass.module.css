@@ -48,7 +48,7 @@
   right: var(--glass-margin);
   top: 0;
   color: var(--prompter-glass-text);
-  font-family: var(--font-family-ui);
+  font-family: var(--font-family-glass);
   font-size: var(--glass-size);
   font-weight: 500;
   font-feature-settings: normal;
@@ -87,7 +87,7 @@
 .column i,
 .cue,
 .cueLine {
-  font-family: "Prompter Glass Italic", var(--font-family-ui);
+  font-family: "Prompter Glass Italic", var(--font-family-glass);
 }
 
 /* A cue inside a sentence: the second colour, where it stands. */

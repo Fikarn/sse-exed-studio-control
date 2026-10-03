@@ -4,39 +4,35 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-// Legibility from the token values (docs/DESIGN.md): `text2` reads at 4.5:1
-// on bg, panel and key, and (as the display ink) on the well; every role text
-// reads at 4.5:1 on bg and panel; every display ink reads at 4.5:1 on the
-// well; and a lit fill's edge, drawn with the stronger hairline, stands 3:1
-// from the plate and the key around it. Computed from `tokens.css` and
-// `wells.css` exactly as the browser would resolve them. One theme, Studio
-// (D25): until 2026-09-28 this ran for Graphite and Bone as well.
+// Legibility from the token values (docs/DESIGN.md sections 4 and 5), computed
+// from `tokens.css` as the browser resolves it. Every ink that carries words
+// reads at 4.5:1 on every surface it is printed on (the one surface, a key's
+// face, a well, the floating layer and a row under the pointer); a lit fill
+// stands 3:1 from the surface around it; every fill's own ink reads at 4.5:1
+// on it, and so do the inks on the Dark Green title plate. One theme, Studio.
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tokensCss = readFileSync(path.join(here, "generated", "tokens.css"), "utf8");
-const wellsCss = readFileSync(path.join(here, "wells.css"), "utf8");
 
 type Rgba = [number, number, number, number];
 
-function declarations(css: string, selector: string, occurrence: "first" | "all" = "all") {
+function declarations(css: string, selector: string) {
   const out: Record<string, string> = {};
   const re = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{([^}]*)\\}`, "g");
   for (const match of css.matchAll(re)) {
     for (const decl of match[1]!.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) out[decl[1]!] = decl[2]!.trim();
-    if (occurrence === "first") break;
   }
   return out;
 }
 
 const vars = declarations(tokensCss, ":root");
-const wellOverrides = declarations(wellsCss, ".well,\n[data-well]");
 
-function resolve(vars: Record<string, string>, value: string, depth = 0): string {
+function resolve(value: string, depth = 0): string {
   if (depth > 10) throw new Error(`token reference too deep: ${value}`);
   return value.replace(/var\((--[a-z0-9-]+)\)/g, (_, name: string) => {
     const next = vars[name];
     if (next === undefined) throw new Error(`unresolved token ${name}`);
-    return resolve(vars, next, depth + 1);
+    return resolve(next, depth + 1);
   });
 }
 
@@ -68,64 +64,73 @@ const ratio = (a: Rgba, b: Rgba) => {
   return Math.round(((Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)) * 100) / 100;
 };
 
-function colour(vars: Record<string, string>, name: string) {
-  return parse(resolve(vars, `var(${name})`));
+const colour = (name: string) => parse(resolve(`var(${name})`));
+function textOn(textName: string, surfaceName: string) {
+  const surface = colour(surfaceName);
+  return ratio(over(colour(textName), surface), surface);
 }
-function textOn(vars: Record<string, string>, textName: string, surfaceName: string) {
-  const surface = colour(vars, surfaceName);
-  return ratio(over(colour(vars, textName), surface), surface);
-}
+
+const SURFACES = ["--material-bg", "--material-key", "--material-well", "--material-raise", "--material-hover"];
+const INKS = [
+  "--text-text",
+  "--text-text2",
+  "--text-text3",
+  "--role-green-text",
+  "--role-yellow-text",
+  "--role-coral-text",
+  "--role-blue-text",
+];
 
 describe("legibility from the token values", () => {
-  it("the well re-points the role inks at the display's", () => {
-    expect(Object.keys(wellOverrides).sort()).toEqual(
-      ["amber", "blue", "green", "red"].flatMap((role) => [`--role-${role}-bloom`, `--role-${role}-text`]).sort()
-    );
-  });
-
-  it("text2 reads at 4.5:1 on bg, panel and key", () => {
-    for (const surface of ["--material-bg", "--material-panel", "--material-key"]) {
-      expect(textOn(vars, "--text-text2", surface), `text2 on ${surface}`).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-
-  it("every role text reads at 4.5:1 on bg and panel", () => {
-    for (const role of ["amber", "green", "red", "blue"]) {
-      for (const surface of ["--material-bg", "--material-panel"]) {
-        expect(textOn(vars, `--role-${role}-text`, surface), `${role} text on ${surface}`).toBeGreaterThanOrEqual(4.5);
+  it("every ink that carries words reads at 4.5:1 on every surface", () => {
+    for (const ink of INKS) {
+      for (const surface of SURFACES) {
+        // Blue is information on the page and its wells; it is never printed
+        // in a floating layer's row under the pointer.
+        if (ink === "--role-blue-text" && surface === "--material-hover") continue;
+        expect(textOn(ink, surface), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
-  it("the display inks read at 4.5:1 on the well", () => {
-    const well = { ...vars, ...wellOverrides };
-    for (const ink of [
-      "--display-text",
-      "--display-text2",
-      "--role-green-text",
-      "--role-amber-text",
-      "--role-red-text",
-      "--role-blue-text",
-    ]) {
-      expect(textOn(well, ink, "--material-well"), `${ink} on the well`).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-
-  it("a lit fill's hairline edge stands 3:1 from the plate and the key", () => {
-    const line2 = colour(vars, "--material-line2");
-    for (const role of ["amber", "green", "red"]) {
-      const edge = over(line2, colour(vars, `--role-${role}-fill`));
-      for (const surface of ["--material-panel", "--material-key"]) {
-        expect(ratio(edge, colour(vars, surface)), `${role} fill edge vs ${surface}`).toBeGreaterThanOrEqual(3);
+  it("a lit fill stands 3:1 from the surface and the key's face around it", () => {
+    for (const fill of ["--role-green-fill", "--role-yellow-fill", "--role-primary-fill"]) {
+      for (const surface of ["--material-bg", "--material-key"]) {
+        expect(ratio(colour(fill), colour(surface)), `${fill} vs ${surface}`).toBeGreaterThanOrEqual(3);
       }
     }
   });
 
-  it("a role ink reads at 4.5:1 on its own fill", () => {
-    for (const role of ["amber", "green", "red", "primary"]) {
-      expect(textOn(vars, `--role-${role}-ink`, `--role-${role}-fill`), `${role} ink on fill`).toBeGreaterThanOrEqual(
+  it("every fill's own ink reads at 4.5:1 on it", () => {
+    for (const role of ["green", "yellow", "coral", "burgundy", "primary"]) {
+      expect(textOn(`--role-${role}-ink`, `--role-${role}-fill`), `${role} ink on its fill`).toBeGreaterThanOrEqual(
         4.5
       );
     }
+  });
+
+  it("the title plate's inks read at 4.5:1 on Dark Green", () => {
+    for (const ink of ["--text-text", "--text-text2", "--sse-beige"]) {
+      expect(textOn(ink, "--sse-dark-green"), `${ink} on Dark Green`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("the tooltip's black ink reads at 4.5:1 on Beige", () => {
+    expect(textOn("--sse-black", "--sse-beige")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("every colour token resolves to the palette or to its own value, never a second copy of a palette colour", () => {
+    const palette = new Map(
+      Object.entries(vars)
+        .filter(([name]) => name.startsWith("--sse-"))
+        .map(([name, value]) => [value.toLowerCase(), name])
+    );
+    // The glass is the presenter's picture, outside the visual system: its
+    // black is the glass's own, whatever the palette's black becomes.
+    const copies = Object.entries(vars)
+      .filter(([name]) => !name.startsWith("--sse-") && !name.startsWith("--prompter-glass-"))
+      .filter(([, value]) => palette.has(value.toLowerCase()))
+      .map(([name, value]) => `${name}: ${value} (is ${palette.get(value.toLowerCase())})`);
+    expect(copies).toEqual([]);
   });
 });
