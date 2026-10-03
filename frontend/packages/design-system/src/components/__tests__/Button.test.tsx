@@ -78,14 +78,19 @@ describe("Button", () => {
   // Visual overhaul A, Slice 3 (system §7, §9): Button aliases Key mode="command"
   // — sentence-case labels and no hover travel. Old: the recipe set
   // text-transform: uppercase and translated the key on hover.
-  it("prints sentence case and never travels", () => {
+  // Atrium (2026-10-03). Old: the key's edge was the inset shadow
+  // `var(--elevation-key)`. New: the key's flat face and a 1 px edge, no
+  // shadow. Reason: keys are flat and matte; only the floating layer casts one.
+  it("prints sentence case, never travels and is the flat key", () => {
     const css = readFileSync(
       path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "Button.module.css"),
       "utf8"
     );
     expect(css).not.toContain("text-transform: uppercase");
-    expect(css).not.toMatch(/:hover \{[^}]*transform/);
-    expect(css).toContain("var(--elevation-key)");
+    expect(css).not.toMatch(/:hover[^{]*\{[^}]*transform/);
+    expect(css).toMatch(/\.button \{[^}]*background: var\(--material-key\)/);
+    expect(css).toMatch(/\.button \{[^}]*border: 1px solid var\(--material-line2\)/);
+    expect(css).not.toContain("box-shadow");
   });
 
   it("renders the leadingVisual slot when provided", () => {

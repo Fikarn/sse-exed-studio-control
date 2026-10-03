@@ -1,8 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import { Dialog } from "../Dialog";
+
+const cssOf = (name: string) =>
+  readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", name), "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    ""
+  );
 
 // plan PR 6 / workstream D2: Dialog is the modal primitive (6 imports). It
 // portals to document.body, manages focus, and traps Tab. Tests cover render,
@@ -15,6 +24,21 @@ describe("Dialog", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Reset scene" })).toBeInTheDocument();
+  });
+
+  // Visual overhaul 2026-10 (Atrium): the dialog is the floating layer — the
+  // raised surface, a key's edge, the one radius, the float shadow, marked
+  // `data-level="float"` — over a flat scrim with no backdrop blur.
+  it("is the floating layer over a flat scrim", () => {
+    render(<Dialog title="Reset scene" />);
+    expect(screen.getByRole("dialog")).toHaveAttribute("data-level", "float");
+    const css = cssOf("Dialog.module.css");
+    expect(css).toMatch(
+      /\.dialog \{[^}]*border-radius: var\(--radius-base\);[^}]*border: 1px solid var\(--material-line2\);[^}]*background: var\(--material-raise\);[^}]*box-shadow: var\(--elevation-float\)/
+    );
+    expect(css).toMatch(/\.overlay \{[^}]*background: color-mix\(in srgb, var\(--material-well\) 60%, transparent\)/);
+    expect(css).toMatch(/\.title \{[^}]*700 var\(--font-size-word\) \/ [^;]* var\(--font-family-ui\)/);
+    expect(css).not.toMatch(/backdrop-filter|gradient\(|--elevation-plate|--radius-screen|--font-size-state/);
   });
 
   it("renders optional body + actions slots when provided", () => {

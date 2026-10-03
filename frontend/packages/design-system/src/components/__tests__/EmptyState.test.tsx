@@ -1,9 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Star } from "lucide-react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import { EmptyState } from "../OperationalState";
+
+const css = readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "OperationalState.module.css"),
+  "utf8"
+);
 
 // plan PR 6 / workstream D2: EmptyState is the operational F10 empty pattern
 // (3 imports, re-exported from OperationalState.tsx). Tests cover render,
@@ -68,5 +76,13 @@ describe("EmptyState", () => {
     );
     expect(screen.getByRole("button", { name: "CTA" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Extra" })).toBeInTheDocument();
+  });
+
+  // The Atrium look: an empty state draws no keyline box and no face; its
+  // message is in the quiet ink, and the one key is all that stands out.
+  it("has no keyline box, and its message is in the quiet ink", () => {
+    expect(css).not.toMatch(/\.empty \{[^}]*(border|background)/);
+    expect(css).not.toMatch(/\.state \{[^}]*background/);
+    expect(css).toMatch(/\.empty \.message \{\s*color: var\(--text-text3\)/);
   });
 });

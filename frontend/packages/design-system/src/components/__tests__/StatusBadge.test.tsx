@@ -1,7 +1,13 @@
 import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { StatusBadge, type StatusTone } from "../StatusBadge";
+
+const cssOf = (name: string) =>
+  readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", name), "utf8");
 
 // plan PR 6 / workstream D2: StatusBadge is a purely-visual label primitive
 // (7 imports). Visual overhaul A, Slice 3 (system §8): its tones are the shared
@@ -26,6 +32,15 @@ describe("StatusBadge", () => {
       expect(badge).toHaveAttribute("data-tone", tone);
       unmount();
     }
+  });
+
+  // Atrium: a keyline word — the word in SSE Adelia capitals, 24 px tall, the
+  // doubt mark (attention) dashed.
+  it("is a keyline round a word in SSE Adelia capitals, dashed for attention", () => {
+    const css = cssOf("StatusBadge.module.css");
+    expect(css).toMatch(/\.badge \{[^}]*height: 24px/);
+    expect(css).toMatch(/\.badge \{[^}]*var\(--font-family-display\)[^}]*text-transform: uppercase/);
+    expect(css).toMatch(/\.attention \{[^}]*border-style: dashed/);
   });
 
   // Slice 11 removed "keeps the legacy tone names as aliases onto the shared

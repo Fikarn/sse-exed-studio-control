@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ArmKey, Key, Segmented } from "../Key";
 import { Drawer } from "../Drawer";
-import { LampWord, Latch } from "../LampWord";
+import { LampWord, Latch, LatchSlot } from "../LampWord";
 import { Meter } from "../Meter";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../Plate";
 import { Groove, Slider } from "../Slider";
@@ -18,6 +18,9 @@ import { useArm } from "../useArm";
 
 const cssOf = (name: string) =>
   readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", name), "utf8");
+
+/** The stylesheet's rules without its comments, for what a file must not draw. */
+const rulesOf = (name: string) => cssOf(name).replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("StateDisplay", () => {
   it("is a fixed-height well region carrying the word, the sentence, the code and the way out", () => {
@@ -43,12 +46,45 @@ describe("StateDisplay", () => {
     expect(css).toContain("height: calc(var(--chrome-studio-state-display)");
   });
 
-  it("the tone word takes the display ink of its tone", () => {
+  // Visual overhaul 2026-10-03 (Atrium). Old: the word took the display inks
+  // (`--display-green` …). New: the role text tokens, the same on every surface.
+  it("the tone word takes the ink of its tone", () => {
     const css = cssOf("StateDisplay.module.css");
-    expect(css).toMatch(/\.ok \.word \{\s*color: var\(--display-green\)/);
-    expect(css).toMatch(/\.attention \.word \{\s*color: var\(--display-amber\)/);
-    expect(css).toMatch(/\.error \.word \{\s*color: var\(--display-red\)/);
-    expect(css).toMatch(/\.info \.word \{\s*color: var\(--display-blue\)/);
+    expect(css).toMatch(/\.ok \.word \{\s*color: var\(--role-green-text\)/);
+    expect(css).toMatch(/\.attention \.word \{\s*color: var\(--role-yellow-text\)/);
+    expect(css).toMatch(/\.error \.word \{\s*color: var\(--role-coral-text\)/);
+    expect(css).toMatch(/\.info \.word \{\s*color: var\(--role-blue-text\)/);
+  });
+
+  it("the word is SSE Adelia in capitals and drops to the readout size past ten characters", () => {
+    const { rerender } = render(<StateDisplay tone="attention" word="NOT VERIFIED" />);
+    expect(screen.getByText("NOT VERIFIED")).toHaveAttribute("data-long");
+    rerender(<StateDisplay tone="ok" word="VERIFIED" />);
+    expect(screen.getByText("VERIFIED")).not.toHaveAttribute("data-long");
+    const css = cssOf("StateDisplay.module.css");
+    expect(css).toMatch(
+      /\.word \{[^}]*var\(--font-size-display\)[^}]*var\(--font-family-display\)[^}]*text-transform: uppercase/
+    );
+    expect(css).toMatch(/\.word\[data-long\] \{\s*font-size: var\(--font-size-readout\)/);
+  });
+
+  it("an error draws the 2 px coral keyline; the sentence is PT Serif italic on two lines; nothing is tinted", () => {
+    const css = cssOf("StateDisplay.module.css");
+    expect(css).toMatch(
+      /\.display \{[^}]*border: 1px solid var\(--material-line\);\s*background: var\(--material-well\)/
+    );
+    expect(css).toMatch(/\.error \{[^}]*border: 2px solid var\(--role-coral-text\)/);
+    expect(css).toMatch(/\.sentence \{[^}]*italic[^}]*var\(--font-family-serif\)[^}]*-webkit-line-clamp: 2/);
+    expect(rulesOf("StateDisplay.module.css")).not.toMatch(/elevation-tint|--display-|box-shadow/);
+  });
+
+  it("the armed row is the one armed form: the Burgundy fill, the Beige ink, a 3 px bar", () => {
+    const css = cssOf("StateDisplay.module.css");
+    expect(css).toMatch(
+      /\.armedRow \{[^}]*background: var\(--role-burgundy-fill\);\s*color: var\(--role-burgundy-ink\)/
+    );
+    expect(css).toMatch(/\.bar \{[^}]*height: 3px/);
+    expect(css).toMatch(/\.bar i \{[^}]*background: var\(--role-burgundy-ink\)/);
   });
 
   it("renders the armed row in place of the meta line", () => {
@@ -74,7 +110,9 @@ describe("StateDisplay", () => {
 });
 
 describe("Key", () => {
-  it("renders every mode with its data attribute and the cap in mono uppercase", () => {
+  // Visual overhaul 2026-10-03 (Atrium). Old: the cap was the mono face in
+  // capitals. New: the cap is SSE Adelia (the display family) in capitals.
+  it("renders every mode with its data attribute and the cap in SSE Adelia capitals", () => {
     for (const mode of ["command", "primary", "danger", "toggle", "momentary", "arm", "hazard", "segmented"] as const) {
       const { unmount } = render(
         <Key mode={mode} cap={mode}>
@@ -85,8 +123,25 @@ describe("Key", () => {
       unmount();
     }
     const css = cssOf("Key.module.css");
-    expect(css).toMatch(/\.cap \{[^}]*font-family-mono[^}]*\}/);
+    expect(css).toMatch(/\.cap \{[^}]*font-family-display[^}]*\}/);
     expect(css).toMatch(/\.cap \{[^}]*text-transform: uppercase/);
+    expect(css).not.toMatch(/font-family-mono/);
+  });
+
+  it("keys are flat: one face, a 1 px edge, no shadow and no gradient", () => {
+    const css = cssOf("Key.module.css");
+    expect(css).toMatch(
+      /\.key \{[^}]*border-radius: var\(--radius-base\);\s*background: var\(--material-key\);\s*border: 1px solid var\(--material-line2\)/
+    );
+    expect(rulesOf("Key.module.css")).not.toMatch(/box-shadow|gradient|blur\(/);
+  });
+
+  it("a selected key carries the Beige keyline and data-selected", () => {
+    const { rerender } = render(<Key>Rename</Key>);
+    expect(screen.getByRole("button")).not.toHaveAttribute("data-selected");
+    rerender(<Key selected>Rename</Key>);
+    expect(screen.getByRole("button")).toHaveAttribute("data-selected");
+    expect(cssOf("Key.module.css")).toMatch(/\.selected \{[^}]*border-color: var\(--accent\)/);
   });
 
   it("engaged and live are lit fills marked data-lit; a toggle exposes aria-pressed", () => {
@@ -127,7 +182,8 @@ describe("Key", () => {
     fireEvent.click(key);
     expect(onClick).not.toHaveBeenCalled();
     const css = cssOf("Key.module.css");
-    expect(css).toMatch(/\.locked \{[^}]*opacity: 0\.55[^}]*border-style: dashed/);
+    // Atrium: the locked form is a dashed edge on no face at 55 %.
+    expect(css).toMatch(/\.locked \{[^}]*opacity: 0\.55;\s*background: transparent;\s*border-style: dashed/);
   });
 
   it("keys never travel: no transform on hover", () => {
@@ -146,7 +202,9 @@ describe("Key", () => {
     expect(container.querySelector("[data-lamp]")).toHaveAttribute("data-lit");
   });
 
-  it("a segmented group is a well of keys with one lit choice", () => {
+  // Visual overhaul 2026-10-03 (Atrium). Old: a well of keys. New: one
+  // outlined row; `data-well` stays on the group for the pages that find it.
+  it("a segmented group is one outlined row of keys with one lit choice", () => {
     render(
       <Segmented label="Mix target" testId="seg">
         <Key mode="segmented" cap="Main Out" engaged />
@@ -155,6 +213,9 @@ describe("Key", () => {
     );
     expect(screen.getByRole("group", { name: "Mix target" })).toHaveAttribute("data-well");
     expect(screen.getAllByRole("button").filter((b) => b.hasAttribute("data-lit"))).toHaveLength(1);
+    expect(cssOf("Key.module.css")).toMatch(
+      /\.segmented \{[^}]*border: 1px solid var\(--material-line2\);\s*border-radius: var\(--radius-base\);\s*background: var\(--material-key\)/
+    );
   });
 
   it("take-time keys declare data-take and measure at least 36 px tall in the stylesheet", () => {
@@ -165,6 +226,15 @@ describe("Key", () => {
     );
     expect(screen.getByRole("button")).toHaveAttribute("data-take");
     expect(cssOf("Key.module.css")).toMatch(/\.key \{[^}]*min-height: 36px/);
+  });
+
+  it("comes in four heights: small 28, default 36, large 48, tall 64", () => {
+    render(<Key size="large">Turn off</Key>);
+    expect(screen.getByRole("button").className).toMatch(/large/);
+    const css = cssOf("Key.module.css");
+    expect(css).toMatch(/\.small \{[^}]*min-height: 28px/);
+    expect(css).toMatch(/\.large \{[^}]*min-height: 48px/);
+    expect(css).toMatch(/\.tall \{[^}]*min-height: 64px/);
   });
 });
 
@@ -190,6 +260,17 @@ describe("ArmKey", () => {
     expect(screen.getByRole("button")).not.toHaveTextContent(/Esc/);
     const bar = screen.getByTestId("audio-arm-countdown");
     expect(bar.getAttribute("style")).toContain("--arm-duration: 4500ms");
+  });
+
+  // Visual overhaul 2026-10-03 (Atrium): the one armed form is the Burgundy
+  // fill with the Beige ink, and its countdown a 3 px bar in that ink.
+  it("armed is the Burgundy fill with the Beige ink and a 3 px countdown bar", () => {
+    const css = cssOf("Key.module.css");
+    expect(css).toMatch(
+      /\.armed \{[^}]*background: var\(--role-burgundy-fill\);\s*border-color: var\(--role-burgundy-fill\);\s*color: var\(--role-burgundy-ink\)/
+    );
+    expect(css).toMatch(/\.countdown \{[^}]*height: 3px[^}]*background: var\(--role-burgundy-ink\)/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)[\s\S]*\.countdown \{[^}]*animation: none/);
   });
 });
 
@@ -317,18 +398,83 @@ describe("LampWord and Latch", () => {
     expect(screen.getByTestId("latch")).toHaveAttribute("data-latch");
     expect(screen.getByRole("button", { name: "Clear all solo" })).toBeInTheDocument();
   });
+
+  it("a latch is a 56 px keyline in its tone; a state word is SSE Adelia in capitals", () => {
+    const css = cssOf("LampWord.module.css");
+    expect(css).toMatch(/\.latch \{[^}]*height: 56px[^}]*border: 1px solid var\(--role-yellow-line\)/);
+    expect(css).toMatch(/\.cap \{[^}]*var\(--font-family-display\)[^}]*text-transform: uppercase/);
+  });
+
+  it("a lamp is a circle with no bloom: hollow when off, filled with its tone when lit", () => {
+    const css = cssOf("Lamp.module.css");
+    expect(css).toMatch(
+      /\.lamp \{[^}]*border-radius: var\(--radius-pill\);\s*border: 1px solid var\(--text-text3\);\s*background: transparent/
+    );
+    expect(css).toMatch(/\.error \{[^}]*background: var\(--role-coral-text\)/);
+    expect(rulesOf("Lamp.module.css")).not.toMatch(/elevation-lamp|bloom|box-shadow/);
+  });
+
+  // The latch slot (new, Atrium): the same 56 px row under the state display
+  // on every page, so the keys below it never move whether anything is
+  // latched or not.
+  it("a latch slot keeps its row: the resting form with nothing latched, the latches when there are", () => {
+    const { rerender } = render(<LatchSlot testId="slot" />);
+    const slot = screen.getByTestId("slot");
+    expect(slot).toHaveAttribute("data-latch-slot");
+    expect(slot).toHaveAttribute("data-count", "0");
+    expect(slot).toHaveTextContent("Nothing latched");
+    expect(slot.querySelector("[data-lamp]")).toHaveAttribute("data-lamp", "off");
+    expect(slot.querySelector("[data-lamp]")).not.toHaveAttribute("data-lit");
+    expect(slot.querySelector("[data-latch]")).toBeNull();
+    rerender(<LatchSlot testId="slot" emptyLabel="No solo" />);
+    expect(slot).toHaveTextContent("No solo");
+    rerender(
+      <LatchSlot testId="slot">
+        <Latch who="Solo" action={<Key>Clear all solo</Key>}>
+          on FX 3/4
+        </Latch>
+        {null}
+        <Latch who="Scene" tone="info" action={<Key>Save</Key>}>
+          changed since it was saved
+        </Latch>
+      </LatchSlot>
+    );
+    expect(screen.getByTestId("slot")).toBe(slot);
+    expect(slot).toHaveAttribute("data-count", "2");
+    expect(slot.querySelectorAll("[data-latch]")).toHaveLength(2);
+    expect(slot).not.toHaveTextContent("Nothing latched");
+    const css = cssOf("LampWord.module.css");
+    // A fixed height that does not shrink, whatever it holds.
+    expect(css).toMatch(/\.latchSlot \{[^}]*height: 56px;\s*flex: none/);
+    expect(css).not.toMatch(/\.latchSlot \{[^}]*min-height/);
+    // The resting form: a hairline edge, the one radius, no fill.
+    expect(css).toMatch(
+      /\.resting \{[^}]*border: 1px solid var\(--material-line\);\s*border-radius: var\(--radius-base\)/
+    );
+    expect(css).toMatch(/\.emptyLabel \{[^}]*color: var\(--text-text3\)/);
+    // Two latches: each keeps its word and its key, and its text gives way.
+    expect(css).toMatch(/\.crowded \.text \{\s*display: none/);
+  });
 });
 
 describe("Wells", () => {
-  it("wells scope the display inks with data-well", () => {
+  it("a well is marked data-well: one step down, a hairline edge, flat", () => {
     render(
       <Well>
         <span>display</span>
       </Well>
     );
     expect(screen.getByText("display").parentElement).toHaveAttribute("data-well");
+    expect(cssOf("Well.module.css")).toMatch(
+      /\.well \{[^}]*background: var\(--material-well\);\s*border: 1px solid var\(--material-line\)/
+    );
+    expect(rulesOf("Well.module.css")).not.toMatch(/box-shadow|gradient/);
   });
 
+  // Visual overhaul 2026-10-03 (Atrium). Old: doubt was dashed in
+  // `--display-yellow` on a readout box. New: the readout is the value itself
+  // (a transparent edge), and doubt dashes that edge in `--role-yellow-line`,
+  // so nothing moves; the unit prints at half size.
   it("a readout prints the value, marks doubt, and prints — when empty", () => {
     const { rerender } = render(<Readout value="-3.8 dB" testId="r" />);
     expect(screen.getByTestId("r")).toHaveTextContent("-3.8 dB");
@@ -336,7 +482,14 @@ describe("Wells", () => {
     expect(screen.getByTestId("r")).toHaveAttribute("data-doubt");
     rerender(<Readout value="-3.8 dB" empty testId="r" />);
     expect(screen.getByTestId("r")).toHaveTextContent("—");
-    expect(cssOf("Well.module.css")).toMatch(/\.doubt \{[^}]*border: 1px dashed var\(--display-amber\)/);
+    rerender(<Readout value="-3.8" unit="dB" testId="r" />);
+    expect(screen.getByTestId("r")).toHaveTextContent("-3.8 dB");
+    expect(screen.getByText("dB")).toBeInTheDocument();
+    const css = cssOf("Well.module.css");
+    expect(css).toMatch(/\.readout \{[^}]*border: 1px solid transparent/);
+    expect(css).toMatch(/\.doubt \{[^}]*border: 1px dashed var\(--role-yellow-line\)/);
+    expect(css).toMatch(/\.readout\[data-empty\] \{\s*color: var\(--text-text3\)/);
+    expect(css).toMatch(/\.unit \{[^}]*font-size: var\(--font-size-tick\);\s*color: var\(--text-text3\)/);
   });
 
   it("a field prints its label and value on a well", () => {
@@ -344,6 +497,7 @@ describe("Wells", () => {
     expect(screen.getByTestId("f")).toHaveAttribute("data-well");
     expect(screen.getByText("Stage X")).toBeInTheDocument();
     expect(screen.getByText("2.9 m")).toBeInTheDocument();
+    expect(cssOf("Well.module.css")).toMatch(/\.field:focus-within \{\s*border-color: var\(--accent\)/);
   });
 
   it("a screen is a well with an optional head and the blue keyline for preview", () => {
@@ -354,6 +508,7 @@ describe("Wells", () => {
     );
     expect(screen.getByText("Stage plot")).toBeInTheDocument();
     expect(screen.getByTestId("screen").querySelector("[data-well]")).toBeInTheDocument();
+    expect(cssOf("Well.module.css")).toMatch(/\.info \{\s*border-color: var\(--role-blue-text\)/);
   });
 });
 
@@ -416,6 +571,40 @@ describe("Slider and Groove", () => {
     expect(groove).toHaveAttribute("data-take");
     expect(cssOf("Slider.module.css")).toMatch(/\.groove \{[^}]*width: 44px/);
     expect(cssOf("Slider.module.css")).toMatch(/\.grooveWell \{[^}]*left: 13px;\s*right: 13px/);
+    // The travel keeps its 14 px insets, the same as the meter's bars, so a
+    // groove and the meter beside it read on one scale.
+    expect(cssOf("Slider.module.css")).toMatch(/\.travel \{[^}]*top: 14px;\s*bottom: 14px/);
+    expect(cssOf("Slider.module.css")).toMatch(/\.slot \{[^}]*width: 2px[^}]*background: var\(--material-line\)/);
+  });
+
+  // Visual overhaul 2026-10-03 (Atrium): the caps are matte and light (the
+  // cap fill, the one radius, no shadow), the groove's cap carries a 2 px
+  // index line, and the horizontal slider has no box, only a 28 px hit area.
+  it("caps are matte and light, with the one radius and no shadow", () => {
+    const css = cssOf("Slider.module.css");
+    expect(css).toMatch(/\.cap \{[^}]*border-radius: var\(--radius-base\);\s*background: var\(--role-cap-fill\)/);
+    expect(css).toMatch(/\.grooveCap \{[^}]*border-radius: var\(--radius-base\);\s*background: var\(--role-cap-fill\)/);
+    expect(css).toMatch(/\.grooveCap::after \{[^}]*height: 2px[^}]*background: var\(--role-cap-line\)/);
+    expect(css).toMatch(/\.slider \{[^}]*height: 28px/);
+    expect(css).toMatch(/\.track \{[^}]*height: 2px;\s*margin-top: -1px;\s*background: var\(--material-line2\)/);
+    expect(css).toMatch(/\.doubt \.cap,\s*\.doubt \.grooveCap \{\s*outline: 1px dashed var\(--role-yellow-line\)/);
+    expect(rulesOf("Slider.module.css")).not.toMatch(/box-shadow|gradient/);
+  });
+
+  it("the colour temperature track is signal and draws no fill", () => {
+    const { container, rerender } = render(<Slider label="Main level" value={0.2} />);
+    expect(container.querySelector('[class*="fill"]')).not.toBeNull();
+    rerender(<Slider label="Colour temperature" value={0.2} cct />);
+    expect(container.querySelectorAll('[data-signal="cct"]')).toHaveLength(1);
+    expect(container.querySelector('[class*="fill"]')).toBeNull();
+    expect(cssOf("Slider.module.css")).toMatch(/\.cct \.track \{[^}]*background: var\(--signal-cct-track\)/);
+  });
+
+  it("a groove draws the ticks it is given, and none without them", () => {
+    const { container, rerender } = render(<Groove label="Host fader" value={0.5} ticks={[0.1, 0.5, 0.9]} />);
+    expect(container.querySelectorAll("[data-tick]")).toHaveLength(3);
+    rerender(<Groove label="Host fader" value={0.5} />);
+    expect(container.querySelectorAll("[data-tick]")).toHaveLength(0);
   });
 
   // Visual overhaul A, Slice 4b: the Console's faders are this groove, so the
@@ -474,9 +663,12 @@ describe("Slider and Groove", () => {
 });
 
 describe("Meter", () => {
-  it("draws the ramp and the glow when live, and marks the ramp as signal", () => {
+  // Visual overhaul 2026-10-03 (Atrium). Old: a blurred glow copy of the ramp
+  // stood under it, so a bar drew two signal elements. New: nothing glows; a
+  // bar draws its one ramp.
+  it("draws the ramp when live and marks it as signal; nothing glows", () => {
     const { container } = render(<Meter label="Host" level={0.6} peak={0.7} />);
-    expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(1);
     expect(screen.getByRole("meter", { name: "Host" })).toHaveAttribute("aria-valuenow", "60");
   });
 
@@ -504,7 +696,7 @@ describe("Meter", () => {
     expect(container.querySelector('[data-meter-peak="right"]')).not.toBeNull();
   });
 
-  it("empty leaves the well with the reference only; stale drops the glow and dims", () => {
+  it("empty leaves the slots and the reference only; stale dims the last frame to 0.4", () => {
     const { container, rerender } = render(<Meter label="Host" level={0.6} peak={0.7} empty />);
     expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(0);
     expect(screen.getByRole("meter")).toHaveAttribute("data-empty");
@@ -516,14 +708,28 @@ describe("Meter", () => {
 
   it("a stereo meter draws two bars and the clip lamp lights only on clip", () => {
     const { container, rerender } = render(<Meter label="Main" level={0.5} levelRight={0.4} />);
-    expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(4);
+    expect(container.querySelectorAll('[data-signal="meter"]')).toHaveLength(2);
     expect(screen.getByRole("meter")).not.toHaveAttribute("data-clip");
     rerender(<Meter label="Main" level={0.5} levelRight={0.4} clip />);
     expect(screen.getByRole("meter")).toHaveAttribute("data-clip");
   });
 
-  it("the ramp stops are the signal token: green to 70 %, yellow to 90 %, orange to 95 %, red above", () => {
+  it("the ramp is the signal token: green to 70 %, yellow to 95 %, coral above", () => {
     expect(cssOf("Meter.module.css")).toContain("var(--signal-ramp-v)");
+    expect(cssOf("Meter.module.css")).toContain("var(--signal-ramp-h)");
+  });
+
+  it("is flat: a slot in each bar, a 2 px peak tick, a coral clip lamp, no glow", () => {
+    const css = cssOf("Meter.module.css");
+    expect(css).toMatch(
+      /\.meter \{[^}]*background: var\(--material-well\);\s*border: 1px solid var\(--material-line\)/
+    );
+    expect(css).toMatch(/\.bar \{[^}]*background: var\(--material-bg\)/);
+    expect(css).toMatch(/\.peak \{[^}]*background: var\(--signal-peak\)/);
+    expect(css).toMatch(/\.vertical \.peak \{[^}]*height: 2px/);
+    expect(css).toMatch(/\.horizontal \.peak \{[^}]*width: 2px/);
+    expect(css).toMatch(/\.clipLit \{[^}]*background: var\(--role-coral-fill\)/);
+    expect(rulesOf("Meter.module.css")).not.toMatch(/box-shadow|blur\(|filter/);
   });
 });
 
@@ -555,6 +761,32 @@ describe("Plate sections", () => {
       screen.getByRole("button", { name: "Delete fixture…" })
     );
   });
+
+  // Visual overhaul 2026-10-03 (Atrium): the plate head is the Dark Green
+  // title plate, its title PT Sans keeping its case; a section head is SSE
+  // Adelia in capitals over the brand's 2 px heavy rule.
+  it("the head is the Dark Green title plate; a section head is Adelia over the heavy rule", () => {
+    const css = cssOf("Plate.module.css");
+    expect(css).toMatch(/\.head \{[^}]*background: var\(--sse-dark-green\)/);
+    expect(css).toMatch(/\.title \{[^}]*font: 700 var\(--font-size-readout\) \/ 1\.1 var\(--font-family-ui\)/);
+    expect(css).not.toMatch(/\.title \{[^}]*text-transform/);
+    expect(css).toMatch(/\.sectionHead \{[^}]*border-bottom: 2px solid var\(--material-line2\)/);
+    expect(css).toMatch(/\.sectionTitle \{[^}]*var\(--font-family-display\)[^}]*text-transform: uppercase/);
+    expect(css).toMatch(/\.readoutLabel,\s*\.readoutValue \{[^}]*border-bottom: 1px solid var\(--material-line\)/);
+  });
+
+  it("a control row prints its value with the unit at half size in the quiet ink", () => {
+    render(
+      <ControlRow label="Phones 1" value="-7.2" unit="dB" testId="cr">
+        <Slider label="Phones 1" value={0.5} />
+      </ControlRow>
+    );
+    expect(screen.getByTestId("cr")).toHaveTextContent("-7.2 dB");
+    expect(screen.getByText("dB")).toBeInTheDocument();
+    expect(cssOf("Plate.module.css")).toMatch(
+      /\.controlUnit \{\s*font-size: var\(--font-size-tick\);\s*color: var\(--text-text3\)/
+    );
+  });
 });
 
 describe("Drawer", () => {
@@ -573,6 +805,12 @@ describe("Drawer", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(2);
+    // Atrium: the floating layer — the raised surface and the float shadow,
+    // no backdrop blur, none of the retired plate or mono tokens.
+    expect(cssOf("Drawer.module.css")).toMatch(
+      /\.drawer \{[^}]*background: var\(--material-raise\);\s*box-shadow: var\(--elevation-float\)/
+    );
+    expect(rulesOf("Drawer.module.css")).not.toMatch(/backdrop-filter|--font-family-mono|--elevation-plate-fill/);
   });
 
   it("renders nothing when closed", () => {
