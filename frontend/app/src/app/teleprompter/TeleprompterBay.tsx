@@ -18,8 +18,9 @@ import styles from "./TeleprompterBay.module.css";
 // never moves it. It reports its layout to the hardware link, which runs the
 // clock on it (Slice 4).
 
-/** The copy across the bay, 1,688 × 950: 88 % of the Prompter XL's pixels (the proposal §6.1). */
-export const COPY_WIDTH = 1688;
+/** The copy across the bay, 1,680 × 945: 87.5 % of the Prompter XL's pixels (the proposal §6.1;
+ *  the shell, overhaul 3, made the bay 1,680 wide). */
+export const COPY_WIDTH = 1680;
 
 export interface TeleprompterBayProps {
   snapshot: PrompterSnapshot;

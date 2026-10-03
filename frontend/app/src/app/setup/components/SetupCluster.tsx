@@ -1,4 +1,16 @@
-import { ArmKey, type ArmedKey, Key, Lamp, Section, Segmented, StateDisplay, Well } from "@sse/design-system";
+import {
+  ArmKey,
+  type ArmedKey,
+  Key,
+  Lamp,
+  LatchSlot,
+  MenuButton,
+  type MenuEntry,
+  Section,
+  Segmented,
+  StateDisplay,
+  Well,
+} from "@sse/design-system";
 
 import type { CommissioningCheck } from "../../shellData";
 import { type SetupMode, UNPUBLISH_ARMED_SENTENCE } from "../setupPilotModel";
@@ -118,6 +130,22 @@ export function SetupCluster({
       </Key>
     ) : null;
 
+  // The shell (overhaul 3): the page's ⋯ on the state display. Until Setup's
+  // own pull request it holds the Workstation row's commands, with the same
+  // handlers and the same locks.
+  const busyReason = busy ? "another action is running" : undefined;
+  const pageMenu: MenuEntry[] = [
+    { id: "export-backup", label: "Export backup", onSelect: onExportBackup, disabledReason: busyReason },
+    { id: "engine-log", label: "Open the log", onSelect: onOpenEngineLog, disabledReason: busyReason },
+    { kind: "divider", id: "divider" },
+    {
+      id: "console",
+      label: "Back to the console",
+      onSelect: onReturnToConsole,
+      disabledReason: canReturnToConsole ? undefined : "commissioning is not published",
+    },
+  ];
+
   return (
     <div className={styles.cluster} data-setup-cluster="" data-testid="setup-cluster">
       <StateDisplay
@@ -137,7 +165,17 @@ export function SetupCluster({
         actions={stateActions}
         data-toolbar-primary="title"
         testId="setup-state-display"
+        menu={
+          <MenuButton
+            buttonLabel="Setup menu"
+            buttonTestId="setup-page-menu"
+            menu={{ head: { title: "Setup / Support" }, items: pageMenu }}
+          />
+        }
       />
+
+      {/* The shell (overhaul 3): the latch slot, the same on every page. */}
+      <LatchSlot testId="setup-latch-slot" />
 
       <Segmented label="Setup mode" className={styles.modeSwitch} testId="setup-mode-switch">
         <Key

@@ -16,13 +16,11 @@
   /* Slice 10: never wider than the bay gives it, so the three tiers are made
      to share what there is instead of running off the canvas' right edge. */
   max-width: 100%;
-  /* Visual overhaul A, Slice 10: the horizontal padding used to be 16 px here
-     as well as on the bay, and the three tiers need the bay's full 1688 px at
-     2560 exactly (4 + 6 + 3 strips at 120 px, 8 px between them, 24 px per
-     hairline divider — A-cockpit.html's own arithmetic). Those 32 px were the
-     whole overflow: the Outputs tier was squeezed below its lanes and the
-     canvas clipped what spilled, so Phones B could not be read at all on the
-     boards whose Inputs head carries a lock note. */
+  /* Visual overhaul A, Slice 10: no horizontal padding here, only the bay's.
+     The shell (overhaul 3): the bay is 1680 px and the page keeps a 16 px
+     margin in it, so the tiers have 1648 px: 4 + 6 + 3 strips at 120 px, 4 px
+     between them and 24 px per hairline divider. Any more and the Outputs tier
+     is squeezed below its lanes and the canvas clips what spills. */
   padding: 16px 0;
 }
 
@@ -217,7 +215,9 @@
 .tierLaneGrid,
 .outputLaneGrid {
   display: flex;
-  gap: 8px;
+  /* The shell (overhaul 3): 4 px between strips, Atrium's 120 px pitch, so the
+     three tiers fit the 1648 px a 1680 px bay leaves inside its margin. */
+  gap: 4px;
   align-items: stretch;
   flex: 1;
   min-height: 0;

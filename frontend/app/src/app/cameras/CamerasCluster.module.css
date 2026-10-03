@@ -13,10 +13,11 @@
   overflow: hidden;
 }
 
-/* REC, the take-time key: 88 px, across the cluster. */
+/* REC, the take-time key: 64 px, the take-time height (the shell, overhaul
+   3), across the cluster. */
 .rec {
   width: 100%;
-  min-height: 88px;
+  min-height: 64px;
   flex: none;
 }
 
@@ -295,15 +296,4 @@
   color: var(--text-text2);
   font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
   white-space: nowrap;
-}
-
-.standing {
-  display: flex;
-  gap: 8px;
-  flex: none;
-  margin-top: auto;
-}
-
-.standing > * {
-  flex: 1 1 0;
 }

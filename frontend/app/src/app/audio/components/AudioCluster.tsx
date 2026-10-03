@@ -1,6 +1,18 @@
 import { useMemo, type CSSProperties } from "react";
 import type { ShellStore } from "@sse/engine-client";
-import { Key, Latch, Meter, Readout, Section, Segmented, Slider, StateDisplay } from "@sse/design-system";
+import {
+  Key,
+  Latch,
+  LatchSlot,
+  MenuButton,
+  Meter,
+  Readout,
+  Section,
+  Segmented,
+  Slider,
+  StateDisplay,
+  type MenuEntry,
+} from "@sse/design-system";
 
 import styles from "./AudioCluster.module.css";
 import { AUDIO_THROTTLE_FADER_MS } from "../audioConstants";
@@ -147,6 +159,26 @@ export function AudioCluster({
   );
 
   const lockedReason = actionsAllowed ? undefined : (status.warningBody ?? `The desk is ${status.label}.`);
+  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
+  // Console's own pull request it holds the Console row's commands, with the
+  // same handlers and the same locks.
+  const syncLocked = !viewModel.capabilities.canSync
+    ? "TotalMix cannot be read now"
+    : busyAction === "audio-sync"
+      ? "a sync is running"
+      : undefined;
+  const pageMenu: MenuEntry[] = [
+    { id: "sync", label: "Sync from TotalMix", onSelect: onSync, disabledReason: syncLocked },
+    { id: "probe", label: "Run audio probe", onSelect: onRunAudioProbe },
+    {
+      id: "clear-clips",
+      label: "Clear clips",
+      onSelect: onClearClips,
+      disabledReason: viewModel.capabilities.canClearClips ? undefined : "no clip held",
+    },
+    { kind: "divider", id: "divider" },
+    { id: "setup", label: "Open Setup", onSelect: onOpenSetup },
+  ];
   // Slice 8 (system §9): the desk's fault code is its own field, so nothing
   // leads a sentence with it. The state display puts it in its small slot; the
   // locked reasons and tooltips read the sentence alone.
@@ -173,41 +205,53 @@ export function AudioCluster({
             : null
         }
         testId="audio-state-display"
+        menu={
+          <MenuButton
+            buttonLabel="Audio menu"
+            buttonTestId="audio-page-menu"
+            menu={{ head: { title: "Audio" }, items: pageMenu }}
+          />
+        }
       />
 
-      {viewModel.soloedChannels.length > 0 ? (
-        <Latch
-          who={`${viewModel.soloedChannels.length} solo engaged`}
-          action={
-            <Key size="small" testId="audio-topbar-solo" onClick={onClearAllSolo} disabled={!actionsAllowed}>
-              Clear all solo
-            </Key>
-          }
-          testId="audio-solo-warning-band"
-        >
-          on {viewModel.soloedChannels.map((channel) => channel.name).join(", ")}
-        </Latch>
-      ) : null}
+      {/* The shell (overhaul 3): the latch slot, the same on every page. Solo
+          and a clip stand side by side in it; nothing above or between the
+          keys. */}
+      <LatchSlot testId="audio-latch-slot">
+        {viewModel.soloedChannels.length > 0 ? (
+          <Latch
+            who="Solo"
+            action={
+              <Key size="small" testId="audio-topbar-solo" onClick={onClearAllSolo} disabled={!actionsAllowed}>
+                Clear all solo
+              </Key>
+            }
+            testId="audio-solo-warning-band"
+          >
+            {viewModel.soloedChannels.length} on {viewModel.soloedChannels.map((channel) => channel.name).join(", ")}
+          </Latch>
+        ) : null}
 
-      {viewModel.healthStats.clippedChannels > 0 ? (
-        <Latch
-          who={`${viewModel.healthStats.clippedChannels} channels clipped`}
-          action={
-            <Key
-              size="small"
-              testId="audio-clip-clear-clips"
-              aria-label="Clear clips"
-              onClick={onClearClips}
-              disabled={!viewModel.capabilities.canClearClips}
-            >
-              Clear clips
-            </Key>
-          }
-          testId="audio-clip-warning-band"
-        >
-          over 0 dBFS
-        </Latch>
-      ) : null}
+        {viewModel.healthStats.clippedChannels > 0 ? (
+          <Latch
+            who="Clip"
+            action={
+              <Key
+                size="small"
+                testId="audio-clip-clear-clips"
+                aria-label="Clear clips"
+                onClick={onClearClips}
+                disabled={!viewModel.capabilities.canClearClips}
+              >
+                Clear clips
+              </Key>
+            }
+            testId="audio-clip-warning-band"
+          >
+            {viewModel.healthStats.clippedChannels} over 0 dBFS
+          </Latch>
+        ) : null}
+      </LatchSlot>
 
       <div className={styles.monitorRow}>
         <Key

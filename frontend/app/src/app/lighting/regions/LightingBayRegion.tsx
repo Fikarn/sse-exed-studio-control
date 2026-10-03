@@ -1,14 +1,13 @@
-import { LightingPlatePanel } from "./LightingPlatePanel";
 import styles from "../LightingWorkspace.module.css";
 import { StagePlot } from "../components/StagePlot";
-import { ColumnResizer } from "../components/ColumnResizer";
 import type { LightingEditor } from "../useLightingEditor";
 
-/** The bay: the plot, and the plate beside it. */
+/** The bay: the plot. The shell (overhaul 3): the plate is the shell's, so
+ *  the plot takes the bay, and the plate keeps the shell's fixed width (the
+ *  resizer went with it). */
 export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
   const { lightingFixtureCatalogSnapshot } = editor.props;
   const {
-    columns,
     uiMode,
     stagePlotRenderMode,
     searchQuery,
@@ -37,14 +36,7 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
   } = editor.fixtureEditor;
   const { previewDirty } = editor.sceneEditor;
   return (
-    <div
-      className={`${styles.body} ${columns.isResizing ? styles.bodyResizing : ""}`}
-      data-testid="lighting-body"
-      style={{
-        ["--lighting-rail-width" as string]: `${columns.railWidth}px`,
-        ["--lighting-inspector-width" as string]: `${columns.inspectorWidth}px`,
-      }}
-    >
+    <div className={styles.body} data-testid="lighting-body">
       {/* Visual overhaul A, Slice 5 (system §7): the plot is the bay's screen —
           a backlit picture of the room at real scale, with the blue keyline
           while the operator is editing offline and the lock note on its head
@@ -107,9 +99,6 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
           onRenderModeChange={setStagePlotRenderMode}
         />
       </main>
-
-      <ColumnResizer ariaLabel="Resize inspector" onPointerDown={columns.startResize("inspector")} />
-      <LightingPlatePanel editor={editor} />
     </div>
   );
 }

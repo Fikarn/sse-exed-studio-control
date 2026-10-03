@@ -550,8 +550,8 @@ export interface LatchedShellState {
   lightingSceneDrift: boolean;
   audioSolo: boolean;
   /** New pages program, Slice 6a: while the prompter scrolls, the time left
-   *  (`3:12`), for the green `Prompter playing` latch on every page; `null`
-   *  otherwise. */
+   *  (`3:12`), which the Teleprompter tab shows beside `playing` on every
+   *  other page; `null` otherwise. */
   prompterPlaying?: string | null;
 }
 
@@ -702,13 +702,36 @@ export function buildMonitorItems(
   // The same when it could not read the cameras'.
   const camerasCheck = (checks.cameras ?? undefined) as CamerasLampCheck | undefined;
   const recChip = recChipOf(camerasCheck);
+  // New pages program, Slice 6a: while the prompter scrolls, the time left on
+  // every page, which opens the Teleprompter (the proposal §2). The shell
+  // (overhaul 3): it is the Teleprompter tab's own state — `playing`, the
+  // time left after it in PT Sans, since SSE Adelia never carries a number —
+  // unless the prompter is worse off, whose word then wins.
+  const prompterTone = healthCheckTone(prompterCheck?.status);
+  const prompterLamp: HeaderItem =
+    latched?.prompterPlaying && prompterTone === "ok"
+      ? {
+          id: "prompter",
+          label: "Prompter",
+          detail: "playing",
+          value: `${latched.prompterPlaying} left`,
+          status: "ok",
+          tab: "teleprompter",
+        }
+      : {
+          id: "prompter",
+          label: "Prompter",
+          detail: prompterLampWord(prompterCheck),
+          status: prompterTone,
+          tab: "teleprompter",
+        };
 
   const lamp = (
     id: "lighting" | "audio",
     label: string,
     check: { status?: string } | undefined,
     workspace: WorkspaceStateTone | null | undefined
-  ) => {
+  ): HeaderItem => {
     const health = healthCheckTone(check?.status);
     const tone = toneForSubsystem(health, workspace?.tone ?? null) as StatusToneLike;
     const workspaceWorse = workspace
@@ -720,6 +743,7 @@ export function buildMonitorItems(
       label,
       detail: workspaceWorse && workspace ? workspace.word : statusLabelFor(check, "pending"),
       status: tone,
+      tab: id,
     };
   };
   // Found, to check (2026-09-28): a light output that could not open its port
@@ -730,7 +754,7 @@ export function buildMonitorItems(
   const lightingTone: WorkspaceStateTone | null | undefined = outputFailed
     ? { tone: "error", winsTies: true, word: "no output" }
     : workspaceTones?.lighting;
-  const items = [
+  const items: HeaderItem[] = [
     lamp("lighting", "Lighting", checks.lighting ?? undefined, lightingTone),
     lamp("audio", "Audio", checks.audio ?? undefined, workspaceTones?.audio),
     // D19: the lamps follow the tabs, so the cameras' stands before the prompter's.
@@ -739,14 +763,10 @@ export function buildMonitorItems(
       label: "Cameras",
       detail: camerasLampWord(camerasCheck),
       status: healthCheckTone(camerasCheck?.status),
+      tab: "cameras",
     },
     // New pages program, Slice 6a (D19): the Teleprompter's lamp, before the deck's.
-    {
-      id: "prompter",
-      label: "Prompter",
-      detail: prompterLampWord(prompterCheck),
-      status: healthCheckTone(prompterCheck?.status),
-    },
+    prompterLamp,
     {
       id: "surface",
       // D19 and the boards: `Surface` (Slice 6's first step 3, 2026-09-27).
@@ -759,13 +779,7 @@ export function buildMonitorItems(
       // "attention" makes the three pills agree on tone for the same state.
       status: healthCheckTone(checks.controlSurface?.status),
     },
-  ] as Array<{
-    id: string;
-    label: string;
-    detail: string;
-    status: "ok" | "attention" | "error" | "info";
-    target?: string;
-  }>;
+  ];
 
   // Found, to check (2026-09-28): an automatic backup that failed, or none for
   // two days, lit no lamp. A chip after the five lamps, only while it is so:
@@ -789,6 +803,7 @@ export function buildMonitorItems(
       detail: "unsaved",
       status: "attention",
       target: "Lighting",
+      page: "lighting",
     });
   }
   if (latched?.audioSolo) {
@@ -798,17 +813,7 @@ export function buildMonitorItems(
       detail: "latched",
       status: "attention",
       target: "Audio",
-    });
-  }
-  // New pages program, Slice 6a: a green latch while the prompter scrolls,
-  // on every page, which opens the Teleprompter (the proposal §2).
-  if (latched?.prompterPlaying) {
-    items.push({
-      id: "latched:prompter-playing",
-      label: "Prompter playing",
-      detail: `${latched.prompterPlaying} left`,
-      status: "ok",
-      target: "Teleprompter",
+      page: "audio",
     });
   }
   // Recording is a hazard: a red lamp and the word (system section 4), last
@@ -820,8 +825,47 @@ export function buildMonitorItems(
       detail: recChip.detail,
       status: recChip.status,
       target: "Cameras",
+      page: "cameras",
+      doubt: recChip.detail === "last known",
     });
   }
 
   return items;
+}
+
+/** One lamp or latch of the header, as `buildMonitorItems` gives it. */
+export interface HeaderItem {
+  id: string;
+  label: string;
+  detail: string;
+  /** A value after the word that changes, in PT Sans. */
+  value?: string;
+  status: "ok" | "attention" | "error" | "info";
+  target?: string;
+  /** The page whose tab carries this lamp. */
+  tab?: string;
+  /** The page a latch belongs to, which shows it itself. */
+  page?: string;
+  doubt?: boolean;
+}
+
+/**
+ * What the header shows on `activeWorkspace` (the shell, overhaul 3): the
+ * REC tally apart, in its own slot on every page; a latch not on the page
+ * that shows it itself (Solo in the Console's latch slot, the drifted scene
+ * in the rig's state display, the prompter's play on its take block); and the
+ * drifted scene not twice, when the Lighting tab already says `unsaved`. A
+ * page's own lamp stays in the list: the frame draws it in the page's tab,
+ * and leaves it out of the active tab.
+ */
+export function headerItems(items: readonly HeaderItem[], activeWorkspace: string) {
+  const rec = items.find((item) => item.id === "latched:rec") ?? null;
+  const lightingWord = items.find((item) => item.id === "lighting")?.detail;
+  const lamps = items.filter((item) => {
+    if (item === rec) return false;
+    if (item.page !== undefined && item.page === activeWorkspace) return false;
+    if (item.id === "latched:scene-drift" && lightingWord === "unsaved") return false;
+    return true;
+  });
+  return { lamps, rec };
 }

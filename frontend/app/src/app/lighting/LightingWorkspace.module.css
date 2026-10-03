@@ -1,9 +1,11 @@
+/* The shell (overhaul 3): the bay draws no margin, so the page keeps its own. */
 .shell {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--color-bg-canvas);
-  color: var(--color-brand-text-primary);
+  padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
+  background: var(--material-bg);
+  color: var(--text-text);
   font-family: var(--font-family-ui);
   min-height: 0;
 }
@@ -69,23 +71,15 @@
   }
 }
 
-/* Visual overhaul A, Slice 5: the rail is the shell's cluster now, so the body
-   is the bay and the plate — the plot takes what the plate leaves. */
+/* Visual overhaul A, Slice 5: the rail is the shell's cluster. The shell
+   (overhaul 3): the plate is the shell's too, so the body is the plot alone. */
 .body {
   flex: 1 1 0;
   display: grid;
-  grid-template-columns:
-    minmax(0, 1fr)
-    6px
-    var(--lighting-inspector-width, 416px);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-}
-
-.bodyResizing {
-  cursor: col-resize;
-  user-select: none;
 }
 
 /* Visual overhaul A, Slice 5: the plot is the bay's screen — the room, backlit,

@@ -1,4 +1,15 @@
-import { ArmKey, Key, LampWord, Section, Segmented, StateDisplay, type ArmedKey } from "@sse/design-system";
+import {
+  ArmKey,
+  Key,
+  LampWord,
+  LatchSlot,
+  MenuButton,
+  Section,
+  Segmented,
+  StateDisplay,
+  type ArmedKey,
+  type MenuEntry,
+} from "@sse/design-system";
 import type { CameraDialBank, CameraNumber, CamerasSnapshot } from "@sse/engine-client";
 
 import {
@@ -60,6 +71,16 @@ export function CamerasCluster({
   const recent = snapshot.recent === null ? null : recentRows(snapshot.recent).slice(0, RECENT_ROOM);
   const wayOut = state.wayOut;
   const dials = dialsView(snapshot);
+  // The shell (overhaul 3): the page's ⋯ on the state display holds the
+  // standing commands, with the same handlers; the row of keys that held them
+  // went, so the cluster keeps its room for the latch slot under the 80 px
+  // header (the Recent list's five rows at two lines).
+  const pageMenu: MenuEntry[] = [
+    { id: "read-all", label: "Read all cameras again", onSelect: () => onReadAgain(null), testId: "cameras-read-all" },
+    { id: "all-actions", label: "All actions", onSelect: onOpenActions },
+    { kind: "divider", id: "divider" },
+    { id: "setup", label: "Camera setup", onSelect: onOpenSetup, testId: "cameras-open-setup" },
+  ];
 
   return (
     <div className={styles.cluster} data-testid="cameras-cluster">
@@ -97,7 +118,17 @@ export function CamerasCluster({
         armed={armed ? { text: `${armed.label} · press again`, timeoutMs: armed.timeoutMs } : null}
         data-camera={state.camera}
         testId="cameras-state-display"
+        menu={
+          <MenuButton
+            buttonLabel="Cameras menu"
+            buttonTestId="cameras-page-menu"
+            menu={{ head: { title: "Cameras" }, items: pageMenu }}
+          />
+        }
       />
+
+      {/* The shell (overhaul 3): the latch slot, the same on every page. */}
+      <LatchSlot testId="cameras-latch-slot" />
 
       <Section title="Recording" detail="CAM 1 only · whichever camera is selected" testId="cameras-recording">
         {rec.kind === "recording" ? (
@@ -169,7 +200,7 @@ export function CamerasCluster({
         </dl>
       </Section>
 
-      <Section title="Cameras" detail="press one to select it" testId="cameras-list">
+      <Section title="Cameras" detail="press one: the picture and the plate follow" testId="cameras-list">
         <div className={styles.cameras} role="group" aria-label="Cameras">
           {snapshot.cameras.map((entry) => {
             const camera = cameraKeyView(entry, snapshot.selected);
@@ -208,7 +239,6 @@ export function CamerasCluster({
             );
           })}
         </div>
-        <p className={styles.fine}>The big picture and the plate follow the camera selected here.</p>
       </Section>
 
       {dials ? (
@@ -279,15 +309,6 @@ export function CamerasCluster({
           </ol>
         )}
       </Section>
-
-      <div className={styles.standing}>
-        <Key size="small" testId="cameras-read-all" onClick={() => onReadAgain(null)}>
-          Read all cameras again
-        </Key>
-        <Key size="small" testId="cameras-open-setup" onClick={onOpenSetup}>
-          Camera setup
-        </Key>
-      </div>
     </div>
   );
 }

@@ -412,7 +412,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   if (!viewModel) {
     return (
-      <div className={styles.audioShell} data-testid="audio-workspace-loading">
+      <div className={`${styles.consoleTheme} ${styles.audioShell}`} data-testid="audio-workspace-loading">
         <section className={styles.loadingPanel} data-material="plate" data-level="float">
           <span className={styles.eyebrow}>Audio</span>
           <h1>Loading the console…</h1>
@@ -428,7 +428,7 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
 
   return (
     <div
-      className={styles.audioShell}
+      className={`${styles.consoleTheme} ${styles.audioShell}`}
       data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
       data-meter-simulation-state={viewModel.meterSimulationState}
       data-output-role={viewModel.selectedMixTarget?.role ?? "main-out"}
@@ -466,6 +466,38 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
         <AudioFooter viewModel={viewModel} />
       </ShellRegion>
 
+      {/* The shell (overhaul 3): one plate mechanism for every page. */}
+      <ShellRegion region="plate">
+        <div
+          className={`${styles.consoleTheme} ${styles.audioPlate}`}
+          data-canvas-metering={viewModel.meterSimulationState === "gated" ? "false" : "true"}
+        >
+          <AudioInspector
+            armedActionKey={armedAction?.key ?? null}
+            clearDraftValueLater={clearDraftValueLater}
+            commitChannelContinuous={commitChannelContinuous}
+            commitChannelEqContinuous={commitChannelEqContinuous}
+            commitMixTargetContinuous={commitMixTargetContinuous}
+            draftStore={draftStore}
+            getDraftValue={getDraftValue}
+            onResetPeakHolds={resetPeakHolds}
+            onSelectMixTarget={selectMixTarget}
+            onTogglePeakHold={togglePeakHold}
+            setDraftValue={setDraftValue}
+            onUpdateChannelDynamics={updateChannelDynamics}
+            onUpdateChannelEq={updateChannelEq}
+            onUpdateChannelSendMode={updateChannelSendMode}
+            onTogglePhantom={togglePhantom}
+            onUpdateChannel={updateChannel}
+            onUpdateMixTarget={updateMixTarget}
+            peakHoldEnabled={peakHoldEnabled}
+            peakHoldResetToken={peakHoldResetToken}
+            store={store}
+            viewModel={viewModel}
+          />
+        </div>
+      </ShellRegion>
+
       <div className={styles.audioBody}>
         <AudioSignalCanvas
           armedAction={armedAction}
@@ -488,29 +520,6 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
           setDraftValue={setDraftValue}
           onUpdateChannel={updateChannel}
           onUpdateMixTarget={updateMixTarget}
-          store={store}
-          viewModel={viewModel}
-        />
-        <AudioInspector
-          armedActionKey={armedAction?.key ?? null}
-          clearDraftValueLater={clearDraftValueLater}
-          commitChannelContinuous={commitChannelContinuous}
-          commitChannelEqContinuous={commitChannelEqContinuous}
-          commitMixTargetContinuous={commitMixTargetContinuous}
-          draftStore={draftStore}
-          getDraftValue={getDraftValue}
-          onResetPeakHolds={resetPeakHolds}
-          onSelectMixTarget={selectMixTarget}
-          onTogglePeakHold={togglePeakHold}
-          setDraftValue={setDraftValue}
-          onUpdateChannelDynamics={updateChannelDynamics}
-          onUpdateChannelEq={updateChannelEq}
-          onUpdateChannelSendMode={updateChannelSendMode}
-          onTogglePhantom={togglePhantom}
-          onUpdateChannel={updateChannel}
-          onUpdateMixTarget={updateMixTarget}
-          peakHoldEnabled={peakHoldEnabled}
-          peakHoldResetToken={peakHoldResetToken}
           store={store}
           viewModel={viewModel}
         />

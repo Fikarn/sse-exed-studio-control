@@ -1,5 +1,4 @@
 import { Suspense, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Mic, ScrollText, Sliders, Sun, Video } from "lucide-react";
 
 import { AppShellFrame } from "@sse/design-system";
 import { useShellSnapshot, type ShellState } from "@sse/engine-client";
@@ -7,7 +6,7 @@ import { useShellSnapshot, type ShellState } from "@sse/engine-client";
 import styles from "./OperatorShell.module.css";
 import type { createShellEnvironment } from "./createShellEnvironment";
 import { OperatorLayoutProvider } from "./OperatorLayoutProvider";
-import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone } from "./shellData";
+import { asRecord, buildMonitorItems, deriveLightingWorkspaceTone, headerItems } from "./shellData";
 import { describeAudioStatus } from "./audio/audioFormatting";
 import { computeLiveSceneDrift } from "./lighting/lightingDrift";
 import { SetupRecoverySurface } from "./setup/SetupRecoverySurface";
@@ -44,11 +43,11 @@ export type ShellEnvironment = Awaited<ReturnType<typeof createShellEnvironment>
 // New pages program, Slice 3 (D4, D6): the header tabs are the way between the
 // workspaces. They print no key hint — Studio Control binds no key of its own.
 const WORKSPACES = [
-  { id: "setup", label: "Setup / Support", meta: "pilot", icon: <Sliders size={16} /> },
-  { id: "lighting", label: "Lighting", meta: "primary", icon: <Sun size={16} /> },
-  { id: "audio", label: "Audio", meta: "primary", icon: <Mic size={16} /> },
-  { id: "cameras", label: "Cameras", meta: "primary", icon: <Video size={16} /> },
-  { id: "teleprompter", label: "Teleprompter", meta: "primary", icon: <ScrollText size={16} /> },
+  { id: "setup", label: "Setup / Support" },
+  { id: "lighting", label: "Lighting" },
+  { id: "audio", label: "Audio" },
+  { id: "cameras", label: "Cameras" },
+  { id: "teleprompter", label: "Teleprompter" },
 ] as const;
 
 export function OperatorShell({ environment }: { environment: ShellEnvironment }) {
@@ -266,27 +265,28 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
   const tabsDisabled = shellExperience !== "ready";
   const disabledWorkspaces =
     !tabsDisabled && !operatorModeUnlocked ? ["lighting", "audio", "cameras", "teleprompter"] : [];
-  const monitorItems = buildMonitorItems(
-    shellState.healthSnapshot,
-    // The prompter's latch counts down, so it shows only while the hardware
-    // link answers: after it stops, the prompter comes back paused.
-    { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
-    shellExperience === "ready" ? workspaceTones : undefined,
-    now.getTime()
+  // The shell (overhaul 3): the page's own latches stay off the header while
+  // it is open, and the REC tally has its own slot (`headerItems`).
+  const header = headerItems(
+    buildMonitorItems(
+      shellState.healthSnapshot,
+      // The prompter's latch counts down, so it shows only while the hardware
+      // link answers: after it stops, the prompter comes back paused.
+      { lightingSceneDrift, audioSolo, prompterPlaying: shellExperience === "ready" ? prompterPlaying : null },
+      shellExperience === "ready" ? workspaceTones : undefined,
+      now.getTime()
+    ),
+    shellExperience === "ready" ? activeWorkspace : ""
   );
 
   // Visual overhaul A: a workspace fills the shell's cluster, plate and
-  // footer regions once it has moved onto the cluster rule. The Console did in
-  // Slice 4, Lighting in Slice 5 and Setup in Slice 7; the Teleprompter was
-  // built on it (new pages program, Slice 6a), and is the first to fill the
-  // shell's own plate (the others draw theirs inside the bay); the Cameras
-  // page does the same. Every page is a workspace, so every page fills them.
-  // The pre-ready surfaces render their own frame (they are not workspaces).
-  const workspaceRegions = shellExperience === "ready" ? ("slot" as const) : undefined;
-  const plateRegion =
-    shellExperience === "ready" && (activeWorkspace === "teleprompter" || activeWorkspace === "cameras")
-      ? ("slot" as const)
-      : undefined;
+  // footer regions. The shell (overhaul 3): one plate for every page — the
+  // Console's, the rig's and Support's left the bay for the shell's plate.
+  // The screens before ready fill the cluster and the plate too (their state
+  // display stands where every page's does); they have no footer, because
+  // there is nothing to report yet.
+  const workspaceRegions = "slot" as const;
+  const footerRegion = shellExperience === "ready" ? ("slot" as const) : undefined;
 
   // What the workspace boundary calls the area it wraps (Slice 9).
   const areaLabel =
@@ -380,25 +380,25 @@ function OperatorShellInner({ environment }: { environment: ShellEnvironment }) 
         activeWorkspace={activeWorkspace}
         clock={clock}
         cluster={workspaceRegions}
-        plate={plateRegion}
-        footer={workspaceRegions}
+        plate={workspaceRegions}
+        footer={footerRegion}
         disabledWorkspaces={disabledWorkspaces}
-        monitorItems={monitorItems}
+        monitorItems={header.lamps}
+        recTally={header.rec}
         tabsDisabled={tabsDisabled}
         workspaces={WORKSPACES}
         onMonitorItemClick={(item) => {
-          // Health chips open Setup / Support; latched chips jump to the
-          // workspace that owns the latched state (same-target clicks no-op).
+          // Health chips open Setup / Support; latched chips and the REC
+          // tally jump to the workspace that owns the latched state
+          // (same-target clicks no-op). A page's own lamp is its tab.
           const target =
             item.id === "latched:scene-drift"
               ? "lighting"
               : item.id === "latched:solo"
                 ? "audio"
-                : item.id === "latched:prompter-playing"
-                  ? "teleprompter"
-                  : item.id === "latched:rec"
-                    ? "cameras"
-                    : "setup";
+                : item.id === "latched:rec"
+                  ? "cameras"
+                  : "setup";
           void tryNavigateWorkspace(target);
         }}
         onWorkspaceChange={(workspaceId) => {

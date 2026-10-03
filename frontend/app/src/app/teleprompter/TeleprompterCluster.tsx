@@ -1,6 +1,18 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
 
-import { ArmKey, ARM_TIMEOUT_MS, Button, Dialog, Key, Section, StateDisplay, type ArmedKey } from "@sse/design-system";
+import {
+  ArmKey,
+  ARM_TIMEOUT_MS,
+  Button,
+  Dialog,
+  Key,
+  LatchSlot,
+  MenuButton,
+  Section,
+  StateDisplay,
+  type ArmedKey,
+  type MenuEntry,
+} from "@sse/design-system";
 import type {
   JsonValue,
   PrompterJumpRequest,
@@ -28,8 +40,9 @@ import styles from "./TeleprompterCluster.module.css";
 // paragraph list, and the standing actions. Every take key is one press and
 // none but PLAY starts the scroll; Clear is armed (D11).
 
-/** The paragraph list's rows: as many as board 1 draws; a longer script shows a window around the place. */
-const PARAGRAPH_ROOM = 18;
+/** The paragraph list's rows: as many as the cluster holds under the latch slot (the shell,
+ *  overhaul 3; board 1 drew 18); a longer script shows a window around the place. */
+const PARAGRAPH_ROOM = 16;
 
 export interface TeleprompterClusterProps {
   snapshot: PrompterSnapshot;
@@ -163,6 +176,15 @@ export function TeleprompterCluster({
       </Key>
     ) : undefined;
 
+  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
+  // Teleprompter's own pull request it holds the standing commands that do
+  // not arm, with the same handlers; Clear stays the key that arms.
+  const pageMenu: MenuEntry[] = [
+    { id: "open-file", label: "Open file…", onSelect: () => fileInput.current?.click() },
+    { id: "paste-script", label: "Paste as a new script", onSelect: onPasteScript },
+    { id: "new-script", label: "New script", onSelect: onNewScript },
+  ];
+
   return (
     <div className={styles.cluster} data-testid="teleprompter-cluster">
       <StateDisplay
@@ -178,7 +200,17 @@ export function TeleprompterCluster({
             : null
         }
         testId="teleprompter-state-display"
+        menu={
+          <MenuButton
+            buttonLabel="Teleprompter menu"
+            buttonTestId="teleprompter-page-menu"
+            menu={{ head: { title: "Teleprompter" }, items: pageMenu }}
+          />
+        }
       />
+
+      {/* The shell (overhaul 3): the latch slot, the same on every page. */}
+      <LatchSlot testId="teleprompter-latch-slot" />
 
       <div className={styles.take}>
         <Key

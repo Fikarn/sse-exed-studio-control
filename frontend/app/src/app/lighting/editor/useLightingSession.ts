@@ -4,7 +4,6 @@ import { asRecord } from "../../shellData";
 import type { StagePlotRenderMode } from "../fixtureVisuals";
 import type { InspectorTab } from "../components/LightingInspectorTabs";
 import { useToast } from "../../shared/toastContext";
-import { useResizableColumns } from "../useResizableColumns";
 import { useUndoStack } from "../useUndoStack";
 import { lightingUndoMemory } from "../lightingUndoMemory";
 import { useLiveCallback } from "../../shared/useLiveCallback";
@@ -74,7 +73,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setPendingInlineRename((prev) => ({ kind, id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
 
-  const columns = useResizableColumns();
   // The undo history and the scenes and fixtures its steps act on, followed
   // through the ids an undo gives them (Slice 3 review, finding 17). They
   // outlive the page (2026-09-29), and are forgotten at a restore or a restart
@@ -203,7 +201,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setConfirmDeleteFixture,
     pendingInlineRename,
     requestInlineRename,
-    columns,
     undoStack,
     undoTargets,
     activeTab,

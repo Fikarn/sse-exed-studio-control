@@ -4,12 +4,15 @@ import {
   ARM_TIMEOUT_MS,
   ArmKey,
   Key,
+  LatchSlot,
+  MenuButton,
   NumberEntryDialog,
   Readout,
   Section,
   Slider,
   StateDisplay,
   useArm,
+  type MenuEntry,
 } from "@sse/design-system";
 
 import styles from "./LightingCluster.module.css";
@@ -235,6 +238,25 @@ export function LightingCluster(props: LightingClusterProps) {
     </>
   );
 
+  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
+  // rig's own pull request it holds the Rig row's commands, with the same
+  // handlers and the same locks.
+  const pageMenu: MenuEntry[] = [
+    { id: "add-fixture", label: "Add fixture", onSelect: onAddFixture },
+    {
+      kind: "check",
+      id: "patch",
+      label: "Patch",
+      checked: patchMode,
+      onCheckedChange: () => onTogglePatch(),
+      disabledReason: previewMode ? "leave preview to address fixtures" : undefined,
+    },
+    { kind: "check", id: "preview", label: "Preview", checked: previewMode, onCheckedChange: () => onTogglePreview() },
+    { id: "dmx-monitor", label: "DMX monitor", onSelect: onOpenDmxMonitor },
+    { kind: "divider", id: "divider" },
+    { id: "setup", label: "Open Setup", onSelect: onOpenSetup },
+  ];
+
   return (
     <div className={styles.cluster} data-lighting-cluster="" data-testid="lighting-cluster">
       <StateDisplay
@@ -246,7 +268,17 @@ export function LightingCluster(props: LightingClusterProps) {
         actions={stateActions}
         data-toolbar-primary="title"
         testId="lighting-state-display"
+        menu={
+          <MenuButton
+            buttonLabel="Lighting menu"
+            buttonTestId="lighting-page-menu"
+            menu={{ head: { title: "Lighting" }, items: pageMenu }}
+          />
+        }
       />
+
+      {/* The shell (overhaul 3): the latch slot, the same on every page. */}
+      <LatchSlot testId="lighting-latch-slot" />
 
       <div className={styles.keyRow}>
         <Key
