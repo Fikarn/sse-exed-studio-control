@@ -3,8 +3,8 @@
 
 use super::audio::audio_controls;
 use super::cameras::camera_controls;
-use super::controls::ControlDef;
 use super::lights::light_controls;
+use super::model::Control;
 use super::prompter::prompter_controls;
 
 /// One page of the exported Stream Deck profile.
@@ -20,14 +20,15 @@ pub(super) struct DeckPage {
     /// page's displays are polled once a second (the LIGHTS page's too, since
     /// 2026-09-29, when its refresh on arrival went).
     pub(super) workspace: &'static str,
-    pub(super) controls: fn() -> Vec<ControlDef>,
+    pub(super) controls: fn() -> Vec<Control>,
 }
 
 /// The deck's pages in their Companion order (D5: the pages follow the
 /// app's tabs): LIGHTS, AUDIO, CAMERAS, PROMPTER. The page keys chain them in
-/// a ring, one key a page, each to the page after it and the last to the
-/// first. The page numbers, the page keys' jumps, the page-follow triggers
-/// and the snapshot's page-nav targets all come from this list.
+/// a ring, one key a page, top right on every page (2026-10-03), each to the
+/// page after it and the last to the first. The page numbers, the page keys'
+/// jumps, the page-follow triggers and the snapshot's page-nav targets all
+/// come from this list.
 pub(super) const DECK_PAGES: [DeckPage; 4] = [
     DeckPage {
         companion_id: "sse-page-lights",

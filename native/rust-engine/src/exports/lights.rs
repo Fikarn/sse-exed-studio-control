@@ -1,159 +1,202 @@
-//! The LIGHTS page.
+//! The LIGHTS page (2026-10-03, the approved layout). Between segments: choose
+//! a scene and recall it. Now and then: set one light by hand, or switch the
+//! whole rig.
+//!
+//! |        | 1    | 2       | 3      | 4       |
+//! | ------ | ---- | ------- | ------ | ------- |
+//! | Top    | REC  | ALL ON  | SAVE   | AUDIO › |
+//! | Bottom | PLAY | ALL OFF | (dark) | RECALL  |
+//!
+//! The strip shows each dial's name over its value: LIGHT, INTENSITY, CCT and
+//! SCENE. Until 2026-10-03 the four displays sat on the dials themselves,
+//! where Companion draws nothing on a Stream Deck+, and the strip was black.
 
-use super::controls::{
-    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, page_jump,
-    ControlDef, DECK_AMBER_BG, DECK_AMBER_INK,
+use super::common::{page_key, play_key, rec_key};
+use super::model::{
+    cell, dark_key, dial, key, key_with_value, reads, shown_head, Control, Prop, Step,
+    DECK_AMBER_BG, DECK_AMBER_INK, DECK_GREY_INK, DECK_LIVE_BG, DECK_PREVIEW_INK, LABEL, VALUE,
 };
-use super::pages::deck_page_number;
-use serde_json::json;
 
-// The LIGHTS page's dial displays. Polled once a second with the other pages'
-// displays, so a change made on screen shows within a second, and each dial's
-// turn and push refresh what they change at once, as the AUDIO page's dials
-// do (Found, to check, 2026-09-28: they were refreshed only as the deck
-// arrived on LIGHTS and at a push of the Light dial, so a turn to the next
-// light left the last one's name on the strip). (New pages program, Slice 2:
-// the Planning keys `project_nav`, `project_status`, `project_priority`,
-// `sort_mode` and `task_nav` left with the PROJECTS and TASKS pages; the list
-// was called `LEGACY_LCD_KEYS` until then.)
-pub(crate) const LIGHT_LCD_KEYS: [&str; 4] =
-    ["light_nav", "light_intensity", "light_cct", "scene_nav"];
+/// The LIGHTS page's keys and dials.
+const ROUTE: &str = "/api/deck/light-action";
 
-/// What a turn of the Light dial changes: the light, and so its two values.
-const LIGHT_SELECTION_LCD_KEYS: [&str; 3] = ["light_nav", "light_intensity", "light_cct"];
-
-/// A LIGHTS action, then the displays it changes.
-fn light_action(action: &str, refresh_keys: &[&str]) -> Vec<serde_json::Value> {
-    http_post("/api/deck/light-action", json!({ "action": action }))
-        .into_iter()
-        .chain(lcd_refreshes(refresh_keys))
-        .collect()
+fn light(action: &'static str) -> Step {
+    Step::Post {
+        route: ROUTE,
+        action,
+        value: None,
+    }
 }
 
-/// The LIGHTS page's two keys that ask first (2026-09-28): `All Off` reads
-/// `OFF?` and `Del Scene` `DEL?` while armed. They are polled with the other
-/// pages' displays, or the question would stand after its 3 s until the deck
-/// came back to the page.
-pub(crate) const LIGHT_POLLED_LCD_KEYS: [&str; 2] = ["light_key_off", "light_key_del"];
+/// While Preview is on: what a key or a dial of the page changes is staged.
+fn previewing() -> String {
+    reads("scene_state", "preview")
+}
 
-/// A key that asks first: its name, or its question in amber while armed.
-/// The press refreshes the key, so the question shows at once.
-fn asking_key(
-    row: &'static str,
-    col: &'static str,
-    label: &'static str,
-    action: &'static str,
-    lcd_key: &'static str,
-    variable: &'static str,
-    question: &'static str,
-) -> ControlDef {
-    expression_button(
-        row,
-        col,
-        label,
-        variable,
-        http_post("/api/deck/light-action", json!({ "action": action }))
-            .into_iter()
-            .chain(lcd_refreshes(&[lcd_key]))
-            .collect(),
+/// `RECALL`: the chosen scene onto the rig, with the Lighting page's Fade.
+/// Under its word: `ON RIG` (green) while the rig holds the chosen scene,
+/// `UNSAVED` (amber) while it was put on the rig and the rig changed since,
+/// `PREVIEW` (blue) while previewing; nothing when a press changes the rig.
+/// Grey with no scene.
+fn recall_key() -> Control {
+    let state = |word: &str| reads("scene_state", word);
+    let value = format!(
+        "{} ? 'ON RIG' : ({} ? 'UNSAVED' : ({} ? 'PREVIEW' : ''))",
+        state("live"),
+        state("unsaved"),
+        state("preview")
+    );
+    key_with_value(
+        1,
+        3,
+        "RECALL",
+        Prop::text("RECALL"),
+        Prop::Expr(value),
+        "key_recall",
     )
-    .with_feedbacks(vec![color_feedback(
-        lcd_key,
-        question,
-        DECK_AMBER_INK,
-        DECK_AMBER_BG,
-    )])
+    .on_press(light("recallScene"))
+    .rule(
+        state("live"),
+        vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
+    )
+    .rule(
+        state("unsaved"),
+        vec![(VALUE, "color", Prop::colour(DECK_AMBER_BG))],
+    )
+    .rule(
+        state("preview"),
+        vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
+    )
+    .inked(state("none"), DECK_GREY_INK)
+    .grey_without_the_link()
 }
 
-/// The LIGHTS page (page 1). New pages program, Slice 2: its `<< PROJ` key
-/// (row 0, column 0) left with Planning and the slot stays empty, since
-/// LIGHTS is the first page. The page keys post nothing to the bridge any
-/// more: the deck mode they stored was a Planning setting nothing read.
-pub(super) fn light_controls() -> Vec<ControlDef> {
+/// A value of the chosen light: blue while Preview is on.
+fn level_cell(
+    col: u8,
+    label: &'static str,
+    shows: &'static str,
+    display: &str,
+    art: &'static str,
+) -> Control {
+    cell(col, label, shows, Prop::text(label), display, art)
+        .rule(
+            previewing(),
+            vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
+        )
+        .grey_without_the_link()
+}
+
+pub(super) fn light_controls() -> Vec<Control> {
+    let scene = |word: &str| reads("scene_state", word);
     vec![
-        button(
-            "0",
-            "1",
-            "Toggle",
-            http_post("/api/deck/light-action", json!({"action":"toggleLight"})),
+        rec_key(),
+        key(0, 1, "ALL ON", "ALL ON", "key_all_on")
+            .on_press(light("allOn"))
+            .grey_without_the_link(),
+        // Saves the rig as a new scene, `Scene N`, which the SCENE dial then
+        // has chosen. One press (the owner's decision, 2026-09-28).
+        key(0, 2, "SAVE", "SAVE", "key_save")
+            .on_press(light("saveScene"))
+            .grey_without_the_link(),
+        page_key(
+            "AUDIO \u{203a}",
+            "AUDIO\n\u{203a}",
+            "audio",
+            "key_page_audio",
         ),
-        button(
-            "0",
-            "2",
-            "All On",
-            http_post("/api/deck/light-action", json!({"action":"allOn"})),
+        play_key(),
+        // Asks first: `OFF?` in amber for 3 s, and a second press within them
+        // switches every fixture off (2026-09-28). ALL ON sits over it, as on
+        // a wall switch.
+        key(1, 1, "ALL OFF", "ALL OFF", "key_all_off")
+            .on_press(light("allOff"))
+            .filled(
+                reads("light_key_off", "OFF?"),
+                DECK_AMBER_BG,
+                DECK_AMBER_INK,
+            )
+            .rule(
+                reads("light_key_off", "OFF?"),
+                vec![(LABEL, "text", Prop::text("OFF?"))],
+            )
+            .grey_without_the_link(),
+        // Del Scene's place: deleting a scene stays on the screen, with its
+        // confirm and its Undo (the owner's answer to question 3).
+        dark_key(1, 2),
+        recall_key(),
+        cell(
+            0,
+            "LIGHT",
+            "the light the dials set, and its place among the lights",
+            Prop::Expr(shown_head("light_nav")),
+            "light_nav",
+            "cell_light",
+        )
+        .grey_without_the_link(),
+        level_cell(
+            1,
+            "INTENSITY",
+            "the chosen light's intensity, or OFF",
+            "light_intensity",
+            "cell_intensity",
         ),
-        // `All Off` and `Del Scene` ask first, as `REC` asks `STOP?`; `Save`
-        // stays one press (the owner's decision, 2026-09-28).
-        asking_key(
-            "0",
-            "3",
-            "All Off",
-            "allOff",
-            "light_key_off",
-            "$(custom:lcd_light_key_off)",
-            "OFF?",
-        ),
-        button(
-            "1",
-            "0",
-            "Save",
-            http_post("/api/deck/light-action", json!({"action":"saveScene"})),
-        ),
-        button(
-            "1",
-            "1",
-            "Recall",
-            http_post("/api/deck/light-action", json!({"action":"recallScene"})),
-        ),
-        asking_key(
-            "1",
-            "2",
-            "Del Scene",
-            "deleteScene",
-            "light_key_del",
-            "$(custom:lcd_light_key_del)",
-            "DEL?",
-        ),
-        // The next page. Its LCD refreshes named four keys the audio surface
-        // retired in 2026-09 (`audio_ch_nav`, `audio_gain1`–`3`), which the
-        // bridge refused on every press; the 1 s poll keeps AUDIO current.
-        button("1", "3", "AUDIO >>", page_jump(deck_page_number("audio"))),
-        dial(
-            "3",
-            "0",
-            "Light",
-            Some("$(custom:lcd_light_nav)"),
-            light_action("toggleLight", &LIGHT_SELECTION_LCD_KEYS),
-            light_action("selectPrevLight", &LIGHT_SELECTION_LCD_KEYS),
-            light_action("selectNextLight", &LIGHT_SELECTION_LCD_KEYS),
-        ),
-        dial(
-            "3",
-            "1",
-            "Intensity",
-            Some("$(custom:lcd_light_intensity)"),
-            light_action("resetIntensity", &["light_intensity"]),
-            light_action("intensityDown", &["light_intensity"]),
-            light_action("intensityUp", &["light_intensity"]),
-        ),
-        dial(
-            "3",
-            "2",
+        level_cell(
+            2,
             "CCT",
-            Some("$(custom:lcd_light_cct)"),
-            light_action("resetCct", &["light_cct"]),
-            light_action("cctDown", &["light_cct"]),
-            light_action("cctUp", &["light_cct"]),
+            "the chosen light's colour temperature",
+            "light_cct",
+            "cell_cct",
+        ),
+        cell(
+            3,
+            "SCENE",
+            "the chosen scene, and whether the rig holds it",
+            Prop::Expr(shown_head("scene_nav")),
+            "scene_nav",
+            "cell_scene",
+        )
+        .rule(
+            scene("live"),
+            vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
+        )
+        .rule(
+            scene("unsaved"),
+            vec![(VALUE, "color", Prop::colour(DECK_AMBER_BG))],
+        )
+        .rule(
+            scene("preview"),
+            vec![(VALUE, "color", Prop::colour(DECK_PREVIEW_INK))],
+        )
+        .grey_without_the_link(),
+        dial(
+            0,
+            "LIGHT",
+            Some(light("toggleLight")),
+            light("selectPrevLight"),
+            light("selectNextLight"),
         ),
         dial(
-            "3",
-            "3",
-            "Scene",
-            Some("$(custom:lcd_scene_nav)"),
-            light_action("recallScene", &["scene_nav"]),
-            light_action("selectPrevScene", &["scene_nav"]),
-            light_action("selectNextScene", &["scene_nav"]),
+            1,
+            "INTENSITY",
+            Some(light("resetIntensity")),
+            light("intensityDown"),
+            light("intensityUp"),
+        ),
+        dial(
+            2,
+            "CCT",
+            Some(light("resetCct")),
+            light("cctDown"),
+            light("cctUp"),
+        ),
+        // The SCENE dial's push recalls, as RECALL does.
+        dial(
+            3,
+            "SCENE",
+            Some(light("recallScene")),
+            light("selectPrevScene"),
+            light("selectNextScene"),
         ),
     ]
 }

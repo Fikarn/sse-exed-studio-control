@@ -1,16 +1,13 @@
-use super::audio::AUDIO_LCD_KEYS;
-use super::controls::{DECK_AMBER_BG, DECK_MUTED_INK};
-use super::controls::{DECK_GREY_INK, DECK_HAZARD_INK, DECK_LIVE_BG};
-use super::lights::{LIGHT_LCD_KEYS, LIGHT_POLLED_LCD_KEYS};
-use super::profile::{
-    generate_companion_config, polled_lcd_keys, streamdeck_surface_id_from,
-    COMPANION_EXPORT_FORMAT_VERSION, INSTANCE_ID, INSTANCE_LABEL,
+use super::companion::{
+    display_path, generate_companion_config, AGE, COMPANION_EXPORT_FORMAT_VERSION, DISPLAYS_PATH,
+    INSTANCE_ID, INSTANCE_LABEL, KEPT, LINK_LOST_AFTER_SECONDS, RAW,
 };
+use super::images::deck_images;
+use super::profile::streamdeck_surface_id_from;
 use super::snapshot::build_control_surface_snapshot;
-use crate::cameras::deck::CAMERA_LCD_KEYS;
-use crate::prompter::deck::PROMPTER_LCD_KEYS;
+use crate::control_surface::{DisplayShape, DECK_DISPLAYS, DECK_DISPLAYS_MARK};
 use serde_json::{json, Value};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 // 2026-09-28: a development build does not ask Companion for its deck;
 // the studio's build does, and reads the deck's id from the answer.
@@ -36,23 +33,116 @@ fn only_the_studio_build_asks_companion_for_its_deck() {
 
 const TEST_TOKEN: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-fn collect_bridge_actions<'a>(value: &'a Value, into: &mut Vec<&'a Value>) {
+fn profile() -> Value {
+    generate_companion_config(
+        "http://127.0.0.1:38201",
+        Some("streamdeck:TESTSERIAL"),
+        TEST_TOKEN,
+    )
+}
+
+/// Every object in `value` that `keep` keeps, depth first.
+fn objects<'a>(value: &'a Value, keep: &dyn Fn(&Value) -> bool, into: &mut Vec<&'a Value>) {
     match value {
         Value::Object(map) => {
-            if map.get("connectionId").and_then(Value::as_str) == Some(INSTANCE_ID) {
+            if keep(value) {
                 into.push(value);
             }
             for child in map.values() {
-                collect_bridge_actions(child, into);
+                objects(child, keep, into);
             }
         }
         Value::Array(items) => {
             for item in items {
-                collect_bridge_actions(item, into);
+                objects(item, keep, into);
             }
         }
         _ => {}
     }
+}
+
+fn bridge_actions(value: &Value) -> Vec<&Value> {
+    let mut actions = Vec::new();
+    objects(
+        value,
+        &|object| object["connectionId"] == INSTANCE_ID,
+        &mut actions,
+    );
+    actions
+}
+
+/// Every action and feedback of the profile: the entities of its buttons
+/// and triggers.
+fn entities(value: &Value) -> Vec<&Value> {
+    let mut entities = Vec::new();
+    objects(
+        value,
+        &|object| {
+            matches!(object["type"].as_str(), Some("action" | "feedback"))
+                && object.get("definitionId").is_some()
+        },
+        &mut entities,
+    );
+    entities
+}
+
+/// A control of a page, by its page number, row and column.
+fn control<'a>(profile: &'a Value, page: &str, row: u8, col: u8) -> &'a Value {
+    &profile["pages"][page]["controls"][row.to_string()][col.to_string()]
+}
+
+/// What a control's set posts first: its route and its body.
+fn posted(control: &Value, set: &str) -> Option<(String, Value)> {
+    let action = control["steps"]["0"]["action_sets"][set]
+        .as_array()?
+        .iter()
+        .find(|action| action["definitionId"] == "post")?;
+    let body = serde_json::from_str(action["options"]["body"]["value"].as_str()?).ok()?;
+    Some((
+        action["options"]["url"]["value"].as_str()?.to_string(),
+        body,
+    ))
+}
+
+/// Where a control's set turns the deck to, if it does.
+fn jumps(control: &Value, set: &str) -> Vec<i64> {
+    control["steps"]["0"]["action_sets"][set]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|action| action["definitionId"] == "set_page")
+        .filter_map(|action| action["options"]["page"]["value"].as_i64())
+        .collect()
+}
+
+/// `value` without its entities' ids, which name the page and the place.
+fn without_ids(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .filter(|(key, _)| key.as_str() != "id" && key.as_str() != "overrideId")
+                .map(|(key, value)| (key.clone(), without_ids(value)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(without_ids).collect()),
+        other => other.clone(),
+    }
+}
+
+/// A layer of a control, by its id.
+fn layer<'a>(control: &'a Value, id: &str) -> &'a Value {
+    control["style"]["layers"]
+        .as_array()
+        .and_then(|layers| layers.iter().find(|layer| layer["id"] == id))
+        .unwrap_or(&Value::Null)
+}
+
+/// The words a key or a cell draws as its fixed label.
+fn words(control: &Value) -> Option<String> {
+    let label = layer(control, "label");
+    (label["text"]["isExpression"] == false)
+        .then(|| label["text"]["value"].as_str().map(String::from))
+        .flatten()
 }
 
 // 2026-09 production readiness, Slice 2 (finding F01): the profile is the
@@ -60,43 +150,29 @@ fn collect_bridge_actions<'a>(value: &'a Value, into: &mut Vec<&'a Value>) {
 // token — and nothing else in the file may.
 #[test]
 fn companion_export_carries_the_bridge_token_on_every_request() {
-    let config = generate_companion_config(
-        "http://127.0.0.1:38201",
-        Some("streamdeck:TESTSERIAL"),
-        TEST_TOKEN,
-    );
-    let mut actions = Vec::new();
-    collect_bridge_actions(&config, &mut actions);
+    let config = profile();
+    let actions = bridge_actions(&config);
     assert!(
         actions.len() > 50,
-        "every deck key, dial and LCD refresh talks to the bridge: {}",
+        "every deck key, dial and the poll talk to the bridge: {}",
         actions.len()
     );
-
     let expected = json!({ "Authorization": format!("Bearer {TEST_TOKEN}") });
     for action in &actions {
-        let header = action["options"]["header"]
+        assert_eq!(
+            action["options"]["header"]["isExpression"], false,
+            "{action}"
+        );
+        let header = action["options"]["header"]["value"]
             .as_str()
             .unwrap_or_else(|| panic!("bridge action without a header option: {action}"));
         let parsed: Value = serde_json::from_str(header)
             .expect("the header option is the JSON object generic-http parses");
         assert_eq!(parsed, expected, "{action}");
+        assert_eq!(action["upgradeIndex"], 1, "{action}");
     }
-
-    let poll_actions = config["triggers"]["sse-trigger-lcd-poll"]["actions"]
-        .as_array()
-        .expect("poll actions");
-    assert!(
-        !poll_actions.is_empty()
-            && poll_actions.iter().all(|action| action["options"]["header"]
-                .as_str()
-                .is_some_and(|header| header.contains(TEST_TOKEN))),
-        "the 1 s LCD poll must be authenticated too"
-    );
-
-    let serialized = config.to_string();
     assert_eq!(
-        serialized.matches(TEST_TOKEN).count(),
+        config.to_string().matches(TEST_TOKEN).count(),
         actions.len(),
         "the token appears once per bridge request and nowhere else"
     );
@@ -105,409 +181,1096 @@ fn companion_export_carries_the_bridge_token_on_every_request() {
 #[test]
 fn companion_export_contains_native_bridge_instance() {
     let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
-    let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
-        .as_str()
-        .expect("prefix should be a string");
-    assert_eq!(prefix, "http://127.0.0.1:38201");
-    assert_eq!(config["instances"][INSTANCE_ID]["label"], INSTANCE_LABEL);
+    let instance = &config["instances"][INSTANCE_ID];
+    assert_eq!(instance["config"]["prefix"], "http://127.0.0.1:38201");
+    assert_eq!(instance["label"], INSTANCE_LABEL);
     assert!(
         !INSTANCE_LABEL.contains(' '),
         "Companion connection labels must not contain spaces"
+    );
+    // Companion 5 reads `moduleId` (`instance_type` was renamed by its
+    // upgrade from version 9), and keeps the module the file was made for.
+    assert_eq!(instance["moduleId"], "generic-http");
+    assert!(instance.get("instance_type").is_none());
+    assert_eq!(instance["moduleVersionId"], "2.7.0");
+    assert_eq!(instance["updatePolicy"], "manual");
+    assert_eq!(instance["lastUpgradeIndex"], 1);
+    assert_eq!(
+        config["instances"].as_object().map(|map| map.len()),
+        Some(1)
     );
 }
 
 #[test]
 fn companion_export_uses_override_base_url() {
     let config = generate_companion_config("http://localhost:3000", None, TEST_TOKEN);
-    let prefix = config["instances"][INSTANCE_ID]["config"]["prefix"]
-        .as_str()
-        .expect("prefix should be a string");
-    assert_eq!(prefix, "http://localhost:3000");
+    assert_eq!(
+        config["instances"][INSTANCE_ID]["config"]["prefix"],
+        "http://localhost:3000"
+    );
 }
 
+// 2026-10-03: the profile is Companion 5's own format, as 5.0.6 writes a
+// full export: version 12, layered buttons, every option of an action, a
+// feedback or a layer wrapped, an event's options plain.
 #[test]
-fn companion_export_is_a_native_v9_full_config() {
-    let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
+fn the_profile_is_companion_5s_own_full_export() {
+    let config = profile();
     assert_eq!(config["version"], COMPANION_EXPORT_FORMAT_VERSION);
+    assert_eq!(config["version"], 12);
     assert_eq!(config["type"], "full");
-    // D5: LIGHTS, AUDIO, CAMERAS and PROMPTER.
-    assert_eq!(
-        config["pages"].as_object().map(|pages| pages.len()),
-        Some(4)
-    );
-    for (number, id) in [
-        ("1", "sse-page-lights"),
-        ("2", "sse-page-audio"),
-        ("3", "sse-page-cameras"),
-        ("4", "sse-page-prompter"),
-    ] {
-        assert_eq!(config["pages"][number]["id"], id);
-    }
+    assert!(config["companionBuild"]
+        .as_str()
+        .is_some_and(|build| build.starts_with("5.0.6")));
     assert!(config.get("surfaces").is_none());
-
-    let custom_variables = config["custom_variables"]
-        .as_object()
-        .expect("custom variables should exist");
-    assert_eq!(
-        custom_variables.len(),
-        AUDIO_LCD_KEYS.len()
-            + LIGHT_LCD_KEYS.len()
-            + CAMERA_LCD_KEYS.len()
-            + PROMPTER_LCD_KEYS.len()
-            + LIGHT_POLLED_LCD_KEYS.len()
-    );
-    assert_eq!(custom_variables.len(), 47);
-    assert!(custom_variables.contains_key("lcd_camera_key_rec"));
-    assert!(custom_variables.contains_key("lcd_prompter_state_play"));
-    assert!(custom_variables.contains_key("lcd_light_nav"));
-    assert!(custom_variables.contains_key("lcd_audio_strip_1_level"));
-    assert!(
-        custom_variables.contains_key("lcd_workspace"),
-        "the polled LCD variables must ship with the profile - generic-http stores are silent no-ops without them"
-    );
-
-    // LIGHTS' first key sits in column 1: column 0 held `<< PROJ`.
-    let sample_action =
-        &config["pages"]["1"]["controls"]["0"]["1"]["steps"]["0"]["action_sets"]["down"][0];
-    assert_eq!(sample_action["connectionId"], INSTANCE_ID);
-    assert_eq!(sample_action["definitionId"], "post");
-}
-
-#[test]
-fn companion_export_audio_page_maps_the_deck_hardware() {
-    let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
-    let controls = config["pages"]["2"]["controls"]
-        .as_object()
-        .expect("audio controls should exist");
-
-    // Row 1, column 2 held TALK until 2026-09-28 (D26); the page key of
-    // the ring stands there now.
-    for (row, columns) in [("0", 4), ("1", 4), ("2", 4), ("3", 4)] {
-        assert_eq!(
-            controls[row].as_object().map(|columns| columns.len()),
-            Some(columns),
-            "audio row {row}"
-        );
-    }
-
-    let strip_cell = &controls["2"]["0"];
-    assert_eq!(strip_cell["style"]["text"], "$(custom:lcd_audio_strip_1)");
-    let tap_body = strip_cell["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
-        .as_str()
-        .expect("tap body should exist");
-    assert!(tap_body.contains("stripTap"));
-
-    let encoder = &controls["3"]["0"];
-    assert_eq!(encoder["options"]["rotaryActions"], true);
-    let left_body = encoder["steps"]["0"]["action_sets"]["rotate_left"][0]["options"]["body"]
-        .as_str()
-        .expect("rotate body should exist");
-    assert!(left_body.contains("dialTurn") && left_body.contains("1:down"));
-    let press_body = encoder["steps"]["0"]["action_sets"]["down"][0]["options"]["body"]
-        .as_str()
-        .expect("press body should exist");
-    assert!(press_body.contains("dialPress"));
-
-    // Row 1, column 2 held TALK until 2026-09-28 (D26). The ring's page
-    // key is there, and every other key is where it was.
-    let page_key = &controls["1"]["2"];
-    assert_eq!(page_key["style"]["text"], "CAMS\\n>>");
-    let jump = &page_key["steps"]["0"]["action_sets"]["down"][0];
-    assert_eq!(jump["definitionId"], "set_page");
-    assert_eq!(jump["options"]["page"], 3);
-    assert_eq!(
-        page_key["steps"]["0"]["action_sets"]["down"]
-            .as_array()
-            .map(Vec::len),
-        Some(1),
-        "a page key posts nothing"
-    );
-    for (row, col, text) in [
-        ("0", "0", "MAIN"),
-        ("0", "1", "PH\\n1"),
-        ("0", "2", "PH\\n2"),
-        ("0", "3", "$(custom:lcd_audio_key_4)"),
-        ("1", "0", "$(custom:lcd_audio_key_5)"),
-        ("1", "1", "$(custom:lcd_audio_key_6)"),
-        ("1", "3", "$(custom:lcd_audio_key_8)"),
+    for key in [
+        "triggerCollections",
+        "customVariablesCollections",
+        "expressionVariablesCollections",
+        "connectionCollections",
+        "imageLibraryCollections",
     ] {
-        assert_eq!(controls[row][col]["style"]["text"], text, "{row}/{col}");
+        assert_eq!(config[key], json!([]), "{key}");
+    }
+    assert_eq!(config, profile(), "an export is the same file every time");
+
+    for (number, id, name) in [
+        ("1", "sse-page-lights", "LIGHTS"),
+        ("2", "sse-page-audio", "AUDIO"),
+        ("3", "sse-page-cameras", "CAMERAS"),
+        ("4", "sse-page-prompter", "PROMPTER"),
+    ] {
+        let page = &config["pages"][number];
+        assert_eq!(
+            (page["id"].as_str(), page["name"].as_str()),
+            (Some(id), Some(name))
+        );
+        for (row, columns) in page["controls"].as_object().expect("rows") {
+            assert_eq!(
+                columns.as_object().map(|columns| columns.len()),
+                Some(4),
+                "page {number} row {row}: every place has a control"
+            );
+            for (col, button) in columns.as_object().expect("columns") {
+                let at = format!("{number}/{row}/{col}");
+                assert_eq!(button["type"], "button-layered", "{at}");
+                let canvas = &button["style"]["layers"][0];
+                assert_eq!(canvas["type"], "canvas", "{at}");
+                assert_eq!(
+                    canvas["decoration"],
+                    json!({"isExpression": false, "value": "none"})
+                );
+                assert_eq!(
+                    canvas["showStatusIcons"],
+                    json!({"isExpression": false, "value": "none"})
+                );
+                assert_eq!(button["options"]["rotaryActions"], row == "3", "{at}");
+                let sets = button["steps"]["0"]["action_sets"]
+                    .as_object()
+                    .expect("a step's action sets");
+                assert!(sets.contains_key("down") && sets.contains_key("up"), "{at}");
+                assert_eq!(sets.contains_key("rotate_left"), row == "3", "{at}");
+                assert_eq!(sets["up"], json!([]), "{at}");
+                for layer in button["style"]["layers"]
+                    .as_array()
+                    .expect("layers")
+                    .iter()
+                    .skip(1)
+                {
+                    for (property, value) in layer.as_object().expect("a layer") {
+                        if ["id", "name", "usage", "type"].contains(&property.as_str()) {
+                            continue;
+                        }
+                        assert!(
+                            value.get("isExpression").is_some_and(Value::is_boolean)
+                                && value.get("value").is_some(),
+                            "{at}: {property} of {layer}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    for entity in entities(&config) {
+        for (option, value) in entity["options"].as_object().expect("options") {
+            assert!(
+                value.get("isExpression").is_some_and(Value::is_boolean)
+                    && value.get("value").is_some(),
+                "{option} of {entity}"
+            );
+        }
+        if entity["type"] == "feedback" {
+            assert!(
+                entity["isInverted"]["isExpression"].is_boolean(),
+                "{entity}"
+            );
+        }
+    }
+    for trigger in config["triggers"].as_object().expect("triggers").values() {
+        for event in trigger["events"].as_array().expect("events") {
+            for value in event["options"].as_object().expect("options").values() {
+                assert!(value.get("isExpression").is_none(), "{event}");
+            }
+        }
     }
 }
 
+// Companion draws nothing on a Stream Deck+'s dials (row 3): every display
+// is a cell of the strip (row 2), over its dial. Until 2026-10-03 the LIGHTS
+// page's four displays sat on its dials, and the strip was black.
 #[test]
-fn companion_export_audio_page_carries_the_visual_language() {
-    let config = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
-    let controls = config["pages"]["2"]["controls"]
-        .as_object()
-        .expect("audio controls should exist");
+fn every_display_is_on_the_strip_and_no_dial_shows_anything() {
+    let config = profile();
+    for page in ["1", "2", "3", "4"] {
+        for col in 0..4 {
+            let dial = control(&config, page, 3, col);
+            let text = dial.to_string();
+            assert!(!text.contains("$(expression:"), "{page}/3/{col}: {text}");
+            assert_eq!(dial["feedbacks"], json!([]), "{page}/3/{col}");
+            let cell = control(&config, page, 2, col);
+            assert!(
+                layer(cell, "value")["text"]["value"]
+                    .as_str()
+                    .is_some_and(|text| text.starts_with("$(expression:deck_")),
+                "{page}/2/{col}: the cell shows a display"
+            );
+            // The strip only shows: a tap does nothing, and a swipe turns
+            // nothing (no rotary actions on row 2).
+            assert_eq!(cell["steps"]["0"]["action_sets"]["down"], json!([]));
+            assert_eq!(cell["options"]["rotaryActions"], false);
+        }
+    }
+}
 
-    let main_key = &controls["0"]["0"];
-    assert_eq!(main_key["style"]["text"], "MAIN");
-    assert_eq!(main_key["style"]["textExpression"], false);
-    assert_eq!(main_key["style"]["show_topbar"], false);
-    assert!(main_key["style"]["png64"]
-        .as_str()
-        .is_some_and(|png| png.starts_with("iVBOR")));
-    let main_feedbacks = main_key["feedbacks"].as_array().expect("feedbacks");
-    assert_eq!(
-        main_feedbacks[0]["options"]["variable"],
-        "custom:lcd_audio_state_target"
-    );
-    assert_eq!(main_feedbacks[0]["options"]["value"], "main");
-    assert_eq!(main_feedbacks[0]["style"]["bgcolor"], DECK_AMBER_BG);
+/// The approved layout's words, by page, row and column (`""`: dark).
+const LAYOUT: [(&str, [[&str; 4]; 2]); 4] = [
+    (
+        "1",
+        [
+            ["REC", "ALL ON", "SAVE", "AUDIO\n\u{203a}"],
+            ["REC_PLAY", "ALL OFF", "", "RECALL"],
+        ],
+    ),
+    (
+        "2",
+        [
+            ["REC", "MAIN\nOUT", "PHONES", "CAMERAS\n\u{203a}"],
+            ["REC_PLAY", "BANK", "DIM", "SOLO"],
+        ],
+    ),
+    (
+        "3",
+        [
+            ["REC", "BANK", "", "PROMPTER\n\u{203a}"],
+            ["REC_PLAY", "CAM 1", "CAM 2", "CAM 3"],
+        ],
+    ),
+    (
+        "4",
+        [
+            ["REC", "\u{25c2} CUE", "CUE \u{25b8}", "LIGHTS\n\u{203a}"],
+            ["REC_PLAY", "BACK", "", "TOP"],
+        ],
+    ),
+];
 
-    let solo_key = &controls["1"]["3"];
-    let solo_feedbacks = solo_key["feedbacks"].as_array().expect("feedbacks");
-    assert_eq!(solo_feedbacks[0]["isInverted"], true);
-    assert_eq!(solo_feedbacks[0]["options"]["value"], "0");
+// The approved layout (2026-10-03): REC top left and PLAY under it on every
+// page, the page key top right, and the pages' own keys where the owner
+// approved them. A dark key is drawn dark and does nothing.
+#[test]
+fn the_four_pages_hold_the_approved_layout() {
+    let config = profile();
+    for (page, rows) in LAYOUT {
+        for (row, words_of_row) in rows.iter().enumerate() {
+            for (col, expected) in words_of_row.iter().enumerate() {
+                let key = control(&config, page, row as u8, col as u8);
+                let at = format!("{page}/{row}/{col}");
+                match *expected {
+                    "" => {
+                        assert_eq!(key["steps"]["0"]["action_sets"]["down"], json!([]), "{at}");
+                        assert_eq!(words(key), None, "{at}");
+                        assert_eq!(
+                            layer(key, "art")["base64Image"]["value"],
+                            "$(image:key_dark)"
+                        );
+                    }
+                    "REC_PLAY" => assert_eq!(words(key).as_deref(), Some("PLAY"), "{at}"),
+                    "PHONES" => assert_eq!(
+                        layer(key, "label")["text"]["isExpression"],
+                        true,
+                        "{at}: PHONES says which phones mix"
+                    ),
+                    words_expected => {
+                        assert_eq!(words(key).as_deref(), Some(words_expected), "{at}")
+                    }
+                }
+            }
+        }
+        // REC and PLAY are the same on every page.
+        assert_eq!(
+            posted(control(&config, page, 0, 0), "down"),
+            Some((
+                String::from("/api/deck/camera-action"),
+                json!({ "action": "rec" })
+            )),
+            "page {page}'s REC"
+        );
+        assert_eq!(
+            posted(control(&config, page, 1, 0), "down"),
+            Some((
+                String::from("/api/deck/prompter-action"),
+                json!({ "action": "playPause" })
+            )),
+            "page {page}'s PLAY"
+        );
+        for (row, what) in [(0, "REC"), (1, "PLAY")] {
+            assert_eq!(
+                without_ids(&control(&config, page, row, 0)["feedbacks"]),
+                without_ids(&control(&config, "1", row, 0)["feedbacks"]),
+                "{what} follows the same rules on every page"
+            );
+        }
+    }
+}
 
-    let strip = &controls["2"]["0"];
-    assert_eq!(strip["style"]["show_topbar"], false);
-    let strip_feedbacks = strip["feedbacks"].as_array().expect("strip feedbacks");
-    // 13 normal + 13 muted bars, off, empty, plus 3 state color feedbacks.
-    assert_eq!(strip_feedbacks.len(), 31);
-    let png_feedbacks = strip_feedbacks
+// D5: LIGHTS, AUDIO, CAMERAS and PROMPTER, chained by the page keys and by
+// the deck following the app. The page keys make a ring, top right on every
+// page (2026-10-03), each to the page after it, PROMPTER's round to LIGHTS.
+// Setup has no deck page, so nothing follows it and the deck stays put.
+#[test]
+fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
+    let config = profile();
+    let mut every_jump = Vec::new();
+    for (page, next) in [("1", 2), ("2", 3), ("3", 4), ("4", 1)] {
+        for row in 0..4_u8 {
+            for col in 0..4_u8 {
+                let key = control(&config, page, row, col);
+                let found: Vec<i64> = ["down", "rotate_left", "rotate_right"]
+                    .iter()
+                    .flat_map(|set| jumps(key, set))
+                    .collect();
+                if (row, col) == (0, 3) {
+                    assert_eq!(found, vec![next], "page {page}'s page key");
+                    assert!(posted(key, "down").is_none(), "a page key posts nothing");
+                    assert_eq!(
+                        key["steps"]["0"]["action_sets"]["down"][0]["options"]["surfaceId"]
+                            ["value"],
+                        "self",
+                        "a key turns the deck it was pressed on"
+                    );
+                } else {
+                    assert_eq!(found, Vec::<i64>::new(), "{page}/{row}/{col}");
+                }
+                every_jump.extend(found);
+            }
+        }
+    }
+    assert_eq!(every_jump, vec![2, 3, 4, 1]);
+
+    let triggers = config["triggers"].as_object().expect("triggers");
+    let mut follows = triggers
         .iter()
-        .filter(|fb| fb["style"]["png64"].is_string())
-        .count();
-    assert_eq!(png_feedbacks, 28);
-    assert!(strip_feedbacks.iter().any(|fb| {
-        fb["options"]["variable"] == "custom:lcd_audio_strip_1_state"
-            && fb["options"]["value"] == "muted"
-            && fb["style"]["color"] == DECK_MUTED_INK
-    }));
-}
-
-#[test]
-fn companion_export_triggers_poll_and_follow_the_app() {
-    let config = generate_companion_config(
-        "http://127.0.0.1:38201",
-        Some("streamdeck:TESTSERIAL"),
-        TEST_TOKEN,
-    );
-    let triggers = config["triggers"]
-        .as_object()
-        .expect("triggers should exist");
-    // The poll, and a follow trigger for each of the deck's four pages.
-    assert_eq!(triggers.len(), 5);
-
-    let poll = &triggers["sse-trigger-lcd-poll"];
-    assert_eq!(poll["options"]["enabled"], true);
-    assert_eq!(poll["events"][0]["type"], "interval");
-    assert_eq!(poll["events"][0]["options"]["seconds"], 1);
+        .filter(|(_, trigger)| trigger["events"][0]["type"] == "condition_true")
+        .map(|(id, trigger)| {
+            assert_eq!(trigger["condition"][0]["definitionId"], "check_expression");
+            assert_eq!(trigger["actions"][0]["definitionId"], "set_page");
+            // A trigger names the deck: `self` names no surface there.
+            assert_eq!(
+                trigger["actions"][0]["options"]["surfaceId"]["value"],
+                "streamdeck:TESTSERIAL"
+            );
+            assert!(bridge_actions(trigger).is_empty(), "{id} sends nothing");
+            (
+                trigger["condition"][0]["options"]["expression"]["value"]
+                    .as_str()
+                    .expect("a follow tests the saved page")
+                    .to_string(),
+                trigger["actions"][0]["options"]["page"]["value"]
+                    .as_i64()
+                    .expect("a page"),
+            )
+        })
+        .collect::<Vec<_>>();
+    follows.sort();
     assert_eq!(
-        poll["actions"].as_array().map(Vec::len),
-        Some(polled_lcd_keys().len())
+        follows,
+        vec![
+            (String::from("$(expression:deck_workspace) == 'audio'"), 2),
+            (String::from("$(expression:deck_workspace) == 'cameras'"), 3),
+            (
+                String::from("$(expression:deck_workspace) == 'lighting'"),
+                1
+            ),
+            // The page's word in the app is the one the hardware link
+            // accepts (`shell_settings::WORKSPACES`).
+            (
+                String::from("$(expression:deck_workspace) == 'teleprompter'"),
+                4
+            ),
+        ]
     );
-    // 47 since 2026-09-29: the LIGHTS page's four dial displays joined the
-    // poll (43 until then).
-    assert_eq!(polled_lcd_keys().len(), 47);
-    for key in LIGHT_LCD_KEYS {
-        assert!(polled_lcd_keys().contains(&key), "{key} is polled");
+    for workspace in ["audio", "cameras", "lighting", "teleprompter"] {
+        assert!(crate::shell_settings::WORKSPACES.contains(&workspace));
     }
-
-    let follow = &triggers["sse-trigger-follow-audio"];
-    assert_eq!(follow["events"][0]["type"], "condition_true");
-    assert_eq!(
-        follow["condition"][0]["options"]["variable"],
-        "custom:lcd_workspace"
-    );
-    assert_eq!(follow["condition"][0]["options"]["value"], "audio");
-    assert_eq!(follow["actions"][0]["definitionId"], "set_page");
-    assert_eq!(
-        follow["actions"][0]["options"]["controller"],
-        "streamdeck:TESTSERIAL"
-    );
-    assert_eq!(follow["actions"][0]["options"]["page"], 2);
 
     let fallback = generate_companion_config("http://127.0.0.1:38201", None, TEST_TOKEN);
     assert_eq!(
-        fallback["triggers"]["sse-trigger-follow-audio"]["actions"][0]["options"]["controller"],
+        fallback["triggers"]["sse-trigger-follow-audio"]["actions"][0]["options"]["surfaceId"]
+            ["value"],
         "self"
     );
 }
 
+/// What every key and dial of the four pages posts, by page, row, column and
+/// set: the approved layout's presses (2026-10-03).
+fn presses() -> Vec<(&'static str, u8, u8, &'static str, &'static str, Value)> {
+    let light = "/api/deck/light-action";
+    let audio = "/api/deck/audio-action";
+    let camera = "/api/deck/camera-action";
+    let prompter = "/api/deck/prompter-action";
+    let mut presses = vec![
+        ("1", 0, 1, "down", light, json!({ "action": "allOn" })),
+        ("1", 0, 2, "down", light, json!({ "action": "saveScene" })),
+        ("1", 1, 1, "down", light, json!({ "action": "allOff" })),
+        ("1", 1, 3, "down", light, json!({ "action": "recallScene" })),
+        ("1", 3, 0, "down", light, json!({ "action": "toggleLight" })),
+        (
+            "1",
+            3,
+            0,
+            "rotate_left",
+            light,
+            json!({ "action": "selectPrevLight" }),
+        ),
+        (
+            "1",
+            3,
+            0,
+            "rotate_right",
+            light,
+            json!({ "action": "selectNextLight" }),
+        ),
+        (
+            "1",
+            3,
+            1,
+            "down",
+            light,
+            json!({ "action": "resetIntensity" }),
+        ),
+        (
+            "1",
+            3,
+            1,
+            "rotate_left",
+            light,
+            json!({ "action": "intensityDown" }),
+        ),
+        (
+            "1",
+            3,
+            1,
+            "rotate_right",
+            light,
+            json!({ "action": "intensityUp" }),
+        ),
+        ("1", 3, 2, "down", light, json!({ "action": "resetCct" })),
+        (
+            "1",
+            3,
+            2,
+            "rotate_left",
+            light,
+            json!({ "action": "cctDown" }),
+        ),
+        (
+            "1",
+            3,
+            2,
+            "rotate_right",
+            light,
+            json!({ "action": "cctUp" }),
+        ),
+        ("1", 3, 3, "down", light, json!({ "action": "recallScene" })),
+        (
+            "1",
+            3,
+            3,
+            "rotate_left",
+            light,
+            json!({ "action": "selectPrevScene" }),
+        ),
+        (
+            "1",
+            3,
+            3,
+            "rotate_right",
+            light,
+            json!({ "action": "selectNextScene" }),
+        ),
+        (
+            "2",
+            0,
+            1,
+            "down",
+            audio,
+            json!({ "action": "setMixTarget", "value": "main" }),
+        ),
+        (
+            "2",
+            0,
+            2,
+            "down",
+            audio,
+            json!({ "action": "setMixTarget", "value": "phones" }),
+        ),
+        ("2", 1, 1, "down", audio, json!({ "action": "cycleBank" })),
+        ("2", 1, 2, "down", audio, json!({ "action": "dimToggle" })),
+        (
+            "2",
+            1,
+            3,
+            "down",
+            audio,
+            json!({ "action": "soloClearAll" }),
+        ),
+        ("3", 0, 1, "down", camera, json!({ "action": "bank" })),
+        (
+            "3",
+            1,
+            1,
+            "down",
+            camera,
+            json!({ "action": "select", "value": "1" }),
+        ),
+        (
+            "3",
+            1,
+            2,
+            "down",
+            camera,
+            json!({ "action": "select", "value": "2" }),
+        ),
+        (
+            "3",
+            1,
+            3,
+            "down",
+            camera,
+            json!({ "action": "select", "value": "3" }),
+        ),
+        (
+            "4",
+            0,
+            1,
+            "down",
+            prompter,
+            json!({ "action": "cue", "value": "previous" }),
+        ),
+        (
+            "4",
+            0,
+            2,
+            "down",
+            prompter,
+            json!({ "action": "cue", "value": "next" }),
+        ),
+        ("4", 1, 1, "down", prompter, json!({ "action": "back" })),
+        ("4", 1, 3, "down", prompter, json!({ "action": "top" })),
+        (
+            "4",
+            3,
+            0,
+            "down",
+            prompter,
+            json!({ "action": "playPause" }),
+        ),
+        (
+            "4",
+            3,
+            0,
+            "rotate_left",
+            prompter,
+            json!({ "action": "speed", "value": "down" }),
+        ),
+        (
+            "4",
+            3,
+            0,
+            "rotate_right",
+            prompter,
+            json!({ "action": "speed", "value": "up" }),
+        ),
+        (
+            "4",
+            3,
+            1,
+            "rotate_left",
+            prompter,
+            json!({ "action": "line", "value": "previous" }),
+        ),
+        (
+            "4",
+            3,
+            1,
+            "rotate_right",
+            prompter,
+            json!({ "action": "line", "value": "next" }),
+        ),
+        (
+            "4",
+            3,
+            2,
+            "rotate_left",
+            prompter,
+            json!({ "action": "paragraph", "value": "previous" }),
+        ),
+        (
+            "4",
+            3,
+            2,
+            "rotate_right",
+            prompter,
+            json!({ "action": "paragraph", "value": "next" }),
+        ),
+        (
+            "4",
+            3,
+            3,
+            "down",
+            prompter,
+            json!({ "action": "size", "value": "standard" }),
+        ),
+        (
+            "4",
+            3,
+            3,
+            "rotate_left",
+            prompter,
+            json!({ "action": "size", "value": "down" }),
+        ),
+        (
+            "4",
+            3,
+            3,
+            "rotate_right",
+            prompter,
+            json!({ "action": "size", "value": "up" }),
+        ),
+    ];
+    for (col, dial) in [(0, "1"), (1, "2"), (2, "3"), (3, "4")] {
+        let way = |direction: &str| Value::String(format!("{dial}:{direction}"));
+        presses.push((
+            "2",
+            3,
+            col,
+            "down",
+            audio,
+            json!({ "action": "dialPress", "value": dial }),
+        ));
+        presses.push((
+            "2",
+            3,
+            col,
+            "rotate_left",
+            audio,
+            json!({ "action": "dialTurn", "value": way("down") }),
+        ));
+        presses.push((
+            "2",
+            3,
+            col,
+            "rotate_right",
+            audio,
+            json!({ "action": "dialTurn", "value": way("up") }),
+        ));
+        presses.push((
+            "3",
+            3,
+            col,
+            "down",
+            camera,
+            json!({ "action": "dialPush", "value": dial }),
+        ));
+        presses.push((
+            "3",
+            3,
+            col,
+            "rotate_left",
+            camera,
+            json!({ "action": "dial", "value": way("down") }),
+        ));
+        presses.push((
+            "3",
+            3,
+            col,
+            "rotate_right",
+            camera,
+            json!({ "action": "dial", "value": way("up") }),
+        ));
+    }
+    presses
+}
+
+// What every press, push and turn posts, and that it reads the displays
+// again with it: one read of every display (2026-10-03), which the bridge
+// answers after the press. GAIN's switch, the strip taps and Del Scene left
+// the deck; PROMPTER's SIZE and PARAGRAPH dials swapped places.
 #[test]
-fn control_surface_snapshot_matches_the_deck_page_model() {
-    let snapshot = build_control_surface_snapshot();
-    // D5: LIGHTS is page 1, AUDIO page 2, CAMERAS page 3, PROMPTER page 4.
-    assert_eq!(
-        snapshot
-            .pages
-            .iter()
-            .map(|page| (page.id.as_str(), page.label.as_str()))
-            .collect::<Vec<_>>(),
-        [
-            ("lights", "LIGHTS"),
-            ("audio", "AUDIO"),
-            ("cameras", "CAMERAS"),
-            ("prompter", "PROMPTER"),
-        ]
-    );
-    let lights = &snapshot.pages[0];
-    assert_eq!(lights.id, "lights");
-    assert_eq!(lights.label, "LIGHTS");
-    assert_eq!(
-        lights.buttons.len(),
-        7,
-        "the LIGHTS page's eight keys less `<< PROJ`"
-    );
-    assert_eq!(lights.dials.len(), 12);
-    assert_eq!(lights.buttons[0].id, "lights-btn-2");
-    assert_eq!(lights.buttons[0].position, 2);
-    assert_eq!(
-        lights.buttons[0].url.as_deref(),
-        Some("/api/deck/light-action")
-    );
-    let audio_key = &lights.buttons[6];
-    assert_eq!(audio_key.label, "AUDIO >>");
-    assert_eq!(audio_key.page_nav_target.as_deref(), Some("AUDIO"));
-    assert_eq!(audio_key.is_page_nav, Some(true));
-    assert_eq!(audio_key.method, None, "a page key posts nothing");
-    assert_eq!(audio_key.lcd_refresh_keys, None);
-    assert_eq!(audio_key.description, "Navigate to the AUDIO page.");
-    assert_eq!(lights.dials[0].id, "lights-dial-1-press");
-    assert_eq!(lights.dials[0].lcd_key.as_deref(), Some("light_nav"));
-    assert_eq!(
-        lights.dials[0].lcd_refresh_keys.as_ref().map(Vec::len),
-        Some(3)
-    );
-
-    let audio = &snapshot.pages[1];
-    assert_eq!(audio.label, "AUDIO");
-    assert_eq!(
-        audio.buttons.len(),
-        12,
-        "audio page should model 7 keys, the page key and 4 touch-strip cells"
-    );
-    let cameras_key = audio
-        .buttons
-        .iter()
-        .find(|control| control.position == 7)
-        .expect("the page key stands at position 7");
-    assert_eq!(cameras_key.label, "CAMS >>");
-    assert_eq!(cameras_key.page_nav_target.as_deref(), Some("CAMERAS"));
-    assert_eq!(cameras_key.method, None, "a page key posts nothing");
-    assert_eq!(audio.dials.len(), 12);
-    assert!(audio.buttons.iter().any(|control| control
-        .body
-        .as_ref()
-        .is_some_and(|body| body.get("action").and_then(Value::as_str) == Some("setMixTarget"))));
-    let strip_cell = audio
-        .buttons
-        .iter()
-        .find(|control| control.position == 9)
-        .expect("strip cell should sit at position 9");
-    assert_eq!(strip_cell.lcd_key.as_deref(), Some("audio_strip_1"));
-    assert!(audio
-        .dials
-        .iter()
-        .any(|control| control.control_type == "dial-turn-right"
-            && control.body.as_ref().is_some_and(|body| {
-                body.get("action").and_then(Value::as_str) == Some("dialTurn")
-            })));
-}
-
-// -----------------------------------------------------------------
-// New pages program, Slice 2 (D5): PROJECTS and TASKS leave the deck.
-// -----------------------------------------------------------------
-
-fn test_profile() -> Value {
-    generate_companion_config(
-        "http://127.0.0.1:38201",
-        Some("streamdeck:TESTSERIAL"),
-        TEST_TOKEN,
-    )
-}
-
-/// Every `set_page` jump in `value`, as (the page it jumps to).
-fn page_jumps(value: &Value, into: &mut Vec<i64>) {
-    match value {
-        Value::Object(map) => {
-            if map.get("definitionId").and_then(Value::as_str) == Some("set_page") {
-                into.push(value["options"]["page"].as_i64().unwrap_or(-1));
-            }
-            for child in map.values() {
-                page_jumps(child, into);
+fn every_press_posts_its_pages_key_and_reads_the_displays_again() {
+    let config = profile();
+    let mut expected: BTreeMap<String, (String, Value)> = BTreeMap::new();
+    for page in ["1", "2", "3", "4"] {
+        expected.insert(
+            format!("{page}/0/0/down"),
+            (
+                String::from("/api/deck/camera-action"),
+                json!({ "action": "rec" }),
+            ),
+        );
+        expected.insert(
+            format!("{page}/1/0/down"),
+            (
+                String::from("/api/deck/prompter-action"),
+                json!({ "action": "playPause" }),
+            ),
+        );
+    }
+    for (page, row, col, set, route, body) in presses() {
+        expected.insert(
+            format!("{page}/{row}/{col}/{set}"),
+            (String::from(route), body),
+        );
+    }
+    let mut found = BTreeMap::new();
+    for page in ["1", "2", "3", "4"] {
+        for row in 0..4_u8 {
+            for col in 0..4_u8 {
+                let key = control(&config, page, row, col);
+                for (set, actions) in key["steps"]["0"]["action_sets"].as_object().expect("sets") {
+                    let actions = actions.as_array().expect("a set");
+                    if let Some(posted) = posted(key, set) {
+                        assert_eq!(actions.len(), 2, "{page}/{row}/{col}/{set}");
+                        let read = &actions[1];
+                        assert_eq!(read["definitionId"], "get");
+                        assert_eq!(read["options"]["url"]["value"], DISPLAYS_PATH);
+                        assert_eq!(read["options"]["jsonResultDataVariable"]["value"], RAW);
+                        found.insert(format!("{page}/{row}/{col}/{set}"), posted);
+                    }
+                }
             }
         }
-        Value::Array(items) => {
-            for item in items {
-                page_jumps(item, into);
-            }
-        }
-        _ => {}
+    }
+    assert_eq!(found, expected);
+    let every = config.to_string();
+    for gone in [
+        "toggleDialMode",
+        "stripTap",
+        "deleteScene",
+        "/api/deck/lcd",
+        "\"phones-a\"",
+    ] {
+        assert!(!every.contains(gone), "the profile still sends {gone}");
     }
 }
 
-/// The LCD keys a profile touches: the ones it shows or tests
-/// (`custom:lcd_<key>`), the ones it asks the bridge for
-/// (`/api/deck/lcd?key=<key>`) and the variables those answers are
-/// stored in (`jsonResultDataVariable`).
-#[derive(Default)]
-struct LcdKeys {
-    read: BTreeSet<String>,
-    requested: BTreeSet<String>,
-    stored: BTreeSet<String>,
-}
+// The deck reads every display in one request a second (2026-10-03: until
+// then a request a display, 47 at once), into one custom variable, and keeps
+// only an answer of the bridge's own that is not older than the one it has:
+// generic-http stores an error's body too, and sends a refused read again.
+// Without an answer for a while, the deck shows nothing it does not know.
+#[test]
+fn the_displays_come_in_one_read_a_second_and_a_bad_answer_is_never_shown() {
+    let config = profile();
+    let triggers = &config["triggers"];
+    let poll = &triggers["sse-trigger-deck-poll"];
+    assert_eq!(poll["events"][0]["type"], "interval");
+    assert_eq!(poll["events"][0]["options"]["seconds"], 1);
+    assert_eq!(poll["actions"].as_array().map(Vec::len), Some(1));
+    let read = &poll["actions"][0];
+    assert_eq!(read["definitionId"], "get");
+    assert_eq!(read["options"]["url"]["value"], DISPLAYS_PATH);
+    assert_eq!(read["options"]["jsonResultDataVariable"]["value"], RAW);
+    assert_eq!(read["options"]["result_stringify"]["value"], true);
 
-fn collect_lcd_keys(value: &Value, into: &mut LcdKeys) {
-    fn key_after<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
-        text.match_indices(marker)
-            .map(|(at, _)| {
-                let rest = &text[at + marker.len()..];
-                let end = rest
-                    .find(|character: char| {
-                        !(character.is_ascii_alphanumeric() || character == '_')
-                    })
-                    .unwrap_or(rest.len());
-                &rest[..end]
-            })
-            .collect()
+    let answer = &triggers["sse-trigger-deck-answer"];
+    assert_eq!(answer["events"][0]["type"], "variable_changed");
+    assert_eq!(
+        answer["events"][0]["options"]["variableId"],
+        format!("custom:{RAW}")
+    );
+    let keep = &answer["actions"][0];
+    assert_eq!(keep["definitionId"], "custom_variable_set_value");
+    assert_eq!(keep["options"]["name"]["value"], KEPT);
+    assert_eq!(keep["options"]["value"]["isExpression"], true);
+    let kept = keep["options"]["value"]["value"]
+        .as_str()
+        .expect("an expression");
+    assert!(kept.starts_with(&format!(
+        "jsonpath($(custom:{RAW}), '$.sse') == '{DECK_DISPLAYS_MARK}' && "
+    )));
+    assert!(kept.contains("'$.at'") && kept.ends_with(&format!("$(custom:{KEPT})")));
+    let heard = &answer["actions"][1];
+    assert_eq!(heard["options"]["name"]["value"], AGE);
+    assert!(heard["options"]["value"]["value"]
+        .as_str()
+        .is_some_and(|value| value.contains(DECK_DISPLAYS_MARK) && value.contains("? 0 :")));
+    let age = &triggers["sse-trigger-deck-age"];
+    assert_eq!(age["events"][0]["options"]["seconds"], 1);
+    assert_eq!(age["actions"][0]["options"]["name"]["value"], AGE);
+    assert!(bridge_actions(answer).is_empty() && bridge_actions(age).is_empty());
+
+    let variables = config["custom_variables"]
+        .as_object()
+        .expect("custom variables");
+    assert_eq!(
+        variables.keys().cloned().collect::<BTreeSet<_>>(),
+        BTreeSet::from([String::from(AGE), String::from(KEPT), String::from(RAW)])
+    );
+    assert_eq!(
+        variables[AGE]["defaultValue"], LINK_LOST_AFTER_SECONDS,
+        "lost until heard"
+    );
+    assert_eq!(variables[KEPT]["defaultValue"], "{}");
+    for variable in variables.values() {
+        assert_eq!(variable["persistCurrentValue"], false);
     }
-    match value {
-        Value::String(text) => {
-            into.read
-                .extend(key_after(text, "custom:lcd_").into_iter().map(String::from));
-            into.requested.extend(
-                key_after(text, "/api/deck/lcd?key=")
-                    .into_iter()
-                    .map(String::from),
+
+    // An error's body is never the bridge's answer: it has no mark.
+    let refusal = crate::control_surface::ControlSurfaceError::Busy(String::from("busy"));
+    assert!(!json!({ "error": refusal.message() })
+        .to_string()
+        .contains("\"sse\""));
+
+    // Every display line is blank while the link is lost, and `deck_link`
+    // says so for the keys to grey.
+    let expressions = config["expressionVariables"]
+        .as_object()
+        .expect("expression variables");
+    let lost = format!("$(custom:{AGE}) >= {LINK_LOST_AFTER_SECONDS} ? ");
+    for (id, variable) in expressions {
+        let source = variable["entity"]["options"]["expression"]["value"]
+            .as_str()
+            .expect("an expression");
+        assert_eq!(variable["entity"]["definitionId"], "expression_value");
+        assert!(source.starts_with(&lost), "{id}: {source}");
+        if variable["options"]["variableName"] != "deck_link" {
+            assert!(source.ends_with("?? '')"), "{id}: {source}");
+            assert!(
+                source.contains(&format!("jsonpath($(custom:{KEPT}), '$.")),
+                "{id}"
             );
         }
-        Value::Object(map) => {
-            if let Some(variable) = map
-                .get("jsonResultDataVariable")
-                .and_then(Value::as_str)
-                .filter(|variable| !variable.is_empty())
-            {
-                into.stored.insert(
-                    variable
-                        .strip_prefix("lcd_")
-                        .unwrap_or_else(|| panic!("an answer stored outside lcd_: {variable}"))
-                        .to_string(),
-                );
-            }
-            for child in map.values() {
-                collect_lcd_keys(child, into);
-            }
-        }
-        Value::Array(items) => {
-            for item in items {
-                collect_lcd_keys(item, into);
-            }
-        }
-        _ => {}
     }
+}
+
+/// Every expression variable the profile reads, by name.
+fn read_variables(config: &Value) -> BTreeSet<String> {
+    let text = config["pages"].to_string() + &config["triggers"].to_string();
+    let marker = "$(expression:";
+    text.match_indices(marker)
+        .map(|(at, _)| {
+            let rest = &text[at + marker.len()..];
+            rest[..rest.find(')').expect("a closed reference")].to_string()
+        })
+        .collect()
+}
+
+// Every line the deck reads is a display the bridge answers, in the shape
+// the bridge gives it, and every display the bridge answers for the deck is
+// shown: the profile and `GET /api/deck/displays` hold the same 39.
+#[test]
+fn every_display_the_deck_reads_is_one_the_bridge_answers() {
+    let config = profile();
+    let read = read_variables(&config);
+    let defined = config["expressionVariables"]
+        .as_object()
+        .expect("expression variables")
+        .values()
+        .map(|variable| {
+            variable["options"]["variableName"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        read, defined,
+        "the profile defines what it reads, and nothing else"
+    );
+
+    let mut shown = BTreeSet::new();
+    for name in read.iter().filter(|name| *name != "deck_link") {
+        let (path, display) =
+            display_path(name).unwrap_or_else(|| panic!("{name} is no display of the bridge's"));
+        shown.insert(display);
+        let shape = DECK_DISPLAYS
+            .iter()
+            .find(|(key, _)| *key == display)
+            .map(|(_, shape)| *shape)
+            .expect("a display");
+        match shape {
+            DisplayShape::Word => assert_eq!(path, format!("$.words.{display}")),
+            DisplayShape::Lines => assert!(
+                path == format!("$.lines.{display}.value")
+                    || path == format!("$.lines.{display}.head"),
+                "{path}"
+            ),
+        }
+    }
+    assert_eq!(
+        shown,
+        DECK_DISPLAYS
+            .iter()
+            .map(|(key, _)| *key)
+            .collect::<BTreeSet<_>>(),
+        "the deck shows every display the bridge answers for it"
+    );
+    assert_eq!(DECK_DISPLAYS.len(), 39);
+
+    // The bridge answers every path the deck reads.
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = crate::control_surface::test_support::ready_audio_test_db("profile-displays");
+    let answer = crate::control_surface::read_deck_displays(
+        &test_dir.db_path(),
+        true,
+        std::time::Instant::now(),
+    )
+    .expect("the bridge answers");
+    assert_eq!(answer["sse"], DECK_DISPLAYS_MARK);
+    for name in read.iter().filter(|name| *name != "deck_link") {
+        let (path, _) = display_path(name).expect("a display");
+        let pointer = path.trim_start_matches('$').replace('.', "/");
+        assert!(
+            answer.pointer(&pointer).is_some_and(Value::is_string),
+            "the bridge does not answer {path}: {answer}"
+        );
+    }
+}
+
+/// The words a display can be, as the bridge says them (`control_surface`,
+/// `cameras::deck`, `prompter::deck`, `lighting::scene_state`).
+fn bridge_words(display: &str) -> Vec<String> {
+    let words: Vec<&str> = match display {
+        "scene_state" => crate::lighting::SCENE_STATES.to_vec(),
+        "prompter_state_play" => crate::prompter::deck::PLAY_STATES.to_vec(),
+        "prompter_state_on" | "audio_state_gated" => vec!["yes", "no"],
+        "camera_state_rec" => vec!["ready", "recording", "armed", "last-known", "locked"],
+        "camera_state_dials" => vec!["live", "doubt", "locked"],
+        "camera_state_selected" => vec!["1", "2", "3"],
+        "camera_key_1" | "camera_key_2" | "camera_key_3" => {
+            vec!["HELD", "UNREACHABLE", "RELEASED", "NOT SET UP"]
+        }
+        "audio_state_target" => vec!["main", "phones-a", "phones-b"],
+        "audio_state_bank" => vec!["inputs", "playback", "outputs"],
+        "audio_state_dim" => vec!["on", "off"],
+        "light_key_off" => vec!["OFF?", "ALL OFF"],
+        "workspace" => crate::shell_settings::WORKSPACES.to_vec(),
+        other => panic!("the deck's colours read {other}, whose words this test does not know"),
+    };
+    words.into_iter().map(String::from).collect()
+}
+
+// The deck's colours follow the bridge's state words with exact equality:
+// change one side without the other and a colour disappears without a word.
+// Every word a rule or a key's line tests is one the bridge can say, letter
+// for letter, and the new ones are pinned here (2026-10-03).
+#[test]
+fn the_words_the_deck_tests_are_the_bridges_letter_for_letter() {
+    let config = profile();
+    let text = config.to_string().replace("\\\"", "\"");
+    let mut tested: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let marker = "$(expression:deck_";
+    for (at, _) in text.match_indices(marker) {
+        let rest = &text[at + marker.len()..];
+        let name = &rest[..rest.find(')').expect("a closed reference")];
+        let after = rest[name.len() + 1..].trim_start();
+        let Some(compared) = after
+            .strip_prefix("== '")
+            .or_else(|| after.strip_prefix("!= '"))
+        else {
+            continue;
+        };
+        let word = &compared[..compared.find('\'').expect("a closed word")];
+        tested
+            .entry(String::from(name))
+            .or_default()
+            .insert(String::from(word));
+    }
+    for (name, words) in &tested {
+        if name == "link" {
+            assert_eq!(words, &BTreeSet::from([String::from("lost")]));
+            continue;
+        }
+        // A level word is tested against its bar's ends, not a list.
+        if name.ends_with("_level") {
+            assert!(words.is_subset(&BTreeSet::from([
+                String::new(),
+                String::from("off"),
+                String::from("empty")
+            ])));
+            continue;
+        }
+        let known = bridge_words(name);
+        for word in words {
+            assert!(
+                known.contains(word),
+                "the deck tests {name} == {word:?}, which the bridge never says"
+            );
+        }
+    }
+    for (display, word) in [
+        ("scene_state", "live"),
+        ("scene_state", "unsaved"),
+        ("scene_state", "preview"),
+        ("scene_state", "none"),
+        ("prompter_state_play", "end"),
+        ("prompter_state_play", "no-xl"),
+        ("prompter_state_play", "playing"),
+        ("camera_state_rec", "recording"),
+        ("camera_state_rec", "armed"),
+        ("camera_state_rec", "last-known"),
+        ("audio_state_target", "phones-a"),
+        ("audio_state_target", "phones-b"),
+        ("light_key_off", "OFF?"),
+    ] {
+        assert!(
+            tested
+                .get(display)
+                .is_some_and(|words| words.contains(word)),
+            "the deck no longer tests {display} == {word}"
+        );
+    }
+    assert_eq!(
+        crate::lighting::SCENE_STATES,
+        ["live", "unsaved", "chosen", "preview", "none"]
+    );
+    assert_eq!(
+        crate::prompter::deck::PLAY_STATES,
+        ["playing", "ready", "end", "no-xl", "locked"]
+    );
+}
+
+// Each rule names a layer of its own control, and a property that layer has.
+#[test]
+fn every_rule_overrides_a_property_of_its_own_layers() {
+    let config = profile();
+    let properties = |kind: &str| -> &'static [&'static str] {
+        match kind {
+            "box" => &["color", "borderWidth", "borderColor", "enabled"],
+            "text" => &["color", "text", "enabled"],
+            "image" => &["base64Image", "enabled"],
+            "gauge" => &["enabled"],
+            _ => &[],
+        }
+    };
+    for page in ["1", "2", "3", "4"] {
+        for row in 0..4_u8 {
+            for col in 0..4_u8 {
+                let key = control(&config, page, row, col);
+                for feedback in key["feedbacks"].as_array().expect("feedbacks") {
+                    assert_eq!(feedback["definitionId"], "check_expression");
+                    assert_eq!(feedback["connectionId"], "internal");
+                    for change in feedback["styleOverrides"].as_array().expect("overrides") {
+                        let target = layer(key, change["elementId"].as_str().expect("an id"));
+                        let kind = target["type"].as_str().unwrap_or_else(|| {
+                            panic!("{page}/{row}/{col}: no layer {}", change["elementId"])
+                        });
+                        assert!(
+                            properties(kind)
+                                .contains(&change["elementProperty"].as_str().unwrap_or("")),
+                            "{page}/{row}/{col}: {change}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The image library: an image of its own for every key and cell, at the
+// deck's own size (120 x 120, 200 x 100), each named once and each used.
+#[test]
+fn every_key_and_cell_has_an_image_of_its_own_at_the_decks_size() {
+    let config = profile();
+    let library = config["imageLibrary"]
+        .as_array()
+        .expect("the image library");
+    let names: BTreeSet<String> = library
+        .iter()
+        .map(|image| image["info"]["name"].as_str().expect("a name").to_string())
+        .collect();
+    assert_eq!(names.len(), library.len(), "each image named once");
+    for image in library {
+        let name = image["info"]["name"].as_str().expect("a name");
+        assert!(
+            name.chars()
+                .all(|character| character.is_ascii_alphanumeric() || character == '_'),
+            "{name}"
+        );
+        assert!(image["originalImage"]
+            .as_str()
+            .is_some_and(|data| data.starts_with("data:image/png;base64,iVBOR")));
+        assert_eq!(image["info"]["checksum"].as_str().map(str::len), Some(40));
+    }
+    for image in deck_images() {
+        let expected = if image.name.starts_with("cell_") {
+            (200, 100)
+        } else {
+            (120, 120)
+        };
+        assert_eq!((image.width, image.height), expected, "{}", image.name);
+    }
+
+    let text = config["pages"].to_string();
+    let marker = "$(image:";
+    let used: BTreeSet<String> = text
+        .match_indices(marker)
+        .map(|(at, _)| {
+            let rest = &text[at + marker.len()..];
+            rest[..rest.find(')').expect("a closed reference")].to_string()
+        })
+        .collect();
+    assert_eq!(
+        used, names,
+        "every image is used, and every image used is there"
+    );
+    for page in ["1", "2", "3", "4"] {
+        for row in 0..3_u8 {
+            for col in 0..4_u8 {
+                let art = layer(control(&config, page, row, col), "art")["base64Image"]["value"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
+                let prefix = if row == 2 {
+                    "$(image:cell_"
+                } else {
+                    "$(image:key_"
+                };
+                assert!(art.starts_with(prefix), "{page}/{row}/{col}: {art}");
+            }
+        }
+    }
+}
+
+// The bridge's worst instant (2026-10-03): the poll is one read of every
+// display, and a press its action and that read again.
+#[test]
+fn the_decks_worst_instant_is_three_requests() {
+    let worst = super::deck_worst_instant_requests();
+    assert_eq!(
+        (worst.poll, worst.follow, worst.press, worst.total()),
+        (1, 0, 2, 3)
+    );
 }
 
 // Nothing of Planning is left on the deck: no PROJECTS or TASKS page, no
 // key on the Planning route (`/api/deck/action`), no deck-mode key (a
-// Planning setting), no project, task or sort LCD, no Planning follow.
+// Planning setting), no project, task or sort display, no Planning follow.
 #[test]
 fn the_deck_profile_and_page_model_carry_no_planning() {
-    let profile = test_profile().to_string().to_lowercase();
+    let profile = profile().to_string().to_lowercase();
     let snapshot = serde_json::to_string(&build_control_surface_snapshot())
         .expect("the snapshot serializes")
         .to_lowercase();
@@ -529,446 +1292,107 @@ fn the_deck_profile_and_page_model_carry_no_planning() {
     }
 }
 
-// generic-http stores an answer only into a custom variable the profile
-// ships (the lesson of 2026-09-01), so every LCD the deck shows or asks
-// for must have one; every LCD it shows must be refreshed by something
-// (the poll, a key or a follow trigger); and every key it asks the bridge
-// for must be one the bridge answers. At `e8d43c5` the `AUDIO >>` key
-// asked for four keys the audio surface had retired (refused, with no
-// variable to land in); taking PROJECTS away took the only refresh of
-// `scene_nav` with it, until the lighting follow trigger took it over.
 #[test]
-fn every_lcd_the_deck_shows_is_shipped_refreshed_and_answered() {
-    let profile = test_profile();
-    let mut keys = LcdKeys::default();
-    collect_lcd_keys(&profile, &mut keys);
-    let variables = profile["custom_variables"]
-        .as_object()
-        .expect("custom variables")
-        .keys()
-        .map(|name| {
-            name.strip_prefix("lcd_")
-                .unwrap_or_else(|| panic!("a variable outside lcd_: {name}"))
-                .to_string()
-        })
-        .collect::<BTreeSet<_>>();
-
-    assert_eq!(
-        keys.requested, keys.stored,
-        "each LCD request stores into its own key's variable"
-    );
-    assert_eq!(
-        keys.read, variables,
-        "the profile ships a variable for every LCD it shows, and none it does not"
-    );
-    assert_eq!(
-        keys.requested, variables,
-        "every LCD the profile shows is refreshed by something, and it asks for no other"
-    );
-
-    let _preview_guard = crate::lighting::shared_preview_test_guard();
-    let test_dir = crate::control_surface::test_support::ready_audio_test_db("profile-lcds");
-    for key in &keys.requested {
-        if let Err(error) =
-            crate::control_surface::read_control_surface_lcd_text(&test_dir.db_path(), key)
-        {
-            panic!(
-                "the profile asks for LCD {key:?}, which the bridge refuses: {}",
-                error.message()
-            );
-        }
-    }
-}
-
-// D5: LIGHTS, AUDIO, CAMERAS and PROMPTER, chained by the page keys and by
-// the deck following the app. The page keys make a ring: each page has one,
-// to the page after it, and PROMPTER's goes round to LIGHTS. Setup has no
-// deck page, so nothing follows it and the deck stays where it is.
-#[test]
-fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
-    let profile = test_profile();
-    let pages = profile["pages"].as_object().expect("pages");
-    let page_names = pages
-        .iter()
-        .map(|(number, page)| {
-            (
-                number.parse::<i64>().expect("page numbers"),
-                page["name"].as_str().expect("page names").to_string(),
-            )
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        page_names,
-        vec![
-            (1, String::from("LIGHTS")),
-            (2, String::from("AUDIO")),
-            (3, String::from("CAMERAS")),
-            (4, String::from("PROMPTER")),
-        ]
-    );
-
-    let mut all_jumps = Vec::new();
-    page_jumps(&profile, &mut all_jumps);
-    assert!(
-        all_jumps.iter().all(|page| (1..=4).contains(page)),
-        "every jump lands on a page the profile has: {all_jumps:?}"
-    );
-
-    // One page key a page, to the page after it; the last to the first.
-    for (page, next, place) in [
-        ("1", 2, ("1", "3")),
-        ("2", 3, ("1", "2")),
-        ("3", 4, ("1", "3")),
-        ("4", 1, ("1", "3")),
-    ] {
-        let mut jumps = Vec::new();
-        page_jumps(&pages[page], &mut jumps);
-        assert_eq!(jumps, vec![next], "page {page}'s one page key");
-        let mut at_its_place = Vec::new();
-        page_jumps(
-            &pages[page]["controls"][place.0][place.1],
-            &mut at_its_place,
-        );
-        assert_eq!(
-            at_its_place,
-            vec![next],
-            "page {page}'s page key stands at {place:?}"
-        );
-    }
-    assert!(
-        pages["1"]["controls"]["0"].get("0").is_none(),
-        "`<< PROJ` left LIGHTS' first place empty"
-    );
-
-    let triggers = profile["triggers"].as_object().expect("triggers");
-    let mut follows = triggers
-        .values()
-        .filter(|trigger| trigger["events"][0]["type"] == "condition_true")
-        .map(|trigger| {
-            let mut jumps = Vec::new();
-            page_jumps(&trigger["actions"], &mut jumps);
-            (
-                trigger["condition"][0]["options"]["value"]
-                    .as_str()
-                    .expect("a follow trigger tests the saved page")
-                    .to_string(),
-                jumps,
-            )
-        })
-        .collect::<Vec<_>>();
-    follows.sort();
-    assert_eq!(
-        follows,
-        vec![
-            (String::from("audio"), vec![2]),
-            (String::from("cameras"), vec![3]),
-            (String::from("lighting"), vec![1]),
-            // The page's word in the app is the one the hardware link
-            // accepts (`shell_settings::WORKSPACES`).
-            (String::from("teleprompter"), vec![4]),
-        ]
-    );
-    for follow in follows.iter().map(|(workspace, _)| workspace.as_str()) {
-        assert!(
-            crate::shell_settings::WORKSPACES.contains(&follow),
-            "{follow} is a page the app can be on"
-        );
-    }
-
-    // The follow triggers turn the page and refresh nothing: every page's
-    // displays are polled (2026-09-29; arriving on LIGHTS refreshed its four
-    // until then, which were polled by nothing).
-    for (workspace, _) in &follows {
-        let mut keys = LcdKeys::default();
-        collect_lcd_keys(
-            &triggers[format!("sse-trigger-follow-{workspace}").as_str()]["actions"],
-            &mut keys,
-        );
-        assert!(
-            keys.requested.is_empty(),
-            "following to {workspace} refreshes nothing: {:?}",
-            keys.requested
-        );
-    }
-}
-
-// Found, to check (2026-09-28): the LIGHTS strip followed only an arrival on
-// the page and a push of the Light dial, so a turn to the next light left the
-// last one's name. Each dial's turn and push refresh what they change, as the
-// AUDIO page's do.
-#[test]
-fn each_lights_dial_refreshes_what_it_changes() {
-    let config = generate_companion_config(
-        "http://127.0.0.1:38201",
-        Some("streamdeck:TESTSERIAL"),
-        TEST_TOKEN,
-    );
-    let lights = &config["pages"]["1"]["controls"];
-    let refreshed = |row: &str, col: &str, set: &str| {
-        let mut keys = LcdKeys::default();
-        collect_lcd_keys(
-            &lights[row][col]["steps"]["0"]["action_sets"][set],
-            &mut keys,
-        );
-        keys.requested
-    };
-    let set = |keys: &[&str]| {
-        keys.iter()
-            .map(|key| key.to_string())
-            .collect::<BTreeSet<_>>()
-    };
-    for step in ["down", "rotate_left", "rotate_right"] {
-        assert_eq!(
-            refreshed("3", "0", step),
-            set(&["light_nav", "light_intensity", "light_cct"]),
-            "the Light dial's {step}"
-        );
-        assert_eq!(
-            refreshed("3", "1", step),
-            set(&["light_intensity"]),
-            "Intensity {step}"
-        );
-        assert_eq!(refreshed("3", "2", step), set(&["light_cct"]), "CCT {step}");
-        assert_eq!(
-            refreshed("3", "3", step),
-            set(&["scene_nav"]),
-            "Scene {step}"
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// The CAMERAS and PROMPTER pages (D14; `docs/design/teleprompter.md` §9)
-// ---------------------------------------------------------------------------
-
-/// The body a control's first action posts, with its route.
-fn posted(control: &Value, set: &str) -> Option<(String, Value)> {
-    let action = control["steps"]["0"]["action_sets"][set].get(0)?;
-    if action["definitionId"] != "post" {
-        return None;
-    }
-    let body = serde_json::from_str(action["options"]["body"].as_str()?).ok()?;
-    Some((action["options"]["url"].as_str()?.to_string(), body))
-}
-
-#[test]
-fn the_cameras_page_is_three_cameras_the_bank_and_rec() {
-    let profile = test_profile();
-    let controls = &profile["pages"]["3"]["controls"];
-    assert_eq!(profile["pages"]["3"]["name"], "CAMERAS");
-
-    for (col, camera) in [("0", "1"), ("1", "2"), ("2", "3")] {
-        let key = &controls["0"][col];
-        assert_eq!(
-            key["style"]["text"],
-            format!("$(custom:lcd_camera_key_{camera})")
-        );
-        assert_eq!(
-            posted(key, "down"),
-            Some((
-                String::from("/api/deck/camera-action"),
-                json!({ "action": "select", "value": camera })
-            ))
-        );
-        // Amber is selected, and it is the page's selection.
-        let selected = &key["feedbacks"][0];
-        assert_eq!(
-            selected["options"]["variable"],
-            "custom:lcd_camera_state_selected"
-        );
-        assert_eq!(selected["options"]["value"], camera);
-        assert_eq!(selected["style"]["bgcolor"], DECK_AMBER_BG);
-    }
-    assert_eq!(
-        posted(&controls["0"]["3"], "down").map(|(_, body)| body),
-        Some(json!({ "action": "bank" }))
-    );
-
-    // `REC`: a red lamp and the word on a dark key, never a red fill (D19).
-    let rec = &controls["1"]["0"];
-    assert_eq!(rec["style"]["text"], "$(custom:lcd_camera_key_rec)");
-    assert_eq!(rec["style"]["bgcolor"], 0);
-    assert_eq!(
-        posted(rec, "down").map(|(_, body)| body),
-        Some(json!({ "action": "rec" }))
-    );
-    let recording = rec["feedbacks"]
-        .as_array()
-        .expect("feedbacks")
-        .iter()
-        .find(|feedback| feedback["options"]["value"] == "recording")
-        .expect("the recording feedback");
-    assert_eq!(recording["style"]["color"], DECK_HAZARD_INK);
-    assert!(recording["style"].get("bgcolor").is_none(), "{recording}");
-    assert!(recording["style"]["png64"]
-        .as_str()
-        .is_some_and(|png| png.starts_with("iVBOR")));
-    for (value, ink) in [("locked", DECK_GREY_INK), ("last-known", DECK_AMBER_BG)] {
-        assert!(
-            rec["feedbacks"]
-                .as_array()
-                .expect("feedbacks")
-                .iter()
-                .any(|feedback| feedback["options"]["value"] == value
-                    && feedback["style"]["color"] == ink),
-            "{value}"
-        );
-    }
-
-    // Rows 1's other places stay dark, but the page key.
-    assert!(controls["1"].get("1").is_none());
-    assert!(controls["1"].get("2").is_none());
-    assert_eq!(controls["1"]["3"]["style"]["text"], "PROMPTER\\n>>");
-
-    for (col, dial) in [("0", "1"), ("1", "2"), ("2", "3"), ("3", "4")] {
-        let cell = &controls["2"][col];
-        assert_eq!(
-            cell["style"]["text"],
-            format!("$(custom:lcd_camera_strip_{dial})")
-        );
-        assert_eq!(
-            cell["steps"]["0"]["action_sets"]["down"],
-            json!([]),
-            "a strip cell only shows"
-        );
-        let encoder = &controls["3"][col];
-        assert_eq!(encoder["options"]["rotaryActions"], true);
-        assert_eq!(
-            posted(encoder, "rotate_left").map(|(_, body)| body),
-            Some(json!({ "action": "dial", "value": format!("{dial}:down") }))
-        );
-        assert_eq!(
-            posted(encoder, "rotate_right").map(|(_, body)| body),
-            Some(json!({ "action": "dial", "value": format!("{dial}:up") }))
-        );
-        assert_eq!(
-            posted(encoder, "down").map(|(_, body)| body),
-            Some(json!({ "action": "dialPush", "value": dial }))
-        );
-    }
-}
-
-#[test]
-fn the_prompter_page_is_the_takes_keys_and_four_dials() {
-    let profile = test_profile();
-    let controls = &profile["pages"]["4"]["controls"];
-    assert_eq!(profile["pages"]["4"]["name"], "PROMPTER");
-
-    let keys: [(&str, &str, &str, Value); 5] = [
-        ("0", "0", "PLAY", json!({ "action": "playPause" })),
-        ("0", "1", "BACK", json!({ "action": "back" })),
-        ("0", "2", "TOP", json!({ "action": "top" })),
-        (
-            "1",
-            "0",
-            "CUE\\n<",
-            json!({ "action": "cue", "value": "previous" }),
-        ),
-        (
-            "1",
-            "1",
-            "CUE\\n>",
-            json!({ "action": "cue", "value": "next" }),
-        ),
-    ];
-    for (row, col, text, body) in keys {
-        let key = &controls[row][col];
-        assert_eq!(key["style"]["text"], text, "{row}/{col}");
-        assert_eq!(
-            posted(key, "down"),
-            Some((String::from("/api/deck/prompter-action"), body)),
-            "{text}"
-        );
-    }
-    // The other keys stay dark (§9), but the page key, which goes round.
-    assert!(controls["0"].get("3").is_none());
-    assert!(controls["1"].get("2").is_none());
-    assert_eq!(controls["1"]["3"]["style"]["text"], "LIGHTS\\n>>");
-
-    // `PLAY` is lit green while the text scrolls, and grey while it cannot
-    // be pressed.
-    let play = controls["0"]["0"]["feedbacks"]
-        .as_array()
-        .expect("feedbacks");
-    assert!(play.iter().any(|feedback| {
-        feedback["options"]["variable"] == "custom:lcd_prompter_state_play"
-            && feedback["options"]["value"] == "playing"
-            && feedback["style"]["bgcolor"] == DECK_LIVE_BG
-    }));
-    assert!(play.iter().any(|feedback| {
-        feedback["options"]["value"] == "locked" && feedback["style"]["color"] == DECK_GREY_INK
-    }));
-
-    let dials: [(&str, Option<Value>, Value, Value); 4] = [
-        (
-            "0",
-            Some(json!({ "action": "playPause" })),
-            json!({ "action": "speed", "value": "down" }),
-            json!({ "action": "speed", "value": "up" }),
-        ),
-        (
-            "1",
-            None,
-            json!({ "action": "line", "value": "previous" }),
-            json!({ "action": "line", "value": "next" }),
-        ),
-        (
-            "2",
-            Some(json!({ "action": "size", "value": "standard" })),
-            json!({ "action": "size", "value": "down" }),
-            json!({ "action": "size", "value": "up" }),
-        ),
-        (
-            "3",
-            None,
-            json!({ "action": "paragraph", "value": "previous" }),
-            json!({ "action": "paragraph", "value": "next" }),
-        ),
-    ];
-    for (col, push, left, right) in dials {
-        let encoder = &controls["3"][col];
-        assert_eq!(posted(encoder, "down").map(|(_, body)| body), push, "{col}");
-        assert_eq!(
-            posted(encoder, "rotate_left").map(|(_, body)| body),
-            Some(left)
-        );
-        assert_eq!(
-            posted(encoder, "rotate_right").map(|(_, body)| body),
-            Some(right)
-        );
-    }
-    for (col, key) in [
-        ("0", "prompter_speed"),
-        ("1", "prompter_place"),
-        ("2", "prompter_left"),
-        ("3", "prompter_name"),
-    ] {
-        assert_eq!(
-            controls["2"][col]["style"]["text"],
-            format!("$(custom:lcd_{key})")
-        );
-    }
-}
-
-// Setup draws every page from the page model: each control says what it
-// does in the operator's words, and none falls back to the words of a
-// control nobody described. (Until the CAMERAS and PROMPTER pages the scene
-// dial's turns read `left Scene.` and `right Scene.`, and a mix target's key
-// `Make phones a the active mix target.`.)
-#[test]
-fn the_page_model_says_what_the_new_pages_controls_do() {
+fn control_surface_snapshot_matches_the_deck_page_model() {
     let snapshot = build_control_surface_snapshot();
-    let cameras = &snapshot.pages[2];
-    let prompter = &snapshot.pages[3];
-    for page in [cameras, prompter] {
-        assert_eq!(
-            page.buttons.len(),
-            10,
-            "{}: 6 keys and 4 strip cells",
-            page.label
-        );
+    // D5: LIGHTS is page 1, AUDIO page 2, CAMERAS page 3, PROMPTER page 4.
+    assert_eq!(
+        snapshot
+            .pages
+            .iter()
+            .map(|page| (page.id.as_str(), page.label.as_str()))
+            .collect::<Vec<_>>(),
+        [
+            ("lights", "LIGHTS"),
+            ("audio", "AUDIO"),
+            ("cameras", "CAMERAS"),
+            ("prompter", "PROMPTER"),
+        ]
+    );
+    // The approved layout: the keys at their places (a dark key is none),
+    // and the four cells of the strip, 9 to 12.
+    let places = |index: usize| {
+        snapshot.pages[index]
+            .buttons
+            .iter()
+            .map(|control| control.position)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(places(0), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12]);
+    assert_eq!(places(1), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    assert_eq!(places(2), [1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    assert_eq!(places(3), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12]);
+    let words = |index: usize| {
+        snapshot.pages[index]
+            .buttons
+            .iter()
+            .map(|control| control.label.as_str())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        words(0),
+        [
+            "REC",
+            "ALL ON",
+            "SAVE",
+            "AUDIO \u{203a}",
+            "PLAY",
+            "ALL OFF",
+            "RECALL",
+            "LIGHT",
+            "INTENSITY",
+            "CCT",
+            "SCENE"
+        ]
+    );
+    assert_eq!(
+        words(1)[..8],
+        [
+            "REC",
+            "MAIN OUT",
+            "PHONES",
+            "CAMERAS \u{203a}",
+            "PLAY",
+            "BANK",
+            "DIM",
+            "SOLO"
+        ]
+    );
+    assert_eq!(
+        words(2),
+        [
+            "REC",
+            "BANK",
+            "PROMPTER \u{203a}",
+            "PLAY",
+            "CAM 1",
+            "CAM 2",
+            "CAM 3",
+            "DIAL 1",
+            "DIAL 2",
+            "DIAL 3",
+            "DIAL 4"
+        ]
+    );
+    assert_eq!(
+        words(3),
+        [
+            "REC",
+            "\u{25c2} CUE",
+            "CUE \u{25b8}",
+            "LIGHTS \u{203a}",
+            "PLAY",
+            "BACK",
+            "TOP",
+            "SPEED",
+            "LINE",
+            "PARAGRAPH",
+            "SIZE"
+        ]
+    );
+    for page in &snapshot.pages {
         assert_eq!(page.dials.len(), 12, "{}", page.label);
-        // The strip's cells only show; every other key is pressed.
+        // The strip only shows; every key is pressed.
         for control in &page.buttons {
             assert_eq!(
                 control.control_type,
@@ -980,17 +1404,44 @@ fn the_page_model_says_what_the_new_pages_controls_do() {
                 "{}",
                 control.id
             );
-            assert_eq!(
-                control.position > 8,
-                control.url.is_none() && control.is_page_nav.is_none()
-            );
         }
+        let page_key = page
+            .buttons
+            .iter()
+            .find(|control| control.position == 4)
+            .expect("the page key");
+        assert_eq!(page_key.is_page_nav, Some(true));
+        assert_eq!(page_key.method, None, "a page key posts nothing");
     }
-    for page in &snapshot.pages[..2] {
-        for control in &page.buttons {
-            assert_eq!(control.control_type, "button", "{}", control.id);
-        }
-    }
+    assert_eq!(
+        snapshot
+            .pages
+            .iter()
+            .map(|page| page.buttons.iter().chain(&page.dials).count())
+            .sum::<usize>(),
+        93
+    );
+    assert_eq!(
+        snapshot
+            .pages
+            .iter()
+            .map(|page| {
+                page.buttons
+                    .iter()
+                    .find(|control| control.position == 4)
+                    .and_then(|control| control.page_nav_target.clone())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<_>>(),
+        ["AUDIO", "CAMERAS", "PROMPTER", "LIGHTS"]
+    );
+}
+
+// Setup draws every page from the page model: each control says what it
+// does in the operator's words.
+#[test]
+fn the_page_model_says_what_each_control_does() {
+    let snapshot = build_control_surface_snapshot();
     for page in &snapshot.pages {
         for control in page.buttons.iter().chain(&page.dials) {
             assert!(
@@ -1004,75 +1455,60 @@ fn the_page_model_says_what_the_new_pages_controls_do() {
                 control.id,
                 control.description
             );
-            for fallback in ["button ", "press ", "left ", "right "] {
-                assert!(
-                    !control.description.starts_with(fallback),
-                    "{}: {:?}",
-                    control.id,
-                    control.description
-                );
-            }
+            assert!(!control.description.starts_with("Send "), "{}", control.id);
         }
     }
-    let by_id = |page: &super::snapshot::ControlSurfacePage, id: &str| {
-        page.buttons
+    let by_id = |page: usize, id: &str| {
+        snapshot.pages[page]
+            .buttons
             .iter()
-            .chain(&page.dials)
+            .chain(&snapshot.pages[page].dials)
             .find(|control| control.id == id)
             .unwrap_or_else(|| panic!("{id}"))
             .clone()
     };
     assert_eq!(
-        by_id(&snapshot.pages[0], "lights-dial-4-left").description,
+        by_id(0, "lights-btn-8").description,
+        "Recall the selected lighting scene, with the Lighting page's Fade."
+    );
+    assert_eq!(
+        by_id(0, "lights-btn-4").description,
+        "Turn the deck to the AUDIO page."
+    );
+    assert_eq!(
+        by_id(0, "lights-btn-9").description,
+        "Shows the light the dials set, and its place among the lights."
+    );
+    assert_eq!(
+        by_id(0, "lights-dial-4-left").description,
         "Select the previous scene."
     );
     assert_eq!(
-        by_id(&snapshot.pages[0], "lights-dial-4-right").description,
-        "Select the next scene."
-    );
-    assert_eq!(
-        ["audio-btn-1", "audio-btn-2", "audio-btn-3"]
-            .map(|id| by_id(&snapshot.pages[1], id).description),
+        ["audio-btn-2", "audio-btn-3"].map(|id| by_id(1, id).description),
         [
             "Make Main Out the active mix target.",
-            "Make Phones 1 the active mix target.",
-            "Make Phones 2 the active mix target."
+            "Make the next phones mix the active mix target: Phones 1, then Phones 2."
         ]
     );
     assert_eq!(
-        by_id(cameras, "cameras-btn-5").description,
+        by_id(2, "cameras-btn-1").description,
         "Start recording on CAM 1. While it records: arm the stop, then stop."
     );
+    assert_eq!(by_id(2, "cameras-dial-2-left").label, "Dial 2 Down");
     assert_eq!(
-        by_id(cameras, "cameras-btn-5").lcd_key.as_deref(),
-        Some("camera_key_rec")
-    );
-    assert_eq!(
-        by_id(cameras, "cameras-dial-2-left").description,
+        by_id(2, "cameras-dial-2-left").description,
         "Step shutter or tint down on the selected camera, as the bank says."
     );
-    assert_eq!(by_id(cameras, "cameras-dial-2-left").label, "Dial 2 Down");
     assert_eq!(
-        by_id(cameras, "cameras-dial-3-press").description,
-        "A push of dial 3 does nothing."
-    );
-    assert_eq!(
-        by_id(cameras, "cameras-btn-9").description,
-        "Shows what dial 1 sets."
-    );
-    assert_eq!(
-        by_id(prompter, "prompter-btn-1").description,
+        by_id(3, "prompter-btn-5").description,
         "Play or pause the prompter."
     );
     assert_eq!(
-        by_id(prompter, "prompter-dial-2-press").description,
-        "A push of Position does nothing."
+        by_id(3, "prompter-dial-2-press").description,
+        "A push of the LINE dial does nothing."
     );
-    assert_eq!(by_id(prompter, "prompter-dial-1-right").label, "Speed Up");
-    assert_eq!(
-        by_id(prompter, "prompter-btn-8").page_nav_target.as_deref(),
-        Some("LIGHTS")
-    );
+    assert_eq!(by_id(3, "prompter-dial-3-right").label, "Next Paragraph");
+    assert_eq!(by_id(3, "prompter-dial-4-right").label, "Size Up");
 }
 
 /// The pages' test double draws the deck's pages from a file, so that Setup

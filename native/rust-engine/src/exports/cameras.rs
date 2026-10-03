@@ -1,168 +1,138 @@
-//! The CAMERAS page (D14): `CAM 1`–`CAM 3`, `BANK`, `REC` and the page key,
-//! four dials, and the strip over them. What a key does and what a display
-//! says is the cameras' own (`cameras::deck`).
+//! The CAMERAS page (D14; 2026-10-03, the approved layout). Between takes:
+//! pick a camera, then set its exposure, colour and focus. During the take:
+//! REC. What a key does and what a display says is the cameras' own
+//! (`cameras::deck`).
+//!
+//! |        | 1    | 2     | 3      | 4          |
+//! | ------ | ---- | ----- | ------ | ---------- |
+//! | Top    | REC  | BANK  | (dark) | PROMPTER › |
+//! | Bottom | PLAY | CAM 1 | CAM 2  | CAM 3      |
+//!
+//! The camera keys sit over the strip that shows the selected camera: pick,
+//! look and turn in one place. The selected camera has a white outline, not
+//! an amber fill (F1): amber means "switched on" on the screen. The state
+//! words take the screen's colours; red stays REC's.
 
-use super::controls::{
-    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, page_jump,
-    state_feedback, ControlDef, DECK_AMBER_BG, DECK_AMBER_INK, DECK_DOUBT_INK, DECK_GREY_INK,
-    DECK_HAZARD_INK,
+use super::common::{camera, page_key, play_key, rec_key};
+use super::model::{
+    cell, dark_key, dial, key_with_value, reads, shown, shown_head, Control, Prop, DECK_DOUBT_INK,
+    DECK_GREY_INK, DECK_LIVE_BG, DECK_SELECT_LINE, FILL, VALUE,
 };
-use super::pages::deck_page_number;
-use serde_json::{json, Value};
 
-/// The route of the page's keys and dials.
-const ROUTE: &str = "/api/deck/camera-action";
-
-/// The strip's four cells and the word their colour follows: what a
-/// selection or the bank changes.
-const STRIP_KEYS: [&str; 5] = [
-    "camera_strip_1",
-    "camera_strip_2",
-    "camera_strip_3",
-    "camera_strip_4",
-    "camera_state_dials",
-];
-
-fn key(action: &str, value: Option<&str>, refresh_keys: &[&str]) -> Vec<Value> {
-    let body = match value {
-        Some(value) => json!({ "action": action, "value": value }),
-        None => json!({ "action": action }),
+/// `CAM n`: selects it; the dials, the strip, the plate and the big picture
+/// follow, and REC stays CAM 1's. Under its name its state, in the screen's
+/// words and colours: `HELD` green, `UNREACHABLE` amber, `RELEASED` and
+/// `NOT SET UP` grey.
+fn camera_key(
+    col: u8,
+    label: &'static str,
+    number: &'static str,
+    display: &'static str,
+) -> Control {
+    let art = match number {
+        "1" => "key_cam_1",
+        "2" => "key_cam_2",
+        _ => "key_cam_3",
     };
-    http_post(ROUTE, body)
-        .into_iter()
-        .chain(lcd_refreshes(refresh_keys))
-        .collect()
-}
-
-/// `CAM n`: amber while it is the selected camera (the page's selection).
-fn camera_key(col: &'static str, camera: &'static str) -> ControlDef {
-    type CameraKey = (&'static str, &'static str);
-    let (label, text): CameraKey = match camera {
-        "1" => ("CAM 1", "$(custom:lcd_camera_key_1)"),
-        "2" => ("CAM 2", "$(custom:lcd_camera_key_2)"),
-        _ => ("CAM 3", "$(custom:lcd_camera_key_3)"),
-    };
-    let mut refreshes = vec!["camera_state_selected"];
-    refreshes.extend(STRIP_KEYS);
-    expression_button(
-        "0",
+    let state = |word: &str| reads(display, word);
+    key_with_value(
+        1,
         col,
         label,
-        text,
-        key("select", Some(camera), &refreshes),
+        Prop::text(label),
+        Prop::Expr(shown(display)),
+        art,
     )
-    .size("14")
-    .with_feedbacks(vec![color_feedback(
-        "camera_state_selected",
-        camera,
-        DECK_AMBER_INK,
-        DECK_AMBER_BG,
-    )])
+    .on_press(camera("select", Some(number)))
+    .rule(
+        state("HELD"),
+        vec![(VALUE, "color", Prop::colour(DECK_LIVE_BG))],
+    )
+    .rule(
+        state("UNREACHABLE"),
+        vec![(VALUE, "color", Prop::colour(DECK_DOUBT_INK))],
+    )
+    .rule(
+        format!("{} || {}", state("RELEASED"), state("NOT SET UP")),
+        vec![(VALUE, "color", Prop::colour(DECK_GREY_INK))],
+    )
+    .rule(
+        reads("camera_state_selected", number),
+        vec![
+            (FILL, "borderWidth", Prop::Fixed(4.into())),
+            (FILL, "borderColor", Prop::colour(DECK_SELECT_LINE)),
+        ],
+    )
+    .grey_without_the_link()
 }
 
-fn strip_cell(col: &'static str, label: &'static str, text: &'static str) -> ControlDef {
-    expression_button("2", col, label, text, Vec::new())
-        .size("14")
-        .no_topbar()
-        .with_feedbacks(vec![
-            // A camera that does not answer: what it last reported, as doubt.
-            state_feedback(
-                "camera_state_dials",
-                "doubt",
-                false,
-                json!({ "color": DECK_DOUBT_INK }),
-            ),
-            state_feedback(
-                "camera_state_dials",
-                "locked",
-                false,
-                json!({ "color": DECK_GREY_INK }),
-            ),
-        ])
+/// A cell of the strip: what the dial under it sets on the selected camera,
+/// by the bank, over the camera's value. Amber while the camera does not
+/// answer (its last values), grey while it is released or not set up.
+fn camera_cell(col: u8, label: &'static str, display: &'static str) -> Control {
+    cell(
+        col,
+        label,
+        "what the dial under it sets on the selected camera, and its value",
+        Prop::Expr(shown_head(display)),
+        display,
+        "cell_camera_dial",
+    )
+    .inked(reads("camera_state_dials", "doubt"), DECK_DOUBT_INK)
+    .inked(reads("camera_state_dials", "locked"), DECK_GREY_INK)
+    .grey_without_the_link()
 }
 
-fn camera_dial(col: &'static str, label: &'static str, number: &'static str) -> ControlDef {
-    type Turns = (&'static str, &'static str, &'static str);
-    let (down, up, strip): Turns = match number {
-        "1" => ("1:down", "1:up", "camera_strip_1"),
-        "2" => ("2:down", "2:up", "camera_strip_2"),
-        "3" => ("3:down", "3:up", "camera_strip_3"),
-        _ => ("4:down", "4:up", "camera_strip_4"),
+fn camera_dial(col: u8, label: &'static str, number: &'static str) -> Control {
+    let (down, up) = match number {
+        "1" => ("1:down", "1:up"),
+        "2" => ("2:down", "2:up"),
+        "3" => ("3:down", "3:up"),
+        _ => ("4:down", "4:up"),
     };
     dial(
-        "3",
         col,
         label,
-        None,
-        key("dialPush", Some(number), &[strip]),
-        key("dial", Some(down), &[strip]),
-        key("dial", Some(up), &[strip]),
+        Some(camera("dialPush", Some(number))),
+        camera("dial", Some(down)),
+        camera("dial", Some(up)),
     )
 }
 
-pub(super) fn camera_controls() -> Vec<ControlDef> {
-    let mut bank_refreshes = vec!["camera_key_bank"];
-    bank_refreshes.extend(STRIP_KEYS);
-
+pub(super) fn camera_controls() -> Vec<Control> {
     vec![
-        camera_key("0", "1"),
-        camera_key("1", "2"),
-        camera_key("2", "3"),
-        expression_button(
-            "0",
-            "3",
+        rec_key(),
+        // EXPOSURE, COLOUR or FOCUS: nothing reaches a camera.
+        key_with_value(
+            0,
+            1,
             "BANK",
-            "$(custom:lcd_camera_key_bank)",
-            key("bank", None, &bank_refreshes),
+            Prop::text("BANK"),
+            Prop::Expr(shown("camera_key_bank")),
+            "key_camera_bank",
         )
-        .size("14"),
-        // `REC` is CAM 1's whichever camera is selected. While CAM 1 records
-        // it is a red lamp and the word on a dark key, never a red fill
-        // (D19); armed to stop it reads `STOP?` in amber.
-        expression_button(
-            "1",
-            "0",
-            "REC",
-            "$(custom:lcd_camera_key_rec)",
-            key("rec", None, &["camera_key_rec", "camera_state_rec"]),
-        )
-        .size("18")
-        .no_topbar()
-        .with_feedbacks(vec![
-            state_feedback(
-                "camera_state_rec",
-                "recording",
-                false,
-                json!({ "color": DECK_HAZARD_INK, "png64": super::controls::deck_asset("lamp_red") }),
-            ),
-            color_feedback("camera_state_rec", "armed", DECK_AMBER_INK, DECK_AMBER_BG),
-            state_feedback(
-                "camera_state_rec",
-                "last-known",
-                false,
-                json!({ "color": DECK_DOUBT_INK, "png64": super::controls::deck_asset("lamp_amber") }),
-            ),
-            state_feedback(
-                "camera_state_rec",
-                "locked",
-                false,
-                json!({ "color": DECK_GREY_INK }),
-            ),
-        ]),
-        // Row 1, columns 1 and 2 stay dark.
-        button(
-            "1",
-            "3",
-            "PROMPTER >>",
-            page_jump(deck_page_number("prompter")),
+        .on_press(camera("bank", None))
+        .grey_without_the_link(),
+        // Kept free: a one-press AUTO could go here once the camera links are
+        // built and reviewed.
+        dark_key(0, 2),
+        page_key(
+            "PROMPTER \u{203a}",
+            "PROMPTER\n\u{203a}",
+            "prompter",
+            "key_page_prompter",
         ),
-        strip_cell("0", "What dial 1 sets", "$(custom:lcd_camera_strip_1)"),
-        strip_cell("1", "What dial 2 sets", "$(custom:lcd_camera_strip_2)"),
-        strip_cell("2", "What dial 3 sets", "$(custom:lcd_camera_strip_3)"),
-        strip_cell("3", "What dial 4 sets", "$(custom:lcd_camera_strip_4)"),
-        camera_dial("0", "Dial 1", "1"),
-        camera_dial("1", "Dial 2", "2"),
-        camera_dial("2", "Dial 3", "3"),
-        camera_dial("3", "Dial 4", "4"),
+        play_key(),
+        camera_key(1, "CAM 1", "1", "camera_key_1"),
+        camera_key(2, "CAM 2", "2", "camera_key_2"),
+        camera_key(3, "CAM 3", "3", "camera_key_3"),
+        camera_cell(0, "DIAL 1", "camera_strip_1"),
+        camera_cell(1, "DIAL 2", "camera_strip_2"),
+        camera_cell(2, "DIAL 3", "camera_strip_3"),
+        camera_cell(3, "DIAL 4", "camera_strip_4"),
+        camera_dial(0, "DIAL 1", "1"),
+        camera_dial(1, "DIAL 2", "2"),
+        camera_dial(2, "DIAL 3", "3"),
+        camera_dial(3, "DIAL 4", "4"),
     ]
 }
