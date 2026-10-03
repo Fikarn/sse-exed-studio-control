@@ -832,6 +832,11 @@ fn the_scene_state_is_decided_once_for_the_screen_and_the_deck() {
     set_shared_preview_mode(db_path, false);
 }
 
+// A rig with no scene reads `none`, on the deck and on the screen. Every
+// scene is deleted, and the bridge's address is cleared: with an address the
+// rig's three default scenes come back when its last scene goes, so the
+// assertions are unconditional (the review of #293: they sat inside an `if`
+// that never held).
 #[test]
 fn a_rig_with_no_scene_is_none() {
     let _preview_guard = crate::lighting::shared_preview_test_guard();
@@ -846,19 +851,32 @@ fn a_rig_with_no_scene_is_none() {
         )
         .expect("the scene should go");
     }
-    if load_lighting_editor_state(&deck_app_settings(db_path))
-        .scenes
-        .is_empty()
-    {
-        assert_eq!(
-            read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
-            "none"
-        );
-        assert_eq!(
-            read_control_surface_lcd_text(db_path, "scene_nav").expect("lcd text"),
-            "SCENE\\n--"
-        );
-    }
+    set_settings_owned(
+        db_path,
+        &[(
+            String::from(crate::commissioning::LIGHTING_BRIDGE_IP_KEY),
+            String::new(),
+        )],
+    )
+    .expect("the address should clear");
+    assert!(
+        load_lighting_editor_state(&deck_app_settings(db_path))
+            .scenes
+            .is_empty(),
+        "no scene is left"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
+        "none"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_nav").expect("lcd text"),
+        "SCENE\\n--"
+    );
+    assert_eq!(
+        crate::lighting::read_lighting_snapshot(&deck_app_settings(db_path)).scene_state,
+        "none"
+    );
 }
 
 // The deck keeps its own scene names ("Scene N"); the id comes from the

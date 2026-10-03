@@ -99,3 +99,4 @@ fn scene_snapshot<'a>(snapshot: &'a LightingSnapshot, scene_id: &str) -> &'a Lig
 mod catalog_and_preview;
 mod fixtures_and_overlays;
 mod ordering;
+mod scene_state_rules;
