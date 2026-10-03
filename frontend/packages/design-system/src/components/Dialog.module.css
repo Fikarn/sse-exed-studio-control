@@ -1,3 +1,8 @@
+/* The dialog (system §5, §9). Visual overhaul 2026-10 (Atrium): the floating
+   layer — the raised surface, a 1 px key edge, the one radius and the float
+   shadow (`data-level="float"`) — over a flat scrim of the well colour, never
+   a backdrop blur. It enters in 200 ms with an 8 px rise and a fade. */
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -8,15 +13,14 @@
   background: color-mix(in srgb, var(--material-well) 60%, transparent);
 }
 
-/* Level +3: the plate recipe plus the one large blur (system §5). */
 .dialog {
   width: min(720px, calc(100vw - 40px));
   max-height: calc(100vh - 40px);
   overflow: auto;
   padding: 20px 24px 24px;
-  border-radius: var(--radius-screen);
+  border-radius: var(--radius-base);
   border: 1px solid var(--material-line2);
-  background: var(--elevation-plate-fill);
+  background: var(--material-raise);
   box-shadow: var(--elevation-float);
   color: var(--text-text);
   outline: none;
@@ -29,7 +33,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .overlay {
-    animation: aDialogOverlayIn var(--motion-duration-exit) var(--motion-easing-out);
+    animation: aDialogOverlayIn var(--motion-duration-enter) var(--motion-easing-out);
   }
 
   .dialog {
@@ -57,22 +61,22 @@
   }
 }
 
+/* Sentence case in PT Sans: the title may hold a name. */
 .title {
   margin: 0;
-  font: 600 var(--font-size-state) / 1.1 var(--font-family-ui);
-  letter-spacing: -0.01em;
+  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
   color: var(--text-text);
 }
 
 .body {
   margin: 12px 0 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
 }
 
 .footer {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 24px;
 }

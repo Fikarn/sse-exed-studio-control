@@ -67,7 +67,7 @@
     color: var(--color-studio-300);
     cursor: pointer;
     display: inline-flex;
-    font: var(--font-weight-semibold) var(--operator-font-size-xs, var(--font-size-xs)) / 1 var(--font-family-mono);
+    font: var(--font-weight-bold) var(--operator-font-size-xs, var(--font-size-xs)) / 1 var(--font-family-mono);
     gap: 6px;
     justify-content: center;
     letter-spacing: 0;
@@ -76,7 +76,7 @@
   }
 
   .clear:hover {
-    background: var(--color-surface-hover, rgba(255, 255, 255, 0.04));
+    background: var(--material-hover);
     color: var(--color-studio-100);
   }
 

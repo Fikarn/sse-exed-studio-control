@@ -1,16 +1,21 @@
+/* A workspace tab (system §7). Visual overhaul 2026-10 (Atrium): no box at
+   rest, PT Sans in the quiet ink; hover brightens the ink; the active tab is
+   the selection — the 2 px Beige keyline drawn inside its edge, the main ink,
+   bold; a locked tab is dashed at 55 %. */
 @layer components {
   .tab {
     appearance: none;
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     height: 36px;
-    padding: 0 14px;
+    padding: 0 16px;
     border: 1px solid transparent;
-    border-radius: var(--radius-key);
+    border-radius: var(--radius-base);
     background: none;
-    color: var(--text-text2);
-    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+    color: var(--text-text3);
+    font: 400 var(--font-size-body) / 1 var(--font-family-ui);
     white-space: nowrap;
     cursor: pointer;
     transition:
@@ -18,8 +23,9 @@
       border-color var(--motion-duration-state) var(--motion-easing-mech);
   }
 
-  .tab:hover {
-    color: var(--text-text);
+  /* Hover changes a colour, never a position (system §6). */
+  .tab:not(.active):not([aria-disabled="true"]):hover {
+    color: var(--text-text2);
   }
 
   .tab:focus-visible {
@@ -29,9 +35,18 @@
 
   .active {
     color: var(--text-text);
-    background: var(--elevation-key-fill);
-    border-color: var(--material-line);
-    box-shadow: var(--elevation-plate);
+    font-weight: 700;
+  }
+
+  /* The selection keyline: 2 px of Beige over the tab's own edge, so the
+     focus ring (an outline) can still stand outside it. */
+  .active::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border: 2px solid var(--accent);
+    border-radius: inherit;
+    pointer-events: none;
   }
 
   .tab[aria-disabled="true"] {

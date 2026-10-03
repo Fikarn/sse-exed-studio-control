@@ -1,69 +1,86 @@
 @layer components {
+  /* The lamp and its word within 8 px. Not a state word: a sentence-case PT
+     Sans label in the second ink, the lamp carrying the colour. */
   .lampWord {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
-    color: var(--text-text);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text2);
     white-space: nowrap;
   }
 
+  /* A state word: SSE Adelia in capitals, in the tone's colour. */
   .cap {
-    font-family: var(--font-family-mono);
-    letter-spacing: var(--font-tracking-cap);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
     text-transform: uppercase;
   }
 
-  .ok {
+  .cap.ok {
     color: var(--role-green-text);
   }
 
-  .attention {
-    color: var(--role-amber-text);
+  .cap.attention {
+    color: var(--role-yellow-text);
   }
 
-  .error {
-    color: var(--role-red-text);
+  .cap.error {
+    color: var(--role-coral-text);
   }
 
-  .info {
+  .cap.info {
     color: var(--role-blue-text);
   }
 
-  .off {
-    color: var(--text-text2);
+  .cap.off {
+    color: var(--text-text3);
   }
 
+  /* A latch: a 56 px row with a keyline in its tone and no fill. */
   .latch {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 40px;
-    padding: 0 12px;
-    border-radius: var(--radius-key);
-    border: 1px solid var(--role-amber-text);
-    background: color-mix(in srgb, var(--role-amber-text) 6%, transparent);
-    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
-    color: var(--text-text);
+    gap: 12px;
+    height: 56px;
+    padding: 0 8px 0 16px;
+    border-radius: var(--radius-base);
+    border: 1px solid var(--role-yellow-line);
+    background: transparent;
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text2);
     min-width: 0;
   }
 
   .latch-info {
     border-color: var(--role-blue-text);
-    background: color-mix(in srgb, var(--role-blue-text) 6%, transparent);
+  }
+
+  .latchLamp {
+    width: 10px;
+    height: 10px;
   }
 
   .who {
-    font-weight: 600;
-    color: var(--role-amber-text);
+    flex: 0 1 auto;
+    min-width: 0;
+    font: var(--font-weight-bold) var(--font-size-word) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
+    color: var(--role-yellow-text);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .latch-info .who {
     color: var(--role-blue-text);
   }
 
+  /* The text takes only the room the word and the key leave, so it is the
+     first thing to give way. */
   .text {
+    flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -73,5 +90,43 @@
   .action {
     margin-left: auto;
     flex: none;
+  }
+
+  /* The latch slot: the reserved row under the state display. */
+  .latchSlot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 56px;
+    flex: none;
+    min-width: 0;
+  }
+
+  /* The latches share the row equally. */
+  .latchSlot:not(.resting) > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* Two latches: each keeps its word and its key. */
+  .crowded .text {
+    display: none;
+  }
+
+  /* Nothing latched: the hairline, a hollow lamp and the quiet words. */
+  .resting {
+    gap: 12px;
+    padding: 0 16px;
+    border: 1px solid var(--material-line);
+    border-radius: var(--radius-base);
+  }
+
+  .emptyLabel {
+    min-width: 0;
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }

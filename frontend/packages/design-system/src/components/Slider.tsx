@@ -3,15 +3,19 @@ import { useCallback, useRef, type CSSProperties, type KeyboardEvent, type Point
 import styles from "./Slider.module.css";
 
 // Visual overhaul A, Slice 3 (system §7, product brief §5 "continuous"): a
-// horizontal Slider and a vertical Groove, both wells with a cap that rides
-// the whole target column (the probe lesson: the pointer target is the full
+// horizontal Slider and a vertical Groove, each with a cap that rides the
+// whole target column (the probe lesson: the pointer target is the full
 // column the cap rides in, so the cap never leaves it). Drag, wheel, arrow
-// keys, Home / End; the host owns commit-on-release and typed entry. A locked
-// slider keeps its geometry and loses its fill; a doubted value carries a
-// dashed amber keyline. New pages program, Slice 3 (decisions 9 and 10): a
-// focused slider takes the arrows (one step), Home and End and nothing with
-// Shift, Ctrl or Alt — the Shift ×5 step and the Shift + press jump to unity
-// are gone.
+// keys, Home / End; the host owns commit-on-release and typed entry. The
+// overhaul's look (Atrium): the Slider has no box, a 2 px track and fill and
+// a 14 × 24 cap; the Groove is a narrow well with a 2 px groove line and
+// ticks; both caps are matte and light (`--role-cap-fill`) so a position
+// reads from 3 m, and nothing casts a shadow. A locked slider keeps its
+// geometry and loses its fill (the cap dashed at 55 %); a doubted value
+// carries a dashed yellow keyline round the cap. New pages program, Slice 3
+// (decisions 9 and 10): a focused slider takes the arrows (one step), Home
+// and End and nothing with Shift, Ctrl or Alt — the Shift ×5 step and the
+// Shift + press jump to unity are gone.
 
 export interface SliderBaseProps {
   /** 0..1 position. */
@@ -160,7 +164,9 @@ export function Slider(props: SliderProps) {
   const { value, unity, locked, doubt, take, cct, testId, className } = props;
   const handlers = useSliderInteraction(props, (element, event) => {
     const rect = element.getBoundingClientRect();
-    const inset = 17;
+    // Half the cap's 14 px: the cap's centre travels from 7 px to the width
+    // less 7 px (Slider.module.css draws it the same way).
+    const inset = 7;
     return (event.clientX - rect.left - inset) / Math.max(1, rect.width - inset * 2);
   });
   return (
@@ -189,6 +195,8 @@ export function Slider(props: SliderProps) {
       {...handlers}
     >
       <span className={styles.track} data-signal={cct ? "cct" : undefined} aria-hidden="true" />
+      {/* The colour-temperature track is the information itself: no fill on it. */}
+      {cct ? null : <span className={styles.fill} aria-hidden="true" />}
       {unity !== undefined ? <span className={styles.unity} aria-hidden="true" /> : null}
       <span className={styles.cap} data-material="cap" aria-hidden="true" />
     </div>
@@ -198,11 +206,18 @@ export function Slider(props: SliderProps) {
 export interface GrooveProps extends SliderBaseProps {
   /** The travel height; the groove fills its host when omitted. */
   height?: number;
+  /**
+   * Scale ticks along the travel, 0..1 from the bottom (the fader law's
+   * marks, e.g. +6, −6, −12 … dB). Short 1 px marks in the well; unity draws
+   * its own longer tick, so leave it out. Omit for none.
+   */
+  ticks?: readonly number[];
 }
 
-// The vertical fader: a 44 px target column with an 18 px slot and the cap.
+// The vertical fader: a 44 px target column with an 18 px well, a 2 px groove
+// line, the ticks and the cap with its index line across the middle.
 export function Groove(props: GrooveProps) {
-  const { value, unity = 0.8172, locked, doubt, take, height, testId, className } = props;
+  const { value, unity = 0.8172, locked, doubt, take, height, ticks, testId, className } = props;
   const handlers = useSliderInteraction(props, (element, event) => {
     const rect = element.getBoundingClientRect();
     const inset = 14;
@@ -225,6 +240,9 @@ export function Groove(props: GrooveProps) {
       <span className={styles.grooveWell} data-well="" aria-hidden="true" />
       <span className={styles.travel} aria-hidden="true">
         <span className={styles.slot} />
+        {ticks?.map((tick) => (
+          <span key={tick} className={styles.grooveTick} data-tick="" style={{ bottom: `${clamp01(tick) * 100}%` }} />
+        ))}
         <span className={styles.grooveUnity} />
         <span className={styles.grooveCap} data-material="cap" />
       </span>

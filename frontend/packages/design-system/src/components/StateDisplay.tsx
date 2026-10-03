@@ -3,19 +3,24 @@ import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { Lamp } from "./Lamp";
 import styles from "./StateDisplay.module.css";
 
-// Visual overhaul A, Slice 3 (plan D1; system §2, §8): the first element of
-// every cluster — a black display of fixed height carrying the lamp and the
-// state word, the engine's sentence verbatim, the raw code small beneath,
-// the meta line, and the way-out keys. Nothing below it ever moves; arming
-// renders as a row inside it (finding C1).
+// Visual overhaul A, Slice 3 (plan D1; system §2, §8); Atrium: the first
+// element of every cluster — a black well of fixed height carrying the lamp
+// and the state word in SSE Adelia, the engine's sentence verbatim in PT Serif
+// italic (the hardware link's voice), the raw code small beneath it, and at
+// the foot the meta line with the way-out keys. Nothing below it ever moves;
+// arming renders as the one armed form (Burgundy, Beige ink) in the meta
+// line's place (finding C1).
 export type StateDisplayTone = "ok" | "attention" | "error" | "info";
 
+/** A word longer than this drops from the display size to the readout size. */
+const LONG_WORD = 10;
+
 export interface StateDisplayArmed {
-  /** The armed word, mono (`ARMED`). */
+  /** The armed word, PT Sans bold (`ARMED`). */
   word?: string;
   /** What is armed and how to apply (`Load Interview · press again to apply`). */
   text: ReactNode;
-  /** Seconds left, printed mono (`3.9 s`). */
+  /** Seconds left, PT Sans bold with tabular digits (`3.9 s`). */
   secondsLeft?: number;
   /** 0..1 of the window left, drawn as the bar (a still bar). */
   progress?: number;
@@ -66,48 +71,51 @@ export function StateDisplay({
     >
       <div className={styles.top}>
         <Lamp tone={tone} className={styles.lamp} />
-        <span className={styles.word}>{word}</span>
+        <span className={styles.word} data-long={word.length > LONG_WORD ? "" : undefined}>
+          {word}
+        </span>
       </div>
-      {sentence || code ? (
-        <div className={styles.sentence}>
-          {sentence}
-          {/* data-state-code: the one place a raw fault code is allowed to
-              stand on its own — it is the code slot, never the first thing the
-              sentence says. The operator-copy census keys on this marker. */}
-          {code ? (
-            <span className={styles.code} data-state-code="">
-              {code}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-      {armed ? (
-        <div className={styles.armedRow} data-armed-row="">
-          <span className={styles.armedWord}>{armed.word ?? "ARMED"}</span>
-          <span className={styles.armedText}>{armed.text}</span>
-          {armed.secondsLeft !== undefined ? (
-            <span className={styles.armedSeconds}>{armed.secondsLeft.toFixed(1)} s</span>
-          ) : (
-            <span />
-          )}
-          <span className={styles.bar} aria-hidden="true">
-            <i
-              className={armed.timeoutMs ? styles.barCountdown : undefined}
-              style={
-                {
-                  "--arm-progress": String(Math.max(0, Math.min(1, armed.progress ?? 1))),
-                  "--arm-duration": armed.timeoutMs ? `${armed.timeoutMs}ms` : undefined,
-                } as CSSProperties
-              }
-            />
+      {/* The sentence and the code share the room between the word and the
+          foot. The sentence keeps at most two lines; the code shows whole
+          when it fits under them and gives way when it does not. */}
+      <div className={styles.story}>
+        {sentence ? <div className={styles.sentence}>{sentence}</div> : null}
+        {/* data-state-code: the one place a raw fault code is allowed to
+            stand on its own — it is the code slot, never the first thing the
+            sentence says. The operator-copy census keys on this marker. */}
+        {code ? (
+          <span className={styles.code} data-state-code="">
+            {code}
           </span>
-        </div>
-      ) : meta ? (
-        <div className={styles.meta}>{meta}</div>
-      ) : (
-        <div />
-      )}
-      {actions ? <div className={styles.actions}>{actions}</div> : <div />}
+        ) : null}
+      </div>
+      <div className={styles.foot}>
+        {armed ? (
+          <div className={styles.armedRow} data-armed-row="">
+            <span className={styles.armedWord}>{armed.word ?? "ARMED"}</span>
+            <span className={styles.armedText}>{armed.text}</span>
+            {armed.secondsLeft !== undefined ? (
+              <span className={styles.armedSeconds}>{armed.secondsLeft.toFixed(1)} s</span>
+            ) : (
+              <span />
+            )}
+            <span className={styles.bar} aria-hidden="true">
+              <i
+                className={armed.timeoutMs ? styles.barCountdown : undefined}
+                style={
+                  {
+                    "--arm-progress": String(Math.max(0, Math.min(1, armed.progress ?? 1))),
+                    "--arm-duration": armed.timeoutMs ? `${armed.timeoutMs}ms` : undefined,
+                  } as CSSProperties
+                }
+              />
+            </span>
+          </div>
+        ) : meta ? (
+          <div className={styles.meta}>{meta}</div>
+        ) : null}
+        {actions ? <div className={styles.actions}>{actions}</div> : null}
+      </div>
     </section>
   );
 }

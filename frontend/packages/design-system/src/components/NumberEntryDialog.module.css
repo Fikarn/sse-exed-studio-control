@@ -1,6 +1,8 @@
-/* NumberEntryDialog — typed numeric entry, styled on GLOBAL DS tokens so it
-   themes correctly wherever the DS Dialog portals it (document.body, outside
-   any workspace shell). Structure mirrors the former audio number dialog. */
+/* NumberEntryDialog — typed numeric entry, styled on the global tokens so it
+   looks right wherever the Dialog portals it (document.body, outside any
+   workspace shell). Visual overhaul 2026-10 (Atrium): the label over a field
+   (a well holding the value in PT Sans; focus turns its edge Beige), the unit
+   and the range in the quiet ink. */
 
 .form {
   display: grid;
@@ -10,28 +12,25 @@
 
 .form label,
 .form small {
-  color: var(--color-text-muted);
-  font: var(--font-weight-semibold) var(--font-size-tick) / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
+  color: var(--text-text3);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .form input {
   width: 100%;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--color-surface-border-strong);
-  border-radius: var(--radius-key);
-  background: var(--color-bg-soft);
-  color: var(--color-text-strong);
-  font: var(--font-weight-semibold) 14px / 1 var(--font-family-ui);
-  letter-spacing: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
   outline: none;
 }
 
 .form input:focus-visible {
-  border-color: color-mix(in srgb, var(--color-primary-500) 76%, var(--color-surface-border-strong));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 28%, transparent);
+  border-color: var(--accent);
 }
 
 /* CONTROLS-07: hide the native number-spinner chrome. Keyboard arrow-stepping
@@ -49,9 +48,8 @@
   align-items: center;
 }
 
+/* The unit: smaller than its number, in the quiet ink. */
 .numberField span {
-  color: var(--color-text-muted);
-  font: var(--font-weight-semibold) 12px / 1 var(--font-family-mono);
-  letter-spacing: 0;
-  text-transform: uppercase;
+  color: var(--text-text3);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }

@@ -1,16 +1,18 @@
 @layer components {
+  /* No box at rest: a transparent edge that a clickable chip shows under the
+     pointer. */
   .chip {
     appearance: none;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     height: 32px;
-    padding: 0 12px;
-    border: 1px solid var(--material-line);
-    border-radius: var(--radius-pill);
-    background: none;
-    color: var(--text-text2);
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-base);
+    background: transparent;
+    color: var(--text-text3);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
     min-width: 0;
     flex: none;
@@ -31,42 +33,33 @@
     outline-offset: 2px;
   }
 
+  /* The name stands 12 px from the lamp; the lamp 8 px from its word. */
   .label {
-    font-weight: 600;
-    color: var(--text-text);
+    font-weight: var(--font-weight-regular);
+    color: var(--text-text3);
+    margin-right: 4px;
   }
 
   .word {
-    color: var(--text-text2);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
+    color: var(--text-text3);
   }
 
-  .attention {
-    border-color: var(--role-amber-text);
-  }
-
-  .attention .label,
-  .attention .word {
-    color: var(--role-amber-text);
-  }
-
-  .error {
-    border-color: var(--role-red-text);
-  }
-
-  .error .label,
-  .error .word {
-    color: var(--role-red-text);
-  }
-
-  /* A green latch: something running that the operator started, shown on
-     every page (the prompter scrolling; new pages program, Slice 6a). A lamp
-     that is well needs no keyline; a latch that is well has one. */
-  .ok[data-latch] {
-    border-color: var(--role-green-text);
-  }
-
-  .ok[data-latch] .label,
-  .ok[data-latch] .word {
+  .ok .word {
     color: var(--role-green-text);
+  }
+
+  .attention .word {
+    color: var(--role-yellow-text);
+  }
+
+  .error .word {
+    color: var(--role-coral-text);
+  }
+
+  .info .word {
+    color: var(--role-blue-text);
   }
 }

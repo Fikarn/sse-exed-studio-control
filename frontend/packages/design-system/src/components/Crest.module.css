@@ -28,7 +28,7 @@
     border-radius: var(--radius-key);
     background: var(--text-text);
     color: var(--material-bg);
-    font: 600 var(--font-size-tick) / 1 var(--font-family-mono);
+    font: 700 var(--font-size-tick) / 1 var(--font-family-mono);
     letter-spacing: var(--font-tracking-cap);
   }
 }

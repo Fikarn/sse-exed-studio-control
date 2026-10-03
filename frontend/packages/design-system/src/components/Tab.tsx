@@ -3,7 +3,9 @@ import type { ReactNode } from "react";
 import styles from "./Tab.module.css";
 
 // Visual overhaul A, Slice 2 (system §7): a workspace tab in the shell
-// header. The active tab is a machined key; a locked tab (startup, recovery,
+// header. Visual overhaul 2026-10 (Atrium): the active tab is the selection,
+// the 2 px Beige keyline round its name in bold (it keeps
+// `data-material="key"` as its hook); a locked tab (startup, recovery,
 // commissioning not published) is a dashed outline at 55 % with
 // `aria-disabled` (plan D7), never opacity alone. New pages program, Slice 3
 // (D6): the tab prints its name and icon only — no key hint.

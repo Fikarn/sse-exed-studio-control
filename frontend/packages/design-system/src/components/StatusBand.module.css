@@ -25,7 +25,7 @@
 
   .title {
     color: var(--color-studio-050);
-    font: var(--font-weight-semibold) var(--operator-font-size-xs, var(--font-size-xs)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-bold) var(--operator-font-size-xs, var(--font-size-xs)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
     text-transform: uppercase;
     overflow: hidden;
@@ -35,7 +35,7 @@
 
   .summary {
     color: var(--color-studio-400);
-    font: var(--font-weight-medium) var(--operator-font-size-sm, var(--font-size-xs)) / 1.35 var(--font-family-mono);
+    font: var(--font-weight-regular) var(--operator-font-size-sm, var(--font-size-xs)) / 1.35 var(--font-family-mono);
     letter-spacing: 0;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -1,10 +1,16 @@
 @layer components {
+  /* The title plate: the one Dark Green surface on a working page. Only
+     --text-text and --text-text2 sit on it; coral and --text-text3 fail 4.5:1. */
   .head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 12px;
     min-width: 0;
+    padding: 16px;
+    background: var(--sse-dark-green);
+    border-radius: var(--radius-base);
+    color: var(--text-text);
   }
 
   .headText {
@@ -14,10 +20,10 @@
     min-width: 0;
   }
 
+  /* The title keeps its case (a strip's, a fixture's, a script's name): PT Sans, never Adelia. */
   .title {
     margin: 0;
-    font: 600 var(--font-size-state) / 1.1 var(--font-family-mono);
-    letter-spacing: -0.01em;
+    font: 700 var(--font-size-readout) / 1.1 var(--font-family-ui);
     color: var(--text-text);
     white-space: nowrap;
     overflow: hidden;
@@ -26,7 +32,7 @@
 
   .sub {
     margin: 0;
-    font: 500 var(--font-size-label) / 1.35 var(--font-family-ui);
+    font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
     color: var(--text-text2);
   }
 
@@ -34,39 +40,55 @@
     flex: none;
   }
 
+  /* A section: the head, then its content 16 px below. */
   .section {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
     min-width: 0;
   }
 
+  /* The section head: the Adelia word and its quiet detail on one baseline,
+     the keys at the right, the brand's heavy rule under the row. */
   .sectionHead {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     align-items: baseline;
-    gap: 10px;
+    align-content: center;
+    column-gap: 12px;
+    min-height: 32px;
     min-width: 0;
+    border-bottom: 2px solid var(--material-line2);
   }
 
   .sectionTitle {
-    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    grid-column: 1;
+    min-width: 0;
+    font: 700 var(--font-size-head) / var(--font-line-height-tight) var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
     color: var(--text-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .sectionDetail {
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
-    color: var(--text-text2);
+    grid-column: 2;
     min-width: 0;
+    font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .sectionActions {
-    margin-left: auto;
+    grid-column: 3;
+    align-self: center;
     display: inline-flex;
+    align-items: center;
     gap: 8px;
-    flex: none;
   }
 
   .fields {
@@ -75,22 +97,26 @@
     gap: 8px;
   }
 
+  /* Label · value rows on 1 px hairlines. */
   .readouts {
     margin: 0;
     display: grid;
-    grid-template-columns: 1fr auto;
-    row-gap: 10px;
-    column-gap: 12px;
-    align-items: center;
-    font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+    grid-template-columns: minmax(0, 1fr) auto;
+    font: 400 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
   }
 
   .readoutRow {
     display: contents;
   }
 
+  .readoutLabel,
+  .readoutValue {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--material-line);
+  }
+
   .readoutLabel {
-    color: var(--text-text2);
+    color: var(--text-text3);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -99,7 +125,7 @@
 
   .readoutValue {
     margin: 0;
-    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+    padding-left: 16px;
     font-variant-numeric: tabular-nums;
     color: var(--text-text);
     text-align: right;
@@ -111,11 +137,11 @@
   }
 
   .attention {
-    color: var(--role-amber-text);
+    color: var(--role-yellow-text);
   }
 
   .error {
-    color: var(--role-red-text);
+    color: var(--role-coral-text);
   }
 
   .info {
@@ -125,36 +151,44 @@
   .controlRow {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
   }
 
   .controlLabel {
     display: flex;
+    align-items: baseline;
     justify-content: space-between;
     gap: 8px;
-    font: 500 var(--font-size-label) / 1 var(--font-family-ui);
-    color: var(--text-text2);
+    min-width: 0;
+    font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
   }
 
   .controlLabel b {
+    font: 700 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     color: var(--text-text);
-    font-weight: 600;
   }
 
   .control {
     display: grid;
-    grid-template-columns: 1fr 96px;
+    grid-template-columns: minmax(0, 1fr) 96px;
     align-items: center;
     gap: 12px;
   }
 
   .controlValue {
-    font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+    font: 400 var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
     font-variant-numeric: tabular-nums;
     color: var(--text-text);
     text-align: right;
     white-space: nowrap;
+  }
+
+  /* The unit after its number and a space: half its size, the quiet ink. */
+  .controlUnit {
+    font-size: var(--font-size-tick);
+    color: var(--text-text3);
   }
 
   .danger {

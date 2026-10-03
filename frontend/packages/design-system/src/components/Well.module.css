@@ -1,28 +1,30 @@
 @layer components {
+  /* A well: one step down from the surface, a 1 px hairline edge, flat. */
   .well {
     background: var(--material-well);
     border: 1px solid var(--material-line);
-    box-shadow: var(--elevation-well);
-    color: var(--display-text);
+    color: var(--text-text);
     min-width: 0;
   }
 
   .key {
-    border-radius: var(--radius-key);
+    border-radius: var(--radius-base);
   }
 
-  .screen {
-    border-radius: var(--radius-screen);
-  }
-
+  /* A readout is the value itself, not a box. Its edge stays transparent until
+     doubt draws it dashed, so nothing moves when the desk stops confirming. */
   .readout {
     display: flex;
     align-items: center;
     justify-content: center;
     height: 40px;
+    min-width: 0;
     padding: 0 10px;
-    font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+    border: 1px solid transparent;
+    border-radius: var(--radius-base);
+    font: 400 var(--font-size-word) / var(--font-line-height-tight) var(--font-family-ui);
     font-variant-numeric: tabular-nums;
+    color: var(--text-text);
     white-space: nowrap;
   }
 
@@ -31,14 +33,13 @@
   }
 
   .value {
-    font-size: var(--font-size-value);
     height: 36px;
+    font-size: var(--font-size-body);
   }
 
   .hero {
     height: 64px;
-    font-size: var(--font-size-hero);
-    letter-spacing: -0.02em;
+    font-size: var(--font-size-display);
   }
 
   .right {
@@ -49,32 +50,49 @@
     justify-content: center;
   }
 
+  /* The unit after its number and a space: half its size (13 px is the floor), the quiet ink. */
+  .unit {
+    font-size: var(--font-size-tick);
+    color: var(--text-text3);
+  }
+
+  .hero .unit {
+    font-size: var(--font-size-word);
+  }
+
   .doubt {
-    border: 1px dashed var(--display-amber);
-    color: var(--display-amber);
+    border: 1px dashed var(--role-yellow-line);
   }
 
   .readout[data-empty] {
-    color: var(--display-text2);
+    color: var(--text-text3);
   }
 
+  /* A field: the label over the value, inside the well; focus lights the edge. */
   .field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 8px 10px;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 12px;
+  }
+
+  .field:focus-within {
+    border-color: var(--accent);
   }
 
   .fieldLabel {
-    font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
-    color: var(--display-text2);
-    text-transform: uppercase;
-    letter-spacing: var(--font-tracking-eyebrow);
+    font: 400 var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .fieldValue {
-    font: 600 var(--font-size-value) / 1 var(--font-family-mono);
-    color: var(--display-text);
+    font: 400 var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -102,9 +120,11 @@
     flex: 1;
     min-height: 0;
     overflow: hidden;
+    border-radius: var(--radius-base);
   }
 
+  /* Editing offline (PREVIEW): the well's edge in the information blue. */
   .info {
-    border: 1px solid var(--display-blue);
+    border-color: var(--role-blue-text);
   }
 }

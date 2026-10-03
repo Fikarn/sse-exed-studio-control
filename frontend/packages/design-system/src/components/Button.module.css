@@ -1,7 +1,8 @@
-/* Visual overhaul A, Slice 3 (system §7, §9): Button aliases Key mode="command"
-   — the machined key recipe, sentence-case labels (no uppercase), no hover
-   travel. Variants map onto the key modes: primary → the primary command key,
-   secondary → command, ghost → an edge-only key, danger → the red keyline. */
+/* Visual overhaul A, Slice 3 (system §7, §9); Atrium: Button is Key
+   mode="command" — the flat key recipe (the face, a 1 px edge, no shadow),
+   sentence-case PT Sans labels, no hover travel. Variants map onto the key
+   modes: primary → the primary command key, secondary → command, ghost → no
+   face and no edge until hovered, danger → the coral word and edge. */
 @layer components {
   .button {
     appearance: none;
@@ -10,23 +11,22 @@
     display: inline-flex;
     justify-content: center;
     gap: 8px;
-    padding: 0 12px;
-    border-radius: var(--radius-key);
-    border: 1px solid var(--material-line);
-    background: var(--elevation-key-fill);
-    box-shadow: var(--elevation-key);
+    padding: 0 14px;
+    border-radius: var(--radius-base);
+    border: 1px solid var(--material-line2);
+    background: var(--material-key);
     color: var(--text-text);
     cursor: pointer;
-    font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     letter-spacing: 0;
     white-space: nowrap;
-    transition:
-      border-color var(--motion-duration-press) var(--motion-easing-mech),
-      color var(--motion-duration-press) var(--motion-easing-mech);
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
-  .button:hover {
-    border-color: var(--material-line2);
+  /* Hover brightens the edge of a key at rest; primary and danger keep the
+     edge their variant gives them. */
+  .button:hover:not(.primary, .danger, :disabled) {
+    border-color: var(--text-text4);
   }
 
   .button:focus-visible {
@@ -34,11 +34,11 @@
     outline-offset: 2px;
   }
 
+  /* Disabled reads as a locked key: dashed at 55 %, no face. */
   .button:disabled {
     cursor: not-allowed;
     opacity: 0.55;
     background: transparent;
-    box-shadow: none;
     border-style: dashed;
     border-color: var(--material-line2);
   }
@@ -54,46 +54,41 @@
   }
 
   .compact {
-    min-height: 32px;
+    min-height: 28px;
     padding-inline: 10px;
     font-size: var(--font-size-label);
   }
 
   .primary {
-    background: linear-gradient(180deg, var(--role-primary-fill-top), var(--role-primary-fill));
-    border-color: transparent;
+    background: var(--role-primary-fill);
+    border-color: var(--role-primary-fill);
     color: var(--role-primary-ink);
-    box-shadow: var(--elevation-key-primary);
   }
 
-  .primary:hover {
-    border-color: var(--role-primary-ink);
+  /* Without its fill the primary's black ink would vanish on the surface. */
+  .primary:disabled {
+    color: var(--text-text);
   }
 
   .secondary {
-    background: var(--elevation-key-fill);
+    background: var(--material-key);
   }
 
   .ghost {
     background: transparent;
     border-color: transparent;
-    box-shadow: none;
     color: var(--text-text2);
   }
 
-  .ghost:hover {
-    border-color: var(--material-line);
+  /* A ghost takes the face and the edge only under the pointer. */
+  .ghost:hover:not(:disabled) {
+    background: var(--material-key);
     color: var(--text-text);
   }
 
   .danger {
-    background: var(--elevation-key-fill);
-    border-color: var(--role-red-text);
-    color: var(--role-red-text);
-  }
-
-  .danger:hover {
-    border-color: var(--role-red-text);
+    border-color: var(--role-coral-text);
+    color: var(--role-coral-text);
   }
 
   .spinner {

@@ -12,10 +12,12 @@ import styles from "./AppShellFrame.module.css";
 // on every surface — header · cluster | bay | plate · footer. The header
 // carries the crest, the product with its owner's eyebrow, the workspace tabs,
 // the subsystem lamps, the latches and the clock; the cluster and the plate
-// are slots a workspace fills (Slices 4–7), the bay is the recessed floor its
-// picture sits on. Every region declares `data-region` so the UI contract
-// can measure the chrome against D4. Setup / Support and the pre-ready
-// surfaces render inside the same frame with the tabs locked.
+// are slots a workspace fills (Slices 4–7), the bay holds its picture. Every
+// region declares `data-region` so the UI contract can measure the chrome
+// against D4. Setup / Support and the pre-ready surfaces render inside the
+// same frame with the tabs locked. Visual overhaul 2026-10 (Atrium): every
+// region is the one flat base, parted by hairlines; the product name is set
+// in SSE Adelia, the eyebrow and the clock in PT Sans.
 
 export interface RailItem {
   id: string;
@@ -38,7 +40,7 @@ export interface MonitorItem {
 
 export interface AppShellFrameProps {
   productName?: string;
-  /** The owner's name under the product, 12 px: "SSE Executive Education". */
+  /** The owner's name under the product, at label size: "SSE Executive Education". */
   eyebrow?: string;
   clock?: ReactNode;
   monitorItems: readonly MonitorItem[];

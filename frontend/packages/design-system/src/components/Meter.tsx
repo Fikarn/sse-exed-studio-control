@@ -3,11 +3,12 @@ import type { CSSProperties } from "react";
 import styles from "./Meter.module.css";
 
 // Visual overhaul A, Slice 3 (system §4, §5, §7): the meter is signal, not
-// status — the ramp keeps the physical green / yellow / orange / red, doubled
-// by a blurred emissive copy so the bar lights the well floor around it; the
-// −18 dBFS reference is a dashed line at 70 %, the peak a white line with its
-// bloom, the clip a lamp. `empty` leaves the well with the reference only
-// (no metering); `stale` shows the last frame dimmed with no glow.
+// status. The overhaul's look (Atrium): each bar runs in a slot one step up
+// inside the black well; the ramp is the signal token's green to −18 dBFS,
+// yellow to −3 and coral above, flat, with nothing glowing; the peak is a
+// 2 px tick, the clip a coral lamp, and the −18 dBFS reference a hairline
+// tick at the slots' edges. `empty` leaves the slots only (no metering);
+// `stale` shows the last frame at 0.4.
 //
 // Slice 4: a meter can name the engine's meter entry (`meterId` / `meterKind`),
 // which stamps the `data-mini-meter-*` attributes the Console's canvas overlay
@@ -65,7 +66,6 @@ function Bar({ level, peak, empty, stale, orientation, meterId, meterKind, side 
       data-mini-meter-orientation={meterId ? orientation : undefined}
       data-meter-track={side}
     >
-      {!empty && !stale ? <span className={styles.glow} data-signal="meter" /> : null}
       {!empty ? <span className={styles.ramp} data-signal="meter" data-meter-fill={side} /> : null}
       {!empty && peak !== undefined ? (
         <span
@@ -126,6 +126,8 @@ export function Meter({
       aria-valuenow={empty ? undefined : Math.round(clamp01(level) * 100)}
       style={{ ...style, "--meter-reference": String(clamp01(reference)) } as CSSProperties}
     >
+      {/* First, so the slots paint over it: the reference shows at their edges. */}
+      <span className={styles.reference} aria-hidden="true" />
       <span className={styles.bars} aria-hidden="true">
         <Bar
           level={level}
@@ -150,7 +152,6 @@ export function Meter({
           />
         ) : null}
       </span>
-      <span className={styles.reference} aria-hidden="true" />
       {orientation === "vertical" ? (
         <span
           className={[styles.clip, clip ? styles.clipLit : ""].filter(Boolean).join(" ")}

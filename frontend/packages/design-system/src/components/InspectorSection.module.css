@@ -9,7 +9,7 @@
 
   .sectionTitle {
     color: var(--color-studio-200);
-    font: var(--font-weight-semibold) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
+    font: var(--font-weight-bold) var(--operator-font-size-sm, var(--font-size-tick)) / 1.2 var(--font-family-mono);
     letter-spacing: 0;
     text-transform: uppercase;
   }

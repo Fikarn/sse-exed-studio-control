@@ -2,7 +2,8 @@ import type { SharedStatusTone } from "./statusTone";
 import styles from "./StatusBadge.module.css";
 
 // Visual overhaul A, Slice 3 (system §8): the badge is a keyline that encloses
-// a word, and its tones are the shared state vocabulary — ok · attention ·
+// a word (Atrium: the word in SSE Adelia capitals, edge and word in the tone's
+// colour), and its tones are the shared state vocabulary — ok · attention ·
 // error · info · neutral. Slice 11: the pre-A names (healthy, ready, connected,
 // degraded, warning, idle) were aliases for those five and are gone, along with
 // the map that folded them in; every caller speaks the vocabulary directly.
