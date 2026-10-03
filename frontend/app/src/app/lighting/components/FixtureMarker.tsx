@@ -741,7 +741,7 @@ export function FixtureMarker({
               y={renderY + nameOffsetY}
               textAnchor="middle"
               fontSize={12}
-              fontWeight={600}
+              fontWeight={700}
               letterSpacing={0}
               pointerEvents="none"
               style={{ fill: LABEL_NAME_FILL, fontFamily: "var(--font-family-mono)", textTransform: "uppercase" }}
@@ -790,7 +790,7 @@ export function FixtureMarker({
               y={ghost.y + 16}
               textAnchor="middle"
               fontSize={12}
-              fontWeight={600}
+              fontWeight={700}
               style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
             >
               {(ghost.x / 100).toFixed(1)} m, {(ghost.y / 100).toFixed(1)} m
@@ -812,7 +812,7 @@ export function FixtureMarker({
               y={renderY - rotateHandleRadius - 4}
               textAnchor="middle"
               fontSize={12}
-              fontWeight={600}
+              fontWeight={700}
               style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
             >
               {roundedDegrees(rotationGhost)}°

@@ -5,14 +5,14 @@
     appearance: none;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     height: 32px;
-    padding: 0 10px;
+    padding: 0 6px;
     border: 1px solid transparent;
     border-radius: var(--radius-base);
     background: transparent;
     color: var(--text-text3);
-    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
     min-width: 0;
     flex: none;
@@ -33,7 +33,7 @@
     outline-offset: 2px;
   }
 
-  /* The name stands 12 px from the lamp; the lamp 8 px from its word. */
+  /* The name stands 10 px from the lamp; the lamp 6 px from its word. */
   .label {
     font-weight: var(--font-weight-regular);
     color: var(--text-text3);

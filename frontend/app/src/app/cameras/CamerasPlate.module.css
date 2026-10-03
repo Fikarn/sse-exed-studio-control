@@ -5,7 +5,7 @@
 .plate {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;

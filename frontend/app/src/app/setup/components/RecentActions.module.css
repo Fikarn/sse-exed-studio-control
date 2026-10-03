@@ -5,7 +5,7 @@
 
 .list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -19,7 +19,7 @@
     "time source";
   align-items: center;
   column-gap: 12px;
-  row-gap: 6px;
+  row-gap: 2px;
   min-width: 0;
 }
 
@@ -28,7 +28,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-text);
-  font: 400 var(--font-size-body) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.15 var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

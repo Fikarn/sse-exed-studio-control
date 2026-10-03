@@ -39,11 +39,8 @@
     color-scheme: dark;
     font-family: var(--font-family-ui);
     font-size: var(--operator-font-size-md, var(--font-size-body));
-    line-height: 1.35;
+    line-height: 1.4;
     letter-spacing: 0;
-    /* PT Sans's figures are tabular at both weights; this keeps them so in
-       any face a page falls back to. */
-    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background: var(--material-bg);
