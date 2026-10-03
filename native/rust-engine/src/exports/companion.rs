@@ -4,9 +4,11 @@
 //! guessing each key's look from its own settings.
 //!
 //! - **Buttons** are layered (`button-layered`): a background, an image of
-//!   the profile's image library, the words and the live values, with no top
-//!   bar, no pressed border and no status icons. Every option of an action,
-//!   a feedback or a layer is wrapped `{isExpression, value}`.
+//!   the profile's image library that draws every fixed word (a picture a
+//!   state, picked by the button's rules), and the live values in
+//!   Companion's own type over it, with no top bar, no pressed border and no
+//!   status icons. Every option of an action, a feedback or a layer is
+//!   wrapped `{isExpression, value}`.
 //! - **The displays** come in one read a second (`GET /api/deck/displays`)
 //!   into one custom variable, `deck_raw`, whatever the answer. A trigger
 //!   keeps it in `deck_displays` only when it is the bridge's own answer and
@@ -25,7 +27,7 @@
 //!   `self` names no surface.
 
 use super::images::image_library;
-use super::model::{Control, Element, ElementKind, Place, Prop, Step};
+use super::model::{Control, Element, ElementKind, Place, Prop, Step, DECK_CAP};
 use super::pages::{deck_page_number, DeckPage, DECK_PAGES};
 use crate::control_surface::{DisplayShape, DECK_DISPLAYS, DECK_DISPLAYS_MARK};
 use serde_json::{json, Map, Value};
@@ -313,7 +315,7 @@ fn layer(element: &Element) -> Value {
                 "gradient": fixed(false)
             }])),
             "markerEnabled": fixed(false),
-            "markerColor": fixed(16_777_215),
+            "markerColor": fixed(DECK_CAP),
             "markerWidth": fixed(15),
             "trackStyle": fixed("transparent"),
             "trackAmount": fixed(30)
