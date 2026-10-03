@@ -42,6 +42,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The pages take the SSE brand's look: a near-black ground with a trace of Dark Green, Beige Light text, SSE Green, Yellow and Coral only for state, PT Sans with SSE Adelia for state words and section heads, flat keys and a matte light cap on every fader. The pages' own layouts follow page by page (#293).
 - The Console's Snapshots are TotalMix's own eight, under the names TotalMix last saved; `active` and `changed` say what TotalMix has loaded. Press a slot twice (`LOAD?`) to load it in TotalMix, and the Console then reads the desk (#282).
 - The Console's strips and outputs carry TotalMix's names; a channel is renamed in TotalMix (#282).
 - Setup / Support's `CAMERAS` names the vMix output each camera's picture comes from, CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4, and no longer takes a vMix input; the Cameras page names it too (`vMix Output 2 · 3840 × 2160 · 29.97`) (#277).

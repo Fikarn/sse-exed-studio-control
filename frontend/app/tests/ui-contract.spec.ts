@@ -221,7 +221,10 @@ test.describe("UI contract — the A primitives on their Storybook pages", () =>
       if (measures.minFontSize !== null && measures.minFontSize < TARGETS.minFontSize)
         problems.push(`type floor ${measures.minFontSize} < ${TARGETS.minFontSize}`);
       if (measures.offFamilyText > 0)
-        problems.push(`${measures.offFamilyText} text nodes outside Inter / JetBrains Mono`);
+        problems.push(`${measures.offFamilyText} text nodes outside ${TARGETS.families.join(" / ")}`);
+      if (measures.offWeightText > 0)
+        problems.push(`${measures.offWeightText} text nodes in a weight other than ${TARGETS.weights.join(" / ")}`);
+      if (measures.facesMissing > 0) problems.push(`faces that did not load: ${measures.facesMissingList}`);
       if (measures.radiiOff > 0) problems.push(`${measures.radiiOff} elements with a radius outside {4, 8, 12, pill}`);
       if (measures.smallTargets > 0) problems.push(`${measures.smallTargets} targets under ${TARGETS.minTarget} px`);
       if (measures.smallTake > 0) problems.push(`${measures.smallTake} take-time targets under ${TARGETS.minTake} px`);
