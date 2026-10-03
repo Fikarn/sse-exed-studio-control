@@ -40,7 +40,7 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] An armed load moves nothing: the key reads `LOAD?` in amber with its countdown, the state display shows the armed row, and Esc clears both.
 - [ ] The strips and the outputs carry TotalMix's names; a channel renamed in TotalMix shows its new name after `Sync from TotalMix`, also with a letter beyond ASCII (`ö`). `engine.log` quotes each name the read-back carried, and has no line that a datagram from TotalMix could not be read in full. The Console has no Rename and no Capture.
 - [ ] After a failed audio probe (one way: `Run audio probe` with TotalMix FX closed) every fader, mute and 48 V key is locked, dashed and dim from the chair, and says why; after a passed probe they return.
-- [ ] `DIM` lights amber on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
+- [ ] `DIM` lights yellow on the Stream Deck and on screen, pressed on either; the cluster also shows `MONO`, the target keys and the level. With `PH 1` as the mix target, `DIM` still dims `Main Out`, and the phones' strips show no `dim` or `mono`.
 
 ## Stream Deck
 
@@ -48,18 +48,19 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] After Companion's Full Reset & Import of the new profile (Companion 5's own format, 2026-10-03), the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, and the deck follows the app's page to each of the four.
 - [ ] In Companion's Surfaces, "Horizontal Swipe Changes Page" is off for the deck (the reset turns it off; the profile cannot carry it): a swipe along the strip turns no page. If it is on, turn it off.
 - [ ] No key and no cell has a top bar, a yellow border while pressed or a status icon; the images fill each key and each strip cell, not letterboxed.
-- [ ] Every page has `REC` top left, `PLAY` under it and the page key top right; the page keys turn the deck round: `AUDIO ›`, `CAMERAS ›`, `PROMPTER ›`, `LIGHTS ›`. The dark keys (LIGHTS bottom row, third key; CAMERAS top row, third key; PROMPTER bottom row, third key) are black and do nothing.
+- [ ] The deck has the screen's look (2026-10-03): its words in the screen's faces, the keys' faces dark green-black, the strip black; at the studio's brightness every key at rest still reads apart from the black glass between keys, and its words read at arm's length.
+- [ ] Every page has `REC` top left, `PLAY` under it and the page key top right; the page keys, dark green with the screen's tab words, turn the deck round: `Audio`, `Cameras`, `Prompter`, `Lighting`, the next page's dot lit. The dark keys (LIGHTS bottom row, third key; CAMERAS top row, third key; PROMPTER bottom row, third key) are black and do nothing.
 - [ ] The LIGHTS strip shows its four dials (until 2026-10-03 it was black): `LIGHT 1/2` over the light's name in capitals, `INTENSITY` over `76 %` (`OFF` for a light that is off), `CCT` over `3200 K`, `SCENE 1/3` over the scene's name.
-- [ ] The deck draws `◂ CUE`, `CUE ▸` and the page keys' `›`, and on the strips `·` and `°`, as they are written here.
+- [ ] The deck draws `◂ Cue`, `Cue ▸` and the page keys' arrows, and on the strips `·` and `°`, as they are written here.
 - [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen within a second.
-- [ ] `RECALL` reads `ON RIG` in green after a recall; `UNSAVED` in amber after a light is changed; nothing once the `SCENE` dial chose another scene; with the Lighting page's `Fade` at 2 s, a recall from the deck fades as one from the screen does.
+- [ ] `RECALL` reads `ON RIG` in green after a recall; `UNSAVED` in yellow after a light is changed; `scene` once the `SCENE` dial chose another scene; with the Lighting page's `Fade` at 2 s, a recall from the deck fades as one from the screen does.
 - [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, `RECALL` reads `PREVIEW` in blue, the INTENSITY and CCT values are blue, and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
-- [ ] `ALL OFF` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.
+- [ ] `ALL OFF` on the deck, in coral, reads `OFF?` and "press again" in dark red at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.
 - [ ] A quick double press on `PLAY`, `DIM`, `PHONES`, a mute (a dial's push) or the `LIGHT` dial's push switches once.
 - [ ] On LIGHTS, a turn of the LIGHT dial shows the next light's name, intensity and colour temperature, at once or within a second; a turn of INTENSITY, CCT or SCENE changes its own cell the same way; a light changed on screen shows on the strip within a second.
 - [ ] A fast spin of the LIGHT dial: the strip catches up within a second of stopping, and `engine.log` has no line that the bridge refused a request (`503`).
-- [ ] On AUDIO, `MAIN OUT` is amber while the dials send into Main Out; `PHONES` goes to `PHONES 1`, `PHONES 2`, `PHONES 1`, amber; `BANK` reads the bank, `DIM` reads `-20 dB` in amber, `SOLO` reads how many are on. The strip shows each strip's name, its level and a bar that follows the fader; a muted strip reads `MUTED` and its bar turns ember. A slow turn steps one step a detent, a fast spin further; a turn never sets a gain. While the Console is locked (TotalMix not verified) every AUDIO key is dark with grey words, `MAIN OUT`, `PHONES` and `DIM` too.
+- [ ] On AUDIO, `Main Out` is yellow while the dials send into Main Out; `Phones` goes to `Phones 1`, `Phones 2`, `Phones 1`, yellow; `BANK` reads the bank with its dot lit, yellow off the inputs; `DIM` is yellow while on, `SOLO` has a yellow outline, lamp and word and reads how many are on. The strip shows each strip's name, its level and a bar that follows the fader; a muted strip reads `MUTED` in yellow and its bar dims. A slow turn steps one step a detent, a fast spin further; a turn never sets a gain. While the Console is locked (TotalMix not verified) every AUDIO key is locked, a dashed outline and grey words, `Main Out`, `Phones` and `DIM` too.
 - [ ] With Companion closed, the header's Surface lamp reads `no deck`, amber, within about 5 s, and nothing locks; started again, it reads `ready`.
 - [ ] With the app closed, the deck's keys and cells turn grey and show no values within about 5 s; with the app started again they come back by themselves. Turned by its page key to another page than the app's before the app was closed, the deck stays on that page when it comes back: it turns only when the app's page changes.
 
@@ -107,7 +108,7 @@ Until the links to the cameras are built:
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
 - [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
 - [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
-- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a white outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC`, on every page, and the dials are grey and do nothing.
+- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a beige outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC`, on every page, and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
 Once the links are built, with the cameras on vMix's outputs:
