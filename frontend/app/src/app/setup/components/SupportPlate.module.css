@@ -46,7 +46,7 @@
 .fine {
   margin: 6px 0 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
 }
 
 .danger {

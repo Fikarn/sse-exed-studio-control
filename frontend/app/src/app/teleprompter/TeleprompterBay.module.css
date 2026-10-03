@@ -47,7 +47,7 @@
 
 .stripLabel {
   color: var(--display-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -55,25 +55,25 @@
 .stripValue {
   overflow: hidden;
   color: var(--display-text);
-  font: 600 var(--font-size-value) / 1 var(--font-family-ui);
+  font: 700 var(--font-size-value) / 1 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .stripMono {
   color: var(--display-text);
-  font: 600 var(--font-size-value) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-value) / 1 var(--font-family-mono);
   white-space: nowrap;
 }
 
 .stripHero {
   color: var(--display-text);
-  font: 600 var(--font-size-hero) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-hero) / 1 var(--font-family-mono);
 }
 
 .stripDetail {
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   white-space: nowrap;
 }
 
@@ -83,7 +83,7 @@
   gap: 8px;
   margin-left: auto;
   color: var(--display-text);
-  font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 /* The copy: a picture of the glass. Dimmed while the Prompter XL shows
@@ -106,17 +106,17 @@
   top: 16px;
   right: 16px;
   padding: 8px 12px;
-  border: 1px solid var(--role-red-text);
+  border: 1px solid var(--role-coral-text);
   border-radius: var(--radius-pill);
   background: var(--material-panel);
-  color: var(--role-red-text);
-  font: 600 var(--font-size-body) / 1 var(--font-family-ui);
+  color: var(--role-coral-text);
+  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 .nothing {
   margin: 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-body) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
 }
 
 .barHead {
@@ -125,7 +125,7 @@
   gap: 16px;
   margin-bottom: -8px;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   flex: none;
@@ -178,7 +178,7 @@
 .segmentNumber {
   padding: 0 0 4px 4px;
   color: var(--display-text);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
 }
 
 .segment[data-read] .segmentNumber {
@@ -221,14 +221,14 @@
 
 .cuesLabel {
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .cuesNone {
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .cueParagraph {
@@ -255,7 +255,7 @@
 
 .goToLabel {
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .goToField {
@@ -266,7 +266,7 @@
   border-radius: var(--radius-ctl);
   background: var(--material-well);
   color: var(--display-text);
-  font: 500 var(--font-size-body) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-body) / 1 var(--font-family-mono);
 }
 
 .goToField:focus-visible {

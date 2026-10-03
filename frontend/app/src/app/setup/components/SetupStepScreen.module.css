@@ -22,7 +22,7 @@
 }
 
 .eyebrow {
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   color: var(--display-text2);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -30,7 +30,7 @@
 
 .title {
   margin: 10px 0 0;
-  font: 600 var(--font-size-hero) / 1.05 var(--font-family-ui);
+  font: 700 var(--font-size-hero) / 1.05 var(--font-family-ui);
   letter-spacing: -0.02em;
   color: var(--display-text);
 }
@@ -38,7 +38,7 @@
 .lead {
   max-width: 760px;
   margin-top: 16px;
-  font: 500 var(--font-size-value) / 1.4 var(--font-family-ui);
+  font: 400 var(--font-size-value) / 1.4 var(--font-family-ui);
   color: var(--display-text);
 }
 
@@ -82,7 +82,7 @@
 }
 
 .cardLabel {
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   color: var(--display-text2);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -91,7 +91,7 @@
 .cardValue {
   overflow: hidden;
   text-overflow: ellipsis;
-  font: 600 var(--font-size-name) / 1.25 var(--font-family-mono);
+  font: 700 var(--font-size-name) / 1.25 var(--font-family-mono);
   color: var(--display-text);
 }
 
@@ -99,16 +99,16 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
   color: var(--role-green-text);
 }
 
 .card[data-tone="attention"] .cardStanding {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .card[data-tone="error"] .cardStanding {
-  color: var(--role-red-text);
+  color: var(--role-coral-text);
 }
 
 .card[data-tone="off"] .cardStanding {
@@ -146,7 +146,7 @@
 
 .recordHeading {
   margin-top: 6px;
-  font: 600 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 700 var(--font-size-label) / 1 var(--font-family-ui);
   color: var(--display-text);
 }
 
@@ -163,7 +163,7 @@
   padding: 0 12px;
   border: 1px solid color-mix(in srgb, var(--display-text) 16%, transparent);
   border-radius: var(--radius-key);
-  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
   color: var(--display-text2);
 }
 
@@ -181,6 +181,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
   color: var(--display-text);
 }

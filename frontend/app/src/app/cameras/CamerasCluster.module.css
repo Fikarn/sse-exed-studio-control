@@ -40,13 +40,13 @@
    A dashed amber keyline on a display, at full strength: it is to be read. */
 .recDoubt {
   opacity: 1;
-  border: 2px dashed var(--display-amber);
+  border: 2px dashed var(--display-yellow);
   background: var(--material-well);
-  color: var(--display-amber);
+  color: var(--display-yellow);
 }
 
 .recDoubt:hover {
-  border-color: var(--display-amber);
+  border-color: var(--display-yellow);
 }
 
 .recDoubt > span:nth-child(2) {
@@ -54,8 +54,8 @@
 }
 
 .recWhy {
-  color: var(--display-amber);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--display-yellow);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .take {
@@ -75,7 +75,7 @@
   column-gap: 12px;
   min-height: calc(var(--font-size-body) * 1.2);
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
 }
 
 .takeRow[data-lines="2"] {
@@ -97,12 +97,12 @@
 
 .takeRow b {
   color: var(--text-text);
-  font: 600 var(--font-size-body) / 1.2 var(--font-family-mono);
+  font: 700 var(--font-size-body) / 1.2 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
 }
 
 .takeRow b[data-doubt] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .cameras {
@@ -148,7 +148,7 @@
 }
 
 .cameraTag {
-  font: 600 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
   letter-spacing: var(--font-tracking-cap);
 }
 
@@ -164,7 +164,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -179,7 +179,7 @@
   gap: 10px;
   grid-column: 1 / -1;
   min-width: 0;
-  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -192,11 +192,11 @@
 
 .cameraValuesTag {
   flex: none;
-  font: 500 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
 }
 
 .cameraValues[data-kind="doubt"] {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .cameraValues[data-kind="plain"] {
@@ -207,7 +207,7 @@
 .fine {
   margin: 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
 }
 
 /* What the deck's dials set: three keys across the cluster. The hint under
@@ -233,11 +233,11 @@
   grid-template-columns: 56px 1fr auto;
   align-items: baseline;
   column-gap: 8px;
-  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
 }
 
 .pictureTag {
-  font: 600 var(--font-size-label) / 1.2 var(--font-family-mono);
+  font: 700 var(--font-size-label) / 1.2 var(--font-family-mono);
   letter-spacing: var(--font-tracking-cap);
 }
 
@@ -272,12 +272,12 @@
   grid-template-columns: 44px 1fr auto;
   align-items: baseline;
   column-gap: 8px;
-  font: 500 var(--font-size-label) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
 }
 
 .recentTime {
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1.2 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -293,7 +293,7 @@
 
 .recentSource {
   color: var(--text-text2);
-  font: 500 var(--font-size-tick) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-tick) / 1.2 var(--font-family-ui);
   white-space: nowrap;
 }
 

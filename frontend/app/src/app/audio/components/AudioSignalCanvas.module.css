@@ -25,7 +25,7 @@
 .canvasHeader h2 {
   margin: 3px 0 0;
   color: var(--fg);
-  font: 600 var(--font-size-xl-tight) / 1.12 var(--font-ui);
+  font: 700 var(--font-size-xl-tight) / 1.12 var(--font-ui);
   letter-spacing: -0.02em;
 }
 
@@ -42,7 +42,7 @@
   border-bottom: 1px solid var(--accent-glow);
   background: var(--accent-soft);
   color: var(--fg-2);
-  font: 500 var(--font-size-tick) / 1.25 var(--font-ui);
+  font: 400 var(--font-size-tick) / 1.25 var(--font-ui);
   letter-spacing: 0;
 }
 
@@ -58,7 +58,7 @@
 
 .warningBand strong {
   color: var(--accent);
-  font: 600 var(--font-size-tick) / 1 var(--font-mono);
+  font: 700 var(--font-size-tick) / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -84,7 +84,7 @@
   border-radius: var(--radius-ctl);
   background: var(--bg-2);
   color: var(--accent);
-  font: 500 var(--font-size-tick) / 1 var(--font-mono);
+  font: 400 var(--font-size-tick) / 1 var(--font-mono);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -199,7 +199,7 @@
   flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--accent);
 }
@@ -210,7 +210,7 @@
 
 .canvasWarningBand b {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .canvasWarningBand button {
@@ -220,7 +220,7 @@
   border-radius: var(--radius-ctl);
   background: var(--bg-2);
   color: var(--fg-2);
-  font: 500 var(--font-size-tick) / 1 var(--font-ui);
+  font: 400 var(--font-size-tick) / 1 var(--font-ui);
   padding: 4px 10px;
   cursor: pointer;
   transition:

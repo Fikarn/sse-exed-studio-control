@@ -44,7 +44,7 @@
   padding: 10px 14px;
   font-family: var(--font-ui);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: -0.005em;
   color: var(--fg-3);
   border-bottom: 2px solid transparent;
@@ -125,7 +125,7 @@
   margin: 0;
   color: var(--fg);
   font-size: var(--font-size-body);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.005em;
 }
 
@@ -173,7 +173,7 @@
 .inspectorTag {
   font-family: var(--font-mono);
   font-size: var(--audio-type-micro);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.08em;
   padding: 2px 6px;
   border-radius: var(--radius-ctl);
@@ -191,7 +191,7 @@
      carries the focal weight (600) so it out-ranks the 600-weight
      channel-card names by size AND weight — the panel subject reads as
      the clear anchor. */
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.015em;
   color: var(--fg);
   line-height: 1.1;
@@ -206,7 +206,7 @@
 
 .inspectorSubtitle strong {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ── Hardware (preamp) card ───────────────────────────────────────────────── */
@@ -297,7 +297,7 @@
   color: var(--fg-2);
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: inline-flex;
@@ -380,7 +380,7 @@
 .unavailableTelemetry strong {
   color: var(--fg);
   font-size: var(--font-size-tick);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .unavailableTelemetry span {
@@ -416,7 +416,7 @@
 .detailGrid strong {
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
@@ -446,7 +446,7 @@
 .inspectorMiniCard strong,
 .sourceCard strong {
   font-size: var(--font-size-body);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--fg);
   letter-spacing: -0.01em;
 }
@@ -514,7 +514,7 @@
 
 .inspectorFaderHead strong {
   color: var(--accent);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .inspectorFaderTicks {
@@ -552,7 +552,7 @@
   border: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   display: inline-flex;
@@ -608,7 +608,7 @@
 
 .preampTabHint p strong {
   color: var(--fg-2);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* ── Inspector EQ mini-preview (Claude Design polish · DP4) ────────────────
@@ -731,7 +731,7 @@
   min-height: 12px;
   padding: 0;
   color: var(--accent);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -760,7 +760,7 @@
 .bigMeterRow small,
 .bigMeterReferenceRow small {
   color: var(--fg-3);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -770,14 +770,14 @@
   align-items: baseline;
   min-width: 0;
   color: var(--fg);
-  font: var(--font-weight-semibold) var(--font-size-name) / 1 var(--font-family-mono);
+  font: var(--font-weight-bold) var(--font-size-name) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .bigMeterReferenceRow strong {
   color: var(--fg-2);
-  font: var(--font-weight-medium) var(--font-size-tick) / 1 var(--font-family-mono);
+  font: var(--font-weight-regular) var(--font-size-tick) / 1 var(--font-family-mono);
 }
 
 .bigMeterRow strong[data-tone="warn"] {

@@ -117,8 +117,8 @@
   padding: 2px 8px;
   border-radius: var(--radius-ctl);
   background: var(--material-panel-top);
-  color: var(--role-red-text);
-  font: 600 var(--font-size-label) / 1.4 var(--font-family-ui);
+  color: var(--role-coral-text);
+  font: 700 var(--font-size-label) / 1.4 var(--font-family-ui);
 }
 
 .connectingState {
@@ -133,7 +133,7 @@
 
 .connectingTitle {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 18px;
   color: var(--color-brand-text-primary);
   margin: 0;

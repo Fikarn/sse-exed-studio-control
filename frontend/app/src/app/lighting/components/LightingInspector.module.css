@@ -338,7 +338,7 @@
 
 .sceneTitle {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 22px;
   line-height: 1.15;
   color: var(--color-brand-text-primary);
@@ -395,7 +395,7 @@
 
 .sceneStatValue {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 18px;
   color: var(--color-brand-text-primary);
   margin: 0;
@@ -405,7 +405,7 @@
 .sceneStatValue small {
   font-family: var(--font-family-mono);
   font-size: var(--font-size-tick);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--color-brand-text-muted);
   margin-left: 2px;
 }
@@ -423,7 +423,7 @@
   text-transform: uppercase;
   color: var(--color-brand-text-muted);
   margin: 0;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sceneFixtureChips {
@@ -472,7 +472,7 @@
 }
 
 .sceneFixtureName {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .sceneFixtureLevel {
@@ -536,7 +536,7 @@
 
 .fixtureName {
   font-family: var(--font-family-ui);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   color: var(--color-brand-text-primary);
   overflow-wrap: anywhere;
@@ -887,7 +887,7 @@
   font-feature-settings: "tnum", "zero";
   font-size: 13px;
   color: var(--color-brand-green);
-  font-weight: 600;
+  font-weight: 700;
   min-width: 56px;
   text-align: right;
 }
@@ -1026,7 +1026,7 @@
   font-family: var(--font-family-mono);
   font-size: var(--font-size-tick);
   color: var(--color-brand-yellow);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* DMX peek */
@@ -1095,7 +1095,7 @@
   font-feature-settings: "tnum", "zero";
   font-size: var(--font-size-tick);
   color: var(--color-brand-text-primary);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .previewSourceEyebrow,

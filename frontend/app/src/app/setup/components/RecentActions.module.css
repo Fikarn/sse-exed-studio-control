@@ -28,7 +28,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--text-text);
-  font: 500 var(--font-size-body) / 1.2 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.2 var(--font-family-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -36,7 +36,7 @@
 .time {
   grid-area: time;
   color: var(--text-text2);
-  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -49,5 +49,5 @@
 .empty {
   margin: 0;
   color: var(--text-text2);
-  font: 500 var(--font-size-body) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.35 var(--font-family-ui);
 }

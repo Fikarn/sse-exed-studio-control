@@ -33,7 +33,7 @@
   margin: 0;
   padding: 20px 28px;
   color: var(--display-text2);
-  font: 500 var(--font-size-body) / 1.3 var(--font-family-ui);
+  font: 400 var(--font-size-body) / 1.3 var(--font-family-ui);
 }
 
 .text {
@@ -74,7 +74,7 @@
   left: -101px;
   width: 84px;
   color: var(--display-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
   text-align: right;
   user-select: none;
 }
@@ -86,28 +86,28 @@
   left: -101px;
   width: 84px;
   color: var(--display-text);
-  font: 600 var(--font-size-tick) / 1 var(--font-family-ui);
+  font: 700 var(--font-size-tick) / 1 var(--font-family-ui);
   text-align: right;
   user-select: none;
 }
 
 .paragraph[data-edited] {
-  border-left-color: var(--role-amber-text);
+  border-left-color: var(--role-yellow-text);
 }
 
 .paragraph[data-edited]::after {
-  color: var(--role-amber-text);
+  color: var(--role-yellow-text);
 }
 
 .paragraph[data-mark="reading line"]::before {
   color: var(--display-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* The browser's own formatting tags, as the glass draws them. */
 .text b,
 .text strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .text u {
@@ -125,12 +125,12 @@
   gap: 24px;
   flex: none;
   color: var(--text-text2);
-  font: 500 var(--font-size-label) / 1 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
 }
 
 .status b {
   color: var(--text-text);
-  font: 600 var(--font-size-label) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-label) / 1 var(--font-family-mono);
 }
 
 .note {
