@@ -30,6 +30,22 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
     let grand_master = read_lighting_grand_master(settings);
     let now_ms = current_unix_ms();
     let mut editor_state = load_lighting_editor_state_with_inventory(settings, &config, &inventory);
+    // Whether the rig holds the live scene: the last recalled, else the
+    // selected one. Decided on the rig as stored, before a running fade is
+    // sampled: a scene being faded in is the rig's (`scene_state`).
+    let has_scene = |id: &String| editor_state.scenes.iter().any(|scene| scene.id == *id);
+    let live_scene_id = last_recalled_scene_id
+        .clone()
+        .filter(has_scene)
+        .or_else(|| {
+            read_optional_setting(settings, LIGHTING_SELECTED_SCENE_ID_KEY).filter(has_scene)
+        });
+    let scene_state = String::from(super::scene_state::scene_state(
+        &editor_state,
+        live_scene_id.as_deref(),
+        last_recalled_scene_id.as_deref(),
+        false,
+    ));
     let fade_status = apply_active_fade_sample(&mut editor_state, now_ms);
     let active_burst_ids = active_identify_burst_ids(settings, now_ms);
     let overrides = read_output_overrides(settings);
@@ -195,6 +211,8 @@ pub fn read_lighting_snapshot(settings: &HashMap<String, String>) -> LightingSna
         output_armed: lighting_output_armed(settings),
         last_recalled_scene_id,
         last_scene_recall_at,
+        scene_state,
+        recall_fade_ms: read_lighting_recall_fade_ms(settings),
         last_action_status,
         last_action_code,
         last_action_message,

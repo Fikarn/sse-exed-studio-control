@@ -49,20 +49,20 @@ fn worker_pool_returns_503_when_saturated() {
 
 // 2026-09-22, found on the studio workstation after the profile was
 // imported with its token: the exported profile's once-a-second LCD poll
-// sends a request per audio LCD key all at once, and a queue of 16 turned
+// sent a request per audio LCD key all at once, and a queue of 16 turned
 // the last five away every second — the same five keys each time. The
 // engine's own pool must hold the deck's worst instant, the poll meeting
-// the press that sends the most.
+// the press that sends the most. Since 2026-10-03 the poll is one read of
+// every display (it was 47 reads, and the instant 64), and a press its
+// action and that read again.
 #[test]
 fn the_pool_holds_the_decks_worst_instant() {
     let worst = crate::exports::deck_worst_instant_requests();
     // The numbers the queue was sized for. A profile that sends more
-    // changes them here, and the queue with them. Since 2026-09-29 the
-    // LIGHTS page's four dial displays are polled, and arriving on LIGHTS
-    // refreshes nothing (it was 43, 4, 17): the instant is the same size.
+    // changes them here, and the queue with them.
     assert_eq!(
         (worst.poll, worst.follow, worst.press, worst.total()),
-        (47, 0, 17, 64)
+        (1, 0, 2, 3)
     );
     // The instant and the largest press again must fit: a key pressed
     // while the instant waits is not turned away.
@@ -76,52 +76,55 @@ fn the_pool_holds_the_decks_worst_instant() {
     let port = start_test_bridge(&test_dir, WORKER_COUNT, QUEUE_CAPACITY);
     let host = format!("127.0.0.1:{port}");
 
-    // What the instant asks for: every display of the poll, the LIGHTS
-    // page's among them, and a press's worth of displays more.
-    let polled = crate::exports::polled_lcd_keys();
-    let keys: Vec<&str> = polled
-        .iter()
-        .copied()
-        .chain(polled.iter().copied().take(worst.press))
+    // A fast spin of a dial is the busiest the deck gets now: a detent's
+    // action and its read again, a dozen detents at once, over the poll.
+    // Each read is every display: it must be served as a read of one was.
+    let detents = 12;
+    let requests: Vec<String> = std::iter::once(displays_read(&host))
+        .chain((0..detents).flat_map(|_| [press(&host), displays_read(&host)]))
         .collect();
-    assert_eq!(keys.len(), worst.total());
+    assert!(requests.len() >= worst.total());
 
     // Every connection is open before any request is sent, so no worker can
     // finish one and make room: the whole burst waits at once.
-    let mut streams: Vec<TcpStream> = keys
+    let mut streams: Vec<TcpStream> = requests
         .iter()
         .map(|_| TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect"))
         .collect();
     thread::sleep(Duration::from_millis(200));
-    for (stream, key) in streams.iter_mut().zip(&keys) {
-        let request = format!(
-            "GET /api/deck/lcd?key={key} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
-        );
+    for (stream, request) in streams.iter_mut().zip(&requests) {
         let _ = stream.write_all(request.as_bytes());
         let _ = stream.shutdown(Shutdown::Write);
     }
-    let statuses: Vec<(&str, u16)> = streams
+    let statuses: Vec<u16> = streams
         .into_iter()
-        .zip(&keys)
-        .map(|(mut stream, key)| {
+        .map(|mut stream| {
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .expect("read timeout");
             let mut response = Vec::new();
             let _ = stream.read_to_end(&mut response);
-            (*key, status_of(&String::from_utf8_lossy(&response)))
+            status_of(&String::from_utf8_lossy(&response))
         })
         .collect();
-    let unserved: Vec<&(&str, u16)> = statuses
-        .iter()
-        .filter(|(_, status)| *status != 200)
-        .collect();
+    let reads = statuses.iter().step_by(2).collect::<Vec<_>>();
     assert!(
-        unserved.is_empty(),
-        "{} of {} requests at the deck's worst instant were not served: {unserved:?}",
-        unserved.len(),
-        keys.len()
+        reads.iter().all(|status| **status == 200),
+        "a read of the displays at the deck's busiest was not served: {statuses:?}"
     );
+    // The presses are the test's own action, which the page refuses; each
+    // was answered.
+    assert!(
+        statuses.iter().all(|status| *status != 0 && *status != 503),
+        "{statuses:?}"
+    );
+}
+
+/// The deck's one read of every display (2026-10-03).
+fn displays_read(host: &str) -> String {
+    format!(
+        "GET /api/deck/displays HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+    )
 }
 
 /// Opens a connection and sends `request` at once, as Companion does.
@@ -158,8 +161,9 @@ fn press(host: &str) -> String {
     )
 }
 
-// Fix D (2026-10-02): the poll's 47 display reads come at one instant, and a
-// press just after them waited for every one to be answered.
+// Fix D (2026-10-02): the poll's display reads came at one instant, and a
+// press just after them waited for every one to be answered. The deck reads
+// every display at once since 2026-10-03; a press still goes first.
 #[test]
 fn a_press_is_answered_before_the_display_reads_that_came_first() {
     let test_dir = ready_audio_test_db("bridge-press-first");
@@ -170,10 +174,7 @@ fn a_press_is_answered_before_the_display_reads_that_came_first() {
     // 408; the reads and then the press queue up behind it.
     let _idle = TcpStream::connect((DEFAULT_CONTROL_SURFACE_HOST, port)).expect("connect");
     thread::sleep(Duration::from_millis(100));
-    let key = crate::exports::polled_lcd_keys()[0];
-    let reads: Vec<TcpStream> = (0..10)
-        .map(|_| send(port, &display_read(&host, key)))
-        .collect();
+    let reads: Vec<TcpStream> = (0..10).map(|_| send(port, &displays_read(&host))).collect();
     thread::sleep(Duration::from_millis(50));
     let pressed = send(port, &press(&host));
 
@@ -207,8 +208,7 @@ fn a_press_that_finds_the_queue_full_is_served_and_a_read_is_refused() {
 
     let pressed = send(port, &press(&host));
     thread::sleep(Duration::from_millis(200));
-    let key = crate::exports::polled_lcd_keys()[0];
-    let (read_status, _) = answer_of(send(port, &display_read(&host, key)));
+    let (read_status, _) = answer_of(send(port, &displays_read(&host)));
     assert_eq!(read_status, 503, "a read finds the queue full");
 
     // Once the idle connections time out, the press is answered.
@@ -310,12 +310,11 @@ fn the_minute_counts_what_the_bridge_served() {
     let test_dir = ready_audio_test_db("bridge-minute");
     let (port, context) = start_test_bridge_with_context(&test_dir, 2, 8);
     let host = format!("127.0.0.1:{port}");
-    let key = crate::exports::polled_lcd_keys()[0];
-
     assert_eq!(
-        status_of(&raw_request(port, &display_read(&host, key))),
+        status_of(&raw_request(port, &display_read(&host, "workspace"))),
         200
     );
+    assert_eq!(status_of(&raw_request(port, &displays_read(&host))), 200);
     assert_ne!(status_of(&raw_request(port, &press(&host))), 0);
     let context_read = format!(
         "GET /api/deck/context HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
@@ -323,12 +322,17 @@ fn the_minute_counts_what_the_bridge_served() {
     assert_eq!(status_of(&raw_request(port, &context_read)), 200);
 
     let minute = std::mem::take(&mut *context.minute());
-    assert_eq!((minute.presses, minute.displays, minute.other), (1, 1, 1));
+    assert_eq!((minute.presses, minute.displays, minute.other), (1, 2, 1));
     assert_eq!((minute.refused, minute.timed_out), (0, 0));
     assert!(minute.deepest >= 1);
     assert!(
-        ["GET lcd", "POST audio-action", "GET context"]
-            .contains(&minute.longest_handling.1.as_str()),
+        [
+            "GET lcd",
+            "GET displays",
+            "POST audio-action",
+            "GET context"
+        ]
+        .contains(&minute.longest_handling.1.as_str()),
         "{minute:?}"
     );
 }

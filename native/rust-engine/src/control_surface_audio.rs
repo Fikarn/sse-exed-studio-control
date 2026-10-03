@@ -5,9 +5,7 @@ use crate::audio::{
     update_audio_mix_target, update_audio_settings, AudioChannelUpdateRequest, AudioCommandError,
     AudioMixTargetUpdateRequest, AudioSettingsUpdateRequest, AudioSnapshot,
 };
-use crate::control_surface::{
-    clamp_i64, cycle_value, emit_audio_changed, truncate, ControlSurfaceError,
-};
+use crate::control_surface::{cycle_value, emit_audio_changed, truncate, ControlSurfaceError};
 use crate::storage::{list_settings_by_prefix, set_settings_owned};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -16,7 +14,12 @@ use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const AUDIO_DECK_BANK_KEY: &str = "app.control_surface.audio.bank";
-const AUDIO_DECK_DIAL_MODE_KEY: &str = "app.control_surface.audio.dial_mode";
+/// The dials' mode, as the deck's displays and context report it: always
+/// `fader` since GAIN left the deck (2026-10-03). The review of #293: a gain
+/// mode an old profile's GAIN key saved (`app.control_surface.audio.dial_mode`)
+/// is no longer read, as it no longer turns the dials, so it is not reported
+/// either; the switch itself (`toggleDialMode`) is refused.
+pub(crate) const AUDIO_DECK_DIAL_MODE: &str = "fader";
 const AUDIO_DECK_BANK_CYCLE: &[&str] = &["inputs", "playback", "outputs"];
 const AUDIO_DECK_FADER_STEP: f64 = 0.01;
 const AUDIO_DECK_FAST_TURN_WINDOW: Duration = Duration::from_millis(80);
@@ -24,8 +27,6 @@ const AUDIO_DECK_FAST_TURN_MULTIPLIER: f64 = 5.0;
 const AUDIO_ROLE_FRONT_PREAMP: &str = "front-preamp";
 const AUDIO_ROLE_PLAYBACK_PAIR: &str = "playback-pair";
 const AUDIO_MAIN_MIX_TARGET_ROLE: &str = "main-out";
-const AUDIO_PREAMP_GAIN_MIN: i64 = 0;
-const AUDIO_PREAMP_GAIN_MAX: i64 = 75;
 
 #[derive(Debug)]
 pub(crate) enum AudioDeckStrip {
@@ -61,6 +62,12 @@ pub(crate) fn audio_deck_gate_label(snapshot: &AudioSnapshot) -> Option<&'static
     }
 }
 
+/// A strip cell of the AUDIO page: the strip's name in capitals, cut to 10
+/// letters, over its level into the mix target, or `MUTED`; `AUDIO` over the
+/// reason while the Console is locked; nothing for a strip the bank does not
+/// have (the fourth on OUTPUTS). Since 2026-10-03 the deck's dials always
+/// ride the level (GAIN left the deck), and the screen's selected strip is no
+/// longer marked (the strip taps left with it).
 pub(crate) fn audio_strip_lcd_text(
     app_settings: &HashMap<String, String>,
     snapshot: &AudioSnapshot,
@@ -71,48 +78,33 @@ pub(crate) fn audio_strip_lcd_text(
     }
 
     let bank = audio_deck_bank(app_settings);
-    let dial_mode = audio_deck_dial_mode(app_settings);
     match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
         Ok(AudioDeckStrip::Channel(channel)) => {
-            let marker = if snapshot.selected_channel_id.as_deref() == Some(channel.id.as_str()) {
-                "\u{2022} "
-            } else {
-                ""
-            };
             let name = truncate(&channel.name.to_uppercase(), 10);
-            if bank == "inputs" && dial_mode == "gain" {
-                format!("{marker}{name}\\nGAIN {} dB", channel.gain)
+            let level = channel
+                .mix_levels
+                .get(&snapshot.selected_mix_target_id)
+                .copied()
+                .unwrap_or(channel.fader);
+            let level_line = if channel.mute {
+                String::from("MUTED")
             } else {
-                let level = channel
-                    .mix_levels
-                    .get(&snapshot.selected_mix_target_id)
-                    .copied()
-                    .unwrap_or(channel.fader);
-                let level_line = if channel.mute {
-                    String::from("MUTED")
-                } else {
-                    audio_fader_db_label(level)
-                };
-                format!("{marker}{name}\\n{level_line}")
-            }
+                audio_fader_db_label(level)
+            };
+            format!("{name}\\n{level_line}")
         }
         Ok(AudioDeckStrip::MixTarget(target)) => {
-            let marker = if snapshot.selected_mix_target_id == target.id {
-                "\u{2022} "
-            } else {
-                ""
-            };
             let level_line = if target.mute {
                 String::from("MUTED")
             } else {
                 audio_fader_db_label(target.volume)
             };
             format!(
-                "{marker}{}\\n{level_line}",
+                "{}\\n{level_line}",
                 truncate(&target.name.to_uppercase(), 10)
             )
         }
-        Err(_) => String::from("\u{2014}"),
+        Err(_) => String::new(),
     }
 }
 
@@ -167,21 +159,18 @@ pub(crate) fn audio_strip_level_text(
     }
 
     let bank = audio_deck_bank(app_settings);
-    let dial_mode = audio_deck_dial_mode(app_settings);
     let bucket_of = |value: f64| -> u32 { (value.clamp(0.0, 1.0) * 12.0).round() as u32 };
     match resolve_audio_deck_strip(snapshot, &bank, strip_index) {
         Ok(AudioDeckStrip::Channel(channel)) => {
-            let bucket = if bank == "inputs" && dial_mode == "gain" {
-                bucket_of(channel.gain as f64 / 75.0)
-            } else {
-                bucket_of(
-                    channel
-                        .mix_levels
-                        .get(&snapshot.selected_mix_target_id)
-                        .copied()
-                        .unwrap_or(channel.fader),
-                )
-            };
+            // The level into the mix target, whatever the saved dial mode:
+            // the deck's dials ride nothing else (2026-10-03).
+            let bucket = bucket_of(
+                channel
+                    .mix_levels
+                    .get(&snapshot.selected_mix_target_id)
+                    .copied()
+                    .unwrap_or(channel.fader),
+            );
             if channel.mute {
                 format!("m{bucket}")
             } else {
@@ -221,7 +210,7 @@ pub(crate) fn audio_state_value_text(
             .unwrap_or_else(|| String::from("main"))),
         "bank" => Ok(audio_deck_bank(app_settings)),
         "mode" => Ok(if audio_deck_bank(app_settings) == "inputs" {
-            audio_deck_dial_mode(app_settings)
+            String::from(AUDIO_DECK_DIAL_MODE)
         } else {
             String::from("n/a")
         }),
@@ -265,15 +254,10 @@ pub(crate) fn audio_key_lcd_text(
             _ => String::from("DIM\\n--"),
         },
         6 => {
+            // The old profile's GAIN key: off, as the dials never ride the
+            // gain (2026-10-03).
             if audio_deck_bank(app_settings) == "inputs" {
-                format!(
-                    "GAIN\\n{}",
-                    if audio_deck_dial_mode(app_settings) == "gain" {
-                        "ON"
-                    } else {
-                        "OFF"
-                    }
-                )
+                String::from("GAIN\\nOFF")
             } else {
                 String::from("GAIN\\nN/A")
             }
@@ -321,13 +305,15 @@ pub(crate) fn handle_audio_action_at(
     // the page keys only turn Companion's page now. `recallSnapshot` left on
     // 2026-10-01: the Console's snapshots are TotalMix's, and one loads only
     // at a second press on screen, never at one press of a key.
+    // `toggleDialMode`, the old profile's GAIN key, is refused since the
+    // review of #293 (2026-10-03), as `talkOn` is: the dials ride the level
+    // whatever it saved, so it switched nothing a deck could see.
     match action {
         "dialTurn" => handle_audio_dial_turn(db_path, value, at),
         "dialPress" => handle_audio_dial_press(db_path, value),
         "stripTap" => handle_audio_strip_tap(db_path, value),
         "setMixTarget" => handle_audio_set_mix_target(db_path, value),
         "cycleBank" => handle_audio_cycle_bank(db_path),
-        "toggleDialMode" => handle_audio_toggle_dial_mode(db_path),
         "dimToggle" => handle_audio_dim_toggle(db_path),
         "soloClearAll" => handle_audio_solo_clear_all(db_path),
         _ => Err(ControlSurfaceError::Unsupported(format!(
@@ -358,14 +344,6 @@ pub(crate) fn audio_deck_bank(settings: &HashMap<String, String>) -> String {
         .filter(|value| AUDIO_DECK_BANK_CYCLE.contains(&value.as_str()))
         .cloned()
         .unwrap_or_else(|| String::from("inputs"))
-}
-
-pub(crate) fn audio_deck_dial_mode(settings: &HashMap<String, String>) -> String {
-    settings
-        .get(AUDIO_DECK_DIAL_MODE_KEY)
-        .filter(|value| value.as_str() == "gain")
-        .cloned()
-        .unwrap_or_else(|| String::from("fader"))
 }
 
 fn parse_audio_strip_index(value: &str) -> Result<usize, ControlSurfaceError> {
@@ -529,57 +507,40 @@ fn handle_audio_dial_turn(
     let (app_settings, snapshot) = current_audio_snapshot(db_path)?;
     ensure_audio_action_allowed(db_path, &snapshot).map_err(map_audio_error)?;
     let bank = audio_deck_bank(&app_settings);
-    let dial_mode = audio_deck_dial_mode(&app_settings);
 
+    // A turn always rides the level into the mix target (2026-10-03: GAIN
+    // left the deck). A dial mode saved by the old profile's GAIN key no
+    // longer turns the dials into preamp gain, where nothing on the deck
+    // would show it.
     match resolve_audio_deck_strip(&snapshot, &bank, strip_index)? {
         AudioDeckStrip::Channel(channel) => {
-            if bank == "inputs" && dial_mode == "gain" {
-                let next_gain = clamp_i64(
-                    channel.gain + step_sign,
-                    AUDIO_PREAMP_GAIN_MIN,
-                    AUDIO_PREAMP_GAIN_MAX,
-                );
-                let mut request = audio_channel_update_request(&channel.id);
-                request.gain = Some(next_gain);
-                let updated = update_audio_channel(db_path, &request).map_err(map_audio_error)?;
-                emit_audio_changed();
-                Ok(json!({
-                    "strip": strip_index,
-                    "channelId": updated.id,
-                    "name": updated.name,
-                    "gain": updated.gain,
-                }))
-            } else {
-                let multiplier = audio_dial_turn_multiplier(
-                    &audio_dial_turn_key(db_path, &bank, strip_index),
-                    at,
-                );
-                let mix_target_id = snapshot.selected_mix_target_id.clone();
-                let current = channel
-                    .mix_levels
-                    .get(&mix_target_id)
-                    .copied()
-                    .unwrap_or(channel.fader);
-                let next = (current + step_sign as f64 * AUDIO_DECK_FADER_STEP * multiplier)
-                    .clamp(0.0, 1.0);
-                let mut request = audio_channel_update_request(&channel.id);
-                request.mix_target_id = Some(mix_target_id.clone());
-                request.fader = Some(next);
-                let updated = update_audio_channel(db_path, &request).map_err(map_audio_error)?;
-                emit_audio_changed();
-                let level = updated
-                    .mix_levels
-                    .get(&mix_target_id)
-                    .copied()
-                    .unwrap_or(updated.fader);
-                Ok(json!({
-                    "strip": strip_index,
-                    "channelId": updated.id,
-                    "name": updated.name,
-                    "mixTargetId": mix_target_id,
-                    "fader": level,
-                }))
-            }
+            let multiplier =
+                audio_dial_turn_multiplier(&audio_dial_turn_key(db_path, &bank, strip_index), at);
+            let mix_target_id = snapshot.selected_mix_target_id.clone();
+            let current = channel
+                .mix_levels
+                .get(&mix_target_id)
+                .copied()
+                .unwrap_or(channel.fader);
+            let next =
+                (current + step_sign as f64 * AUDIO_DECK_FADER_STEP * multiplier).clamp(0.0, 1.0);
+            let mut request = audio_channel_update_request(&channel.id);
+            request.mix_target_id = Some(mix_target_id.clone());
+            request.fader = Some(next);
+            let updated = update_audio_channel(db_path, &request).map_err(map_audio_error)?;
+            emit_audio_changed();
+            let level = updated
+                .mix_levels
+                .get(&mix_target_id)
+                .copied()
+                .unwrap_or(updated.fader);
+            Ok(json!({
+                "strip": strip_index,
+                "channelId": updated.id,
+                "name": updated.name,
+                "mixTargetId": mix_target_id,
+                "fader": level,
+            }))
         }
         AudioDeckStrip::MixTarget(target) => {
             let multiplier =
@@ -679,6 +640,11 @@ fn handle_audio_strip_tap(
     }
 }
 
+/// The mix target the dials send into. `main`, `phones-a` and `phones-b`
+/// name one; `phones` (2026-10-03, the deck's PHONES key) is the next phones
+/// mix: Phones 1 from Main Out, Phones 2 from Phones 1, and Phones 1 again
+/// from Phones 2. Either way the saved mix target is written, as the screen
+/// writes it, and nothing goes to TotalMix.
 fn handle_audio_set_mix_target(
     db_path: &Path,
     value: Option<&str>,
@@ -688,9 +654,18 @@ fn handle_audio_set_mix_target(
         .filter(|value| !value.is_empty())
         .ok_or_else(|| {
             ControlSurfaceError::InvalidParams(String::from(
-                "setMixTarget requires a value of main, phones-a, or phones-b",
+                "setMixTarget requires a value of main, phones, phones-a, or phones-b",
             ))
         })?;
+    let value = if value == "phones" {
+        let (app_settings, snapshot) = current_audio_snapshot(db_path)?;
+        match audio_state_value_text(&app_settings, &snapshot, "target")?.as_str() {
+            "phones-a" => "phones-b",
+            _ => "phones-a",
+        }
+    } else {
+        value
+    };
     let mix_target_id = match value {
         "main" => "audio-mix-main",
         "phones-a" => "audio-mix-phones-a",
@@ -715,22 +690,6 @@ fn handle_audio_cycle_bank(db_path: &Path) -> Result<Value, ControlSurfaceError>
     )
     .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
     Ok(json!({ "bank": next }))
-}
-
-fn handle_audio_toggle_dial_mode(db_path: &Path) -> Result<Value, ControlSurfaceError> {
-    let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let next = if audio_deck_dial_mode(&app_settings) == "gain" {
-        String::from("fader")
-    } else {
-        String::from("gain")
-    };
-    set_settings_owned(
-        db_path,
-        &[(String::from(AUDIO_DECK_DIAL_MODE_KEY), next.clone())],
-    )
-    .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    Ok(json!({ "dialMode": next }))
 }
 
 fn handle_audio_dim_toggle(db_path: &Path) -> Result<Value, ControlSurfaceError> {
@@ -842,7 +801,6 @@ mod tests {
             )])),
             "inputs"
         );
-        assert_eq!(audio_deck_dial_mode(&HashMap::new()), "fader");
     }
 
     #[test]
@@ -1158,34 +1116,105 @@ mod tests {
         ));
     }
 
+    /// The setting the old profile's GAIN key saved, as an old build left it.
+    fn save_the_old_gain_mode(db_path: &Path) {
+        set_settings_owned(
+            db_path,
+            &[(
+                String::from("app.control_surface.audio.dial_mode"),
+                String::from("gain"),
+            )],
+        )
+        .expect("the old gain mode is saved");
+    }
+
+    // 2026-10-03: GAIN left the deck. A dial mode the old profile's GAIN key
+    // saved no longer turns the dials into preamp gain, where nothing on the
+    // deck would show it: a turn rides the level, the strip shows the level.
+    // The review of #293: the mode reads `fader`, and the key's switch is
+    // refused (501) and saves nothing.
     #[test]
-    fn audio_gain_mode_steps_one_whole_db_and_clamps() {
-        let test_dir = ready_audio_test_db("gain-mode");
+    fn a_saved_gain_mode_no_longer_turns_the_dials_into_gain() {
+        let test_dir = ready_audio_test_db("gain-mode-gone");
+        let db_path = test_dir.db_path();
+        save_the_old_gain_mode(db_path.as_path());
+        let settings_before =
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).expect("settings");
+        let refused = handle_audio_action(db_path.as_path(), "toggleDialMode", None)
+            .expect_err("the GAIN key left the deck");
+        assert!(
+            matches!(refused, ControlSurfaceError::Unsupported(_)),
+            "{refused:?}"
+        );
+        assert_eq!(refused.status_code(), 501);
         assert_eq!(
-            handle_audio_action(test_dir.db_path().as_path(), "toggleDialMode", None)
-                .expect("mode toggle should succeed")["dialMode"],
-            "gain"
+            list_settings_by_prefix(db_path.as_path(), APP_SETTINGS_PREFIX).expect("settings"),
+            settings_before,
+            "a refused GAIN key writes nothing"
+        );
+        let (app_settings, snapshot) =
+            current_audio_snapshot(db_path.as_path()).expect("the snapshot");
+        assert_eq!(
+            audio_state_value_text(&app_settings, &snapshot, "mode").expect("mode state"),
+            "fader"
+        );
+        assert_eq!(
+            audio_key_lcd_text(&app_settings, &snapshot, 6),
+            "GAIN\\nOFF"
         );
 
         let before = audio_snapshot_for(&test_dir);
-        let gain = before
+        let host = before
             .channels
             .iter()
             .find(|entry| entry.id == "audio-input-9")
             .expect("host input should exist")
-            .gain;
+            .clone();
 
-        let result = handle_audio_action(test_dir.db_path().as_path(), "dialTurn", Some("1:up"))
-            .expect("gain turn should succeed");
-        assert_eq!(result["gain"], gain + 1);
+        let result = handle_audio_action(db_path.as_path(), "dialTurn", Some("1:up"))
+            .expect("the turn rides the level");
+        assert!(result.get("gain").is_none(), "{result}");
+        assert!(result["fader"].is_number(), "{result}");
+        let after = audio_snapshot_for(&test_dir);
+        let host_after = after
+            .channels
+            .iter()
+            .find(|entry| entry.id == "audio-input-9")
+            .expect("host input should exist");
+        assert_eq!(host_after.gain, host.gain, "the preamp gain is untouched");
 
-        let mut request = audio_channel_update_request("audio-input-9");
-        request.gain = Some(AUDIO_PREAMP_GAIN_MAX);
-        update_audio_channel(test_dir.db_path().as_path(), &request)
-            .expect("gain should force to max");
-        let result = handle_audio_action(test_dir.db_path().as_path(), "dialTurn", Some("1:up"))
-            .expect("gain turn at max should clamp");
-        assert_eq!(result["gain"], AUDIO_PREAMP_GAIN_MAX);
+        let (app_settings, snapshot) =
+            current_audio_snapshot(db_path.as_path()).expect("the snapshot");
+        let strip = audio_strip_lcd_text(&app_settings, &snapshot, 1);
+        assert!(strip.ends_with(" dB") && !strip.contains("GAIN"), "{strip}");
+    }
+
+    // 2026-10-03: the deck's PHONES key. Main Out goes to Phones 1, Phones 1
+    // to Phones 2, Phones 2 back to Phones 1; the saved mix target is
+    // written as MAIN OUT writes it.
+    #[test]
+    fn the_phones_key_goes_round_the_phones_mixes() {
+        let test_dir = ready_audio_test_db("phones-key");
+        let db_path = test_dir.db_path();
+        let target = |db_path: &Path| {
+            let (app_settings, snapshot) = current_audio_snapshot(db_path).expect("the snapshot");
+            audio_state_value_text(&app_settings, &snapshot, "target").expect("the target")
+        };
+        assert_eq!(target(db_path.as_path()), "main");
+        for expected in ["phones-a", "phones-b", "phones-a", "phones-b"] {
+            let answer = handle_audio_action(db_path.as_path(), "setMixTarget", Some("phones"))
+                .expect("the phones key");
+            assert_eq!(
+                answer["selectedMixTargetId"],
+                format!("audio-mix-{expected}")
+            );
+            assert_eq!(target(db_path.as_path()), expected);
+        }
+        handle_audio_action(db_path.as_path(), "setMixTarget", Some("main")).expect("MAIN OUT");
+        assert_eq!(target(db_path.as_path()), "main");
+        handle_audio_action(db_path.as_path(), "setMixTarget", Some("phones"))
+            .expect("the phones key");
+        assert_eq!(target(db_path.as_path()), "phones-a");
     }
 
     // D26 (2026-09-28): talkback is gone. The deck's old profile still has
@@ -1253,14 +1282,16 @@ mod tests {
             "muted strips carry the ember bar prefix"
         );
 
-        handle_audio_action(db_path.as_path(), "toggleDialMode", None).expect("gain mode");
+        save_the_old_gain_mode(db_path.as_path());
         let app_settings = settings();
         let live = snapshot(&app_settings);
-        // Host preamp default 34 dB over 0-75 -> bucket 5.
-        assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "5");
+        // GAIN left the deck (2026-10-03): the bar is the level, whatever the
+        // saved mode (fader 0.78 -> bucket 9, not the preamp's 34 dB), and the
+        // mode reads `fader` (the review of #293).
+        assert_eq!(audio_strip_level_text(&app_settings, &live, 1), "9");
         assert_eq!(
             audio_state_value_text(&app_settings, &live, "mode").expect("mode state"),
-            "gain"
+            "fader"
         );
 
         handle_audio_action(db_path.as_path(), "cycleBank", None).expect("to playback");

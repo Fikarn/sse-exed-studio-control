@@ -8,8 +8,10 @@
 //!   decided under the lock, by what the glass does at that moment.
 //! - `BACK`, `TOP` and the two cue keys jump as the page's keys do; a jump
 //!   keeps the scroll as it was, and only `TOP` pauses.
-//! - The dials: speed (5 words a minute a detent), position (a line), text
-//!   size (4 px; a push returns to the standard) and paragraph.
+//! - The dials, left to right (2026-10-03): speed (5 words a minute a
+//!   detent), line, paragraph, and text size (4 px; a push returns to the
+//!   standard). Each cell of the strip shows its own dial's value; `PLAY`
+//!   shows the time left, on every page.
 //!
 //! Putting a script on, replacing, updating and clearing it stay on the
 //! screen (D14). Nothing here starts a scroll but `PLAY` and the speed
@@ -19,8 +21,7 @@
 //!
 //! Since 2026-10-02 the keys, the dials and the displays run on the
 //! prompter's memory alone: the place, the pace and the size go to the saver,
-//! and the strip's name is the prompter's, so a slow disk never holds the
-//! deck. A key's jump is saved at once, a dial's detent shortly after. The
+//! so a slow disk never holds the deck. A key's jump is saved at once, a dial's detent shortly after. The
 //! displays take no lock of the prompter's: they read the frame it publishes
 //! whenever it lets go of its lock (`DeckFrame`) and work their text out from
 //! it at the moment they are asked, so they never wait for a key or the
@@ -36,25 +37,29 @@ use crate::prompter::screen::PrompterScreenState;
 use crate::prompter::{PrompterError, PrompterReply};
 use serde_json::json;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-/// After a turn of the size dial the strip shows the size for this long,
-/// then the time left again (§9).
-pub(crate) const SIZE_SHOWN_FOR: Duration = Duration::from_secs(2);
-
-/// The displays of the PROMPTER page, by their LCD keys: the four
-/// touch-strip cells, and the two words the keys' colours follow.
-pub(crate) const PROMPTER_LCD_KEYS: [&str; 6] = [
+/// The displays of the PROMPTER page, by their LCD keys (2026-10-03): the
+/// four touch-strip cells, each its own dial's (speed, the share read, the
+/// paragraph, the size), the time left `PLAY` shows, and the two words the
+/// keys' colours follow. The script's name left the deck: the screen shows
+/// it.
+pub(crate) const PROMPTER_LCD_KEYS: [&str; 7] = [
     "prompter_speed",
+    "prompter_line",
     "prompter_place",
+    "prompter_size",
     "prompter_left",
-    "prompter_name",
     "prompter_state_play",
     "prompter_state_on",
 ];
 
-/// A line of a strip cell holds about this many characters.
-const STRIP_LINE_CHARS: usize = 12;
+/// What `PLAY` can do, as the deck's colours match it letter for letter:
+/// `playing` (the text scrolls), `ready`, `end` (the text is at its end),
+/// `no-xl` (the Prompter XL shows nothing, or has not drawn the text yet),
+/// `locked` (nothing is on the prompter).
+#[cfg(test)]
+pub(crate) const PLAY_STATES: [&str; 5] = ["playing", "ready", "end", "no-xl", "locked"];
 
 /// What the page's displays say, by their LCD keys.
 pub(crate) type DeckTexts = Vec<(&'static str, String)>;
@@ -64,20 +69,16 @@ pub(crate) type DeckTexts = Vec<(&'static str, String)>;
 #[derive(Debug, Clone)]
 pub(crate) struct DeckFrame {
     glass: Option<GlassClock>,
-    name: String,
     screen: PrompterScreenState,
     size_px: u32,
-    size_shown_at: Option<Instant>,
 }
 
 impl DeckFrame {
     pub(crate) fn of(prompter: &Prompter) -> Self {
         Self {
             glass: prompter.glass.clone(),
-            name: prompter.glass_name.clone(),
             screen: prompter.screen.state(),
             size_px: prompter.size_px,
-            size_shown_at: prompter.deck_size_shown_at,
         }
     }
 
@@ -89,14 +90,7 @@ impl DeckFrame {
         if let Some(glass) = glass.as_mut() {
             glass.settle(now);
         }
-        texts_of(
-            glass.as_ref(),
-            &self.name,
-            self.screen,
-            self.size_px,
-            self.size_shown_at,
-            now,
-        )
+        texts_of(glass.as_ref(), self.screen, self.size_px, now)
     }
 }
 
@@ -149,9 +143,7 @@ pub(crate) fn handle_deck_action(
                     "down" => json!({ "step": -1 }),
                     _ => json!({ "standard": true }),
                 };
-                let answer = text_size_request(prompter, &params, now)?;
-                prompter.deck_size_shown_at = Some(now);
-                answer
+                text_size_request(prompter, &params, now)?
             }
             ("cue" | "line" | "paragraph", _) => {
                 return Err(PrompterError::Invalid(format!(
@@ -210,132 +202,65 @@ pub(crate) fn duration_text(total_seconds: f64) -> String {
     }
 }
 
-/// A name on a strip cell: two lines at most, broken between words where it
-/// can be, and cut with `...` when it is longer.
-pub(crate) fn name_text(name: &str) -> String {
-    let words: Vec<&str> = name.split_whitespace().collect();
-    if words.is_empty() {
-        return String::from("(no name)");
-    }
-    let mut lines: Vec<String> = Vec::new();
-    let mut rest = words.as_slice();
-    while !rest.is_empty() && lines.len() < 2 {
-        let mut line = String::new();
-        let mut taken = 0;
-        for word in rest {
-            let longer = if line.is_empty() {
-                word.chars().count()
-            } else {
-                line.chars().count() + 1 + word.chars().count()
-            };
-            if longer > STRIP_LINE_CHARS && !line.is_empty() {
-                break;
-            }
-            if !line.is_empty() {
-                line.push(' ');
-            }
-            line.push_str(word);
-            taken += 1;
-            if longer > STRIP_LINE_CHARS {
-                break;
-            }
-        }
-        lines.push(line);
-        rest = &rest[taken..];
-    }
-    let cut = !rest.is_empty()
-        || lines
-            .iter()
-            .any(|line| line.chars().count() > STRIP_LINE_CHARS);
-    let mut lines: Vec<String> = lines
-        .into_iter()
-        .map(|line| line.chars().take(STRIP_LINE_CHARS).collect())
-        .collect();
-    if cut {
-        if let Some(last) = lines.last_mut() {
-            let kept: String = last.chars().take(STRIP_LINE_CHARS - 3).collect();
-            *last = format!("{}...", kept.trim_end());
-        }
-    }
-    lines.join("\\n")
-}
-
-/// The place as the strip says it: the paragraph of the script's
-/// paragraphs, and how far into the words the presenter reads, rounded down
-/// so a place short of the end never reads 100 % (the page's `placeView`).
-fn place_text(
+/// The place as the strip says it (2026-10-03): `LINE` over how far into
+/// the words the presenter reads, rounded down so a place short of the end
+/// never reads 100 % (the page's `placeView`), and `PARAGRAPH` over the
+/// paragraph of the script's paragraphs, or `END` at the end.
+fn place_texts(
     paragraphs: &[crate::prompter::model::PrompterParagraph],
     place: PrompterPlace,
-) -> String {
+) -> (String, String) {
     let count = paragraphs.len();
-    if place.paragraph as usize >= count {
-        return String::from("PLACE\\nEND");
-    }
     let total = read_words_from(paragraphs, PrompterPlace::TOP);
     let left = read_words_from(paragraphs, place);
     let share = (total.saturating_sub(left) * 100)
         .checked_div(total)
         .unwrap_or(0);
-    format!("¶ {}/{count}\\n{share} %", place.paragraph + 1)
-}
-
-/// What the strip says of a Prompter XL that draws nothing.
-fn screen_words(state: PrompterScreenState) -> &'static str {
-    match state {
-        PrompterScreenState::NotConnected => "XL NOT\\nCONNECTED",
-        PrompterScreenState::Duplicated => "XL\\nDUPLICATED",
-        PrompterScreenState::NotShowing => "XL NOT\\nSHOWING",
-        PrompterScreenState::Connected | PrompterScreenState::LowResolution => "",
-    }
+    let paragraph = if place.paragraph as usize >= count {
+        String::from("PARAGRAPH\\nEND")
+    } else {
+        format!("PARAGRAPH\\n{} / {count}", place.paragraph + 1)
+    };
+    (format!("LINE\\n{share} %"), paragraph)
 }
 
 fn texts_of(
     glass: Option<&GlassClock>,
-    name: &str,
     screen: PrompterScreenState,
     size_px: u32,
-    size_shown_at: Option<Instant>,
     now: Instant,
 ) -> DeckTexts {
+    // The size, all the time: the dial under it sets it (§9, 2026-10-03).
+    let size = format!("SIZE\\n{size_px} px");
     let Some(glass) = glass else {
         return vec![
             ("prompter_speed", String::from("SPEED\\n--")),
-            ("prompter_place", String::from("PLACE\\n--")),
-            ("prompter_left", String::from("LEFT\\n--")),
-            ("prompter_name", String::from("NOTHING\\nON")),
+            ("prompter_line", String::from("LINE\\n--")),
+            ("prompter_place", String::from("PARAGRAPH\\n--")),
+            ("prompter_size", size),
+            ("prompter_left", String::from("--")),
             ("prompter_state_play", String::from("locked")),
             ("prompter_state_on", String::from("no")),
         ];
     };
-    let at_end = glass.at_end(now);
-    let speed = if screen.draws() {
-        format!("SPEED\\n{}", glass.speed_wpm)
-    } else {
-        format!("SPEED {}\\n{}", glass.speed_wpm, screen_words(screen))
-    };
-    let size_shown =
-        size_shown_at.is_some_and(|shown| now.saturating_duration_since(shown) < SIZE_SHOWN_FOR);
-    let left = if size_shown {
-        format!("SIZE\\n{size_px} px")
-    } else {
-        format!("LEFT\\n{}", duration_text(glass.time_left(now).0))
-    };
-    // The name is the script's as a rename left it, from the prompter.
+    let (line, paragraph) = place_texts(&glass.paragraphs, glass.place_at(now));
+    // Why `PLAY` will not play, for the deck to say it (`END`, `NO XL`).
     let play = if glass.playing {
         "playing"
-    } else if !screen.draws() || at_end || glass.layout.is_none() {
-        "locked"
+    } else if !screen.draws() || glass.layout.is_none() {
+        "no-xl"
+    } else if glass.at_end(now) {
+        "end"
     } else {
         "ready"
     };
     vec![
-        ("prompter_speed", speed),
-        (
-            "prompter_place",
-            place_text(&glass.paragraphs, glass.place_at(now)),
-        ),
-        ("prompter_left", left),
-        ("prompter_name", name_text(name)),
+        ("prompter_speed", format!("SPEED\\n{}", glass.speed_wpm)),
+        ("prompter_line", line),
+        ("prompter_place", paragraph),
+        ("prompter_size", size),
+        // The bare time left: `PLAY` shows it under its word.
+        ("prompter_left", duration_text(glass.time_left(now).0)),
         ("prompter_state_play", String::from(play)),
         ("prompter_state_on", String::from("yes")),
     ]
@@ -353,20 +278,5 @@ mod tests {
         assert_eq!(duration_text(3725.0), "1:02:05");
         assert_eq!(duration_text(-3.0), "0:00");
         assert_eq!(duration_text(f64::NAN), "0:00");
-    }
-
-    #[test]
-    fn a_name_takes_two_lines_and_says_when_it_is_cut() {
-        assert_eq!(name_text("Welcome"), "Welcome");
-        assert_eq!(name_text("02 Interview intro"), "02 Interview\\nintro");
-        assert_eq!(
-            name_text("04 Outro and the closing credits"),
-            "04 Outro and\\nthe closi..."
-        );
-        assert_eq!(name_text("Extraordinarily"), "Extraordi...");
-        assert_eq!(name_text("   "), "(no name)");
-        for line in name_text("A name of many words that goes on and on").split("\\n") {
-            assert!(line.chars().count() <= STRIP_LINE_CHARS, "{line}");
-        }
     }
 }

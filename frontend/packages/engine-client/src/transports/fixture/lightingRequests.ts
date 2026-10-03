@@ -690,9 +690,20 @@ export function handleFixtureLightingRequest(
       // rounds it and clamps it to 0–100 (`E/lighting/parse.rs`,
       // `parse_i64_value`); the double refused it until 2026-09-23.
       const hasGrandMaster = Object.prototype.hasOwnProperty.call(params, "grandMaster");
+      // The Lighting page's Fade (2026-10-03): whole milliseconds, 0 to 10 s,
+      // saved, and the deck's RECALL fades with it.
+      const hasRecallFade = Object.prototype.hasOwnProperty.call(params, "recallFadeMs");
 
-      if (!hasSelectedSceneId && !hasSelectedFixtureId && !hasGrandMaster) {
+      if (!hasSelectedSceneId && !hasSelectedFixtureId && !hasGrandMaster && !hasRecallFade) {
         throw new Error("lighting.settings.update requires one or more supported fields");
+      }
+      let recallFadeMs: number | null = null;
+      if (hasRecallFade) {
+        const raw = params.recallFadeMs;
+        if (typeof raw !== "number" || !Number.isFinite(raw)) {
+          throw new Error("recallFadeMs must be a number");
+        }
+        recallFadeMs = Math.min(10_000, Math.max(0, Math.round(raw)));
       }
 
       let grandMaster: number | null = null;
@@ -740,6 +751,10 @@ export function handleFixtureLightingRequest(
       if (grandMaster !== null) {
         lightingSnapshot.grandMaster = grandMaster;
         summaryParts.push(`grand master -> ${grandMaster}%`);
+      }
+      if (recallFadeMs !== null) {
+        lightingSnapshot.recallFadeMs = recallFadeMs;
+        summaryParts.push(`recall fade -> ${(recallFadeMs / 1000).toFixed(1)} s`);
       }
 
       if (hasSelectedSceneId) {
@@ -797,6 +812,7 @@ export function handleFixtureLightingRequest(
         grandMaster: asNumber(lightingSnapshot.grandMaster, 100),
         selectedSceneId: lightingSnapshot.selectedSceneId ?? null,
         selectedFixtureId: lightingSnapshot.selectedFixtureId ?? null,
+        recallFadeMs: asNumber(lightingSnapshot.recallFadeMs, 0),
         summary,
       };
     }

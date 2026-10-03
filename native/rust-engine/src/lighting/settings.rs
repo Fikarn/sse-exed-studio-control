@@ -88,6 +88,9 @@ pub fn update_lighting_settings(
         .subject_marker
         .clone()
         .unwrap_or_else(|| read_marker_setting(&app_settings, LIGHTING_SUBJECT_MARKER_KEY));
+    let recall_fade_ms = request
+        .recall_fade_ms
+        .unwrap_or_else(|| read_lighting_recall_fade_ms(&app_settings));
     let transport_changed =
         request.enabled.is_some() || request.bridge_ip.is_some() || request.universe.is_some();
     let mut updates = Vec::new();
@@ -177,6 +180,16 @@ pub fn update_lighting_settings(
             String::from("subject marker hidden")
         });
     }
+    if let Some(recall_fade_ms) = request.recall_fade_ms {
+        updates.push((
+            String::from(LIGHTING_RECALL_FADE_MS_KEY),
+            recall_fade_ms.to_string(),
+        ));
+        summary_parts.push(format!(
+            "recall fade -> {:.1} s",
+            recall_fade_ms as f64 / 1000.0
+        ));
+    }
     if transport_changed {
         updates.push((
             format!("app.commissioning.check.{LIGHTING_CHECK_ID}.status"),
@@ -222,6 +235,7 @@ pub fn update_lighting_settings(
         selected_fixture_id,
         camera_marker,
         subject_marker,
+        recall_fade_ms,
         summary,
     })
 }

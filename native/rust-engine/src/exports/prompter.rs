@@ -1,174 +1,127 @@
-//! The PROMPTER page (`docs/design/teleprompter.md` §9, D14): five keys and
-//! the page key, four dials, and the strip over them. What a key does and
-//! what a display says is the prompter's own (`prompter::deck`).
+//! The PROMPTER page (`docs/design/teleprompter.md` §9, D14; 2026-10-03, the
+//! approved layout). During the take: play and pause, pace the presenter,
+//! nudge or jump the text. Between takes: TOP. What a key does and what a
+//! display says is the prompter's own (`prompter::deck`).
+//!
+//! |        | 1    | 2      | 3      | 4        |
+//! | ------ | ---- | ------ | ------ | -------- |
+//! | Top    | REC  | ◂ CUE  | CUE ▸  | LIGHTS › |
+//! | Bottom | PLAY | BACK   | (dark) | TOP      |
+//!
+//! Each cell shows its own dial: SPEED, LINE, PARAGRAPH and SIZE (SIZE and
+//! PARAGRAPH swapped places, so the two dials that move through the text sit
+//! together). TOP sits in the far corner beside a free key: a slip onto it
+//! mid-take would pause the presenter at line one.
 
-use super::controls::{
-    button, color_feedback, dial, expression_button, http_post, lcd_refreshes, page_jump,
-    state_feedback, ControlDef, DECK_GREY_INK, DECK_LIVE_BG, DECK_LIVE_INK,
-};
-use super::pages::deck_page_number;
-use serde_json::{json, Value};
+use super::common::{page_key, play_key, prompter, rec_key};
+use super::model::{cell, dark_key, dial, key, reads, Control, Prop, DECK_GREY_INK};
 
-/// The route of the page's keys and dials.
-const ROUTE: &str = "/api/deck/prompter-action";
-
-/// What a jump refreshes: the place, the time left, and whether `PLAY` may
-/// be pressed (`TOP` pauses, and a jump back from the end frees it).
-const AFTER_A_JUMP: [&str; 3] = ["prompter_place", "prompter_left", "prompter_state_play"];
-
-fn key(action: &str, value: Option<&str>, refresh_keys: &[&str]) -> Vec<Value> {
-    let body = match value {
-        Some(value) => json!({ "action": action, "value": value }),
-        None => json!({ "action": action }),
-    };
-    http_post(ROUTE, body)
-        .into_iter()
-        .chain(lcd_refreshes(refresh_keys))
-        .collect()
-}
-
-/// Grey while nothing is on the prompter: every control of the page.
-fn nothing_on_feedback() -> Value {
-    state_feedback(
-        "prompter_state_on",
-        "no",
-        false,
-        json!({ "color": DECK_GREY_INK }),
-    )
-}
-
-/// Grey while `PLAY` cannot be pressed: nothing is drawn on the glass, the
-/// text is at its end, or nothing is on the prompter.
-fn play_locked_feedback() -> Value {
-    state_feedback(
-        "prompter_state_play",
-        "locked",
-        false,
-        json!({ "color": DECK_GREY_INK }),
-    )
+/// While nothing is on the prompter, every control of the page is grey (§9).
+fn nothing_on() -> String {
+    reads("prompter_state_on", "no")
 }
 
 fn take_key(
-    row: &'static str,
-    col: &'static str,
+    row: u8,
+    col: u8,
     label: &'static str,
-    action: &str,
-    value: Option<&str>,
-) -> ControlDef {
-    button(row, col, label, key(action, value, &AFTER_A_JUMP))
-        .size("18")
-        .with_feedbacks(vec![nothing_on_feedback()])
+    art: &'static str,
+    action: &'static str,
+    value: Option<&'static str>,
+) -> Control {
+    key(row, col, label, label, art)
+        .on_press(prompter(action, value))
+        .inked(nothing_on(), DECK_GREY_INK)
+        .grey_without_the_link()
 }
 
-fn strip_cell(
-    col: &'static str,
+fn prompter_cell(
+    col: u8,
     label: &'static str,
-    text: &'static str,
-    feedbacks: Vec<Value>,
-) -> ControlDef {
-    expression_button("2", col, label, text, Vec::new())
-        .size("14")
-        .no_topbar()
-        .with_feedbacks(feedbacks)
+    shows: &'static str,
+    display: &'static str,
+    art: &'static str,
+) -> Control {
+    cell(col, label, shows, Prop::text(label), display, art)
+        .inked(nothing_on(), DECK_GREY_INK)
+        .grey_without_the_link()
 }
 
-pub(super) fn prompter_controls() -> Vec<ControlDef> {
+pub(super) fn prompter_controls() -> Vec<Control> {
     vec![
-        // `PLAY` plays or pauses: green while the text scrolls (§9).
-        button(
-            "0",
-            "0",
-            "PLAY",
-            key("playPause", None, &["prompter_state_play", "prompter_left"]),
-        )
-        .size("18")
-        .with_feedbacks(vec![
-            color_feedback(
-                "prompter_state_play",
-                "playing",
-                DECK_LIVE_INK,
-                DECK_LIVE_BG,
-            ),
-            play_locked_feedback(),
-        ]),
-        take_key("0", "1", "BACK", "back", None),
-        take_key("0", "2", "TOP", "top", None),
-        // Row 0, column 3 and row 1, column 2 stay dark (§9).
-        take_key("1", "0", "CUE <", "cue", Some("previous")),
-        take_key("1", "1", "CUE >", "cue", Some("next")),
+        rec_key(),
+        // The arrows back as D14 had them (2026-10-03; until then `CUE <`).
+        take_key(
+            0,
+            1,
+            "\u{25c2} CUE",
+            "key_cue_back",
+            "cue",
+            Some("previous"),
+        ),
+        take_key(0, 2, "CUE \u{25b8}", "key_cue_next", "cue", Some("next")),
         // The last page of the ring: its page key goes round to the first.
-        button("1", "3", "LIGHTS >>", page_jump(deck_page_number("lights"))),
-        strip_cell(
-            "0",
-            "The speed",
-            "$(custom:lcd_prompter_speed)",
-            vec![play_locked_feedback()],
+        page_key(
+            "LIGHTS \u{203a}",
+            "LIGHTS\n\u{203a}",
+            "lights",
+            "key_page_lights",
         ),
-        strip_cell(
-            "1",
-            "The place",
-            "$(custom:lcd_prompter_place)",
-            vec![nothing_on_feedback()],
+        play_key(),
+        take_key(1, 1, "BACK", "key_back", "back", None),
+        // Free: it keeps TOP clear of a slip.
+        dark_key(1, 2),
+        take_key(1, 3, "TOP", "key_top", "top", None),
+        prompter_cell(
+            0,
+            "SPEED",
+            "the speed, in words a minute",
+            "prompter_speed",
+            "cell_speed",
         ),
-        strip_cell(
-            "2",
-            "The time left",
-            "$(custom:lcd_prompter_left)",
-            vec![nothing_on_feedback()],
+        prompter_cell(
+            1,
+            "LINE",
+            "how much of the script has been read",
+            "prompter_line",
+            "cell_line",
         ),
-        strip_cell(
-            "3",
-            "The script's name",
-            "$(custom:lcd_prompter_name)",
-            vec![nothing_on_feedback()],
+        prompter_cell(
+            2,
+            "PARAGRAPH",
+            "the paragraph at the reading line, of the script's paragraphs",
+            "prompter_place",
+            "cell_paragraph",
+        ),
+        prompter_cell(3, "SIZE", "the text's size", "prompter_size", "cell_size"),
+        // The speed dial's push plays and pauses, as PLAY does.
+        dial(
+            0,
+            "SPEED",
+            Some(prompter("playPause", None)),
+            prompter("speed", Some("down")),
+            prompter("speed", Some("up")),
         ),
         dial(
-            "3",
-            "0",
-            "Speed",
+            1,
+            "LINE",
             None,
-            key("playPause", None, &["prompter_state_play", "prompter_left"]),
-            key("speed", Some("down"), &["prompter_speed", "prompter_left"]),
-            key("speed", Some("up"), &["prompter_speed", "prompter_left"]),
+            prompter("line", Some("previous")),
+            prompter("line", Some("next")),
         ),
         dial(
-            "3",
-            "1",
-            "Position",
+            2,
+            "PARAGRAPH",
             None,
-            Vec::new(),
-            key("line", Some("previous"), &AFTER_A_JUMP),
-            key("line", Some("next"), &AFTER_A_JUMP),
+            prompter("paragraph", Some("previous")),
+            prompter("paragraph", Some("next")),
         ),
         dial(
-            "3",
-            "2",
-            "Text size",
-            None,
-            key(
-                "size",
-                Some("standard"),
-                &["prompter_left", "prompter_state_play"],
-            ),
-            key(
-                "size",
-                Some("down"),
-                &["prompter_left", "prompter_state_play"],
-            ),
-            key(
-                "size",
-                Some("up"),
-                &["prompter_left", "prompter_state_play"],
-            ),
-        ),
-        dial(
-            "3",
-            "3",
-            "Paragraph",
-            None,
-            Vec::new(),
-            key("paragraph", Some("previous"), &AFTER_A_JUMP),
-            key("paragraph", Some("next"), &AFTER_A_JUMP),
+            3,
+            "SIZE",
+            Some(prompter("size", Some("standard"))),
+            prompter("size", Some("down")),
+            prompter("size", Some("up")),
         ),
     ]
 }

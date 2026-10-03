@@ -63,8 +63,9 @@ pub(crate) struct CameraRuntime {
     /// answers.
     pub failure: Option<LinkFailure>,
     /// When the hardware link saw the take start; `None` when it started
-    /// before the link looked, or nothing records.
-    pub started_at: Option<String>,
+    /// before the link looked, or nothing records. The page counts the take's
+    /// length from it, and the deck's `REC` the same way (2026-10-03).
+    pub started_at: Option<SystemTime>,
 }
 
 /// What reading a camera again found.
@@ -157,8 +158,8 @@ impl CameraRuntime {
         let answered_before = self.reading.is_some() && self.failure.is_none();
         let was = self.reading.as_ref().and_then(|last| last.recording);
         self.started_at = match reading.recording {
-            Some(true) if answered_before && was == Some(true) => self.started_at.clone(),
-            Some(true) if answered_before && was == Some(false) => Some(utc_text(now)),
+            Some(true) if answered_before && was == Some(true) => self.started_at,
+            Some(true) if answered_before && was == Some(false) => Some(now),
             _ => None,
         };
         self.reading = Some(reading);

@@ -7,8 +7,9 @@
 //! method, target, headers and body.
 
 use crate::control_surface::{
-    handle_deck_http_action_at, read_control_surface_context, read_deck_lcd_text,
-    ControlSurfaceBridgeInfo, ControlSurfaceError, DEFAULT_CONTROL_SURFACE_HOST,
+    handle_deck_http_action_at, read_control_surface_context, read_deck_displays,
+    read_deck_lcd_text, ControlSurfaceBridgeInfo, ControlSurfaceError,
+    DEFAULT_CONTROL_SURFACE_HOST,
 };
 use crate::control_surface_minute::{BridgeMinute, Kind};
 use crate::control_surface_pool::{Next, Pool};
@@ -41,23 +42,17 @@ const RESPONSE_WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 const DRAIN_LIMIT_BYTES: usize = 64 * 1024;
 const WORKER_COUNT: usize = 4;
-/// Sized for the deck's worst instant: the exported profile's once-a-second
-/// LCD poll sends one request per polled LCD key, all at once, and the
-/// control with the most LCD refreshes sends its own burst on one press
-/// (`exports::deck_worst_instant_requests` counts them). All
-/// of them must fit the workers and the queue together, with
-/// room for another press (`the_pool_holds_the_decks_worst_instant`); a queue
-/// of 16 turned the poll's last five requests away every second on the studio
-/// workstation. The thread count stays fixed whatever the queue holds. With
-/// the CAMERAS and PROMPTER pages the instant was 62 requests (it was 44),
-/// and 64 since the LIGHTS page's `OFF?` and `DEL?` (2026-09-28); the queue
-/// went from 64 to 96: a refused key press is lost, since Companion never
-/// sends one again. Since 2026-09-29 the LIGHTS page's four dial displays are
-/// polled rather than refreshed by its page-follow trigger, which sends
-/// nothing to the bridge now: the instant stays 64 (47 polled, a press of
-/// 17). A fast spin of the Light dial sends its action and three displays a
-/// detent, and is worked off about one detent at a time behind the lighting
-/// lock.
+/// Sized for the deck's worst instant, and far past it since 2026-10-03: the
+/// exported profile's once-a-second poll is one read of every display
+/// (`GET /api/deck/displays`), and a press or a dial's detent sends its
+/// action and that one read again (`exports::deck_worst_instant_requests`
+/// counts them: 3). Until then the poll was a request a display, 47 at once,
+/// and the press that sent the most 17 more: 64, for which the queue went
+/// from 64 to 96 (a refused key press is lost, since Companion never sends
+/// one again). The queue keeps its size: a fast spin of a dial sends two
+/// requests a detent, which are worked off one detent at a time behind the
+/// lighting lock or the Console's. The thread count stays fixed whatever the
+/// queue holds.
 const QUEUE_CAPACITY: usize = 96;
 /// Slots kept for presses when the queue is full (fix D, 2026-10-02): a
 /// refused press is lost, since Companion never sends one again.
@@ -454,7 +449,7 @@ fn serve_next(
 fn kind_of(request: &HttpRequest) -> Kind {
     let (path, _) = split_target(&request.target);
     match request.method.as_str() {
-        "GET" if path == "/api/deck/lcd" => Kind::Display,
+        "GET" if path == "/api/deck/lcd" || path == "/api/deck/displays" => Kind::Display,
         "POST" if KEY_ROUTES.contains(&path) => Kind::Press,
         _ => Kind::Other,
     }
@@ -581,7 +576,7 @@ const KEY_ROUTES: [&str; 4] = [
 /// press was lost without a trace (`REC` while CAM 1 is released). One line
 /// a second at most for each route and action, since a dial's turn is many
 /// refused detents; the next line of that key counts the ones between. The
-/// displays' reads are left out, since the poll asks for 47 of them a second,
+/// displays' reads are left out, since the poll asks for them every second,
 /// and so are the bridge's own refusals, which `note_rejection` counts.
 fn note_refused_key(
     context: &BridgeContext,
@@ -948,6 +943,10 @@ fn route_control_surface_request(
 
     let result = match (request.method.as_str(), path) {
         ("GET", "/api/deck/context") => read_control_surface_context(db_path),
+        // Every display the deck shows, in one answer: the profile's one
+        // read a second, and a key's after its press (2026-10-03).
+        ("GET", "/api/deck/displays") => read_deck_displays(db_path, cameras_simulated, arrived),
+        // One display: the lanes', and the displays that left the deck.
         ("GET", "/api/deck/lcd") => {
             let key = query_parameter(query, "key").ok_or_else(|| {
                 ControlSurfaceError::InvalidParams(String::from("Missing ?key= parameter"))
@@ -1666,6 +1665,71 @@ mod tests {
         );
     }
 
+    // 2026-10-03: the deck reads every display it shows in one request a
+    // second. The answer carries the mark an error's body never has, the
+    // moment of the read, every display of `DECK_DISPLAYS` in its shape, and
+    // the same words as the displays read one by one.
+    #[test]
+    fn the_deck_reads_every_display_in_one_answer() {
+        // The lighting preview is one for the process: no other test may
+        // switch it between the answer and the reads it is compared with.
+        let _preview_guard = crate::lighting::shared_preview_test_guard();
+        let test_dir = ready_audio_test_db("bridge-displays");
+        let port = start_test_bridge(&test_dir, 2, 4);
+        let host = format!("127.0.0.1:{port}");
+        let get = |target: &str| {
+            raw_request(
+                port,
+                &format!(
+                    "GET {target} HTTP/1.1\r\nHost: {host}\r\nAuthorization: Bearer {TEST_TOKEN}\r\n\r\n"
+                ),
+            )
+        };
+        let body = |response: &str| -> Value {
+            serde_json::from_str(response.split_once("\r\n\r\n").map_or("", |(_, body)| body))
+                .expect("a JSON body")
+        };
+
+        let response = get("/api/deck/displays");
+        assert_eq!(status_of(&response), 200, "{response}");
+        let answer = body(&response);
+        assert_eq!(answer["sse"], crate::control_surface::DECK_DISPLAYS_MARK);
+        assert!(answer["at"].as_u64().is_some_and(|at| at > 0), "{answer}");
+        let words = answer["words"].as_object().expect("the words");
+        let lines = answer["lines"].as_object().expect("the lines");
+        assert_eq!(
+            words.len() + lines.len(),
+            crate::control_surface::DECK_DISPLAYS.len()
+        );
+        for (key, shape) in crate::control_surface::DECK_DISPLAYS {
+            let one = body(&get(&format!("/api/deck/lcd?key={key}")));
+            let one = one.as_str().expect("a display's text");
+            match shape {
+                crate::control_surface::DisplayShape::Word => {
+                    assert_eq!(words[key], one, "{key}");
+                }
+                crate::control_surface::DisplayShape::Lines => {
+                    let (head, value) = one.split_once("\\n").unwrap_or((one, ""));
+                    assert_eq!(lines[key], json!({ "head": head, "value": value }), "{key}");
+                }
+            }
+        }
+        assert_eq!(words["workspace"], "audio");
+        assert_eq!(lines["light_intensity"]["head"], "INTENSITY");
+        assert!(
+            crate::lighting::SCENE_STATES.contains(&words["scene_state"].as_str().unwrap_or("")),
+            "{answer}"
+        );
+
+        // Without the token it is refused, and the refusal carries no mark.
+        let anonymous = raw_request(
+            port,
+            &format!("GET /api/deck/displays HTTP/1.1\r\nHost: {host}\r\n\r\n"),
+        );
+        assert_eq!(status_of(&anonymous), 401, "{anonymous}");
+        assert!(!anonymous.contains(r#""sse""#), "{anonymous}");
+    }
+
     // The CAMERAS and PROMPTER pages over the wire: a key of each is pressed
     // as Companion presses it, and answered as the page's own entry point
     // answers. The cameras are the simulated ones (D15).
@@ -1722,8 +1786,10 @@ mod tests {
         );
         let unknown = post("/api/deck/prompter-action", r#"{"action":"rec"}"#);
         assert_eq!(status_of(&unknown), 400, "{unknown}");
-        let display = get("prompter_name");
+        let display = get("prompter_size");
         assert_eq!(status_of(&display), 200, "{display}");
+        // The script's name left the deck (2026-10-03).
+        assert_eq!(status_of(&get("prompter_name")), 400);
 
         // Without the token a key of the new pages is refused as any other.
         let anonymous = raw_request(

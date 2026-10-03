@@ -50,7 +50,8 @@ impl AskingKey {
     fn text(self, armed: bool) -> &'static str {
         match (self, armed) {
             (Self::AllOff, true) => "OFF?",
-            (Self::AllOff, false) => "All\\nOff",
+            // One line, in capitals as on the other pages (2026-10-03).
+            (Self::AllOff, false) => "ALL OFF",
             (Self::DeleteScene, true) => "DEL?",
             (Self::DeleteScene, false) => "Del\\nScene",
         }
@@ -174,8 +175,9 @@ pub(crate) fn asking_key_text(db_path: &Path, key: AskingKey, at: Instant) -> St
 /// The keys that switch at one press and drop a second within the dwell,
 /// named by their route, action and value: `Toggle` (and the Light dial's
 /// push, which posts the same), `DIM`, each strip's mute (a dial's push, one
-/// for each strip), and `PLAY` (and the speed dial's push). `None` for every
-/// other key.
+/// for each strip), `PLAY` (and the speed dial's push), and `PHONES` (the
+/// review of #293: a bounce would go on to the other phones mix). `None` for
+/// every other key, `MAIN OUT` too, which a second press leaves where it is.
 pub(crate) fn dwelling_press(path: &str, action: &str, value: Option<&str>) -> Option<String> {
     match (path, action) {
         ("/api/deck/light-action", "toggleLight")
@@ -183,6 +185,9 @@ pub(crate) fn dwelling_press(path: &str, action: &str, value: Option<&str>) -> O
         | ("/api/deck/prompter-action", "playPause") => Some(format!("{path} {action}")),
         ("/api/deck/audio-action", "dialPress") => {
             Some(format!("{path} {action} {}", value.unwrap_or_default()))
+        }
+        ("/api/deck/audio-action", "setMixTarget") if value == Some("phones") => {
+            Some(format!("{path} {action} phones"))
         }
         _ => None,
     }
@@ -252,7 +257,7 @@ mod tests {
             Ask::Armed
         );
         assert_eq!(asking_key_text(&db, AskingKey::DeleteScene, start), "DEL?");
-        assert_eq!(asking_key_text(&db, AskingKey::AllOff, start), "All\\nOff");
+        assert_eq!(asking_key_text(&db, AskingKey::AllOff, start), "ALL OFF");
         // Inside the dwell: the same press again.
         assert_eq!(
             ask(
@@ -304,7 +309,7 @@ mod tests {
             Ask::Armed
         );
         let late = start + ASK_WINDOW + Duration::from_millis(1);
-        assert_eq!(asking_key_text(&db, AskingKey::AllOff, late), "All\\nOff");
+        assert_eq!(asking_key_text(&db, AskingKey::AllOff, late), "ALL OFF");
         assert_eq!(
             ask(&db, AskingKey::AllOff, AskTarget::Previewing(false), late),
             Ask::Armed
@@ -361,7 +366,7 @@ mod tests {
         );
         assert_eq!(
             asking_key_text(&db, AskingKey::AllOff, start + Duration::from_millis(500)),
-            "All\\nOff"
+            "ALL OFF"
         );
         // `All Off` armed again, not acted on: its arm had ended.
         assert_eq!(
@@ -376,7 +381,7 @@ mod tests {
         end_arm(&db);
         assert_eq!(
             asking_key_text(&db, AskingKey::AllOff, start + Duration::from_secs(1)),
-            "All\\nOff"
+            "ALL OFF"
         );
     }
 
@@ -451,11 +456,20 @@ mod tests {
         for (path, action) in [
             ("/api/deck/light-action", "saveScene"),
             ("/api/deck/light-action", "allOff"),
-            ("/api/deck/audio-action", "toggleDialMode"),
+            ("/api/deck/audio-action", "cycleBank"),
             ("/api/deck/camera-action", "rec"),
             ("/api/deck/prompter-action", "back"),
         ] {
             assert!(dwelling_press(path, action, None).is_none(), "{action}");
+        }
+        // PHONES dwells (the review of #293); the mix targets the screen
+        // names, `MAIN OUT` among them, do not.
+        assert!(dwelling_press("/api/deck/audio-action", "setMixTarget", Some("phones")).is_some());
+        for target in ["main", "phones-a", "phones-b"] {
+            assert!(
+                dwelling_press("/api/deck/audio-action", "setMixTarget", Some(target)).is_none(),
+                "{target}"
+            );
         }
     }
 }

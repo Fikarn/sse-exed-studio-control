@@ -6,7 +6,10 @@
 //! display themselves (`*_at`), so none of them counts real time. The
 //! prompter reads its own clock.
 
-use super::{handle_page_action, keys_on_their_way, CAMERA_ROUTE, PROMPTER_ROUTE, TEXTS_KEPT_FOR};
+use super::{
+    handle_page_action, keys_on_their_way, page_texts, CAMERA_ROUTE, DISPLAYS_TEXTS_KEPT_FOR,
+    PROMPTER_ROUTE, TEXTS_KEPT_FOR,
+};
 use crate::cameras::deck::{CAMERA_LCD_KEYS, STOP_ARM_DWELL};
 use crate::cameras::model::Setting;
 use crate::cameras::runtime::with_bodies_unnoticed;
@@ -132,9 +135,11 @@ fn the_decks_rec_leaves_rows_with_the_deck_as_their_source() {
     let cameras = TestCameras::set_up("bridge-cameras-rec");
     let start = Instant::now();
     let rec = |at: Instant| key_at(cameras.path(), CAMERA_ROUTE, json!({ "action": "rec" }), at);
+    // `REC`'s word, over the take's length, and its state.
     let rec_key = |at: Instant| {
+        let text = display_at(cameras.path(), "camera_key_rec", at);
         (
-            display_at(cameras.path(), "camera_key_rec", at),
+            text.split("\\n").next().unwrap_or_default().to_string(),
             display_at(cameras.path(), "camera_state_rec", at),
         )
     };
@@ -392,7 +397,7 @@ fn a_pages_displays_are_read_once_for_a_poll_and_follow_the_decks_own_keys_at_on
     );
 
     // A display the page does not have is refused, as any other.
-    for key in ["camera_strip_5", "camera_key_4", "prompter_size", "camera_"] {
+    for key in ["camera_strip_5", "camera_key_4", "prompter_name", "camera_"] {
         let error =
             read_control_surface_lcd_text(cameras.path(), key).expect_err("no such display");
         assert!(
@@ -401,6 +406,66 @@ fn a_pages_displays_are_read_once_for_a_poll_and_follow_the_decks_own_keys_at_on
         );
         assert_eq!(error.message(), format!("Unsupported LCD key: {key}"));
     }
+}
+
+// The review of #293: every press of every page reads every display
+// again, so the deck's one read keeps the cameras' texts a little under a
+// second, and a fast spin of a dial elsewhere reads the cameras about once a
+// second. A key of the page puts its own texts in their place, and while the
+// stop is armed they are kept 250 ms only, so `STOP?` lapses on time.
+#[test]
+fn the_decks_one_read_keeps_the_cameras_texts_for_most_of_a_second() {
+    let cameras = TestCameras::set_up("bridge-cameras-displays-kept");
+    let body_sets_iso = |iso: &str| {
+        with_bodies_unnoticed(cameras.path(), |bodies| {
+            bodies.body_sets(1, Setting::Iso, CameraValue::Text(String::from(iso)));
+        });
+    };
+    let iso = |at: Instant| -> String {
+        page_texts(cameras.path(), true, at)
+            .expect("the displays")
+            .into_iter()
+            .find(|(key, _)| *key == "camera_strip_1")
+            .map(|(_, text)| text)
+            .expect("the first cell")
+    };
+    assert!(DISPLAYS_TEXTS_KEPT_FOR > TEXTS_KEPT_FOR);
+    assert!(DISPLAYS_TEXTS_KEPT_FOR < Duration::from_secs(1));
+    let poll = Instant::now();
+    assert_eq!(iso(poll), "ISO\\n400");
+    body_sets_iso("3200");
+    // Detents of another page's dial, each with its read: no camera read.
+    for millis in [100, 300, 500, 700, 899] {
+        assert_eq!(iso(poll + Duration::from_millis(millis)), "ISO\\n400");
+    }
+    // The next poll reads them.
+    let poll = poll + DISPLAYS_TEXTS_KEPT_FOR;
+    assert_eq!(iso(poll), "ISO\\n3200");
+
+    // While the stop is armed, 250 ms.
+    let armed_at = poll + Duration::from_secs(1);
+    assert_eq!(
+        key_at(
+            cameras.path(),
+            CAMERA_ROUTE,
+            json!({ "action": "rec" }),
+            armed_at
+        )["did"],
+        "started"
+    );
+    let armed_at = armed_at + Duration::from_secs(1);
+    assert_eq!(
+        key_at(
+            cameras.path(),
+            CAMERA_ROUTE,
+            json!({ "action": "rec" }),
+            armed_at
+        )["did"],
+        "armed"
+    );
+    body_sets_iso("800");
+    assert_eq!(iso(armed_at + Duration::from_millis(100)), "ISO\\n3200");
+    assert_eq!(iso(armed_at + TEXTS_KEPT_FOR), "ISO\\n800");
 }
 
 // D12: a display never reads a camera by itself. One poll of the deck reads

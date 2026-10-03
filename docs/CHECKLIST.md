@@ -44,18 +44,24 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 
 ## Stream Deck
 
-- [ ] After Companion's Full Reset & Import the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, with no PROJECTS or TASKS, and the deck follows the app's page to each of the four.
-- [ ] The page keys turn the deck round: `AUDIO >>`, `CAMS >>`, `PROMPTER >>`, `LIGHTS >>`. The AUDIO page has no `TALK` key: `CAMS >>` stands in its place, second row, third key.
-- [ ] The deck draws `CUE <` and `CUE >`, and on the strips `¶`, `·` and `°`, as they are written here.
-- [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen.
-- [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, its displays read `PREVIEW` and the page shows each press; with Preview off the same keys move the rig.
+- [ ] The new profile is imported before the deck is used on the new build, not before the build is on: an old build with the new profile greys the whole deck (`/api/deck/displays` answers `400`), `PHONES` answers `400` and `RECALL` recalls at once.
+- [ ] After Companion's Full Reset & Import of the new profile (Companion 5's own format, 2026-10-03), the pages are LIGHTS, AUDIO, CAMERAS and PROMPTER, and the deck follows the app's page to each of the four.
+- [ ] In Companion's Surfaces, "Horizontal Swipe Changes Page" is off for the deck (the reset turns it off; the profile cannot carry it): a swipe along the strip turns no page. If it is on, turn it off.
+- [ ] No key and no cell has a top bar, a yellow border while pressed or a status icon; the images fill each key and each strip cell, not letterboxed.
+- [ ] Every page has `REC` top left, `PLAY` under it and the page key top right; the page keys turn the deck round: `AUDIO ›`, `CAMERAS ›`, `PROMPTER ›`, `LIGHTS ›`. The dark keys (LIGHTS bottom row, third key; CAMERAS top row, third key; PROMPTER bottom row, third key) are black and do nothing.
+- [ ] The LIGHTS strip shows its four dials (until 2026-10-03 it was black): `LIGHT 1/2` over the light's name in capitals, `INTENSITY` over `76 %` (`OFF` for a light that is off), `CCT` over `3200 K`, `SCENE 1/3` over the scene's name.
+- [ ] The deck draws `◂ CUE`, `CUE ▸` and the page keys' `›`, and on the strips `·` and `°`, as they are written here.
+- [ ] A key pressed on the deck acts in the app, and the deck's display follows a change made on screen within a second.
+- [ ] `RECALL` reads `ON RIG` in green after a recall; `UNSAVED` in amber after a light is changed; nothing once the `SCENE` dial chose another scene; with the Lighting page's `Fade` at 2 s, a recall from the deck fades as one from the screen does.
+- [ ] With Preview on in Lighting, the deck's lighting keys leave the rig alone, `RECALL` reads `PREVIEW` in blue, the INTENSITY and CCT values are blue, and the page shows each press; with Preview off the same keys move the rig.
 - [ ] After a lighting key and a mute on the deck, a mute in TotalMix and a key on screen, Recent actions lists Stream Deck, Stream Deck, Console and Screen.
-- [ ] `All Off` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `All Off` again within about a second. `Del Scene` does the same with `DEL?`, and deletes nothing if the scene dial was turned in between.
-- [ ] A quick double press on `PLAY`, `DIM`, a mute (a dial's push) or `Toggle` switches once.
-- [ ] On LIGHTS, a turn of the Light dial shows the next light's name, intensity and colour temperature, at once or within a second; a turn of Intensity, CCT or Scene changes its own display the same way; a light changed on screen shows on the strip within a second.
-- [ ] A fast spin of the Light dial: the strip catches up within a second of stopping, and `engine.log` has no line that the bridge refused a request (`503`).
-- [ ] On AUDIO, with the dials on levels, a slow turn steps one step a detent, and a fast spin steps further. On gain, every detent is 1 dB.
+- [ ] `ALL OFF` on the deck reads `OFF?` in amber at the first press and switches nothing; a second press within 3 s switches every light off. After 3 s without a second press it reads `ALL OFF` again within about a second. `REC` or `PLAY` pressed meanwhile does not end the question.
+- [ ] A quick double press on `PLAY`, `DIM`, `PHONES`, a mute (a dial's push) or the `LIGHT` dial's push switches once.
+- [ ] On LIGHTS, a turn of the LIGHT dial shows the next light's name, intensity and colour temperature, at once or within a second; a turn of INTENSITY, CCT or SCENE changes its own cell the same way; a light changed on screen shows on the strip within a second.
+- [ ] A fast spin of the LIGHT dial: the strip catches up within a second of stopping, and `engine.log` has no line that the bridge refused a request (`503`).
+- [ ] On AUDIO, `MAIN OUT` is amber while the dials send into Main Out; `PHONES` goes to `PHONES 1`, `PHONES 2`, `PHONES 1`, amber; `BANK` reads the bank, `DIM` reads `-20 dB` in amber, `SOLO` reads how many are on. The strip shows each strip's name, its level and a bar that follows the fader; a muted strip reads `MUTED` and its bar turns ember. A slow turn steps one step a detent, a fast spin further; a turn never sets a gain. While the Console is locked (TotalMix not verified) every AUDIO key is dark with grey words, `MAIN OUT`, `PHONES` and `DIM` too.
 - [ ] With Companion closed, the header's Surface lamp reads `no deck`, amber, within about 5 s, and nothing locks; started again, it reads `ready`.
+- [ ] With the app closed, the deck's keys and cells turn grey and show no values within about 5 s; with the app started again they come back by themselves. Turned by its page key to another page than the app's before the app was closed, the deck stays on that page when it comes back: it turns only when the app's page changes.
 
 - [ ] In Setup's `Verify live echo`, a key of each of the four pages pulses on screen, and the screen turns to the key's page.
 
@@ -71,7 +77,7 @@ The PROMPTER and CAMERAS pages are walked under Teleprompter and Cameras.
 - [ ] After a restart the script and the place are still there, paused.
 - [ ] With the Prompter XL plugged in, and again with it unplugged, the app is fullscreen on the studio display within a few seconds, and `shell.log` names the Prompter XL among the screens and says `connected`.
 - [ ] With the studio display switched off and on again, the app is back on it, fullscreen, within a few seconds.
-- [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page and the strip follows. With nothing on the prompter every control is grey.
+- [ ] With a script on the prompter, the jumps, the speed and the text size work from the deck's PROMPTER page, and the strip follows: `SPEED` over the words a minute, `LINE` over the share read, `PARAGRAPH` over `8 / 18` (`END` at the end), `SIZE` over `88 px`; `PLAY` shows the time left. With nothing on the prompter every control is grey.
 
 The Prompter XL:
 
@@ -81,7 +87,7 @@ The Prompter XL:
 - [ ] While the window opens, and after it, typing in `Edit script` goes on: the window takes no keyboard. A click on the Prompter XL's screen leaves the keyboard with the app too.
 - [ ] With the Prompter XL at another scale than the studio display in Windows' display settings (100 % and 125 %), the script still fills its screen.
 - [ ] Play, pause, speed, position, text size and the jumps work from the page, and from the deck's PROMPTER page. `PLAY` is green while the text scrolls, and the scroll is smooth at the speeds used, with the Cameras page open.
-- [ ] Unplugged while the text scrolls: the text pauses, the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", the deck's `PLAY` is grey and its strip reads `XL NOT CONNECTED`, and no other screen shows the script, not for a moment.
+- [ ] Unplugged while the text scrolls: the text pauses, the page reads `NOT CONNECTED`, its copy dims and reads "Not on the glass", the deck's `PLAY` is grey and reads `NO XL` on every page, and no other screen shows the script, not for a moment.
 - [ ] Plugged back in: the script returns at the same place, paused.
 - [ ] Set to duplicate another screen in Windows' display settings: the page reads `DUPLICATED` and the Prompter XL shows the copy, not the script. Set back to extend: the script returns.
 - [ ] With the app closed the Prompter XL shows a black desktop, and Elgato Camera Hub's own prompter, if installed, is off.
@@ -101,7 +107,7 @@ Until the links to the cameras are built:
 - [ ] The Cameras lamp reads `not set up`. The page reads `NOT SET UP` and says that the link comes with a later version; every control and `REC` are locked.
 - [ ] `Camera setup` opens Setup / Support's `CAMERAS`: pairing and addresses are locked and say why, and each camera's line names its vMix output: CAM 1 Output 2, CAM 2 Output 3, CAM 3 Output 4.
 - [ ] Setup / Support's About ends with `NDI® is a registered trademark of Vizrt NDI AB · ndi.video`, as words.
-- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC` and the dials are grey and do nothing.
+- [ ] On the deck's CAMERAS page the three cameras' keys select, on the page too, with a white outline on the selected one, and `BANK` turns the dials' bank, which the page's `Exposure`, `Colour` and `Focus` follow. `REC`, on every page, and the dials are grey and do nothing.
 - [ ] Nothing on the page scrolls, and from the chair every word on it can be read.
 
 Once the links are built, with the cameras on vMix's outputs:
@@ -113,7 +119,7 @@ Once the links are built, with the cameras on vMix's outputs:
 - [ ] Every setting changed from the page or the deck reaches the camera, and the page shows what the camera reports.
 - [ ] A change made on the camera shows on the page within about a second.
 - [ ] `REC` starts CAM 1 whichever camera is selected; stopping needs the second press, on the page and on the deck (`STOP?`).
-- [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds.
+- [ ] On the deck, two quick presses of `REC` start one take and arm nothing; two quick presses on `STOP?` stop it and start no other. `STOP?` left alone reads `REC` again within about four seconds. While CAM 1 records, `REC` on every page shows the take's length, the same as the Cameras page's.
 - [ ] The deck's dials step the selected camera's values in every bank, and the strip shows what the camera reports; a push of the first dial on focus runs the autofocus once.
 - [ ] Resolution, frame rate, picture profile and LUT need the second press; afterwards vMix gets the picture back (its input may need to follow).
 - [ ] Recent actions lists record starts and stops and the armed changes, each with Screen or Stream Deck.

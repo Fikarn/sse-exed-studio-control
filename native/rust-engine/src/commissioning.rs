@@ -1042,14 +1042,15 @@ mod tests {
 
     // The test double says this sentence word for word
     // (`controlSurface.test.ts`), and the pages' captures print its number:
-    // when the deck's model changes, both change. 7 keys and 12 dial
-    // controls on LIGHTS; 8 keys, 4 strips and 12 dial controls on AUDIO;
-    // 6 keys, 4 strips and 12 dial controls on CAMERAS and on PROMPTER.
+    // when the deck's model changes, both change. Since 2026-10-03 (the
+    // approved layout): 7 keys, 4 strip cells and 12 dial controls on LIGHTS,
+    // CAMERAS and PROMPTER, which have a dark key each; 8 keys, 4 strip cells
+    // and 12 dial controls on AUDIO.
     #[test]
     fn the_control_surface_probe_counts_the_decks_controls() {
         assert_eq!(
             summarize_control_surface_probe(),
-            "The deck's bridge serves 87 controls on 4 pages."
+            "The deck's bridge serves 93 controls on 4 pages."
         );
     }
 

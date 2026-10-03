@@ -1,9 +1,9 @@
 // Part of the fixture double (`../fixtureTransport.ts`): the in-memory stand-in for the
 // hardware link that Playwright and the browser fixture mode run against. Test-only.
 import type { JsonObject } from "../../generated/protocol";
-import { asArray, asBoolean, asString, cloneJson } from "./json";
+import { asArray, asBoolean, asNumber, asRecord, asString, cloneJson } from "./json";
 import { clampNumber, lightingFixtures, lightingScenes } from "./lighting";
-import { lightingFixtureCctRange } from "./lightingCatalog";
+import { fixtureProfileForFixture, lightingFixtureCctRange } from "./lightingCatalog";
 
 /** One identify flash, as `E/lighting/identify.rs` keeps it: when it starts and
  *  how long it lasts. A Find sequence schedules its flashes ahead. */
@@ -27,6 +27,50 @@ export const IDENTIFY_SEQUENCE_MAX_FIXTURES = 64;
 /** A flash is lit from its start until its duration has passed; a scheduled one waits. */
 export function identifyBurstActive(burst: IdentifyBurst, nowMs: number): boolean {
   return burst.startedAtMs <= nowMs && nowMs - burst.startedAtMs < burst.durationMs;
+}
+
+/**
+ * Whether the rig holds the live scene (`E/lighting/scene_state.rs`): the
+ * last recalled scene, else the selected one, against the stored fixtures.
+ * `preview` while previewing, `none` with no scene, `chosen` when the live
+ * scene is not the one last put on the rig, else `live` or `unsaved`. The
+ * double recalls without a fade, so its stored rig is the fade's end.
+ */
+export function lightingSceneState(snapshot: JsonObject): string {
+  if (asBoolean(snapshot.previewMode, false)) return "preview";
+  const scenes = lightingScenes(snapshot);
+  // A test scenario may mark the recalled scene by its flag alone, as the
+  // hardware link's scenes carry it (`lastRecalled`).
+  const lastRecalled =
+    asString(scenes.find((entry) => asBoolean(entry.lastRecalled, false))?.id) ||
+    asString(snapshot.lastRecalledSceneId);
+  const scene =
+    scenes.find((entry) => asString(entry.id) === lastRecalled && lastRecalled !== "") ??
+    scenes.find((entry) => asString(entry.id) === asString(snapshot.selectedSceneId));
+  if (!scene) return "none";
+  if (asString(scene.id) !== lastRecalled) return "chosen";
+  const saved = asArray(scene.fixtureStates)
+    .map((state) => asRecord(state))
+    .filter((state): state is JsonObject => state !== null);
+  const holds = lightingFixtures(snapshot).every((fixture) => {
+    const state = saved.find((entry) => asString(entry.fixtureId) === asString(fixture.id));
+    const on = asBoolean(fixture.on, false);
+    const intensity = asNumber(fixture.intensity, 0);
+    if (!state) return !(on && intensity > 0);
+    if (asBoolean(state.on, false) !== on) return false;
+    const controls = asRecord(fixture.controlValues) ?? {};
+    const savedControls = asRecord(state.controlValues) ?? {};
+    const hasCct =
+      fixtureProfileForFixture(fixture).channels.some((channel) => asString(channel.controlId) === "cct") ||
+      Object.prototype.hasOwnProperty.call(controls, "cct");
+    if (on && Math.abs(asNumber(state.intensity, 0) - intensity) > 0.5) return false;
+    if (on && hasCct && Math.abs(asNumber(state.cct, 0) - asNumber(fixture.cct, 0)) > 25) return false;
+    const keys = new Set([...Object.keys(controls), ...Object.keys(savedControls)]);
+    return [...keys]
+      .filter((key) => key !== "intensity" && key !== "cct")
+      .every((key) => Math.abs(asNumber(controls[key], 0) - asNumber(savedControls[key], 0)) <= 0.5);
+  });
+  return holds ? "live" : "unsaved";
 }
 
 /** A stored id list (`highlightFixtureIds`, `soloFixtureIds`), sorted and without repeats. */
@@ -73,6 +117,11 @@ export function lightingSnapshotView(snapshot: JsonObject, bursts: IdentifyBurst
     }
     return fixture;
   });
+
+  // Decided on the stored rig, before the overrides, as the hardware link
+  // decides it (2026-10-03).
+  view.sceneState = lightingSceneState(snapshot);
+  view.recallFadeMs = asNumber(snapshot.recallFadeMs, 0);
 
   const scenes = lightingScenes(view).map((scene) => ({ ...scene, pinned: asBoolean(scene.pinned, false) }));
   view.scenes = [...scenes.filter((scene) => scene.pinned), ...scenes.filter((scene) => !scene.pinned)];

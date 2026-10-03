@@ -30,6 +30,7 @@ function snapshot(overrides: Partial<LightingSnapshot>): LightingSnapshot {
       },
     ],
     lastRecalledSceneId: "scene-1",
+    sceneState: "live",
     previewMode: false,
     previewDirty: false,
     previewSceneId: null,
@@ -38,20 +39,27 @@ function snapshot(overrides: Partial<LightingSnapshot>): LightingSnapshot {
   } as unknown as LightingSnapshot;
 }
 
+// 2026-10-03: the hardware link decides whether the rig holds the live scene
+// (`sceneState`), for the screen and the deck alike; the page reads it.
 describe("computeLiveSceneDrift", () => {
-  it("is false without a snapshot or a recalled scene", () => {
+  it("is false without a snapshot or a scene on the rig", () => {
     expect(computeLiveSceneDrift(null, null)).toBe(false);
-    expect(computeLiveSceneDrift(snapshot({ lastRecalledSceneId: null }), null)).toBe(false);
+    expect(computeLiveSceneDrift(snapshot({ lastRecalledSceneId: null, sceneState: "chosen" }), null)).toBe(false);
+    expect(computeLiveSceneDrift(snapshot({ sceneState: "none" }), null)).toBe(false);
   });
 
-  it("is false when the rig matches the recalled scene", () => {
-    expect(computeLiveSceneDrift(snapshot({}), null)).toBe(false);
+  it("is false while the rig holds the live scene", () => {
+    expect(computeLiveSceneDrift(snapshot({ sceneState: "live" }), null)).toBe(false);
   });
 
-  it("latches when a fixture drifts from the recalled scene", () => {
-    const drifted = snapshot({});
+  it("latches when the hardware link says the rig changed since", () => {
+    expect(computeLiveSceneDrift(snapshot({ sceneState: "unsaved" }), null)).toBe(true);
+  });
+
+  it("reads the hardware link's answer, not the fixtures", () => {
+    const drifted = snapshot({ sceneState: "live" });
     (drifted.fixtures[0] as { intensity: number }).intensity = 40;
-    expect(computeLiveSceneDrift(drifted, null)).toBe(true);
+    expect(computeLiveSceneDrift(drifted)).toBe(false);
   });
 
   it("follows the engine's dirty flag in preview mode", () => {

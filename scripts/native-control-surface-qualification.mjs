@@ -24,7 +24,10 @@ const DECK_ROUTES_CHANGED =
 const REFUSALS_CHANGED =
   "New pages program, Slice 2: the refused requests go to the LIGHTS route (/api/deck/light-action) and the deck's last event and selected light prove nothing got through; until then they went to the PROJECTS and TASKS pages' route and the project count proved it.";
 const PROFILE_CHANGED =
-  "The profile has four pages, LIGHTS, AUDIO, CAMERAS and PROMPTER, a page-follow trigger for each, and every LCD it reads is answered by this bridge; until 2026-09-28 it had two, LIGHTS and AUDIO, and until the new pages program's Slice 2 four, PROJECTS and TASKS first.";
+  "The profile is Companion 5's own format (version 12) with four pages, LIGHTS, AUDIO, CAMERAS and PROMPTER, a page-follow trigger for each, and reads every display in one request, GET /api/deck/displays, whose every line this bridge answers; until 2026-10-03 it was Companion's version 9 and read a display a request at /api/deck/lcd, until 2026-09-28 it had two pages, LIGHTS and AUDIO, and until the new pages program's Slice 2 four, PROJECTS and TASKS first.";
+/** The read of every display (2026-10-03), and the mark of the bridge's own answer. */
+const DISPLAYS_PATH = "/api/deck/displays";
+const DISPLAYS_MARK = "deck";
 /** The routes a key of the exported profile may post to: one a page. */
 const DECK_ACTION_ROUTES = [
   "/api/deck/light-action",
@@ -34,8 +37,12 @@ const DECK_ACTION_ROUTES = [
 ];
 /** The page of the app each page-follow trigger waits for, and the deck page it turns to. */
 const FOLLOW_TARGETS = ["audio:2", "cameras:3", "lighting:1", "teleprompter:4"];
-/** Actions the bridge answered once and refuses now: the deck-mode key (Planning) and talkback's (D26). */
-const RETIRED_DECK_ACTIONS = ["switchToDeckMode", "talkOn", "talkOff"];
+/**
+ * Actions the bridge answered once and refuses now (the deck-mode key, Planning's; talkback's,
+ * D26), and the ones that left the profile on 2026-10-03, which it still answers (GAIN's
+ * switch, the strip taps, Del Scene).
+ */
+const RETIRED_DECK_ACTIONS = ["switchToDeckMode", "talkOn", "talkOff", "toggleDialMode", "stripTap", "deleteScene"];
 const FOLLOW_TRIGGER_PREFIX = "sse-trigger-follow-";
 // The bridge answers only requests that carry the per-install token the engine
 // writes into <app-data>/control-surface.token (2026-09 production readiness,
@@ -191,6 +198,12 @@ function rawHttp(port, request, timeoutMs = 5000) {
 function rawRequestLines(method, target, port, headers, body = "") {
   const lines = [`${method} ${target} HTTP/1.1`, `Host: ${controlSurfaceHost}:${port}`, ...headers, "", ""];
   return `${lines.join("\r\n")}${body}`;
+}
+
+/** An option of a Companion 5 entity: `{ isExpression, value }`. */
+function optionValue(action, name) {
+  const option = action?.options?.[name];
+  return option && typeof option === "object" && "value" in option ? option.value : undefined;
 }
 
 function collectBridgeActions(value, connectionId, into = []) {
@@ -378,6 +391,17 @@ async function main() {
       lcdWorkspace === SEEDED_WORKSPACE,
       `Bridge qualification failed: GET /api/deck/lcd?key=workspace returned '${lcdWorkspace}' instead of the saved page '${SEEDED_WORKSPACE}'.`
     );
+    // Every display the deck shows, in one answer (2026-10-03), with the mark an error's body
+    // never carries.
+    const displaysBefore = await fetchJson(`${expectedBaseUrl}${DISPLAYS_PATH}`);
+    assert(
+      displaysBefore?.sse === DISPLAYS_MARK &&
+        Number.isInteger(displaysBefore?.at) &&
+        displaysBefore?.words?.workspace === SEEDED_WORKSPACE &&
+        typeof displaysBefore?.lines?.light_nav?.head === "string" &&
+        displaysBefore?.lines?.audio_strip_1?.value !== undefined,
+      `Bridge qualification failed: GET ${DISPLAYS_PATH} did not answer every display with the bridge's mark and the saved page: ${JSON.stringify(displaysBefore)}.`
+    );
 
     // New saved data holds no lights, so the lane adds two through the app's
     // own requests for the LIGHTS page's next-light key to move between.
@@ -489,6 +513,8 @@ async function main() {
       contextBefore,
       lcdAudioBefore,
       lcdWorkspace,
+      displaysWords: Object.keys(displaysBefore.words ?? {}).length,
+      displaysLines: Object.keys(displaysBefore.lines ?? {}).length,
       qualificationLights,
       lcdLightNavBefore,
       lightResponse,
@@ -678,8 +704,12 @@ async function main() {
       "Bridge qualification failed: exports.companion.export did not write a profile."
     );
     const profile = JSON.parse(readFileSync(exportSummary.path, "utf8"));
+    assert(
+      profile.version === 12 && profile.type === "full",
+      `Bridge qualification failed: the exported profile is version ${profile.version} ${profile.type}, not Companion 5's full export (12).`
+    );
     const bridgeConnectionId = Object.entries(profile.instances ?? {}).find(
-      ([, instance]) => instance?.instance_type === "generic-http"
+      ([, instance]) => instance?.moduleId === "generic-http"
     )?.[0];
     assert(
       typeof bridgeConnectionId === "string",
@@ -693,34 +723,33 @@ async function main() {
     for (const action of bridgeActions) {
       let header = null;
       try {
-        header = JSON.parse(action.options.header);
+        header = JSON.parse(optionValue(action, "header"));
       } catch {
         header = null;
       }
       assert(
         header?.Authorization === bridgeAuthorization,
-        `Bridge qualification failed: a profile request to ${action.options.url} does not carry the bridge token.`
+        `Bridge qualification failed: a profile request to ${optionValue(action, "url")} does not carry the bridge token.`
       );
     }
-    const pollActions = profile.triggers?.["sse-trigger-lcd-poll"]?.actions ?? [];
+    const pollActions = profile.triggers?.["sse-trigger-deck-poll"]?.actions ?? [];
     assert(
-      pollActions.length > 0 &&
-        pollActions.every(
-          (action) => typeof action.options?.header === "string" && action.options.header.includes(bridgeToken)
-        ),
-      "Bridge qualification failed: the 1 s LCD poll trigger does not carry the bridge token."
+      pollActions.length === 1 &&
+        optionValue(pollActions[0], "url") === DISPLAYS_PATH &&
+        String(optionValue(pollActions[0], "header")).includes(bridgeToken),
+      "Bridge qualification failed: the 1 s poll trigger is not one authenticated read of every display."
     );
 
     summary.profileCheck = {
       path: exportSummary.path,
       bridgeConnectionId,
       bridgeActionCount: bridgeActions.length,
-      lcdPollActionCount: pollActions.length,
+      pollActionCount: pollActions.length,
     };
     summary.steps.push({
       name: "profile-carries-token",
       status: "passed",
-      message: `Exported Stream Deck profile carries the bridge token on all ${bridgeActions.length} bridge requests, the LCD poll included.`,
+      message: `Exported Stream Deck profile carries the bridge token on all ${bridgeActions.length} bridge requests, the poll included.`,
     });
 
     // The four-page profile (D5): LIGHTS, AUDIO, CAMERAS and PROMPTER, a
@@ -743,17 +772,20 @@ async function main() {
       .filter(([id]) => id.startsWith(FOLLOW_TRIGGER_PREFIX))
       .map(([id, trigger]) => ({
         workspace: id.slice(FOLLOW_TRIGGER_PREFIX.length),
-        condition: trigger?.condition?.[0]?.options ?? null,
-        page: trigger?.actions?.find((action) => action?.definitionId === "set_page")?.options?.page ?? null,
+        condition: optionValue(trigger?.condition?.[0], "expression") ?? null,
+        page: optionValue(
+          trigger?.actions?.find((action) => action?.definitionId === "set_page"),
+          "page"
+        ),
       }));
     const followTargets = followTriggers.map(({ workspace, page }) => `${workspace}:${page}`).sort();
     assert(
       JSON.stringify(followTargets) === JSON.stringify(FOLLOW_TARGETS) &&
         followTriggers.every(
           ({ workspace, condition }) =>
-            condition?.variable === "custom:lcd_workspace" && condition?.op === "eq" && condition?.value === workspace
+            condition === `(jsonpath($(custom:deck_displays), '$.words.workspace') ?? '') == '${workspace}'`
         ),
-      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of ${FOLLOW_TARGETS.join(", ")} on custom:lcd_workspace.`
+      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of ${FOLLOW_TARGETS.join(", ")} on the kept answer's workspace (which a silence leaves as it was).`
     );
     const savedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
     assert(
@@ -761,17 +793,17 @@ async function main() {
       `Bridge qualification failed: the saved page '${lcdWorkspace}' does not bring the deck to LIGHTS.`
     );
 
-    const lcdKeys = new Set();
+    let displayReads = 0;
     const strayRequests = [];
     for (const action of bridgeActions) {
-      const url = action.options?.url ?? "";
-      if (action.definitionId === "get" && url.startsWith("/api/deck/lcd?key=")) {
-        lcdKeys.add(url.slice("/api/deck/lcd?key=".length));
+      const url = optionValue(action, "url") ?? "";
+      if (action.definitionId === "get" && url === DISPLAYS_PATH) {
+        displayReads += 1;
         continue;
       }
       let body = null;
       try {
-        body = JSON.parse(action.options?.body ?? "");
+        body = JSON.parse(optionValue(action, "body") ?? "");
       } catch {
         body = null;
       }
@@ -781,23 +813,37 @@ async function main() {
         typeof body?.action !== "string" ||
         RETIRED_DECK_ACTIONS.includes(body.action)
       ) {
-        strayRequests.push(`${action.definitionId} ${url} ${action.options?.body ?? ""}`.trim());
+        strayRequests.push(`${action.definitionId} ${url} ${optionValue(action, "body") ?? ""}`.trim());
       }
     }
     assert(
       strayRequests.length === 0,
-      `Bridge qualification failed: the exported profile sends requests this bridge no longer answers: ${strayRequests.join("; ")}.`
+      `Bridge qualification failed: the exported profile sends requests this bridge no longer answers or no longer has: ${strayRequests.join("; ")}.`
     );
-    const unansweredLcds = [];
-    for (const key of [...lcdKeys].sort()) {
-      const answer = await fetchStatus(`${expectedBaseUrl}/api/deck/lcd?key=${key}`);
-      if (answer.status !== 200 || typeof answer.body !== "string") {
-        unansweredLcds.push(`${key} (${answer.status})`);
+
+    // Every line the profile reads out of the answer (an expression variable each, by a JSON
+    // path) is one this bridge answers. Reads only: the CAMERAS page's displays read the
+    // simulated cameras, and send them nothing.
+    const displays = await fetchJson(`${expectedBaseUrl}${DISPLAYS_PATH}`);
+    const unansweredLines = [];
+    let linesRead = 0;
+    for (const variable of Object.values(profile.expressionVariables ?? {})) {
+      const source = String(optionValue(variable?.entity, "expression") ?? "");
+      const path = /jsonpath\(\$\(custom:deck_displays\), '\$\.([a-z0-9_.]+)'\)/.exec(source)?.[1];
+      if (!path) continue;
+      linesRead += 1;
+      const value = path.split(".").reduce((node, step) => node?.[step], displays);
+      if (typeof value !== "string") {
+        unansweredLines.push(path);
       }
     }
+    // The follow triggers read the page the app is on out of the kept answer themselves.
+    if (typeof displays?.words?.workspace !== "string") {
+      unansweredLines.push("words.workspace");
+    }
     assert(
-      lcdKeys.size > 0 && unansweredLcds.length === 0,
-      `Bridge qualification failed: the bridge did not answer the profile's LCDs: ${unansweredLcds.join(", ") || "none read"}.`
+      displayReads > 1 && linesRead >= 38 && unansweredLines.length === 0,
+      `Bridge qualification failed: the bridge did not answer the profile's display lines (${linesRead} read, ${displayReads} reads in the profile): ${unansweredLines.join(", ") || "none"}.`
     );
 
     summary.profilePages = {
@@ -805,12 +851,12 @@ async function main() {
       pageCount: exportSummary.pageCount,
       triggerCount: exportSummary.triggerCount,
       followTargets,
-      lcdKeysAnswered: lcdKeys.size,
+      displayLinesAnswered: linesRead,
     };
     summary.steps.push({
       name: "profile-four-pages",
       status: "passed",
-      message: `Exported Stream Deck profile holds the pages ${profilePages.join(", ")}, follows the app's page to them, posts only to ${DECK_ACTION_ROUTES.join(" and ")}, and the bridge answered all ${lcdKeys.size} LCDs it reads.`,
+      message: `Exported Stream Deck profile holds the pages ${profilePages.join(", ")}, follows the app's page to them, posts only to ${DECK_ACTION_ROUTES.join(" and ")}, reads its displays at ${DISPLAYS_PATH}, and the bridge answered all ${linesRead} display lines it reads.`,
       scopeChanged: PROFILE_CHANGED,
     });
 
@@ -851,7 +897,7 @@ async function main() {
   }
 
   console.log(
-    `Bridge qualification passed: the ${packaged.label} engine's bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a four-page profile that carries the token and reads only LCDs the bridge answers.`
+    `Bridge qualification passed: the ${packaged.label} engine's bridge bound at ${summary.expectedBaseUrl}, served live deck HTTP routes with the bridge token, refused the unauthenticated and malformed cases, and exported a four-page profile that carries the token and reads only displays the bridge answers.`
   );
 }
 

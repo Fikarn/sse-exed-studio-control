@@ -33,6 +33,16 @@ pub(crate) const CAMERA_ROUTE: &str = "/api/deck/camera-action";
 /// two polls.
 pub(crate) const TEXTS_KEPT_FOR: Duration = Duration::from_millis(250);
 
+/// How long the CAMERAS page's texts answer the deck's one read of every
+/// display (`page_texts`, the review of #293): every press of every page
+/// reads them again, so a fast spin of an AUDIO or LIGHTS dial would read
+/// every held camera several times a second, under the cameras' lock. A
+/// little under the poll's second, so the poll still reads the cameras once
+/// a second; a key of the CAMERAS page puts its own texts in their place
+/// anyway. While `REC`'s stop is armed they are kept `TEXTS_KEPT_FOR` only,
+/// so `STOP?` lapses as `STOP_SHOWN_FOR` counts on.
+pub(crate) const DISPLAYS_TEXTS_KEPT_FOR: Duration = Duration::from_millis(900);
+
 /// A PROMPTER display asked for while a key of the page is on its way waits
 /// for the key this long at most, then answers from the prompter as it is
 /// (the review of #288: Companion asks for a dial's displays as it sends the
@@ -186,42 +196,75 @@ pub(crate) fn page_lcd_text(
     at: Instant,
 ) -> Option<Result<String, ControlSurfaceError>> {
     let page = page_of(key)?;
-    if page == Page::Prompter {
-        wait_for_keys(db_path);
-        return Some(
-            crate::prompter::deck::deck_texts(db_path)
-                .map_err(prompter_error)
-                .and_then(|texts| text_of(texts, key)),
-        );
-    }
-    let kept = kept(db_path, page);
+    Some(match page {
+        Page::Prompter => prompter_texts(db_path).and_then(|texts| text_of(texts, key)),
+        Page::Cameras => camera_texts(db_path, cameras_simulated, at, false)
+            .and_then(|texts| text_of(texts, key)),
+    })
+}
+
+/// Every display of the PROMPTER and the CAMERAS pages at `at`, each read as
+/// its displays are one by one: the deck's one read a second
+/// (`GET /api/deck/displays`, 2026-10-03).
+pub(crate) fn page_texts(
+    db_path: &Path,
+    cameras_simulated: bool,
+    at: Instant,
+) -> Result<Texts, ControlSurfaceError> {
+    let mut texts = prompter_texts(db_path)?;
+    texts.extend(camera_texts(db_path, cameras_simulated, at, true)?);
+    Ok(texts)
+}
+
+/// The PROMPTER page's displays, once no key of the page is on its way, or
+/// `KEY_WAITED_FOR` on.
+fn prompter_texts(db_path: &Path) -> Result<Texts, ControlSurfaceError> {
+    wait_for_keys(db_path);
+    crate::prompter::deck::deck_texts(db_path).map_err(prompter_error)
+}
+
+/// The CAMERAS page's displays, as kept for `TEXTS_KEPT_FOR` from `at`, or
+/// for the deck's one read of every display (`all_at_once`)
+/// `DISPLAYS_TEXTS_KEPT_FOR`, unless `REC`'s stop is armed.
+fn camera_texts(
+    db_path: &Path,
+    cameras_simulated: bool,
+    at: Instant,
+    all_at_once: bool,
+) -> Result<Texts, ControlSurfaceError> {
+    let kept = kept(db_path, Page::Cameras);
     // Held while the texts are read: the other displays of the same poll
     // wait for this read instead of making their own.
     let mut guard = lock(&kept);
-    let fresh = guard
-        .as_ref()
-        .is_some_and(|kept| at.saturating_duration_since(kept.at) < TEXTS_KEPT_FOR);
-    if !fresh {
-        let texts = match page {
-            Page::Prompter => crate::prompter::deck::deck_texts(db_path).map_err(prompter_error),
-            Page::Cameras => crate::cameras::deck::deck_texts_at(db_path, cameras_simulated, at)
-                .map_err(camera_error),
+    let fresh = guard.as_ref().is_some_and(|kept| {
+        let armed = kept
+            .texts
+            .iter()
+            .any(|(key, text)| *key == "camera_state_rec" && text == "armed");
+        let kept_for = if all_at_once && !armed {
+            DISPLAYS_TEXTS_KEPT_FOR
+        } else {
+            TEXTS_KEPT_FOR
         };
-        match texts {
+        at.saturating_duration_since(kept.at) < kept_for
+    });
+    if !fresh {
+        match crate::cameras::deck::deck_texts_at(db_path, cameras_simulated, at)
+            .map_err(camera_error)
+        {
             Ok(texts) => {
                 *guard = Some(KeptTexts { at, texts });
             }
             Err(error) => {
                 *guard = None;
-                return Some(Err(error));
+                return Err(error);
             }
         }
     }
-    let texts = guard
+    Ok(guard
         .as_ref()
         .map(|kept| kept.texts.clone())
-        .unwrap_or_default();
-    Some(text_of(texts, key))
+        .unwrap_or_default())
 }
 
 /// A display's text among a page's.

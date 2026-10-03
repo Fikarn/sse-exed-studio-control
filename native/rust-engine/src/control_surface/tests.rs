@@ -58,8 +58,11 @@ fn audio_strip_lcd_shows_gate_reason_until_verified() {
     assert_eq!(key_text, "DIM\\n--");
 }
 
+// 2026-10-03: the strip taps and GAIN left the deck. A tap still selects
+// the screen's strip (its route is kept until a later cleanup), and the
+// strip no longer marks it; a saved gain mode no longer shows the gain.
 #[test]
-fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
+fn audio_strip_lcd_renders_live_state_and_mute_without_a_selection_mark() {
     let test_dir = ready_audio_test_db("lcd-live");
     let db_path = test_dir.db_path();
 
@@ -80,8 +83,8 @@ fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
     let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
         .expect("lcd text should render");
     assert!(
-        text.starts_with("\u{2022} HOST"),
-        "selected strip should carry the marker: {text}"
+        text.starts_with("HOST\\n") && !text.contains('\u{2022}'),
+        "the selected strip carries no marker: {text}"
     );
 
     handle_audio_action(db_path.as_path(), "dialPress", Some("1")).expect("mute should engage");
@@ -92,14 +95,17 @@ fn audio_strip_lcd_renders_live_state_with_selection_and_mute() {
         "muted strip should say MUTED instead of a level: {text}"
     );
 
-    handle_audio_action(db_path.as_path(), "toggleDialMode", None)
-        .expect("gain mode should engage");
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.control_surface.audio.dial_mode"),
+            String::from("gain"),
+        )],
+    )
+    .expect("the old GAIN key's mode, as an old build saved it");
     let text = read_control_surface_lcd_text(db_path.as_path(), "audio_strip_1")
         .expect("lcd text should render");
-    assert!(
-        text.contains("GAIN 34 dB"),
-        "gain mode should show the preamp gain: {text}"
-    );
+    assert_eq!(text, "HOST\\nMUTED", "a saved gain mode shows no gain");
 }
 
 #[test]
@@ -313,6 +319,47 @@ fn the_talk_key_of_an_old_profile_is_refused_and_stores_nothing() {
     assert!(recent_actions(db_path.as_path()).is_empty());
 }
 
+// The review of #293: the old profile's GAIN key is refused as its TALK key
+// is, and a gain mode an old build saved is reported nowhere: the context's
+// `dialMode` and the `audio_state_mode` display read `fader`.
+#[test]
+fn the_gain_key_of_an_old_profile_is_refused_and_stores_nothing() {
+    let test_dir = ready_audio_test_db("old-gain-key");
+    let db_path = test_dir.db_path();
+    set_settings_owned(
+        db_path.as_path(),
+        &[(
+            String::from("app.control_surface.audio.dial_mode"),
+            String::from("gain"),
+        )],
+    )
+    .expect("the old GAIN key's mode, as an old build saved it");
+    let settings_before = list_settings_by_prefix(db_path.as_path(), "").expect("settings");
+
+    let refused = handle_control_surface_http_action(
+        db_path.as_path(),
+        "/api/deck/audio-action",
+        &json!({ "action": "toggleDialMode" }),
+    )
+    .expect_err("the GAIN key left the deck");
+    assert_eq!(refused.status_code(), 501, "{}", refused.message());
+    assert_eq!(
+        list_settings_by_prefix(db_path.as_path(), "").expect("settings"),
+        settings_before,
+        "a refused GAIN key writes nothing"
+    );
+    assert!(control_surface_last_event(db_path.as_path()).is_null());
+    assert!(recent_actions(db_path.as_path()).is_empty());
+
+    let context = read_control_surface_context(db_path.as_path()).expect("context should load");
+    assert_eq!(context["audio"]["dialMode"], "fader");
+    assert_eq!(
+        read_control_surface_lcd_text(db_path.as_path(), "audio_state_mode")
+            .expect("state should render"),
+        "fader"
+    );
+}
+
 #[test]
 fn successful_actions_stamp_the_last_event_for_verify_echo() {
     let test_dir = ready_audio_test_db("last-event");
@@ -492,21 +539,39 @@ fn deck_preview_action_updates_preview_runtime() {
         "a recall into the preview is not a recall on the rig"
     );
 
-    // The LCD shows the staged number and says so.
+    // The LCD shows the staged number, and the scene's state says that it
+    // is staged (2026-10-03: a third line said PREVIEW until then; the deck
+    // now turns the values blue from the state). A light that is off reads
+    // OFF.
     light_action(db_path, "resetIntensity");
+    if !lock_shared_lighting_preview().fixture_states[KEY_LEFT].on {
+        light_action(db_path, "toggleLight");
+    }
     assert_eq!(
         read_control_surface_lcd_text(db_path, "light_intensity").expect("lcd text"),
-        "INTENSITY\\n100%\\nPREVIEW"
+        "INTENSITY\\n100 %"
     );
-    assert!(read_control_surface_lcd_text(db_path, "light_cct")
-        .expect("lcd text")
-        .ends_with("K\\nPREVIEW"));
+    let cct = read_control_surface_lcd_text(db_path, "light_cct").expect("lcd text");
+    assert!(cct.starts_with("CCT\\n") && cct.ends_with(" K"), "{cct}");
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
+        "preview"
+    );
+    light_action(db_path, "toggleLight");
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "light_intensity").expect("lcd text"),
+        "INTENSITY\\nOFF"
+    );
 
     // Out of preview the same key moves the rig.
     set_shared_preview_mode(db_path, false);
     assert_eq!(
         read_control_surface_lcd_text(db_path, "light_intensity").expect("lcd text"),
-        "INTENSITY\\n40%"
+        "INTENSITY\\n40 %"
+    );
+    assert_ne!(
+        read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
+        "preview"
     );
     let reply = light_action(db_path, "intensityUp");
     assert_eq!(reply["light"]["intensity"], 45);
@@ -556,7 +621,7 @@ fn deck_relative_keys_store_through_the_fixture_update() {
     );
     assert_eq!(
         read_control_surface_lcd_text(db_path, "light_cct").expect("lcd text"),
-        format!("CCT\\n{last_cct}K")
+        format!("CCT\\n{last_cct} K")
     );
     assert_eq!(light_action(db_path, "resetCct")["light"]["cct"], 4500);
     assert_eq!(
@@ -626,6 +691,191 @@ fn deck_recall_writes_what_a_recall_writes_and_nothing_after_it() {
     assert_eq!(
         read_lighting_snapshot_last_recall(db_path).as_deref(),
         Some("scene-stream")
+    );
+}
+
+/// The Lighting page's Fade, as the page sets it (`lighting.settings.update`).
+fn set_recall_fade_ms(db_path: &Path, fade_ms: i64) {
+    crate::lighting::update_lighting_settings(
+        db_path,
+        &crate::lighting::parse_lighting_settings_update_request(
+            &json!({ "recallFadeMs": fade_ms }),
+        )
+        .expect("the update should parse"),
+    )
+    .expect("the fade should be saved");
+}
+
+// The owner's answer to question 5 (2026-10-03): the deck's RECALL fades as
+// the Lighting page's recall does, with the page's Fade; into the preview
+// it loads at once, as the page's does. Until then the deck always recalled
+// at once.
+#[test]
+fn the_decks_recall_uses_the_lighting_pages_fade() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("light-recall-fade");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    set_settings_owned(
+        db_path,
+        &[(
+            String::from(SELECTED_SCENE_ID_KEY),
+            String::from("scene-stream"),
+        )],
+    )
+    .expect("the deck's scene selection should persist");
+
+    set_recall_fade_ms(db_path, 2_500);
+    assert_eq!(
+        crate::lighting::read_lighting_snapshot(&deck_app_settings(db_path)).recall_fade_ms,
+        2_500
+    );
+    assert_eq!(light_action(db_path, "recallScene")["preview"], false);
+    let fade = load_lighting_editor_state(&deck_app_settings(db_path))
+        .active_fade
+        .expect("the recall fades");
+    assert_eq!(fade.scene_id, "scene-stream");
+    assert_eq!(fade.duration_ms, 2_500);
+    assert_eq!(
+        read_lighting_snapshot_last_recall(db_path).as_deref(),
+        Some("scene-stream")
+    );
+    // A scene being faded in is the rig's: RECALL reads ON RIG at once.
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
+        "live"
+    );
+
+    // No Fade: at once, as before.
+    set_recall_fade_ms(db_path, 0);
+    light_action(db_path, "recallScene");
+    assert!(load_lighting_editor_state(&deck_app_settings(db_path))
+        .active_fade
+        .is_none());
+
+    // Into the preview: at once, whatever the Fade, and the rig stays.
+    set_recall_fade_ms(db_path, 4_000);
+    set_shared_preview_mode(db_path, true);
+    assert_eq!(light_action(db_path, "recallScene")["preview"], true);
+    assert!(load_lighting_editor_state(&deck_app_settings(db_path))
+        .active_fade
+        .is_none());
+    set_shared_preview_mode(db_path, false);
+}
+
+// 2026-10-03: whether the rig holds a scene is decided once, in the hardware
+// link, for the screen (`lighting.snapshot`'s `sceneState`, of the live
+// scene) and the deck (`scene_state`, of the scene its SCENE dial chose),
+// with the same rule. The words are the deck's colour rules', letter for
+// letter.
+#[test]
+fn the_scene_state_is_decided_once_for_the_screen_and_the_deck() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("scene-state");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let deck = || read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text");
+    let screen =
+        || crate::lighting::read_lighting_snapshot(&deck_app_settings(db_path)).scene_state;
+    for word in [deck(), screen()] {
+        assert!(
+            crate::lighting::SCENE_STATES.contains(&word.as_str()),
+            "{word}"
+        );
+    }
+    set_settings_owned(
+        db_path,
+        &[(
+            String::from(SELECTED_SCENE_ID_KEY),
+            String::from("scene-stream"),
+        )],
+    )
+    .expect("the deck's scene selection should persist");
+
+    // Chosen, not on the rig: a press will change the rig.
+    if read_lighting_snapshot_last_recall(db_path).as_deref() != Some("scene-stream") {
+        assert_eq!(deck(), "chosen");
+    }
+    light_action(db_path, "recallScene");
+    assert_eq!(deck(), "live");
+    assert_eq!(screen(), "live");
+
+    // The rig changed since: both say so.
+    let scene_fixture = load_lighting_editor_state(&deck_app_settings(db_path))
+        .scenes
+        .into_iter()
+        .find(|scene| scene.id == "scene-stream")
+        .and_then(|scene| scene.fixture_states.into_iter().find(|state| state.on))
+        .expect("the scene lights a fixture");
+    set_live_fixture(
+        db_path,
+        &scene_fixture.fixture_id,
+        true,
+        if scene_fixture.intensity > 50 { 10 } else { 90 },
+    );
+    assert_eq!(deck(), "unsaved");
+    assert_eq!(screen(), "unsaved");
+
+    // The deck's SCENE dial moves on: its scene is only chosen; the screen's
+    // live scene is still the one on the rig, changed.
+    light_action(db_path, "selectNextScene");
+    assert_eq!(deck(), "chosen");
+    assert_eq!(screen(), "unsaved");
+
+    // Preview: both.
+    set_shared_preview_mode(db_path, true);
+    assert_eq!(deck(), "preview");
+    let previewing = with_lighting_state_and_preview(|preview| {
+        crate::lighting::read_lighting_snapshot_with_preview(&deck_app_settings(db_path), preview)
+    });
+    assert_eq!(previewing.scene_state, "preview");
+    set_shared_preview_mode(db_path, false);
+}
+
+// A rig with no scene reads `none`, on the deck and on the screen. Every
+// scene is deleted, and the bridge's address is cleared: with an address the
+// rig's three default scenes come back when its last scene goes, so the
+// assertions are unconditional (the review of #293: they sat inside an `if`
+// that never held).
+#[test]
+fn a_rig_with_no_scene_is_none() {
+    let _preview_guard = crate::lighting::shared_preview_test_guard();
+    let test_dir = ready_lighting_deck_db("scene-state-none");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    for scene in load_lighting_editor_state(&deck_app_settings(db_path)).scenes {
+        crate::lighting::delete_lighting_scene(
+            db_path,
+            &parse_lighting_scene_delete_request(&json!({ "sceneId": scene.id }))
+                .expect("the delete should parse"),
+        )
+        .expect("the scene should go");
+    }
+    set_settings_owned(
+        db_path,
+        &[(
+            String::from(crate::commissioning::LIGHTING_BRIDGE_IP_KEY),
+            String::new(),
+        )],
+    )
+    .expect("the address should clear");
+    assert!(
+        load_lighting_editor_state(&deck_app_settings(db_path))
+            .scenes
+            .is_empty(),
+        "no scene is left"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_state").expect("lcd text"),
+        "none"
+    );
+    assert_eq!(
+        read_control_surface_lcd_text(db_path, "scene_nav").expect("lcd text"),
+        "SCENE\\n--"
+    );
+    assert_eq!(
+        crate::lighting::read_lighting_snapshot(&deck_app_settings(db_path)).scene_state,
+        "none"
     );
 }
 
@@ -975,7 +1225,7 @@ fn all_off_asks_first_and_switches_at_the_second_press() {
     assert_eq!(recent_actions(db_path).len(), rows + 1);
     assert_eq!(
         read_control_surface_lcd_text_at(db_path, "light_key_off", second).expect("a display"),
-        "All\\nOff"
+        "ALL OFF"
     );
     assert_eq!(
         light_action_at(db_path, "allOff", second + Duration::from_millis(200))["did"],
@@ -995,7 +1245,7 @@ fn all_off_asks_first_and_switches_at_the_second_press() {
     let over = late + Duration::from_secs(5);
     assert_eq!(
         read_control_surface_lcd_text_at(db_path, "light_key_off", over).expect("a display"),
-        "All\\nOff"
+        "ALL OFF"
     );
     assert_eq!(light_action_at(db_path, "allOff", over)["did"], "armed");
     assert!(lit_count(db_path) > 0, "nothing went off at one press");
@@ -1146,6 +1396,48 @@ fn toggle_dim_and_a_mute_drop_a_second_press_within_the_dwell() {
             .count(),
         2
     );
+}
+
+// The review of #293: `PHONES` goes on to the next phones mix at each
+// press, so a bounce or a double press would land on the other one. It
+// dwells as `PLAY` does: a second press within 350 ms of the one that acted
+// is the same press, answered `kept`, and the target stays.
+#[test]
+fn phones_drops_a_second_press_within_the_dwell() {
+    let test_dir = ready_audio_test_db("phones-dwell");
+    let db_path = test_dir.db_path();
+    let db_path = db_path.as_path();
+    let start = next_press_moment() + Duration::from_secs(10);
+    let press = |value: &str, at: Instant| {
+        handle_control_surface_http_action_at(
+            db_path,
+            "/api/deck/audio-action",
+            &json!({ "action": "setMixTarget", "value": value }),
+            at,
+        )
+        .unwrap_or_else(|error| panic!("{value} should succeed: {}", error.message()))
+    };
+    let target = || {
+        read_control_surface_lcd_text(db_path, "audio_state_target").expect("state should render")
+    };
+    assert_eq!(
+        press("phones", start)["selectedMixTargetId"],
+        "audio-mix-phones-a"
+    );
+    let kept = press("phones", start + Duration::from_millis(200));
+    assert_eq!(kept["did"], "kept", "{kept}");
+    assert_eq!(target(), "phones-a", "the same press moves nothing");
+    assert_eq!(
+        press("phones", start + Duration::from_millis(400))["selectedMixTargetId"],
+        "audio-mix-phones-b",
+        "a press after the dwell goes on"
+    );
+    // MAIN OUT does not dwell: a second press leaves it where it is anyway.
+    let main = start + Duration::from_secs(1);
+    assert_eq!(press("main", main)["selectedMixTargetId"], "audio-mix-main");
+    let again = press("main", main + Duration::from_millis(100));
+    assert_eq!(again["selectedMixTargetId"], "audio-mix-main", "{again}");
+    assert_eq!(target(), "main");
 }
 
 // The review of #254: an armed or kept press of `All Off` raises no

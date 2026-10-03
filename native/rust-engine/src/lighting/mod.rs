@@ -17,6 +17,10 @@ const LIGHTING_IDENTIFY_BURSTS_KEY: &str = "app.lighting.identify_bursts";
 const LIGHTING_HIGHLIGHT_IDS_KEY: &str = "app.lighting.highlight_ids";
 const LIGHTING_SOLO_IDS_KEY: &str = "app.lighting.solo_ids";
 const LIGHTING_SELECTED_SCENE_ID_KEY: &str = "app.lighting.selected_scene_id";
+/// The Lighting page's Fade, which the deck's recall uses too (2026-10-03).
+const LIGHTING_RECALL_FADE_MS_KEY: &str = "app.lighting.recall_fade_ms";
+/// A recall fades for 10 s at most (`parse_lighting_scene_recall_request`).
+const MAX_RECALL_FADE_MS: i64 = 10_000;
 const LIGHTING_CAMERA_MARKER_KEY: &str = "app.lighting.camera_marker";
 const LIGHTING_SUBJECT_MARKER_KEY: &str = "app.lighting.subject_marker";
 const LIGHTING_CUSTOM_FIXTURE_ID_PREFIX: &str = "fixture-custom-";
@@ -38,6 +42,7 @@ mod output_arming;
 mod palettes;
 mod parse;
 mod preview;
+mod scene_state;
 mod scenes;
 mod settings;
 mod snapshot;
@@ -50,11 +55,15 @@ use editor_state::save_lighting_editor_state;
 pub use fixture_catalog::*;
 pub use fixtures::*;
 pub use groups::*;
+pub(crate) use helpers::read_lighting_recall_fade_ms;
 pub use identify::*;
 pub use output_arming::*;
 pub use palettes::*;
 pub use parse::*;
 pub use preview::*;
+pub(crate) use scene_state::scene_state_in;
+#[cfg(test)]
+pub(crate) use scene_state::SCENE_STATES;
 pub use scenes::*;
 pub use settings::*;
 pub use snapshot::*;

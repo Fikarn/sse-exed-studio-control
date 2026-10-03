@@ -91,31 +91,36 @@ The switch is `Light outputs` in Setup / Support › Workstation. A start with `
 
 ## Stream Deck
 
-Bitfocus Companion, on this PC, drives the Stream Deck+. Its connection `SSE_Studio_Control` calls the engine's bridge at `http://127.0.0.1:38201`.
+Bitfocus Companion 5.0.6, on this PC, drives the Stream Deck+. Its connection `SSE_Studio_Control` (generic-http 2.7.0) calls the engine's bridge at `http://127.0.0.1:38201`.
 
 - The bridge listens on `127.0.0.1` only and has no fallback port. `SSE_CONTROL_SURFACE_PORT` names another port.
 - Every request must carry the bridge token. The app makes it once, as `control-surface.token` in the app-data folder, and writes it into the exported profile. Do not share that file.
 - `401` in Companion's log means the profile's token is missing or wrong: export and import again.
-- The profile asks for every display once a second, a connection each: 47 of them (43 until 2026-09-29, when the LIGHTS page's four dial displays joined). A few thousand sockets in `TIME_WAIT` on port `38201` are normal. A dial's turn also refreshes the displays it changes.
-- The AUDIO dials, setting a level, step five times as far on a fast turn, two detents within 80 ms of each other by their arrival at the bridge: a detent that waited behind the poll is not taken for part of a fast turn. Setting a gain, a detent is always 1 dB. Detents that Companion itself bunches before it sends them still look fast.
-- A dial's own display refresh can be answered before its action is: the display then follows at the next poll, within a second.
-- Those requests are how the app knows Companion runs with the profile. Setup's deck probe passes when one with the token arrived in the last 5 s, and the header's Surface lamp reads `no deck`, amber, while none has. It locks nothing. Companion closed, or a profile without the right token, reads `no deck`. Companion's poll runs whether the Stream Deck is plugged in or not: the deck itself is proven by Setup's `Verify live echo`.
-- A display never reads a camera by itself. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second, and once for a key, whose own read answers its displays.
+- The profile is Companion 5's own format (2026-10-03): layered keys with no top bar, no yellow pressed border and no status icons, an image of its own for every key and strip cell at the deck's size, and the approved layout (`docs/OPERATIONS.md`, Stream Deck). Until then it was Companion's version 9, which Companion upgraded at import, guessing each key's look.
+- The profile reads every display once a second in one request, `GET /api/deck/displays` (2026-10-03; until then a request a display, 47 at once). A key's press or a dial's detent sends its action and that one read again. A few thousand sockets in `TIME_WAIT` on port `38201` are normal.
+- The answer lands in Companion's custom variable `deck_raw`, whatever it is: generic-http stores an error's body too, and tries a refused read again, twice, up to 3 s later. A trigger keeps it in `deck_displays` only when it carries the bridge's mark (`"sse": "deck"`) and is not older than the one kept, so an error or a late answer never shows. Each line a key or a cell shows is an expression variable read out of `deck_displays`.
+- After 4 s without an answer the deck keeps, the deck greys every key and cell and shows no value (`deck_link` reads `lost`): what it showed is no longer known. It comes back with the next answer. An answer it does not keep (an error, a late one) does not count as heard. The deck's page stays where it is: the page-follow triggers read the app's page from the kept answer, which a silence leaves as it was, so the deck turns only when the app's page changes, never when the link comes back.
+- A key's own read can be answered before its action is: the display then follows at the next read, within a second.
+- The AUDIO dials, setting a level, step five times as far on a fast turn, two detents within 80 ms of each other by their arrival at the bridge: a detent that waited behind the poll is not taken for part of a fast turn. The dials always set a level: a gain mode the old profile's `GAIN` key saved is no longer read (2026-10-03), the dial mode reads `fader` wherever it is reported, and the old `GAIN` key is refused (`501`). Detents that Companion itself bunches before it sends them still look fast.
+- The reads are how the app knows Companion runs with the profile. Setup's deck probe passes when one with the token arrived in the last 5 s, and the header's Surface lamp reads `no deck`, amber, while none has. It locks nothing. Companion closed, or a profile without the right token, reads `no deck`. Companion's poll runs whether the Stream Deck is plugged in or not: the deck itself is proven by Setup's `Verify live echo`.
+- A display never reads a camera by itself. The hardware link reads the cameras once for all the displays of a poll, as the open Cameras page does once a second, and once for a key, whose own read answers its displays. Every press of every page reads every display again, so the deck's one read keeps the cameras' texts about a second (250 ms while `REC`'s stop is armed): a fast spin of an AUDIO or LIGHTS dial reads the cameras about once a second. `REC`'s take length is counted from the start the hardware link saw: nothing new is asked of a camera.
 - `REC` on the deck starts a take with one press and stops it with two, and with nothing else: a press that arrives twice is one press, an armed stop stops the take it was made for and no other, and a press starts no take while the key can still read `STOP?`.
-- `All Off` and `Del Scene` ask as `REC`'s stop does: `OFF?` or `DEL?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, a mute and `Toggle` drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the two keys without showing it, so the build and the profile go together.
+- `ALL OFF` asks as `REC`'s stop does: `OFF?` for 3 s, and the second press acts only on the rig the first asked about. `PLAY`, `DIM`, `PHONES`, a mute and the LIGHT dial's push drop a second press within 350 ms. The hardware link keeps the arm and the moments in memory: a new build with an old profile arms the key without showing it, so the build and the profile go together. An old build with the new profile greys the whole deck (`/api/deck/displays` answers `400`), `PHONES` answers `400` and `RECALL` recalls at once: import the new profile once the new build is on.
+- `RECALL` and the SCENE dial's push fade as the Lighting page's recall does, with the page's Fade (saved, 2026-10-03; until then the deck recalled at once). Into the preview a recall loads at once.
 - Companion's generic-http connection tries a refused `GET` again, twice, and a `POST` never: a display recovers, a refused key press is lost.
-- It stores a reply only in a custom variable that exists already, so the profile brings its own.
+- It stores a reply only in a custom variable that exists already, so the profile brings its own (`deck_raw`, `deck_displays`, `deck_age`).
 - The bridge writes one refusal line a minute at most for each status, and counts the rest in it. A key a page refuses (`REC` while CAM 1 is released) is a `WARN` line of its own in `engine.log`, with the key and the reason: one a second at most for each key, counting the rest.
 - Companion can press a key without hands (`POST http://127.0.0.1:8000/api/location/<page>/<row>/<column>/press`). With the studio's app running, that drives the real devices.
 
 To put the profile on the deck:
 
-1. Start Companion. The export asks it for the deck, at `http://127.0.0.1:8000`.
+1. Start Companion. The export asks it for the deck, at `http://127.0.0.1:8000`: the page-follow triggers name the deck (`streamdeck:<serial>`), which a trigger needs. A profile exported with Companion closed follows the app's page nowhere.
 2. In Setup step 1, export the Companion profile. It lands in the app-data `exports` folder.
-3. In Companion's Import / Export page, import it with `Full Reset & Import`, never `Import Preserving Unselected`.
-4. In Setup's Verify step, press each control: its cell pulses.
+3. In Companion's Import / Export page, import it with `Full Reset & Import`, never `Import Preserving Unselected`. The reset puts Companion's settings and the deck's surface settings back to their defaults, the deck's "Horizontal Swipe Changes Page" off among them; the profile cannot carry that setting.
+4. In Companion's Surfaces, check that "Horizontal Swipe Changes Page" is off for the deck: a swipe on the strip would turn Companion's page away from the app's.
+5. In Setup's Verify step, press each key and dial: its cell pulses.
 
-The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the app's tabs. The deck follows the app's page, and each page has one page key, to the page after it; `PROMPTER`'s goes round to `LIGHTS`. When the pages change, export and import again: the deck has the two new pages only after the next import.
+The pages are `LIGHTS`, `AUDIO`, `CAMERAS` and `PROMPTER`, in the order of the app's tabs. The deck follows the app's page, and each page has one page key, top right, to the page after it; `PROMPTER`'s goes round to `LIGHTS`. When the pages change, export and import again: the deck has a new layout only after the next import.
 
 ## Cameras
 

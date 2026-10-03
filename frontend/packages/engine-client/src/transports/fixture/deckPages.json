@@ -4,39 +4,25 @@
       "buttons": [
         {
           "body": {
-            "action": "toggleLight"
+            "action": "rec"
           },
-          "description": "Toggle the selected light.",
-          "id": "lights-btn-2",
-          "label": "Toggle",
+          "description": "Start recording on CAM 1. While it records: arm the stop, then stop.",
+          "id": "lights-btn-1",
+          "label": "REC",
           "method": "POST",
-          "position": 2,
+          "position": 1,
           "type": "button",
-          "url": "/api/deck/light-action"
+          "url": "/api/deck/camera-action"
         },
         {
           "body": {
             "action": "allOn"
           },
           "description": "Turn all lights on.",
-          "id": "lights-btn-3",
-          "label": "All On",
+          "id": "lights-btn-2",
+          "label": "ALL ON",
           "method": "POST",
-          "position": 3,
-          "type": "button",
-          "url": "/api/deck/light-action"
-        },
-        {
-          "body": {
-            "action": "allOff"
-          },
-          "description": "Turn all lights off: press, and press again within 3 s.",
-          "id": "lights-btn-4",
-          "label": "All Off",
-          "lcdKey": "light_key_off",
-          "lcdRefreshKeys": ["light_key_off"],
-          "method": "POST",
-          "position": 4,
+          "position": 2,
           "type": "button",
           "url": "/api/deck/light-action"
         },
@@ -45,20 +31,41 @@
             "action": "saveScene"
           },
           "description": "Save the current lighting scene.",
-          "id": "lights-btn-5",
-          "label": "Save",
+          "id": "lights-btn-3",
+          "label": "SAVE",
           "method": "POST",
-          "position": 5,
+          "position": 3,
           "type": "button",
           "url": "/api/deck/light-action"
         },
         {
+          "description": "Turn the deck to the AUDIO page.",
+          "id": "lights-btn-4",
+          "isPageNav": true,
+          "label": "AUDIO ›",
+          "pageNavTarget": "AUDIO",
+          "position": 4,
+          "type": "button"
+        },
+        {
           "body": {
-            "action": "recallScene"
+            "action": "playPause"
           },
-          "description": "Recall the selected lighting scene.",
+          "description": "Play or pause the prompter.",
+          "id": "lights-btn-5",
+          "label": "PLAY",
+          "method": "POST",
+          "position": 5,
+          "type": "button",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
+            "action": "allOff"
+          },
+          "description": "Turn all lights off: press, and press again within 3 s.",
           "id": "lights-btn-6",
-          "label": "Recall",
+          "label": "ALL OFF",
           "method": "POST",
           "position": 6,
           "type": "button",
@@ -66,26 +73,43 @@
         },
         {
           "body": {
-            "action": "deleteScene"
+            "action": "recallScene"
           },
-          "description": "Delete the selected lighting scene: press, and press again within 3 s.",
-          "id": "lights-btn-7",
-          "label": "Del Scene",
-          "lcdKey": "light_key_del",
-          "lcdRefreshKeys": ["light_key_del"],
+          "description": "Recall the selected lighting scene, with the Lighting page's Fade.",
+          "id": "lights-btn-8",
+          "label": "RECALL",
           "method": "POST",
-          "position": 7,
+          "position": 8,
           "type": "button",
           "url": "/api/deck/light-action"
         },
         {
-          "description": "Navigate to the AUDIO page.",
-          "id": "lights-btn-8",
-          "isPageNav": true,
-          "label": "AUDIO >>",
-          "pageNavTarget": "AUDIO",
-          "position": 8,
-          "type": "button"
+          "description": "Shows the light the dials set, and its place among the lights.",
+          "id": "lights-btn-9",
+          "label": "LIGHT",
+          "position": 9,
+          "type": "display"
+        },
+        {
+          "description": "Shows the chosen light's intensity, or OFF.",
+          "id": "lights-btn-10",
+          "label": "INTENSITY",
+          "position": 10,
+          "type": "display"
+        },
+        {
+          "description": "Shows the chosen light's colour temperature.",
+          "id": "lights-btn-11",
+          "label": "CCT",
+          "position": 11,
+          "type": "display"
+        },
+        {
+          "description": "Shows the chosen scene, and whether the rig holds it.",
+          "id": "lights-btn-12",
+          "label": "SCENE",
+          "position": 12,
+          "type": "display"
         }
       ],
       "dials": [
@@ -95,9 +119,7 @@
           },
           "description": "Toggle the selected light.",
           "id": "lights-dial-1-press",
-          "label": "Light",
-          "lcdKey": "light_nav",
-          "lcdRefreshKeys": ["light_nav", "light_intensity", "light_cct"],
+          "label": "LIGHT",
           "method": "POST",
           "position": 1,
           "type": "dial-press",
@@ -110,7 +132,6 @@
           "description": "Select the previous light.",
           "id": "lights-dial-1-left",
           "label": "Prev Light",
-          "lcdRefreshKeys": ["light_nav", "light_intensity", "light_cct"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-left",
@@ -123,7 +144,6 @@
           "description": "Select the next light.",
           "id": "lights-dial-1-right",
           "label": "Next Light",
-          "lcdRefreshKeys": ["light_nav", "light_intensity", "light_cct"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-right",
@@ -135,9 +155,7 @@
           },
           "description": "Reset the selected light intensity.",
           "id": "lights-dial-2-press",
-          "label": "Intensity",
-          "lcdKey": "light_intensity",
-          "lcdRefreshKeys": ["light_intensity"],
+          "label": "INTENSITY",
           "method": "POST",
           "position": 2,
           "type": "dial-press",
@@ -150,7 +168,6 @@
           "description": "Lower the selected light intensity.",
           "id": "lights-dial-2-left",
           "label": "Intensity Down",
-          "lcdRefreshKeys": ["light_intensity"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-left",
@@ -163,7 +180,6 @@
           "description": "Raise the selected light intensity.",
           "id": "lights-dial-2-right",
           "label": "Intensity Up",
-          "lcdRefreshKeys": ["light_intensity"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-right",
@@ -176,8 +192,6 @@
           "description": "Reset the selected light CCT.",
           "id": "lights-dial-3-press",
           "label": "CCT",
-          "lcdKey": "light_cct",
-          "lcdRefreshKeys": ["light_cct"],
           "method": "POST",
           "position": 3,
           "type": "dial-press",
@@ -190,7 +204,6 @@
           "description": "Lower the selected light CCT.",
           "id": "lights-dial-3-left",
           "label": "CCT Down",
-          "lcdRefreshKeys": ["light_cct"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-left",
@@ -203,7 +216,6 @@
           "description": "Raise the selected light CCT.",
           "id": "lights-dial-3-right",
           "label": "CCT Up",
-          "lcdRefreshKeys": ["light_cct"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-right",
@@ -213,11 +225,9 @@
           "body": {
             "action": "recallScene"
           },
-          "description": "Recall the selected lighting scene.",
+          "description": "Recall the selected lighting scene, with the Lighting page's Fade.",
           "id": "lights-dial-4-press",
-          "label": "Scene",
-          "lcdKey": "scene_nav",
-          "lcdRefreshKeys": ["scene_nav"],
+          "label": "SCENE",
           "method": "POST",
           "position": 4,
           "type": "dial-press",
@@ -230,7 +240,6 @@
           "description": "Select the previous scene.",
           "id": "lights-dial-4-left",
           "label": "Prev Scene",
-          "lcdRefreshKeys": ["scene_nav"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-left",
@@ -243,7 +252,6 @@
           "description": "Select the next scene.",
           "id": "lights-dial-4-right",
           "label": "Next Scene",
-          "lcdRefreshKeys": ["scene_nav"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-right",
@@ -257,55 +265,24 @@
       "buttons": [
         {
           "body": {
-            "action": "setMixTarget",
-            "value": "main"
+            "action": "rec"
           },
-          "description": "Make Main Out the active mix target.",
+          "description": "Start recording on CAM 1. While it records: arm the stop, then stop.",
           "id": "audio-btn-1",
-          "label": "MAIN",
-          "lcdRefreshKeys": [
-            "audio_state_target",
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state",
-            "audio_strip_1_level",
-            "audio_strip_2_level",
-            "audio_strip_3_level",
-            "audio_strip_4_level"
-          ],
+          "label": "REC",
           "method": "POST",
           "position": 1,
           "type": "button",
-          "url": "/api/deck/audio-action"
+          "url": "/api/deck/camera-action"
         },
         {
           "body": {
             "action": "setMixTarget",
-            "value": "phones-a"
+            "value": "main"
           },
-          "description": "Make Phones 1 the active mix target.",
+          "description": "Make Main Out the active mix target.",
           "id": "audio-btn-2",
-          "label": "PH 1",
-          "lcdRefreshKeys": [
-            "audio_state_target",
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state",
-            "audio_strip_1_level",
-            "audio_strip_2_level",
-            "audio_strip_3_level",
-            "audio_strip_4_level"
-          ],
+          "label": "MAIN OUT",
           "method": "POST",
           "position": 2,
           "type": "button",
@@ -314,59 +291,46 @@
         {
           "body": {
             "action": "setMixTarget",
-            "value": "phones-b"
+            "value": "phones"
           },
-          "description": "Make Phones 2 the active mix target.",
+          "description": "Make the next phones mix the active mix target: Phones 1, then Phones 2.",
           "id": "audio-btn-3",
-          "label": "PH 2",
-          "lcdRefreshKeys": [
-            "audio_state_target",
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state",
-            "audio_strip_1_level",
-            "audio_strip_2_level",
-            "audio_strip_3_level",
-            "audio_strip_4_level"
-          ],
+          "label": "PHONES",
           "method": "POST",
           "position": 3,
           "type": "button",
           "url": "/api/deck/audio-action"
         },
         {
+          "description": "Turn the deck to the CAMERAS page.",
+          "id": "audio-btn-4",
+          "isPageNav": true,
+          "label": "CAMERAS ›",
+          "pageNavTarget": "CAMERAS",
+          "position": 4,
+          "type": "button"
+        },
+        {
+          "body": {
+            "action": "playPause"
+          },
+          "description": "Play or pause the prompter.",
+          "id": "audio-btn-5",
+          "label": "PLAY",
+          "method": "POST",
+          "position": 5,
+          "type": "button",
+          "url": "/api/deck/prompter-action"
+        },
+        {
           "body": {
             "action": "cycleBank"
           },
           "description": "Cycle the dial bank: inputs, playback, outputs.",
-          "id": "audio-btn-4",
+          "id": "audio-btn-6",
           "label": "BANK",
-          "lcdKey": "audio_key_4",
-          "lcdRefreshKeys": [
-            "audio_state_bank",
-            "audio_state_mode",
-            "audio_key_4",
-            "audio_key_6",
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state",
-            "audio_strip_1_level",
-            "audio_strip_2_level",
-            "audio_strip_3_level",
-            "audio_strip_4_level"
-          ],
           "method": "POST",
-          "position": 4,
+          "position": 6,
           "type": "button",
           "url": "/api/deck/audio-action"
         },
@@ -375,52 +339,12 @@
             "action": "dimToggle"
           },
           "description": "Toggle control-room dim on Main Out.",
-          "id": "audio-btn-5",
-          "label": "DIM",
-          "lcdKey": "audio_key_5",
-          "lcdRefreshKeys": ["audio_state_dim", "audio_key_5"],
-          "method": "POST",
-          "position": 5,
-          "type": "button",
-          "url": "/api/deck/audio-action"
-        },
-        {
-          "body": {
-            "action": "toggleDialMode"
-          },
-          "description": "Toggle the input dials between fader and gain.",
-          "id": "audio-btn-6",
-          "label": "GAIN",
-          "lcdKey": "audio_key_6",
-          "lcdRefreshKeys": [
-            "audio_state_mode",
-            "audio_key_6",
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state",
-            "audio_strip_1_level",
-            "audio_strip_2_level",
-            "audio_strip_3_level",
-            "audio_strip_4_level"
-          ],
-          "method": "POST",
-          "position": 6,
-          "type": "button",
-          "url": "/api/deck/audio-action"
-        },
-        {
-          "description": "Navigate to the CAMERAS page.",
           "id": "audio-btn-7",
-          "isPageNav": true,
-          "label": "CAMS >>",
-          "pageNavTarget": "CAMERAS",
+          "label": "DIM",
+          "method": "POST",
           "position": 7,
-          "type": "button"
+          "type": "button",
+          "url": "/api/deck/audio-action"
         },
         {
           "body": {
@@ -428,109 +352,39 @@
           },
           "description": "Clear solo on every audio channel.",
           "id": "audio-btn-8",
-          "label": "SOLO CLR",
-          "lcdKey": "audio_key_8",
-          "lcdRefreshKeys": ["audio_state_solo", "audio_key_8"],
+          "label": "SOLO",
           "method": "POST",
           "position": 8,
           "type": "button",
           "url": "/api/deck/audio-action"
         },
         {
-          "body": {
-            "action": "stripTap",
-            "value": "1"
-          },
-          "description": "Select strip 1 in the app inspector.",
+          "description": "Shows the strip's name and its level into the mix target.",
           "id": "audio-btn-9",
-          "label": "Strip 1",
-          "lcdKey": "audio_strip_1",
-          "lcdRefreshKeys": [
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state"
-          ],
-          "method": "POST",
+          "label": "STRIP 1",
           "position": 9,
-          "type": "button",
-          "url": "/api/deck/audio-action"
+          "type": "display"
         },
         {
-          "body": {
-            "action": "stripTap",
-            "value": "2"
-          },
-          "description": "Select strip 2 in the app inspector.",
+          "description": "Shows the strip's name and its level into the mix target.",
           "id": "audio-btn-10",
-          "label": "Strip 2",
-          "lcdKey": "audio_strip_2",
-          "lcdRefreshKeys": [
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state"
-          ],
-          "method": "POST",
+          "label": "STRIP 2",
           "position": 10,
-          "type": "button",
-          "url": "/api/deck/audio-action"
+          "type": "display"
         },
         {
-          "body": {
-            "action": "stripTap",
-            "value": "3"
-          },
-          "description": "Select strip 3 in the app inspector.",
+          "description": "Shows the strip's name and its level into the mix target.",
           "id": "audio-btn-11",
-          "label": "Strip 3",
-          "lcdKey": "audio_strip_3",
-          "lcdRefreshKeys": [
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state"
-          ],
-          "method": "POST",
+          "label": "STRIP 3",
           "position": 11,
-          "type": "button",
-          "url": "/api/deck/audio-action"
+          "type": "display"
         },
         {
-          "body": {
-            "action": "stripTap",
-            "value": "4"
-          },
-          "description": "Select strip 4 in the app inspector.",
+          "description": "Shows the strip's name and its level into the mix target.",
           "id": "audio-btn-12",
-          "label": "Strip 4",
-          "lcdKey": "audio_strip_4",
-          "lcdRefreshKeys": [
-            "audio_strip_1",
-            "audio_strip_2",
-            "audio_strip_3",
-            "audio_strip_4",
-            "audio_strip_1_state",
-            "audio_strip_2_state",
-            "audio_strip_3_state",
-            "audio_strip_4_state"
-          ],
-          "method": "POST",
+          "label": "STRIP 4",
           "position": 12,
-          "type": "button",
-          "url": "/api/deck/audio-action"
+          "type": "display"
         }
       ],
       "dials": [
@@ -541,8 +395,7 @@
           },
           "description": "Toggle mute on strip 1.",
           "id": "audio-dial-1-press",
-          "label": "Dial 1",
-          "lcdRefreshKeys": ["audio_strip_1", "audio_strip_1_state", "audio_strip_1_level"],
+          "label": "DIAL 1",
           "method": "POST",
           "position": 1,
           "type": "dial-press",
@@ -556,7 +409,6 @@
           "description": "Ride the level on strip 1.",
           "id": "audio-dial-1-left",
           "label": "Level Down",
-          "lcdRefreshKeys": ["audio_strip_1", "audio_strip_1_level"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-left",
@@ -570,7 +422,6 @@
           "description": "Ride the level on strip 1.",
           "id": "audio-dial-1-right",
           "label": "Level Up",
-          "lcdRefreshKeys": ["audio_strip_1", "audio_strip_1_level"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-right",
@@ -583,8 +434,7 @@
           },
           "description": "Toggle mute on strip 2.",
           "id": "audio-dial-2-press",
-          "label": "Dial 2",
-          "lcdRefreshKeys": ["audio_strip_2", "audio_strip_2_state", "audio_strip_2_level"],
+          "label": "DIAL 2",
           "method": "POST",
           "position": 2,
           "type": "dial-press",
@@ -598,7 +448,6 @@
           "description": "Ride the level on strip 2.",
           "id": "audio-dial-2-left",
           "label": "Level Down",
-          "lcdRefreshKeys": ["audio_strip_2", "audio_strip_2_level"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-left",
@@ -612,7 +461,6 @@
           "description": "Ride the level on strip 2.",
           "id": "audio-dial-2-right",
           "label": "Level Up",
-          "lcdRefreshKeys": ["audio_strip_2", "audio_strip_2_level"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-right",
@@ -625,8 +473,7 @@
           },
           "description": "Toggle mute on strip 3.",
           "id": "audio-dial-3-press",
-          "label": "Dial 3",
-          "lcdRefreshKeys": ["audio_strip_3", "audio_strip_3_state", "audio_strip_3_level"],
+          "label": "DIAL 3",
           "method": "POST",
           "position": 3,
           "type": "dial-press",
@@ -640,7 +487,6 @@
           "description": "Ride the level on strip 3.",
           "id": "audio-dial-3-left",
           "label": "Level Down",
-          "lcdRefreshKeys": ["audio_strip_3", "audio_strip_3_level"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-left",
@@ -654,7 +500,6 @@
           "description": "Ride the level on strip 3.",
           "id": "audio-dial-3-right",
           "label": "Level Up",
-          "lcdRefreshKeys": ["audio_strip_3", "audio_strip_3_level"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-right",
@@ -667,8 +512,7 @@
           },
           "description": "Toggle mute on strip 4.",
           "id": "audio-dial-4-press",
-          "label": "Dial 4",
-          "lcdRefreshKeys": ["audio_strip_4", "audio_strip_4_state", "audio_strip_4_level"],
+          "label": "DIAL 4",
           "method": "POST",
           "position": 4,
           "type": "dial-press",
@@ -682,7 +526,6 @@
           "description": "Ride the level on strip 4.",
           "id": "audio-dial-4-left",
           "label": "Level Down",
-          "lcdRefreshKeys": ["audio_strip_4", "audio_strip_4_level"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-left",
@@ -696,7 +539,6 @@
           "description": "Ride the level on strip 4.",
           "id": "audio-dial-4-right",
           "label": "Level Up",
-          "lcdRefreshKeys": ["audio_strip_4", "audio_strip_4_level"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-right",
@@ -710,23 +552,59 @@
       "buttons": [
         {
           "body": {
+            "action": "rec"
+          },
+          "description": "Start recording on CAM 1. While it records: arm the stop, then stop.",
+          "id": "cameras-btn-1",
+          "label": "REC",
+          "method": "POST",
+          "position": 1,
+          "type": "button",
+          "url": "/api/deck/camera-action"
+        },
+        {
+          "body": {
+            "action": "bank"
+          },
+          "description": "Put the dials on exposure, colour or focus, in turn.",
+          "id": "cameras-btn-2",
+          "label": "BANK",
+          "method": "POST",
+          "position": 2,
+          "type": "button",
+          "url": "/api/deck/camera-action"
+        },
+        {
+          "description": "Turn the deck to the PROMPTER page.",
+          "id": "cameras-btn-4",
+          "isPageNav": true,
+          "label": "PROMPTER ›",
+          "pageNavTarget": "PROMPTER",
+          "position": 4,
+          "type": "button"
+        },
+        {
+          "body": {
+            "action": "playPause"
+          },
+          "description": "Play or pause the prompter.",
+          "id": "cameras-btn-5",
+          "label": "PLAY",
+          "method": "POST",
+          "position": 5,
+          "type": "button",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
             "action": "select",
             "value": "1"
           },
           "description": "Select CAM 1: the dials, the plate and the big picture follow.",
-          "id": "cameras-btn-1",
+          "id": "cameras-btn-6",
           "label": "CAM 1",
-          "lcdKey": "camera_key_1",
-          "lcdRefreshKeys": [
-            "camera_state_selected",
-            "camera_strip_1",
-            "camera_strip_2",
-            "camera_strip_3",
-            "camera_strip_4",
-            "camera_state_dials"
-          ],
           "method": "POST",
-          "position": 1,
+          "position": 6,
           "type": "button",
           "url": "/api/deck/camera-action"
         },
@@ -736,19 +614,10 @@
             "value": "2"
           },
           "description": "Select CAM 2: the dials, the plate and the big picture follow.",
-          "id": "cameras-btn-2",
+          "id": "cameras-btn-7",
           "label": "CAM 2",
-          "lcdKey": "camera_key_2",
-          "lcdRefreshKeys": [
-            "camera_state_selected",
-            "camera_strip_1",
-            "camera_strip_2",
-            "camera_strip_3",
-            "camera_strip_4",
-            "camera_state_dials"
-          ],
           "method": "POST",
-          "position": 2,
+          "position": 7,
           "type": "button",
           "url": "/api/deck/camera-action"
         },
@@ -758,95 +627,38 @@
             "value": "3"
           },
           "description": "Select CAM 3: the dials, the plate and the big picture follow.",
-          "id": "cameras-btn-3",
-          "label": "CAM 3",
-          "lcdKey": "camera_key_3",
-          "lcdRefreshKeys": [
-            "camera_state_selected",
-            "camera_strip_1",
-            "camera_strip_2",
-            "camera_strip_3",
-            "camera_strip_4",
-            "camera_state_dials"
-          ],
-          "method": "POST",
-          "position": 3,
-          "type": "button",
-          "url": "/api/deck/camera-action"
-        },
-        {
-          "body": {
-            "action": "bank"
-          },
-          "description": "Put the dials on exposure, colour or focus, in turn.",
-          "id": "cameras-btn-4",
-          "label": "BANK",
-          "lcdKey": "camera_key_bank",
-          "lcdRefreshKeys": [
-            "camera_key_bank",
-            "camera_strip_1",
-            "camera_strip_2",
-            "camera_strip_3",
-            "camera_strip_4",
-            "camera_state_dials"
-          ],
-          "method": "POST",
-          "position": 4,
-          "type": "button",
-          "url": "/api/deck/camera-action"
-        },
-        {
-          "body": {
-            "action": "rec"
-          },
-          "description": "Start recording on CAM 1. While it records: arm the stop, then stop.",
-          "id": "cameras-btn-5",
-          "label": "REC",
-          "lcdKey": "camera_key_rec",
-          "lcdRefreshKeys": ["camera_key_rec", "camera_state_rec"],
-          "method": "POST",
-          "position": 5,
-          "type": "button",
-          "url": "/api/deck/camera-action"
-        },
-        {
-          "description": "Navigate to the PROMPTER page.",
           "id": "cameras-btn-8",
-          "isPageNav": true,
-          "label": "PROMPTER >>",
-          "pageNavTarget": "PROMPTER",
+          "label": "CAM 3",
+          "method": "POST",
           "position": 8,
-          "type": "button"
+          "type": "button",
+          "url": "/api/deck/camera-action"
         },
         {
-          "description": "Shows what dial 1 sets.",
+          "description": "Shows what the dial under it sets on the selected camera, and its value.",
           "id": "cameras-btn-9",
-          "label": "What dial 1 sets",
-          "lcdKey": "camera_strip_1",
+          "label": "DIAL 1",
           "position": 9,
           "type": "display"
         },
         {
-          "description": "Shows what dial 2 sets.",
+          "description": "Shows what the dial under it sets on the selected camera, and its value.",
           "id": "cameras-btn-10",
-          "label": "What dial 2 sets",
-          "lcdKey": "camera_strip_2",
+          "label": "DIAL 2",
           "position": 10,
           "type": "display"
         },
         {
-          "description": "Shows what dial 3 sets.",
+          "description": "Shows what the dial under it sets on the selected camera, and its value.",
           "id": "cameras-btn-11",
-          "label": "What dial 3 sets",
-          "lcdKey": "camera_strip_3",
+          "label": "DIAL 3",
           "position": 11,
           "type": "display"
         },
         {
-          "description": "Shows what dial 4 sets.",
+          "description": "Shows what the dial under it sets on the selected camera, and its value.",
           "id": "cameras-btn-12",
-          "label": "What dial 4 sets",
-          "lcdKey": "camera_strip_4",
+          "label": "DIAL 4",
           "position": 12,
           "type": "display"
         }
@@ -859,8 +671,7 @@
           },
           "description": "Autofocus once, while the dials are on focus.",
           "id": "cameras-dial-1-press",
-          "label": "Dial 1",
-          "lcdRefreshKeys": ["camera_strip_1"],
+          "label": "DIAL 1",
           "method": "POST",
           "position": 1,
           "type": "dial-press",
@@ -874,7 +685,6 @@
           "description": "Step ISO, white balance or focus down on the selected camera, as the bank says.",
           "id": "cameras-dial-1-left",
           "label": "Dial 1 Down",
-          "lcdRefreshKeys": ["camera_strip_1"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-left",
@@ -888,7 +698,6 @@
           "description": "Step ISO, white balance or focus up on the selected camera, as the bank says.",
           "id": "cameras-dial-1-right",
           "label": "Dial 1 Up",
-          "lcdRefreshKeys": ["camera_strip_1"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-right",
@@ -901,8 +710,7 @@
           },
           "description": "A push of dial 2 does nothing.",
           "id": "cameras-dial-2-press",
-          "label": "Dial 2",
-          "lcdRefreshKeys": ["camera_strip_2"],
+          "label": "DIAL 2",
           "method": "POST",
           "position": 2,
           "type": "dial-press",
@@ -916,7 +724,6 @@
           "description": "Step shutter or tint down on the selected camera, as the bank says.",
           "id": "cameras-dial-2-left",
           "label": "Dial 2 Down",
-          "lcdRefreshKeys": ["camera_strip_2"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-left",
@@ -930,7 +737,6 @@
           "description": "Step shutter or tint up on the selected camera, as the bank says.",
           "id": "cameras-dial-2-right",
           "label": "Dial 2 Up",
-          "lcdRefreshKeys": ["camera_strip_2"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-right",
@@ -943,8 +749,7 @@
           },
           "description": "A push of dial 3 does nothing.",
           "id": "cameras-dial-3-press",
-          "label": "Dial 3",
-          "lcdRefreshKeys": ["camera_strip_3"],
+          "label": "DIAL 3",
           "method": "POST",
           "position": 3,
           "type": "dial-press",
@@ -958,7 +763,6 @@
           "description": "Step iris down on the selected camera, as the bank says.",
           "id": "cameras-dial-3-left",
           "label": "Dial 3 Down",
-          "lcdRefreshKeys": ["camera_strip_3"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-left",
@@ -972,7 +776,6 @@
           "description": "Step iris up on the selected camera, as the bank says.",
           "id": "cameras-dial-3-right",
           "label": "Dial 3 Up",
-          "lcdRefreshKeys": ["camera_strip_3"],
           "method": "POST",
           "position": 3,
           "type": "dial-turn-right",
@@ -985,8 +788,7 @@
           },
           "description": "A push of dial 4 does nothing.",
           "id": "cameras-dial-4-press",
-          "label": "Dial 4",
-          "lcdRefreshKeys": ["camera_strip_4"],
+          "label": "DIAL 4",
           "method": "POST",
           "position": 4,
           "type": "dial-press",
@@ -1000,7 +802,6 @@
           "description": "Step ND down on the selected camera, as the bank says.",
           "id": "cameras-dial-4-left",
           "label": "Dial 4 Down",
-          "lcdRefreshKeys": ["camera_strip_4"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-left",
@@ -1014,7 +815,6 @@
           "description": "Step ND up on the selected camera, as the bank says.",
           "id": "cameras-dial-4-right",
           "label": "Dial 4 Up",
-          "lcdRefreshKeys": ["camera_strip_4"],
           "method": "POST",
           "position": 4,
           "type": "dial-turn-right",
@@ -1028,42 +828,15 @@
       "buttons": [
         {
           "body": {
-            "action": "playPause"
+            "action": "rec"
           },
-          "description": "Play or pause the prompter.",
+          "description": "Start recording on CAM 1. While it records: arm the stop, then stop.",
           "id": "prompter-btn-1",
-          "label": "PLAY",
-          "lcdRefreshKeys": ["prompter_state_play", "prompter_left"],
+          "label": "REC",
           "method": "POST",
           "position": 1,
           "type": "button",
-          "url": "/api/deck/prompter-action"
-        },
-        {
-          "body": {
-            "action": "back"
-          },
-          "description": "Go back to the start of the paragraph.",
-          "id": "prompter-btn-2",
-          "label": "BACK",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
-          "method": "POST",
-          "position": 2,
-          "type": "button",
-          "url": "/api/deck/prompter-action"
-        },
-        {
-          "body": {
-            "action": "top"
-          },
-          "description": "Go to the top, and pause.",
-          "id": "prompter-btn-3",
-          "label": "TOP",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
-          "method": "POST",
-          "position": 3,
-          "type": "button",
-          "url": "/api/deck/prompter-action"
+          "url": "/api/deck/camera-action"
         },
         {
           "body": {
@@ -1071,11 +844,10 @@
             "value": "previous"
           },
           "description": "Go to the cue before the reading line.",
-          "id": "prompter-btn-5",
-          "label": "CUE <",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
+          "id": "prompter-btn-2",
+          "label": "◂ CUE",
           "method": "POST",
-          "position": 5,
+          "position": 2,
           "type": "button",
           "url": "/api/deck/prompter-action"
         },
@@ -1085,52 +857,83 @@
             "value": "next"
           },
           "description": "Go to the cue after the reading line.",
+          "id": "prompter-btn-3",
+          "label": "CUE ▸",
+          "method": "POST",
+          "position": 3,
+          "type": "button",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "description": "Turn the deck to the LIGHTS page.",
+          "id": "prompter-btn-4",
+          "isPageNav": true,
+          "label": "LIGHTS ›",
+          "pageNavTarget": "LIGHTS",
+          "position": 4,
+          "type": "button"
+        },
+        {
+          "body": {
+            "action": "playPause"
+          },
+          "description": "Play or pause the prompter.",
+          "id": "prompter-btn-5",
+          "label": "PLAY",
+          "method": "POST",
+          "position": 5,
+          "type": "button",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
+            "action": "back"
+          },
+          "description": "Go back to the start of the paragraph.",
           "id": "prompter-btn-6",
-          "label": "CUE >",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
+          "label": "BACK",
           "method": "POST",
           "position": 6,
           "type": "button",
           "url": "/api/deck/prompter-action"
         },
         {
-          "description": "Navigate to the LIGHTS page.",
+          "body": {
+            "action": "top"
+          },
+          "description": "Go to the top, and pause.",
           "id": "prompter-btn-8",
-          "isPageNav": true,
-          "label": "LIGHTS >>",
-          "pageNavTarget": "LIGHTS",
+          "label": "TOP",
+          "method": "POST",
           "position": 8,
-          "type": "button"
+          "type": "button",
+          "url": "/api/deck/prompter-action"
         },
         {
-          "description": "Shows the speed.",
+          "description": "Shows the speed, in words a minute.",
           "id": "prompter-btn-9",
-          "label": "The speed",
-          "lcdKey": "prompter_speed",
+          "label": "SPEED",
           "position": 9,
           "type": "display"
         },
         {
-          "description": "Shows the place.",
+          "description": "Shows how much of the script has been read.",
           "id": "prompter-btn-10",
-          "label": "The place",
-          "lcdKey": "prompter_place",
+          "label": "LINE",
           "position": 10,
           "type": "display"
         },
         {
-          "description": "Shows the time left.",
+          "description": "Shows the paragraph at the reading line, of the script's paragraphs.",
           "id": "prompter-btn-11",
-          "label": "The time left",
-          "lcdKey": "prompter_left",
+          "label": "PARAGRAPH",
           "position": 11,
           "type": "display"
         },
         {
-          "description": "Shows the script's name.",
+          "description": "Shows the text's size.",
           "id": "prompter-btn-12",
-          "label": "The script's name",
-          "lcdKey": "prompter_name",
+          "label": "SIZE",
           "position": 12,
           "type": "display"
         }
@@ -1142,8 +945,7 @@
           },
           "description": "Play or pause the prompter.",
           "id": "prompter-dial-1-press",
-          "label": "Speed",
-          "lcdRefreshKeys": ["prompter_state_play", "prompter_left"],
+          "label": "SPEED",
           "method": "POST",
           "position": 1,
           "type": "dial-press",
@@ -1157,7 +959,6 @@
           "description": "Slow the prompter by 5 words a minute.",
           "id": "prompter-dial-1-left",
           "label": "Speed Down",
-          "lcdRefreshKeys": ["prompter_speed", "prompter_left"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-left",
@@ -1171,16 +972,15 @@
           "description": "Speed the prompter up by 5 words a minute.",
           "id": "prompter-dial-1-right",
           "label": "Speed Up",
-          "lcdRefreshKeys": ["prompter_speed", "prompter_left"],
           "method": "POST",
           "position": 1,
           "type": "dial-turn-right",
           "url": "/api/deck/prompter-action"
         },
         {
-          "description": "A push of Position does nothing.",
+          "description": "A push of the LINE dial does nothing.",
           "id": "prompter-dial-2-press",
-          "label": "Position",
+          "label": "LINE",
           "position": 2,
           "type": "dial-press"
         },
@@ -1192,7 +992,6 @@
           "description": "Move the text back by a line.",
           "id": "prompter-dial-2-left",
           "label": "Line Back",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-left",
@@ -1206,59 +1005,16 @@
           "description": "Move the text on by a line.",
           "id": "prompter-dial-2-right",
           "label": "Line On",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
           "method": "POST",
           "position": 2,
           "type": "dial-turn-right",
           "url": "/api/deck/prompter-action"
         },
         {
-          "body": {
-            "action": "size",
-            "value": "standard"
-          },
-          "description": "Return the text to its standard size.",
+          "description": "A push of the PARAGRAPH dial does nothing.",
           "id": "prompter-dial-3-press",
-          "label": "Text size",
-          "lcdRefreshKeys": ["prompter_left", "prompter_state_play"],
-          "method": "POST",
+          "label": "PARAGRAPH",
           "position": 3,
-          "type": "dial-press",
-          "url": "/api/deck/prompter-action"
-        },
-        {
-          "body": {
-            "action": "size",
-            "value": "down"
-          },
-          "description": "Make the text 4 px smaller.",
-          "id": "prompter-dial-3-left",
-          "label": "Size Down",
-          "lcdRefreshKeys": ["prompter_left", "prompter_state_play"],
-          "method": "POST",
-          "position": 3,
-          "type": "dial-turn-left",
-          "url": "/api/deck/prompter-action"
-        },
-        {
-          "body": {
-            "action": "size",
-            "value": "up"
-          },
-          "description": "Make the text 4 px larger.",
-          "id": "prompter-dial-3-right",
-          "label": "Size Up",
-          "lcdRefreshKeys": ["prompter_left", "prompter_state_play"],
-          "method": "POST",
-          "position": 3,
-          "type": "dial-turn-right",
-          "url": "/api/deck/prompter-action"
-        },
-        {
-          "description": "A push of Paragraph does nothing.",
-          "id": "prompter-dial-4-press",
-          "label": "Paragraph",
-          "position": 4,
           "type": "dial-press"
         },
         {
@@ -1267,11 +1023,10 @@
             "value": "previous"
           },
           "description": "Go to the paragraph before.",
-          "id": "prompter-dial-4-left",
+          "id": "prompter-dial-3-left",
           "label": "Prev Paragraph",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
           "method": "POST",
-          "position": 4,
+          "position": 3,
           "type": "dial-turn-left",
           "url": "/api/deck/prompter-action"
         },
@@ -1281,9 +1036,47 @@
             "value": "next"
           },
           "description": "Go to the next paragraph.",
-          "id": "prompter-dial-4-right",
+          "id": "prompter-dial-3-right",
           "label": "Next Paragraph",
-          "lcdRefreshKeys": ["prompter_place", "prompter_left", "prompter_state_play"],
+          "method": "POST",
+          "position": 3,
+          "type": "dial-turn-right",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
+            "action": "size",
+            "value": "standard"
+          },
+          "description": "Return the text to its standard size.",
+          "id": "prompter-dial-4-press",
+          "label": "SIZE",
+          "method": "POST",
+          "position": 4,
+          "type": "dial-press",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
+            "action": "size",
+            "value": "down"
+          },
+          "description": "Make the text 4 px smaller.",
+          "id": "prompter-dial-4-left",
+          "label": "Size Down",
+          "method": "POST",
+          "position": 4,
+          "type": "dial-turn-left",
+          "url": "/api/deck/prompter-action"
+        },
+        {
+          "body": {
+            "action": "size",
+            "value": "up"
+          },
+          "description": "Make the text 4 px larger.",
+          "id": "prompter-dial-4-right",
+          "label": "Size Up",
           "method": "POST",
           "position": 4,
           "type": "dial-turn-right",

@@ -496,6 +496,16 @@ pub(super) fn read_selected_scene_id(
         .filter(|selected_scene_id| scenes.iter().any(|scene| scene.id == *selected_scene_id))
 }
 
+/// The Lighting page's Fade for a recall, in milliseconds (2026-10-03): the
+/// screen's recall and the deck's both use it. `0` until it is set.
+pub(crate) fn read_lighting_recall_fade_ms(settings: &HashMap<String, String>) -> i64 {
+    settings
+        .get(LIGHTING_RECALL_FADE_MS_KEY)
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .map(|value| clamp_i64(value, 0, MAX_RECALL_FADE_MS))
+        .unwrap_or(0)
+}
+
 pub(super) fn read_lighting_grand_master(settings: &HashMap<String, String>) -> i64 {
     settings
         .get(LIGHTING_GRAND_MASTER_KEY)

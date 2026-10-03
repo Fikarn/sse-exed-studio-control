@@ -35,6 +35,20 @@ export type LightingSnapshot = {
   outputArmed: boolean;
   lastRecalledSceneId: string | null;
   lastSceneRecallAt: string | null;
+  /**
+   * Whether the rig holds the live scene (2026-10-03), decided here for
+   * the screen and the deck alike: `live` while the rig holds the scene
+   * last put on it, `unsaved` once the rig changed since, `chosen` while
+   * a scene is selected but none was put on the rig, `preview` while
+   * previewing, `none` with no scene. The live scene is the last
+   * recalled, else the selected one (`lighting::scene_state`).
+   */
+  sceneState: string;
+  /**
+   * The Lighting page's Fade for a recall, in milliseconds, `0..10000`
+   * (2026-10-03): saved, and used by the deck's recall too.
+   */
+  recallFadeMs: number;
   lastActionStatus: string;
   lastActionCode: string | null;
   lastActionMessage: string | null;
