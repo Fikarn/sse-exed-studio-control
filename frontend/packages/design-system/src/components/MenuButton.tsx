@@ -70,6 +70,8 @@ export function MenuButton({
     const target = contextTarget?.current;
     if (!target || disabled) return undefined;
     const onContextMenu = (event: globalThis.MouseEvent) => {
+      // An object inside this one (a fixture on the stage) opened its own menu.
+      if (event.defaultPrevented) return;
       event.preventDefault();
       setOpenState({ anchor: { x: event.clientX, y: event.clientY }, fromKeyboard: false });
     };

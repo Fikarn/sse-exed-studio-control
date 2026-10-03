@@ -6,7 +6,8 @@ import { Menu, type MenuEntry } from "./Menu";
 // Visual overhaul B (DESIGN.md §9): the right-click menus of before, drawn
 // by the one menu at the pointer. The API stays, so the pages move to `Menu`
 // and a visible ⋯ (`MenuButton`) one at a time: a disabled item is drawn
-// disabled and the arrows pass over it; a `danger` item is coral and, when it
+// disabled, with its reason when it has one, and the arrows pass over it; a
+// `danger` item (one its own dialog confirms) is coral and, when it
 // is the last, stands after a divider; it still opens its own confirmation, as
 // before. The icons are no longer drawn: the menu's rows are words.
 
@@ -21,6 +22,8 @@ export interface ContextMenuItem {
   /** Click / Enter activation handler. The menu closes before it runs. */
   onSelect: () => void;
   disabled?: boolean;
+  /** Why it is disabled, in a few words at the right ("desk offline"). */
+  disabledReason?: string;
   tone?: ContextMenuItemTone;
 }
 
@@ -51,7 +54,7 @@ export function ContextMenu({ x, y, items, onClose, ariaLabel }: ContextMenuProp
         id: item.id,
         label: item.label,
         onSelect: item.onSelect,
-        disabledReason: item.disabled ? "" : undefined,
+        disabledReason: item.disabled ? (item.disabledReason ?? "") : undefined,
         tone: item.tone === "danger" ? "danger" : undefined,
       });
     });

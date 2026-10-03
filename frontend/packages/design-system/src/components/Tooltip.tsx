@@ -100,6 +100,8 @@ export function Tooltip({
   const suppressUntilLeaveRef = useRef(false);
   const [hovered, setVisible] = useState(false);
   const visible = open ?? hovered;
+  const held = open !== undefined;
+  const [placeAgain, setPlaceAgain] = useState(0);
   const [place, setPlace] = useState<{ left: number; top: number; side: Side; arrow: number } | null>(null);
 
   const clearTimers = () => {
@@ -108,13 +110,14 @@ export function Tooltip({
   };
 
   const hideNow = useCallback(() => {
+    if (held) return;
     clearTimers();
     setVisible((was) => {
       if (was) lastClosedAt = performance.now();
       return false;
     });
     setPlace(null);
-  }, []);
+  }, [held]);
 
   const show = useCallback(
     (immediate: boolean) => {
@@ -156,11 +159,36 @@ export function Tooltip({
       fallbackSides: PERPENDICULAR[placement],
     });
     if (!result) {
+      setPlace(null);
       hideNow();
       return;
     }
     setPlace({ left: result.left, top: result.top, side: result.side, arrow: result.arrow });
-  }, [visible, placement, content, maxWidth, hideNow]);
+  }, [visible, placement, content, maxWidth, hideNow, placeAgain]);
+
+  // It follows the page while it shows: placed again when the window changes
+  // size and once the fonts are in; closed when anything under it scrolls, so
+  // it never stays over a control that moved under it.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const again = () => setPlaceAgain((count) => count + 1);
+    const onScroll = (event: Event) => {
+      if (event.target instanceof Node && bubbleRef.current?.contains(event.target)) return;
+      if (held) again();
+      else hideNow();
+    };
+    window.addEventListener("resize", again);
+    window.addEventListener("scroll", onScroll, true);
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (live) again();
+    });
+    return () => {
+      live = false;
+      window.removeEventListener("resize", again);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [visible, held, hideNow]);
 
   // Esc closes an open tooltip and goes on to whatever else listens for it.
   useEffect(() => {

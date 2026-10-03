@@ -276,17 +276,26 @@ export function Menu({
     [arm, armKey, destructive]
   );
 
-  // The arrows pass over a disabled item; its reason is read with its words.
+  // The arrows pass over a disabled item (its reason is read with its words):
+  // from the item under the focus, a disabled one too, to the next enabled one.
   const enabled = useMemo(() => focusables.filter((entry) => !isDisabled(entry)), [focusables]);
   const step = useCallback(
     (delta: 1 | -1) => {
       if (enabled.length === 0) return;
-      const current = enabled.findIndex((entry) => entry.id === activeId);
-      const start = current === -1 ? (delta === 1 ? -1 : 0) : current;
-      const next = enabled[(start + delta + enabled.length) % enabled.length]!;
-      focusEntry(next.id);
+      const at = focusables.findIndex((entry) => entry.id === activeId);
+      if (at === -1) {
+        focusEntry((delta === 1 ? enabled[0] : enabled[enabled.length - 1])!.id);
+        return;
+      }
+      for (let offset = 1; offset <= focusables.length; offset += 1) {
+        const next = focusables[(at + delta * offset + focusables.length * offset) % focusables.length]!;
+        if (!isDisabled(next)) {
+          focusEntry(next.id);
+          return;
+        }
+      }
     },
-    [activeId, enabled, focusEntry]
+    [activeId, enabled, focusEntry, focusables]
   );
 
   const activate = useCallback(
@@ -455,7 +464,13 @@ export function Menu({
       // The menu is drawn in a portal, but its events still pass up the page's
       // tree: a press in it is not a press on the tile or strip that opened it.
       onPointerDown={(event) => event.stopPropagation()}
-      onMouseDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => {
+        // A press on the head row or the edge keeps the focus in the menu, so
+        // the arrows and Esc still reach it (the items take the focus as the
+        // pointer enters them, and their click still comes).
+        event.stopPropagation();
+        event.preventDefault();
+      }}
       onClick={(event) => event.stopPropagation()}
     >
       {head ? (

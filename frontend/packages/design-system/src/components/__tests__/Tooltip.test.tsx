@@ -153,6 +153,29 @@ describe("Tooltip", () => {
     expect(screen.queryByRole("tooltip")).toBeNull();
   });
 
+  it("stays when it is held open, whatever is pressed", () => {
+    render(
+      <Tooltip content="held" open>
+        <span>t</span>
+      </Tooltip>
+    );
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.pointerDown(screen.getByText("t"));
+    expect(screen.getByRole("tooltip")).toHaveAttribute("data-visible", "true");
+  });
+
+  it("closes when the page under it scrolls", () => {
+    render(
+      <Tooltip content="hint" delayMs={0}>
+        <span>t</span>
+      </Tooltip>
+    );
+    fireEvent.pointerEnter(screen.getByText("t").parentElement!.parentElement!);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.scroll(window);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
   it("applies maxWidth to the tooltip", () => {
     render(
       <Tooltip content="x" maxWidth={240} delayMs={0}>

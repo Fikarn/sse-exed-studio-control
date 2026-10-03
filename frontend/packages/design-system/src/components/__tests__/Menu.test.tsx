@@ -238,6 +238,26 @@ describe("Menu", () => {
     expect(level).toHaveBeenCalledTimes(1);
   });
 
+  it("steps from a hovered disabled item to its neighbours, not to the ends", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.hover(screen.getByRole("menuitemcheckbox", { name: /AutoSet/ }));
+    await user.hover(screen.getByRole("menuitem", { name: /Clear clip/ }));
+    await user.keyboard("{ArrowUp}");
+    expect(screen.getByRole("menuitemcheckbox", { name: /AutoSet/ })).toHaveFocus();
+    await user.hover(screen.getByRole("menuitem", { name: /Clear clip/ }));
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByTestId("phantom-off")).toHaveFocus();
+  });
+
+  it("keeps the focus in the menu when its head is pressed", () => {
+    render(<Harness />);
+    const head = screen.getByText("Preamp 1 · mic");
+    const press = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    head.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(true);
+  });
+
   it("closes on a press outside", () => {
     const onClose = vi.fn();
     render(
@@ -309,6 +329,51 @@ describe("MenuButton", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
     expect(button).toHaveFocus();
+  });
+
+  it("gives the focus back to what had it, not to the ⋯, after a right-click menu", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <button type="button">fader</button>
+        <ObjectWithMenu />
+      </>
+    );
+    screen.getByRole("button", { name: "fader" }).focus();
+    fireEvent.contextMenu(screen.getByTestId("strip"), { clientX: 300, clientY: 200 });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    screen.getByRole("menu").focus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.getByRole("button", { name: "fader" })).toHaveFocus();
+  });
+
+  it("opens only the inner object's menu on a right-click inside two objects", () => {
+    function Nested() {
+      const outer = useRef<HTMLDivElement | null>(null);
+      const inner = useRef<HTMLDivElement | null>(null);
+      return (
+        <div ref={outer} data-testid="stage">
+          <MenuButton
+            buttonLabel="Stage menu"
+            contextTarget={outer}
+            menu={{ head: { title: "Stage" }, items: [{ id: "a", label: "Add fixture…", onSelect: () => undefined }] }}
+          />
+          <div ref={inner} data-testid="fixture">
+            Key
+          </div>
+          <MenuButton
+            buttonLabel="Key menu"
+            contextTarget={inner}
+            menu={{ head: { title: "Key" }, items: [{ id: "b", label: "Identify", onSelect: () => undefined }] }}
+          />
+        </div>
+      );
+    }
+    render(<Nested />);
+    fireEvent.contextMenu(screen.getByTestId("fixture"), { clientX: 300, clientY: 200 });
+    expect(screen.getAllByRole("menu")).toHaveLength(1);
+    expect(screen.getByRole("menu", { name: "Key" })).toBeInTheDocument();
   });
 
   it("opens the same menu at the pointer on a right-click on its object", () => {

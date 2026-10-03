@@ -171,7 +171,9 @@ export function useReturnFocus(
     returnRef.current = explicitRef.current ?? (active instanceof HTMLElement ? active : null);
     const layer = layerRef.current;
     return () => {
-      const target = explicitRef.current ?? returnRef.current;
+      // What was decided when the layer opened: a menu opened at the pointer
+      // gives the focus back to what had it, even when its ⋯ asks for it later.
+      const target = returnRef.current;
       const focused = document.activeElement;
       const focusLeftWithLayer =
         !focused || focused === document.body || (layer !== null && layer.contains(focused)) || !focused.isConnected;

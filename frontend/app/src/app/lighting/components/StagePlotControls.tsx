@@ -86,7 +86,6 @@ export function StagePlotControls({
           items.push({
             id: "clear",
             label: `Clear view ${menu.slot + 1}`,
-            tone: "danger",
             onSelect: () => onClearViewBookmark?.(menu.slot),
           });
         }
