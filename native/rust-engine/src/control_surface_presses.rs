@@ -50,7 +50,8 @@ impl AskingKey {
     fn text(self, armed: bool) -> &'static str {
         match (self, armed) {
             (Self::AllOff, true) => "OFF?",
-            (Self::AllOff, false) => "All\\nOff",
+            // One line, in capitals as on the other pages (2026-10-03).
+            (Self::AllOff, false) => "ALL OFF",
             (Self::DeleteScene, true) => "DEL?",
             (Self::DeleteScene, false) => "Del\\nScene",
         }
@@ -252,7 +253,7 @@ mod tests {
             Ask::Armed
         );
         assert_eq!(asking_key_text(&db, AskingKey::DeleteScene, start), "DEL?");
-        assert_eq!(asking_key_text(&db, AskingKey::AllOff, start), "All\\nOff");
+        assert_eq!(asking_key_text(&db, AskingKey::AllOff, start), "ALL OFF");
         // Inside the dwell: the same press again.
         assert_eq!(
             ask(
@@ -304,7 +305,7 @@ mod tests {
             Ask::Armed
         );
         let late = start + ASK_WINDOW + Duration::from_millis(1);
-        assert_eq!(asking_key_text(&db, AskingKey::AllOff, late), "All\\nOff");
+        assert_eq!(asking_key_text(&db, AskingKey::AllOff, late), "ALL OFF");
         assert_eq!(
             ask(&db, AskingKey::AllOff, AskTarget::Previewing(false), late),
             Ask::Armed
@@ -361,7 +362,7 @@ mod tests {
         );
         assert_eq!(
             asking_key_text(&db, AskingKey::AllOff, start + Duration::from_millis(500)),
-            "All\\nOff"
+            "ALL OFF"
         );
         // `All Off` armed again, not acted on: its arm had ended.
         assert_eq!(
@@ -376,7 +377,7 @@ mod tests {
         end_arm(&db);
         assert_eq!(
             asking_key_text(&db, AskingKey::AllOff, start + Duration::from_secs(1)),
-            "All\\nOff"
+            "ALL OFF"
         );
     }
 

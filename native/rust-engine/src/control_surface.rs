@@ -18,8 +18,8 @@ use crate::lighting::{
     lock_shared_lighting_preview, parse_lighting_all_power_request,
     parse_lighting_fixture_update_request, parse_lighting_scene_create_request,
     parse_lighting_scene_delete_request, parse_lighting_scene_recall_request,
-    read_lighting_fixture_levels, recall_lighting_scene_with_preview,
-    set_lighting_all_power_with_preview, update_lighting_fixture_with_preview,
+    read_lighting_fixture_levels, read_lighting_recall_fade_ms, recall_lighting_scene_with_preview,
+    scene_state_in, set_lighting_all_power_with_preview, update_lighting_fixture_with_preview,
     with_lighting_state_and_preview, LightingCommandError, LightingEditorState,
     LightingFixtureLevels, LightingPreviewRuntimeState,
 };
@@ -196,7 +196,7 @@ fn read_deck_lcd_text_at(
     // Console or the rig, and are read once for a whole poll.
     match crate::control_surface_pages::page_lcd_text(db_path, cameras_simulated, key, at) {
         Some(text) => text,
-        None => lights_and_audio_lcd_text(db_path, key, at),
+        None => lights_and_audio_lcd_text(&LightsAndAudio::read(db_path)?, db_path, key, at),
     }
 }
 
@@ -219,125 +219,246 @@ pub fn read_control_surface_lcd_text_at(
     read_deck_lcd_text_at(db_path, true, key, at)
 }
 
+/// How a display reaches the deck in `GET /api/deck/displays`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DisplayShape {
+    /// One word, whole: a state word the deck's colours follow, or a value
+    /// with no line above it.
+    Word,
+    /// A line above a value (`INTENSITY` over `76 %`): the deck draws the
+    /// line from its label image where it is a fixed word, and the value in
+    /// its own type.
+    Lines,
+}
+
+/// Every display the deck's profile shows (2026-10-03), in one answer a
+/// second: 6 of the LIGHTS page, 14 of the AUDIO page (with the page the
+/// app is on, which every page's follow reads), 12 of the CAMERAS page and
+/// 7 of the PROMPTER page. The deck reads nothing else; the displays that
+/// left the profile (Del Scene's, the AUDIO page's strip states, its key
+/// texts and dial mode, the script's name) are still answered one by one at
+/// `GET /api/deck/lcd`, until a later cleanup.
+pub(crate) const DECK_DISPLAYS: [(&str, DisplayShape); 39] = [
+    ("light_nav", DisplayShape::Lines),
+    ("light_intensity", DisplayShape::Lines),
+    ("light_cct", DisplayShape::Lines),
+    ("scene_nav", DisplayShape::Lines),
+    ("light_key_off", DisplayShape::Word),
+    ("scene_state", DisplayShape::Word),
+    ("audio_strip_1", DisplayShape::Lines),
+    ("audio_strip_2", DisplayShape::Lines),
+    ("audio_strip_3", DisplayShape::Lines),
+    ("audio_strip_4", DisplayShape::Lines),
+    ("audio_strip_1_level", DisplayShape::Word),
+    ("audio_strip_2_level", DisplayShape::Word),
+    ("audio_strip_3_level", DisplayShape::Word),
+    ("audio_strip_4_level", DisplayShape::Word),
+    ("audio_state_target", DisplayShape::Word),
+    ("audio_state_bank", DisplayShape::Word),
+    ("audio_state_dim", DisplayShape::Word),
+    ("audio_state_solo", DisplayShape::Word),
+    ("audio_state_gated", DisplayShape::Word),
+    ("workspace", DisplayShape::Word),
+    ("camera_key_1", DisplayShape::Lines),
+    ("camera_key_2", DisplayShape::Lines),
+    ("camera_key_3", DisplayShape::Lines),
+    ("camera_key_bank", DisplayShape::Lines),
+    ("camera_key_rec", DisplayShape::Lines),
+    ("camera_strip_1", DisplayShape::Lines),
+    ("camera_strip_2", DisplayShape::Lines),
+    ("camera_strip_3", DisplayShape::Lines),
+    ("camera_strip_4", DisplayShape::Lines),
+    ("camera_state_selected", DisplayShape::Word),
+    ("camera_state_rec", DisplayShape::Word),
+    ("camera_state_dials", DisplayShape::Word),
+    ("prompter_speed", DisplayShape::Lines),
+    ("prompter_line", DisplayShape::Lines),
+    ("prompter_place", DisplayShape::Lines),
+    ("prompter_size", DisplayShape::Lines),
+    ("prompter_left", DisplayShape::Word),
+    ("prompter_state_play", DisplayShape::Word),
+    ("prompter_state_on", DisplayShape::Word),
+];
+
+/// What marks an answer of `GET /api/deck/displays` as the bridge's: an
+/// error's body never carries it, so the deck keeps what it showed rather
+/// than show the error (`exports`).
+pub(crate) const DECK_DISPLAYS_MARK: &str = "deck";
+
+/// Every display of `DECK_DISPLAYS` at `at`, in one answer
+/// (`GET /api/deck/displays`, 2026-10-03): `sse` is the mark, `at` the
+/// moment of the read in milliseconds since 1970 (the deck keeps the newer of
+/// two answers that cross), `words` the displays that are one word and
+/// `lines` the others as `head` over `value`. The pages are read as their
+/// displays are one by one: the PROMPTER page's from the frame the prompter
+/// published, the CAMERAS page's from the texts kept for a poll, the LIGHTS
+/// and AUDIO pages' from one read of the saved data. A page that cannot be
+/// read refuses the whole answer, and the deck keeps what it showed.
+pub fn read_deck_displays(
+    db_path: &Path,
+    cameras_simulated: bool,
+    at: Instant,
+) -> Result<Value, ControlSurfaceError> {
+    let mut texts: HashMap<&str, String> =
+        crate::control_surface_pages::page_texts(db_path, cameras_simulated, at)?
+            .into_iter()
+            .collect();
+    let lights_and_audio = LightsAndAudio::read(db_path)?;
+    for (key, _) in DECK_DISPLAYS {
+        if !texts.contains_key(key) {
+            texts.insert(
+                key,
+                lights_and_audio_lcd_text(&lights_and_audio, db_path, key, at)?,
+            );
+        }
+    }
+    let mut words = serde_json::Map::new();
+    let mut lines = serde_json::Map::new();
+    for (key, shape) in DECK_DISPLAYS {
+        let text = texts.remove(key).unwrap_or_default();
+        match shape {
+            DisplayShape::Word => {
+                words.insert(String::from(key), Value::String(text));
+            }
+            DisplayShape::Lines => {
+                let (head, value) = text.split_once("\\n").unwrap_or((text.as_str(), ""));
+                lines.insert(String::from(key), json!({ "head": head, "value": value }));
+            }
+        }
+    }
+    let at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_millis() as u64)
+        .unwrap_or(0);
+    Ok(json!({
+        "sse": DECK_DISPLAYS_MARK,
+        "at": at_ms,
+        "words": words,
+        "lines": lines,
+    }))
+}
+
+/// What the LIGHTS and AUDIO pages' displays are made of: one read of the
+/// saved data, and the lighting preview as it was then. The read is a
+/// reader's: it takes the shared preview alone and reads the settings under
+/// it — a preview-aware change holds the preview from its first read to its
+/// last write, so the pair read here is from one side of it, never the stored
+/// value of one moment beside the preview of another.
+struct LightsAndAudio {
+    app_settings: HashMap<String, String>,
+    audio_snapshot: crate::audio::AudioSnapshot,
+    /// The rig as stored: the target of a running fade.
+    lighting_state: LightingEditorState,
+    preview: LightingPreviewRuntimeState,
+}
+
+impl LightsAndAudio {
+    fn read(db_path: &Path) -> Result<Self, ControlSurfaceError> {
+        let shared_preview = lock_shared_lighting_preview();
+        let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
+            .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
+        let preview = shared_preview.clone();
+        drop(shared_preview);
+        Ok(Self {
+            audio_snapshot: read_audio_snapshot(&app_settings),
+            lighting_state: load_lighting_editor_state(&app_settings),
+            app_settings,
+            preview,
+        })
+    }
+
+    /// The light the deck has chosen, and its place among the rig's.
+    fn chosen_light(&self) -> Option<(usize, &crate::lighting::LightingEditorFixtureState)> {
+        let fixtures = &self.lighting_state.fixtures;
+        let id = resolve_selected_inventory_id(
+            &self.app_settings,
+            SELECTED_LIGHT_ID_KEY,
+            fixtures.iter().map(|fixture| fixture.id.as_str()),
+        )?;
+        fixtures
+            .iter()
+            .enumerate()
+            .find(|(_, fixture)| fixture.id == id)
+    }
+
+    /// The scene the deck has chosen, and its place among the rig's.
+    fn chosen_scene(&self) -> Option<(usize, &crate::lighting::LightingEditorSceneState)> {
+        let scenes = &self.lighting_state.scenes;
+        let id = resolve_selected_inventory_id(
+            &self.app_settings,
+            SELECTED_SCENE_ID_KEY,
+            scenes.iter().map(|scene| scene.id.as_str()),
+        )?;
+        scenes.iter().enumerate().find(|(_, scene)| scene.id == id)
+    }
+
+    /// The chosen light's levels as the operator means them: the preview's
+    /// while previewing, else the stored ones with a running fade sampled.
+    fn chosen_levels(&self) -> Option<LightingFixtureLevels> {
+        let (_, fixture) = self.chosen_light()?;
+        read_lighting_fixture_levels(&self.app_settings, &self.preview, &fixture.id)
+    }
+}
+
+/// A name as the deck's strip prints it: capitals, cut to 10 letters.
+fn deck_name(name: &str) -> String {
+    truncate(&name.to_uppercase(), 10)
+}
+
 fn lights_and_audio_lcd_text(
+    displays: &LightsAndAudio,
     db_path: &Path,
     key: &str,
     at: Instant,
 ) -> Result<String, ControlSurfaceError> {
-    // The two keys that ask first read the hardware link's memory, not the
-    // saved data: `OFF?` or `DEL?` while armed (2026-09-28).
+    let app_settings = &displays.app_settings;
+    let audio_snapshot = &displays.audio_snapshot;
     match key {
-        "light_key_off" => return Ok(asking_key_text(db_path, AskingKey::AllOff, at)),
-        "light_key_del" => return Ok(asking_key_text(db_path, AskingKey::DeleteScene, at)),
-        _ => {}
-    }
-    let app_settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX)
-        .map_err(|error| ControlSurfaceError::Storage(error.to_string()))?;
-    let audio_snapshot = read_audio_snapshot(&app_settings);
-    let lighting_state = load_lighting_editor_state(&app_settings);
-
-    match key {
-        "light_nav" => {
-            let selected_light_id = resolve_selected_inventory_id(
-                &app_settings,
-                SELECTED_LIGHT_ID_KEY,
-                lighting_state
-                    .fixtures
-                    .iter()
-                    .map(|fixture| fixture.id.as_str()),
-            );
-            if let Some(selected_light_id) = selected_light_id {
-                if let Some((index, fixture)) = lighting_state
-                    .fixtures
-                    .iter()
-                    .enumerate()
-                    .find(|(_, fixture)| fixture.id == selected_light_id)
-                {
-                    return Ok(format!(
-                        "LIGHT\\n{}\\n{}/{}",
-                        truncate(&fixture.name, 12),
-                        index + 1,
-                        lighting_state.fixtures.len()
-                    ));
-                }
-            }
-            Ok(String::from("LIGHT\\n(none)\\n--"))
-        }
-        "light_intensity" => {
-            let selected_light_id = resolve_selected_inventory_id(
-                &app_settings,
-                SELECTED_LIGHT_ID_KEY,
-                lighting_state
-                    .fixtures
-                    .iter()
-                    .map(|fixture| fixture.id.as_str()),
-            );
-            if let Some(levels) =
-                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
-            {
-                return Ok(format!(
-                    "INTENSITY\\n{}%{}",
-                    levels.intensity,
-                    preview_lcd_line(&levels)
-                ));
-            }
-            Ok(String::from("INTENSITY\\n--"))
-        }
-        "light_cct" => {
-            let selected_light_id = resolve_selected_inventory_id(
-                &app_settings,
-                SELECTED_LIGHT_ID_KEY,
-                lighting_state
-                    .fixtures
-                    .iter()
-                    .map(|fixture| fixture.id.as_str()),
-            );
-            if let Some(levels) =
-                selected_light_id.and_then(|fixture_id| deck_fixture_levels(db_path, &fixture_id))
-            {
-                return Ok(format!(
-                    "CCT\\n{}K{}",
-                    levels.cct,
-                    preview_lcd_line(&levels)
-                ));
-            }
-            Ok(String::from("CCT\\n--"))
-        }
-        "scene_nav" => {
-            let selected_scene_id = resolve_selected_inventory_id(
-                &app_settings,
-                SELECTED_SCENE_ID_KEY,
-                lighting_state.scenes.iter().map(|scene| scene.id.as_str()),
-            );
-            if let Some(selected_scene_id) = selected_scene_id {
-                if let Some((index, scene)) = lighting_state
-                    .scenes
-                    .iter()
-                    .enumerate()
-                    .find(|(_, scene)| scene.id == selected_scene_id)
-                {
-                    return Ok(format!(
-                        "SCENE\\n{}\\n{}/{}",
-                        truncate(&scene.name, 12),
-                        index + 1,
-                        lighting_state.scenes.len()
-                    ));
-                }
-            }
-            Ok(String::from("SCENE\\n(none)\\n--"))
-        }
-        "audio_strip_1" | "audio_strip_2" | "audio_strip_3" | "audio_strip_4" => {
-            let strip_index = key
-                .rsplit('_')
-                .next()
-                .and_then(|value| value.parse::<usize>().ok())
-                .unwrap_or(1);
-            Ok(audio_strip_lcd_text(
-                &app_settings,
-                &audio_snapshot,
-                strip_index,
-            ))
-        }
+        // The two keys that ask first read the hardware link's memory, not
+        // the saved data: `OFF?` or `DEL?` while armed (2026-09-28).
+        "light_key_off" => Ok(asking_key_text(db_path, AskingKey::AllOff, at)),
+        "light_key_del" => Ok(asking_key_text(db_path, AskingKey::DeleteScene, at)),
+        // Two lines a cell (2026-10-03): the dial's name over its value,
+        // names in capitals cut to 10 letters, `--` for none. Preview shows
+        // in the deck's colours, from `scene_state`, not as a third line.
+        "light_nav" => Ok(match displays.chosen_light() {
+            Some((index, fixture)) => format!(
+                "LIGHT {}/{}\\n{}",
+                index + 1,
+                displays.lighting_state.fixtures.len(),
+                deck_name(&fixture.name)
+            ),
+            None => String::from("LIGHT\\n--"),
+        }),
+        "light_intensity" => Ok(match displays.chosen_levels() {
+            Some(levels) if !levels.on => String::from("INTENSITY\\nOFF"),
+            Some(levels) => format!("INTENSITY\\n{} %", levels.intensity),
+            None => String::from("INTENSITY\\n--"),
+        }),
+        "light_cct" => Ok(match displays.chosen_levels() {
+            Some(levels) => format!("CCT\\n{} K", levels.cct),
+            None => String::from("CCT\\n--"),
+        }),
+        "scene_nav" => Ok(match displays.chosen_scene() {
+            Some((index, scene)) => format!(
+                "SCENE {}/{}\\n{}",
+                index + 1,
+                displays.lighting_state.scenes.len(),
+                deck_name(&scene.name)
+            ),
+            None => String::from("SCENE\\n--"),
+        }),
+        // Whether the deck's chosen scene is on the rig, decided as the
+        // screen's is (`lighting::scene_state`).
+        "scene_state" => Ok(String::from(scene_state_in(
+            app_settings,
+            &displays.lighting_state,
+            displays.chosen_scene().map(|(_, scene)| scene.id.as_str()),
+            displays.preview.enabled,
+        ))),
+        "audio_strip_1" | "audio_strip_2" | "audio_strip_3" | "audio_strip_4" => Ok(
+            audio_strip_lcd_text(app_settings, audio_snapshot, audio_strip_key_index(key)),
+        ),
         "audio_key_1" | "audio_key_2" | "audio_key_3" | "audio_key_4" | "audio_key_5"
         | "audio_key_6" | "audio_key_8" => {
             let key_index = key
@@ -345,32 +466,28 @@ fn lights_and_audio_lcd_text(
                 .next()
                 .and_then(|value| value.parse::<usize>().ok())
                 .unwrap_or(1);
-            Ok(audio_key_lcd_text(
-                &app_settings,
-                &audio_snapshot,
-                key_index,
-            ))
+            Ok(audio_key_lcd_text(app_settings, audio_snapshot, key_index))
         }
         "audio_strip_1_state"
         | "audio_strip_2_state"
         | "audio_strip_3_state"
         | "audio_strip_4_state" => Ok(audio_strip_state_text(
-            &app_settings,
-            &audio_snapshot,
+            app_settings,
+            audio_snapshot,
             audio_strip_key_index(key),
         )),
         "audio_strip_1_level"
         | "audio_strip_2_level"
         | "audio_strip_3_level"
         | "audio_strip_4_level" => Ok(audio_strip_level_text(
-            &app_settings,
-            &audio_snapshot,
+            app_settings,
+            audio_snapshot,
             audio_strip_key_index(key),
         )),
         "audio_state_target" | "audio_state_bank" | "audio_state_mode" | "audio_state_dim"
         | "audio_state_solo" | "audio_state_gated" => audio_state_value_text(
-            &app_settings,
-            &audio_snapshot,
+            app_settings,
+            audio_snapshot,
             key.trim_start_matches("audio_state_"),
         ),
         "workspace" => read_active_workspace(db_path),
@@ -906,12 +1023,20 @@ fn locked_light_action(
             })?;
             // The recall writes everything a recall writes; nothing is saved
             // after it (the deck used to save its pre-recall copy of the
-            // state over what the recall had just written).
+            // state over what the recall had just written). It fades as the
+            // Lighting page's recall does (the owner's decision, 2026-10-03:
+            // until then the deck always recalled at once): the page's Fade,
+            // and none into the preview, which the page loads at once too.
+            let fade_ms = if preview.enabled {
+                0
+            } else {
+                read_lighting_recall_fade_ms(&app_settings)
+            };
             let result = recall_lighting_scene_with_preview(
                 db_path,
                 &parse_lighting_scene_recall_request(&json!({
                     "sceneId": scene_id,
-                    "fadeDurationSeconds": 0.0
+                    "fadeMs": fade_ms
                 }))
                 .map_err(ControlSurfaceError::InvalidParams)?,
                 preview,
@@ -1008,26 +1133,6 @@ fn selected_lighting_fixture_id(
         state.fixtures.iter().map(|fixture| fixture.id.as_str()),
     )
     .ok_or_else(|| ControlSurfaceError::Rejected(String::from("No lighting fixture is available.")))
-}
-
-/// The LCD is a reader: it takes the shared preview alone, and reads the
-/// settings under it — a preview-aware mutation holds the preview from its
-/// first read to its last write, so the pair read here is from one side of
-/// it, never the stored value of one moment beside the preview of another.
-fn deck_fixture_levels(db_path: &Path, fixture_id: &str) -> Option<LightingFixtureLevels> {
-    let preview = lock_shared_lighting_preview();
-    let settings = list_settings_by_prefix(db_path, APP_SETTINGS_PREFIX).ok()?;
-    read_lighting_fixture_levels(&settings, &preview, fixture_id)
-}
-
-/// A third LCD line while previewing: the number above it is staged, not on
-/// the light output.
-fn preview_lcd_line(levels: &LightingFixtureLevels) -> &'static str {
-    if levels.previewing {
-        "\\nPREVIEW"
-    } else {
-        ""
-    }
 }
 
 pub(crate) fn clamp_i64(value: i64, min: i64, max: i64) -> i64 {

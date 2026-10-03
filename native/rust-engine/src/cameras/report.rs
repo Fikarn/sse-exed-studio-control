@@ -128,8 +128,8 @@ pub(crate) fn camera_snapshot(runtime: &CameraRuntime, picture: CameraPicture) -
             timecode_reported: model.timecode_reported(),
             started_at: runtime
                 .started_at
-                .clone()
-                .filter(|_| shown && recording == Some(true)),
+                .filter(|_| shown && recording == Some(true))
+                .map(crate::cameras::runtime::utc_text),
             card_time_left: None,
             card_time_not_reported: model.card_time_not_reported(),
         },

@@ -186,15 +186,41 @@ pub(crate) fn page_lcd_text(
     at: Instant,
 ) -> Option<Result<String, ControlSurfaceError>> {
     let page = page_of(key)?;
-    if page == Page::Prompter {
-        wait_for_keys(db_path);
-        return Some(
-            crate::prompter::deck::deck_texts(db_path)
-                .map_err(prompter_error)
-                .and_then(|texts| text_of(texts, key)),
-        );
-    }
-    let kept = kept(db_path, page);
+    Some(match page {
+        Page::Prompter => prompter_texts(db_path).and_then(|texts| text_of(texts, key)),
+        Page::Cameras => {
+            camera_texts(db_path, cameras_simulated, at).and_then(|texts| text_of(texts, key))
+        }
+    })
+}
+
+/// Every display of the PROMPTER and the CAMERAS pages at `at`, each read as
+/// its displays are one by one: the deck's one read a second
+/// (`GET /api/deck/displays`, 2026-10-03).
+pub(crate) fn page_texts(
+    db_path: &Path,
+    cameras_simulated: bool,
+    at: Instant,
+) -> Result<Texts, ControlSurfaceError> {
+    let mut texts = prompter_texts(db_path)?;
+    texts.extend(camera_texts(db_path, cameras_simulated, at)?);
+    Ok(texts)
+}
+
+/// The PROMPTER page's displays, once no key of the page is on its way, or
+/// `KEY_WAITED_FOR` on.
+fn prompter_texts(db_path: &Path) -> Result<Texts, ControlSurfaceError> {
+    wait_for_keys(db_path);
+    crate::prompter::deck::deck_texts(db_path).map_err(prompter_error)
+}
+
+/// The CAMERAS page's displays, as kept for `TEXTS_KEPT_FOR` from `at`.
+fn camera_texts(
+    db_path: &Path,
+    cameras_simulated: bool,
+    at: Instant,
+) -> Result<Texts, ControlSurfaceError> {
+    let kept = kept(db_path, Page::Cameras);
     // Held while the texts are read: the other displays of the same poll
     // wait for this read instead of making their own.
     let mut guard = lock(&kept);
@@ -202,26 +228,22 @@ pub(crate) fn page_lcd_text(
         .as_ref()
         .is_some_and(|kept| at.saturating_duration_since(kept.at) < TEXTS_KEPT_FOR);
     if !fresh {
-        let texts = match page {
-            Page::Prompter => crate::prompter::deck::deck_texts(db_path).map_err(prompter_error),
-            Page::Cameras => crate::cameras::deck::deck_texts_at(db_path, cameras_simulated, at)
-                .map_err(camera_error),
-        };
-        match texts {
+        match crate::cameras::deck::deck_texts_at(db_path, cameras_simulated, at)
+            .map_err(camera_error)
+        {
             Ok(texts) => {
                 *guard = Some(KeptTexts { at, texts });
             }
             Err(error) => {
                 *guard = None;
-                return Some(Err(error));
+                return Err(error);
             }
         }
     }
-    let texts = guard
+    Ok(guard
         .as_ref()
         .map(|kept| kept.texts.clone())
-        .unwrap_or_default();
-    Some(text_of(texts, key))
+        .unwrap_or_default())
 }
 
 /// A display's text among a page's.

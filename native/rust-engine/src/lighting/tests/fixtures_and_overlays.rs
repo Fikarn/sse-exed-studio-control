@@ -235,6 +235,7 @@ fn lighting_spatial_updates_and_markers_round_trip() {
                 y: 0.44,
                 rotation: 180.0,
             })),
+            recall_fade_ms: None,
         },
     )
     .expect("lighting settings update should succeed");
@@ -304,6 +305,7 @@ fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
             selected_fixture_id: None,
             camera_marker: None,
             subject_marker: None,
+            recall_fade_ms: Some(1500),
         },
     )
     .expect("lighting settings update should succeed");
@@ -313,6 +315,7 @@ fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
     assert_eq!(updated.universe, 4);
     assert_eq!(updated.grand_master, 68);
     assert_eq!(updated.selected_scene_id.as_deref(), Some("scene-stream"));
+    assert_eq!(updated.recall_fade_ms, 1500);
 
     let snapshot = read_lighting_snapshot(
         &list_settings_by_prefix(test_dir.db_path().as_path(), APP_SETTINGS_PREFIX)
@@ -328,6 +331,8 @@ fn lighting_settings_update_persists_transport_scene_focus_and_grand_master() {
     assert_eq!(snapshot.fixtures.len(), 4);
     assert_eq!(snapshot.scenes.len(), 3);
     assert_eq!(snapshot.selected_scene_id.as_deref(), Some("scene-stream"));
+    // The Lighting page's Fade is saved, and the deck's recall reads it too.
+    assert_eq!(snapshot.recall_fade_ms, 1500);
 }
 
 #[test]

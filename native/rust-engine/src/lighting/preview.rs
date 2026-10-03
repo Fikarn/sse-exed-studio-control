@@ -82,6 +82,7 @@ pub fn read_lighting_snapshot_with_preview(
     }
 
     snapshot.preview_mode = true;
+    snapshot.scene_state = String::from(super::scene_state::SCENE_STATE_PREVIEW);
     snapshot.preview_dirty = preview.dirty;
     snapshot.preview_scene_id = preview.target_scene_id.clone();
     snapshot.preview_fixtures = snapshot

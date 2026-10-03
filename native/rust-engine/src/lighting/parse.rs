@@ -620,6 +620,18 @@ pub fn parse_lighting_settings_update_request(
         .get("subjectMarker")
         .map(|value| parse_optional_spatial_marker(value, "subjectMarker"))
         .transpose()?;
+    // The Lighting page's Fade (2026-10-03): whole milliseconds, 0 to 10 s,
+    // as a recall takes it.
+    let recall_fade_ms = params
+        .get("recallFadeMs")
+        .map(|value| {
+            value
+                .as_f64()
+                .filter(|ms| ms.is_finite())
+                .map(|ms| (ms.round() as i64).clamp(0, super::MAX_RECALL_FADE_MS))
+                .ok_or_else(|| String::from("recallFadeMs must be a number"))
+        })
+        .transpose()?;
 
     if enabled.is_none()
         && bridge_ip.is_none()
@@ -629,6 +641,7 @@ pub fn parse_lighting_settings_update_request(
         && selected_fixture_id.is_none()
         && camera_marker.is_none()
         && subject_marker.is_none()
+        && recall_fade_ms.is_none()
     {
         return Err(String::from(
             "lighting.settings.update requires one or more supported fields",
@@ -644,6 +657,7 @@ pub fn parse_lighting_settings_update_request(
         selected_fixture_id,
         camera_marker,
         subject_marker,
+        recall_fade_ms,
     })
 }
 

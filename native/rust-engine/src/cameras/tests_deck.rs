@@ -2,8 +2,8 @@
 //! against the simulated cameras.
 
 use crate::cameras::deck::{
-    deck_texts, deck_texts_at, handle_deck_action, handle_deck_action_at, CAMERA_LCD_KEYS,
-    STOP_ARM_DWELL, STOP_ARM_WINDOW, STOP_SHOWN_FOR,
+    deck_texts, deck_texts_at, handle_deck_action, handle_deck_action_at, take_length_text,
+    CAMERA_LCD_KEYS, STOP_ARM_DWELL, STOP_ARM_WINDOW, STOP_SHOWN_FOR,
 };
 use crate::cameras::model::Setting;
 use crate::cameras::simulated::{CameraCommand, CameraValue};
@@ -55,15 +55,18 @@ fn rec_at(cameras: &TestCameras, at: Instant) -> Value {
 
 /// What the `REC` key reads at a moment of the test's, and the word its
 /// colour follows.
+/// `REC`'s word (`REC` or `STOP?`, above the take's length) and its state.
 fn rec_key_at(cameras: &TestCameras, at: Instant) -> (String, String) {
     let texts: HashMap<&'static str, String> = deck_texts_at(cameras.path(), cameras.simulated, at)
         .expect("the displays read")
         .into_iter()
         .collect();
-    (
-        texts["camera_key_rec"].clone(),
-        texts["camera_state_rec"].clone(),
-    )
+    let word = texts["camera_key_rec"]
+        .split("\\n")
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    (word, texts["camera_state_rec"].clone())
 }
 
 fn strip(cameras: &TestCameras) -> [String; 4] {
@@ -388,6 +391,53 @@ fn rec_starts_at_one_press_and_stops_at_two_within_three_seconds() {
     );
 }
 
+// 2026-10-03: while CAM 1 records, `REC` shows the take's length under its
+// word, counted from the start the hardware link saw as the page counts it;
+// `STOP?` keeps it under; `--` when the take began before the link looked.
+// Nothing is asked of a camera for it.
+#[test]
+fn rec_shows_the_takes_length_as_the_page_counts_it() {
+    assert_eq!(take_length_text(0), "0:00");
+    assert_eq!(take_length_text(59), "0:59");
+    assert_eq!(take_length_text(754), "12:34");
+    assert_eq!(take_length_text(3725), "1:02:05");
+
+    let cameras = TestCameras::set_up("deck-rec-length");
+    let start = Instant::now();
+    assert_eq!(rec_at(&cameras, start), "started");
+    let sent = cameras.sent(1);
+    assert_eq!(
+        deck_texts_at(cameras.path(), cameras.simulated, start)
+            .expect("the displays read")
+            .into_iter()
+            .find(|(key, _)| *key == "camera_key_rec")
+            .map(|(_, text)| text),
+        Some(String::from("REC\\n0:00"))
+    );
+    let armed_at = start + Duration::from_secs(10);
+    assert_eq!(rec_at(&cameras, armed_at), "armed");
+    let armed: HashMap<&'static str, String> =
+        deck_texts_at(cameras.path(), cameras.simulated, armed_at)
+            .expect("the displays read")
+            .into_iter()
+            .collect();
+    assert_eq!(armed["camera_key_rec"], "STOP?\\n0:00");
+    assert_eq!(cameras.sent(1), sent, "the displays sent nothing");
+
+    // CAM 1 lost and found again: the take began before the link looked.
+    cameras.answering(1, false);
+    cameras.answering(1, true);
+    let found: HashMap<&'static str, String> = deck_texts_at(
+        cameras.path(),
+        cameras.simulated,
+        armed_at + Duration::from_secs(10),
+    )
+    .expect("the displays read")
+    .into_iter()
+    .collect();
+    assert_eq!(found["camera_key_rec"], "REC\\n--");
+}
+
 // A press that arrives twice is one press. Without the dwell the second of a
 // double press would arm the stop of the take the first began, and the
 // second of a stop's double press would begin a take after the one it ended.
@@ -483,7 +533,7 @@ fn the_second_press_of_a_stop_starts_no_take_when_the_take_ended_by_itself() {
     );
     assert_eq!(reply.event, None);
     let texts: HashMap<&'static str, String> = texts.into_iter().collect();
-    assert_eq!(texts["camera_key_rec"], "REC");
+    assert_eq!(texts["camera_key_rec"], "REC", "no take, no length");
     assert_eq!(texts["camera_state_rec"], "ready");
     assert_eq!(cameras.sent(1), vec![CameraCommand::RecordStart]);
 
@@ -667,7 +717,8 @@ fn a_camera_that_is_not_held_takes_nothing_from_the_deck() {
 
     let displays = displays(&cameras);
     assert_eq!(displays["camera_key_1"], "CAM 1\\nUNREACHABLE");
-    assert_eq!(displays["camera_key_rec"], "REC");
+    // The take CAM 1 last reported: no length is counted (2026-10-03).
+    assert_eq!(displays["camera_key_rec"], "REC\\nLAST KNOWN");
     assert_eq!(displays["camera_state_rec"], "last-known");
     assert_eq!(displays["camera_state_dials"], "doubt");
     assert_eq!(

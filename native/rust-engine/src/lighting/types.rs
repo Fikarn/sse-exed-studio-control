@@ -54,6 +54,18 @@ pub struct LightingSnapshot {
     pub last_recalled_scene_id: Option<String>,
     #[serde(rename = "lastSceneRecallAt")]
     pub last_scene_recall_at: Option<String>,
+    /// Whether the rig holds the live scene (2026-10-03), decided here for
+    /// the screen and the deck alike: `live` while the rig holds the scene
+    /// last put on it, `unsaved` once the rig changed since, `chosen` while
+    /// a scene is selected but none was put on the rig, `preview` while
+    /// previewing, `none` with no scene. The live scene is the last
+    /// recalled, else the selected one (`lighting::scene_state`).
+    #[serde(rename = "sceneState")]
+    pub scene_state: String,
+    /// The Lighting page's Fade for a recall, in milliseconds, `0..10000`
+    /// (2026-10-03): saved, and used by the deck's recall too.
+    #[serde(rename = "recallFadeMs")]
+    pub recall_fade_ms: i64,
     #[serde(rename = "lastActionStatus")]
     pub last_action_status: String,
     #[serde(rename = "lastActionCode")]
@@ -484,6 +496,8 @@ pub struct LightingSettingsUpdateResult {
     pub camera_marker: Option<LightingSpatialMarker>,
     #[serde(rename = "subjectMarker")]
     pub subject_marker: Option<LightingSpatialMarker>,
+    #[serde(rename = "recallFadeMs")]
+    pub recall_fade_ms: i64,
     pub summary: String,
 }
 
@@ -782,6 +796,8 @@ pub struct LightingSettingsUpdateRequest {
     pub selected_fixture_id: Option<Option<String>>,
     pub camera_marker: Option<Option<LightingSpatialMarker>>,
     pub subject_marker: Option<Option<LightingSpatialMarker>>,
+    /// The Lighting page's Fade, in milliseconds, clamped to `0..10000`.
+    pub recall_fade_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone)]

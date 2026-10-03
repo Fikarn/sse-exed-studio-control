@@ -132,9 +132,11 @@ fn the_decks_rec_leaves_rows_with_the_deck_as_their_source() {
     let cameras = TestCameras::set_up("bridge-cameras-rec");
     let start = Instant::now();
     let rec = |at: Instant| key_at(cameras.path(), CAMERA_ROUTE, json!({ "action": "rec" }), at);
+    // `REC`'s word, over the take's length, and its state.
     let rec_key = |at: Instant| {
+        let text = display_at(cameras.path(), "camera_key_rec", at);
         (
-            display_at(cameras.path(), "camera_key_rec", at),
+            text.split("\\n").next().unwrap_or_default().to_string(),
             display_at(cameras.path(), "camera_state_rec", at),
         )
     };
@@ -392,7 +394,7 @@ fn a_pages_displays_are_read_once_for_a_poll_and_follow_the_decks_own_keys_at_on
     );
 
     // A display the page does not have is refused, as any other.
-    for key in ["camera_strip_5", "camera_key_4", "prompter_size", "camera_"] {
+    for key in ["camera_strip_5", "camera_key_4", "prompter_name", "camera_"] {
         let error =
             read_control_surface_lcd_text(cameras.path(), key).expect_err("no such display");
         assert!(

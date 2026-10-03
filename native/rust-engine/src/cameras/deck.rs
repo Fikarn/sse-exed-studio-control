@@ -169,7 +169,7 @@ pub(crate) fn handle_deck_action_at(
             event,
             health_changed: cameras.health_check() != before,
         };
-        Ok((reply, texts(cameras, at)))
+        Ok((reply, texts(cameras, at, now)))
     })
 }
 
@@ -295,10 +295,38 @@ pub(crate) fn deck_texts_at(
     simulated: bool,
     at: Instant,
 ) -> Result<DeckTexts, CameraError> {
-    with_cameras(db_path, simulated, |cameras, _, _| Ok(texts(cameras, at)))
+    with_cameras(db_path, simulated, |cameras, _, now| {
+        Ok(texts(cameras, at, now))
+    })
 }
 
-fn texts(cameras: &Cameras, at: Instant) -> DeckTexts {
+/// A take's length as the page counts it (`formatTakeLength`): whole
+/// seconds, `4:07`, `1:02:05`.
+pub(crate) fn take_length_text(seconds: u64) -> String {
+    let (hours, minutes, rest) = (seconds / 3600, (seconds % 3600) / 60, seconds % 60);
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{rest:02}")
+    } else {
+        format!("{minutes}:{rest:02}")
+    }
+}
+
+/// `REC` (D14, D19; 2026-10-03): its word, and under it the take's length
+/// while CAM 1 records, counted from the start the hardware link saw as the
+/// page counts it (`--` for a take that began before it looked), `STOP?`
+/// over the length while the stop is armed, and `LAST KNOWN` while CAM 1
+/// does not answer mid-take. Nothing is asked of a camera for it.
+fn rec_text(rec_state: &str, take: Option<String>) -> String {
+    let take = take.unwrap_or_else(|| String::from("--"));
+    match rec_state {
+        "armed" => format!("STOP?\\n{take}"),
+        "recording" => format!("REC\\n{take}"),
+        "last-known" => String::from("REC\\nLAST KNOWN"),
+        _ => String::from("REC"),
+    }
+}
+
+fn texts(cameras: &Cameras, at: Instant, now: SystemTime) -> DeckTexts {
     let mut texts = Vec::with_capacity(CAMERA_LCD_KEYS.len());
     for (key, camera) in [
         ("camera_key_1", 1),
@@ -325,10 +353,12 @@ fn texts(cameras: &Cameras, at: Instant) -> DeckTexts {
         CameraState::Unreachable if recording => "last-known",
         _ => "locked",
     };
-    texts.push((
-        "camera_key_rec",
-        String::from(if rec_state == "armed" { "STOP?" } else { "REC" }),
-    ));
+    let take = main
+        .started_at
+        .filter(|_| recording)
+        .and_then(|started| now.duration_since(started).ok())
+        .map(|length| take_length_text(length.as_secs()));
+    texts.push(("camera_key_rec", rec_text(rec_state, take)));
 
     let selected = cameras.camera(cameras.selected);
     let state = selected.state();
