@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Button, Key, StatusBadge } from "@sse/design-system";
+import { Button, Key, Section, StatusBadge } from "@sse/design-system";
 import type { JsonValue, ShellStore, StartupFailure } from "@sse/engine-client";
 
 import {
@@ -19,8 +19,7 @@ import { exportShellDiagnostics, openShellPath, resetWindowLayout } from "../she
 import { RestoreConfirmDialog, type RestorePrompt } from "./components/RestoreConfirmDialog";
 import { useLiveCallback } from "../shared/useLiveCallback";
 import { PreReadyState } from "../startup/PreReadyState";
-import recoveryStyles from "../startup/RecoveryBands.module.css";
-import styles from "../OperatorShell.module.css";
+import styles from "./SetupRecoverySurface.module.css";
 import {
   type ActionFeedback,
   feedbackBadgeTone,
@@ -182,10 +181,12 @@ export function SetupRecoverySurface({
     // The one recovery screen, whichever page was open (2026-09-28: a stop
     // during a session showed a smaller one, without Export diagnostics and
     // without the restore keys). The word, the hardware link's sentence, its
-    // code in the display's own slot, and the ways out as keys on the display.
-    // Reset the window layout sits beside Retry startup; it says nothing when
-    // the window moves, and a refusal lands in the message line below the
-    // display.
+    // code in the display's own slot.
+    // The shell (overhaul 3): the display, its one way out (Retry startup), the
+    // window's keys under it and the message line in the cluster; what to do
+    // in the bay (the restore and where things are); what the hardware
+    // reported on the plate. Reset the window layout says nothing when the
+    // window moves, and a refusal lands in the message line.
     <PreReadyState
       tone="error"
       word={getFailureTitle(failure).toUpperCase()}
@@ -193,68 +194,157 @@ export function SetupRecoverySurface({
       code={failure?.code ?? undefined}
       meta={`${formatFailureCode(failure)} · failed at ${failure?.stage ?? "runtime"} · recover from Setup / Support`}
       actions={
-        <>
-          <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
-            Retry startup
-          </Key>
-          <Key
-            size="small"
-            disabled={busyAction !== null}
-            testId="setup-recovery-window-reset"
-            onClick={() => void performAction("reset-window-layout", resetWindowLayout)}
-          >
-            Reset the window layout
-          </Key>
-          <Key
-            size="small"
-            disabled={!canReturnToConsole}
-            testId="setup-recovery-console"
-            onClick={() => void store.setWorkspace("audio")}
-          >
-            Back to Console
-          </Key>
-        </>
+        <Key size="small" mode="primary" testId="setup-recovery-retry" onClick={onRequestRestart}>
+          Retry startup
+        </Key>
       }
       testId="setup-recovery-surface"
-    >
-      {feedback ? (
-        <div
-          aria-live="polite"
-          className={styles.setupFeedbackBanner}
-          data-testid="setup-recovery-feedback"
-          data-tone={feedback.tone}
-          role="status"
-        >
-          <StatusBadge
-            label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
-            tone={feedbackBadgeTone(feedback.tone)}
-          />
-          <span>{feedback.message}</span>
-        </div>
-      ) : null}
-
-      <div className={styles.setupIncidentGrid} data-testid="setup-recovery-cards">
-        <div className={`${styles.setupIncidentHero} ${recoveryStyles.card}`} data-material="plate">
-          <div className={styles.setupIncidentPrompt}>What went wrong?</div>
-
-          {failure?.code === "PROTOCOL_MISMATCH" ? (
-            <div className={styles.setupIncidentMetaGrid}>
-              <div className={styles.setupIncidentMetaCard}>
-                <div className={styles.setupIncidentMetaLabel}>Requested protocol</div>
-                <div className={styles.setupIncidentMetaValue}>{failure.requestedProtocol ?? "unknown"}</div>
-              </div>
-              <div className={styles.setupIncidentMetaCard}>
-                <div className={styles.setupIncidentMetaLabel}>Reported protocol</div>
-                <div className={styles.setupIncidentMetaValue}>{failure.supportedProtocol ?? "unknown"}</div>
-              </div>
+      cluster={
+        <>
+          <div className={styles.keys} data-testid="setup-recovery-keys">
+            <Key
+              size="small"
+              disabled={busyAction !== null}
+              testId="setup-recovery-window-reset"
+              onClick={() => void performAction("reset-window-layout", resetWindowLayout)}
+            >
+              Reset the window layout
+            </Key>
+            <Key
+              size="small"
+              disabled={!canReturnToConsole}
+              testId="setup-recovery-console"
+              onClick={() => void store.setWorkspace("audio")}
+            >
+              Back to Console
+            </Key>
+          </div>
+          {feedback ? (
+            <div
+              aria-live="polite"
+              className={styles.feedback}
+              data-testid="setup-recovery-feedback"
+              data-tone={feedback.tone}
+              role="status"
+            >
+              <StatusBadge
+                label={feedback.tone === "ok" ? "Updated" : feedback.tone === "error" ? "Attention" : "Info"}
+                tone={feedbackBadgeTone(feedback.tone)}
+              />
+              <span>{feedback.message}</span>
             </div>
           ) : null}
+        </>
+      }
+      plate={
+        <div className={styles.column} data-testid="setup-recovery-diagnostics">
+          <Section title="Diagnostics">
+            <div className={styles.checks}>
+              {diagnosticsChecks.map((check) => (
+                <div key={check.label} className={styles.check}>
+                  <div className={styles.checkHead}>
+                    <div className={styles.checkTitle}>{check.label}</div>
+                    <StatusBadge label={statusToneLabel(check.tone)} tone={asStatusTone(check.tone)} />
+                  </div>
+                  <div className={styles.hint}>{check.detail}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
 
-          <div className={styles.setupIncidentRestoreGrid}>
-            <div className={styles.setupIncidentHighlight}>
-              <span className={styles.setupIncidentMetaLabel}>Latest database backup</span>
+          <div className={styles.subsection}>
+            <div className={styles.subhead}>Recovery evidence</div>
+            {detailEntries.length > 0 ? (
+              <ul className={styles.list}>
+                {detailEntries.map(([key, value]) => (
+                  <li key={key}>
+                    <span className={styles.listLabel}>{formatPathLabel(key)}</span>
+                    <span className={styles.hint}>{String(value)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className={styles.hint}>
+                Startup failed before Studio Control could write detailed incident evidence.
+              </div>
+            )}
+          </div>
+
+          <div className={styles.keys}>
+            <Button
+              disabled={busyAction !== null}
+              onClick={() => {
+                void performAction("export-diagnostics-card", exportDiagnostics);
+              }}
+              variant="secondary"
+            >
+              {busyAction === "export-diagnostics-card" ? "Working…" : "Export diagnostics"}
+            </Button>
+            <Button
+              disabled={!String(runtimePaths.logFilePath ?? "").trim() || busyAction !== null}
+              onClick={() => {
+                void performAction("open-engine-log-card", () =>
+                  openReferencePath("The log", String(runtimePaths.logFilePath ?? ""))
+                );
+              }}
+              variant="ghost"
+            >
+              Open the log
+            </Button>
+          </div>
+
+          <div className={styles.subsection}>
+            <div className={styles.subhead}>File paths</div>
+            <ul className={styles.list}>
+              {pathEntries.length > 0 ? (
+                pathEntries.map(([key, value]) => (
+                  <li key={key}>
+                    <span className={styles.listLabel}>{formatPathLabel(key)}</span>
+                    <span className={styles.hint}>{value}</span>
+                  </li>
+                ))
+              ) : (
+                <li>
+                  <span className={styles.hint}>No file paths were attached to this startup failure.</span>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {recentLogExcerpt.length > 0 ? (
+            <div className={styles.subsection} data-testid="setup-recovery-log">
+              <div className={styles.subhead}>The log's last lines</div>
+              <pre className={styles.log}>{recentLogExcerpt.join("\n")}</pre>
+            </div>
+          ) : null}
+        </div>
+      }
+    >
+      <div className={styles.column} data-testid="setup-recovery-cards">
+        <Section title="What went wrong?" detail="restore what was saved, or retry the start">
+          {/* The hardware link's sentence whole: the state display keeps two
+              lines of it in the cluster. */}
+          <p className={styles.sentence} data-testid="setup-recovery-sentence">
+            {summary}
+          </p>
+          {failure?.code === "PROTOCOL_MISMATCH" ? (
+            <dl className={styles.facts}>
+              <div>
+                <dt>Requested protocol</dt>
+                <dd>{failure.requestedProtocol ?? "unknown"}</dd>
+              </div>
+              <div>
+                <dt>Reported protocol</dt>
+                <dd>{failure.supportedProtocol ?? "unknown"}</dd>
+              </div>
+            </dl>
+          ) : null}
+
+          <div className={styles.restore}>
+            <div className={styles.latest}>
+              <span className={styles.listLabel}>Latest database backup</span>
               <strong>{lastBackup ? formatBackupTimestamp(lastBackup.modifiedAt) : "No database backup yet"}</strong>
-              <span className={styles.setupIncidentHint}>
+              <span className={styles.hint}>
                 {storageFailed
                   ? "While the saved data does not open, only a database backup can be restored. The hardware link restarts into it."
                   : String(
@@ -267,10 +357,10 @@ export function SetupRecoverySurface({
                     )}
               </span>
             </div>
-            <label className={styles.setupIncidentField}>
-              <span className={styles.setupIncidentMetaLabel}>Restore from path</span>
+            <label className={styles.field}>
+              <span className={styles.listLabel}>Restore from path</span>
               <input
-                className={styles.setupIncidentInput}
+                className={styles.input}
                 onChange={(event) => setRestorePath(event.target.value)}
                 placeholder={String(runtimePaths.backupDir ?? "a file inside the backups folder")}
                 value={restorePath}
@@ -278,7 +368,7 @@ export function SetupRecoverySurface({
             </label>
           </div>
 
-          <div className={styles.setupIncidentActions}>
+          <div className={styles.keys}>
             <Button onClick={onRequestRestart} variant="primary">
               Retry startup
             </Button>
@@ -313,167 +403,87 @@ export function SetupRecoverySurface({
               Restore path
             </Button>
           </div>
+        </Section>
 
-          <div className={styles.setupIncidentBackupList}>
-            {backups.length > 0 ? (
-              backups.map((backup) => (
+        <Section title="Backups">
+          {backups.length > 0 ? (
+            <div className={styles.backups}>
+              {backups.map((backup) => (
                 <button
                   key={backup.path}
-                  className={styles.setupIncidentBackupRow}
+                  className={styles.backupRow}
                   onClick={() => setRestorePath(backup.path)}
                   type="button"
                 >
-                  <span>
+                  <span className={styles.backupName}>
                     <strong>{backup.name}</strong>
                     <small>{backup.path}</small>
                   </span>
-                  <span className={styles.setupIncidentHint}>
+                  <span className={styles.hint}>
                     {formatBackupTimestamp(backup.modifiedAt)} · {formatFileSize(backup.sizeBytes)} ·{" "}
                     {describeBackupKind(backup.kind)}
                   </span>
                 </button>
-              ))
-            ) : (
-              <div className={styles.setupIncidentEmptyState}>
-                No backup list was published before startup failed. Name a file inside the backups folder above and
-                restore it directly.
-              </div>
-            )}
-          </div>
-
-          <div className={styles.setupIncidentReferencePanel}>
-            <div className={styles.setupIncidentSectionLabel}>Reference paths</div>
-            <div className={styles.setupIncidentRailButtons}>
-              <button
-                className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.backupDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-archive", () =>
-                    openReferencePath("Archive", String(runtimePaths.backupDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Archive
-              </button>
-              <button
-                className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.appDataDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-app-data", () =>
-                    openReferencePath("App data", String(runtimePaths.appDataDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                App data
-              </button>
-              <button
-                className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-diagnostics", () =>
-                    openReferencePath("Diagnostics", String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""))
-                  );
-                }}
-                type="button"
-              >
-                Diagnostics
-              </button>
-              <button
-                className={styles.setupIncidentRailButton}
-                disabled={!String(runtimePaths.logsDir ?? "").trim()}
-                onClick={() => {
-                  void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths.logsDir ?? "")));
-                }}
-                type="button"
-              >
-                Logs
-              </button>
+              ))}
             </div>
-          </div>
-        </div>
+          ) : (
+            <div className={styles.hint}>
+              No backup list was published before startup failed. Name a file inside the backups folder above and
+              restore it directly.
+            </div>
+          )}
+        </Section>
 
-        <div className={`${styles.setupIncidentCard} ${recoveryStyles.card}`} data-material="plate">
-          <div className={styles.setupIncidentSectionLabel}>Diagnostics</div>
-          <div className={styles.setupIncidentCheckGrid}>
-            {diagnosticsChecks.map((check) => (
-              <div key={check.label} className={styles.setupIncidentCheckCard}>
-                <div className={styles.setupIncidentCheckHeader}>
-                  <div className={styles.setupIncidentCheckTitle}>{check.label}</div>
-                  <StatusBadge label={statusToneLabel(check.tone)} tone={asStatusTone(check.tone)} />
-                </div>
-                <div className={styles.setupIncidentHint}>{check.detail}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className={styles.setupIncidentSubsection}>
-            <div className={styles.setupIncidentMetaLabel}>Recovery evidence</div>
-            {detailEntries.length > 0 ? (
-              <ul className={styles.setupIncidentDetailList}>
-                {detailEntries.map(([key, value]) => (
-                  <li key={key}>
-                    <span className={styles.setupIncidentMetaLabel}>{formatPathLabel(key)}</span>
-                    <span className={styles.setupIncidentHint}>{String(value)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className={styles.setupIncidentHint}>
-                Startup failed before Studio Control could write detailed incident evidence.
-              </div>
-            )}
-          </div>
-
-          <div className={styles.setupIncidentActions}>
-            <Button
-              disabled={busyAction !== null}
+        <Section title="Reference paths">
+          <div className={styles.keys}>
+            <button
+              className={styles.pathKey}
+              disabled={!String(runtimePaths.backupDir ?? "").trim()}
               onClick={() => {
-                void performAction("export-diagnostics-card", exportDiagnostics);
-              }}
-              variant="secondary"
-            >
-              {busyAction === "export-diagnostics-card" ? "Working…" : "Export diagnostics"}
-            </Button>
-            <Button
-              disabled={!String(runtimePaths.logFilePath ?? "").trim() || busyAction !== null}
-              onClick={() => {
-                void performAction("open-engine-log-card", () =>
-                  openReferencePath("The log", String(runtimePaths.logFilePath ?? ""))
+                void performAction("open-archive", () =>
+                  openReferencePath("Archive", String(runtimePaths.backupDir ?? ""))
                 );
               }}
-              variant="ghost"
+              type="button"
             >
-              Open the log
-            </Button>
+              Archive
+            </button>
+            <button
+              className={styles.pathKey}
+              disabled={!String(runtimePaths.appDataDir ?? "").trim()}
+              onClick={() => {
+                void performAction("open-app-data", () =>
+                  openReferencePath("App data", String(runtimePaths.appDataDir ?? ""))
+                );
+              }}
+              type="button"
+            >
+              App data
+            </button>
+            <button
+              className={styles.pathKey}
+              disabled={!String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? "").trim()}
+              onClick={() => {
+                void performAction("open-diagnostics", () =>
+                  openReferencePath("Diagnostics", String(runtimePaths.exportsDir ?? runtimePaths.appDataDir ?? ""))
+                );
+              }}
+              type="button"
+            >
+              Diagnostics
+            </button>
+            <button
+              className={styles.pathKey}
+              disabled={!String(runtimePaths.logsDir ?? "").trim()}
+              onClick={() => {
+                void performAction("open-logs", () => openReferencePath("Logs", String(runtimePaths.logsDir ?? "")));
+              }}
+              type="button"
+            >
+              Logs
+            </button>
           </div>
-
-          <div className={styles.setupIncidentSubsection}>
-            <div className={styles.setupIncidentMetaLabel}>File paths</div>
-            <ul className={styles.setupIncidentDetailList}>
-              {pathEntries.length > 0 ? (
-                pathEntries.map(([key, value]) => (
-                  <li key={key}>
-                    <span className={styles.setupIncidentMetaLabel}>{formatPathLabel(key)}</span>
-                    <span className={styles.setupIncidentHint}>{value}</span>
-                  </li>
-                ))
-              ) : (
-                <li>
-                  <span className={styles.setupIncidentHint}>No file paths were attached to this startup failure.</span>
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {recentLogExcerpt.length > 0 ? (
-            <div className={styles.setupIncidentSubsection} data-testid="setup-recovery-log">
-              <div className={styles.setupIncidentMetaLabel}>The log's last lines</div>
-              <pre className={recoveryStyles.log}>{recentLogExcerpt.join("\n")}</pre>
-            </div>
-          ) : null}
-        </div>
+        </Section>
       </div>
 
       {restorePrompt ? (

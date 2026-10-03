@@ -10,19 +10,19 @@ From the operator's chair, in one glance and without reading a sentence: is it s
 
 ## 2. The skeleton
 
-Every page is one grid: **header · cluster · bay · plate · footer**. There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
+Every page is one grid: **header · cluster · bay · plate · footer**, 80 · 440 | 1680 | 440 · 40. There is no page top bar; the cluster's first element is the state. The one surface is 2560×1440, fullscreen.
 
-| Region        | What it is                                                                                                                               | Size (px) |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------: |
-| Header        | the product's name, the tabs, one lamp per subsystem, latches, the clock                                                                 |   56 high |
-| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                    |  424 wide |
-| State display | a black display, fixed height: lamp and word, the hardware link's sentence, the way-out key; nothing below it moves                      |  180 high |
-| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched" |   56 high |
-| Bay           | the page's picture: strips, the plot, the glass, the step screen                                                                         |  the rest |
-| Plate         | right column: the selection (strip, fixture, script, camera) or Support, headed by its title plate                                       |  416 wide |
-| Footer        | telemetry as `Label value` items and one action key                                                                                      |   40 high |
+| Region        | What it is                                                                                                                                         | Size (px) |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------: |
+| Header        | the product's name, the tabs with their pages' lamps, the lamps without a page, latches, the REC tally, the clock, the logotype                    |   80 high |
+| Cluster       | left column: the **state display**, the **latch slot**, the take-time keys, the lists                                                              |  440 wide |
+| State display | a black display, fixed height: lamp and word, the page's ⋯ at its top right, the hardware link's sentence, the way-out key; nothing below it moves |  180 high |
+| Latch slot    | under the state display on every page: a latched state (solo, a clip, a highlight) and the key that clears it; at rest "Nothing latched"           |   56 high |
+| Bay           | the page's picture: strips, the plot, the glass, the step screen; the shell draws no margin in it, the page keeps its own                          | 1680 wide |
+| Plate         | right column, the shell's own on every page: the selection (strip, fixture, script, camera) or Support, headed by its title plate                  |  440 wide |
+| Footer        | telemetry as `Label value` items and one action key                                                                                                |   40 high |
 
-The tabs are Setup / Support · Lighting · Audio · Cameras · Teleprompter. The header's lamps follow the tab order with the deck last: Lighting · Audio · Cameras · Prompter · Surface. A `Backup` chip follows them only while the automatic backup failed or is overdue. Density never comes from the type; the sizes stay.
+The header reads left to right: the product's name in SSE Adelia at the frame's 32 px margin, alone over the cluster; the tabs, Setup / Support · Lighting · Audio · Cameras · Teleprompter, each page's tab carrying its page's lamp and state word (16 px), the open page's none, because its state display says it; the deck's lamp, `Surface`, and a `Backup` chip only while the automatic backup failed or is overdue; the latches (`SOLO`, `SCENE DRIFT`), each left off the page that shows it itself; the `REC` tally in a slot of its own that never moves, quiet at rest and the latch form in coral while CAM 1 records; the clock; and the SSE logotype alone at the right, 40 px high with half its height clear on every side, never a lockup. The screens before ready use the same frame: their state display in the cluster, what they show in the bay, the hardware's diagnostics on the plate, and no footer. Density never comes from the type; the sizes stay.
 
 Every take-time key has one fixed home. A latch goes into the latch slot, never above or between keys, so nothing a hand reaches for during a take is ever pushed.
 
@@ -112,8 +112,8 @@ Nothing on an idle surface animates. Hover changes an edge or a colour, never a 
 
 Pages compose these and never re-implement them; `frontend/packages/design-system` owns them. Test ids are extended, never renamed. The Storybook boards "Design System/A primitives" show every one of them and are measured like a page; the board "Menus and overlays, open" holds the floating layers open.
 
-- **Shell**: the header (the product's name, tabs, one `LampChip` per subsystem showing its worst state, latch chips, the clock) and the `Footer`.
-- **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, `Section`, the take-time keys.
+- **Shell**: the header (the product's name, `Tab`s with their pages' lamps, a `LampChip` for the deck and for each latch, the `Tally` for `REC`, the clock, the logotype) and the `Footer`; one plate slot that every page fills (`ShellRegion`).
+- **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys, the page's ⋯ as `menu` at its top right; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, on every page, `Section`, the take-time keys.
 - **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
 - **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.

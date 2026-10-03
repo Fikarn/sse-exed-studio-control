@@ -6,6 +6,8 @@ import { createShellStore, type JsonObject, type ShellStore } from "@sse/engine-
 import { createFixtureTransport } from "@sse/engine-client/fixture";
 import { getFixtureScenario } from "@sse/test-fixtures";
 
+import { AppShellFrame } from "@sse/design-system";
+
 import { OperatorLayoutProvider } from "../OperatorLayoutProvider";
 import { enterStudioFullscreen, resetWindowLayout } from "../shellCommands";
 import { SetupSupportPilot } from "./SetupSupportPilot";
@@ -38,20 +40,31 @@ function PilotOnStore({
   const supportSnapshot = supportSnapshotOverride
     ? supportSnapshotOverride(state.supportSnapshot)
     : state.supportSnapshot;
+  // The shell (overhaul 3): the Support plate is the shell's plate, so the
+  // pilot renders in the shell's frame, as the app mounts it.
   return (
     <OperatorLayoutProvider>
-      <SetupSupportPilot
-        appSnapshot={state.appSnapshot}
-        camerasSnapshot={state.camerasSnapshot}
-        commissioningSnapshot={state.commissioningSnapshot}
-        controlSurfaceSnapshot={state.controlSurfaceSnapshot}
-        healthSnapshot={state.healthSnapshot}
-        lightOutputsArmed={state.lightingSnapshot ? state.lightingSnapshot.outputArmed !== false : null}
-        liveTransportRequested={false}
-        onRequestRestart={() => {}}
-        store={store}
-        supportSnapshot={supportSnapshot}
-      />
+      <AppShellFrame
+        activeWorkspace="setup"
+        monitorItems={[]}
+        workspaces={[]}
+        cluster="slot"
+        plate="slot"
+        footer="slot"
+      >
+        <SetupSupportPilot
+          appSnapshot={state.appSnapshot}
+          camerasSnapshot={state.camerasSnapshot}
+          commissioningSnapshot={state.commissioningSnapshot}
+          controlSurfaceSnapshot={state.controlSurfaceSnapshot}
+          healthSnapshot={state.healthSnapshot}
+          lightOutputsArmed={state.lightingSnapshot ? state.lightingSnapshot.outputArmed !== false : null}
+          liveTransportRequested={false}
+          onRequestRestart={() => {}}
+          store={store}
+          supportSnapshot={supportSnapshot}
+        />
+      </AppShellFrame>
     </OperatorLayoutProvider>
   );
 }

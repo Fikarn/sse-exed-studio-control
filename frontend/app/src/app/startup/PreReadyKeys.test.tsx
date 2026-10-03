@@ -78,13 +78,13 @@ describe("the recovery screen: Reset the window layout beside Retry startup", ()
     );
   }
 
-  it("offers the key after Retry startup; a reset that works says nothing", async () => {
+  // The shell (overhaul 3): the state display stands in the 440 px cluster,
+  // where three keys do not fit; its one way out stays on it, and the window's
+  // keys stand right under it.
+  it("offers the key under Retry startup; a reset that works says nothing", async () => {
     renderSetupRecovery();
-    expect(keysOn("setup-recovery-surface-state-display")).toEqual([
-      "Retry startup",
-      "Reset the window layout",
-      "Back to Console",
-    ]);
+    expect(keysOn("setup-recovery-surface-state-display")).toEqual(["Retry startup"]);
+    expect(keysOn("setup-recovery-keys")).toEqual(["Reset the window layout", "Back to Console"]);
 
     fireEvent.click(screen.getByTestId("setup-recovery-window-reset"));
     await waitFor(() => expect(resetWindowLayout).toHaveBeenCalledTimes(1));

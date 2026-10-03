@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createShellStore, type EngineTransport, type EventEnvelope, type EventName } from "@sse/engine-client";
@@ -80,11 +80,11 @@ describe("the recovery screen is one screen", () => {
     expect(store.getSnapshot().recovery).toBe("recovery");
     expect(store.getSnapshot().activeWorkspace).toBe("audio");
 
-    const surface = await screen.findByTestId("setup-recovery-surface");
+    await screen.findByTestId("setup-recovery-surface");
     expect(screen.getByTestId("setup-recovery-surface-state-display").textContent).toContain("ENGINE_EXITED");
-    const keys = within(surface)
-      .getAllByRole("button")
-      .map((key) => key.textContent);
+    // The shell (overhaul 3): the screen fills the cluster, the bay and the
+    // plate, so its keys are the whole window's.
+    const keys = screen.getAllByRole("button").map((key) => key.textContent);
     for (const key of ["Retry startup", "Reset the window layout", "Export diagnostics", "Restore latest"]) {
       expect(keys, key).toContain(key);
     }

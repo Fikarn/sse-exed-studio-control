@@ -156,23 +156,28 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
 // GLO-09: latched cross-workspace state (audio SOLO, lighting scene drift)
 // surfaces as persistent attention chips in the shell monitor strip instead of
 // being guarded only by the async leave-prompt. Both flags derive from engine
-// snapshots, so the chips survive workspace switches.
+// snapshots, so the chips survive workspace switches. The shell (overhaul 3):
+// a latch is not printed in the header on the page that shows it itself —
+// Solo stands in the Console's latch slot there.
 test("audio solo latches a monitor-strip chip that survives workspace switches", async ({ page }) => {
   await openFixture(page, "audio-populated");
   const soloChip = page.getByRole("button", { name: /Open Audio for Solo/ });
+  const soloLatch = page.getByTestId("audio-latch-slot").getByTestId("audio-solo-warning-band");
   // The fixture transport's synthesized bank ships FX 3/4 pre-soloed, so the
-  // chip is part of the designed rest state.
-  await expect(soloChip).toBeVisible();
+  // latch is part of the designed rest state: in the latch slot, not the header.
+  await expect(soloLatch).toBeVisible();
+  await expect(soloChip).toHaveCount(0);
 
   const soloButton = page.getByTestId("audio-strip-audio-playback-3-4").getByRole("button", { name: "Solo FX 3/4" });
   await expect(soloButton).toHaveAttribute("aria-pressed", "true");
   await soloButton.click();
   await expect(soloButton).toHaveAttribute("aria-pressed", "false");
-  await expect(soloChip).toHaveCount(0);
+  await expect(soloLatch).toHaveCount(0);
+  await expect(page.getByTestId("audio-latch-slot")).toContainText("Nothing latched");
 
-  // Re-latch and confirm the chip survives leaving the audio workspace.
+  // Re-latch and confirm the chip stands on every other page.
   await soloButton.click();
-  await expect(soloChip).toBeVisible();
+  await expect(soloLatch).toBeVisible();
   await page.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
   await expect(soloChip).toBeVisible();
@@ -180,43 +185,143 @@ test("audio solo latches a monitor-strip chip that survives workspace switches",
   // The chip's click target is the owning workspace, not Setup.
   await soloChip.click();
   await expect(page.getByTestId("audio-workspace")).toBeVisible();
+  await expect(soloChip).toHaveCount(0);
 });
 
-test("lighting scene drift latches a monitor-strip chip", async ({ page }) => {
+// The shell (overhaul 3): a drifted scene is the rig's state display's word on
+// Lighting, and the Lighting tab's word everywhere else; a chip of its own only
+// when a worse state holds the tab's word (it is never printed twice).
+test("lighting scene drift is the Lighting tab's word on the other pages", async ({ page }) => {
   await openFixture(page, "lighting-populated");
   const driftChip = page.getByRole("button", { name: /Open Lighting for Scene drift/ });
   await expect(driftChip).toHaveCount(0);
 
   // Toggle the Front group off — the rig now diverges from the recalled
-  // Warm wash scene, which must latch the drift chip; restoring the group
-  // clears it.
+  // Warm wash scene; restoring the group clears it.
   await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
-  await expect(driftChip).toBeVisible();
-  await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
+  await expect(page.getByTestId("lighting-state-display")).toContainText("UNSAVED");
   await expect(driftChip).toHaveCount(0);
+  await page.getByRole("button", { name: "Audio", exact: true }).click();
+  // The rig's page asks before it is left with a drifted scene; the rig stays as it is.
+  await page.getByRole("button", { name: "Leave anyway" }).click();
+  await expectWorkspaceMounted(page, "audio");
+  await expect(page.getByTestId("shell-lamp-lighting")).toContainText("unsaved");
+  await expect(driftChip).toHaveCount(0);
+  await page.getByRole("button", { name: "Lighting", exact: true }).click();
+  await expectWorkspaceMounted(page, "lighting");
+  await page.getByRole("button", { name: /^Front, 2 fixtures/ }).click();
+  await expect(page.getByTestId("lighting-state-display")).not.toContainText("UNSAVED");
 });
 
 // Visual overhaul A, Slice 2 (plan D1, finding C3): the header lamp mirrors
 // the worst state its workspace shows — `ACTION FAILED` is red in the header
-// too. Until the state display lands (Slice 4), the workspace's state is its
-// current band: the Console's warning band and the Lighting bridge banner.
-// Visual overhaul A, Slice 4a. Old: both audio cases read
-// `audio-warning-band`. New: they read `audio-state-display`. Reason: the
-// Console's state, its sentence and its way out are the cluster's state
-// display now, so the band the header lamp mirrored no longer exists. Lighting
-// Visual overhaul A, Slice 5: Lighting's case moved the same way — the bridge
-// banner became the rig's state display.
-for (const { fixture, lamp, band, tone } of [
-  { fixture: "lighting-dmx-unreachable", lamp: "shell-lamp-lighting", band: "lighting-state-display", tone: "error" },
-  { fixture: "audio-offline", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
-  { fixture: "audio-action-failed", lamp: "shell-lamp-audio", band: "audio-state-display", tone: "error" },
+// too. Visual overhaul A, Slices 4a and 5: the workspace's state is its state
+// display. The shell (overhaul 3): the lamp is the page's tab's word, and the
+// active tab carries none, because the page's own display says it; so the
+// lamp is read from another page. This case also stands for the per-page lamp
+// words the Cameras, Lighting and Teleprompter specs read on their own page
+// before.
+for (const { fixture, tab, label, band, tone, word } of [
+  {
+    fixture: "lighting-dmx-unreachable",
+    tab: "lighting",
+    label: "Lighting",
+    band: "lighting-state-display",
+    tone: "error",
+    word: "no bridge",
+  },
+  {
+    fixture: "lighting-bridge-silent",
+    tab: "lighting",
+    label: "Lighting",
+    band: "lighting-state-display",
+    tone: "attention",
+    word: "not answering",
+  },
+  {
+    fixture: "audio-offline",
+    tab: "audio",
+    label: "Audio",
+    band: "audio-state-display",
+    tone: "error",
+    word: "offline",
+  },
+  {
+    fixture: "audio-action-failed",
+    tab: "audio",
+    label: "Audio",
+    band: "audio-state-display",
+    tone: "error",
+    word: "action failed",
+  },
+  {
+    fixture: "cameras-unreachable",
+    tab: "cameras",
+    label: "Cameras",
+    band: "cameras-state-display",
+    tone: "error",
+    word: "unreachable",
+  },
+  {
+    fixture: "cameras-released",
+    tab: "cameras",
+    label: "Cameras",
+    band: "cameras-state-display",
+    tone: "attention",
+    word: "released",
+  },
+  {
+    fixture: "cameras-no-link",
+    tab: "cameras",
+    label: "Cameras",
+    band: "cameras-state-display",
+    tone: "attention",
+    word: "not set up",
+  },
+  {
+    fixture: "cameras-picture-missing",
+    tab: "cameras",
+    label: "Cameras",
+    band: "cameras-state-display",
+    tone: "attention",
+    word: "picture missing",
+  },
+  {
+    fixture: "teleprompter-not-connected",
+    tab: "prompter",
+    label: "Teleprompter",
+    band: "teleprompter-state-display",
+    tone: "error",
+    word: "not connected",
+  },
+  {
+    fixture: "teleprompter-not-updated",
+    tab: "prompter",
+    label: "Teleprompter",
+    band: "teleprompter-state-display",
+    tone: "attention",
+    word: "not updated",
+  },
 ]) {
-  test(`the header lamp's tone equals the workspace's state tone on ${fixture}`, async ({ page }) => {
+  test(`the ${label} tab's word is the page's state, and the open page's tab carries none, on ${fixture}`, async ({
+    page,
+  }) => {
     await openFixture(page, fixture);
     const workspaceBand = page.getByTestId(band);
     await expect(workspaceBand).toBeVisible();
     await expect(workspaceBand).toHaveAttribute("data-tone", tone);
-    await expect(page.getByTestId(lamp)).toHaveAttribute("data-tone", tone);
+    const lamp = page.getByTestId(`shell-lamp-${tab}`);
+    await expect(lamp).toHaveCount(0);
+    await page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Setup / Support", exact: true })
+      .click();
+    await expect(page.getByTestId("setup-state-display")).toBeVisible();
+    const tabButton = page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: label, exact: true });
+    await expect(tabButton.getByTestId(`shell-lamp-${tab}`)).toHaveAttribute("data-tone", tone);
+    await expect(tabButton.getByTestId(`shell-lamp-${tab}`)).toContainText(word);
   });
 }
 
@@ -237,7 +342,7 @@ test("Setup renders inside the shell with tabs and lamps", async ({ page }) => {
   await expect(page.getByTestId("shell-clock")).toHaveText(/^\d\d:\d\d$/);
   const header = page.locator('[data-region="header"]');
   const headerBox = await header.boundingBox();
-  expect(Math.abs((headerBox?.height ?? 0) - 56), "header height within 2 px of D4").toBeLessThanOrEqual(2);
+  expect(Math.abs((headerBox?.height ?? 0) - 80), "header height within 2 px of section 2").toBeLessThanOrEqual(2);
   await nav.getByRole("button", { name: "Lighting", exact: true }).click();
   await expect(page.getByTestId("lighting-stage")).toBeVisible();
 });

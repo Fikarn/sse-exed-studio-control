@@ -22,7 +22,11 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
   test("is the last tab, and shows the script on the glass with its place and time", async ({ page }) => {
     await openTeleprompter(page);
     const tabs = page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button");
-    await expect(tabs).toHaveText(["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"]);
+    // The shell (overhaul 3): a tab carries its page's word, outside its name.
+    await expect(tabs).toHaveCount(5);
+    for (const [index, name] of ["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"].entries()) {
+      await expect(tabs.nth(index)).toHaveAccessibleName(name);
+    }
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("ON SCREEN");
     await expect(page.getByTestId("teleprompter-state-display")).toContainText(
       "The Prompter XL shows 02 Interview intro. Paused at paragraph 8"
@@ -30,29 +34,38 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-on-glass")).toHaveText("02 Interview intro");
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 8 of");
     await expect(page.getByTestId("teleprompter-copy")).toHaveAttribute("data-picture", "prompter-glass");
-    // The header: the Prompter lamp before the deck's, which is called Surface (D19).
-    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("Prompter");
+    // The header: the Prompter lamp before the deck's, which is called Surface
+    // (D19). The shell (overhaul 3): the prompter's lamp is the Teleprompter
+    // tab's word, which the open page's tab does not repeat.
+    await expect(page.getByTestId("shell-lamp-prompter")).toHaveCount(0);
     await expect(page.getByTestId("shell-lamp-surface")).toContainText("Surface");
   });
 
-  test("PLAY scrolls and lights a green latch on every page, which opens the Teleprompter", async ({ page }) => {
+  // The shell (overhaul 3): while the prompter scrolls, the Teleprompter
+  // tab says `playing` and the time left on every other page, and the tab
+  // opens it. Old: a green latch of its own beside the lamps.
+  test("PLAY scrolls and the Teleprompter tab says playing on every page, and opens it", async ({ page }) => {
     await openTeleprompter(page);
     await expectLaidOut(page);
     await page.getByTestId("teleprompter-play").click();
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("aria-pressed", "true");
-    const latch = page.getByTestId("shell-lamp-latched-prompter-playing");
-    await expect(latch).toContainText("Prompter playing");
-    await expect(latch).toContainText("left");
+    const word = page.getByTestId("shell-lamp-prompter");
+    await expect(word).toHaveCount(0);
+    await expect(page.getByTestId("shell-lamp-latched-prompter-playing")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Audio", exact: true }).click();
     await expectWorkspaceMounted(page, "audio");
-    await expect(latch).toBeVisible();
-    await latch.click();
+    await expect(word).toContainText("playing");
+    await expect(word).toContainText("left");
+    await expect(word).toHaveAttribute("data-tone", "ok");
+    await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
     await expectWorkspaceMounted(page, "teleprompter");
 
     await page.getByTestId("teleprompter-play").click();
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("aria-pressed", "false");
-    await expect(latch).toHaveCount(0);
+    await page.getByRole("button", { name: "Audio", exact: true }).click();
+    await expectWorkspaceMounted(page, "audio");
+    await expect(word).not.toContainText("playing");
   });
 
   test("a jump moves the place and never starts the scroll", async ({ page }) => {
@@ -141,7 +154,6 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT CONNECTED");
     await expect(page.getByTestId("teleprompter-play")).toHaveAttribute("data-locked", "");
     await expect(page.getByTestId("teleprompter-not-on-glass")).toHaveText("Not on the glass");
-    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("not connected");
     // Jumps still work: the place they set is where the prompter comes back.
     await page.getByTestId("teleprompter-top").click();
     await expect(page.getByTestId("teleprompter-place")).toContainText("¶ 1 of");
@@ -150,7 +162,6 @@ test.describe("the Teleprompter page (new pages S6a)", () => {
   test("NOT UPDATED offers Update · press twice, and Update clears it", async ({ page }) => {
     await openTeleprompter(page, "teleprompter-not-updated");
     await expect(page.getByTestId("teleprompter-state-display")).toContainText("NOT UPDATED");
-    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("not updated");
     await page.getByTestId("teleprompter-state-update").click();
     await page.waitForTimeout(400);
     await page.getByTestId("teleprompter-state-update").click();

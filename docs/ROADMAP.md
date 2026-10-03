@@ -24,14 +24,14 @@ The owner asked on 2026-10-03 for the pages to look and work as one premium inst
 
 - [x] 1. Foundation A: the look: tokens, the PT faces and SSE Adelia, the primitives, the measures (#293)
 - [x] 2. Foundation B: menus and overlays: the menu, the ⋯, the popover, the tooltip, the context menu and the colour picker on them, the cameras' picture holes (#296)
-- [ ] 3. The shell: header with the `REC` tally and the logo, footer, one plate mechanism, the latch slot on every page, the screens before ready
+- [x] 3. The shell: header with the `REC` tally and the logo, footer, one plate mechanism, the latch slot on every page, the screens before ready (#298)
 - [ ] 4. Audio: the outputs in the left column, the strips, the plate without scrolling, menus and tooltips
 - [ ] 5. Lighting: the plot from real positions, the bar under it, scenes as rows, the plate, menus
 - [ ] 6. Cameras: the cluster, caption and plate; format and look as popovers; the values list as a popover
 - [ ] 7. Teleprompter: the take block, the look and the Prompter XL readouts in popovers, script rows with menus
 - [ ] 8. Setup / Support and recovery
 - [x] 9. The deck's Companion 5 profile, and one read of every display (#294)
-- [ ] 10. The deck's look: labels drawn in PT Sans and SSE Adelia, the screen's palette and forms
+- [x] 10. The deck's look: labels drawn in PT Sans and SSE Adelia, the screen's palette and forms (#297)
 - [ ] 11. Polish: a critique of every capture, the fixes, the app shown to the owner
 
 Left by pull request 2 for the page pull requests:

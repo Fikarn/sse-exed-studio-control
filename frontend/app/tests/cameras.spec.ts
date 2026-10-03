@@ -46,7 +46,11 @@ test.describe("the Cameras page", () => {
   }) => {
     await openCameras(page);
     const tabs = page.getByRole("navigation", { name: "Workspace navigation" }).getByRole("button");
-    await expect(tabs).toHaveText(["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"]);
+    // The shell (overhaul 3): a tab carries its page's word, outside its name.
+    await expect(tabs).toHaveCount(5);
+    for (const [index, name] of ["Setup / Support", "Lighting", "Audio", "Cameras", "Teleprompter"].entries()) {
+      await expect(tabs.nth(index)).toHaveAccessibleName(name);
+    }
     await expect(state(page)).toContainText("HELD");
     await expect(state(page)).toContainText("CAM 1 is held: Studio Control reads it and sends only what you press.");
     await expect(state(page)).toContainText("3 of 3 held · CAM 1 not recording");
@@ -60,11 +64,18 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-iso-value")).toContainText("400");
     await expect(page.getByTestId("cameras-shutter-value")).toContainText("180°");
 
-    // The header: the cameras' lamp between the Console's and the prompter's (D19).
+    // The header: the cameras' lamp between the Console's and the prompter's
+    // (D19). The shell (overhaul 3): each page's lamp is its tab's word, and
+    // the open page's tab carries none, because the state display says it;
+    // the deck's lamp follows the tabs. REC has its own slot, quiet at rest.
     const lamps = page.locator('[data-region="header"] [data-testid^="shell-lamp-"]:not([data-latch])');
-    await expect(lamps).toHaveText([/^Lighting/, /^Audio/, /^Cameras/, /^Prompter/, /^Surface/]);
-    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("ready");
+    await expect(lamps).toHaveCount(4);
+    await expect(page.getByTestId("shell-lamp-cameras")).toHaveCount(0);
+    await expect(page.getByTestId("shell-lamp-surface")).toContainText("Surface");
     await expect(recChip(page)).toHaveCount(0);
+    await expect(page.getByTestId("shell-rec-slot")).toHaveText("REC");
+    await tabs.nth(0).click();
+    await expect(tabs.nth(3).getByTestId("shell-lamp-cameras")).toContainText("ready");
   });
 
   test("has one selection: a camera's key and a small picture both select, and everything follows", async ({
@@ -318,7 +329,6 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-iso-value")).toContainText("not read");
     await expect(page.getByTestId("cameras-iso-up")).toHaveAttribute("aria-disabled", "true");
     await expect(page.getByTestId("cameras-release")).toHaveCount(0);
-    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("released");
     await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 2 released to LUMIX Tether.");
 
     // The state display's way out and the plate's key are the same Connect.
@@ -366,7 +376,6 @@ test.describe("the Cameras page", () => {
     await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.stopAnswering(3));
     await expect(state(page)).toContainText("UNREACHABLE");
     await expect(state(page)).toContainText("CAM 3 does not answer at 172.16.16.30.");
-    await expect(page.getByTestId("shell-lamp-cameras")).toHaveAttribute("data-tone", "error");
     await expect(page.getByTestId("cameras-iso-value")).toHaveAttribute("data-doubt", "");
     await expect(page.getByTestId("cameras-iso-value")).toContainText("1600");
     await expect(page.getByTestId("cameras-iso-value")).toContainText("last read");
@@ -417,7 +426,6 @@ test.describe("the Cameras page", () => {
     await openCameras(page, "cameras-no-link");
     await expect(state(page)).toContainText("NOT SET UP");
     await expect(state(page)).toContainText("Studio Control has no link to CAM 1 yet: it comes with a later version.");
-    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("not set up");
     await expect(page.getByTestId("cameras-rec")).toHaveAttribute("data-rec", "locked");
     await expect(page.getByTestId("cameras-rec")).toContainText("locked · CAM 1 is not set up");
     await expect(page.getByTestId("cameras-recent-empty")).toBeVisible();
@@ -478,7 +486,6 @@ test.describe("the Cameras page", () => {
       "vMix sends no picture for CAM 2. Check that vMix input 7 is still there and live."
     );
     await expect(state(page)).toContainText("The camera controls still work · 3 of 3 held");
-    await expect(page.getByTestId("shell-lamp-cameras")).toContainText("picture missing");
     await expect(page.getByTestId("cameras-no-picture-2")).toContainText("NO PICTURE");
     await expect(page.getByTestId("cameras-no-picture-2")).toContainText("nothing received");
     await expect(page.getByTestId("cameras-picture-row-2")).toContainText("nothing received");
@@ -869,13 +876,18 @@ test.describe("the Cameras page", () => {
         cut: section.scrollHeight > section.clientHeight + 1,
         lastRowBottom: rows.at(-1)!.getBoundingClientRect().bottom,
         sectionBottom: section.getBoundingClientRect().bottom,
-        standingTop: document.querySelector("[data-testid=cameras-read-all]")!.getBoundingClientRect().top,
+        // The shell (overhaul 3): the standing keys went into the page's ⋯, so
+        // the list is the cluster's last section, above its foot margin.
+        clusterFoot: (() => {
+          const cluster = document.querySelector<HTMLElement>("[data-testid=cameras-cluster]")!;
+          return cluster.getBoundingClientRect().bottom - parseFloat(getComputedStyle(cluster).paddingBottom);
+        })(),
       };
     });
     expect(room.lines).toEqual([2, 2, 2, 2, 2]);
     expect(room.cut, "the list is not cut").toBe(false);
     expect(room.lastRowBottom).toBeLessThanOrEqual(room.sectionBottom + 0.5);
-    expect(room.sectionBottom, "the list ends above the standing keys").toBeLessThan(room.standingTop);
+    expect(room.sectionBottom, "the list ends inside the cluster").toBeLessThanOrEqual(room.clusterFoot + 0.5);
   });
 
   // Controls used during a take never move (docs/DESIGN.md, section 1): REC,
@@ -895,10 +907,10 @@ test.describe("the Cameras page", () => {
           "cameras-dials-hint",
           "cameras-pictures",
           "cameras-recent",
-          "cameras-read-all",
         ].map((id) => {
           const box = document.querySelector(`[data-testid=${id}]`)!.getBoundingClientRect();
-          // The Recent list is as long as its rows; the standing keys under it are at the foot.
+          // The Recent list is as long as its rows. The shell (overhaul 3): the
+          // standing keys that stood at the foot are in the page's ⋯.
           const height = id === "cameras-recent" ? null : Math.round(box.height * 10) / 10;
           return [id, Math.round(box.top * 10) / 10, height];
         })
@@ -937,7 +949,10 @@ test.describe("the Cameras page", () => {
 });
 
 test.describe("the header with the cameras", () => {
-  test("its fullest row fits: Scene drift, Solo, Prompter playing and REC together", async ({ page }) => {
+  // The shell (overhaul 3): the fullest header is Setup's, where every page's
+  // tab carries its word, with the deck, the latches and the REC tally lit. A
+  // drifted scene is the Lighting tab's word, the prompter's play its tab's.
+  test("its fullest row fits: every tab's word, Solo, the prompter playing and REC together", async ({ page }) => {
     await openFixture(page, "every-page");
     await expectWorkspaceMounted(page, "cameras");
     await page.getByTestId("cameras-rec").click();
@@ -946,7 +961,6 @@ test.describe("the header with the cameras", () => {
     await page.getByRole("button", { name: "Lighting", exact: true }).click();
     await expectWorkspaceMounted(page, "lighting");
     await page.getByRole("button", { name: /^Front, 2 fixtures at 67 %, on/ }).click();
-    await expect(page.getByTestId("shell-lamp-latched-scene-drift")).toBeVisible();
 
     await page.getByRole("button", { name: "Teleprompter", exact: true }).click();
     // The lighting page asks before it is left with a scene that drifted.
@@ -955,53 +969,76 @@ test.describe("the header with the cameras", () => {
     await expectWorkspaceMounted(page, "teleprompter");
     await expect(page.getByTestId("teleprompter-play")).not.toHaveAttribute("data-locked", "", { timeout: 10_000 });
     await page.getByTestId("teleprompter-play").click();
-    await expect(page.getByTestId("shell-lamp-latched-prompter-playing")).toBeVisible();
+
+    await page.getByRole("button", { name: "Setup / Support", exact: true }).click();
+    await expect(page.getByTestId("setup-state-display")).toBeVisible();
+    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("playing");
+    await expect(page.getByTestId("shell-lamp-prompter")).toContainText("left");
     await expect(page.getByTestId("shell-lamp-latched-solo")).toBeVisible();
+    await expect(recChip(page)).toBeVisible();
 
     const row = await page.evaluate(() => {
       const header = document.querySelector('[data-region="header"]')!;
-      const health = header.querySelector('[data-testid^="shell-lamp-"]')!.parentElement!;
-      const chips = [...health.querySelectorAll('[data-testid^="shell-lamp-"]')].map((chip) => {
-        const box = chip.getBoundingClientRect();
-        return { id: chip.getAttribute("data-testid"), left: box.left, right: box.right };
-      });
-      const tabs = header.querySelector("nav")!.getBoundingClientRect();
-      const clock = header.querySelector('[data-testid="shell-clock"]')!.getBoundingClientRect();
+      const box = (element: Element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right };
+      };
+      const nav = header.querySelector("nav")!;
+      const words = [...nav.querySelectorAll('[data-testid^="shell-lamp-"]')].map((word) =>
+        word.getAttribute("data-testid")
+      );
+      const health = header.querySelector('[data-testid="shell-lamp-surface"]')!.parentElement!;
+      const chips = [...health.querySelectorAll('[data-testid^="shell-lamp-"]')].map((chip) => ({
+        id: chip.getAttribute("data-testid"),
+        ...box(chip),
+      }));
       return {
+        words,
         chips,
-        tabsRight: tabs.right,
-        clockLeft: clock.left,
-        clockRight: clock.right,
+        tabs: box(nav),
+        tabsClipped: nav.scrollWidth > nav.clientWidth,
+        tally: box(header.querySelector('[data-testid="shell-rec-slot"]')!),
+        clock: box(header.querySelector('[data-testid="shell-clock"]')!),
+        logo: box(header.querySelector("img")!),
         clipped: health.scrollWidth > health.clientWidth,
         width: header.getBoundingClientRect().width,
       };
     });
-    expect(row.chips.map((chip) => chip.id)).toEqual([
-      "shell-lamp-lighting",
-      "shell-lamp-audio",
-      "shell-lamp-cameras",
-      "shell-lamp-prompter",
-      "shell-lamp-surface",
-      "shell-lamp-latched-scene-drift",
-      "shell-lamp-latched-solo",
-      "shell-lamp-latched-prompter-playing",
-      "shell-lamp-latched-rec",
-    ]);
+    expect(row.words).toEqual(["shell-lamp-lighting", "shell-lamp-audio", "shell-lamp-cameras", "shell-lamp-prompter"]);
+    expect(row.chips.map((chip) => chip.id)).toEqual(["shell-lamp-surface", "shell-lamp-latched-solo"]);
+    expect(row.tabsClipped, "no tab is cut").toBe(false);
     expect(row.clipped, "no chip is cut").toBe(false);
-    expect(row.chips[0]!.left, "the lamps start after the tabs").toBeGreaterThan(row.tabsRight);
-    expect(row.chips.at(-1)!.right, "the last chip ends before the clock").toBeLessThanOrEqual(row.clockLeft);
-    expect(row.clockRight).toBeLessThanOrEqual(row.width);
+    expect(row.chips[0]!.left, "the lamps start after the tabs").toBeGreaterThan(row.tabs.right);
     for (let index = 1; index < row.chips.length; index += 1) {
       expect(row.chips[index]!.left, `${row.chips[index]!.id} stands after the chip before it`).toBeGreaterThanOrEqual(
         row.chips[index - 1]!.right
       );
     }
+    expect(row.chips.at(-1)!.right, "the last chip ends before the REC tally").toBeLessThanOrEqual(row.tally.left);
+    expect(row.tally.right, "the REC tally ends before the clock").toBeLessThanOrEqual(row.clock.left);
+    expect(row.clock.right, "the clock keeps the logotype's clear space").toBeLessThanOrEqual(row.logo.left - 20);
+    expect(row.logo.right).toBeLessThanOrEqual(row.width - 32);
+  });
+
+  test("the REC tally stands in the same place whether or not it is lit", async ({ page }) => {
+    await openFixture(page, "every-page");
+    await expectWorkspaceMounted(page, "cameras");
+    const slot = page.getByTestId("shell-rec-slot");
+    const surface = page.getByTestId("shell-lamp-surface");
+    const at = async () => ({ slot: await slot.boundingBox(), surface: await surface.boundingBox() });
+    const before = await at();
+    await page.getByTestId("cameras-rec").click();
+    await expect(recChip(page)).toBeVisible();
+    await expect(recChip(page)).toHaveAttribute("data-tone", "error");
+    expect(await at(), "nothing in the header moves when REC lights").toEqual(before);
   });
 });
 
 test.describe("Setup / Support's camera section", () => {
   test("Camera setup opens it from the page, and it is no step of the runner", async ({ page }) => {
     await openCameras(page);
+    // The shell (overhaul 3): Camera setup is in the page's ⋯.
+    await page.getByTestId("cameras-page-menu").click();
     await page.getByTestId("cameras-open-setup").click();
     await expectWorkspaceMounted(page, "setup");
     await expect(page.getByTestId("setup-mode-cameras")).toHaveAttribute("aria-pressed", "true");

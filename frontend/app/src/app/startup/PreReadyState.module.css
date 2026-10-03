@@ -1,35 +1,49 @@
-/* Visual overhaul A, Slice 7: the pre-ready surfaces on the bay's material,
-   with the state display first and fixed. The column is the width the state
-   display wants at the studio surface; whatever the surface has to show
-   follows it and scrolls if it is an unbounded list. */
+/* The surfaces before ready (the shell, overhaul 3): the state display in the
+   cluster with whatever belongs beside it, the surface's content in the bay,
+   the hardware's diagnostics on the plate — each column with a page's own
+   16 px margin. Nothing is a card and nothing floats in the middle. */
 
-.shell {
+.cluster,
+.plate {
   display: flex;
-  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
   height: 100%;
+  min-height: 0;
+  padding: 16px 16px 20px;
+  overflow: hidden;
+}
+
+.bay {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
   padding: 16px;
-  background: var(--material-bay);
-  box-shadow: var(--elevation-bay);
-  overflow-y: auto;
+  overflow: hidden;
 }
 
-/* The surface fills the bay, as every workspace does: nothing on this program
-   is a centred card. */
-.column {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  min-width: 0;
+/* Without the shell: the cluster's column, the bay and the plate, side by side. */
+.frame {
+  display: grid;
+  grid-template-columns: calc(var(--chrome-studio-cluster) * var(--operator-ui-scale-factor, 1)) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--material-bg);
 }
 
-.display {
-  flex: none;
+.frame[data-plate] {
+  grid-template-columns:
+    calc(var(--chrome-studio-cluster) * var(--operator-ui-scale-factor, 1)) minmax(0, 1fr)
+    calc(var(--chrome-studio-plate) * var(--operator-ui-scale-factor, 1));
 }
 
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+.frame > .cluster {
+  border-right: 1px solid var(--material-line);
+}
+
+.frame > .plate {
+  border-left: 1px solid var(--material-line);
 }
