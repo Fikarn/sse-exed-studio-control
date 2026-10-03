@@ -23,7 +23,7 @@ A schema change brings a migration test that starts from schema 7, the studio da
 The owner asked on 2026-10-03 for the pages to look and work as one premium instrument in SSE's brand, with more context menus. The direction is Atrium (`docs/DESIGN.md`), built in eleven pull requests. The new look reaches the studio at the next `npm run release`, and the deck's at the owner's Full Reset & Import in Companion.
 
 - [x] 1. Foundation A: the look: tokens, the PT faces and SSE Adelia, the primitives, the measures (#293)
-- [x] 2. Foundation B: menus and overlays: the menu, the ⋯, the popover, the tooltip, the context menu and the colour picker on them, the cameras' picture holes (#PR2)
+- [x] 2. Foundation B: menus and overlays: the menu, the ⋯, the popover, the tooltip, the context menu and the colour picker on them, the cameras' picture holes (#296)
 - [ ] 3. The shell: header with the `REC` tally and the logo, footer, one plate mechanism, the latch slot on every page, the screens before ready
 - [ ] 4. Audio: the outputs in the left column, the strips, the plate without scrolling, menus and tooltips
 - [ ] 5. Lighting: the plot from real positions, the bar under it, scenes as rows, the plate, menus
