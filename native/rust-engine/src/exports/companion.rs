@@ -462,12 +462,34 @@ pub(super) fn answer_is_the_bridges() -> String {
 /// is the bridge's and newer than the kept one (or older by far: the
 /// hardware link restarted), else the kept one, unchanged.
 pub(super) fn kept_displays() -> String {
+    format!(
+        "{} ? $(custom:{RAW}) : $(custom:{KEPT})",
+        answer_is_kept(">")
+    )
+}
+
+/// Whether `deck_raw` is an answer the deck keeps: the bridge's own, and
+/// newer than the kept one (`newer` is `>`), or older by far (the hardware
+/// link restarted, or the clock was set back). The link counts as heard by
+/// the same rule, with `>=`: the trigger's two actions may run in either
+/// order, and once the answer is kept its moment equals the kept one's
+/// (the review of #293: an answer the deck drops does not count as heard).
+pub(super) fn answer_is_kept(newer: &str) -> String {
     let raw_at = format!("jsonpath($(custom:{RAW}), '$.at')");
     let kept_at = format!("(jsonpath($(custom:{KEPT}), '$.at') ?? 0)");
     format!(
-        "{} && ({raw_at} > {kept_at} || {raw_at} < {kept_at} - {ANSWERS_CROSS_WITHIN_MS}) ? $(custom:{RAW}) : $(custom:{KEPT})",
+        "{} && ({raw_at} {newer} {kept_at} || {raw_at} < {kept_at} - {ANSWERS_CROSS_WITHIN_MS})",
         answer_is_the_bridges()
     )
+}
+
+/// The page the app is on, as the kept answer says it, whether the link is
+/// lost or not: a follow trigger fires only when the app's page changes,
+/// never when the deck hears the hardware link again after a silence (the
+/// review of #293: the display lines go blank while the link is lost, and a
+/// follow on them turned the deck to the app's page at every recovery).
+pub(super) fn kept_workspace() -> String {
+    format!("(jsonpath($(custom:{KEPT}), '$.words.workspace') ?? '')")
 }
 
 /// While the deck has not heard the bridge for `LINK_LOST_AFTER_SECONDS`.
@@ -631,7 +653,7 @@ fn triggers(writer: &Writer) -> Value {
                 set_custom(
                     "sse-act-deck-heard",
                     AGE,
-                    &format!("{} ? 0 : $(custom:{AGE})", answer_is_the_bridges()),
+                    &format!("{} ? 0 : $(custom:{AGE})", answer_is_kept(">=")),
                 ),
             ],
             Vec::new(),
@@ -660,8 +682,9 @@ fn triggers(writer: &Writer) -> Value {
     );
 
     // The deck follows the app's page: one trigger per deck page, on the
-    // page the app saves (`workspace`). The app's Setup page has no deck
-    // page, so the deck stays where it is while Setup is open.
+    // page the app saves (`workspace`), read from the kept answer, which a
+    // silence leaves as it was. The app's Setup page has no deck page, so
+    // the deck stays where it is while Setup is open.
     for (index, deck_page) in DECK_PAGES.iter().enumerate() {
         let slug = deck_page.workspace;
         triggers.insert(
@@ -685,7 +708,7 @@ fn triggers(writer: &Writer) -> Value {
                     "definitionId": "check_expression",
                     "connectionId": "internal",
                     "options": {
-                        "expression": fixed(format!("$(expression:deck_workspace) == '{slug}'"))
+                        "expression": fixed(format!("{} == '{slug}'", kept_workspace()))
                     },
                     "isInverted": fixed(false)
                 })],

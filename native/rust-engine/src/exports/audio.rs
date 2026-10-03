@@ -18,8 +18,8 @@
 use super::common::{page_key, play_key, rec_key};
 use super::model::{
     cell, dial, glyph_key, reads, shown, shown_head, Control, Element, ElementKind, Prop, Step,
-    ART, DECK_AMBER_BG, DECK_AMBER_INK, DECK_BANK_TINT_BG, DECK_BAR, DECK_BAR_MUTED, DECK_GREY_INK,
-    DECK_MUTED_INK, DECK_UNITY_MARK, DECK_WARN_BG, DECK_WARN_INK, FILL, VALUE,
+    ART, DECK_AMBER_BG, DECK_AMBER_INK, DECK_BANK_TINT_BG, DECK_BAR, DECK_BAR_MUTED, DECK_BLACK,
+    DECK_GREY_INK, DECK_MUTED_INK, DECK_UNITY_MARK, DECK_WARN_BG, DECK_WARN_INK, FILL, VALUE,
 };
 
 /// The AUDIO page's keys and dials.
@@ -34,7 +34,9 @@ fn audio(action: &'static str, value: Option<&'static str>) -> Step {
 }
 
 /// While the Console is locked (OSC off, not verified, offline): every
-/// control of the page is grey.
+/// control of the page is grey, its fill dark whatever state word the
+/// hardware link still sends (a key's lock rule comes after its colours, and
+/// only the lost link's after it).
 fn locked() -> String {
     reads("audio_state_gated", "yes")
 }
@@ -151,7 +153,7 @@ pub(super) fn audio_controls() -> Vec<Control> {
         )
         .on_press(audio("setMixTarget", Some("main")))
         .filled(target("main"), DECK_AMBER_BG, DECK_AMBER_INK)
-        .inked(locked(), DECK_GREY_INK)
+        .filled(locked(), DECK_BLACK, DECK_GREY_INK)
         .grey_without_the_link(),
         // Main Out to Phones 1, Phones 1 to Phones 2, Phones 2 to Phones 1;
         // amber while a phones mix is the target, so that a take never
@@ -163,7 +165,7 @@ pub(super) fn audio_controls() -> Vec<Control> {
                 DECK_AMBER_BG,
                 DECK_AMBER_INK,
             )
-            .inked(locked(), DECK_GREY_INK)
+            .filled(locked(), DECK_BLACK, DECK_GREY_INK)
             .grey_without_the_link(),
         page_key(
             "CAMERAS \u{203a}",
@@ -189,7 +191,7 @@ pub(super) fn audio_controls() -> Vec<Control> {
             format!("{} != 'inputs'", shown("audio_state_bank")),
             vec![(FILL, "color", Prop::colour(DECK_BANK_TINT_BG))],
         )
-        .inked(locked(), DECK_GREY_INK)
+        .filled(locked(), DECK_BLACK, DECK_GREY_INK)
         .grey_without_the_link(),
         glyph_key(
             1,
@@ -208,7 +210,7 @@ pub(super) fn audio_controls() -> Vec<Control> {
             DECK_AMBER_BG,
             DECK_AMBER_INK,
         )
-        .inked(locked(), DECK_GREY_INK)
+        .filled(locked(), DECK_BLACK, DECK_GREY_INK)
         .grey_without_the_link(),
         glyph_key(
             1,
@@ -220,7 +222,7 @@ pub(super) fn audio_controls() -> Vec<Control> {
         )
         .on_press(audio("soloClearAll", None))
         .filled(format!("{solo} > 0"), DECK_WARN_BG, DECK_WARN_INK)
-        .inked(locked(), DECK_GREY_INK)
+        .filled(locked(), DECK_BLACK, DECK_GREY_INK)
         .grey_without_the_link(),
         strip_cell(0, "STRIP 1", "audio_strip_1", "audio_strip_1_level"),
         strip_cell(1, "STRIP 2", "audio_strip_2", "audio_strip_2_level"),

@@ -782,9 +782,10 @@ async function main() {
     assert(
       JSON.stringify(followTargets) === JSON.stringify(FOLLOW_TARGETS) &&
         followTriggers.every(
-          ({ workspace, condition }) => condition === `$(expression:deck_workspace) == '${workspace}'`
+          ({ workspace, condition }) =>
+            condition === `(jsonpath($(custom:deck_displays), '$.words.workspace') ?? '') == '${workspace}'`
         ),
-      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of ${FOLLOW_TARGETS.join(", ")} on the workspace display.`
+      `Bridge qualification failed: the page-follow triggers are ${JSON.stringify(followTriggers)} instead of ${FOLLOW_TARGETS.join(", ")} on the kept answer's workspace (which a silence leaves as it was).`
     );
     const savedFollow = followTriggers.find(({ workspace }) => workspace === lcdWorkspace);
     assert(
@@ -836,8 +837,12 @@ async function main() {
         unansweredLines.push(path);
       }
     }
+    // The follow triggers read the page the app is on out of the kept answer themselves.
+    if (typeof displays?.words?.workspace !== "string") {
+      unansweredLines.push("words.workspace");
+    }
     assert(
-      displayReads > 1 && linesRead >= 39 && unansweredLines.length === 0,
+      displayReads > 1 && linesRead >= 38 && unansweredLines.length === 0,
       `Bridge qualification failed: the bridge did not answer the profile's display lines (${linesRead} read, ${displayReads} reads in the profile): ${unansweredLines.join(", ") || "none"}.`
     );
 

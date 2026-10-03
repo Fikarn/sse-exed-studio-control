@@ -1,6 +1,7 @@
 use super::companion::{
-    display_path, generate_companion_config, AGE, COMPANION_EXPORT_FORMAT_VERSION, DISPLAYS_PATH,
-    INSTANCE_ID, INSTANCE_LABEL, KEPT, LINK_LOST_AFTER_SECONDS, RAW,
+    answer_is_kept, display_path, generate_companion_config, kept_workspace, AGE,
+    COMPANION_EXPORT_FORMAT_VERSION, DISPLAYS_PATH, INSTANCE_ID, INSTANCE_LABEL, KEPT,
+    LINK_LOST_AFTER_SECONDS, RAW,
 };
 use super::images::deck_images;
 use super::profile::streamdeck_surface_id_from;
@@ -493,21 +494,16 @@ fn the_page_keys_and_follow_triggers_chain_the_four_pages() {
         })
         .collect::<Vec<_>>();
     follows.sort();
+    let on = |workspace: &str| format!("{} == '{workspace}'", kept_workspace());
     assert_eq!(
         follows,
         vec![
-            (String::from("$(expression:deck_workspace) == 'audio'"), 2),
-            (String::from("$(expression:deck_workspace) == 'cameras'"), 3),
-            (
-                String::from("$(expression:deck_workspace) == 'lighting'"),
-                1
-            ),
+            (on("audio"), 2),
+            (on("cameras"), 3),
+            (on("lighting"), 1),
             // The page's word in the app is the one the hardware link
             // accepts (`shell_settings::WORKSPACES`).
-            (
-                String::from("$(expression:deck_workspace) == 'teleprompter'"),
-                4
-            ),
+            (on("teleprompter"), 4),
         ]
     );
     for workspace in ["audio", "cameras", "lighting", "teleprompter"] {
@@ -913,9 +909,24 @@ fn the_displays_come_in_one_read_a_second_and_a_bad_answer_is_never_shown() {
     assert!(kept.contains("'$.at'") && kept.ends_with(&format!("$(custom:{KEPT})")));
     let heard = &answer["actions"][1];
     assert_eq!(heard["options"]["name"]["value"], AGE);
-    assert!(heard["options"]["value"]["value"]
-        .as_str()
-        .is_some_and(|value| value.contains(DECK_DISPLAYS_MARK) && value.contains("? 0 :")));
+    // The link is heard by the keep's own rule (the review of #293): an answer
+    // the deck drops does not count. `>=` because the two actions may run in
+    // either order, and a kept answer's moment is then the kept one's.
+    assert_eq!(
+        kept,
+        format!(
+            "{} ? $(custom:{RAW}) : $(custom:{KEPT})",
+            answer_is_kept(">")
+        )
+    );
+    assert_eq!(
+        heard["options"]["value"]["value"],
+        format!("{} ? 0 : $(custom:{AGE})", answer_is_kept(">="))
+    );
+    assert_eq!(
+        answer_is_kept(">="),
+        answer_is_kept(">").replacen("') > (", "') >= (", 1)
+    );
     let age = &triggers["sse-trigger-deck-age"];
     assert_eq!(age["events"][0]["options"]["seconds"], 1);
     assert_eq!(age["actions"][0]["options"]["name"]["value"], AGE);
@@ -1001,6 +1012,14 @@ fn every_display_the_deck_reads_is_one_the_bridge_answers() {
     );
 
     let mut shown = BTreeSet::new();
+    // The follow triggers read the page the app is on out of the kept
+    // answer themselves (`a_silence_turns_no_page_of_the_deck`).
+    if config["triggers"]
+        .to_string()
+        .contains("'$.words.workspace'")
+    {
+        shown.insert("workspace");
+    }
     for name in read.iter().filter(|name| *name != "deck_link") {
         let (path, display) =
             display_path(name).unwrap_or_else(|| panic!("{name} is no display of the bridge's"));
@@ -1047,6 +1066,9 @@ fn every_display_the_deck_reads_is_one_the_bridge_answers() {
             "the bridge does not answer {path}: {answer}"
         );
     }
+    assert!(answer
+        .pointer("/words/workspace")
+        .is_some_and(Value::is_string));
 }
 
 /// The words a display can be, as the bridge says them (`control_surface`,
@@ -1249,6 +1271,98 @@ fn every_key_and_cell_has_an_image_of_its_own_at_the_decks_size() {
                     "$(image:key_"
                 };
                 assert!(art.starts_with(prefix), "{page}/{row}/{col}: {art}");
+            }
+        }
+    }
+}
+
+// The review of #293: the follow triggers turned the deck to the app's page
+// after every silence of 4 s, mid-take, because they read the workspace's
+// display line, which goes blank while the link is lost and comes back when
+// it is heard again. They read the kept answer, which a silence leaves as it
+// was: a follow fires only when the app's page changes.
+#[test]
+fn a_silence_turns_no_page_of_the_deck() {
+    let config = profile();
+    assert_eq!(
+        kept_workspace(),
+        format!("(jsonpath($(custom:{KEPT}), '$.words.workspace') ?? '')")
+    );
+    let follows: Vec<&Value> = config["triggers"]
+        .as_object()
+        .expect("triggers")
+        .values()
+        .filter(|trigger| trigger["events"][0]["type"] == "condition_true")
+        .collect();
+    assert_eq!(follows.len(), 4);
+    for follow in follows {
+        let condition = follow["condition"][0]["options"]["expression"]["value"]
+            .as_str()
+            .expect("a condition");
+        assert!(condition.starts_with(&kept_workspace()), "{condition}");
+        for blanked in [AGE, "$(expression:", "deck_link"] {
+            assert!(!condition.contains(blanked), "{condition} reads {blanked}");
+        }
+    }
+    // The display lines do go blank while the link is lost: the follows must
+    // not read them.
+    assert!(read_variables(&config)
+        .iter()
+        .all(|name| name != "deck_workspace"));
+    let lines = config["expressionVariables"].to_string();
+    assert!(lines.contains(&format!(
+        "$(custom:{AGE}) >= {LINK_LOST_AFTER_SECONDS} ? ''"
+    )));
+}
+
+// The review of #293: on a locked Console the hardware link still sends the
+// mix target, the dim and the solos, and an AUDIO key kept its amber or
+// yellow fill under grey words. Its lock rule comes after its colour rules
+// and darkens the fill too; only the lost link's comes after it.
+#[test]
+fn every_audio_key_is_dark_and_grey_while_the_console_is_locked() {
+    let config = profile();
+    let locked = "$(expression:deck_audio_state_gated) == 'yes'";
+    for (row, col) in [(0, 1), (0, 2), (1, 1), (1, 2), (1, 3)] {
+        let key = control(&config, "2", row, col);
+        let filling: Vec<&Value> = key["feedbacks"]
+            .as_array()
+            .expect("feedbacks")
+            .iter()
+            .filter(|feedback| {
+                feedback["styleOverrides"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .any(|change| {
+                        change["elementId"] == "fill" && change["elementProperty"] == "color"
+                    })
+            })
+            .collect();
+        let at = format!("2/{row}/{col}");
+        assert!(filling.len() >= 2, "{at}");
+        let [.., lock, lost] = filling.as_slice() else {
+            panic!("{at}: no lock and lost rules");
+        };
+        assert_eq!(lock["options"]["expression"]["value"], locked, "{at}");
+        assert_eq!(
+            lost["options"]["expression"]["value"], "$(expression:deck_link) == 'lost'",
+            "{at}"
+        );
+        for rule in [lock, lost] {
+            let changes = rule["styleOverrides"].as_array().expect("overrides");
+            assert!(changes
+                .iter()
+                .any(|change| change["elementId"] == "fill" && change["override"]["value"] == 0));
+            for text in ["label", "value"] {
+                if layer(key, text).is_null() {
+                    continue;
+                }
+                assert!(
+                    changes.iter().any(|change| change["elementId"] == text
+                        && change["override"]["value"] == 0x006D_675A),
+                    "{at}: {text} is grey"
+                );
             }
         }
     }
