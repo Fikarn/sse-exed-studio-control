@@ -5,45 +5,55 @@ import { ShellRegionsContext, type ShellRegionElements } from "./shellRegions";
 import { Footer, type FooterProps } from "./Footer";
 import { LampChip } from "./LampChip";
 import { Tab } from "./Tab";
+import { Tally } from "./Tally";
 import type { SharedStatusTone } from "./statusTone";
 import styles from "./AppShellFrame.module.css";
 
 // Visual overhaul A, Slice 2 (plan D1, D4; system §2): the shell is one grid
-// on every surface — header · cluster | bay | plate · footer. The header
-// carries the crest, the product with its owner's eyebrow, the workspace tabs,
-// the subsystem lamps, the latches and the clock; the cluster and the plate
-// are slots a workspace fills (Slices 4–7), the bay holds its picture. Every
-// region declares `data-region` so the UI contract can measure the chrome
-// against D4. Setup / Support and the pre-ready surfaces render inside the
+// on every surface — header · cluster | bay | plate · footer. The cluster and
+// the plate are slots a page fills, the bay holds its picture. Every region
+// declares `data-region` so the UI contract can measure the chrome against
+// section 2. Setup / Support and the screens before ready render inside the
 // same frame with the tabs locked. Visual overhaul 2026-10 (Atrium): every
-// region is the one flat base, parted by hairlines; the product name is set
-// in SSE Adelia, the eyebrow and the clock in PT Sans.
+// region is the one flat base, parted by hairlines. The shell (overhaul 3):
+// the header is 80 px. The product's name stands alone over the cluster at
+// the left, set in SSE Adelia; the tabs follow, each carrying its page's lamp
+// and state word (the active one none: its page says it); then the lamps that
+// have no page (the deck, the backup) and the latches; then the REC tally in
+// a slot of its own, the clock, and the SSE logotype alone at the right, 40 px
+// high with its clear space — never a lockup.
 
 export interface RailItem {
   id: string;
   label: string;
-  meta?: string;
-  icon?: ReactNode;
 }
 
 export interface MonitorItem {
   id?: string;
   label: string;
   detail?: string;
+  /** A value after the word that changes, in PT Sans (`2:31 left`). */
+  value?: string;
   status: Exclude<SharedStatusTone, "neutral">;
   /** Where clicking the chip takes the operator; defaults to Setup / Support.
    *  Latched-state chips (GLO-09) point at their owning workspace instead. */
   target?: string;
   /** A latched state (Solo, Scene drift) rather than a subsystem lamp. */
   latch?: boolean;
+  /** The workspace whose tab carries this lamp (`lighting`): the lamp is
+   *  drawn in its tab, and not at all while that tab is the active one. */
+  tab?: string;
+  /** A state that is no longer read (the tally's `last known`). */
+  doubt?: boolean;
 }
 
 export interface AppShellFrameProps {
   productName?: string;
-  /** The owner's name under the product, at label size: "SSE Executive Education". */
-  eyebrow?: string;
   clock?: ReactNode;
   monitorItems: readonly MonitorItem[];
+  /** The REC tally: `null` at rest, an item while lit. Left out, there is no
+   *  slot (a story of the frame alone). */
+  recTally?: MonitorItem | null;
   workspaces: readonly RailItem[];
   activeWorkspace: string;
   /** Every tab locked: startup and recovery, where there is nowhere to go. */
@@ -60,17 +70,22 @@ export interface AppShellFrameProps {
   /** The footer: `FooterProps` for the shell's own, `"slot"` for the
    *  workspace's own `<Footer>` through `<ShellRegion region="footer">`. */
   footer?: FooterProps | "slot";
-  /** The bay. */
+  /** The bay. The shell draws no margin in it: the page's picture decides
+   *  its own. */
   children: ReactNode;
   onMonitorItemClick?: (item: MonitorItem) => void;
   onWorkspaceChange?: (workspaceId: string) => void;
 }
 
+function testIdFor(item: MonitorItem): string | undefined {
+  return item.id ? `shell-lamp-${item.id.replace(/[^a-z0-9]+/gi, "-")}` : undefined;
+}
+
 export function AppShellFrame({
   productName = "Studio Control",
-  eyebrow = "SSE Executive Education",
   clock,
   monitorItems,
+  recTally,
   workspaces,
   activeWorkspace,
   tabsDisabled = false,
@@ -98,58 +113,85 @@ export function AppShellFrame({
         data-plate={plate ? "" : undefined}
       >
         <header className={styles.header} data-region="header" data-material="plate">
-          <Crest variant="mark" />
-          <div className={styles.wordmark}>
-            <span className={styles.product}>{productName}</span>
-            {eyebrow ? <span className={styles.eyebrow}>{eyebrow}</span> : null}
-          </div>
+          <span className={styles.product}>{productName}</span>
           <nav className={styles.tabs} aria-label="Workspace navigation">
-            {workspaces.map((workspace) => (
-              <Tab
-                key={workspace.id}
-                id={workspace.id}
-                label={workspace.label}
-                active={workspace.id === activeWorkspace}
-                disabled={tabsDisabled || disabledWorkspaces.includes(workspace.id)}
-                onClick={() => onWorkspaceChange?.(workspace.id)}
-              />
-            ))}
-          </nav>
-          <div className={styles.health}>
-            {monitorItems.map((item, index) => {
-              const key = item.id ?? `${item.status}:${item.label}:${index}`;
-              const statusDetail = item.detail ?? item.status;
-              const targetDescription = item.target ?? "Setup / Support";
-              const latch = item.latch ?? item.id?.startsWith("latched:") ?? false;
-              const testId = item.id ? `shell-lamp-${item.id.replace(/[^a-z0-9]+/gi, "-")}` : undefined;
+            {workspaces.map((workspace) => {
+              const active = workspace.id === activeWorkspace;
+              const lamp = active ? undefined : monitorItems.find((item) => item.tab === workspace.id);
               return (
-                <LampChip
-                  key={key}
-                  label={item.label}
-                  word={statusDetail}
-                  tone={item.status}
-                  latch={latch}
-                  testId={testId}
-                  title={
-                    onMonitorItemClick
-                      ? `Open ${targetDescription} for ${item.label}: ${statusDetail}`
-                      : `${item.label}: ${statusDetail}`
-                  }
-                  ariaLabel={
-                    onMonitorItemClick
-                      ? `Open ${targetDescription} for ${item.label}. Current status: ${statusDetail}.`
-                      : undefined
-                  }
-                  onClick={onMonitorItemClick ? () => onMonitorItemClick(item) : undefined}
+                <Tab
+                  key={workspace.id}
+                  id={workspace.id}
+                  label={workspace.label}
+                  active={active}
+                  disabled={tabsDisabled || disabledWorkspaces.includes(workspace.id)}
+                  word={lamp ? (lamp.detail ?? lamp.status) : undefined}
+                  value={lamp?.value}
+                  tone={lamp?.status}
+                  wordTestId={lamp ? testIdFor(lamp) : undefined}
+                  onClick={() => onWorkspaceChange?.(workspace.id)}
                 />
               );
             })}
-            {clock ? (
-              <span className={styles.clock} data-testid="shell-clock">
-                {clock}
-              </span>
-            ) : null}
+          </nav>
+          <div className={styles.health}>
+            {monitorItems
+              .filter((item) => !item.tab)
+              .map((item, index) => {
+                const key = item.id ?? `${item.status}:${item.label}:${index}`;
+                const statusDetail = item.detail ?? item.status;
+                const spoken = item.value ? `${statusDetail}, ${item.value}` : statusDetail;
+                const targetDescription = item.target ?? "Setup / Support";
+                const latch = item.latch ?? item.id?.startsWith("latched:") ?? false;
+                return (
+                  <LampChip
+                    key={key}
+                    label={latch ? "" : item.label}
+                    word={latch ? item.label : statusDetail}
+                    value={item.value}
+                    tone={item.status}
+                    latch={latch}
+                    testId={testIdFor(item)}
+                    title={
+                      onMonitorItemClick
+                        ? `Open ${targetDescription} for ${item.label}: ${spoken}`
+                        : `${item.label}: ${spoken}`
+                    }
+                    ariaLabel={
+                      onMonitorItemClick
+                        ? `Open ${targetDescription} for ${item.label}. Current status: ${spoken}.`
+                        : undefined
+                    }
+                    onClick={onMonitorItemClick ? () => onMonitorItemClick(item) : undefined}
+                  />
+                );
+              })}
           </div>
+          {recTally !== undefined ? (
+            <Tally
+              name="REC"
+              testId="shell-rec-slot"
+              litTestId={recTally ? testIdFor(recTally) : undefined}
+              state={
+                recTally && (recTally.status === "error" || recTally.status === "attention")
+                  ? { detail: recTally.detail ?? "", tone: recTally.status, doubt: recTally.doubt }
+                  : null
+              }
+              title={recTally ? `Open ${recTally.target ?? "Cameras"} for REC: ${recTally.detail ?? ""}` : undefined}
+              ariaLabel={
+                recTally
+                  ? `Open ${recTally.target ?? "Cameras"} for REC. Current status: ${recTally.detail ?? ""}.`
+                  : undefined
+              }
+              onClick={recTally && onMonitorItemClick ? () => onMonitorItemClick(recTally) : undefined}
+            />
+          ) : null}
+          {clock ? (
+            <span className={styles.clock} data-testid="shell-clock">
+              {clock}
+            </span>
+          ) : null}
+          <Crest size="header" className={styles.logo} />
         </header>
 
         <div className={styles.body}>

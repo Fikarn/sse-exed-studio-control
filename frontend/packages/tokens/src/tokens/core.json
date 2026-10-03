@@ -372,22 +372,27 @@
     "$description": "The chrome budget of the one surface, 2560x1440 (docs/DESIGN.md section 2).",
     "studio": {
       "header": {
-        "$value": "56px"
+        "$value": "80px"
       },
       "footer": {
         "$value": "40px"
       },
       "cluster": {
-        "$value": "424px"
+        "$value": "440px"
       },
       "plate": {
-        "$value": "416px"
+        "$value": "440px"
       },
       "stateDisplay": {
         "$value": "180px"
       },
       "gutter": {
-        "$value": "16px"
+        "$value": "16px",
+        "$description": "a page's own margin inside its bay, where it wants one: the shell draws none"
+      },
+      "margin": {
+        "$value": "32px",
+        "$description": "the frame's outer margin: the header's and the footer's sides"
       },
       "strip": {
         "$value": "120px"

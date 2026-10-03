@@ -1,4 +1,4 @@
-/* The shell grid (system §2, plan D4). Header 56, cluster 424, plate 416,
+/* The shell grid (system §2, plan D4). Header 80, cluster 440, plate 440,
    footer 40 at 2560×1440, every value a chrome token scaled by the operator
    UI scale. Visual overhaul 2026-10 (Atrium): one flat, matte surface —
    header, cluster, bay, plate and footer are all the base, parted by 1 px
@@ -23,62 +23,63 @@
   font-family: var(--font-family-ui);
 }
 
+/* The header (the shell, overhaul 3): the product's name at the frame's
+   margin, the tabs after it, the lamps without a page and the latches set to
+   the right, then the REC tally, the clock and the logotype at the frame's
+   margin. The tabs follow the name rather than the bay's edge: the row has to
+   hold every page's longest word, the deck's, the backup's and the latches at
+   once, and nothing in it may be cut. */
 .header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
   align-items: center;
-  gap: 28px;
-  padding: 0 24px;
+  padding-right: calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
   min-width: 0;
   overflow: hidden;
   border-bottom: 1px solid var(--material-line);
   background: var(--material-bg);
 }
 
-.wordmark {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: none;
-  white-space: nowrap;
-}
-
-/* The product name: a display word, SSE Adelia in capitals. */
+/* The product name: a display word, SSE Adelia in capitals, at the frame's
+   margin. */
 .product {
+  padding-left: calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
   font: 700 var(--font-size-word) / 1 var(--font-family-display);
   letter-spacing: var(--font-tracking-display);
   text-transform: uppercase;
   color: var(--text-text);
-}
-
-.eyebrow {
-  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
-  color: var(--text-text3);
+  white-space: nowrap;
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-left: 12px;
-  flex: none;
+  gap: 4px;
+  margin-left: 40px;
+  min-width: 0;
 }
 
 .health {
-  margin-left: auto;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   min-width: 0;
+  padding: 0 8px;
   overflow: hidden;
 }
 
 /* The clock is read during a take: PT Sans at word size, tabular digits. */
 .clock {
-  margin-left: 12px;
+  margin-left: 16px;
   font: 700 var(--font-size-word) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   color: var(--text-text);
   white-space: nowrap;
-  flex: none;
+}
+
+/* The logotype's clear space: half its height, 20 px, on every side. */
+.logo {
+  margin-left: 20px;
 }
 
 .body {
@@ -124,12 +125,14 @@
   display: contents;
 }
 
+/* The bay is the page's picture, and the page decides its margin (the
+   shell, overhaul 3): the Cameras' big picture and the prompter's copy are as
+   wide as the bay, 1680 px; the other pages keep `--chrome-studio-gutter`. */
 .bay {
   display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
   background: var(--material-bg);
 }

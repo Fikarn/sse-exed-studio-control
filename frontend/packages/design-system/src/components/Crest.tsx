@@ -1,27 +1,20 @@
 import horizontalLogo from "../assets/brand/sse-exed-horizontal-white.png";
 import styles from "./Crest.module.css";
 
-export type CrestSize = "sm" | "md" | "lg";
+// The SSE Executive Education horizontal logotype in white. The shell
+// (visual overhaul 3) sets it alone at the header's right, 40 px high, the
+// brand's recommended size, with half its height clear on every side
+// (`header`); the product's name stands at the far left, so the two never read
+// as a lockup. The square `SSE` mark of the first overhaul went with it.
+export type CrestSize = "header" | "sm" | "md" | "lg";
 
 export interface CrestProps {
   size?: CrestSize;
   alt?: string;
   className?: string;
-  /** `logo` (default): the SSE Executive Education horizontal white logo.
-   *  `mark` (visual overhaul A, Slice 2): the 30 px square crest of the A
-   *  header — an ink box with `SSE` — which reads in every theme, where the
-   *  white logo would vanish on Bone; the wordmark's eyebrow names the owner. */
-  variant?: "logo" | "mark";
 }
 
-export const Crest = ({ size = "md", alt = "SSE Executive Education", className, variant = "logo" }: CrestProps) => {
-  if (variant === "mark") {
-    return (
-      <span className={[styles.mark, className].filter(Boolean).join(" ")} role="img" aria-label={alt}>
-        SSE
-      </span>
-    );
-  }
+export const Crest = ({ size = "md", alt = "SSE Executive Education", className }: CrestProps) => {
   const classes = [styles.crest, styles[size], className].filter(Boolean).join(" ");
   return <img src={horizontalLogo} alt={alt} className={classes} />;
 };

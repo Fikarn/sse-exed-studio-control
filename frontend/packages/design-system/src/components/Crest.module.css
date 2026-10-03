@@ -2,8 +2,15 @@
   .crest {
     display: block;
     width: auto;
+    flex: none;
     image-rendering: -webkit-optimize-contrast;
     opacity: 0.96;
+  }
+
+  /* The header's logotype: 40 px, the brand's recommended size; the header
+     keeps 20 px (half its height) clear on every side. */
+  .header {
+    height: 40px;
   }
 
   .sm {
@@ -16,19 +23,5 @@
 
   .lg {
     height: 72px;
-  }
-
-  /* Visual overhaul A: the square crest of the header. */
-  .mark {
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    flex: none;
-    border-radius: var(--radius-key);
-    background: var(--text-text);
-    color: var(--material-bg);
-    font: 700 var(--font-size-tick) / 1 var(--font-family-mono);
-    letter-spacing: var(--font-tracking-cap);
   }
 }

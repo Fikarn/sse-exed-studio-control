@@ -10,6 +10,7 @@ import { EmptyState } from "../components/OperationalState";
 import { Footer } from "../components/Footer";
 import { Lamp } from "../components/Lamp";
 import { LampChip } from "../components/LampChip";
+import { Tally } from "../components/Tally";
 import { Tab } from "../components/Tab";
 import { PlotMeta } from "../components/PlotMeta";
 import { PlotPill } from "../components/PlotPill";
@@ -256,8 +257,10 @@ export const TabRow: StoryObj<typeof meta> = {
   render: () => (
     <div style={{ display: "flex", gap: 4 }}>
       <Tab id="setup" label="Setup / Support" />
-      <Tab id="lighting" label="Lighting" />
+      <Tab id="lighting" label="Lighting" word="no bridge" tone="error" />
       <Tab id="audio" label="Audio" active />
+      <Tab id="cameras" label="Cameras" word="not set up" tone="attention" />
+      <Tab id="teleprompter" label="Teleprompter" word="playing" value="2:31 left" tone="ok" />
     </div>
   ),
 };
@@ -274,10 +277,18 @@ export const Lamps: StoryObj<typeof meta> = {
         <Lamp tone="off" />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <LampChip label="Lighting" word="ok" tone="ok" />
-        <LampChip label="Audio" word="not verified" tone="attention" />
-        <LampChip label="Surface" word="failed" tone="error" />
-        <LampChip label="Solo" word="1" tone="attention" latch />
+        <LampChip label="Surface" word="ready" tone="ok" />
+        <LampChip label="Backup" word="overdue" tone="attention" />
+        <LampChip label="Surface" word="unavailable" tone="error" />
+        <LampChip label="" word="Solo" tone="attention" latch />
+        <LampChip label="" word="Scene drift" tone="attention" latch />
+      </div>
+      {/* The REC tally: at rest, recording, last known, not read. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <Tally name="REC" state={null} />
+        <Tally name="REC" state={{ detail: "CAM 1", tone: "error" }} />
+        <Tally name="REC" state={{ detail: "last known", tone: "attention", doubt: true }} />
+        <Tally name="REC" state={{ detail: "not read while released", tone: "attention" }} />
       </div>
     </div>
   ),

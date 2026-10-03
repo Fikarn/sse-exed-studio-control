@@ -12,6 +12,7 @@ import { ArmKey, Key, Segmented } from "../components/Key";
 import { LampChip } from "../components/LampChip";
 import { LampWord, Latch, LatchSlot } from "../components/LampWord";
 import { Menu, type MenuEntry } from "../components/Menu";
+import { MenuButton } from "../components/MenuButton";
 import { Meter } from "../components/Meter";
 import { DegradedState, EmptyState, LoadingState } from "../components/OperationalState";
 import { ControlRow, Danger, Fields, PlateHead, Readouts, Section } from "../components/Plate";
@@ -269,12 +270,24 @@ function KeyCards() {
 function StateCards() {
   return (
     <>
-      <Card title="StateDisplay · ok, and a long word">
+      <Card title="StateDisplay · ok with the page's ⋯, and a long word">
         <StateDisplay
           tone="ok"
           word="VERIFIED"
           sentence="Console · TotalMix on the UFX III"
           meta="42 values confirmed · last sync 18:24"
+          menu={
+            <MenuButton
+              buttonLabel="Audio menu"
+              menu={{
+                head: { title: "Audio" },
+                items: [
+                  { id: "sync", label: "Sync from TotalMix", onSelect: () => {} },
+                  { id: "probe", label: "Run audio probe", onSelect: () => {} },
+                ],
+              }}
+            />
+          }
         />
         <StateDisplay
           tone="attention"

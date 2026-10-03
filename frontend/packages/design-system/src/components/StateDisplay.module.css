@@ -40,6 +40,13 @@
     height: 14px;
   }
 
+  /* The page's ⋯ at the top right; the word gives way before it. */
+  .menu {
+    display: inline-flex;
+    margin-left: auto;
+    flex: none;
+  }
+
   .word {
     font: var(--font-weight-bold) var(--font-size-display) / var(--font-line-height-tight) var(--font-family-display);
     letter-spacing: 0;

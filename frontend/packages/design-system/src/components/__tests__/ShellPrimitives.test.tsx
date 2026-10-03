@@ -45,6 +45,16 @@ describe("Tab", () => {
     expect(tab.querySelector("kbd")).toBeNull();
   });
 
+  // The shell (overhaul 3): a tab carries its page's lamp and state word. The
+  // word describes the tab and is never part of its name.
+  it("carries its page's lamp and word after its name, outside its accessible name", () => {
+    render(<Tab id="lighting" label="Lighting" word="no bridge" tone="error" wordTestId="shell-lamp-lighting" />);
+    const tab = screen.getByRole("button", { name: "Lighting" });
+    expect(tab).toHaveAccessibleDescription("no bridge");
+    expect(screen.getByTestId("shell-lamp-lighting")).toHaveAttribute("data-tone", "error");
+    expect(screen.getByTestId("shell-lamp-lighting")).toHaveTextContent("no bridge");
+  });
+
   it("marks the active tab as the current page (its `data-material` hook stays)", () => {
     render(<Tab id="audio" label="Audio" active />);
     const tab = screen.getByRole("button", { name: "Audio" });
@@ -163,10 +173,10 @@ describe("AppShellFrame", () => {
     { id: "audio", label: "Audio" },
   ];
   const monitorItems = [
-    { id: "lighting", label: "Lighting", detail: "ok", status: "ok" as const },
-    { id: "audio", label: "Audio", detail: "failed", status: "error" as const },
-    { id: "surface", label: "Surface", detail: "ok", status: "ok" as const },
-    { id: "latched:solo", label: "Solo", detail: "1", status: "attention" as const, target: "Audio" },
+    { id: "lighting", label: "Lighting", detail: "no bridge", status: "error" as const, tab: "lighting" },
+    { id: "audio", label: "Audio", detail: "failed", status: "error" as const, tab: "audio" },
+    { id: "surface", label: "Surface", detail: "ready", status: "ok" as const },
+    { id: "latched:solo", label: "Solo", detail: "latched", status: "attention" as const, target: "Audio" },
   ];
 
   it("declares the header and the bay on every surface, the cluster and the plate when a workspace fills them", () => {
@@ -192,21 +202,52 @@ describe("AppShellFrame", () => {
     expect(regions()).toEqual(["header", "cluster", "bay", "plate", "footer"]);
   });
 
-  it("prints the product with its owner's eyebrow, the three tabs, the lamps with their tones and the clock", () => {
-    render(
-      <AppShellFrame activeWorkspace="audio" clock="09:11" monitorItems={monitorItems} workspaces={workspaces}>
+  // The shell (overhaul 3): the product's name alone at the left, the
+  // logotype alone at the right; each page's lamp in its tab, none in the
+  // active one; the lamps without a page and the latches after the tabs; the
+  // REC tally in its own slot, quiet at rest.
+  it("prints the product, the three tabs with their pages' lamps, the lamps, the REC tally, the clock and the logotype", () => {
+    const { rerender } = render(
+      <AppShellFrame
+        activeWorkspace="audio"
+        clock="09:11"
+        monitorItems={monitorItems}
+        recTally={null}
+        workspaces={workspaces}
+      >
         <p>bay</p>
       </AppShellFrame>
     );
     expect(screen.getByText("Studio Control")).toBeInTheDocument();
-    expect(screen.getByText("SSE Executive Education")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "SSE Executive Education" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Workspace navigation" });
     expect(nav.querySelectorAll("button")).toHaveLength(3);
     expect(nav.querySelector("kbd")).toBeNull();
     expect(screen.getByRole("button", { name: "Audio" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByTestId("shell-lamp-audio")).toHaveAttribute("data-tone", "error");
+    // The active tab carries no word: its page's state display says it.
+    expect(screen.queryByTestId("shell-lamp-audio")).toBeNull();
+    expect(nav.querySelector('[data-testid="shell-lamp-lighting"]')).toHaveAttribute("data-tone", "error");
+    expect(screen.getByTestId("shell-lamp-surface")).toHaveTextContent("Surface");
     expect(screen.getByTestId("shell-lamp-latched-solo")).toHaveAttribute("data-latch");
+    expect(screen.getByTestId("shell-rec-slot")).toHaveTextContent("REC");
+    expect(screen.queryByTestId("shell-lamp-latched-rec")).toBeNull();
     expect(screen.getByTestId("shell-clock")).toHaveTextContent("09:11");
+
+    rerender(
+      <AppShellFrame
+        activeWorkspace="audio"
+        clock="09:11"
+        monitorItems={monitorItems}
+        recTally={{ id: "latched:rec", label: "REC", detail: "CAM 1", status: "error", target: "Cameras" }}
+        workspaces={workspaces}
+      >
+        <p>bay</p>
+      </AppShellFrame>
+    );
+    const rec = screen.getByTestId("shell-lamp-latched-rec");
+    expect(rec).toHaveAttribute("data-tone", "error");
+    expect(rec).toHaveTextContent("RECCAM 1");
+    expect(screen.getByTestId("shell-rec-slot")).toContainElement(rec);
   });
 
   it("locks every tab before the engine is ready, and only the operator workspaces before commissioning is published", () => {

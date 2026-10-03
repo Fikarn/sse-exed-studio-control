@@ -1,13 +1,14 @@
 /* The 40 px footer (system §2, §7). Visual overhaul 2026-10 (Atrium): the one
    flat base under a hairline; quiet `Label value` facts in PT Sans at label
-   size, 40 px apart; the action key at the right edge. */
+   size, 40 px apart; the action key at the right edge. The shell (overhaul 3):
+   it keeps the frame's margin, as the header does. */
 @layer components {
   .footer {
     display: flex;
     align-items: center;
     gap: 24px;
     height: calc(var(--chrome-studio-footer) * var(--operator-ui-scale-factor, 1));
-    padding: 0 24px;
+    padding: 0 calc(var(--chrome-studio-margin) * var(--operator-ui-scale-factor, 1));
     border-top: 1px solid var(--material-line);
     background: var(--material-bg);
     color: var(--text-text3);
