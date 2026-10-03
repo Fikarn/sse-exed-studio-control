@@ -1,8 +1,10 @@
-//! The profile's image library (2026-10-03): an image for every key and
-//! every strip cell, by its own name, drawn at the deck's own size by
-//! `scripts/deck-assets.py` into `assets/deck/images.json`. A key's layer
-//! takes its image by name (`$(image:<name>)`), so the brand's label images
-//! replace these without a change to any key.
+//! The profile's image library (2026-10-03): the brand's label images, a
+//! picture for every key and every strip cell and for each state it shows,
+//! by its own name, drawn at the deck's own size in the screen's palette and
+//! faces by `scripts/deck-assets.py` into `assets/deck/images.json` (the
+//! rendered pictures only: SSE Adelia's file never enters the repository).
+//! A layer takes its image by name (`$(image:<name>)`), and a rule swaps it
+//! for a state's picture by name.
 
 use serde::Deserialize;
 use serde_json::{json, Value};
