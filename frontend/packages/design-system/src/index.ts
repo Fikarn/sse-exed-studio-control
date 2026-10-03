@@ -38,13 +38,34 @@ export { ConfirmDialog } from "./components/ConfirmDialog";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
 export { NumberEntryDialog } from "./components/NumberEntryDialog";
 export type { NumberEntryDialogProps } from "./components/NumberEntryDialog";
+export { Menu } from "./components/Menu";
+export type {
+  MenuActionItem,
+  MenuCheckItem,
+  MenuCloseReason,
+  MenuDestructiveItem,
+  MenuDivider,
+  MenuEntry,
+  MenuGroupLabel,
+  MenuHead,
+  MenuProps,
+  MenuRadioItem,
+} from "./components/Menu";
+export { MenuButton } from "./components/MenuButton";
+export type { MenuButtonProps, MenuContent } from "./components/MenuButton";
+export { Popover } from "./components/Popover";
+export type { PopoverCloseReason, PopoverProps } from "./components/Popover";
+export { placeFloating } from "./components/anchoredPosition";
+export type { Placement, PlaceOptions, PlaceResult, Rect, Side } from "./components/anchoredPosition";
+export type { FloatingAnchor } from "./components/useFloatingLayer";
+export { COVERING_LAYER_SELECTOR, FLOATING_LAYER_SELECTOR, floatingLayers } from "./components/floatingLayers";
 export { ContextMenu } from "./components/ContextMenu";
 export type { ContextMenuItem, ContextMenuItemTone, ContextMenuProps } from "./components/ContextMenu";
 export { ColorPicker } from "./components/ColorPicker";
 export type { ColorPickerProps, ColorPickerSwatch } from "./components/ColorPicker";
 export { ChipStrip } from "./components/ChipStrip";
 export type { ChipStripChip, ChipStripProps } from "./components/ChipStrip";
-export { Tooltip } from "./components/Tooltip";
+export { Tooltip, TAKE_TIME_ATTRIBUTE, TOOLTIP_DELAY_MS } from "./components/Tooltip";
 export type { TooltipPlacement, TooltipProps } from "./components/Tooltip";
 export { EmptyState, DegradedState, LoadingState } from "./components/OperationalState";
 export type {

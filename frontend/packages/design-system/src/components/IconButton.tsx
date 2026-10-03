@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import styles from "./IconButton.module.css";
@@ -35,6 +35,8 @@ export type IconButtonSize = "sm" | "md";
 export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
   badge?: string;
   icon: LucideIcon;
+  /** The button element (the menu's ⋯ gives the focus back to it). */
+  ref?: Ref<HTMLButtonElement>;
   label: string;
   pressed?: boolean;
   size?: IconButtonSize;

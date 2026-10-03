@@ -386,16 +386,20 @@ export function AudioWorkspace({ appSnapshot, audioSnapshot, store }: AudioWorks
   const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
     if (!contextMenuChannel || !viewModel) return [];
     const canMutate = viewModel.actionsAllowed;
+    const locked = `desk ${viewModel.status.label}`;
+    const hasPhase = audioChannelSupportsPhase(contextMenuChannel);
     return [
       {
         disabled: !canMutate,
+        disabledReason: locked,
         icon: RotateCcw,
         id: "reset-unity",
         label: "Reset to unity",
         onSelect: () => resetChannelFaderToUnity(contextMenuChannel.id, viewModel.selectedMixTargetId),
       },
       {
-        disabled: !canMutate || !audioChannelSupportsPhase(contextMenuChannel),
+        disabled: !canMutate || !hasPhase,
+        disabledReason: !canMutate ? locked : "no polarity on this channel",
         icon: SlidersHorizontal,
         id: "flip-polarity",
         label: contextMenuChannel.phase ? "Restore polarity" : "Flip polarity",

@@ -27,7 +27,9 @@ export function Drawer({ open, title, children, onClose, actions, width = 360, t
     const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     panelRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      // An Esc a layer above took (a menu or popover opened in the drawer)
+      // closes that layer only.
+      if (event.key === "Escape" && !event.defaultPrevented) {
         event.preventDefault();
         onClose();
       }

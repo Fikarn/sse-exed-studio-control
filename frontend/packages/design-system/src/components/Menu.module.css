@@ -1,0 +1,211 @@
+/* The one menu (docs/DESIGN.md §5, §9): the floating layer, a raised face
+   with a 1 px edge, a black outline and one soft shadow. A head row naming
+   the object, rows 36 px high, the current value at the right in the quiet
+   ink, dividers of one hairline, the destructive item last in coral; armed, it
+   is the one armed form with its countdown bar. */
+@layer components {
+  /* Above a dialog's scrim (a ⋯ in a dialog or drawer), under a tooltip. */
+  .layer {
+    z-index: var(--z-palette);
+    min-width: 256px;
+    max-width: 440px;
+    padding: 6px 0;
+    background: var(--material-raise);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    box-shadow: var(--elevation-float);
+    color: var(--text-text);
+    font-family: var(--font-family-ui);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .layer {
+      animation: aMenuEnter var(--motion-duration-enter) var(--motion-easing-out);
+    }
+  }
+
+  @keyframes aMenuEnter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-height: 40px;
+    padding: 10px 16px 8px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--material-line);
+    white-space: nowrap;
+  }
+
+  .headTitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text);
+  }
+
+  .headDetail {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
+  }
+
+  .list {
+    outline: none;
+  }
+
+  .item {
+    appearance: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 36px;
+    padding: 0 16px;
+    border: 0;
+    background: transparent;
+    color: var(--text-text);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+  }
+
+  /* A menu with choices keeps a column for the mark of the chosen one. */
+  .layer[data-marks] .item {
+    padding-left: 8px;
+  }
+
+  .mark {
+    display: none;
+  }
+
+  .layer[data-marks] .mark {
+    display: inline-flex;
+    flex: 0 0 28px;
+    justify-content: center;
+    color: var(--text-text);
+  }
+
+  .markIcon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .item[data-active] {
+    background: var(--material-hover);
+  }
+
+  .item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  .label {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .value {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding-left: 24px;
+    font-size: var(--font-size-label);
+    color: var(--text-text3);
+  }
+
+  /* A disabled item: the quiet ink, its reason at the right; never pressed. */
+  .item[aria-disabled="true"] {
+    color: var(--text-text3);
+    cursor: default;
+  }
+
+  .item[aria-disabled="true"] .value {
+    color: var(--text-text3);
+  }
+
+  .groupLabel {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 16px;
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text3);
+    white-space: nowrap;
+  }
+
+  .divider {
+    height: 1px;
+    margin: 6px 0;
+    background: var(--material-line2);
+  }
+
+  .destructive,
+  .item[data-tone="danger"] {
+    color: var(--role-coral-text);
+  }
+
+  .item[data-tone="danger"][aria-disabled="true"] {
+    color: var(--text-text3);
+  }
+
+  .destructive[aria-disabled="true"] {
+    color: var(--text-text3);
+  }
+
+  /* Armed: the one armed form, in place; the menu stays open. */
+  .armed,
+  .armed[data-active] {
+    overflow: hidden;
+    background: var(--role-burgundy-fill);
+    color: var(--role-burgundy-ink);
+    font-weight: var(--font-weight-bold);
+  }
+
+  .countdown {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 3px;
+    background: var(--role-burgundy-ink);
+    transform-origin: left;
+    animation: aMenuArmCountdown var(--arm-duration, 4500ms) linear forwards;
+    pointer-events: none;
+  }
+
+  .countdown[data-still] {
+    animation: none;
+  }
+
+  @keyframes aMenuArmCountdown {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .countdown {
+      animation: none;
+      transform: scaleX(1);
+      opacity: 0.6;
+    }
+  }
+}

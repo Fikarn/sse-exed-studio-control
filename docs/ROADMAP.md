@@ -14,8 +14,33 @@ Built so far: the Teleprompter page and its editor, the prompter and the cameras
 - [ ] The Pocket 6K Pro over Bluetooth
 - [ ] The BGH1s over the network (waits on the owner)
 - [ ] The close-out
+- [ ] The visual overhaul (below; it runs beside the cameras' work)
 
 A schema change brings a migration test that starts from schema 7, the studio data's, and makes the whole jump in one start.
+
+### The visual overhaul (2026-10-03)
+
+The owner asked on 2026-10-03 for the pages to look and work as one premium instrument in SSE's brand, with more context menus. The direction is Atrium (`docs/DESIGN.md`), built in eleven pull requests. The new look reaches the studio at the next `npm run release`, and the deck's at the owner's Full Reset & Import in Companion.
+
+- [x] 1. Foundation A: the look: tokens, the PT faces and SSE Adelia, the primitives, the measures (#293)
+- [x] 2. Foundation B: menus and overlays: the menu, the ⋯, the popover, the tooltip, the context menu and the colour picker on them, the cameras' picture holes (#296)
+- [ ] 3. The shell: header with the `REC` tally and the logo, footer, one plate mechanism, the latch slot on every page, the screens before ready
+- [ ] 4. Audio: the outputs in the left column, the strips, the plate without scrolling, menus and tooltips
+- [ ] 5. Lighting: the plot from real positions, the bar under it, scenes as rows, the plate, menus
+- [ ] 6. Cameras: the cluster, caption and plate; format and look as popovers; the values list as a popover
+- [ ] 7. Teleprompter: the take block, the look and the Prompter XL readouts in popovers, script rows with menus
+- [ ] 8. Setup / Support and recovery
+- [x] 9. The deck's Companion 5 profile, and one read of every display (#294)
+- [ ] 10. The deck's look: labels drawn in PT Sans and SSE Adelia, the screen's palette and forms
+- [ ] 11. Polish: a critique of every capture, the fixes, the app shown to the owner
+
+Left by pull request 2 for the page pull requests:
+
+- Every object with a menu gets its ⋯ (`MenuButton`, with `contextTarget` for the right-click), and the right-click menus move from `ContextMenu` to it. Their "Delete …" items, which open a confirmation today, become the menu's destructive item that arms in place. The view slots' Save and Clear are right-click only today (Lighting).
+- Controls used during a take that are not yet marked `take`: the Teleprompter's paragraph rows and its Update and Clear keys, the Console's Clip key, Lighting's scene tiles and Highlight, Solo and Find. A tooltip avoids only what is marked.
+- The Cameras values list is a dialog, so it hides the pictures: pull request 6 makes it a popover with a `listbox`.
+- The Console's arm (`useAudioArming`) is not the design system's `useArm`: a Console menu with a destructive item needs the Console on `useArm`, or an adapter, so that two keys are never armed at once (pull request 4).
+- A locked key's reason is the browser's own tooltip (`title`); DESIGN.md §9 keeps a lock's reason on screen. Each page settles it as it moves.
 
 ### The Cameras page (was Slice 9)
 

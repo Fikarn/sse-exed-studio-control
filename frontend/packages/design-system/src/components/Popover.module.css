@@ -1,0 +1,49 @@
+/* The popover (docs/DESIGN.md §5): the floating layer beside its key, the
+   raised face with a 1 px edge, a black outline and one soft shadow. Its
+   title names what it edits, in PT Sans (it may hold a name or a number),
+   over a hairline, as the menu's head row. */
+@layer components {
+  /* Above a dialog's scrim, under a tooltip. */
+  .panel {
+    z-index: var(--z-palette);
+    min-width: 240px;
+    max-width: 640px;
+    padding: 16px;
+    background: var(--material-raise);
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    box-shadow: var(--elevation-float);
+    color: var(--text-text);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .panel {
+      animation: aPopoverEnter var(--motion-duration-enter) var(--motion-easing-out);
+    }
+  }
+
+  @keyframes aPopoverEnter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .title {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    margin: -4px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--material-line);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    color: var(--text-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
