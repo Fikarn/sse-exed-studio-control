@@ -207,7 +207,6 @@ test("unreachable: the state display carries the bridge sentence, the rig is out
   await expect(stateDisplay).toHaveAttribute("data-tone", "error");
   await expect(stateDisplay).toContainText(/is not answering/i);
   await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
-  await expect(page.getByTestId("shell-lamp-lighting")).toHaveAttribute("data-tone", "error");
 
   for (const testId of ["lighting-power-toggle", "lighting-emergency-cut", "lighting-grand-master"]) {
     const control = page.getByTestId(testId);
@@ -242,9 +241,8 @@ test("not answering: the watch's word is amber, and nothing is locked", async ({
   // (the review of #260).
   await expect(page.getByTestId("lighting-state-setup")).toHaveCount(0);
 
-  const lamp = page.getByTestId("shell-lamp-lighting");
-  await expect(lamp).toHaveAttribute("data-tone", "attention");
-  await expect(lamp).toContainText("not answering");
+  // The header's word is the Lighting tab's, read from another page
+  // (shell.spec.ts).
 
   for (const testId of ["lighting-power-toggle", "lighting-emergency-cut", "lighting-grand-master"]) {
     await expect(page.getByTestId(testId), `${testId} stays live`).not.toHaveAttribute("aria-disabled", "true");
@@ -262,7 +260,6 @@ test("not answering while held: the sentence names the hold, and Open Setup goes
   await expect(stateDisplay).toContainText("NOT ANSWERING");
   await expect(stateDisplay).toContainText(/and the outputs are held until armed in Setup \/ Support/);
   await expect(page.getByTestId("lighting-state-setup")).toBeVisible();
-  await expect(page.getByTestId("shell-lamp-lighting")).toContainText("not answering");
 });
 
 // Visual overhaul A, Slice 5: the rig has drifted from the scene it was

@@ -9,8 +9,8 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    height: 36px;
-    padding: 0 16px;
+    height: 40px;
+    padding: 0 12px;
     border: 1px solid transparent;
     border-radius: var(--radius-base);
     background: none;
@@ -54,6 +54,49 @@
     border-style: dashed;
     border-color: var(--material-line2);
     cursor: not-allowed;
+  }
+
+  /* The page's lamp and its state word, after the name: SSE Adelia at body
+     size in the tone's colour (the shell, overhaul 3: header words 16 px or
+     larger). */
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 4px;
+  }
+
+  .word {
+    font: var(--font-weight-bold) var(--font-size-body) / 1 var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
+    color: var(--text-text3);
+  }
+
+  /* A value that changes (the prompter's time left): PT Sans, tabular, never
+     SSE Adelia, which carries no number. */
+  .value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ok .word,
+  .ok .value {
+    color: var(--role-green-text);
+  }
+
+  .attention .word,
+  .attention .value {
+    color: var(--role-yellow-text);
+  }
+
+  .error .word,
+  .error .value {
+    color: var(--role-coral-text);
+  }
+
+  .info .word,
+  .info .value {
+    color: var(--role-blue-text);
   }
 
   .icon {

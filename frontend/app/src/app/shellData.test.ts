@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildMonitorItems, deriveLightingWorkspaceTone, recChipOf, withRestoreDetail } from "./shellData";
+import { buildMonitorItems, deriveLightingWorkspaceTone, headerItems, recChipOf, withRestoreDetail } from "./shellData";
 
 // New pages program, Slice 2 (D3): a restore's `detail` (the hardware link's
 // note that a backup's Planning data was not restored) follows the shell's
@@ -201,23 +201,29 @@ describe("the header's Prompter lamp, Surface lamp and playing latch", () => {
     expect(lamp(null)).toMatchObject({ detail: "pending", status: "attention" });
   });
 
-  it("shows a green latch with the time left only while the prompter scrolls", () => {
-    const playing = buildMonitorItems(
-      { checks: {} },
+  // The shell (overhaul 3): while the prompter scrolls, the Teleprompter
+  // tab's own lamp says `playing` with the time left in PT Sans, unless the
+  // prompter is worse off. Old: a green `Prompter playing` latch of its own.
+  it("says playing with the time left on the prompter's lamp while it scrolls, unless it is worse off", () => {
+    const ready = { checks: { prompter: { status: "ok", word: "ON SCREEN" } } };
+    const playing = buildMonitorItems(ready, { lightingSceneDrift: false, audioSolo: false, prompterPlaying: "3:12" });
+    expect(byId(playing, "prompter")).toEqual({
+      id: "prompter",
+      label: "Prompter",
+      detail: "playing",
+      value: "3:12 left",
+      status: "ok",
+      tab: "teleprompter",
+    });
+    expect(byId(playing, "latched:prompter-playing")).toBeUndefined();
+    const paused = buildMonitorItems(ready, { lightingSceneDrift: false, audioSolo: false, prompterPlaying: null });
+    expect(byId(paused, "prompter")).toMatchObject({ detail: "ready", status: "ok" });
+    expect(byId(paused, "prompter")?.value).toBeUndefined();
+    const lost = buildMonitorItems(
+      { checks: { prompter: { status: "error", word: "NOT CONNECTED" } } },
       { lightingSceneDrift: false, audioSolo: false, prompterPlaying: "3:12" }
     );
-    expect(byId(playing, "latched:prompter-playing")).toEqual({
-      id: "latched:prompter-playing",
-      label: "Prompter playing",
-      detail: "3:12 left",
-      status: "ok",
-      target: "Teleprompter",
-    });
-    const paused = buildMonitorItems(
-      { checks: {} },
-      { lightingSceneDrift: false, audioSolo: false, prompterPlaying: null }
-    );
-    expect(byId(paused, "latched:prompter-playing")).toBeUndefined();
+    expect(byId(lost, "prompter")).toMatchObject({ detail: "not connected", status: "error" });
   });
 });
 
@@ -283,19 +289,74 @@ describe("the header's Cameras lamp and REC chip", () => {
       audioSolo: true,
       prompterPlaying: "3:12",
     });
-    expect(items.map((item) => item.id).slice(-4)).toEqual([
-      "latched:scene-drift",
-      "latched:solo",
-      "latched:prompter-playing",
-      "latched:rec",
-    ]);
+    expect(items.map((item) => item.id).slice(-3)).toEqual(["latched:scene-drift", "latched:solo", "latched:rec"]);
     expect(byId(items, "latched:rec")).toEqual({
       id: "latched:rec",
       label: "REC",
       detail: "CAM 1",
       status: "error",
       target: "Cameras",
+      page: "cameras",
+      doubt: false,
     });
+  });
+
+  it("marks a last known REC as a doubt", () => {
+    const items = buildMonitorItems({
+      checks: { cameras: check("error", "UNREACHABLE", true, "unreachable") },
+    } as never);
+    expect(byId(items, "latched:rec")).toMatchObject({ detail: "last known", doubt: true });
+  });
+});
+
+// The shell (overhaul 3): what the header shows on each page.
+describe("the header on each page", () => {
+  const camera = (number: number, state: string) => ({ camera: number, tag: `CAM ${number}`, state });
+  const recording = {
+    checks: {
+      cameras: { status: "ok", word: "HELD", recording: true, cameras: [camera(1, "held")] },
+      lighting: { status: "ready" },
+    },
+  };
+  const ids = (items: readonly { id: string }[]) => items.map((item) => item.id);
+
+  it("keeps REC in its own slot on every page, Cameras included", () => {
+    const items = buildMonitorItems(recording as never, { lightingSceneDrift: false, audioSolo: false });
+    for (const page of ["setup", "lighting", "audio", "cameras", "teleprompter"]) {
+      const header = headerItems(items, page);
+      expect(header.rec?.id, page).toBe("latched:rec");
+      expect(ids(header.lamps), page).not.toContain("latched:rec");
+    }
+    expect(headerItems(buildMonitorItems({ checks: {} }), "audio").rec).toBeNull();
+  });
+
+  it("leaves a latch off the page that shows it itself: Solo on Audio, the drifted scene on Lighting", () => {
+    const items = buildMonitorItems(
+      recording as never,
+      { lightingSceneDrift: true, audioSolo: true },
+      {
+        lighting: { tone: "attention", winsTies: true, word: "held" },
+      }
+    );
+    expect(ids(headerItems(items, "audio").lamps)).not.toContain("latched:solo");
+    expect(ids(headerItems(items, "audio").lamps)).toContain("latched:scene-drift");
+    expect(ids(headerItems(items, "lighting").lamps)).not.toContain("latched:scene-drift");
+    expect(ids(headerItems(items, "lighting").lamps)).toContain("latched:solo");
+    expect(ids(headerItems(items, "setup").lamps)).toEqual(
+      expect.arrayContaining(["latched:scene-drift", "latched:solo"])
+    );
+  });
+
+  it("prints the drifted scene once: not as a latch when the Lighting tab already says unsaved", () => {
+    const items = buildMonitorItems(
+      recording as never,
+      { lightingSceneDrift: true, audioSolo: false },
+      {
+        lighting: deriveLightingWorkspaceTone({ reachable: true, outputArmed: true }, true),
+      }
+    );
+    expect(items.find((item) => item.id === "lighting")?.detail).toBe("unsaved");
+    expect(ids(headerItems(items, "audio").lamps)).not.toContain("latched:scene-drift");
   });
 });
 

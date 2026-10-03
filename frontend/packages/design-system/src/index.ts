@@ -31,6 +31,8 @@ export type { TabProps } from "./components/Tab";
 export { Button } from "./components/Button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/Button";
 export { Crest } from "./components/Crest";
+export { Tally } from "./components/Tally";
+export type { TallyProps, TallyState } from "./components/Tally";
 export type { CrestProps, CrestSize } from "./components/Crest";
 export { Dialog } from "./components/Dialog";
 export type { DialogProps } from "./components/Dialog";

@@ -1,23 +1,28 @@
 /* The Teleprompter's bay (new pages program, Slice 6a): board 1's centre.
-   The strip over the copy, the copy across the bay (1,688 × 950), the whole
-   script under it, then the cue keys and Go to paragraph. The shell's bay
-   already keeps its gutter, so the copy has the bay's whole width. */
+   The strip over the copy, the copy across the bay (1,680 × 945), the whole
+   script under it, then the cue keys and Go to paragraph. The shell
+   (overhaul 3): the bay draws no margin, so the copy has its whole width,
+   between the cluster's hairline and the plate's. */
 
 .bay {
   display: flex;
   flex-direction: column;
   gap: 16px;
   height: 100%;
+  padding: calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1)) 0;
   min-height: 0;
   overflow: hidden;
 }
 
 /* The bay's head: what it shows (the live copy or the editor, Slice 6b)
    beside the strip. */
+/* The rows over and under the copy keep the page's margin; the copy itself
+   has the bay's whole width (the shell, overhaul 3). */
 .bayHead {
   display: flex;
   gap: 16px;
   flex: none;
+  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
 }
 
 .views {
@@ -91,8 +96,8 @@
 .copy {
   position: relative;
   flex: none;
-  width: 1688px;
-  height: 950px;
+  width: 1680px;
+  height: 945px;
   border-radius: var(--radius-screen);
   overflow: hidden;
 }
@@ -124,6 +129,7 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: -8px;
+  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
   color: var(--text-text2);
   font: 400 var(--font-size-tick) / 1 var(--font-family-mono);
   letter-spacing: 0.04em;
@@ -137,7 +143,8 @@
 .bar {
   appearance: none;
   display: block;
-  width: 100%;
+  width: calc(100% - 2 * var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
+  margin: 0 auto;
   height: 40px;
   padding: 4px;
   border: 1px solid var(--material-line);
@@ -206,6 +213,7 @@
   align-items: center;
   gap: 16px;
   flex: none;
+  padding: 0 calc(var(--chrome-studio-gutter) * var(--operator-ui-scale-factor, 1));
 }
 
 .cues {

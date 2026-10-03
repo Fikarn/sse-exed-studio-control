@@ -34,14 +34,23 @@ describe("AppShellFrame.module.css", () => {
     expect(css).toContain("var(--chrome-studio-plate)");
   });
 
-  it("sets the product name in SSE Adelia capitals, the eyebrow and the clock in PT Sans", () => {
+  // The shell (overhaul 3): the header is 80 px, the frame's margin is a
+  // token, and the bay draws no margin of its own (the page's picture decides
+  // it). The eyebrow went with the lockup: the logotype stands alone at the
+  // right.
+  it("sets the product name in SSE Adelia capitals and the clock in PT Sans, with no eyebrow", () => {
     expect(code).toMatch(
       /\.product \{[^}]*var\(--font-size-word\) \/ 1 var\(--font-family-display\)[^}]*text-transform: uppercase/
     );
-    expect(code).toMatch(
-      /\.eyebrow \{[^}]*var\(--font-size-label\)[^}]*var\(--font-family-ui\)[^}]*color: var\(--text-text3\)/
-    );
+    expect(code).not.toMatch(/\.eyebrow\b/);
     expect(code).toMatch(/\.clock \{[^}]*var\(--font-family-ui\)/);
+  });
+
+  it("keeps the frame's margin at the header's sides and none in the bay", () => {
+    expect(code).toMatch(/\.header \{[^}]*padding-right: calc\(var\(--chrome-studio-margin\)/);
+    expect(code).toMatch(/\.product \{[^}]*padding-left: calc\(var\(--chrome-studio-margin\)/);
+    expect(code).toMatch(/\.bay \{[^}]*\}/);
+    expect(code.match(/\.bay \{[^}]*\}/)?.[0]).not.toMatch(/padding/);
   });
 
   it("is flat: no gradient, no shadow, no backdrop blur, no retired plate material", () => {

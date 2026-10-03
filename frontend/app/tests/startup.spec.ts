@@ -116,16 +116,19 @@ test("the recovery screen needs no scroll at 2560x1440 (SET-11)", async ({ page 
     timeout: 10000,
   });
 
-  // Both cards, whole: the grid that holds them ends on the screen, and so
-  // does the last row of the list of file paths, the lowest text there is.
+  // The bay's sections, whole: they end on the screen. The shell (overhaul
+  // 3): the file paths are on the plate, and the last of them, the lowest
+  // text there is, ends on the screen too, with the plate unscrolled.
   const cards = await page.getByTestId("setup-recovery-cards").boundingBox();
-  expect(cards, "the cards should have a box").not.toBeNull();
+  expect(cards, "the sections should have a box").not.toBeNull();
   expect(cards!.y).toBeGreaterThanOrEqual(0);
   expect(cards!.y + cards!.height).toBeLessThanOrEqual(1440);
   const lastPath = page.getByText("File paths").locator("xpath=following-sibling::ul/li[last()]");
   const box = await lastPath.boundingBox();
   expect(box, "the last file path should have a box").not.toBeNull();
-  expect(box!.y + box!.height).toBeLessThanOrEqual(cards!.y + cards!.height);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(1440);
+  const plate = page.getByTestId("setup-recovery-surface-plate");
+  expect(await plate.evaluate((node) => node.scrollHeight <= node.clientHeight + 1)).toBe(true);
   await expectNoDocumentScroll(page);
 });
 
@@ -164,7 +167,13 @@ test("the recovery screen offers Reset the window layout beside Retry startup (S
   await openFixture(page, "bootstrap-failed");
   const display = page.getByTestId("setup-recovery-surface-state-display");
   await expect(display).toContainText("STARTUP FAILED", { timeout: 10000 });
-  await expect(display.getByRole("button")).toHaveText(["Retry startup", "Reset the window layout", "Back to Console"]);
+  // The shell (overhaul 3): the display stands in the 440 px cluster; its one
+  // way out stays on it, and the window's keys stand right under it.
+  await expect(display.getByRole("button")).toHaveText(["Retry startup"]);
+  await expect(page.getByTestId("setup-recovery-keys").getByRole("button")).toHaveText([
+    "Reset the window layout",
+    "Back to Console",
+  ]);
 
   const reset = page.getByTestId("setup-recovery-window-reset");
   await reset.click();

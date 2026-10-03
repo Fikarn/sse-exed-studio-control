@@ -146,13 +146,7 @@ export function AudioInspector({
   );
 
   return (
-    <aside
-      className={styles.inspector}
-      data-material="plate"
-      data-region="plate"
-      data-source-tier={viewModel.selectedSourceTier}
-      data-testid="audio-inspector"
-    >
+    <aside className={styles.inspector} data-source-tier={viewModel.selectedSourceTier} data-testid="audio-inspector">
       {selectedChannel ? (
         <>
           <PlateHead

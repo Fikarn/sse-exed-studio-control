@@ -8,12 +8,13 @@
   --lighting-inspector-font-stat: var(--operator-font-size-title-md, 18px);
   --lighting-inspector-font-scene-title: var(--operator-font-size-title-lg, 22px);
 
+  /* The shell (overhaul 3): it fills the shell's plate, which draws its edge. */
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  height: 100%;
   gap: var(--operator-inspector-gap, 12px);
   padding: var(--operator-inspector-padding, 12px);
-  background: linear-gradient(180deg, var(--color-bg-canvas) 0%, var(--color-bg-soft) 100%);
-  border-left: 1px solid var(--color-bg-stroke);
   font-family: var(--font-family-ui);
   font-size: var(--lighting-inspector-font-body);
   color: var(--color-brand-text-primary);

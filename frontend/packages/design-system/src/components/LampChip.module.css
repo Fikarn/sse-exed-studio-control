@@ -5,14 +5,14 @@
     appearance: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 6px;
+    gap: 8px;
+    height: 40px;
+    padding: 0 8px;
     border: 1px solid transparent;
     border-radius: var(--radius-base);
     background: transparent;
     color: var(--text-text3);
-    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
     white-space: nowrap;
     min-width: 0;
     flex: none;
@@ -41,25 +41,35 @@
   }
 
   .word {
-    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-display);
+    font: var(--font-weight-bold) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-display);
     letter-spacing: var(--font-tracking-display);
     text-transform: uppercase;
     color: var(--text-text3);
   }
 
-  .ok .word {
+  /* A value that changes: PT Sans, tabular, in the word's colour. */
+  .value {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-text2);
+  }
+
+  .ok .word,
+  .ok .value {
     color: var(--role-green-text);
   }
 
-  .attention .word {
+  .attention .word,
+  .attention .value {
     color: var(--role-yellow-text);
   }
 
-  .error .word {
+  .error .word,
+  .error .value {
     color: var(--role-coral-text);
   }
 
-  .info .word {
+  .info .word,
+  .info .value {
     color: var(--role-blue-text);
   }
 }

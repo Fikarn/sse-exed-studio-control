@@ -8,6 +8,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The frame is the new design's: an 80 px header with each page's lamp and word in its tab (the open page's in its own display), a `REC` slot that never moves, the clock and the SSE logotype; every page's plate on the right at the same width; `Nothing latched` under every state display, with a `⋯` for the page's commands. Start-up and recovery stand on the same frame (#298).
 - The Stream Deck takes the screen's look: its words in the screen's faces and colours, `SOLO` as the screen's latch, one armed form ("press again" in dark red), the selected camera in beige, the page keys dark green with the tab words and a dot a page. It reaches the deck with the next export and Full Reset & Import in Companion (#297).
 - The right-click menus are drawn anew: bigger rows that stay on the screen, a coral delete last, and the focus back where it was when they close. The colour-tag picker has bigger swatches (#296).
 - Tooltips are Beige notes that open after a short rest and never cover a key used during a take; the strip's `M` and `S` have none, their names say it (#296).

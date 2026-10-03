@@ -53,12 +53,13 @@
   --prompter-glass-line: rgba(255, 255, 255, 0.35); /** the thin line across at the reading line, off by default */
   --prompter-glass-number: rgba(255, 255, 255, 0.45); /** a paragraph number on the glass, off by default */
   --prompter-glass-read: rgba(0, 0, 0, 0.55); /** laid over text already read: white on black reads at 45 % */
-  --chrome-studio-header: 56px;
+  --chrome-studio-header: 80px;
   --chrome-studio-footer: 40px;
-  --chrome-studio-cluster: 424px;
-  --chrome-studio-plate: 416px;
+  --chrome-studio-cluster: 440px;
+  --chrome-studio-plate: 440px;
   --chrome-studio-state-display: 180px;
-  --chrome-studio-gutter: 16px;
+  --chrome-studio-gutter: 16px; /** a page's own margin inside its bay, where it wants one: the shell draws none */
+  --chrome-studio-margin: 32px; /** the frame's outer margin: the header's and the footer's sides */
   --chrome-studio-strip: 120px;
   --elevation-float: 0 0 0 1px #000000, 0 16px 40px rgba(0, 0, 0, 0.55); /** the floating layer: menu, popover, dialog, drawer, toast (data-level=float) */
   --elevation-tip: 0 6px 16px rgba(0, 0, 0, 0.45); /** the tooltip (data-level=float) */

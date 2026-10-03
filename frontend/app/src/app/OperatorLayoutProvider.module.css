@@ -45,16 +45,6 @@
   --font-size-xl-tight: var(--font-size-head);
   --font-size-2xl: var(--font-size-word);
   --font-size-3xl: var(--font-size-readout);
-  --operator-shell-header-gap: calc(18px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-x: calc(24px * var(--operator-ui-scale-factor));
-  --operator-shell-header-padding-left: calc(36px * var(--operator-ui-scale-factor));
-  --operator-shell-brand-gap: calc(22px * var(--operator-ui-scale-factor));
-  --operator-shell-meta-gap: calc(10px * var(--operator-ui-scale-factor));
-  --operator-shell-main-padding: calc(var(--space-4) * var(--operator-ui-scale-factor));
-  --operator-shell-main-header-height: clamp(60px, calc(72px * var(--operator-ui-scale-factor)), 92px);
-  --operator-shell-main-header-padding-x: calc(var(--space-5) * var(--operator-ui-scale-factor));
-  --operator-shell-main-header-gap: calc(var(--space-3) * var(--operator-ui-scale-factor));
-  --operator-shell-title-block-gap: calc(6px * var(--operator-ui-scale-factor));
   --operator-stage-control-inset: calc(16px * var(--operator-ui-scale-factor));
   --operator-stage-control-padding: calc(2px * var(--operator-ui-scale-factor));
   --operator-stage-control-height: calc(26px * var(--operator-ui-scale-factor));
@@ -63,10 +53,6 @@
   --operator-stage-control-bookmark-width: calc(24px * var(--operator-ui-scale-factor));
   --operator-stage-control-mode-width: calc(62px * var(--operator-ui-scale-factor));
   --operator-stage-control-zoom-width: calc(44px * var(--operator-ui-scale-factor));
-  --operator-health-toggle-gap: calc(6px * var(--operator-ui-scale-factor));
-  --operator-health-toggle-padding-y: calc(4px * var(--operator-ui-scale-factor));
-  --operator-health-toggle-padding-x: calc(8px * var(--operator-ui-scale-factor));
-  --operator-health-dot-size: calc(6px * var(--operator-ui-scale-factor));
   --operator-inspector-gap: calc(12px * var(--operator-ui-scale-factor));
   --operator-inspector-padding: calc(12px * var(--operator-ui-scale-factor));
   --operator-inspector-section-gap: calc(10px * var(--operator-ui-scale-factor));
@@ -89,7 +75,7 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  background: var(--color-bg-deep);
+  background: var(--material-bg);
   container: operator-root / size;
 }
 

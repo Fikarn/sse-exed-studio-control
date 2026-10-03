@@ -2,6 +2,7 @@ import styles from "./LightingWorkspace.module.css";
 import { LightingClusterRegion } from "./regions/LightingClusterRegion";
 import { LightingBayRegion } from "./regions/LightingBayRegion";
 import { LightingBottomStrips } from "./regions/LightingBottomStrips";
+import { LightingPlatePanel } from "./regions/LightingPlatePanel";
 import { ShellRegion } from "@sse/design-system";
 import { LightingFooter } from "./components/LightingFooter";
 import { LightingDialogs } from "./regions/LightingDialogs";
@@ -39,6 +40,10 @@ export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
       <LightingClusterRegion editor={editor} />
       <LightingBayRegion editor={editor} />
       <LightingBottomStrips editor={editor} />
+      {/* The shell (overhaul 3): one plate mechanism for every page. */}
+      <ShellRegion region="plate">
+        <LightingPlatePanel editor={editor} />
+      </ShellRegion>
       <ShellRegion region="footer">
         <LightingFooter
           bridgeReachable={bridgeReachable}

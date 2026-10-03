@@ -1,0 +1,73 @@
+/* The header's REC tally (the shell, visual overhaul 3). A fixed slot as wide
+   as its longest form ("REC not read while released", measured), so nothing
+   beside it moves when it lights. */
+@layer components {
+  .slot {
+    display: flex;
+    width: 272px;
+    height: 40px;
+    flex: none;
+  }
+
+  .rest,
+  .lit {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 100%;
+    padding: 0 14px;
+    border: 1px solid var(--material-line);
+    border-radius: var(--radius-base);
+    background: transparent;
+    color: var(--text-text3);
+    font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+    white-space: nowrap;
+  }
+
+  /* At rest the slot is quiet: no edge, a hollow lamp and the name. */
+  .rest {
+    border-color: transparent;
+  }
+
+  .lit {
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .lit:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* Read during a take: the name at word size. */
+  .name {
+    font: var(--font-weight-bold) var(--font-size-word) / 1 var(--font-family-display);
+    letter-spacing: var(--font-tracking-display);
+    text-transform: uppercase;
+  }
+
+  .detail {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .error {
+    border-color: var(--role-coral-text);
+    color: var(--role-coral-text);
+  }
+
+  .attention {
+    border-color: var(--role-yellow-line);
+    color: var(--role-yellow-text);
+  }
+
+  .lit[data-doubt] {
+    border-style: dashed;
+  }
+
+  .error .detail {
+    font-weight: var(--font-weight-bold);
+  }
+}

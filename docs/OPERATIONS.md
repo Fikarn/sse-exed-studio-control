@@ -13,18 +13,18 @@ What the operator does at the screen and the Stream Deck. The devices and their 
 
 ## The screen
 
-**Header.** The tabs are `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Then comes one lamp for each subsystem, with its worst state as a word: green is fine, amber wants attention, red is a fault. Pressing a lamp opens Setup / Support.
+**Header.** `Studio Control` at the left; then the tabs, `Setup / Support`, `Lighting`, `Audio`, `Cameras` and `Teleprompter`. Each page's tab carries that page's lamp with its worst state as a word: green is fine, amber wants attention, red is a fault. The open page's tab carries none, because its state display says it. The deck's lamp, `Surface`, follows the tabs; pressing it opens Setup / Support. The SSE logotype stands at the right.
 
 - `Lighting`. `ready`: the bridge passed its last probe, and answers during the session. `not answering`: it has stopped answering (the app looks every 5 s); nothing is locked. `held`: nothing is sent to the rig. `unsaved`: the rig differs from the recalled scene. `no bridge`: the probe has not passed. `no output`: the light output could not open its port, so nothing reaches the rig; arming does not help, restarting the hardware link does.
 - `Audio`. `ready`, or the Console's state in small letters, such as `sync needed`.
 - `Cameras`. `ready`: all three are held. Otherwise the worst camera's state in small letters: `released`, `not set up`, `unreachable`. Today that is `not set up`.
-- `Prompter`. `ready`: the Prompter XL shows Studio Control's window. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`.
+- `Teleprompter`. `ready`: the Prompter XL shows Studio Control's window. `playing` and the time left while the prompter scrolls. Otherwise the Teleprompter's state in small letters, such as `not connected` or `not updated`, which wins over `playing`.
 - `Surface`. `ready`: Companion, with the profile and its token, asked the app in the last 5 s (it asks once a second, whether the Stream Deck is plugged in or not). `no deck`, amber: it has not; Companion may be closed, or its profile lacks the right token. Nothing locks. `unavailable`: the app could not open its port. That the deck itself answers, Setup's `Verify live echo` shows.
-- `Backup`, amber, after the five, only while something is wrong: `failed` when the automatic backup could not be written, `overdue` when none has been written for two days. Pressing it opens Setup / Support, where the backups are.
+- `Backup`, amber, after `Surface`, only while something is wrong: `failed` when the automatic backup could not be written, `overdue` when none has been written for two days. Pressing it opens Setup / Support, where the backups are.
 
-A latch shows while something is on: `Scene drift unsaved`, `Solo latched`, `Prompter playing 3:12 left`, `REC CAM 1`. Pressing it opens its page. The clock comes last.
+A latch shows while something is on, on every page but its own, which shows it itself: `SOLO` (the Console shows it in its latch slot), `SCENE DRIFT` (only while the Lighting tab says something worse than `unsaved`). Pressing it opens its page. `REC` has a slot of its own before the clock, on every page: quiet while nothing records, `REC CAM 1` in coral while CAM 1 records, amber `last known` when CAM 1 stopped answering while it recorded, amber `not read while released` while CAM 1 is released. Pressing it opens the Cameras page. The clock comes last.
 
-**Page.** The cluster on the left, the bay in the middle, the plate on the right. The state display, top left, says what is true in one word and one sentence, and offers the way out as a key. The footer holds the page's facts, such as `Metering TotalMix · live`.
+**Page.** The cluster on the left, the bay in the middle, the plate on the right. The state display, top left, says what is true in one word and one sentence, and offers the way out as a key; its `⋯` opens the page's menu. Under it, the latch slot shows what is latched and the key that clears it, or `Nothing latched`. The footer holds the page's facts, such as `Metering TotalMix · live`.
 
 **Keys.** Amber is switched on, green is running now, a red lamp is a hazard that is on. A dashed, dim key is locked: point at it to read why. A `press twice` key arms at the first press, reads `ARMED · press again` and counts down 4.5 s (3 s for the cameras' stop and for a press that would unpublish the setup). A second press, 0.35 s later at the earliest, applies it. `Esc` cancels.
 

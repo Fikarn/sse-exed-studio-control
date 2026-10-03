@@ -9,7 +9,9 @@ import styles from "./StateDisplay.module.css";
 // italic (the hardware link's voice), the raw code small beneath it, and at
 // the foot the meta line with the way-out keys. Nothing below it ever moves;
 // arming renders as the one armed form (Burgundy, Beige ink) in the meta
-// line's place (finding C1).
+// line's place (finding C1). The shell (overhaul 3): the page's ⋯ stands at
+// the display's top right (`menu`, a `MenuButton`), in the same place on
+// every page.
 export type StateDisplayTone = "ok" | "attention" | "error" | "info";
 
 /** A word longer than this drops from the display size to the readout size. */
@@ -40,6 +42,8 @@ export interface StateDisplayProps extends Omit<HTMLAttributes<HTMLElement>, "ti
   meta?: ReactNode;
   /** The way-out keys. */
   actions?: ReactNode;
+  /** The page's ⋯ (a `MenuButton`), at the top right. */
+  menu?: ReactNode;
   armed?: StateDisplayArmed | null;
   /** `<workspace>-state-display`. */
   testId?: string;
@@ -53,6 +57,7 @@ export function StateDisplay({
   code,
   meta,
   actions,
+  menu,
   armed,
   testId,
   className,
@@ -74,6 +79,7 @@ export function StateDisplay({
         <span className={styles.word} data-long={word.length > LONG_WORD ? "" : undefined}>
           {word}
         </span>
+        {menu ? <span className={styles.menu}>{menu}</span> : null}
       </div>
       {/* The sentence and the code share the room between the word and the
           foot. The sentence keeps at most two lines; the code shows whole

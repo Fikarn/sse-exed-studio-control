@@ -61,13 +61,14 @@ export function fixtureUrl(fixture) {
   return `/?${new URLSearchParams({ fixture, transport: "fixture" }).toString()}`;
 }
 
-// The chrome budget of plan D4 at 2560×1440; a declared `[data-region]` must
-// sit within ±2 px of its number.
+// The chrome budget at 2560×1440 (docs/DESIGN.md section 2; the shell, visual
+// overhaul 3, moved it to Atrium's frame: 80 · 440 | 1680 | 440 · 40); a
+// declared `[data-region]` must sit within ±2 px of its number.
 export const D4_CHROME = {
-  header: { h: 56 },
+  header: { h: 80 },
   footer: { h: 40 },
-  cluster: { w: 424 },
-  plate: { w: 416 },
+  cluster: { w: 440 },
+  plate: { w: 440 },
   "state-display": { h: 180 },
 };
 export const CHROME_TOLERANCE_PX = 2;
@@ -120,19 +121,14 @@ export const LIMITS = {
 // The boards that differ, each with its reason. A number here is a limit like
 // the others: the board may do better and may not do worse.
 export const EXCEPTIONS = {
-  // No workspace is on these screens: a header and a state display.
-  "startup-loading": { regionsPresent: 2 },
-  "bootstrap-failed": { regionsPresent: 2 },
-  "protocol-mismatch": { regionsPresent: 2 },
-  // The Console's loading surface stands in for its cluster, plate and display.
-  "audio-loading": { regionsPresent: 2 },
-  // Setup has no cluster: its runner takes the bay's whole width.
-  "setup-required": { regionsPresent: 4 },
-  "setup-ready": { regionsPresent: 4 },
-  "setup-degraded": { regionsPresent: 4 },
-  "setup-cameras": { regionsPresent: 4 },
-  "setup-map-cameras": { regionsPresent: 4 },
-  "setup-map-prompter": { regionsPresent: 4 },
+  // Before ready there is nothing to report yet, so no footer: the header, the
+  // cluster with its state display, and the plate (the shell, overhaul 3).
+  "startup-loading": { regionsPresent: 4 },
+  "bootstrap-failed": { regionsPresent: 4 },
+  "protocol-mismatch": { regionsPresent: 4 },
+  // The Console's loading surface stands in for its display and its footer:
+  // the header, the cluster and the plate stand empty.
+  "audio-loading": { regionsPresent: 3 },
 };
 
 /** The limits of one board: the common ones, with the board's own in their place. */

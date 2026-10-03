@@ -1,0 +1,252 @@
+/* The recovery screen (the shell, overhaul 3): drawn by type and hairlines like
+   every page. The bay holds what to do — what went wrong and the restore, the
+   backups, where things are; the plate holds what the hardware reported.
+   Sections are Adelia heads over the heavy rule (the design system's
+   `Section`), lists are rows under hairlines, and nothing is a card. */
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The message line under the state display, in the cluster. */
+.feedback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  font: 400 var(--font-size-body) / 1.35 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.feedback[data-tone="error"] {
+  border-color: var(--role-coral-text);
+}
+
+/* The hardware link's voice, as in the state display. */
+.sentence {
+  margin: 0;
+  max-width: 1200px;
+  font: italic 400 var(--font-size-word) / 1.3 var(--font-family-serif);
+  color: var(--text-text);
+}
+
+.facts {
+  display: flex;
+  gap: 40px;
+  margin: 0;
+}
+
+.facts dt {
+  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.facts dd {
+  margin: 4px 0 0;
+  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.restore {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.latest,
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.latest strong {
+  font: 700 var(--font-size-word) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.input {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text);
+  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backups {
+  display: flex;
+  flex-direction: column;
+}
+
+/* A backup: one row under a hairline; pressing it puts its path in the field. */
+.backupRow {
+  appearance: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--material-line);
+  background: transparent;
+  color: var(--text-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.backupRow:hover {
+  background: var(--material-hover);
+}
+
+.backupRow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.backupName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.backupName strong {
+  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
+}
+
+.backupName small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+/* A folder to open: a key face, its name in PT Sans. */
+.pathKey {
+  appearance: none;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  color: var(--text-text);
+  font: 700 var(--font-size-body) / 1 var(--font-family-ui);
+  cursor: pointer;
+}
+
+.pathKey:hover:not(:disabled) {
+  border-color: var(--text-text3);
+}
+
+.pathKey:disabled {
+  color: var(--text-text4);
+  cursor: not-allowed;
+}
+
+.pathKey:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+}
+
+.check {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--material-line);
+}
+
+.checkHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checkTitle {
+  font: 700 var(--font-size-body) / 1.2 var(--font-family-ui);
+  color: var(--text-text);
+}
+
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.subhead {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--material-line2);
+  font: 700 var(--font-size-label) / 1.2 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.listLabel {
+  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.log {
+  max-height: 220px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+  color: var(--text-text2);
+  font: 400 var(--font-size-tick) / 1.5 var(--font-family-ui);
+  overflow: auto;
+  white-space: pre-wrap;
+}

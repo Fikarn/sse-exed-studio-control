@@ -88,11 +88,12 @@ export function SetupSupportPilot(props: SetupSupportPilotProps) {
             </div>
           ) : null}
         </main>
-
-        <aside className={styles.plateColumn} data-material="plate" data-region="support">
-          <SetupWorkstationPlate editor={editor} />
-        </aside>
       </div>
+
+      {/* The shell (overhaul 3): one plate mechanism for every page. */}
+      <ShellRegion region="plate">
+        <SetupWorkstationPlate editor={editor} />
+      </ShellRegion>
 
       <ShellRegion region="footer">
         <SetupFooter

@@ -133,7 +133,9 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // way out duplicates them deliberately).
   await expect(page.getByTestId("audio-topbar-sync")).toContainText("Sync from TotalMix");
   await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
-  await expect(page.getByTestId("audio-solo-warning-band")).toContainText("solo engaged");
+  // The shell (overhaul 3): the latch names itself, Solo, and counts in its text.
+  await expect(page.getByTestId("audio-solo-warning-band")).toContainText("Solo");
+  await expect(page.getByTestId("audio-solo-warning-band")).toContainText("1 on FX 3/4");
   // The latch is one row in the cluster, the latch slot's height (56 px,
   // docs/DESIGN.md section 2), never a band across the bay.
   await expect
@@ -1136,9 +1138,10 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   ]) {
     await expectNoHorizontalOverflow(page.getByTestId(testId), `2560 ${testId}`);
   }
-  // Plan D4: the plate is 416 px at 2560 × 1440.
+  // The shell (overhaul 3): the plate is the shell's, 440 px at 2560 × 1440,
+  // and the inspector fills it inside its hairline.
   const plateBox = await readRequiredBox(page, "audio-inspector");
-  expect(Math.abs(plateBox.width - 416), "the plate should be 416 px wide").toBeLessThanOrEqual(1);
+  expect(Math.abs(plateBox.width - 439), "the plate should be 440 px wide").toBeLessThanOrEqual(1);
 
   await expectAudioLaneCardsInsideTierGrids(page);
   await expectDbfsScaleLabelsInsideMeters(page, "2560 studio surface");

@@ -250,8 +250,6 @@ export function LightingInspector({
     <aside
       className={styles.inspector}
       aria-label={`Lighting inspector — ${TAB_TITLE[activeTab]}`}
-      data-material="plate"
-      data-region="plate"
       data-testid="lighting-plate"
     >
       {previewMode && activeTab !== "patch" ? (

@@ -19,8 +19,8 @@
   }
 
   /* Visual overhaul A, Slice 7: the cluster and the footer are the shell's;
-     what is left here is the bay with the step screen on it and the Support
-     plate beside it. */
+     what is left here is the bay with the step screen on it. The shell
+     (overhaul 3): the Support plate is the shell's plate. */
   .workspaceStack {
     display: grid;
     grid-template-rows: minmax(0, 1fr);
@@ -30,7 +30,7 @@
 
   .body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--chrome-studio-plate);
+    grid-template-columns: minmax(0, 1fr);
     min-height: 0;
     min-width: 0;
     overflow: hidden;
@@ -62,15 +62,6 @@
     white-space: nowrap;
     font: 400 var(--font-size-label) / 1 var(--font-family-ui);
     color: var(--text-text2);
-  }
-
-  .plateColumn {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    min-width: 0;
-    border-left: 1px solid var(--material-line);
-    background: linear-gradient(180deg, var(--material-panel-top), var(--material-panel));
   }
 
   /* One probe as the step screen records it: the row, what it says, and the

@@ -6,13 +6,13 @@
  * inspectorTabs, inspectorPanel, emptyInspector) preserved.
  */
 
-/* Visual overhaul A, Slice 4c (system §7): the plate — a level +1 surface at
-   the right of the shell holding every section of the selected strip at once.
-   It scrolls as one column; nothing is behind a tab. */
+/* Visual overhaul A, Slice 4c (system §7): the plate holding every section of
+   the selected strip at once. It scrolls as one column; nothing is behind a
+   tab. The shell (overhaul 3): it fills the shell's plate, which draws its
+   edge. */
 .inspector {
-  border-left: 1px solid var(--material-line);
-  background: var(--elevation-plate-fill);
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 16px;
   min-height: 0;

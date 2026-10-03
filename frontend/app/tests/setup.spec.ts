@@ -371,7 +371,7 @@ test("Support keeps the shell header, tabs and lamps (H1)", async ({ page }) => 
   const header = page.getByRole("banner");
   await expect(header).toBeVisible();
   const headerBox = await header.boundingBox();
-  expect(Math.abs((headerBox?.height ?? 0) - 56)).toBeLessThanOrEqual(2);
+  expect(Math.abs((headerBox?.height ?? 0) - 80)).toBeLessThanOrEqual(2);
   await expect(page.getByRole("navigation", { name: "Workspace navigation" })).toBeVisible();
   await expect(header.getByRole("button", { name: /^Lighting/ })).toBeVisible();
   await expect(page.getByTestId("setup-health-bar")).toBeVisible();
@@ -400,9 +400,12 @@ test.describe("Light outputs: Armed / Held", () => {
 
   test("holding and arming from the plate: the readout, the lamp, the row", async ({ page }) => {
     await openFixture(page, "lighting-populated");
-    const header = page.getByRole("banner");
-    const lamp = header.getByRole("button", { name: /^Open Setup \/ Support for Lighting/ });
-    await expect(lamp).not.toContainText("held");
+    // The shell (overhaul 3): the lamp is the Lighting tab's word, which the
+    // open page's tab leaves to its state display; it is read on Setup.
+    const lamp = page
+      .getByRole("navigation", { name: "Workspace navigation" })
+      .getByRole("button", { name: "Lighting", exact: true });
+    await expect(lamp).toHaveCount(1);
 
     await page
       .getByRole("navigation", { name: "Workspace navigation" })
@@ -427,15 +430,18 @@ test.describe("Light outputs: Armed / Held", () => {
     await expect(newest).toContainText("Screen");
     await expect(newest).toHaveAttribute("data-source", "ui");
 
-    // The lamp is the header's: it says held on the other workspaces too.
+    // The lamp is the header's: it says held on the other workspaces too. The
+    // shell (overhaul 3): on the rig's own page its tab carries no word, and the
+    // page's display says it.
     await page
       .getByRole("navigation", { name: "Workspace navigation" })
       .getByRole("button", { name: "Lighting", exact: true })
       .click();
     await expect(page.getByTestId("lighting-workspace")).toBeVisible();
-    await expect(lamp).toContainText("held");
+    await expect(lamp).not.toContainText("held");
     // Found, to check (2026-09-28): the page's own display said REACHABLE,
-    // "the rig is following it", while held. It says HELD, as the lamp does.
+    // "the rig is following it", while held. It says HELD, as the lamp does
+    // on the other pages.
     const lightingState = page.getByTestId("lighting-state-display");
     await expect(lightingState).toContainText("HELD");
     await expect(lightingState).not.toContainText("following it");
