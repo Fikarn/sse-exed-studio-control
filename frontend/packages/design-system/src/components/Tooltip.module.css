@@ -1,62 +1,62 @@
-.wrapper {
-  position: relative;
-  display: inline-flex;
-}
+/* The tooltip (docs/DESIGN.md §5): the one light surface, Beige with black
+   text, so it reads as a note and not a panel. Drawn in a portal above every
+   layer, the meters' canvas included; its arrow points at its trigger. */
+@layer components {
+  .wrapper {
+    position: relative;
+    display: inline-flex;
+  }
 
-.trigger {
-  display: inline-flex;
-  align-items: center;
-  outline: none;
-}
+  .trigger {
+    display: inline-flex;
+    align-items: center;
+    outline: none;
+  }
 
-.bubble {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  z-index: 50;
-  background: var(--color-bg-deep);
-  border: 1px solid var(--color-bg-border);
-  border-radius: var(--radius-ctl);
-  color: var(--color-brand-text-primary);
-  font-family: var(--font-family-ui);
-  font-size: var(--font-size-tick);
-  line-height: 1.4;
-  padding: 6px 9px;
-  max-width: 240px;
-  white-space: normal;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease,
-    visibility 0s 120ms;
-  box-shadow: var(--shadow-md);
-}
+  .bubble {
+    position: fixed;
+    z-index: var(--z-tooltip);
+    max-width: 360px;
+    padding: 7px 12px;
+    background: var(--sse-beige);
+    border-radius: var(--radius-base);
+    box-shadow: var(--elevation-tip);
+    color: var(--sse-black);
+    font: var(--font-weight-regular) var(--font-size-label) / var(--font-line-height-text) var(--font-family-ui);
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
 
-.bubble[data-visible] {
-  opacity: 1;
-  visibility: visible;
-  transition:
-    opacity 120ms ease,
-    transform 120ms ease;
-  transform: translateX(-50%) translateY(0);
-}
+  .arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 6px solid transparent;
+    pointer-events: none;
+  }
 
-.bubbleTop {
-  bottom: 100%;
-  margin-bottom: 6px;
-}
+  /* The arrow sits on the edge that faces the trigger. */
+  .bubble[data-side="bottom"] .arrow {
+    top: -12px;
+    left: calc(var(--tooltip-arrow, 50%) - 6px);
+    border-bottom-color: var(--sse-beige);
+  }
 
-.bubbleTop[data-visible] {
-  transform: translateX(-50%) translateY(-2px);
-}
+  .bubble[data-side="top"] .arrow {
+    bottom: -12px;
+    left: calc(var(--tooltip-arrow, 50%) - 6px);
+    border-top-color: var(--sse-beige);
+  }
 
-.bubbleBottom {
-  top: 100%;
-  margin-top: 6px;
-}
+  .bubble[data-side="right"] .arrow {
+    left: -12px;
+    top: calc(var(--tooltip-arrow, 50%) - 6px);
+    border-right-color: var(--sse-beige);
+  }
 
-.bubbleBottom[data-visible] {
-  transform: translateX(-50%) translateY(2px);
+  .bubble[data-side="left"] .arrow {
+    right: -12px;
+    top: calc(var(--tooltip-arrow, 50%) - 6px);
+    border-left-color: var(--sse-beige);
+  }
 }

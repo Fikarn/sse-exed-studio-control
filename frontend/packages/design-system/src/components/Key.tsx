@@ -122,6 +122,11 @@ export interface ArmKeyProps extends Omit<KeyProps, "mode"> {
   /** Test id of the countdown bar; the Console's is `audio-arm-countdown`. */
   countdownTestId?: string;
   /**
+   * A still countdown: the bar drawn at this fraction of the window (1 full,
+   * 0 empty) without running, as StateDisplay's armed row draws it (boards).
+   */
+  progress?: number;
+  /**
    * At rest the key is a hazard, a coral lamp and the word (`REC` while the
    * camera records); armed, it is an armed key like any other. It stays the
    * same key, so the focus stays on it between the two presses.
@@ -139,6 +144,7 @@ export function ArmKey({
   secondsLeft,
   armedWord = "ARMED · press again",
   countdownTestId = "audio-arm-countdown",
+  progress,
   hazard = false,
   cap,
   children,
@@ -167,7 +173,12 @@ export function ArmKey({
             aria-hidden="true"
             className={styles.countdown}
             data-testid={countdownTestId}
-            style={{ "--arm-duration": `${timeoutMs}ms` } as CSSProperties}
+            data-still={progress === undefined ? undefined : ""}
+            style={
+              (progress === undefined
+                ? { "--arm-duration": `${timeoutMs}ms` }
+                : { transform: `scaleX(${Math.min(1, Math.max(0, progress))})` }) as CSSProperties
+            }
           />
         </>
       ) : (

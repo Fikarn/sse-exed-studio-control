@@ -1,88 +1,77 @@
+/* The colour-tag picker (docs/DESIGN.md §5): keys of the tag's own colour in
+   a popover. The chosen one carries the Beige keyline (selection) and a black
+   mark; the Clear key is a small key of the one family. */
 @layer components {
   .picker {
-    background: var(--color-surface-default);
-    border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-key);
-    box-shadow: var(--shadow-md);
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 8px;
-    position: fixed;
-    z-index: var(--z-menu);
-    min-width: 180px;
-  }
-
-  .picker:focus {
-    outline: none;
+    gap: 12px;
   }
 
   .swatches {
     display: grid;
-    grid-template-columns: repeat(8, 18px);
+    grid-template-columns: repeat(8, 28px);
     gap: 4px;
   }
 
   .swatch {
-    align-items: center;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: var(--radius-ctl);
-    cursor: pointer;
+    appearance: none;
     display: inline-flex;
-    height: 18px;
+    align-items: center;
     justify-content: center;
+    width: 28px;
+    height: 28px;
     padding: 0;
-    width: 18px;
-    transition:
-      box-shadow 80ms ease,
-      border-color 80ms ease;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    cursor: pointer;
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
   .swatch:hover {
-    /* Slice 9 (system §6): hover changes an edge, never a position — the
-       swatch brightens its own border rather than growing. */
-    border-color: var(--color-accent-primary);
+    border-color: var(--text-text2);
   }
 
-  .swatchFocused {
-    box-shadow: 0 0 0 2px var(--color-accent-primary);
-    border-color: var(--color-accent-primary);
+  .swatch[data-selected] {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
 
-  .swatchSelected {
-    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.5);
+  .swatch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .checkIcon {
-    color: rgba(0, 0, 0, 0.85);
-    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
+    color: var(--sse-black);
   }
 
   .clear {
-    align-items: center;
-    background: transparent;
-    border: 1px solid var(--color-surface-border);
-    border-radius: var(--radius-ctl);
-    color: var(--color-studio-300);
-    cursor: pointer;
+    appearance: none;
     display: inline-flex;
-    font: var(--font-weight-bold) var(--operator-font-size-xs, var(--font-size-xs)) / 1 var(--font-family-mono);
-    gap: 6px;
+    align-items: center;
     justify-content: center;
-    letter-spacing: 0;
-    padding: 4px 8px;
-    text-transform: uppercase;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--material-line2);
+    border-radius: var(--radius-base);
+    background: var(--material-key);
+    color: var(--text-text);
+    font: var(--font-weight-bold) var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+    cursor: pointer;
+    transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
   }
 
   .clear:hover {
-    background: var(--material-hover);
-    color: var(--color-studio-100);
+    border-color: var(--text-text4);
   }
 
-  .clearFocused {
-    box-shadow: 0 0 0 2px var(--color-accent-primary);
-    border-color: var(--color-accent-primary);
-    color: var(--color-studio-100);
+  .clear[aria-pressed="true"] {
+    border-color: var(--accent);
+  }
+
+  .clear:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }

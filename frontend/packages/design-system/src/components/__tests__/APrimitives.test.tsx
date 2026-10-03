@@ -338,6 +338,25 @@ describe("useArm", () => {
     expect(onDisarm).toHaveBeenLastCalledWith(expect.objectContaining({ key: "k" }), "escape");
   });
 
+  // The Esc order: a layer above (a dialog, a drawer, a menu) that took the
+  // Esc closes alone, and the next Esc disarms.
+  it("leaves an Esc that a layer above took to that layer", () => {
+    const onDisarm = vi.fn();
+    const { result } = renderHook(() => useArm({ now: () => 0, onDisarm }));
+    act(() => result.current.armOrApply("k", "K", () => {}));
+    act(() => {
+      const taken = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
+      taken.preventDefault();
+      window.dispatchEvent(taken);
+    });
+    expect(result.current.armed?.key).toBe("k");
+    expect(onDisarm).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+    });
+    expect(result.current.armed).toBeNull();
+  });
+
   // A key with a window of its own (the Cameras page's stop has the deck's
   // 3 s) disarms after that, and the next key has the surface's again.
   it("gives a key its own window when it names one", () => {

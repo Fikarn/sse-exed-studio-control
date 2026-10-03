@@ -289,6 +289,10 @@
     pointer-events: none;
   }
 
+  .countdown[data-still] {
+    animation: none;
+  }
+
   @keyframes aArmCountdown {
     from {
       transform: scaleX(1);

@@ -1,65 +1,101 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Tooltip } from "../Tooltip";
+import { TOOLTIP_DELAY_MS, Tooltip } from "../Tooltip";
 
-// plan PR 6 / workstream D2: Tooltip wraps a trigger and reveals a bubble
-// on hover / focus (5 imports). Tests cover render, both placement variants,
-// aria-describedby wiring, the focus reveal (Tab brings the bubble), and
-// blur dismissal.
+// Visual overhaul B (DESIGN.md §9): the helper sentences are tooltips. The
+// sentence is always the trigger's description; the tooltip opens after a
+// rest of the pointer, at once on keyboard focus, closes on Esc, blur or a
+// press, is drawn in a portal on the floating layer, and never covers a
+// control used during a take.
+
+function box(left: number, top: number, width: number, height: number): DOMRect {
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect;
+}
 
 describe("Tooltip", () => {
-  it("renders the trigger child and a tooltip with the supplied content", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 2560 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 1440 });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("describes its trigger with the sentence, and draws nothing at rest", () => {
     render(
-      <Tooltip content="Helpful info">
+      <Tooltip content="Faders set the sends into this mix">
+        <button type="button">Main Out</button>
+      </Tooltip>
+    );
+    const describedBy = screen.getByText("Main Out").parentElement?.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    expect(document.getElementById(describedBy!)).toHaveTextContent("Faders set the sends into this mix");
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
+
+  it("opens after the pointer rests, on the floating layer, in a portal", () => {
+    const { container } = render(
+      <Tooltip content="hint">
         <span>trigger</span>
       </Tooltip>
     );
-    expect(screen.getByText("trigger")).toBeInTheDocument();
-    const bubble = screen.getByRole("tooltip");
-    expect(bubble).toHaveTextContent("Helpful info");
+    fireEvent.pointerEnter(screen.getByText("trigger").parentElement!.parentElement!);
+    act(() => {
+      vi.advanceTimersByTime(TOOLTIP_DELAY_MS - 50);
+    });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(60);
+    });
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("hint");
+    expect(tooltip).toHaveAttribute("data-level", "float");
+    expect(container.contains(tooltip)).toBe(false);
   });
 
-  it("wires aria-describedby from trigger to the tooltip id", () => {
+  it("closes when the pointer leaves, on Esc, and on a press", () => {
     render(
-      <Tooltip content="hint">
-        <span>t</span>
+      <Tooltip content="hint" delayMs={0}>
+        <span>trigger</span>
       </Tooltip>
     );
-    const bubble = screen.getByRole("tooltip");
-    const describer = bubble.id;
-    expect(describer).toBeTruthy();
-    const triggerWrap = screen.getByText("t").parentElement;
-    expect(triggerWrap).toHaveAttribute("aria-describedby", describer);
+    const wrapper = screen.getByText("trigger").parentElement!.parentElement!;
+    fireEvent.pointerEnter(wrapper);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).toBeNull();
+
+    fireEvent.pointerEnter(wrapper);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.pointerDown(screen.getByText("trigger"));
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    // A press keeps it closed until the pointer leaves.
+    fireEvent.pointerEnter(wrapper);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+    fireEvent.pointerLeave(wrapper);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    fireEvent.pointerEnter(wrapper);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
   });
 
-  it("applies every documented placement variant", () => {
-    for (const placement of ["top", "bottom"] as const) {
-      const { unmount } = render(
-        <Tooltip content={placement} placement={placement}>
-          <span>{placement}</span>
-        </Tooltip>
-      );
-      const bubble = screen.getByRole("tooltip");
-      // Class names contain a hashed token, e.g. "bubbleBottom_abc123".
-      const expectedFragment = placement === "bottom" ? "bubbleBottom" : "bubbleTop";
-      expect(bubble.className).toMatch(new RegExp(expectedFragment));
-      unmount();
-    }
-  });
-
-  it("applies maxWidth as an inline style when provided", () => {
-    render(
-      <Tooltip content="x" maxWidth={240}>
-        <span>t</span>
-      </Tooltip>
-    );
-    const bubble = screen.getByRole("tooltip");
-    expect(bubble).toHaveStyle({ maxWidth: "240px" });
-  });
-
-  it("becomes visible on focus and hides on blur", async () => {
+  it("opens at once on keyboard focus and closes on blur", async () => {
+    vi.useRealTimers();
     const user = userEvent.setup();
     render(
       <>
@@ -67,18 +103,63 @@ describe("Tooltip", () => {
         <Tooltip content="reveal me">
           <button type="button">trigger</button>
         </Tooltip>
-        <button type="button">after</button>
       </>
     );
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole("tooltip")).toHaveTextContent("reveal me");
+    await user.tab();
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
 
-    const bubble = screen.getByRole("tooltip");
-    expect(bubble).not.toHaveAttribute("data-visible");
+  it("never covers a take-time control: it takes another side", () => {
+    render(
+      <>
+        <Tooltip content="hint" placement="bottom" delayMs={0}>
+          <span data-testid="trigger">trigger</span>
+        </Tooltip>
+        <button type="button" data-take="" data-testid="dim">
+          DIM
+        </button>
+      </>
+    );
+    vi.spyOn(screen.getByTestId("trigger").parentElement!, "getBoundingClientRect").mockReturnValue(
+      box(500, 500, 100, 36)
+    );
+    vi.spyOn(screen.getByTestId("dim"), "getBoundingClientRect").mockReturnValue(box(400, 540, 300, 64));
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(32);
+    fireEvent.pointerEnter(screen.getByTestId("trigger").parentElement!.parentElement!);
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveAttribute("data-side", "top");
+  });
 
-    await user.tab(); // before
-    await user.tab(); // trigger (focus inside wrapper triggers reveal)
-    expect(bubble).toHaveAttribute("data-visible", "true");
+  it("does not open when every place would cover a take-time control", () => {
+    render(
+      <>
+        <Tooltip content="hint" placement="bottom" delayMs={0}>
+          <span data-testid="trigger">trigger</span>
+        </Tooltip>
+        <div data-take="" data-testid="block" />
+      </>
+    );
+    vi.spyOn(screen.getByTestId("trigger").parentElement!, "getBoundingClientRect").mockReturnValue(
+      box(500, 500, 100, 36)
+    );
+    vi.spyOn(screen.getByTestId("block"), "getBoundingClientRect").mockReturnValue(box(0, 0, 2560, 1440));
+    vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(200);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(32);
+    fireEvent.pointerEnter(screen.getByTestId("trigger").parentElement!.parentElement!);
+    expect(screen.queryByRole("tooltip")).toBeNull();
+  });
 
-    await user.tab(); // after — blur the wrapper
-    expect(bubble).not.toHaveAttribute("data-visible");
+  it("applies maxWidth to the tooltip", () => {
+    render(
+      <Tooltip content="x" maxWidth={240} delayMs={0}>
+        <span>t</span>
+      </Tooltip>
+    );
+    fireEvent.pointerEnter(screen.getByText("t").parentElement!.parentElement!);
+    expect(screen.getByRole("tooltip")).toHaveStyle({ maxWidth: "240px" });
   });
 });
