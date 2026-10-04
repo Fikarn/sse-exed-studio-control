@@ -235,7 +235,6 @@ pub(crate) enum UiMethodClass {
 }
 
 const RECORDED_UI_METHODS: &[&str] = &[
-    "audio.channel.dynamics.update",
     "audio.channel.eq.update",
     "audio.channel.update",
     "audio.mixTarget.update",
@@ -667,22 +666,6 @@ pub(crate) fn ui_actions(
                 ));
             }
             rows
-        }
-        "audio.channel.dynamics.update" => {
-            let name = text(result, "/name").unwrap_or("Channel");
-            flag(params, "enabled")
-                .map(|on| {
-                    vec![audio(
-                        "dynamics",
-                        name,
-                        format!(
-                            "Dynamics ({}) {}: {name}",
-                            text(params, "/section").unwrap_or("section"),
-                            on_off(on)
-                        ),
-                    )]
-                })
-                .unwrap_or_default()
         }
         "audio.snapshot.load" => {
             // A slot TotalMix saved no name for is named by its number; the

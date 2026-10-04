@@ -232,43 +232,6 @@ fn optional_low_cut_slope(value: Option<&Value>) -> Result<Option<i64>, String> 
     }
 }
 
-pub fn parse_audio_dynamics_update_request(
-    params: &Value,
-) -> Result<AudioDynamicsUpdateRequest, String> {
-    let channel_id = required_trimmed_string(params, "channelId")?;
-    let section = optional_enum_string(params.get("section"), "section", &["compressor", "gate"])?
-        .ok_or_else(|| String::from("section is required"))?;
-    let enabled = optional_bool(params.get("enabled"), "enabled")?;
-    let threshold_db = optional_number_range(params.get("thresholdDb"), "thresholdDb", -80.0, 0.0)?;
-    let ratio = optional_number_range(params.get("ratio"), "ratio", 1.0, 20.0)?;
-    let attack_ms = optional_number_range(params.get("attackMs"), "attackMs", 0.1, 2000.0)?;
-    let release_ms = optional_number_range(params.get("releaseMs"), "releaseMs", 0.1, 2000.0)?;
-    let makeup_db = optional_number_range(params.get("makeupDb"), "makeupDb", 0.0, 24.0)?;
-
-    if enabled.is_none()
-        && threshold_db.is_none()
-        && ratio.is_none()
-        && attack_ms.is_none()
-        && release_ms.is_none()
-        && makeup_db.is_none()
-    {
-        return Err(String::from(
-            "audio.channel.dynamics.update requires one or more supported fields",
-        ));
-    }
-
-    Ok(AudioDynamicsUpdateRequest {
-        channel_id,
-        section,
-        enabled,
-        threshold_db,
-        ratio,
-        attack_ms,
-        release_ms,
-        makeup_db,
-    })
-}
-
 pub(super) fn optional_level(
     value: Option<&Value>,
     field_name: &str,

@@ -6,7 +6,6 @@ export const PROTOCOL_VERSION = "2" as const;
 export const REQUEST_METHODS = [
   "app.snapshot",
   "audio.channel.update",
-  "audio.channel.dynamics.update",
   "audio.channel.eq.update",
   "audio.clip.clear",
   "audio.mixTarget.update",

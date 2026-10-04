@@ -37,17 +37,17 @@ impl Drop for TestDir {
     }
 }
 
-// 2026-10-04 (the owner's decision): the per-send modes are gone. They were
-// kept in the channels' saved state (`sendModes`) and never reached TotalMix.
-// A channel map written with them still reads whole, every other field kept,
-// and the field is not written again.
+// 2026-10-04 (the owner's decisions): the per-send modes and the dynamics are
+// gone. They were kept in the channels' saved state (`sendModes`, `dynamics`)
+// and never reached TotalMix. A channel map written with them still reads
+// whole, every other field kept, and neither field is written again.
 #[test]
-fn saved_channel_state_with_the_old_send_modes_still_reads() {
+fn saved_channel_state_with_the_old_send_modes_and_dynamics_still_reads() {
     let mut settings = HashMap::new();
     settings.insert(
         String::from(AUDIO_CHANNEL_STATE_KEY),
         String::from(
-            r#"{"audio-input-9":{"gain":41,"mute":true,"phantom":true,"mixLevels":{"audio-mix-main":0.5},"sendModes":{"audio-mix-main":{"preFader":true,"mute":true,"linkStereo":false,"solo":true}}}}"#,
+            r#"{"audio-input-9":{"gain":41,"mute":true,"phantom":true,"mixLevels":{"audio-mix-main":0.5},"sendModes":{"audio-mix-main":{"preFader":true,"mute":true,"linkStereo":false,"solo":true}},"dynamics":{"compressor":{"enabled":true,"thresholdDb":-18,"ratio":2,"attackMs":12,"releaseMs":120,"makeupDb":3},"gate":{"enabled":false,"thresholdDb":-48,"ratio":1.5,"attackMs":4,"releaseMs":180,"makeupDb":0}}}}"#,
         ),
     );
 
@@ -64,8 +64,10 @@ fn saved_channel_state_with_the_old_send_modes_still_reads() {
     assert_eq!(stored["audio-input-9"].gain, 41);
     let written = serde_json::to_string(&stored["audio-input-9"]).expect("the state serializes");
     assert!(!written.contains("sendModes"), "{written}");
+    assert!(!written.contains("dynamics"), "{written}");
     let served = serde_json::to_string(host).expect("the snapshot serializes");
     assert!(!served.contains("sendModes"), "{served}");
+    assert!(!served.contains("dynamics"), "{served}");
 }
 
 // D26 (2026-09-28): talkback is gone, and what the build before wrote is still
@@ -200,6 +202,52 @@ fn a_saved_recall_message_reads_as_no_action() {
         "Recalled show was sent to TotalMix; TotalMix did not answer.",
     );
     assert_eq!(named.last_action_status, "failed");
+}
+
+// 2026-10-04: the send modes and the dynamics went. A last action their edits
+// wrote ("Audio dynamics updated.", or a refusal while OSC was off) would
+// describe a control this build does not have, so it reads as no action.
+#[test]
+fn a_saved_send_mode_or_dynamics_action_reads_as_no_action() {
+    let last = |status: &str, code: &str, message: &str| {
+        read_audio_snapshot(&HashMap::from([
+            (
+                String::from(AUDIO_LAST_ACTION_STATUS_KEY),
+                String::from(status),
+            ),
+            (String::from(AUDIO_LAST_ACTION_CODE_KEY), String::from(code)),
+            (
+                String::from(AUDIO_LAST_ACTION_MESSAGE_KEY),
+                String::from(message),
+            ),
+        ]))
+    };
+    for (status, code, message) in [
+        ("succeeded", "", "Audio send mode updated."),
+        ("succeeded", "", "Audio dynamics updated."),
+        (
+            "failed",
+            "AUDIO_SEND_UNAVAILABLE",
+            "Audio send controls are unavailable while OSC is disabled.",
+        ),
+        (
+            "failed",
+            "AUDIO_PROCESSING_UNAVAILABLE",
+            "Audio dynamics editing is unavailable while OSC is disabled.",
+        ),
+    ] {
+        let retired = last(status, code, message);
+        assert_eq!(retired.last_action_status, "idle", "{message}");
+        assert_eq!(retired.last_action_code, None, "{message}");
+        assert_eq!(retired.last_action_message, None, "{message}");
+    }
+    // An action that still exists keeps its last action.
+    let settings = last("succeeded", "", "Native audio settings updated.");
+    assert_eq!(settings.last_action_status, "succeeded");
+    assert_eq!(
+        settings.last_action_message.as_deref(),
+        Some("Native audio settings updated.")
+    );
 }
 
 // The same build could leave a refused talkback as the Console's last action.
@@ -712,7 +760,6 @@ fn meter_test_channel(
         instrument: false,
         auto_set: false,
         eq: default_audio_eq_snapshot(),
-        dynamics: default_audio_dynamics_snapshot(),
     }
 }
 
@@ -1696,10 +1743,10 @@ fn a_phones_fader_edit_leaves_the_main_fader_alone() {
 // console flush on the metering thread holds while it writes what the desk
 // reported. The dynamics and send-mode edits and the clip clear did not take
 // it, so a flush committed between their read and their write was undone. The lock is held
-// here on the test's thread; each edit, run on a second one, must wait for it.
-// (The send-mode edit went on 2026-10-04 with the send modes.)
+// here on the test's thread; the edit, run on a second one, must wait for it.
+// (The send-mode and dynamics edits went on 2026-10-04 with what they edited.)
 #[test]
-fn dynamics_and_clip_edits_wait_for_the_audio_state_lock() {
+fn the_clip_clear_waits_for_the_audio_state_lock() {
     let test_dir = TestDir::new("channel-edits-take-the-lock");
     initialize_test_database(test_dir.db_path().as_path()).expect("database should initialize");
     set_settings_owned(
@@ -1711,49 +1758,32 @@ fn dynamics_and_clip_edits_wait_for_the_audio_state_lock() {
     )
     .expect("probe state should persist");
 
-    for edit in ["dynamics", "clip clear"] {
-        let guard = super::helpers::lock_audio_state();
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let db_path = test_dir.db_path();
-        let worker = std::thread::spawn(move || {
-            let outcome = if edit == "dynamics" {
-                update_audio_channel_dynamics(
-                    db_path.as_path(),
-                    &AudioDynamicsUpdateRequest {
-                        channel_id: String::from("audio-input-9"),
-                        section: String::from("compressor"),
-                        enabled: Some(true),
-                        threshold_db: Some(-18.0),
-                        ratio: None,
-                        attack_ms: None,
-                        release_ms: None,
-                        makeup_db: None,
-                    },
-                )
-                .map(|_| ())
-            } else {
-                clear_audio_clips(
-                    db_path.as_path(),
-                    &AudioClipClearRequest {
-                        channel_id: Some(String::from("audio-input-9")),
-                    },
-                )
-                .map(|_| ())
-            };
-            let _ = sender.send(outcome.is_ok());
-        });
-        let early = receiver.recv_timeout(Duration::from_millis(300));
-        drop(guard);
-        assert!(
-            early.is_err(),
-            "the {edit} edit went ahead while the audio state lock was held"
-        );
-        assert!(
-            receiver
-                .recv_timeout(Duration::from_secs(10))
-                .expect("the edit should finish once the lock is free"),
-            "the {edit} edit should succeed"
-        );
-        worker.join().expect("the edit's thread should finish");
-    }
+    let guard = super::helpers::lock_audio_state();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let db_path = test_dir.db_path();
+    let worker = std::thread::spawn(move || {
+        let outcome = clear_audio_clips(
+            db_path.as_path(),
+            &AudioClipClearRequest {
+                channel_id: Some(String::from("audio-input-9")),
+            },
+        )
+        .map(|_| ());
+        let _ = sender.send(outcome.is_ok());
+    });
+    let early = receiver.recv_timeout(Duration::from_millis(300));
+    drop(guard);
+    assert!(
+        early.is_err(),
+        "the clip clear went ahead while the audio state lock was held"
+    );
+    assert!(
+        receiver
+            .recv_timeout(Duration::from_secs(10))
+            .expect("the clip clear should finish once the lock is free"),
+        "the clip clear should succeed"
+    );
+    worker
+        .join()
+        .expect("the clip clear's thread should finish");
 }

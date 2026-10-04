@@ -15,7 +15,6 @@ import {
   normalizeAudioEq,
   normalizeLowCutSlope,
   normalizeEqBandType,
-  buildAudioDynamics,
 } from "./audioConsole";
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
@@ -333,25 +332,6 @@ export function handleFixtureAudioRequest(
       state.audioSnapshot = audioSnapshot;
       synchronizeFixtureState(state);
       emit("audio.changed", { reason: "audio-channel-eq-updated" });
-      return cloneJson(channel);
-    }
-    case "audio.channel.dynamics.update": {
-      const audioSnapshot = ensureAudioEditAllowed(state);
-      const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
-      const dynamics = asRecord(channel.dynamics) ?? buildAudioDynamics();
-      const key = params.section === "gate" ? "gate" : "compressor";
-      const section = asRecord(dynamics[key]) ?? {};
-      if ("enabled" in params) section.enabled = asBoolean(params.enabled, false);
-      if (typeof params.thresholdDb === "number") section.thresholdDb = clampNumber(params.thresholdDb, -80, 0);
-      if (typeof params.ratio === "number") section.ratio = clampNumber(params.ratio, 1, 20);
-      if (typeof params.attackMs === "number") section.attackMs = clampNumber(params.attackMs, 0.1, 2000);
-      if (typeof params.releaseMs === "number") section.releaseMs = clampNumber(params.releaseMs, 0.1, 2000);
-      if (typeof params.makeupDb === "number") section.makeupDb = clampNumber(params.makeupDb, 0, 24);
-      dynamics[key] = section;
-      channel.dynamics = dynamics;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-channel-dynamics-updated" });
       return cloneJson(channel);
     }
     case "audio.mixTarget.update": {

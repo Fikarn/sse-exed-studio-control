@@ -60,7 +60,6 @@ pub(super) fn apply_channel_state(
                     channel.auto_set = state.auto_set;
                 }
                 channel.eq = normalize_audio_eq_snapshot(&state.eq);
-                channel.dynamics = state.dynamics.clone();
                 for (mix_target_id, level) in &state.mix_levels {
                     channel
                         .mix_levels
@@ -572,22 +571,6 @@ pub(super) fn eq_band_type_supported(band_id: &str, band_type: &str) -> bool {
     }
 }
 
-pub(super) fn clamp_dynamics_threshold(value: f64) -> f64 {
-    value.clamp(-80.0, 0.0)
-}
-
-pub(super) fn clamp_dynamics_ratio(value: f64) -> f64 {
-    value.clamp(1.0, 20.0)
-}
-
-pub(super) fn clamp_dynamics_time(value: f64) -> f64 {
-    value.clamp(0.1, 2000.0)
-}
-
-pub(super) fn clamp_dynamics_makeup(value: f64) -> f64 {
-    value.clamp(0.0, 24.0)
-}
-
 pub(super) fn channel_supports_gain(channel: &AudioChannelSnapshot) -> bool {
     channel.role == "front-preamp"
 }
@@ -669,7 +652,6 @@ pub(super) fn stored_channel_state_from_snapshot(
         instrument: channel.instrument,
         auto_set: channel.auto_set,
         eq: channel.eq.clone(),
-        dynamics: channel.dynamics.clone(),
     }
 }
 

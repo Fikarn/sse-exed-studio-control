@@ -602,11 +602,7 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
       return false;
     }
 
-    if (
-      method === "audio.channel.update" ||
-      method === "audio.channel.eq.update" ||
-      method === "audio.channel.dynamics.update"
-    ) {
+    if (method === "audio.channel.update" || method === "audio.channel.eq.update") {
       const patched = patchAudioChannel(currentAudioSnapshot, result);
       return patched ? applyPatchedAudioSnapshot(patched, "audio.changed") : false;
     }
@@ -1454,9 +1450,6 @@ export function createShellStore(transport: EngineTransport, options: ShellStore
     },
     async updateAudioChannelEq(request) {
       return performAudioRequest("audio.channel.eq.update", request as unknown as JsonObject);
-    },
-    async updateAudioChannelDynamics(request) {
-      return performAudioRequest("audio.channel.dynamics.update", request as unknown as JsonObject);
     },
     async updateAudioMixTarget(request: AudioMixTargetUpdateRequest) {
       return performAudioRequest("audio.mixTarget.update", request as unknown as JsonObject);

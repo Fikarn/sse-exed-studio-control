@@ -1,7 +1,6 @@
 use crate::audio::{
-    default_audio_dynamics_snapshot, default_audio_eq_snapshot, AudioChannelSnapshot,
-    AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetSnapshot,
-    AudioMixTargetUpdateRequest,
+    default_audio_eq_snapshot, AudioChannelSnapshot, AudioChannelUpdateRequest,
+    AudioEqUpdateRequest, AudioMixTargetSnapshot, AudioMixTargetUpdateRequest,
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
 use crate::rme_totalmix_osc::{
@@ -650,7 +649,6 @@ fn simulated_channel(
         instrument: id == "audio-input-12",
         auto_set: false,
         eq: default_audio_eq_snapshot(),
-        dynamics: default_audio_dynamics_snapshot(),
     }
 }
 

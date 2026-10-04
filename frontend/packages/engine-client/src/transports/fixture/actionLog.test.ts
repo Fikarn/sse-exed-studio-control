@@ -161,12 +161,6 @@ describe("the fixture double's action log", () => {
       [row("audio", "eq-band", "Host", "EQ band band-2 off: Host")],
     ],
     [
-      "audio.channel.dynamics.update",
-      { channelId: "audio-input-9", section: "gate", enabled: true },
-      { name: "Host" },
-      [row("audio", "dynamics", "Host", "Dynamics (gate) on: Host")],
-    ],
-    [
       "audio.snapshot.load",
       { slot: 2 },
       { loaded: true, slot: 2, name: "Interview" },
