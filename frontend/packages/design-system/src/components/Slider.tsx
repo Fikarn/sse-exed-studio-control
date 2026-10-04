@@ -138,7 +138,12 @@ function useSliderInteraction(
     },
     [locked, onChange, onCommit, onRequestTypedEntry, step, value]
   );
-  return { onPointerDown, onPointerMove, onPointerUp, onKeyDown };
+  // A double-click asks for typed entry too: a pointerdown's own `detail` is 0
+  // in Chromium, so the press count above never reaches 2 there.
+  const onDoubleClick = useCallback(() => {
+    if (!locked) onRequestTypedEntry?.();
+  }, [locked, onRequestTypedEntry]);
+  return { onPointerDown, onPointerMove, onPointerUp, onKeyDown, onDoubleClick };
 }
 
 function ariaProps(props: SliderBaseProps, orientation: "vertical" | "horizontal") {
@@ -155,13 +160,30 @@ function ariaProps(props: SliderBaseProps, orientation: "vertical" | "horizontal
   };
 }
 
+/** A mark under a slider's track: a value kept elsewhere (the scene's saved
+ *  level, Lighting), drawn as a small ▲ at its place. */
+export interface SliderMark {
+  /** 0..1 along the travel. */
+  at: number;
+  /** Yellow while the slider's value no longer matches it (the rig drifted). */
+  tone?: "attention";
+  testId?: string;
+}
+
 export interface SliderProps extends SliderBaseProps {
   /** The colour-temperature track: the one other gradient that is information. */
   cct?: boolean;
+  /** Marks under the track (each a ▲); the slider keeps 10 px below it for them. */
+  marks?: readonly SliderMark[];
+  /**
+   * The value in the control's own units for assistive tech (`3200` of
+   * `2000`..`10000` K) instead of the 0..100 of its travel.
+   */
+  ariaValue?: { min: number; max: number; now: number };
 }
 
 export function Slider(props: SliderProps) {
-  const { value, unity, locked, doubt, take, cct, testId, className } = props;
+  const { value, unity, locked, doubt, take, cct, marks, ariaValue, testId, className } = props;
   const handlers = useSliderInteraction(props, (element, event) => {
     const rect = element.getBoundingClientRect();
     // Half the cap's 14 px: the cap's centre travels from 7 px to the width
@@ -174,6 +196,7 @@ export function Slider(props: SliderProps) {
       className={[
         styles.slider,
         cct ? styles.cct : "",
+        marks && marks.length > 0 ? styles.marked : "",
         locked ? styles.locked : "",
         doubt ? styles.doubt : "",
         className,
@@ -192,6 +215,9 @@ export function Slider(props: SliderProps) {
         } as CSSProperties
       }
       {...ariaProps(props, "horizontal")}
+      {...(ariaValue
+        ? { "aria-valuemin": ariaValue.min, "aria-valuemax": ariaValue.max, "aria-valuenow": ariaValue.now }
+        : null)}
       {...handlers}
     >
       <span className={styles.track} data-signal={cct ? "cct" : undefined} aria-hidden="true" />
@@ -199,6 +225,16 @@ export function Slider(props: SliderProps) {
       {cct ? null : <span className={styles.fill} aria-hidden="true" />}
       {unity !== undefined ? <span className={styles.unity} aria-hidden="true" /> : null}
       <span className={styles.cap} data-material="cap" aria-hidden="true" />
+      {marks?.map((mark, index) => (
+        <span
+          key={index}
+          className={styles.mark}
+          data-tone={mark.tone}
+          data-testid={mark.testId}
+          aria-hidden="true"
+          style={{ "--slider-mark": String(clamp01(mark.at)) } as CSSProperties}
+        />
+      ))}
     </div>
   );
 }

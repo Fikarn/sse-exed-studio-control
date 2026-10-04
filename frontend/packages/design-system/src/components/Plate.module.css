@@ -13,10 +13,13 @@
     color: var(--text-text);
   }
 
+  /* The text takes the room the key leaves, so a title that is an inline
+     rename (Lighting) is never narrower than its own field. */
   .headText {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex: 1 1 auto;
     min-width: 0;
   }
 

@@ -45,6 +45,27 @@
     background: var(--signal-cct-track);
   }
 
+  /* A value kept elsewhere (the scene's saved level): a small ▲ under the
+     track at its place, Yellow while the value has left it. */
+  .marked {
+    margin-bottom: 10px;
+  }
+
+  .mark {
+    position: absolute;
+    top: calc(100% + 2px);
+    width: 10px;
+    height: 7px;
+    left: calc(2px + var(--slider-mark, 0) * (100% - 14px));
+    background: var(--text-text2);
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    pointer-events: none;
+  }
+
+  .mark[data-tone="attention"] {
+    background: var(--role-yellow-text);
+  }
+
   .unity {
     position: absolute;
     top: 6px;

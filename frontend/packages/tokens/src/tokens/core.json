@@ -329,8 +329,32 @@
       "$value": "linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%)"
     },
     "cctTrack": {
-      "$value": "linear-gradient(to right, #EF8E5A, #F6C39A 30%, #EBE5D2 60%, #C9D4DA)",
+      "$value": "linear-gradient(to right, var(--signal-cct-2700), var(--signal-cct-3800) 30%, var(--signal-cct-5000) 60%, var(--signal-cct-6500))",
       "$description": "warm (2700 K) to cool (6500 K), the light's own colour"
+    },
+    "cct": {
+      "$description": "The colour of the light itself at each colour temperature, warm to cool: the plot's pools and markers, the scene's swatch. Signal, not status.",
+      "2700": {
+        "$value": "#EF8E5A"
+      },
+      "3200": {
+        "$value": "#F3A87A"
+      },
+      "3800": {
+        "$value": "#F6C39A"
+      },
+      "4400": {
+        "$value": "#F0DFB8"
+      },
+      "5000": {
+        "$value": "#EBE5D2"
+      },
+      "5600": {
+        "$value": "#D4DDE2"
+      },
+      "6500": {
+        "$value": "{sse.sky}"
+      }
     }
   },
   "prompterGlass": {
@@ -1090,25 +1114,25 @@
     },
     "cct": {
       "2700": {
-        "$value": "#EF8E5A"
+        "$value": "{signal.cct.2700}"
       },
       "3200": {
-        "$value": "#F3A87A"
+        "$value": "{signal.cct.3200}"
       },
       "3800": {
-        "$value": "#F6C39A"
+        "$value": "{signal.cct.3800}"
       },
       "4400": {
-        "$value": "#F0DFB8"
+        "$value": "{signal.cct.4400}"
       },
       "5000": {
-        "$value": "#EBE5D2"
+        "$value": "{signal.cct.5000}"
       },
       "5600": {
-        "$value": "#D4DDE2"
+        "$value": "{signal.cct.5600}"
       },
       "6500": {
-        "$value": "{sse.sky}"
+        "$value": "{signal.cct.6500}"
       }
     },
     "fixture": {
