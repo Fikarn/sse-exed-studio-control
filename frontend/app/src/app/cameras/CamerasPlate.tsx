@@ -79,10 +79,14 @@ export interface CamerasPlateProps {
   onOpenSetup: () => void;
 }
 
-/** The plate's one popover, and the camera it was opened for. */
+/**
+ * The plate's one popover, and the camera it was opened for. A list or a typed
+ * value names its setting only: its row is read from the camera at every
+ * render, so what it shows is what the camera reports now.
+ */
 type OpenPopover =
-  | { kind: "values"; camera: number; row: ChoiceRowView }
-  | { kind: "typed"; camera: number; row: LevelRowView }
+  | { kind: "values"; camera: number; setting: ChoiceRowView["setting"] }
+  | { kind: "typed"; camera: number; setting: LevelRowView["setting"] }
   | { kind: "format"; camera: number }
   | { kind: "look"; camera: number };
 
@@ -112,17 +116,31 @@ export function CamerasPlate({
   onOpenSetup,
 }: CamerasPlateProps) {
   const [popover, setPopover] = useState<OpenPopover | null>(null);
-  // What the open popover stands beside: the readout or the key that opened it.
+  // What the open popover stands beside (its row or its section), and the key
+  // that opened it, a press on which closes it again; a press anywhere else
+  // closes it too.
   const anchor = useRef<HTMLElement | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
   const formatKey = useRef<HTMLSpanElement | null>(null);
   const lookKey = useRef<HTMLSpanElement | null>(null);
+  const plateHead = useRef<HTMLDivElement | null>(null);
   const number = cameraNumber(camera);
   const lock = controlsLock(camera);
   const held = lock === null;
   const doubt = camera.state === "unreachable";
   const shown = camera.state === "held" || doubt;
-  // A popover belongs to the camera it was opened for, while that camera is held.
-  const open = popover && popover.camera === camera.camera && held ? popover : null;
+  // A popover belongs to the camera it was opened for, while that camera is
+  // held and, for a list or a typed value, reports the setting.
+  const fresh = popover && popover.camera === camera.camera && held ? popover : null;
+  const valuesRow =
+    fresh?.kind === "values"
+      ? (exposureRows(camera).find((row) => row.setting === fresh.setting && row.choice.reported) ?? null)
+      : null;
+  const typedRow =
+    fresh?.kind === "typed"
+      ? (colourRows(camera).find((row) => row.setting === fresh.setting && row.level.reported) ?? null)
+      : null;
+  const open = (fresh?.kind === "values" && !valuesRow) || (fresh?.kind === "typed" && !typedRow) ? null : fresh;
   useEffect(() => {
     if (popover && !open) setPopover(null);
   }, [popover, open]);
@@ -144,14 +162,15 @@ export function CamerasPlate({
     setPopover(null);
   };
 
-  /** Opens a popover beside `element`, or closes it when it is the one open. */
-  const toggle = (next: OpenPopover, element: HTMLElement | null) => {
-    if (open && open.kind === next.kind && anchor.current === element) {
+  /** Opens a popover beside `beside`, or closes it when `key` opened the one open. */
+  const toggle = (next: OpenPopover, beside: HTMLElement | null, key: HTMLElement | null) => {
+    if (open && open.kind === next.kind && opener.current === key) {
       close();
       return;
     }
     if (open) close();
-    anchor.current = element;
+    anchor.current = beside;
+    opener.current = key;
     setPopover(next);
   };
 
@@ -193,7 +212,7 @@ export function CamerasPlate({
     text: string,
     unit: string | null,
     isOpen: boolean,
-    onPress: (element: HTMLElement) => void
+    onPress: (beside: HTMLElement, key: HTMLElement) => void
   ) =>
     held ? (
       <button
@@ -206,7 +225,7 @@ export function CamerasPlate({
         aria-label={`${label} ${text}${unit ? `, as ${unit}` : ""}. Press for the values ${camera.tag} allows.`}
         data-testid={`cameras-${setting}-value`}
         // The popover stands beside the whole row, over the bay, so the plate stays in view.
-        onClick={(event) => onPress(event.currentTarget.parentElement ?? event.currentTarget)}
+        onClick={(event) => onPress(event.currentTarget.parentElement ?? event.currentTarget, event.currentTarget)}
       >
         <Readout value={text} unit={unit ?? undefined} className={styles.readout} />
       </button>
@@ -240,8 +259,8 @@ export function CamerasPlate({
           label,
           choice.value ?? "—",
           setting === "shutter" ? shutterUnit(choice.value) : null,
-          open?.kind === "values" && open.row.setting === setting,
-          (element) => toggle({ kind: "values", camera: camera.camera, row }, element)
+          open?.kind === "values" && open.setting === setting,
+          (beside, key) => toggle({ kind: "values", camera: camera.camera, setting }, beside, key)
         )}
         {stepKeys(
           setting,
@@ -264,8 +283,8 @@ export function CamerasPlate({
           label,
           levelText(level, setting === "tint"),
           null,
-          open?.kind === "typed" && open.row.setting === setting,
-          (element) => toggle({ kind: "typed", camera: camera.camera, row }, element)
+          open?.kind === "typed" && open.setting === setting,
+          (beside, key) => toggle({ kind: "typed", camera: camera.camera, setting }, beside, key)
         )}
         {stepKeys(
           setting,
@@ -296,7 +315,7 @@ export function CamerasPlate({
   );
 
   /** The key that opens a press-twice section's popover. */
-  const opener = (kind: "format" | "look", ref: { current: HTMLSpanElement | null }, label: string) => (
+  const changeKey = (kind: "format" | "look", ref: { current: HTMLSpanElement | null }, label: string) => (
     <span ref={ref} className={styles.opener}>
       <Key
         size="small"
@@ -308,7 +327,9 @@ export function CamerasPlate({
         aria-label={label}
         testId={`cameras-${kind}-open`}
         // The popover stands beside the whole section, over the bay, so the plate stays in view.
-        onClick={() => toggle({ kind, camera: camera.camera }, ref.current?.closest("section") ?? ref.current)}
+        onClick={() =>
+          toggle({ kind, camera: camera.camera }, ref.current?.closest("section") ?? ref.current, ref.current)
+        }
       >
         Change…
       </Key>
@@ -390,30 +411,38 @@ export function CamerasPlate({
 
   return (
     <div className={styles.plate} data-testid="cameras-plate" data-camera={camera.camera}>
-      <PlateHead
-        title={
-          <Tooltip
-            content={
-              camera.recording.records
-                ? "Recording, timecode and card time are under REC. Not offered here: formatting a card, firmware, factory reset."
-                : `${camera.tag} does not record here; REC acts on CAM 1. Not offered here: formatting a card, firmware, factory reset.`
-            }
-            placement="left"
-          >
-            <span>{camera.tag}</span>
-          </Tooltip>
-        }
-        sub={
-          <>
-            <span className={styles.subLine}>{camera.model} </span>
-            <span className={styles.subLine}>vMix Output {camera.setup.vmixOutput}</span>
-          </>
-        }
-        action={
-          <MenuButton buttonLabel={`${camera.tag} menu`} buttonTestId="cameras-plate-menu" menu={{ ...menu, arm }} />
-        }
-        testId="cameras-plate-head"
-      />
+      {/* A right-click on the title opens the camera's menu, as its ⋯ does. */}
+      <div ref={plateHead}>
+        <PlateHead
+          title={
+            <Tooltip
+              content={
+                camera.recording.records
+                  ? "Recording, timecode and card time are under REC. Not offered here: formatting a card, firmware, factory reset."
+                  : `${camera.tag} does not record here; REC acts on CAM 1. Not offered here: formatting a card, firmware, factory reset.`
+              }
+              placement="left"
+            >
+              <span>{camera.tag}</span>
+            </Tooltip>
+          }
+          sub={
+            <>
+              <span className={styles.subLine}>{camera.model} </span>
+              <span className={styles.subLine}>vMix Output {camera.setup.vmixOutput}</span>
+            </>
+          }
+          action={
+            <MenuButton
+              buttonLabel={`${camera.tag} menu`}
+              buttonTestId="cameras-plate-menu"
+              contextTarget={plateHead}
+              menu={{ ...menu, arm }}
+            />
+          }
+          testId="cameras-plate-head"
+        />
+      </div>
 
       <div className={styles.connectionBlock}>
         <div className={styles.connection} data-testid="cameras-connection">
@@ -495,7 +524,7 @@ export function CamerasPlate({
       <Section
         title={<Head word="Format" tip="Press twice: the picture drops while the format changes." />}
         detail={detail("press twice")}
-        actions={opener("format", formatKey, `Change the format of ${camera.tag}`)}
+        actions={changeKey("format", formatKey, `Change the format of ${camera.tag}`)}
         testId="cameras-format"
       >
         <Readouts
@@ -517,7 +546,7 @@ export function CamerasPlate({
       <Section
         title={<Head word="Profile and LUT" tip="The picture profile and the display LUT. Press twice." />}
         detail={lookShown ? detail("press twice") : undefined}
-        actions={lookShown ? opener("look", lookKey, `Change the look of ${camera.tag}`) : undefined}
+        actions={lookShown ? changeKey("look", lookKey, `Change the look of ${camera.tag}`) : undefined}
         testId="cameras-look"
       >
         {range.reported ? (
@@ -554,34 +583,40 @@ export function CamerasPlate({
         )}
       </Section>
 
-      {open?.kind === "values" ? (
+      {open?.kind === "values" && valuesRow ? (
         <CamerasValuesList
+          key={`values:${valuesRow.setting}`}
           camera={camera}
-          row={open.row}
+          row={valuesRow}
           anchor={anchor}
+          opener={opener}
           onClose={close}
           onPick={(picked) => {
             close();
-            onSet(open.row.setting, picked);
+            onSet(valuesRow.setting, picked);
           }}
         />
       ) : null}
-      {open?.kind === "typed" ? (
+      {open?.kind === "typed" && typedRow ? (
         <CamerasTypedEntry
+          key={`typed:${typedRow.setting}`}
           camera={camera}
-          row={open.row}
+          row={typedRow}
           anchor={anchor}
+          opener={opener}
           onClose={close}
           onSet={(typed) => {
             close();
-            onSet(open.row.setting, typed);
+            onSet(typedRow.setting, typed);
           }}
         />
       ) : null}
       {open?.kind === "format" ? (
         <CamerasChoices
+          key="format"
           title={`Format · ${camera.tag}`}
           anchor={anchor}
+          opener={opener}
           onClose={close}
           testId="cameras-format-popover"
         >
@@ -613,8 +648,10 @@ export function CamerasPlate({
       ) : null}
       {open?.kind === "look" ? (
         <CamerasChoices
+          key="look"
           title={`Profile and LUT · ${camera.tag}`}
           anchor={anchor}
+          opener={opener}
           onClose={close}
           testId="cameras-look-popover"
         >

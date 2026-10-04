@@ -48,17 +48,19 @@ export interface OnOffGroup {
  * page holds no arm. With the focus in the popover, Esc reaches the popover,
  * which closes and drops the arm (one Esc, one layer).
  */
-function useFocusFollowsArm(armedHere: boolean, anyArmed: boolean) {
+function useFocusFollowsArm(armedHere: string | null, anyArmed: boolean) {
   const row = useRef<HTMLDivElement>(null);
   const was = useRef(armedHere);
+  // On every change of the key armed here: another key of the same row taking
+  // the arm is a change too, and its old key is gone with the focus as well.
   useEffect(() => {
     const changed = was.current !== armedHere;
     was.current = armedHere;
-    if (!changed || (!armedHere && anyArmed)) return;
+    if (!changed || (armedHere === null && anyArmed)) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
     row.current
-      ?.querySelector<HTMLElement>(armedHere ? '[data-armed="true"]' : 'button[aria-pressed="true"]')
+      ?.querySelector<HTMLElement>(armedHere !== null ? '[data-armed="true"]' : 'button[aria-pressed="true"]')
       ?.focus({ preventScroll: true });
   }, [armedHere, anyArmed]);
   return row;
@@ -69,7 +71,7 @@ export function ChoiceRow({ group, armed }: { group: ChoiceGroup; armed: ArmedKe
   const { choice, setting, label, unit, lock } = group;
   const refused = choice.unavailable.map((entry) => `${entry.value}${unit} ${entry.reason}`).join(" · ");
   const row = useFocusFollowsArm(
-    choice.options.some((option) => armed?.key === group.armKey(option)),
+    choice.options.map((option) => group.armKey(option)).find((key) => key === armed?.key) ?? null,
     armed !== null
   );
   return (
@@ -127,7 +129,7 @@ export function ChoiceRow({ group, armed }: { group: ChoiceGroup; armed: ArmedKe
 export function OnOffRow({ group, armed }: { group: OnOffGroup; armed: ArmedKey | null }) {
   const { setting, label, value, lock } = group;
   const row = useFocusFollowsArm(
-    [true, false].some((on) => armed?.key === group.armKey(on)),
+    [true, false].map((on) => group.armKey(on)).find((key) => key === armed?.key) ?? null,
     armed !== null
   );
   return (
@@ -173,15 +175,17 @@ export function OnOffRow({ group, armed }: { group: OnOffGroup; armed: ArmedKey 
 
 export interface CamerasChoicesProps {
   title: string;
-  /** The plate's key that opened it, which it stands beside and which toggles it. */
+  /** The section it stands beside. */
   anchor: RefObject<HTMLElement | null>;
+  /** The plate's key that opened it: a press on it closes the popover, and a press anywhere else too. */
+  opener: RefObject<HTMLElement | null>;
   onClose: () => void;
   testId: string;
   children: ReactNode;
 }
 
 /** The popover the format's and the look's rows stand in. */
-export function CamerasChoices({ title, anchor, onClose, testId, children }: CamerasChoicesProps) {
+export function CamerasChoices({ title, anchor, opener, onClose, testId, children }: CamerasChoicesProps) {
   return (
     <Popover
       open
@@ -190,7 +194,7 @@ export function CamerasChoices({ title, anchor, onClose, testId, children }: Cam
       title={title}
       placement="left-start"
       width={407}
-      ignoreOutside={[anchor]}
+      ignoreOutside={[opener]}
       initialFocus="first"
       testId={testId}
     >

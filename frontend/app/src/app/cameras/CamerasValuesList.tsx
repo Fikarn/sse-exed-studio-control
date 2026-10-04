@@ -20,13 +20,15 @@ const COLUMNS = 5;
 export interface CamerasValuesListProps {
   camera: CameraSnapshot;
   row: ChoiceRowView;
-  /** The readout that opened it, which it stands beside and which toggles it. */
+  /** The row it stands beside. */
   anchor: RefObject<HTMLElement | null>;
+  /** The readout that opened it: a press on it closes the list, and a press anywhere else too. */
+  opener: RefObject<HTMLElement | null>;
   onPick: (value: string) => void;
   onClose: () => void;
 }
 
-export function CamerasValuesList({ camera, row, anchor, onPick, onClose }: CamerasValuesListProps) {
+export function CamerasValuesList({ camera, row, anchor, opener, onPick, onClose }: CamerasValuesListProps) {
   const options = row.choice.options;
   const list = useRef<HTMLDivElement>(null);
   const current = row.choice.value !== null && options.includes(row.choice.value) ? row.choice.value : null;
@@ -85,7 +87,7 @@ export function CamerasValuesList({ camera, row, anchor, onPick, onClose }: Came
       title={`${row.label} · ${camera.tag}`}
       placement="left-start"
       width={407}
-      ignoreOutside={[anchor]}
+      ignoreOutside={[opener]}
       initialFocus="first"
       testId="cameras-values-list"
     >

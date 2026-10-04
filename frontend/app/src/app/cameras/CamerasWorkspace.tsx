@@ -220,36 +220,33 @@ export function CamerasWorkspace({ camerasSnapshot, pictures = null, store }: Ca
       STOP_WINDOW_MS
     );
   });
-  const release = useLiveCallback(() => {
-    if (!selected) return;
-    const camera = selectedNumber;
+  /** The plate's Release key for `target`: the first press arms, the second releases. */
+  const armRelease = (target: CameraSnapshot) => {
+    const camera = cameraNumber(target);
     arm.armOrApply(
       camerasArmKey.release(camera),
-      `Release ${selected.tag} to ${releasedTo(selected)}`,
+      `Release ${target.tag} to ${releasedTo(target)}`,
       () => void perform(() => store.releaseCamera(camera, true), true)
     );
+  };
+  const release = useLiveCallback(() => {
+    if (selected) armRelease(selected);
   });
   // Release from the menu of a camera that is not selected: select it, then
-  // arm the plate's Release key, but only once the hardware link says that
-  // camera is selected. It never arms the camera that was selected before.
-  const [releaseNext, setReleaseNext] = useState<CameraNumber | null>(null);
+  // arm the plate's Release key, and only if the read that follows the
+  // selection says that camera is selected and held. That read is the one
+  // chance: nothing waits for a later read, so a later selection of the camera,
+  // by hand or from the deck, never arms anything. It never arms the camera
+  // that was selected before, and it only arms: it never gives the second press.
   const releaseElsewhere = useLiveCallback(async (camera: CameraNumber) => {
     if (camera === selectedNumber) return;
     const answer = await perform(() => store.selectCamera(camera));
-    if (answer !== null) setReleaseNext(camera);
+    if (answer === null) return;
+    const now = store.getSnapshot().camerasSnapshot;
+    const target = now?.selected === camera ? cameraOf(now, camera) : null;
+    if (target?.state !== "held" || arm.armed?.key === camerasArmKey.release(camera)) return;
+    armRelease(target);
   });
-  useEffect(() => {
-    if (releaseNext === null) return undefined;
-    if (selectedNumber === releaseNext) {
-      setReleaseNext(null);
-      if (selected?.state === "held") release();
-      return undefined;
-    }
-    // A selection that does not come within 2 s ends the hand-off, so a later
-    // selection of that camera never arms anything.
-    const id = window.setTimeout(() => setReleaseNext(null), 2000);
-    return () => window.clearTimeout(id);
-  }, [releaseNext, selectedNumber, selected, release]);
   const format = useLiveCallback((setting: "resolution" | "frameRate", value: string) => {
     if (!selected) return;
     const camera = selectedNumber;

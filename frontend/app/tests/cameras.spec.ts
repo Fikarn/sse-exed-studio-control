@@ -14,7 +14,7 @@ import { pausePageClock } from "./helpers/pageClock";
 // `window.__SSE_TEST_CAMERAS__`: a value changed on a camera's body, a camera
 // that stops answering and answers again. The visual overhaul (2026-10-05):
 // each camera has one menu (its key's ⋯, its small picture's ⋯, the plate
-// title's ⋯, and a right-click on any of them); the values list, the typed
+// title's ⋯, and a right-click on the key, the picture or the title); the values list, the typed
 // entry, the format and the look open in popovers beside the plate, never a
 // dialog, so the pictures stay drawn; the current choice is the selection.
 
@@ -262,7 +262,8 @@ test.describe("the Cameras page", () => {
     await expect(list).toHaveCount(0);
     await expect(iso).toContainText("6400");
 
-    // Esc, a press outside and its readout again leave the list without a change.
+    // Esc, its readout again and a press anywhere else (the title, the row's
+    // own label) leave the list without a change.
     await page.getByTestId("cameras-shutter-value").click();
     await expect(list).toContainText("Shutter");
     await page.keyboard.press("Escape");
@@ -272,7 +273,31 @@ test.describe("the Cameras page", () => {
     await expect(list).toBeVisible();
     await page.getByTestId("cameras-shutter-value").click();
     await expect(list).toHaveCount(0);
+    await page.getByTestId("cameras-shutter-value").click();
+    await expect(list).toBeVisible();
+    await page.getByTestId("cameras-plate-head").click({ position: { x: 20, y: 20 } });
+    await expect(list).toHaveCount(0);
+    await page.getByTestId("cameras-shutter-value").click();
+    await expect(list).toBeVisible();
+    await page.getByTestId("cameras-shutter").getByText("Shutter", { exact: true }).click();
+    await expect(list).toHaveCount(0);
     await expect(page.getByTestId("cameras-shutter-value")).toContainText("180°");
+
+    // What the list shows is what the camera reports now: a value changed on
+    // the camera while the list is open moves its selected option.
+    await iso.click();
+    await expect(list.getByRole("option", { selected: true })).toHaveText("6400");
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.changeOnBody(1, { iso: "800" }));
+    await expect(list.getByRole("option", { selected: true })).toHaveText("800", { timeout: 3000 });
+    // Another value's list from the keyboard is a list of its own: its value
+    // takes the focus.
+    await page.getByTestId("cameras-shutter-value").focus();
+    await page.keyboard.press("Enter");
+    await expect(list).toContainText("Shutter");
+    await expect(list.getByRole("option", { selected: true })).toHaveText("180°");
+    await expect(list.getByRole("option", { selected: true })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(list).toHaveCount(0);
 
     await page.getByTestId("cameras-auto-iris").click();
     await expect(page.getByTestId("cameras-iris-value")).toContainText("f/4.0");
@@ -357,12 +382,40 @@ test.describe("the Cameras page", () => {
     await openFormat(page);
     await expect(page.getByTestId("cameras-resolution-UHD")).not.toHaveAttribute("data-armed", "true");
     await expect(page.getByTestId("cameras-resolution-6K")).toHaveAttribute("aria-pressed", "true");
-    // So does a close by its key.
+    // The arm moved to another key of the same row keeps the focus in the
+    // popover: Esc still reaches it and drops the arm.
+    await page.getByTestId("cameras-resolution-UHD").click();
+    await expect(page.getByTestId("cameras-resolution-UHD")).toBeFocused();
+    await page.getByTestId("cameras-resolution-HD").click();
+    await expect(page.getByTestId("cameras-resolution-HD")).toHaveAttribute("data-armed", "true");
+    await expect(page.getByTestId("cameras-resolution-HD")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(format).toHaveCount(0);
+    await expect(state(page)).not.toContainText("press again");
+    // So does a close by its key, and a press elsewhere in the section.
+    await openFormat(page);
     await page.getByTestId("cameras-resolution-UHD").click();
     await expect(page.getByTestId("cameras-resolution-UHD")).toHaveAttribute("data-armed", "true");
     await page.getByTestId("cameras-format-open").click();
     await expect(format).toHaveCount(0);
     await expect(state(page)).not.toContainText("press again");
+    await openFormat(page);
+    await page.getByTestId("cameras-resolution-UHD").click();
+    await page.getByTestId("cameras-resolution-value").click();
+    await expect(format).toHaveCount(0);
+    await expect(state(page)).not.toContainText("press again");
+    // A popover belongs to a camera that is held: one that stops answering
+    // takes its popover, and the arm, with it, with no press anywhere.
+    await openFormat(page);
+    await page.getByTestId("cameras-resolution-UHD").click();
+    await expect(page.getByTestId("cameras-resolution-UHD")).toHaveAttribute("data-armed", "true");
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.stopAnswering(1));
+    await expect(format).toHaveCount(0, { timeout: 3000 });
+    await expect(state(page)).not.toContainText("press again");
+    await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.answerAgain(1));
+    await expect(page.getByTestId("cameras-format-open")).not.toHaveAttribute("aria-disabled", "true", {
+      timeout: 3000,
+    });
 
     await openFormat(page);
     await pressTwice(page, "cameras-frameRate-50");
@@ -378,8 +431,8 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-displayLutOn-off")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("cameras-recent-row").first()).toContainText("CAM 1: display LUT off.");
 
-    // The BGH1s report neither a profile nor a LUT, and say so. A popover
-    // belongs to its camera: selecting another closes it.
+    // The BGH1s report neither a profile nor a LUT, and say so. Selecting
+    // another camera (a press outside the popover) closes the popover.
     await page.getByTestId("cameras-key-2").click();
     await expect(page.getByTestId("cameras-look-popover")).toHaveCount(0);
     await expect(page.getByTestId("cameras-look-open")).toHaveCount(0);
@@ -1075,6 +1128,12 @@ test.describe("the Cameras page", () => {
     await expect(menu.getByTestId("cameras-plate-menu-select")).toHaveAttribute("aria-disabled", "true");
     await expect(menu.getByTestId("cameras-plate-menu-release")).toHaveText("Release CAM 1…");
     await page.keyboard.press("Escape");
+    // A right-click on the plate's title opens the same menu.
+    await page.getByTestId("cameras-plate-head").click({ button: "right", position: { x: 40, y: 30 } });
+    menu = page.getByRole("menu").last();
+    await expect(menu).toHaveAccessibleName("CAM 1");
+    await expect(menu.getByTestId("cameras-plate-menu-release")).toHaveText("Release CAM 1…");
+    await page.keyboard.press("Escape");
     await page.getByTestId("cameras-key-1").click({ button: "right" });
     menu = page.getByRole("menu").last();
     await expect(menu.getByTestId("cameras-key-menu-1-release")).toHaveText("Release CAM 1…");
@@ -1150,6 +1209,29 @@ test.describe("the Cameras page", () => {
     expect(await page.evaluate(() => window.__SSE_TEST_CAMERAS__!.sent(1))).toBe(0);
   });
 
+  // The hand-off arms once, from the read that follows its own selection, and
+  // nothing waits for a later one: the camera selected again by hand later
+  // arms nothing (the review of pull request 6: a give-up timer that every
+  // read restarted could arm it then, and one press would have released it).
+  test("a hand-off arms once: the camera selected again by hand later arms nothing", async ({ page }) => {
+    await openCameras(page);
+    const menu = await openTileMenu(page, 2);
+    await menu.getByTestId("cameras-tile-menu-2-release").click();
+    const key = page.getByTestId("cameras-release");
+    await expect(key).toHaveAttribute("data-armed", "true");
+    await page.keyboard.press("Escape");
+    await expect(key).toHaveAttribute("data-armed", "false");
+    await page.getByTestId("cameras-key-3").click();
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "3");
+    // Past more than one read.
+    await page.waitForTimeout(2_500);
+    await page.getByTestId("cameras-key-2").click();
+    await expect(page.getByTestId("cameras-plate")).toHaveAttribute("data-camera", "2");
+    await page.waitForTimeout(1_200);
+    await expect(key).toHaveAttribute("data-armed", "false");
+    await expect(state(page)).not.toContainText("press again");
+  });
+
   // The words the page prints are the hardware link's state words, in capitals
   // (DESIGN.md §8), and no value is set in SSE Adelia.
   test("the state words are in capitals, and no value is set in the display face", async ({ page }) => {
@@ -1158,13 +1240,32 @@ test.describe("the Cameras page", () => {
     await expect(page.getByTestId("cameras-caption-state")).toHaveText("RELEASED");
     await expect(page.getByTestId("cameras-tile-chip-1")).toContainText("HELD");
     await expect(page.getByTestId("cameras-picture-row-1")).toContainText("LIVE");
-    const faces = await page.evaluate(() =>
-      ["cameras-zoom-2", "cameras-zoom-4", "cameras-take", "cameras-whiteBalance-value"].map((id) => {
-        const element = document.querySelector(`[data-testid=${id}]`);
-        return element ? getComputedStyle(element.querySelector("span, b, div") ?? element).fontFamily : "";
-      })
-    );
-    for (const face of faces) expect(face).not.toContain("Adelia");
+    // The face of each element whose own text is a value, on the held board:
+    // the loupe's zooms, the take's timecode, a value of the plate's and a
+    // camera key's values.
+    await openCameras(page);
+    const faces = await page.evaluate(() => {
+      const ownText = (element: Element) =>
+        [...element.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? "")
+          .join("")
+          .trim();
+      const valued = (id: string) =>
+        [document.querySelector(`[data-testid=${id}]`), ...document.querySelectorAll(`[data-testid=${id}] *`)].filter(
+          (element): element is Element => element !== null && /\d/.test(ownText(element))
+        );
+      return ["cameras-zoom-2", "cameras-zoom-4", "cameras-take-timecode", "cameras-iso-value", "cameras-key-1"].map(
+        (id) => {
+          const elements = valued(id);
+          return { id, count: elements.length, faces: elements.map((element) => getComputedStyle(element).fontFamily) };
+        }
+      );
+    });
+    for (const { id, count, faces: found } of faces) {
+      expect(count, `${id} has a value`).toBeGreaterThan(0);
+      for (const face of found) expect(face, id).not.toContain("Adelia");
+    }
   });
 });
 

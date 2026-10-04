@@ -16,8 +16,10 @@ import styles from "./CamerasTypedEntry.module.css";
 export interface CamerasTypedEntryProps {
   camera: CameraSnapshot;
   row: LevelRowView;
-  /** The readout that opened it, which it stands beside and which toggles it. */
+  /** The row it stands beside. */
   anchor: RefObject<HTMLElement | null>;
+  /** The readout that opened it: a press on it closes the entry, and a press anywhere else too. */
+  opener: RefObject<HTMLElement | null>;
   onSet: (value: number) => void;
   onClose: () => void;
 }
@@ -28,7 +30,7 @@ export function snapToLevel(value: number, min: number, max: number, step: numbe
   return Math.max(min, Math.min(max, Number((Math.round((value - min) / step) * step + min).toFixed(5))));
 }
 
-export function CamerasTypedEntry({ camera, row, anchor, onSet, onClose }: CamerasTypedEntryProps) {
+export function CamerasTypedEntry({ camera, row, anchor, opener, onSet, onClose }: CamerasTypedEntryProps) {
   const id = useId();
   const { level } = row;
   const [draft, setDraft] = useState(() => String(level.value ?? level.min));
@@ -50,7 +52,7 @@ export function CamerasTypedEntry({ camera, row, anchor, onSet, onClose }: Camer
       title={`${row.label} · ${camera.tag}`}
       placement="left-start"
       width={407}
-      ignoreOutside={[anchor]}
+      ignoreOutside={[opener]}
       initialFocus="first"
       testId="cameras-typed-entry"
     >
