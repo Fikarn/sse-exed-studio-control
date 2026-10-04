@@ -19,6 +19,8 @@ export interface GroupKeyProps {
   name: string;
   fixtureCount: number;
   on: boolean;
+  /** How many of its fixtures are on: a partly lit group says so. */
+  onCount?: number;
   level: number;
   drifted: boolean;
   colorIndex?: number | null;
@@ -35,6 +37,7 @@ export function GroupKey({
   name,
   fixtureCount,
   on,
+  onCount = on ? fixtureCount : 0,
   level,
   drifted,
   colorIndex = null,
@@ -57,7 +60,12 @@ export function GroupKey({
 
   const colourHex = lightingColorTagHex(colorIndex);
   const fixtures = `${fixtureCount} fixture${fixtureCount === 1 ? "" : "s"}`;
-  const ariaLabel = `${name}, ${fixtures}${on ? ` at ${level} %` : ""}${drifted ? ", drifted" : ""}, ${on ? "on" : "off"}. Toggle ${on ? "off" : "on"}.`;
+  // Lit when every fixture is on; a press then turns them off, and turns
+  // them all on otherwise. A partly lit group says how many are on.
+  const partly = !on && onCount > 0;
+  const word = on ? `${level} %` : partly ? `${onCount} of ${fixtureCount}` : "off";
+  const stateWords = on ? "on" : partly ? `${onCount} of ${fixtureCount} on` : "off";
+  const ariaLabel = `${name}, ${fixtures}${on ? ` at ${level} %` : ""}${drifted ? ", drifted" : ""}, ${stateWords}. Toggle ${on ? "off" : "on"}.`;
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id,
@@ -115,7 +123,7 @@ export function GroupKey({
         />
         <span className={styles.name}>{name}</span>
         <span className={styles.level}>
-          {on ? `${level} %` : "off"}
+          {word}
           {drifted ? <span className={styles.drift}> · unsaved</span> : null}
         </span>
       </div>

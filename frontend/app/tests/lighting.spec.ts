@@ -810,6 +810,32 @@ test("opens typed numeric entry on a lighting intensity slider via Enter and com
   await expect(intensity).toHaveAttribute("aria-valuenow", "42");
 });
 
+// The review of the Lighting page's redraw (2026-10-04): the hardware link
+// takes a fixture's control map whole, so the plate sends every control with
+// the one changed. It sent the one alone, and on the INFINIBAR Green reset Red.
+test("a catalog control's commit keeps the fixture's other controls", async ({ page }) => {
+  await openFixture(page, "lighting-populated");
+  await page.getByRole("button", { name: /^Fixture Back,/ }).click();
+  await expect(page.getByTestId("lighting-plate-head")).toContainText("Back");
+  // Back is off in the scene, and an off fixture's levels wait.
+  await page.getByRole("button", { name: "Turn on", exact: true }).click();
+  await expect(page.getByRole("slider", { name: "Red", exact: true })).not.toHaveAttribute("aria-disabled", "true");
+
+  for (const [label, value] of [
+    ["Red", "200"],
+    ["Green", "100"],
+  ] as const) {
+    await page.getByRole("slider", { name: label, exact: true }).focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: `Set ${label}` });
+    await dialog.getByRole("spinbutton").fill(value);
+    await dialog.getByRole("button", { name: "Set value", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByRole("slider", { name: label, exact: true })).toHaveAttribute("aria-valuenow", value);
+  }
+  await expect(page.getByRole("slider", { name: "Red", exact: true })).toHaveAttribute("aria-valuenow", "200");
+});
+
 test("opens lighting intensity typed entry via a bare double-click", async ({ page }) => {
   await openFixture(page, "lighting-populated");
 

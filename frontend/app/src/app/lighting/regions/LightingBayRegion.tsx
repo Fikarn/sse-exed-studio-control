@@ -45,6 +45,7 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
     previewMode,
     bridgeReachable,
     bridgeUniverse,
+    fixtures,
     liveFixtures,
     selectedFixture,
     overlayFixtureIds,
@@ -165,7 +166,9 @@ export function LightingBayRegion({ editor }: { editor: LightingEditor }) {
     items: plotMenuItems,
   };
 
-  const menuFixture = fixtureMenu ? (liveFixtures.find((fixture) => fixture.id === fixtureMenu.id) ?? null) : null;
+  // The fixtures the plot draws and the plate shows: in Preview, the
+  // preview's, so the menu says and switches what the plot shows.
+  const menuFixture = fixtureMenu ? (fixtures.find((fixture) => fixture.id === fixtureMenu.id) ?? null) : null;
   const fixtureMenuContent = menuFixture
     ? buildFixtureMenu({
         fixture: menuFixture,

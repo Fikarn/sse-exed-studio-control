@@ -129,6 +129,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Fixed
 
+- On the Lighting plate, setting one of a light's colour or effect controls (the INFINIBAR's Red, Green, Blue, FX, Speed) no longer puts its others back to 0 on the light (#PR5).
 - A channel name with a letter beyond ASCII (`ö`) shows on the Console, and that channel's mute, gain and other values arrive with it; such a name lost the channel's whole report (#284).
 - The daily database backup is written a day after the last one; every start of the app wrote one more, so restarts pushed older days out of the 14 kept (#284).
 - A Stream Deck key is answered before the displays the deck asked for just before it, and sixteen places are kept for keys when the deck's link is busy. `engine.log` gets a line a minute about the deck's link while the prompter plays, or when the link was slow or busy (#291).

@@ -150,6 +150,27 @@ describe("LightingCluster", () => {
     expect(screen.queryByTestId("lighting-latch-highlight")).toBeNull();
   });
 
+  it("a group key is lit while all its fixtures are on; a partly lit group says how many, not off", () => {
+    renderCluster({
+      groupRailProps: {
+        groups: [
+          { id: "front", name: "Front", fixtureCount: 2, on: true, onCount: 2, level: 67, drifted: false },
+          { id: "back", name: "Back", fixtureCount: 2, on: false, onCount: 1, level: 64, drifted: false },
+          { id: "side", name: "Side", fixtureCount: 2, on: false, onCount: 0, level: 0, drifted: false },
+        ],
+        onTogglePower: () => {},
+        buildMenu: (group) => ({ head: { title: group.name }, items: [] }),
+      },
+    });
+    const front = screen.getByRole("button", { name: /^Front, / });
+    expect(front.textContent).toContain("67 %");
+    expect(front.getAttribute("aria-label")).toBe("Front, 2 fixtures at 67 %, on. Toggle off.");
+    const back = screen.getByRole("button", { name: /^Back, / });
+    expect(back.textContent).toContain("1 of 2");
+    expect(back.getAttribute("aria-label")).toBe("Back, 2 fixtures, 1 of 2 on. Toggle on.");
+    expect(screen.getByRole("button", { name: /^Side, / }).textContent).toContain("off");
+  });
+
   it("says how to leave Patch, never a key, while patch mode holds the rig", () => {
     renderCluster({ patchMode: true });
     expect(screen.getByTestId("lighting-power-toggle").getAttribute("title")).toBe(

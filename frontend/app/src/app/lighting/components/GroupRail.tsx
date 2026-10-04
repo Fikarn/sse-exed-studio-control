@@ -19,6 +19,8 @@ export interface GroupRailEntry {
   name: string;
   fixtureCount: number;
   on: boolean;
+  /** How many of its fixtures are on. */
+  onCount?: number;
   level: number;
   drifted: boolean;
   levelDelta?: number;
@@ -103,6 +105,7 @@ export function GroupRail({
             name={group.name}
             fixtureCount={group.fixtureCount}
             on={group.on}
+            onCount={group.onCount ?? (group.on ? group.fixtureCount : 0)}
             level={group.level}
             drifted={group.drifted}
             colorIndex={group.colorIndex ?? null}

@@ -89,6 +89,8 @@ export interface InspectorFixtureProps {
   pendingInlineRenameNonce?: number | null;
   /** When this nonce changes the placement fields open (the menu's Edit placement…). */
   placementRequestNonce?: number | null;
+  /** Called once the request is taken, so the session forgets it. */
+  onPlacementRequestHandled?: () => void;
 }
 
 const MOUNTING_LABEL: Record<FixtureMounting, string> = {
@@ -137,6 +139,7 @@ export function InspectorFixture({
   renameBusy = false,
   pendingInlineRenameNonce = null,
   placementRequestNonce = null,
+  onPlacementRequestHandled,
 }: InspectorFixtureProps) {
   const definition = getFixtureDefinition(catalog, fixture);
   const mode = getFixtureMode(definition, fixture.modeId);
@@ -162,10 +165,14 @@ export function InspectorFixture({
     if (pendingInlineRenameNonce === null) return;
     renameRef.current?.beginEdit();
   }, [pendingInlineRenameNonce]);
+  // A request opens the fields once and is handed back: until 2026-10-04
+  // the request stayed, and every render opened the popover again.
+  const canPlace = Boolean(onSpatialCommit);
   useEffect(() => {
-    if (placementRequestNonce === null || !onSpatialCommit) return;
-    setPlacementOpen(true);
-  }, [onSpatialCommit, placementRequestNonce]);
+    if (placementRequestNonce === null) return;
+    if (canPlace) setPlacementOpen(true);
+    onPlacementRequestHandled?.();
+  }, [canPlace, onPlacementRequestHandled, placementRequestNonce]);
 
   const handleIntensityChange = (next: number) => {
     const target = Math.max(0, Math.min(100, Math.round(next)));
@@ -353,7 +360,7 @@ export function InspectorFixture({
                 onCommit={(next) => {
                   const rounded = Math.round(control.min + next * span);
                   setControlDrafts((current) => ({ ...current, [control.id]: rounded }));
-                  onControlValuesCommit?.(fixture.id, { [control.id]: rounded });
+                  onControlValuesCommit?.(fixture.id, { ...fixture.controlValues, [control.id]: rounded });
                 }}
                 onRequestTypedEntry={() => setNumberDialog({ kind: "control", controlId: control.id })}
               />
@@ -475,7 +482,7 @@ export function InspectorFixture({
           onConfirm={(value) => {
             const rounded = Math.round(value);
             setControlDrafts((draft) => ({ ...draft, [numberDialogControl.id]: rounded }));
-            onControlValuesCommit?.(fixture.id, { [numberDialogControl.id]: rounded });
+            onControlValuesCommit?.(fixture.id, { ...fixture.controlValues, [numberDialogControl.id]: rounded });
             setNumberDialog(null);
           }}
           onCancel={() => setNumberDialog(null)}

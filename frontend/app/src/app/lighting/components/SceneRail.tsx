@@ -118,9 +118,10 @@ export function SceneRail({
     if (!liveSceneId) return;
     const index = filtered.findIndex((scene) => scene.id === liveSceneId);
     if (index >= 0) setPage(Math.floor(index / perPage));
-    // Only a change of the live scene moves the page, not the operator's paging.
+    // Only a change of the live scene, or of the rows that fit (the first
+    // measure, a resize), moves the page, never the operator's paging.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveSceneId]);
+  }, [liveSceneId, perPage]);
 
   const [renameRequests, setRenameRequests] = useState<Record<string, number>>({});
   const [colourRequests, setColourRequests] = useState<Record<string, number>>({});

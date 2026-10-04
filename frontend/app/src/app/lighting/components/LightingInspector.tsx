@@ -135,6 +135,7 @@ export interface LightingInspectorProps {
   busyActions: ReadonlySet<string>;
   pendingInlineRename?: { kind: "fixture" | "group"; id: string; nonce: number } | null;
   placementRequest?: { id: string; nonce: number } | null;
+  onPlacementRequestHandled?: () => void;
 }
 
 export function deriveInspectorTab(opts: {
@@ -188,6 +189,7 @@ export function LightingInspector(props: LightingInspectorProps) {
     busyActions,
     pendingInlineRename,
     placementRequest,
+    onPlacementRequestHandled,
   } = props;
   const hasBusyPrefix = (prefix: string) => Array.from(busyActions).some((key) => key.startsWith(prefix));
   const selectedFixture = fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null;
@@ -297,6 +299,7 @@ export function LightingInspector(props: LightingInspectorProps) {
               : null
           }
           placementRequestNonce={placementRequest?.id === selectedFixture.id ? placementRequest.nonce : null}
+          onPlacementRequestHandled={onPlacementRequestHandled}
         />
       ) : null}
 

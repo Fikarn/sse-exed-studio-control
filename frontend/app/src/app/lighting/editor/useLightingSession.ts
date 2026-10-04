@@ -72,6 +72,9 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   const requestPlacement = useCallback((id: string) => {
     setPlacementRequest((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
+  // The plate takes the request once; it is then forgotten, so a later
+  // render or a later selection of the fixture does not open it again.
+  const clearPlacementRequest = useCallback(() => setPlacementRequest(null), []);
   // The plot menu's "Symbol key": shown over the floor's corner while on.
   const [showSymbolKey, setShowSymbolKey] = useState(false);
 
@@ -191,6 +194,7 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     requestInlineRename,
     placementRequest,
     requestPlacement,
+    clearPlacementRequest,
     showSymbolKey,
     setShowSymbolKey,
     undoStack,

@@ -91,6 +91,7 @@ export function useLightingRigControls({
         name: group.name,
         fixtureCount: group.fixtureCount,
         on: allOn,
+        onCount: onFixtures.length,
         level,
         drifted,
         levelDelta,

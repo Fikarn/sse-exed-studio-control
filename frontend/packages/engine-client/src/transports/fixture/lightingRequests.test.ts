@@ -281,6 +281,25 @@ describe("the fixture double's rig actions", () => {
     expect((await snapshot()).sceneState).toBe("preview");
   });
 
+  // The review of the Lighting page's redraw (2026-10-04): the hardware link
+  // takes a fixture's control map whole (`fixtures.rs`, `preview.rs`), a
+  // control left out going to its default. The double merged it, and hid that
+  // the plate sent one control at a time: on the INFINIBAR, Green reset Red.
+  it("lighting.fixture.update takes the control map whole, as the hardware link does", async () => {
+    const { request, fixture } = openDouble();
+    await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { red: 200, green: 0 } });
+    expect((await fixture("fixture-back"))?.controlValues).toMatchObject({ red: 200, green: 0, blue: 0 });
+    await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { green: 100 } });
+    expect((await fixture("fixture-back"))?.controlValues).toMatchObject({ red: 0, green: 100 });
+
+    await request("lighting.editor.previewMode", { enabled: true });
+    await request("lighting.fixture.update", { fixtureId: "fixture-back", controlValues: { blue: 50 } });
+    const preview = ((await request("lighting.snapshot")).previewFixtures as JsonObject[]).find(
+      (entry) => entry.id === "fixture-back"
+    );
+    expect(preview?.controlValues).toMatchObject({ red: 0, green: 0, blue: 50 });
+  });
+
   // 2026-09-23: the double refused `grandMaster` until then, so the Lighting
   // page's Grand master failed against it. The hardware link reads it as a
   // number, rounds it and clamps it to 0–100 (`parse.rs`), stores it and names

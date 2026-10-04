@@ -27,6 +27,7 @@ export function LightingPlatePanel({ editor }: { editor: LightingEditor }) {
     requestInlineRename,
     placementRequest,
     requestPlacement,
+    clearPlacementRequest,
     handleInspectGroup,
   } = editor.session;
   const {
@@ -241,6 +242,7 @@ export function LightingPlatePanel({ editor }: { editor: LightingEditor }) {
       busyActions={busyActions}
       pendingInlineRename={pendingInlineRename}
       placementRequest={placementRequest}
+      onPlacementRequestHandled={clearPlacementRequest}
     />
   );
 }
