@@ -37,17 +37,17 @@ impl Drop for TestDir {
     }
 }
 
-// 2026-10-04 (the owner's decisions): the per-send modes and the dynamics are
-// gone. They were kept in the channels' saved state (`sendModes`, `dynamics`)
-// and never reached TotalMix. A channel map written with them still reads
-// whole, every other field kept, and neither field is written again.
+// 2026-10-04 (the owner's decisions): the per-send modes, the dynamics and the
+// equaliser are gone. They were kept in the channels' saved state
+// (`sendModes`, `dynamics`, `eq`). A channel map written with them still reads
+// whole, every other field kept, and none of them is written again.
 #[test]
-fn saved_channel_state_with_the_old_send_modes_and_dynamics_still_reads() {
+fn saved_channel_state_with_the_old_send_modes_dynamics_and_eq_still_reads() {
     let mut settings = HashMap::new();
     settings.insert(
         String::from(AUDIO_CHANNEL_STATE_KEY),
         String::from(
-            r#"{"audio-input-9":{"gain":41,"mute":true,"phantom":true,"mixLevels":{"audio-mix-main":0.5},"sendModes":{"audio-mix-main":{"preFader":true,"mute":true,"linkStereo":false,"solo":true}},"dynamics":{"compressor":{"enabled":true,"thresholdDb":-18,"ratio":2,"attackMs":12,"releaseMs":120,"makeupDb":3},"gate":{"enabled":false,"thresholdDb":-48,"ratio":1.5,"attackMs":4,"releaseMs":180,"makeupDb":0}}}}"#,
+            r#"{"audio-input-9":{"gain":41,"mute":true,"phantom":true,"mixLevels":{"audio-mix-main":0.5},"sendModes":{"audio-mix-main":{"preFader":true,"mute":true,"linkStereo":false,"solo":true}},"dynamics":{"compressor":{"enabled":true,"thresholdDb":-18,"ratio":2,"attackMs":12,"releaseMs":120,"makeupDb":3},"gate":{"enabled":false,"thresholdDb":-48,"ratio":1.5,"attackMs":4,"releaseMs":180,"makeupDb":0}},"eq":{"enabled":true,"lowCut":{"enabled":true,"frequencyHz":80,"slopeDbPerOctave":12},"hardwareStatus":"pending","bands":[{"id":"1","label":"1","enabled":true,"frequencyHz":180,"gainDb":3,"q":0.9,"bandType":"bell"}]}}}"#,
         ),
     );
 
@@ -65,9 +65,11 @@ fn saved_channel_state_with_the_old_send_modes_and_dynamics_still_reads() {
     let written = serde_json::to_string(&stored["audio-input-9"]).expect("the state serializes");
     assert!(!written.contains("sendModes"), "{written}");
     assert!(!written.contains("dynamics"), "{written}");
+    assert!(!written.contains("\"eq\""), "{written}");
     let served = serde_json::to_string(host).expect("the snapshot serializes");
     assert!(!served.contains("sendModes"), "{served}");
     assert!(!served.contains("dynamics"), "{served}");
+    assert!(!served.contains("\"eq\""), "{served}");
 }
 
 // D26 (2026-09-28): talkback is gone, and what the build before wrote is still
@@ -204,11 +206,12 @@ fn a_saved_recall_message_reads_as_no_action() {
     assert_eq!(named.last_action_status, "failed");
 }
 
-// 2026-10-04: the send modes and the dynamics went. A last action their edits
-// wrote ("Audio dynamics updated.", or a refusal while OSC was off) would
-// describe a control this build does not have, so it reads as no action.
+// 2026-10-04: the send modes, the dynamics and the equaliser went. A last
+// action their edits wrote ("Audio dynamics updated.", "Sent 4 EQ changes …",
+// or a refusal) would describe a control this build does not have, so it
+// reads as no action.
 #[test]
-fn a_saved_send_mode_or_dynamics_action_reads_as_no_action() {
+fn a_saved_send_mode_dynamics_or_eq_action_reads_as_no_action() {
     let last = |status: &str, code: &str, message: &str| {
         read_audio_snapshot(&HashMap::from([
             (
@@ -235,13 +238,63 @@ fn a_saved_send_mode_or_dynamics_action_reads_as_no_action() {
             "AUDIO_PROCESSING_UNAVAILABLE",
             "Audio dynamics editing is unavailable while OSC is disabled.",
         ),
+        (
+            "succeeded",
+            "",
+            "Sent 4 EQ changes for 'Host' to TotalMix — waiting for the console to confirm.",
+        ),
+        (
+            "succeeded",
+            "",
+            "Simulated audio EQ state for 'Host' was updated.",
+        ),
+        (
+            "succeeded",
+            "",
+            "Saved the EQ change for 'Host' in the app only — TotalMix has no remote control for that field.",
+        ),
+        (
+            "failed",
+            "AUDIO_EQ_BAND_REQUIRED",
+            "Audio EQ band updates require bandId.",
+        ),
+        (
+            "failed",
+            "AUDIO_EQ_UPDATE_FAILED",
+            "TotalMix OSC send port is invalid.",
+        ),
     ] {
         let retired = last(status, code, message);
         assert_eq!(retired.last_action_status, "idle", "{message}");
         assert_eq!(retired.last_action_code, None, "{message}");
         assert_eq!(retired.last_action_message, None, "{message}");
     }
-    // An action that still exists keeps its last action.
+    // An action that still exists keeps its last action; a channel edit's
+    // "Sent 1 change …" too.
+    let channel = last(
+        "succeeded",
+        "",
+        "Sent 1 change for 'Host' to TotalMix — waiting for the console to confirm.",
+    );
+    assert_eq!(channel.last_action_status, "succeeded");
+    // The old equaliser's sentence is matched whole: a name TotalMix gave a
+    // strip or a slot may hold its words (the review of the equaliser's
+    // removal).
+    for message in [
+        "Sent 1 change for 'Vox EQ changes' to TotalMix — waiting for the console to confirm.",
+        "Sent 3 EQ changes was sent to TotalMix; TotalMix did not answer.",
+        "Saved 'Simulated audio EQ state for 'x' was updated.' in the app only — nothing to send to TotalMix.",
+    ] {
+        let live = last("succeeded", "", message);
+        assert_eq!(live.last_action_status, "succeeded", "{message}");
+        assert_eq!(live.last_action_message.as_deref(), Some(message));
+    }
+    let singular = last(
+        "succeeded",
+        "",
+        "Sent 1 EQ change for 'Host' to TotalMix — waiting for the console to confirm.",
+    );
+    assert_eq!(singular.last_action_status, "idle");
     let settings = last("succeeded", "", "Native audio settings updated.");
     assert_eq!(settings.last_action_status, "succeeded");
     assert_eq!(
@@ -326,119 +379,6 @@ fn audio_snapshot_reports_ready_when_probe_passed() {
     assert_eq!(snapshot.channels.len(), 18);
     assert_eq!(snapshot.mix_targets.len(), 3);
     assert_eq!(snapshot.console_snapshots.slots.len(), 8);
-}
-
-#[test]
-fn default_audio_eq_uses_totalmix_low_cut_and_three_peq_bands() {
-    let eq = default_audio_eq_snapshot();
-    assert!(!eq.low_cut.enabled);
-    assert_eq!(eq.low_cut.frequency_hz, 80.0);
-    assert_eq!(eq.low_cut.slope_db_per_octave, 12);
-    assert_eq!(
-        eq.bands
-            .iter()
-            .map(|band| band.id.as_str())
-            .collect::<Vec<_>>(),
-        vec!["1", "2", "3"]
-    );
-    assert!(eq.bands.iter().all(|band| band.enabled));
-    assert_eq!(eq.bands[2].band_type, "high-shelf");
-    assert_eq!(eq.hardware_status, "local");
-}
-
-#[test]
-fn audio_eq_parser_enforces_totalmix_ranges_and_band_ids() {
-    let request = parse_audio_eq_update_request(&serde_json::json!({
-        "channelId": "audio-input-9",
-        "enabled": true,
-        "lowCutEnabled": true,
-        "lowCutFrequencyHz": 120.0,
-        "lowCutSlopeDbPerOctave": 18,
-        "bandId": "1",
-        "bandType": "low-shelf",
-        "frequencyHz": 240.0,
-        "gainDb": -18.0,
-        "q": 0.4
-    }))
-    .expect("RME EQ request should parse");
-    assert_eq!(request.band_id.as_deref(), Some("1"));
-    assert_eq!(request.band_type.as_deref(), Some("low-shelf"));
-    assert_eq!(request.low_cut_slope_db_per_octave, Some(18));
-
-    assert!(parse_audio_eq_update_request(&serde_json::json!({
-        "channelId": "audio-input-9",
-        "bandId": "lo",
-        "frequencyHz": 240.0
-    }))
-    .is_err());
-    assert!(parse_audio_eq_update_request(&serde_json::json!({
-        "channelId": "audio-input-9",
-        "lowCutSlopeDbPerOctave": 10
-    }))
-    .is_err());
-    assert!(parse_audio_eq_update_request(&serde_json::json!({
-        "channelId": "audio-input-9",
-        "gainDb": 21.0
-    }))
-    .is_err());
-}
-
-#[test]
-fn audio_eq_normalizes_legacy_lc_lo_mid_hi_state() {
-    let legacy = AudioEqSnapshot {
-        enabled: true,
-        low_cut: default_audio_low_cut_snapshot(),
-        hardware_status: String::from("unknown"),
-        bands: vec![
-            AudioEqBandSnapshot {
-                id: String::from("lc"),
-                label: String::from("LC"),
-                enabled: true,
-                frequency_hz: 640.0,
-                gain_db: 0.0,
-                q: 0.7,
-                band_type: String::from("low-cut"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("lo"),
-                label: String::from("LO"),
-                enabled: true,
-                frequency_hz: 180.0,
-                gain_db: -16.0,
-                q: 0.2,
-                band_type: String::from("bell"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("mid"),
-                label: String::from("MID"),
-                enabled: true,
-                frequency_hz: 1600.0,
-                gain_db: 0.0,
-                q: 1.2,
-                band_type: String::from("bell"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("hi"),
-                label: String::from("HI"),
-                enabled: true,
-                frequency_hz: 8500.0,
-                gain_db: 24.0,
-                q: 0.8,
-                band_type: String::from("shelf"),
-            },
-        ],
-    };
-
-    let normalized = super::helpers::normalize_audio_eq_snapshot(&legacy);
-    assert!(normalized.low_cut.enabled);
-    assert_eq!(normalized.low_cut.frequency_hz, 500.0);
-    assert_eq!(normalized.hardware_status, "local");
-    assert_eq!(normalized.bands[0].id, "1");
-    assert_eq!(normalized.bands[0].q, 0.4);
-    assert_eq!(normalized.bands[2].id, "3");
-    assert!(normalized.bands.iter().all(|band| band.enabled));
-    assert_eq!(normalized.bands[2].gain_db, 20.0);
-    assert_eq!(normalized.bands[2].band_type, "high-shelf");
 }
 
 #[test]
@@ -759,7 +699,6 @@ fn meter_test_channel(
         pad: false,
         instrument: false,
         auto_set: false,
-        eq: default_audio_eq_snapshot(),
     }
 }
 

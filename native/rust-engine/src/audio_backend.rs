@@ -1,11 +1,11 @@
 use crate::audio::{
-    default_audio_eq_snapshot, AudioChannelSnapshot, AudioChannelUpdateRequest,
-    AudioEqUpdateRequest, AudioMixTargetSnapshot, AudioMixTargetUpdateRequest,
+    AudioChannelSnapshot, AudioChannelUpdateRequest, AudioMixTargetSnapshot,
+    AudioMixTargetUpdateRequest,
 };
 use crate::audio_meter_fixture::{real_speech_body_level_at, real_speech_peak_level_at};
 use crate::rme_totalmix_osc::{
-    send_totalmix_channel_update, send_totalmix_eq_update, send_totalmix_mix_target_update,
-    RME_TOTALMIX_OSC_SOURCE, SIMULATED_AUDIO_SOURCE,
+    send_totalmix_channel_update, send_totalmix_mix_target_update, RME_TOTALMIX_OSC_SOURCE,
+    SIMULATED_AUDIO_SOURCE,
 };
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -49,12 +49,6 @@ pub struct AudioMixTargetUpdateOutcome {
     pub summary: String,
 }
 
-#[derive(Debug)]
-pub struct AudioEqUpdateOutcome {
-    pub summary: String,
-    pub hardware_status: String,
-}
-
 pub trait AudioBackend {
     fn read_inventory(&self, config: &AudioBackendConfig) -> AudioBackendInventory;
     // Sync (a console pull) and recall (a console push) are owned by
@@ -73,12 +67,6 @@ pub trait AudioBackend {
         inventory: &AudioBackendInventory,
         request: &AudioMixTargetUpdateRequest,
     ) -> Result<AudioMixTargetUpdateOutcome, String>;
-    fn update_eq(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        request: &AudioEqUpdateRequest,
-    ) -> Result<AudioEqUpdateOutcome, String>;
 }
 
 pub struct SimulatedAudioBackend;
@@ -435,33 +423,6 @@ impl AudioBackend for SimulatedAudioBackend {
             ),
         })
     }
-
-    fn update_eq(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        request: &AudioEqUpdateRequest,
-    ) -> Result<AudioEqUpdateOutcome, String> {
-        ensure_transport_configured(config)?;
-        let channel = inventory
-            .channels
-            .iter()
-            .find(|entry| entry.id == request.channel_id)
-            .ok_or_else(|| {
-                format!(
-                    "Channel '{}' is not part of this console.",
-                    request.channel_id
-                )
-            })?;
-
-        Ok(AudioEqUpdateOutcome {
-            summary: format!(
-                "Simulated audio EQ state for '{}' was updated.",
-                channel.name
-            ),
-            hardware_status: String::from("local"),
-        })
-    }
 }
 
 impl AudioBackend for RmeTotalMixOscBackend {
@@ -530,47 +491,6 @@ impl AudioBackend for RmeTotalMixOscBackend {
 
         Ok(AudioMixTargetUpdateOutcome {
             summary: totalmix_update_summary(&mix_target.name, &report),
-        })
-    }
-
-    fn update_eq(
-        &self,
-        config: &AudioBackendConfig,
-        inventory: &AudioBackendInventory,
-        request: &AudioEqUpdateRequest,
-    ) -> Result<AudioEqUpdateOutcome, String> {
-        ensure_transport_configured(config)?;
-        let channel = inventory
-            .channels
-            .iter()
-            .find(|entry| entry.id == request.channel_id)
-            .ok_or_else(|| {
-                format!(
-                    "Channel '{}' is not part of this console.",
-                    request.channel_id
-                )
-            })?;
-        let sent =
-            send_totalmix_eq_update(&config.send_host, config.send_port, &channel.id, request)?;
-
-        if sent == 0 {
-            return Ok(AudioEqUpdateOutcome {
-                summary: format!(
-                    "Saved the EQ change for '{}' in the app only — TotalMix has no remote control for that field.",
-                    channel.name
-                ),
-                hardware_status: String::from("local"),
-            });
-        }
-
-        Ok(AudioEqUpdateOutcome {
-            summary: format!(
-                "Sent {} EQ change{} for '{}' to TotalMix — waiting for the console to confirm.",
-                sent,
-                if sent == 1 { "" } else { "s" },
-                channel.name
-            ),
-            hardware_status: String::from("pending"),
         })
     }
 }
@@ -648,7 +568,6 @@ fn simulated_channel(
         pad: false,
         instrument: id == "audio-input-12",
         auto_set: false,
-        eq: default_audio_eq_snapshot(),
     }
 }
 
@@ -979,18 +898,6 @@ pub fn update_default_audio_mix_target(
         SimulatedAudioBackend.update_mix_target(config, inventory, request)
     } else {
         RmeTotalMixOscBackend.update_mix_target(config, inventory, request)
-    }
-}
-
-pub fn update_default_audio_eq(
-    config: &AudioBackendConfig,
-    inventory: &AudioBackendInventory,
-    request: &AudioEqUpdateRequest,
-) -> Result<AudioEqUpdateOutcome, String> {
-    if config.metering_source == SIMULATED_AUDIO_SOURCE {
-        SimulatedAudioBackend.update_eq(config, inventory, request)
-    } else {
-        RmeTotalMixOscBackend.update_eq(config, inventory, request)
     }
 }
 

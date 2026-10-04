@@ -4,9 +4,8 @@
 //! console-only sources). Split out of `rme_totalmix_osc.rs` under the
 //! 2,000-line file-health guard, as `storage/tests.rs` was in Slice 3.
 
-use super::classic_eq::{totalmix_channel_target, totalmix_eq_parameter_messages};
 use super::*;
-use crate::audio::{AudioChannelUpdateRequest, AudioEqUpdateRequest, AudioMixTargetUpdateRequest};
+use crate::audio::{AudioChannelUpdateRequest, AudioMixTargetUpdateRequest};
 use crate::audio_backend::{read_default_audio_inventory, AudioBackendConfig};
 use rosc::{OscBundle, OscMessage, OscTime, OscType};
 use std::fs;
@@ -69,56 +68,6 @@ fn a_level_that_is_not_a_number_is_not_a_level() {
     let mut meters = RmeTotalMixMeterState::new();
     assert!(!meters.apply_global_message(&message("/level/in/0", OscType::Float(f32::NAN)), 1_000));
     assert!(meters.entries.is_empty());
-}
-
-#[test]
-fn builds_totalmix_page_two_eq_messages_for_rme_model() {
-    assert_eq!(
-        totalmix_channel_target("audio-input-9"),
-        Some(("busInput", 8))
-    );
-    assert_eq!(
-        totalmix_channel_target("audio-playback-3-4"),
-        Some(("busPlayback", 2))
-    );
-
-    let request = AudioEqUpdateRequest {
-        channel_id: String::from("audio-input-9"),
-        enabled: Some(true),
-        low_cut_enabled: Some(true),
-        low_cut_frequency_hz: Some(80.0),
-        low_cut_slope_db_per_octave: Some(18),
-        band_id: Some(String::from("3")),
-        band_enabled: None,
-        band_type: Some(String::from("high-shelf")),
-        frequency_hz: Some(8_500.0),
-        gain_db: Some(6.0),
-        q: Some(1.4),
-    };
-    let messages = totalmix_eq_parameter_messages(&request);
-    let addresses = messages
-        .iter()
-        .map(|(address, _)| address.as_str())
-        .collect::<Vec<_>>();
-    assert_eq!(
-        addresses,
-        vec![
-            "/2/eqEnable",
-            "/2/lowcutEnable",
-            "/2/lowcutFreq",
-            "/2/lowcutGrade",
-            "/2/eqType3",
-            "/2/eqGain3",
-            "/2/eqFreq3",
-            "/2/eqQ3",
-        ]
-    );
-    assert!(
-        matches!(messages[3].1, OscType::Float(value) if (value - (2.0 / 3.0)).abs() < 0.000_001)
-    );
-    assert!(
-        matches!(messages[4].1, OscType::Float(value) if (value - (1.0 / 3.0)).abs() < 0.000_001)
-    );
 }
 
 #[test]
@@ -416,86 +365,6 @@ fn rme_meter_state_holds_and_decays_peaks_with_console_ballistics() {
     assert!(
         (normalized_to_payload_dbfs(decayed.peak_hold_left) + 7.0).abs() < 0.25,
         "peak should decay by roughly 20 dB/s after the 1500 ms hold window"
-    );
-}
-
-// plan PR 8 / workstream E6: wire-level OSC test. Binds a local UDP
-// receiver and asserts that `send_totalmix_eq_update` emits the
-// documented prefix sequence (`/2/busInput` + `/setBankStart` +
-// `/setOffsetInBank`) followed by the per-band parameter messages.
-// Exercises the bytes that actually go on the wire — the higher-level
-// simulator/parser tests above cover the receive side; this fills in
-// the send-side coverage the plan called out.
-#[test]
-fn send_totalmix_eq_update_emits_documented_address_prefix_on_the_wire() {
-    use crate::audio::AudioEqUpdateRequest;
-    use rosc::OscPacket;
-    use std::time::Duration;
-
-    let receiver = UdpSocket::bind(("127.0.0.1", 0)).expect("test UDP receiver should bind");
-    receiver
-        .set_read_timeout(Some(Duration::from_secs(1)))
-        .expect("test receiver should accept timeout");
-    let port = receiver
-        .local_addr()
-        .expect("receiver should expose port")
-        .port();
-
-    let request = AudioEqUpdateRequest {
-        channel_id: String::from("audio-input-9"),
-        enabled: None,
-        low_cut_enabled: None,
-        low_cut_frequency_hz: None,
-        low_cut_slope_db_per_octave: None,
-        band_id: Some(String::from("1")),
-        band_enabled: None,
-        band_type: Some(String::from("bell")),
-        frequency_hz: Some(180.0),
-        gain_db: Some(3.0),
-        q: Some(0.9),
-    };
-
-    let count = super::send_totalmix_eq_update("127.0.0.1", port as i64, "audio-input-9", &request)
-        .expect("send_totalmix_eq_update should succeed against the local receiver");
-    assert!(
-        count >= 3,
-        "sender should emit at least the 3-message prefix (got {count})"
-    );
-
-    let mut addresses: Vec<String> = Vec::new();
-    let mut buffer = [0u8; 4096];
-    for _ in 0..count {
-        let (read, _from) = receiver
-            .recv_from(&mut buffer)
-            .expect("each sent message should arrive on the loopback");
-        let packet = rosc::decoder::decode_udp(&buffer[..read])
-            .expect("each datagram should decode as OSC")
-            .1;
-        if let OscPacket::Message(message) = packet {
-            addresses.push(message.addr);
-        }
-    }
-
-    // Prefix contract per `send_totalmix_eq_update`:
-    //   1. `/2/<bus>` (busInput / busOutput)
-    //   2. `/setBankStart`
-    //   3. `/setOffsetInBank`
-    assert!(
-        addresses.iter().any(|addr| addr == "/2/busInput"),
-        "prefix should include /2/busInput, saw {addresses:?}"
-    );
-    assert!(
-        addresses.contains(&String::from("/setBankStart")),
-        "prefix should include /setBankStart, saw {addresses:?}"
-    );
-    assert!(
-        addresses.contains(&String::from("/setOffsetInBank")),
-        "prefix should include /setOffsetInBank, saw {addresses:?}"
-    );
-    // And at least one per-band parameter address after the prefix.
-    assert!(
-        addresses.iter().any(|addr| addr.starts_with("/2/eq")),
-        "wire payload should include at least one /2/eq* parameter address, saw {addresses:?}"
     );
 }
 

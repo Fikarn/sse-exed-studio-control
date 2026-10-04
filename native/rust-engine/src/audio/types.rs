@@ -127,7 +127,6 @@ pub struct AudioChannelSnapshot {
     pub instrument: bool,
     #[serde(rename = "autoSet")]
     pub auto_set: bool,
-    pub eq: AudioEqSnapshot,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -193,53 +192,10 @@ pub struct AudioCapabilitySnapshot {
     pub can_sync: bool,
     #[serde(rename = "canRecallConsoleSnapshot")]
     pub can_recall_console_snapshot: bool,
-    #[serde(rename = "canEditProcessing")]
-    pub can_edit_processing: bool,
     #[serde(rename = "canClearClips")]
     pub can_clear_clips: bool,
     #[serde(rename = "canUseMasterView")]
     pub can_use_master_view: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioEqSnapshot {
-    pub enabled: bool,
-    #[serde(rename = "lowCut")]
-    #[serde(default = "default_audio_low_cut_snapshot")]
-    pub low_cut: AudioLowCutSnapshot,
-    #[serde(rename = "hardwareStatus")]
-    #[serde(default = "default_audio_eq_hardware_status")]
-    pub hardware_status: String,
-    pub bands: Vec<AudioEqBandSnapshot>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioLowCutSnapshot {
-    pub enabled: bool,
-    #[serde(rename = "frequencyHz")]
-    pub frequency_hz: f64,
-    #[serde(rename = "slopeDbPerOctave")]
-    pub slope_db_per_octave: i64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioEqBandSnapshot {
-    pub id: String,
-    pub label: String,
-    pub enabled: bool,
-    #[serde(rename = "frequencyHz")]
-    pub frequency_hz: f64,
-    #[serde(rename = "gainDb")]
-    pub gain_db: f64,
-    pub q: f64,
-    #[serde(rename = "bandType")]
-    pub band_type: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -301,14 +257,14 @@ pub struct StoredAudioChannelState {
     #[serde(rename = "autoSet")]
     #[serde(default)]
     pub auto_set: bool,
-    #[serde(default = "default_audio_eq_snapshot")]
-    pub eq: AudioEqSnapshot,
     // 2026-10-04 (the owner's decisions): the per-send modes (pre fader, mute
-    // send, link, solo send) and the dynamics (a compressor and a gate) went.
-    // They were only ever kept here and never reached TotalMix, which has no
-    // such modes per send and models its dynamics differently. Saved data
-    // written before still carries `sendModes` and `dynamics`; they are read
-    // past (no field here denies an unknown one) and dropped at the next write.
+    // send, link, solo send) and the dynamics (a compressor and a gate) went:
+    // they were only ever kept here and never reached TotalMix. The equaliser
+    // and Low Cut went the same day: they went out over TotalMix's classic
+    // page-2 commands, whose on/off only flips, whose channel selection did not
+    // match the layout, and which nothing read back. Saved data written before
+    // still carries `sendModes`, `dynamics` and `eq`; they are read past (no
+    // field here denies an unknown one) and dropped at the next write.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -453,74 +409,4 @@ pub struct AudioClipClearResult {
     #[serde(rename = "channelId")]
     pub channel_id: Option<String>,
     pub summary: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct AudioEqUpdateRequest {
-    pub channel_id: String,
-    pub enabled: Option<bool>,
-    pub low_cut_enabled: Option<bool>,
-    pub low_cut_frequency_hz: Option<f64>,
-    pub low_cut_slope_db_per_octave: Option<i64>,
-    pub band_id: Option<String>,
-    pub band_enabled: Option<bool>,
-    pub band_type: Option<String>,
-    pub frequency_hz: Option<f64>,
-    pub gain_db: Option<f64>,
-    pub q: Option<f64>,
-}
-
-pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
-    AudioEqSnapshot {
-        enabled: false,
-        low_cut: default_audio_low_cut_snapshot(),
-        hardware_status: default_audio_eq_hardware_status(),
-        bands: vec![
-            AudioEqBandSnapshot {
-                id: String::from("1"),
-                label: String::from("1"),
-                enabled: true,
-                frequency_hz: 180.0,
-                gain_db: 0.0,
-                q: 0.9,
-                band_type: String::from("bell"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("2"),
-                label: String::from("2"),
-                enabled: true,
-                frequency_hz: 1600.0,
-                gain_db: 0.0,
-                q: 1.2,
-                band_type: String::from("bell"),
-            },
-            AudioEqBandSnapshot {
-                id: String::from("3"),
-                label: String::from("3"),
-                enabled: true,
-                frequency_hz: 8500.0,
-                gain_db: 0.0,
-                q: 0.8,
-                band_type: String::from("high-shelf"),
-            },
-        ],
-    }
-}
-
-pub fn default_audio_eq_hardware_status() -> String {
-    String::from("local")
-}
-
-pub fn default_audio_low_cut_snapshot() -> AudioLowCutSnapshot {
-    AudioLowCutSnapshot {
-        enabled: false,
-        frequency_hz: 80.0,
-        slope_db_per_octave: 12,
-    }
-}
-
-impl Default for AudioEqSnapshot {
-    fn default() -> Self {
-        default_audio_eq_snapshot()
-    }
 }

@@ -235,7 +235,6 @@ pub(crate) enum UiMethodClass {
 }
 
 const RECORDED_UI_METHODS: &[&str] = &[
-    "audio.channel.eq.update",
     "audio.channel.update",
     "audio.mixTarget.update",
     "audio.settings.update",
@@ -640,32 +639,6 @@ pub(crate) fn ui_actions(
                 audio(action, name, format!("{label} {}: {name}", on_off(on)))
             })
             .collect()
-        }
-        "audio.channel.eq.update" => {
-            let name = text(result, "/name").unwrap_or("Channel");
-            let mut rows = Vec::new();
-            if let Some(on) = flag(params, "enabled") {
-                rows.push(audio("eq", name, format!("EQ {}: {name}", on_off(on))));
-            }
-            if let Some(on) = flag(params, "lowCutEnabled") {
-                rows.push(audio(
-                    "low-cut",
-                    name,
-                    format!("Low cut {}: {name}", on_off(on)),
-                ));
-            }
-            if let Some(on) = flag(params, "bandEnabled") {
-                rows.push(audio(
-                    "eq-band",
-                    name,
-                    format!(
-                        "EQ band {} {}: {name}",
-                        text(params, "/bandId").unwrap_or("?"),
-                        on_off(on)
-                    ),
-                ));
-            }
-            rows
         }
         "audio.snapshot.load" => {
             // A slot TotalMix saved no name for is named by its number; the

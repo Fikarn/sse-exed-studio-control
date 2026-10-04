@@ -820,7 +820,6 @@ fn stored_audio_state_tolerates_missing_and_unknown_fields() {
     assert!(host.mute);
     assert_eq!(host.fader, 0.0);
     assert!(host.mix_levels.is_empty());
-    assert_eq!(host.eq, default_audio_eq_snapshot());
 
     let mix_targets: HashMap<String, StoredAudioMixTargetState> =
         serde_json::from_str(r#"{"audio-mix-main":{"dim":true}}"#)

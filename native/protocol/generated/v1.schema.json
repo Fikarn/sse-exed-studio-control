@@ -56,7 +56,6 @@
         "enum": [
           "app.snapshot",
           "audio.channel.update",
-          "audio.channel.eq.update",
           "audio.clip.clear",
           "audio.mixTarget.update",
           "audio.settings.update",
