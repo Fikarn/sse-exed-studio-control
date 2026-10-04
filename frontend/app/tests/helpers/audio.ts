@@ -38,8 +38,11 @@ export async function expectAudioWorkspaceGeometry(page: Page) {
 
   expectInsideBox(canvas, workspace, "canvas inside workspace");
   expectInsideBox(mixer, canvas, "tiered mixer inside canvas");
-  expectInsideBox(outputTier, mixer, "output tier inside tiered mixer");
-  expectInsideBox(outputTier, canvas, "output tier inside canvas");
+  // The visual overhaul's Console pull request (graft 1). Old: the Outputs tier
+  // stood in the bay beside Inputs and Playback. New: the outputs are a block
+  // in the cluster, beside DIM and MONO. Reason: the owner chose that graft;
+  // the bay holds the sources only.
+  expectInsideBox(outputTier, cluster, "outputs block inside the cluster");
   expectInsideBox(stateDisplay, cluster, "state display inside the cluster");
   expectInsideBox(snapshotDeck, cluster, "snapshot keys inside the cluster");
   expect(stateDisplay.top, "the state display is the cluster's first element").toBeLessThanOrEqual(
@@ -64,10 +67,13 @@ export async function expectAudioInspectorPanelsFit(page: Page) {
     })),
   }));
 
-  const scrollable = metrics.overflowY === "auto" || metrics.overflowY === "scroll";
+  // The visual overhaul's Console pull request. Old: a plate taller than its
+  // column passed when it could scroll. New: the plate fits its 1320 px and
+  // never scrolls. Reason: DESIGN.md §1, nothing scrolls; the plate's EQ and
+  // dynamics are tables with their editing in popovers now.
   expect(
-    metrics.scrollHeight <= metrics.clientHeight + 1 || scrollable,
-    `the plate clips content (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
+    metrics.scrollHeight <= metrics.clientHeight + 1,
+    `the plate scrolls or clips (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
   ).toBe(true);
   expect(metrics.sections.length, "the plate should render its sections").toBeGreaterThan(0);
   expect(
@@ -87,7 +93,9 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
   const metrics = await page.evaluate(() => {
     const cluster = document.querySelector<HTMLElement>('[data-testid="audio-monitor-bar"]');
     const state = document.querySelector<HTMLElement>('[data-testid="audio-state-display"]');
-    const monitorMeter = document.querySelector<HTMLElement>('[data-testid="audio-monitor-master-meter"]');
+    // The visual overhaul's Console pull request: Main Out's meter in the
+    // outputs block (it was the master meter under the cluster's level).
+    const monitorMeter = document.querySelector<HTMLElement>('[data-testid="audio-lane-meter-audio-mix-main"]');
     const rect = (el: HTMLElement | null) => (el ? el.getBoundingClientRect().width : 0);
     return {
       clusterWidth: rect(cluster),
@@ -131,25 +139,25 @@ export async function expectSnapshotSlotsHoldTheirWords(page: Page) {
     const keyBox = await readRequiredLocatorBox(page.getByTestId(`audio-snapshot-load-${slot}`), `slot ${slot} key`);
     expectInsideBox(keyBox, deck, `slot ${slot} key inside the snapshot panel`);
     const nameBox = await readRequiredLocatorBox(page.getByTestId(`audio-snapshot-name-${slot}`), `slot ${slot} name`);
-    const stateBox = await readRequiredLocatorBox(
-      page.getByTestId(`audio-snapshot-state-${slot}`),
-      `slot ${slot} state`
-    );
     expectInsideBox(nameBox, keyBox, `slot ${slot} name inside its key`);
-    expectInsideBox(stateBox, keyBox, `slot ${slot} state inside its key`);
-    expect(boxesIntersect(nameBox, stateBox), `slot ${slot} name overlaps its state`).toBe(false);
+    // The visual overhaul's Console pull request: a slot TotalMix does not hold
+    // says nothing (it said "–"), so only a word is measured.
+    const state = page.getByTestId(`audio-snapshot-state-${slot}`);
+    if ((await state.textContent())?.trim()) {
+      const stateBox = await readRequiredLocatorBox(state, `slot ${slot} state`);
+      expectInsideBox(stateBox, keyBox, `slot ${slot} state inside its key`);
+      expect(boxesIntersect(nameBox, stateBox), `slot ${slot} name overlaps its state`).toBe(false);
+    }
   }
+  // The visual overhaul's Console pull request. Old: the line naming where the
+  // names come from stood under the keys, inside the panel. New: it is the
+  // tooltip of the head's "in TotalMix", so its words are the panel's own
+  // (hidden until the pointer rests there). Reason: hints are tooltips.
   const source = page.getByTestId("audio-snapshot-source");
   if ((await source.count()) > 0) {
-    expectInsideBox(
-      await readRequiredLocatorBox(source, "snapshot names' source"),
-      deck,
-      "source line inside the panel"
+    await expect(page.getByTestId("audio-snapshot-deck"), "the source line belongs to the panel").toContainText(
+      (await source.first().textContent()) ?? ""
     );
-    expect(
-      await source.evaluate((node) => node.scrollWidth <= node.clientWidth),
-      "the source line holds its words"
-    ).toBe(true);
   }
 }
 
@@ -240,6 +248,39 @@ export async function expectAudioOverviewProcessingStack(page: Page, label: stri
     expect(box.left, `${label} ${name} left inside the plate`).toBeGreaterThanOrEqual(plateBox.left - 1);
     expect(box.right, `${label} ${name} right inside the plate`).toBeLessThanOrEqual(plateBox.right + 1);
   }
+}
+
+// The visual overhaul's Console pull request: the Console's standing commands
+// (Sync, the probe, Clear clips, Peak hold, Reset peaks, Open Setup) are the
+// page's ⋯ items, with the test ids the standing keys had. This opens it.
+export async function openAudioPageMenu(page: Page) {
+  await page.getByTestId("audio-page-menu").click();
+  const menu = page.getByRole("menu", { name: "Audio" });
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** The group filter is the tier's ⋯ now (it was the chips): opens it. */
+export async function openAudioTierMenu(page: Page, tier: "hardware-inputs" | "software-playback") {
+  await page.getByTestId(`audio-tier-menu-${tier}`).click();
+  const menu = page.getByRole("menu", { name: tier === "hardware-inputs" ? "Inputs" : "Playback" });
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+/** Switches one group of a tier's filter on or off, from the tier's ⋯. */
+export async function toggleAudioTierGroup(page: Page, tier: "hardware-inputs" | "software-playback", group: string) {
+  await openAudioTierMenu(page, tier);
+  await page.getByTestId(`audio-tier-chip-${tier === "hardware-inputs" ? "inputs" : "playback"}-${group}`).click();
+}
+
+/** Reads whether a tier's filter shows `group` lit ("true" / "false"), or "absent"; leaves the menu closed. */
+export async function readAudioTierGroup(page: Page, tier: "hardware-inputs" | "software-playback", group: string) {
+  await openAudioTierMenu(page, tier);
+  const item = page.getByTestId(`audio-tier-chip-${tier === "hardware-inputs" ? "inputs" : "playback"}-${group}`);
+  const state = (await item.count()) === 0 ? "absent" : ((await item.getAttribute("aria-checked")) ?? "absent");
+  await page.keyboard.press("Escape");
+  return state;
 }
 
 // 2026-10-01: loads TotalMix's snapshot `slot` the operator's way, two presses

@@ -19,7 +19,10 @@ import {
   expectSliderValueChanges,
   expectSnapshotSlotsHoldTheirWords,
   loadAudioSnapshot,
+  openAudioPageMenu,
+  readAudioTierGroup,
   revealPlateSection,
+  toggleAudioTierGroup,
 } from "./helpers/audio";
 import {
   expectAspectRatio,
@@ -71,15 +74,22 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(
     page.locator('[data-testid="audio-tier-lanes-software-playback"] [data-testid^="audio-strip-"]')
   ).toHaveCount(6);
-  // One accent for the Console, not a colour per output: the SSE palette's
-  // Yellow since the visual overhaul (2026-10-03; it was the amber #f5a524).
-  // Read from the Console's --accent, which the workspace re-points.
+  // One yellow for engaged, not a colour per output. The visual overhaul's
+  // Console pull request. Old: read from the Console's own --accent, which the
+  // workspace re-pointed to Yellow. New: the mix target's key is lit in the
+  // palette's Yellow, and the workspace keeps the design system's --accent, the
+  // Beige of selection. Reason: the Console's private colours went; Yellow is
+  // engaged and Beige is selected, one meaning each (DESIGN.md §4).
+  const mainTarget = page.getByTestId("audio-mix-target-audio-mix-main");
+  await expect
+    .poll(() => mainTarget.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .toBe("rgb(242, 222, 111)");
   await expect
     .poll(() =>
       workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim().toLowerCase())
     )
-    .toBe("#f2de6f");
-  await expect(workspace.getByText("Main Out").first()).toBeVisible();
+    .toBe("#edebd1");
+  await expect(page.getByTestId("audio-lane-name-audio-mix-main")).toHaveText("Main Out");
   await expect(page.getByTestId("audio-signal-canvas")).toBeVisible();
   // 2026-05-27 redesign: the dense context bar was slimmed; AudioSignalCanvas
   // no longer renders an "Editing" label.
@@ -128,11 +138,17 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // new AudioMonitorBar (footer). The master-meter dB readout is on
   // `audio-monitor-master-meter`; assert visibility of the bar itself.
   await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
-  await expect(page.getByTestId("audio-monitor-master-meter")).toBeVisible();
-  // The standing actions live in the cluster now (plan D8: the state display's
-  // way out duplicates them deliberately).
+  // The visual overhaul's Console pull request. Old: the master meter under the
+  // cluster's level; the standing keys in a "Console" row. New: Main Out's
+  // meter in its row of the outputs block; the standing commands are the
+  // page's ⋯ items, with the same test ids. Reason: the output level has one
+  // home (graft 1), and the Console row became the page's menu (Atrium).
+  await expect(page.getByTestId("audio-lane-meter-audio-mix-main")).toBeVisible();
+  await expect(page.getByTestId("audio-standing-actions")).toHaveCount(0);
+  await openAudioPageMenu(page);
   await expect(page.getByTestId("audio-topbar-sync")).toContainText("Sync from TotalMix");
   await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
+  await page.keyboard.press("Escape");
   // The shell (overhaul 3): the latch names itself, Solo, and counts in its text.
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("Solo");
   await expect(page.getByTestId("audio-solo-warning-band")).toContainText("1 on FX 3/4");
@@ -147,11 +163,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
   await page.getByRole("button", { name: "Clear all solo" }).click();
   await expect(page.getByTestId("audio-solo-warning-band")).toHaveCount(0);
-  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toBeVisible();
-  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveCount(0);
-  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveCount(0);
-  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toBeVisible();
-  await expect(page.getByTestId("audio-tier-chip-playback-remote")).toHaveCount(0);
+  // The visual overhaul's Console pull request. Old: the group chips stood in
+  // each tier's heading. New: they are the check items of the tier's ⋯, with
+  // the chips' test ids. Reason: Atrium's tier menu replaces the chips.
+  expect(await readAudioTierGroup(page, "hardware-inputs", "talent")).toBe("false");
+  expect(await readAudioTierGroup(page, "hardware-inputs", "line")).toBe("absent");
+  expect(await readAudioTierGroup(page, "hardware-inputs", "remote")).toBe("absent");
+  expect(await readAudioTierGroup(page, "software-playback", "bed")).toBe("false");
+  expect(await readAudioTierGroup(page, "software-playback", "remote")).toBe("absent");
   // 2026-10-01 (the owner's decision, after the studio walk). Old: the panel
   // held the app's own snapshots, a Capture key, empty slots, mix-shape
   // thumbnails and a hover preview naming the TotalMix slot a recall would
@@ -167,9 +186,15 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("active");
   await expect(page.getByTestId("audio-snapshot-slot-1")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-snapshot-name-3")).toHaveText("Panel & Q&A");
-  await expect(page.getByTestId("audio-snapshot-state-3")).toHaveText("–");
+  // The visual overhaul's Console pull request. Old: a slot TotalMix does not
+  // hold read "–". New: it says nothing; only TotalMix's own word shows.
+  // Reason: Atrium, a quiet slot; the dash was a word saying nothing.
+  await expect(page.getByTestId("audio-snapshot-state-3")).toHaveText("");
   await expect(page.getByTestId("audio-snapshot-name-6")).toHaveText("Slot 6");
-  await expect(page.getByTestId("audio-snapshot-state-6")).toHaveText("–");
+  await expect(page.getByTestId("audio-snapshot-state-6")).toHaveText("");
+  // A slot with no name of its own reads quieter.
+  await expect(page.getByTestId("audio-snapshot-slot-6")).toHaveAttribute("data-named", "false");
+  await expect(page.getByTestId("audio-snapshot-slot-3")).toHaveAttribute("data-named", "true");
   await expect(page.getByTestId("audio-snapshot-load-6")).toHaveAttribute("aria-label", "Load Slot 6 in TotalMix");
   await expect(page.getByTestId("audio-snapshot-load-6")).toHaveAttribute("title", "Press twice to load in TotalMix");
   await expect(page.getByTestId("audio-snapshot-source")).toHaveText(/^Names as TotalMix last saved them · .+/);
@@ -184,16 +209,14 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-strip-audio-input-1")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toHaveAttribute("data-feeding", "true");
   await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
-  // Visual overhaul A, Slice 4c. Old: the preamp card printed its own eyebrow
-  // ("Software" / "Mic / Line Gain"). New: the plate's section head says it.
-  // Reason: with no tabs the section head names what the section is, so the
-  // card no longer repeats it.
-  await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Software");
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("No playback stats from the driver");
-  await expect(page.getByTestId("audio-inspector-channel")).not.toContainText("Buffer status");
-  await expect(page.getByTestId("audio-inspector-channel").getByRole("button", { name: "Stereo link" })).toHaveCount(0);
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Stereo link");
-  await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("Auto fade");
+  // The visual overhaul's Console pull request. Old: a playback strip's plate
+  // had a "Software" section: "No playback stats from the driver", its stereo
+  // link and a fixed "Auto fade Off". New: a playback strip has no preamp
+  // section; what it is (stereo, linked, its group) is the title plate's one
+  // line. Reason: the section repeated the plate's other facts or printed
+  // placeholders (the survey's clutter findings), and the plate must fit.
+  await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
+  await expect(page.getByTestId("audio-plate-head")).toContainText("stereo, linked");
   await page.getByTestId("audio-strip-audio-input-9").click();
   await expect(page.locator('[data-plate-section="preamp"]')).toContainText("Preamp");
   await expect(page.getByTestId("audio-inspector-hardware-mini")).toContainText("48 V");
@@ -203,21 +226,27 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-inspector-hardware-mini")).not.toContainText("Pad");
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
 
-  // 2026-05-27 redesign: the AudioTargetPicker output dropdown (a "Main Out
-  // selected output target" button that opened an "Audio output targets" menu)
-  // was removed. Outputs are now selected directly from the output lanes.
-  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  // The visual overhaul's Console pull request. Old: a click on an output's
+  // strip in the bay made it the mix target and showed it on the plate. New:
+  // the output's key in the cluster's outputs block makes it the mix target and
+  // keeps the selected strip, as the deck's MAIN OUT and PHONES do; the plate
+  // shows an output from its menu, "Show in the plate". Reason: graft 1 moves
+  // the outputs into the cluster, and one press does one thing.
+  await page.getByTestId("audio-mix-target-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   await expect(workspace).toHaveAttribute("data-output-role", "phones-a");
-  // One accent for every output role: a phones mix does not recolour it. The
-  // guard that keeps that decision honest (see the note at the first check).
+  // One yellow for every output role: a phones mix does not recolour it.
   await expect
     .poll(() =>
-      workspace.evaluate((element) => getComputedStyle(element).getPropertyValue("--accent").trim().toLowerCase())
+      page
+        .getByTestId("audio-mix-target-audio-mix-phones-a")
+        .evaluate((element) => getComputedStyle(element).backgroundColor)
     )
-    .toBe("#f2de6f");
+    .toBe("rgb(242, 222, 111)");
+  await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
   await expect(page.getByTestId("audio-hardware-outputs-tier")).toContainText("Phones 1");
-  await page.getByTestId("audio-output-audio-mix-main").click();
+  await page.getByTestId("audio-lane-menu-audio-mix-main").click();
+  await page.getByTestId("audio-output-menu-plate-audio-mix-main").click();
   await expect(page.locator('[data-source-tier="outputs"]')).toBeVisible();
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Hardware output");
   await page.getByTestId("audio-tier-lanes-hardware-inputs").dispatchEvent("click");
@@ -236,6 +265,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // in TotalMix (it recalled the app's own snapshot).
   await page.getByTestId("audio-bank-next").click();
   await expect(page.getByTestId("audio-footer-telemetry")).toContainText("2 of 3");
+  await expect(page.getByTestId("audio-tier-bank-pill-hardware-inputs")).toHaveText("2 / 3");
 
   const selectedStrip = page.getByTestId("audio-strip-audio-input-1");
   // On the strip's name, clear of its fader, which a click mid-strip would move.
@@ -250,14 +280,19 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   await expect(page.getByTestId("audio-snapshot-slot-3")).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-snapshot-state-3")).toHaveText("active");
   await expect(page.getByTestId("audio-snapshot-slot-1")).toHaveAttribute("data-current", "false");
-  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("–");
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("");
   await expect(page.getByTestId("audio-load-report")).toContainText("Loaded Panel & Q&A in TotalMix");
+  // The visual overhaul's Console pull request: the load report stands at the
+  // cluster's foot (it was a band over the bay, which shrank the strips).
+  await expect(page.locator('[data-region="cluster"]').getByTestId("audio-load-report")).toBeVisible();
 
   // Visual overhaul A, Slice 4c. Old: the plate was a tab strip and this
   // asserted the Preamp tab was selected and its panel visible. New: every
   // section of the plate is present at once. Reason: the plate has no tab row —
   // nothing about the selected strip is hidden behind one.
-  await expect(page.locator('[data-plate-section="preamp"]')).toBeVisible();
+  // The visual overhaul's Console pull request: Line 1 is a line input, and
+  // only a front preamp has a preamp section (gain, 48 V, Hi-Z, AutoSet).
+  await expect(page.locator('[data-plate-section="preamp"]')).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Level L / R");
   await expect(page.getByTestId("audio-inspector-metering")).toContainText("Peak hold");
   await expect(page.getByTestId("audio-inspector-level-readout")).toHaveAttribute("data-meter-readout-mode", "level");
@@ -265,17 +300,28 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
     "data-meter-readout-mode",
     "peakHold"
   );
-  await expect(page.getByTestId("audio-inspector-metering")).toContainText("Nominal ref");
+  // The visual overhaul's Console pull request. Old: "Nominal ref" and "Peak
+  // warn" printed under the readouts. New: the meter section's tooltip says
+  // them. Reason: hints are tooltips; the meter draws the reference itself.
+  await expect(page.getByTestId("audio-plate-meter")).toContainText("the reference at −18 dBFS");
   // 2026-05-27 redesign: Overview mini-preview cards removed; the EQ / Dyn /
   // Routing tabs are the route into processing now.
   // Visual overhaul A, Slice 4c: they are sections of the plate, all present.
-  for (const section of ["eq", "dynamics", "send", "meter", "channel"] as const) {
+  // The visual overhaul's Console pull request: the "Channel" section, which
+  // repeated the sections above it, went (the survey's clutter findings).
+  for (const section of ["eq", "dynamics", "send", "meter"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
   }
+  await expect(page.locator('[data-plate-section="channel"]')).toHaveCount(0);
   const contextCountsBefore = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
-  const menu = page.getByRole("menu", { name: /actions/i });
-  await expect(menu).toContainText("Reset to unity");
+  // The visual overhaul's Console pull request. Old: the right-click menu was
+  // named "<strip> actions" and held "Reset to unity" and the polarity. New:
+  // the strip's menu (its ⋯ or a right-click) is named by its head, the
+  // strip's name, and says which send it sets to 0 dB. Reason: DESIGN.md §9,
+  // a menu's head names its object; "unity" did not say which mix.
+  const menu = page.getByRole("menu", { name: "Line 1" });
+  await expect(menu).toContainText("Set Main Out send to 0 dB");
   const contextCountsAfterOpen = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   expect(contextCountsAfterOpen["audio.settings.update"] ?? 0).toBe(contextCountsBefore["audio.settings.update"] ?? 0);
   await page.keyboard.press("Escape");
@@ -288,7 +334,7 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
   // New: no Rename, in the menu or on the plate. Reason: the strips take
   // TotalMix's names, and a channel is renamed in TotalMix.
   await page.getByTestId("audio-strip-audio-input-1").click({ button: "right", position: { x: 12, y: 12 } });
-  await expect(menu).toContainText("Reset to unity");
+  await expect(menu).toContainText("Set Main Out send to 0 dB");
   await expect(page.getByRole("menuitem", { name: /Rename/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
@@ -302,20 +348,40 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
     });
   await expect(page.getByRole("button", { name: "PFL" })).toHaveCount(0);
   await revealPlateSection(page, "eq");
+  // The visual overhaul's Console pull request. Old: "Enable PEQ" / "Bypass
+  // PEQ" stood in the equaliser's band grid; the band keys only chose a band.
+  // New: a band key opens the band's popover, and the equaliser is switched
+  // from the section's ⋯ ("Equaliser", on / bypassed). Reason: the plate's
+  // equaliser is a graph and a table; its switches are menu items (Atrium).
   await page.getByTestId("audio-inspector-eq").getByRole("button", { name: "1", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Enable PEQ" })).toBeEnabled();
-  await page.getByRole("button", { name: "Enable PEQ" }).click();
-  await expect(page.getByRole("button", { name: "Bypass PEQ" })).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-eq-band-card-1")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("audio-eq-menu").click();
+  await expect(page.getByTestId("audio-eq-menu-peq")).toHaveAttribute("aria-checked", "false");
+  await page.getByTestId("audio-eq-menu-peq").click();
+  await page.getByTestId("audio-eq-menu").click();
+  await expect(page.getByTestId("audio-eq-menu-peq")).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
   await revealPlateSection(page, "dynamics");
-  await expect(page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" })).toBeEnabled();
-  await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
+  // Old: a range row repeated the compressor's numbers. New: the two-row table
+  // is the one place they are read.
+  await expect(
+    page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp", exact: true })
+  ).toBeEnabled();
+  await expect(page.getByTestId("audio-dynamics-row-compressor")).toBeVisible();
   await revealPlateSection(page, "send");
+  // Old: a send card per mix with four mode keys. New: a row per other mix, its
+  // modes in the row's ⋯ as toggles stating their value. Reason: Atrium's OTHER
+  // MIXES; the mix target's send is the strip's fader.
   await expect(page.getByTestId("audio-inspector-sends")).toContainText("Phones 1");
-  await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText(/Send|No send|Muted/);
-  const preFader = page.getByTestId("audio-inspector-sends").getByRole("button", { name: "Pre fader" }).first();
-  await expect(preFader).toBeEnabled();
+  await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
+  await page.getByTestId("audio-send-menu-audio-mix-phones-a").click();
+  const preFader = page.getByTestId("audio-send-pre-fader-audio-mix-phones-a");
+  await expect(preFader).toHaveAttribute("aria-checked", "false");
   await preFader.click();
-  await expect(preFader).toHaveAttribute("data-active", "true");
+  await page.getByTestId("audio-send-menu-audio-mix-phones-a").click();
+  await expect(preFader).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
 
   // New pages program, Slice 3 (decisions 4 and 6). Old: E / D / R / P brought
   // a plate section into view, then Esc let the strip go. New: the section
@@ -331,6 +397,9 @@ test("renders the audio workspace from an engine-backed snapshot and supports ke
 test("audio topbar setup action opens the setup workspace", async ({ page }) => {
   await openFixture(page, "audio-populated");
 
+  // The visual overhaul's Console pull request: Open Setup is the page's ⋯ item
+  // (it was the Console row's standing key), with the same test id.
+  await openAudioPageMenu(page);
   await page.getByTestId("audio-topbar-setup").click();
   await expect(page.getByText("Setup / Support").first()).toBeVisible();
 });
@@ -360,13 +429,19 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // whatever the state; the probe is the way out inside the state display.
   // Old: the top bar hid Sync while the console was not verified.
   await expect(page.getByTestId("audio-state-probe")).toBeVisible();
+  // The visual overhaul's Console pull request: the probe stands in the page's
+  // ⋯ too (it was the Console row's standing key).
+  await openAudioPageMenu(page);
   await expect(page.getByTestId("audio-topbar-probe")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("button", { name: "Mute Host" })).toBeDisabled();
   await page.getByTestId("audio-state-probe").click();
   // The fixture probe passes, which is exactly what unlocks the console.
   await expect(page.getByTestId("audio-state-display")).not.toContainText("NOT VERIFIED");
-  await expect(page.getByTestId("audio-topbar-sync")).toBeEnabled();
+  await openAudioPageMenu(page);
+  await expect(page.getByTestId("audio-topbar-sync")).not.toHaveAttribute("aria-disabled", "true");
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("slider", { name: "FX 3/4 send level" })).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.getByRole("button", { name: "Mute Host" })).toBeEnabled();
 
@@ -374,7 +449,11 @@ test("renders audio degraded and loading fixture states", async ({ page }) => {
   // The state display carries the engine's word (old: the band's title
   // "OSC DISABLED").
   await expect(page.getByTestId("audio-state-display")).toContainText("DISABLED");
-  await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
+  // A menu item that cannot be pressed is disabled and says why at its right.
+  await openAudioPageMenu(page);
+  await expect(page.getByTestId("audio-topbar-sync")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByTestId("audio-topbar-sync")).toContainText("TotalMix cannot be read now");
+  await page.keyboard.press("Escape");
 
   await openFixture(page, "audio-offline");
   // The state display carries the engine's word and its sentence (old: the
@@ -423,12 +502,20 @@ test("audio-not-verified outlines every console write on the bay and prints the 
   }
 
   const strip = page.getByTestId("audio-strip-audio-input-9");
-  for (const testId of ["audio-lane-phantom-audio-input-9", "audio-lane-gain-audio-input-9"]) {
+  // The visual overhaul's Console pull request. Old: the strip's gain was a key,
+  // locked like 48 V. New: the gain is a value on the strip, set from the
+  // strip's menu and the plate, whose items are disabled and say why.
+  // Reason: the strip shows the gain; editing it is the menu's and the plate's.
+  for (const testId of ["audio-lane-phantom-audio-input-9"]) {
     const key = strip.getByTestId(testId);
     await expect(key).toHaveAttribute("aria-disabled", "true");
     await expect(key).toHaveAttribute("title", reason);
     expect(await key.evaluate((node) => getComputedStyle(node).borderStyle)).toBe("dashed");
   }
+  await page.getByTestId("audio-lane-menu-audio-input-9").click();
+  await expect(page.getByTestId("audio-lane-menu-audio-input-9-gain")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.getByTestId("audio-lane-menu-audio-input-9-gain")).toContainText("desk NOT VERIFIED");
+  await page.keyboard.press("Escape");
   const fader = strip.getByRole("slider", { name: "Host send level" });
   await expect(fader).toHaveAttribute("aria-disabled", "true");
   await expect(strip.getByRole("button", { name: "Mute Host" })).toBeDisabled();
@@ -443,7 +530,7 @@ test("audio-not-verified outlines every console write on the bay and prints the 
   // The lock is the engine's, so it lifts the moment the probe passes.
   await page.getByTestId("audio-state-probe").click();
   await expect(page.getByTestId("audio-tier-lock-note-hardware-inputs")).toHaveCount(0);
-  await expect(strip.getByTestId("audio-lane-gain-audio-input-9")).not.toHaveAttribute("aria-disabled", "true");
+  await expect(strip.getByTestId("audio-lane-phantom-audio-input-9")).not.toHaveAttribute("aria-disabled", "true");
   await expect(loadKey).not.toHaveAttribute("aria-disabled", "true");
   await expect(loadKey).toHaveAttribute("title", "Press twice to load in TotalMix");
 });
@@ -456,7 +543,9 @@ test("switches audio output targets without a full-domain refresh", async ({ pag
   await expectWorkspaceMounted(page, "audio");
 
   const initialCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
-  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  // The visual overhaul's Console pull request: the output's key in the
+  // cluster's outputs block (it was a click on the output's strip in the bay).
+  await page.getByTestId("audio-mix-target-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
 
   const finalCounts = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
@@ -488,7 +577,9 @@ test("supports audio warning-band sync", async ({ page }) => {
   const stateDisplay = page.getByTestId("audio-state-display");
   await expect(stateDisplay).not.toContainText("Esc clear");
   await expect(page.getByTestId("audio-state-sync")).toBeEnabled();
+  await openAudioPageMenu(page);
   await expect(page.getByTestId("audio-topbar-setup")).toBeEnabled();
+  await page.keyboard.press("Escape");
   await page.getByTestId("audio-state-sync").press("Enter");
   await expect(stateDisplay).not.toContainText("ASSUMED");
 
@@ -496,35 +587,40 @@ test("supports audio warning-band sync", async ({ page }) => {
 
   await openFixture(page, "audio-osc-disabled");
   await expect(page.getByTestId("audio-state-display")).toContainText("DISABLED");
-  await expect(page.getByTestId("audio-topbar-sync")).toBeDisabled();
+  await openAudioPageMenu(page);
+  await expect(page.getByTestId("audio-topbar-sync")).toHaveAttribute("aria-disabled", "true");
 });
 
 test("supports audio group filtering and source/output selection flow", async ({ page }) => {
   test.slow();
   await openFixture(page, "audio-populated");
 
-  await page.getByTestId("audio-tier-chip-inputs-talent").click();
-  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "true");
+  // The visual overhaul's Console pull request. Old: the group chips stood in
+  // each tier's heading and a click on one switched it. New: the chips are the
+  // check items of the tier's ⋯ (same test ids, `aria-checked`), and a lit
+  // filter is said in the heading's words. Reason: Atrium's tier menu.
+  await toggleAudioTierGroup(page, "hardware-inputs", "talent");
+  expect(await readAudioTierGroup(page, "hardware-inputs", "talent")).toBe("true");
+  await expect(page.getByTestId("audio-tier-filter-hardware-inputs")).toHaveText("Talent only");
   await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
 
-  await page.getByTestId("audio-tier-chip-inputs-talent").click();
-  await expect(page.getByTestId("audio-tier-chip-inputs-talent")).toHaveAttribute("data-active", "false");
+  await toggleAudioTierGroup(page, "hardware-inputs", "talent");
+  expect(await readAudioTierGroup(page, "hardware-inputs", "talent")).toBe("false");
+  await expect(page.getByTestId("audio-tier-filter-hardware-inputs")).toHaveCount(0);
   await expect(page.getByTestId("audio-strip-audio-input-9")).toBeVisible();
 
-  await expect(page.getByTestId("audio-tier-chip-inputs-line")).toHaveCount(0);
-  await expect(page.getByTestId("audio-tier-chip-inputs-remote")).toHaveCount(0);
+  expect(await readAudioTierGroup(page, "hardware-inputs", "line")).toBe("absent");
+  expect(await readAudioTierGroup(page, "hardware-inputs", "remote")).toBe("absent");
 
-  await page.getByTestId("audio-tier-chip-playback-fx").click();
-  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
+  await toggleAudioTierGroup(page, "software-playback", "fx");
+  expect(await readAudioTierGroup(page, "software-playback", "fx")).toBe("true");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
   await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toHaveCount(0);
-  // New pages program, Slice 3 (decision 10). Old: Shift+click on Bed added it
-  // beside FX. New: a plain click does. Reason: a key held while pointing is a
-  // shortcut too; a plain click switches a chip on or off and several can be lit.
-  await page.getByTestId("audio-tier-chip-playback-bed").click();
-  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "true");
-  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "true");
+  // New pages program, Slice 3 (decision 10): several groups can be lit at once.
+  await toggleAudioTierGroup(page, "software-playback", "bed");
+  expect(await readAudioTierGroup(page, "software-playback", "fx")).toBe("true");
+  expect(await readAudioTierGroup(page, "software-playback", "bed")).toBe("true");
   await expect(page.getByTestId("audio-strip-audio-playback-1-2")).toBeVisible();
 
   await page.getByTestId("audio-strip-audio-input-9").click();
@@ -539,22 +635,24 @@ test("supports audio group filtering and source/output selection flow", async ({
   // gone; the output is selected by a click on it below. Reason: the arrows only
   // move a focused slider or list now.
 
-  await page.getByTestId("audio-tier-chip-inputs-talent").click();
-  // Old: one plain click on the lit FX chip cleared the row's filter. New: a
-  // plain click turns only that chip off, so FX and then Bed are clicked, and
-  // with no chip lit the row shows every strip again (decision 10).
-  await page.getByTestId("audio-tier-chip-playback-fx").click();
-  await expect(page.getByTestId("audio-tier-chip-playback-fx")).toHaveAttribute("data-active", "false");
-  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "true");
-  await page.getByTestId("audio-tier-chip-playback-bed").click();
-  await expect(page.getByTestId("audio-tier-chip-playback-bed")).toHaveAttribute("data-active", "false");
+  // Old: one plain click on the lit FX chip cleared the row's filter. New: the
+  // tier's "Show all" clears it; switching one group turns only that one off.
+  await toggleAudioTierGroup(page, "software-playback", "fx");
+  expect(await readAudioTierGroup(page, "software-playback", "fx")).toBe("false");
+  expect(await readAudioTierGroup(page, "software-playback", "bed")).toBe("true");
+  await page.getByTestId("audio-tier-menu-software-playback").click();
+  await page.getByTestId("audio-tier-show-all-playback").click();
+  expect(await readAudioTierGroup(page, "software-playback", "bed")).toBe("false");
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toBeVisible();
   await page.getByTestId("audio-strip-audio-playback-3-4").click();
   // 2026-05-27 redesign: the channel name moved into the inspector's slimmed
   // sticky identity header (an <h2>), outside the audio-inspector-channel
   // tabpanel. Assert FX 3/4's inspector is shown via that header heading.
   await expect(page.getByRole("heading", { name: "FX 3/4" })).toBeVisible();
-  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  // The visual overhaul's Console pull request: the output's menu shows it on
+  // the plate (a click on its strip in the bay did), and makes it the target.
+  await page.getByTestId("audio-lane-menu-audio-mix-phones-a").click();
+  await page.getByTestId("audio-output-menu-plate-audio-mix-phones-a").click();
   await expect(page.getByTestId("audio-output-audio-mix-phones-a")).toHaveAttribute("data-selected", "true");
   // Visual overhaul A, Slice 4c. Old: selecting an output selected the Output
   // tab and hid the EQ / Dyn / Routing tabs. New: the plate carries the
@@ -577,12 +675,12 @@ test("supports audio group filtering and source/output selection flow", async ({
   );
   await expect(page.getByTestId("audio-inspector-eq-mini")).toHaveCount(0);
   await expect(page.getByTestId("audio-inspector-dynamics-mini")).toHaveCount(0);
-  // Visual overhaul A, Slice 4c. Old: the no-channel overview card printed
-  // "Output processing". New: the output's own plate section prints the mix,
-  // its level and its metering. Reason: the overview cards were the tabbed
-  // plate's way of previewing what a tab held; with every section visible there
-  // is nothing to preview.
-  await expect(page.getByTestId("audio-inspector-output")).toContainText("Monitor level");
+  // The visual overhaul's Console pull request. Old: the output's plate had its
+  // "Monitor level" slider and Mute and Unity keys. New: the plate shows the
+  // output's meter and facts, and no control of its level. Reason: the output
+  // level has one home, the outputs block in the cluster (graft 1).
+  await expect(page.getByTestId("audio-inspector-output").getByRole("slider")).toHaveCount(0);
+  await expect(page.getByTestId("audio-inspector-output")).toContainText("Mute");
 
   await page.getByTestId("audio-tier-lanes-hardware-inputs").dispatchEvent("click");
   await expect(page.getByTestId("audio-inspector-output")).toContainText("Phones 1");
@@ -619,7 +717,10 @@ test("aligns audio input hardware controls with UFX III preamps", async ({ page 
   const phantomBefore = await phantom.getAttribute("data-active");
   await phantom.click();
   await expect(phantom).toHaveAttribute("data-armed", "true");
-  await expect(phantom).toHaveText(/Confirm 48 V (on|off)/);
+  // The visual overhaul's Console pull request. Old: "Confirm 48 V on|off".
+  // New: the one armed form's question, "48 V ON?" / "48 V OFF?", as the
+  // strip's 48 V key and the snapshot keys' "LOAD?" ask it.
+  await expect(phantom).toHaveText(/48 V (ON|OFF)\?/);
   await expect(phantom).toHaveAttribute("data-active", phantomBefore ?? "");
   await page.keyboard.press("Escape");
   await expect(phantom).not.toHaveAttribute("data-armed", "true");
@@ -661,7 +762,10 @@ test("supports audio solo chip and clip clearing", async ({ page }) => {
 
   await openFixture(page, "audio-clipped");
   await expect(page.getByTestId("audio-clip-warning-band")).toBeVisible();
-  await expect(page.getByTestId("audio-clear-clips")).toBeEnabled();
+  // The visual overhaul's Console pull request: the page's ⋯ holds "Clear
+  // clips" (it was a standing key); the clip latch's own key clears them too.
+  await openAudioPageMenu(page);
+  await expect(page.getByTestId("audio-clear-clips")).not.toHaveAttribute("aria-disabled", "true");
   await page.getByTestId("audio-clear-clips").click();
   await expect(page.getByTestId("audio-clip-warning-band")).toHaveCount(0);
 });
@@ -756,7 +860,7 @@ test("loads one of TotalMix's snapshots with two presses, and keeps none of its 
   await loadAudioSnapshot(page, 2);
   await expect(interviewTile).toHaveAttribute("data-current", "true");
   await expect(page.getByTestId("audio-snapshot-state-2")).toHaveText("active");
-  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("–");
+  await expect(page.getByTestId("audio-snapshot-state-1")).toHaveText("");
   expect(
     await page.evaluate(() => window.__SSE_TEST_ENGINE_REQUEST_COUNTS__?.["audio.snapshot.load"] ?? 0),
     "one load for two presses"
@@ -790,14 +894,17 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
 
   await page.getByTestId("audio-strip-audio-input-9").click();
   await revealPlateSection(page, "eq");
-  await expect(page.getByTestId("audio-eq-range")).toContainText("20 Hz");
-  await expect(page.getByTestId("audio-eq-range")).toContainText("20 kHz");
-  await expect(page.getByTestId("audio-eq-range")).toContainText("±20 dB");
+  // The visual overhaul's Console pull request. Old: a range row under the
+  // graph repeated its edges ("20 Hz · … · 20 kHz · ±20 dB") and the graph
+  // named 20 Hz and 20 kHz. New: the graph names its decades (100, 1 k, 10 k)
+  // and its dB marks, and the band table is where values are read. Reason: the
+  // row repeated the graph, and the edge labels collided with the dB marks.
+  await expect(page.getByTestId("audio-eq-range")).toHaveCount(0);
   await expect(page.getByTestId("audio-eq-db-scale")).toContainText("+20 dB");
   await expect(page.getByTestId("audio-eq-db-scale")).toContainText("0 dB");
   await expect(page.getByTestId("audio-eq-db-scale")).toContainText("-20 dB");
-  await expect(page.getByTestId("audio-eq-frequency-markers")).toContainText("20 Hz");
-  await expect(page.getByTestId("audio-eq-frequency-markers")).toContainText("20 kHz");
+  await expect(page.getByTestId("audio-eq-frequency-markers")).toContainText("100");
+  await expect(page.getByTestId("audio-eq-frequency-markers")).toContainText("10 k");
   await expect(page.getByTestId("audio-eq-point-low-cut")).toBeVisible();
   await expect(page.getByTestId("audio-eq-point-1")).toBeVisible();
   await expect(page.getByTestId("audio-eq-point-2")).toBeVisible();
@@ -813,13 +920,19 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
     "disabled Low Cut point should sit on the 0 dB line"
   ).toBeLessThanOrEqual(3);
 
+  // The visual overhaul's Console pull request. Old: every band's card stood in
+  // the plate at once. New: a band key in the table (or a press on its point)
+  // opens that band's popover beside the table: `audio-eq-control-tray` with
+  // the band's card in it. Reason: the plate fits without scrolling (Atrium:
+  // the band popover); the knobs and keys inside are the cards' own.
   const eqPanel = page.getByTestId("audio-inspector-eq");
   await eqPanel.getByRole("button", { name: "LC", exact: true }).click();
-  await expect(page.getByTestId("audio-eq-control-tray")).toContainText("Low Cut");
+  const tray = page.getByTestId("audio-eq-control-tray");
+  await expect(tray).toContainText("Low Cut");
   const lowCutEnable = page.getByRole("button", { name: "Enable Low Cut" });
   await expect(lowCutEnable).toBeVisible();
   for (const slope of ["6", "12", "18", "24"]) {
-    await expect(eqPanel.getByRole("button", { name: slope, exact: true })).toBeVisible();
+    await expect(tray.getByRole("button", { name: slope, exact: true })).toBeVisible();
   }
   await expect(page.getByRole("slider", { name: "Host Low Cut frequency" })).toHaveAttribute("aria-valuemin", "20");
   await expect(page.getByRole("slider", { name: "Host Low Cut frequency" })).toHaveAttribute("aria-valuemax", "500");
@@ -832,18 +945,16 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   await expectSliderValueChanges(page, "Host Low Cut frequency");
 
   await eqPanel.getByRole("button", { name: "2", exact: true }).click();
-  // 2026-05-27 Console redesign: the EQ tab now shows every band's knobs +
-  // type controls at once (all-bands grid) instead of a single-active-band
-  // tray. Band-type assertions scope to band 2's card, and the knob counts
-  // reflect all three PEQ bands (Low Cut has only a cutoff knob, no "EQ" knob).
+  // The visual overhaul's Console pull request. Old: the knob counts were three
+  // a kind, every band's card at once. New: the popover holds the one band's
+  // knobs. Reason: the band popover (above).
   const bandTwoCard = page.getByTestId("audio-eq-band-card-2");
-  await expect(page.getByTestId("audio-eq-control-tray")).toContainText("Band 2");
-  await expect(page.getByRole("button", { name: "Enable PEQ" })).toBeVisible();
+  await expect(tray).toContainText("Band 2");
   await expect(bandTwoCard.getByRole("button", { name: "Bell", exact: true })).toBeDisabled();
-  await expect(bandTwoCard.getByRole("button", { name: "Low Shelf", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("slider", { name: /Host .* EQ frequency/ })).toHaveCount(3);
-  await expect(page.getByRole("slider", { name: /Host .* EQ Q/ })).toHaveCount(3);
-  await expect(page.getByRole("slider", { name: /Host .* EQ gain/ })).toHaveCount(3);
+  await expect(bandTwoCard.getByRole("button", { name: "Low shelf", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("slider", { name: /Host .* EQ frequency/ })).toHaveCount(1);
+  await expect(page.getByRole("slider", { name: /Host .* EQ Q/ })).toHaveCount(1);
+  await expect(page.getByRole("slider", { name: /Host .* EQ gain/ })).toHaveCount(1);
   await expect(page.getByRole("slider", { name: "Host Band 2 EQ frequency" })).toHaveAttribute("aria-valuemin", "20");
   await expect(page.getByRole("slider", { name: "Host Band 2 EQ frequency" })).toHaveAttribute(
     "aria-valuemax",
@@ -855,10 +966,11 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Host Band 2 EQ Q" })).toHaveAttribute("aria-valuemax", "9.9");
   await expectSliderValueChanges(page, "Host Band 2 EQ Q");
 
-  const bandTwoFrequency = page.getByRole("slider", { name: "Host Band 2 EQ frequency" });
-  const bandTwoGain = page.getByRole("slider", { name: "Host Band 2 EQ gain" });
-  const bandTwoFrequencyBefore = await bandTwoFrequency.getAttribute("aria-valuenow");
-  const bandTwoGainBefore = await bandTwoGain.getAttribute("aria-valuenow");
+  // The band table reads band 2's values; a drag on its point moves them.
+  await page.keyboard.press("Escape");
+  await expect(tray).toHaveCount(0);
+  const bandTwoValues = page.getByTestId("audio-inspector-eq").getByRole("table");
+  const bandTwoBefore = await bandTwoValues.textContent();
   const bandTwoPoint = page.getByTestId("audio-eq-point-2");
   await expect(bandTwoPoint).toHaveAttribute("data-selected", "true");
   await page.waitForTimeout(180);
@@ -879,8 +991,9 @@ test("supports engine-backed audio EQ editing", async ({ page }) => {
   );
   await page.mouse.up();
   await expect(bandTwoPoint).toHaveAttribute("data-selected", "true");
-  await expect(bandTwoFrequency).not.toHaveAttribute("aria-valuenow", bandTwoFrequencyBefore ?? "");
-  await expect(bandTwoGain).not.toHaveAttribute("aria-valuenow", bandTwoGainBefore ?? "");
+  await expect.poll(() => bandTwoValues.textContent()).not.toBe(bandTwoBefore);
+  // A drag is not a press: it leaves the band's popover shut.
+  await expect(tray).toHaveCount(0);
   const graphDragCountsAfter = await page.evaluate(() => ({ ...window.__SSE_TEST_ENGINE_REQUEST_COUNTS__ }));
   expect(graphDragCountsAfter["audio.channel.eq.update"] ?? 0).toBeLessThanOrEqual(3);
 });
@@ -891,24 +1004,31 @@ test("supports engine-backed audio dynamics editing", async ({ page }) => {
 
   await page.getByTestId("audio-strip-audio-input-9").click();
   await revealPlateSection(page, "dynamics");
-  await expect(page.getByTestId("audio-dynamics-range")).toContainText("Comp");
-  await expect(page.getByTestId("audio-dynamics-curve")).toHaveAttribute("data-active", "false");
-  const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp" });
+  // The visual overhaul's Console pull request. Old: a curve, a range row and
+  // ten knobs in the plate. New: a two-row table (Comp, Gate) whose keys switch
+  // each, and a press on a row's values opens its popover with the five knobs.
+  // Reason: the plate fits without scrolling (Atrium: dynamics as a table).
+  const comp = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Comp", exact: true });
   await expect(comp).toHaveAttribute("data-active", "false");
   await comp.click();
   await expect(comp).toHaveAttribute("data-active", "true");
-  await expect(page.getByTestId("audio-dynamics-curve")).toHaveAttribute("data-active", "true");
+  await expect(page.getByTestId("audio-inspector-dynamics")).toContainText("comp on");
 
+  await page.getByTestId("audio-dynamics-row-compressor").click();
+  await expect(page.getByTestId("audio-dynamics-popover-compressor")).toBeVisible();
   await expectSliderValueChanges(page, "Host compressor threshold");
   await expectSliderValueChanges(page, "Host compressor ratio");
   await expectSliderValueChanges(page, "Host compressor attack");
   await expectSliderValueChanges(page, "Host compressor release");
   await expectSliderValueChanges(page, "Host compressor makeup");
 
-  const gate = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Gate" });
+  await page.keyboard.press("Escape");
+  const gate = page.getByTestId("audio-inspector-dynamics").getByRole("button", { name: "Gate", exact: true });
   await expect(gate).toHaveAttribute("data-active", "false");
   await gate.click();
   await expect(gate).toHaveAttribute("data-active", "true");
+  await page.getByTestId("audio-dynamics-row-gate").click();
+  await expect(page.getByTestId("audio-dynamics-popover-gate")).toBeVisible();
   await expectSliderValueChanges(page, "Host gate threshold");
   await expectSliderValueChanges(page, "Host gate ratio");
   await expectSliderValueChanges(page, "Host gate attack");
@@ -921,22 +1041,29 @@ test("supports engine-backed audio send mode controls", async ({ page }) => {
 
   await page.getByTestId("audio-strip-audio-input-9").click();
   await revealPlateSection(page, "send");
-  const sends = page.getByTestId("audio-inspector-sends");
-  await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toContainText("Main Out");
+  // The visual overhaul's Console pull request. Old: a card per mix, the mix
+  // target's first, each with four mode keys. New: a row per other mix; the mix
+  // target's send is the strip's fader, so Main Out has no row while it is the
+  // target; a row's modes are its ⋯'s toggles, which state their value.
+  // Reason: Atrium's OTHER MIXES.
+  await expect(page.getByTestId("audio-send-destination-audio-mix-main")).toHaveCount(0);
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-a")).toContainText("Phones 1");
   await expect(page.getByTestId("audio-send-destination-audio-mix-phones-b")).toContainText("Phones 2");
-  const preFader = sends.getByRole("button", { name: "Pre fader" }).first();
-  await expect(preFader).toBeEnabled();
-  await expect(preFader).toHaveAttribute("data-active", "false");
+  const sendMenu = page.getByTestId("audio-send-menu-audio-mix-phones-a");
+  await sendMenu.click();
+  const preFader = page.getByTestId("audio-send-pre-fader-audio-mix-phones-a");
+  await expect(preFader).not.toHaveAttribute("aria-disabled", "true");
+  await expect(preFader).toHaveAttribute("aria-checked", "false");
   await preFader.click();
-  await expect(preFader).toHaveAttribute("data-active", "true");
-  await expect(preFader).toHaveAttribute("aria-pressed", "true");
+  await sendMenu.click();
+  await expect(preFader).toHaveAttribute("aria-checked", "true");
 
-  const link = sends.getByRole("button", { name: "Link L+R" }).first();
-  await expect(link).toHaveAttribute("data-active", "true");
+  const link = page.getByTestId("audio-send-link-audio-mix-phones-a");
+  await expect(link).toHaveAttribute("aria-checked", "true");
   await link.click();
-  await expect(link).toHaveAttribute("data-active", "false");
-  await expect(link).toHaveAttribute("aria-pressed", "false");
+  await sendMenu.click();
+  await expect(link).toHaveAttribute("aria-checked", "false");
+  await page.keyboard.press("Escape");
 });
 
 // New pages program, Slice 3 (D6): "supports audio command palette and
@@ -983,7 +1110,9 @@ test("formats audio faders with RME's TotalMix fader curve", () => {
   expect(normalizedToFaderDb(1)).toBeCloseTo(6, 5);
   expect(faderDbToNormalized(0)).toBeCloseTo(836 / 1023, 5);
   expect(faderDbToNormalized(-6)).toBeCloseTo(649 / 1023, 5);
-  expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("0.0 dB");
+  // The visual overhaul's Console pull request: unity reads "+0.0 dB", as the
+  // deck's display prints it (it read "0.0 dB").
+  expect(formatAudioDb(AUDIO_FADER_UNITY)).toBe("+0.0 dB");
   expect(formatAudioDb(0.8)).toBe("-0.6 dB");
   expect(formatAudioDb(1)).toBe("+6.0 dB");
 });
@@ -1032,7 +1161,9 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
   // back on unity. New: right-click the strip, then "Reset to unity". Reason:
   // the Console binds no key; the strip's menu was the on-screen way all along.
   await page.getByTestId("audio-strip-audio-playback-3-4").click({ button: "right", position: { x: 12, y: 12 } });
-  await page.getByRole("menuitem", { name: "Reset to unity" }).click();
+  // The visual overhaul's Console pull request: "Reset to unity" says which
+  // send it sets now.
+  await page.getByRole("menuitem", { name: "Set Main Out send to 0 dB" }).click();
   await expect(page.getByTestId("audio-strip-audio-playback-3-4")).toContainText("0.0 dB");
 });
 
@@ -1041,7 +1172,13 @@ test("audio workspace custom faders drag and accept numeric dB entry", async ({ 
 // focused key and read a new gain. New: that step is gone and the name says the
 // key types. Reason: the Gain key is a button, and a button takes no arrows;
 // the plate's gain knob takes them (its whole-dB case below presses one).
-test("audio preamp gain on the strip is a key that types", async ({ page }) => {
+// The visual overhaul's Console pull request. Old name: "audio preamp gain on
+// the strip is a key that types"; the strip's gain key opened typed entry. New:
+// the strip shows the gain as a value, and its menu's "Set preamp gain…" opens
+// the same typed entry. Reason: the strip is name, level, M and S, 48 V and the
+// fader; the gain shows on it and is set from the menu and the plate (Atrium,
+// and the operator's review: the screen shows what the deck's GAIN showed).
+test("audio preamp gain shows on the strip and its menu types it", async ({ page }) => {
   // Visual overhaul A, Slice 4b. Old: "audio preamp gain control responds to
   // pointer drag" — the strip carried a 32 px knob and the test dragged it.
   // New: the strip carries a key that prints the gain the desk reports and
@@ -1054,8 +1191,12 @@ test("audio preamp gain on the strip is a key that types", async ({ page }) => {
   const hostGain = page.getByTestId("audio-lane-gain-audio-input-9");
   await expect(hostGain).toBeVisible();
   await expect(hostGain).toContainText("dB");
+  await expect(page.getByTestId("audio-strip-audio-input-9").getByRole("button", { name: /preamp gain/ })).toHaveCount(
+    0
+  );
 
-  await hostGain.click();
+  await page.getByTestId("audio-lane-menu-audio-input-9").click();
+  await page.getByTestId("audio-lane-menu-audio-input-9-gain").click();
   const gainDialog = page.getByRole("dialog", { name: /Set Host preamp gain/i });
   await expect(gainDialog).toBeVisible();
   await gainDialog.getByLabel("Preamp gain").fill("12");
@@ -1124,6 +1265,8 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   await expect(
     page.locator('[data-testid="audio-tier-lanes-hardware-outputs"] > [data-testid^="audio-output-"]')
   ).toHaveCount(3);
+  // The visual overhaul's Console pull request: the outputs are in the cluster.
+  await expect(page.locator('[data-region="cluster"]').getByTestId("audio-tier-lanes-hardware-outputs")).toBeVisible();
   // 2026-09 audit Slice 9: no tier, the mixer, the plate or the workspace
   // scrolls sideways. The tiers scroll inside overflow-x:auto grids under an
   // overflow:hidden shell, so a document read never sees a lane overflow; each
@@ -1145,11 +1288,20 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
 
   await expectAudioLaneCardsInsideTierGrids(page);
   await expectDbfsScaleLabelsInsideMeters(page, "2560 studio surface");
-  // Visual overhaul A, Slice 4b: the strip's gain is a key, and it keeps its
-  // target height.
-  const gainBox = await page.getByTestId("audio-lane-gain-audio-input-9").boundingBox();
-  expect(gainBox, "the strip's gain key should have a box").not.toBeNull();
-  expect(gainBox!.height, "the strip's gain key keeps its target height").toBeGreaterThanOrEqual(24);
+  // The visual overhaul's Console pull request. Old: the strip's gain key kept
+  // its target height. New: the gain is a value and the strip's M and S are 48
+  // px keys (at least 44, the operator's review). Reason: the strip's take
+  // keys are M, S, 48 V and the fader; the gain is set from the menu.
+  for (const name of ["Mute Host", "Solo Host"]) {
+    const keyBox = await page.getByTestId("audio-strip-audio-input-9").getByRole("button", { name }).boundingBox();
+    expect(keyBox, `${name} should have a box`).not.toBeNull();
+    expect(keyBox!.height, `${name} is at least 44 px tall`).toBeGreaterThanOrEqual(44);
+  }
+  // Names never wrap: one line on every strip.
+  const names = page.locator('[data-testid^="audio-lane-name-"]');
+  for (let index = 0; index < (await names.count()); index += 1) {
+    await expectNoElementOverflow(names.nth(index), `strip name ${index + 1}`);
+  }
 
   await page.getByTestId("audio-strip-audio-input-9").click();
   // Visual overhaul A, Slice 4a: the Console's chrome is the cluster and the
@@ -1157,10 +1309,10 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   await expect(page.getByTestId("audio-topbar")).toHaveCount(0);
   await expect(page.getByTestId("audio-monitor-bar")).toBeVisible();
   await expect(page.getByTestId("audio-health-bar")).toBeVisible();
-  // Visual overhaul A, Slice 4c: every section of the plate is present; the
-  // plate scrolls, it does not hide.
-  for (const section of ["eq", "dynamics", "send", "meter", "channel"] as const) {
-    await expect(page.locator(`[data-plate-section="${section}"]`)).toBeAttached();
+  // Visual overhaul A, Slice 4c: every section of the plate is present. The
+  // visual overhaul's Console pull request: and the plate never scrolls.
+  for (const section of ["eq", "dynamics", "send", "meter"] as const) {
+    await expect(page.locator(`[data-plate-section="${section}"]`)).toBeVisible();
   }
   await expectAudioStudioSideRailsFilled(page);
   await expectAudioOverviewProcessingStack(page, "2560 selected-channel", 82);
@@ -1173,9 +1325,13 @@ test("keeps the full audio workspace visible and inside its boxes at 2560x1440",
   );
   await expectSnapshotSlotsHoldTheirWords(page);
   await expectAudioInspectorPanelsFit(page);
+  await page.getByTestId("audio-strip-audio-playback-3-4").click();
+  await expectAudioInspectorPanelsFit(page);
 
-  await page.getByTestId("audio-output-audio-mix-phones-a").click();
+  await page.getByTestId("audio-lane-menu-audio-mix-phones-a").click();
+  await page.getByTestId("audio-output-menu-plate-audio-mix-phones-a").click();
   await expect(page.locator('[data-plate-section="output"]')).toBeVisible();
+  await expectAudioInspectorPanelsFit(page);
   await expectDbfsScaleLabelsInsideMeters(page, "2560 output plate");
   for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
     await expect(page.locator(`[data-plate-section="${section}"]`)).toHaveCount(0);

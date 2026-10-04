@@ -54,15 +54,18 @@ Held is not a blackout: the rig keeps its last look. Scenes and fixtures still m
 
 ## Audio (the Console)
 
-- **Rows.** `Inputs` in banks of four, turned with the arrows on the heading; `Playback`; `Outputs`: the main output and the two phones.
+- **Rows.** `Inputs` in banks of four, turned with the arrows on the heading (`1 / 3` between them); `Playback`. The fader scale stands beside each row's first strip.
+- **Outputs.** In the left column, under `DIM` and `MONO`: `Main Out`, `Phones 1` and `Phones 2`, each a row of its key, its level, `M`, its fader and its meter. This is the one place an output's level is set; its `⋯` sets it by number or to 0 dB, and shows the output on the plate.
 - **Names.** Every strip carries TotalMix's name for its channel, and is renamed in TotalMix. A channel TotalMix names nothing keeps its own.
-- **Mix target.** The faders set what each strip sends into the chosen output. `DIM` and `MONO` are `Main Out`'s, whichever output is the mix target: TotalMix has neither for the phones, so their strips show neither.
-- **Strip.** A fader, `M` for mute, `S` for solo. Press a strip to open it in the plate.
-- **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on.
-- **Gain.** `GAIN` on a preamp's strip opens typed entry, 0 to 75 dB. The plate's knob rides it.
-- **Solo and clip.** The cluster names the soloed strips, with `Clear all solo`. A clipped strip shows `CLIP`; `Clear clips` clears all.
+- **Mix target.** The lit output (yellow, `mix target`) is the mix the faders send into: press an output's key to make it the target. `DIM` and `MONO` are `Main Out`'s, whichever output is the mix target: TotalMix has neither for the phones, so their menus have neither.
+- **Strip.** Its name, the level it sends into the mix target, `M` for mute, `S` for solo, the fader. Press a strip to open it in the plate. Its `⋯`, or a right-click on it, holds the rest: the level and the gain by number, the send to 0 dB, the sends' modes, Hi-Z, polarity, AutoSet and the clip.
+- **48 V** is a hazard, armed for each channel: press twice. A red lamp means it is on. The strip's `⋯` ends in `Turn 48 V off…`, also pressed twice.
+- **Gain** shows on a preamp's strip. `Set preamp gain…` in the strip's `⋯` types it, 0 to 75 dB; the plate's knob rides it.
+- **Groups.** A row's `⋯` shows only some groups (Talent, Line, Bed, FX, Remote); the heading then says which, and `Show all` brings every strip back.
+- **Plate.** The whole strip, without scrolling: its preamp (an input's), the other mixes it feeds, the equaliser (a graph and a table; a band's key, or its point, opens its controls), the dynamics (a press on the compressor's or the gate's values opens their controls) and its meter. Each section's `⋯` holds its switches.
+- **Solo and clip.** The latch slot names the soloed strips, with `Clear all`; a clip latches beside it, with `Clear`.
 - **Snapshots** are TotalMix's own eight, under the names TotalMix last saved (it saves them when it closes); one without a name reads `Slot 3`. `active` is the one TotalMix has loaded, `changed` that it changed since. Press a slot twice (`LOAD?`) to load it in TotalMix; the Console then reads the desk. Snapshots are stored and named in TotalMix, and 48 V does not switch with one.
-- **`Sync from TotalMix`** reads the desk and changes nothing on it.
+- **The page's `⋯`** holds `Sync from TotalMix`, which reads the desk and changes nothing on it, `Run audio probe`, `Clear clips`, `Peak hold`, `Reset peaks` and `Open Setup`.
 
 The state display reads `VERIFIED` when the probe has passed, meter data arrives and the desk has been read. Otherwise:
 

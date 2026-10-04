@@ -24,7 +24,7 @@ The studio's devices, how Studio Control reaches each one, and the rules that ke
 
 ## Audio console
 
-The app talks to the console's mixer, TotalMix FX 2.1 or newer (for Global OSC). Front preamps 9–12 are the live inputs; rear line inputs 1–8 are secondary. The outputs are Main, Phones 1 and Phones 2.
+The app talks to the console's mixer, TotalMix FX 2.1 or newer (for Global OSC). Front preamps 9–12 are the live inputs; rear line inputs 1–8 are secondary. The outputs are Main Out, Phones 1 and Phones 2.
 
 In TotalMix FX, `Options › Settings › OSC`, four remote controllers are `In Use`, each with the address `127.0.0.1`:
 

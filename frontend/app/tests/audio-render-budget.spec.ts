@@ -92,16 +92,24 @@ test("scrolling the plate between its sections does not re-render the audio insp
   // scroll must render nothing (the idle budget, ≤ 3). Reason: the section keys
   // went with no replacement — the plate shows every section and scrolls — so
   // what is left to guard is that moving around the plate costs no renders.
+  // The visual overhaul's Console pull request. Old: the plate was scrolled to
+  // each section in turn. New: every section is in view at once, the plate
+  // does not scroll, and reading each costs no render. Reason: the plate fits
+  // its 1320 px (FX 3/4 is a playback pair: it has no preamp section).
   await openSettledConsole(page, "audio-selected-channel");
 
   const baseline = await getInspectorRenderCount(page);
   expect(baseline).not.toBeNull();
 
-  for (const section of ["eq", "dynamics", "send", "preamp"] as const) {
+  for (const section of ["send", "eq", "dynamics", "meter"] as const) {
     const target = page.locator(`[data-plate-section="${section}"]`);
     await target.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
-    await expect(target).toBeInViewport();
+    await expect(target).toBeInViewport({ ratio: 1 });
   }
+  expect(
+    await page.getByTestId("audio-inspector").evaluate((plate) => plate.scrollTop),
+    "the plate never scrolled"
+  ).toBe(0);
 
   const afterSections = await getInspectorRenderCount(page);
   expect(afterSections).not.toBeNull();
