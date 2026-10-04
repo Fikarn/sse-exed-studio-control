@@ -60,15 +60,22 @@ export function lightingSceneState(snapshot: JsonObject): string {
     if (asBoolean(state.on, false) !== on) return false;
     const controls = asRecord(fixture.controlValues) ?? {};
     const savedControls = asRecord(state.controlValues) ?? {};
+    const profile = fixtureProfileForFixture(fixture);
     const hasCct =
-      fixtureProfileForFixture(fixture).channels.some((channel) => asString(channel.controlId) === "cct") ||
+      profile.channels.some((channel) => asString(channel.controlId) === "cct") ||
       Object.prototype.hasOwnProperty.call(controls, "cct");
     if (on && Math.abs(asNumber(state.intensity, 0) - intensity) > 0.5) return false;
     if (on && hasCct && Math.abs(asNumber(state.cct, 0) - asNumber(fixture.cct, 0)) > 25) return false;
-    const keys = new Set([...Object.keys(controls), ...Object.keys(savedControls)]);
-    return [...keys]
-      .filter((key) => key !== "intensity" && key !== "cct")
-      .every((key) => Math.abs(asNumber(controls[key], 0) - asNumber(savedControls[key], 0)) <= 0.5);
+    // Through the fixture's own controls, as the hardware link compares them:
+    // a value saved for a control the light no longer has (the INFINIMAT's
+    // strobe, removed on 2026-10-04) does not count.
+    return profile.controls
+      .map((control) => ({ key: asString(control.id), fallback: asNumber(control.defaultValue, 0) }))
+      .filter(({ key }) => key !== "intensity" && key !== "cct")
+      .every(
+        ({ key, fallback }) =>
+          Math.abs(asNumber(controls[key], fallback) - asNumber(savedControls[key], fallback)) <= 0.5
+      );
   });
   return holds ? "live" : "unsaved";
 }

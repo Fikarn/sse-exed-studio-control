@@ -79,6 +79,51 @@ fn lighting_fixture_catalog_is_built_once_and_resolves_as_before() {
     );
 }
 
+// The owner, 2026-10-04: the plate offers no control the light never gets.
+// The INFINIMAT's strobe was saved and always sent at 0, and the LS 600d's
+// effects need a mode selection nothing sets, so they went. A strobe value
+// saved before is read past.
+#[test]
+fn lighting_fixture_catalog_offers_no_control_that_never_reaches_the_light() {
+    use super::super::helpers::normalize_fixture_control_values;
+    use super::fixture_catalog::resolve_fixture_profile;
+
+    let catalog = read_lighting_fixture_catalog_snapshot();
+    let controls = |definition_id: &str| -> Vec<String> {
+        catalog
+            .definitions
+            .iter()
+            .find(|definition| definition.id == definition_id)
+            .expect("the light")
+            .modes[0]
+            .controls
+            .iter()
+            .map(|control| control.id.clone())
+            .collect()
+    };
+    assert_eq!(
+        controls("aputure-infinimat-generic"),
+        ["intensity", "cct", "green-magenta"]
+    );
+    assert_eq!(controls("aputure-ls-600d-pro"), ["intensity"]);
+
+    let profile = resolve_fixture_profile(
+        Some("aputure-infinimat-generic"),
+        None,
+        None,
+        None,
+        "fixture-1",
+    );
+    let read = normalize_fixture_control_values(
+        &profile,
+        &HashMap::from([
+            (String::from("strobe"), 200),
+            (String::from("green-magenta"), 10),
+        ]),
+    );
+    assert_eq!(read, HashMap::from([(String::from("green-magenta"), 10)]));
+}
+
 #[test]
 fn lighting_fixture_catalog_modes_have_valid_channel_maps() {
     let catalog = read_lighting_fixture_catalog_snapshot();
