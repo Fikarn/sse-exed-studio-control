@@ -129,8 +129,6 @@ pub struct AudioChannelSnapshot {
     pub auto_set: bool,
     pub eq: AudioEqSnapshot,
     pub dynamics: AudioDynamicsSnapshot,
-    #[serde(rename = "sendModes")]
-    pub send_modes: HashMap<String, AudioSendModeSnapshot>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -269,18 +267,6 @@ pub struct AudioDynamicsProcessorSnapshot {
     pub makeup_db: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts-rs", ts(export))]
-pub struct AudioSendModeSnapshot {
-    #[serde(rename = "preFader")]
-    pub pre_fader: bool,
-    pub mute: bool,
-    #[serde(rename = "linkStereo")]
-    pub link_stereo: bool,
-    pub solo: bool,
-}
-
 #[derive(Debug, Serialize, Clone)]
 #[cfg_attr(feature = "ts-rs", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts-rs", ts(export))]
@@ -344,9 +330,11 @@ pub struct StoredAudioChannelState {
     pub eq: AudioEqSnapshot,
     #[serde(default = "default_audio_dynamics_snapshot")]
     pub dynamics: AudioDynamicsSnapshot,
-    #[serde(rename = "sendModes")]
-    #[serde(default)]
-    pub send_modes: HashMap<String, AudioSendModeSnapshot>,
+    // 2026-10-04 (the owner's decision): the per-send modes (pre fader, mute
+    // send, link, solo send) went. They were only ever kept here and never
+    // reached TotalMix, which has no such modes per send. Saved data written
+    // before still carries `sendModes`; it is read past (no field here denies
+    // an unknown one) and dropped at the next write.
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -520,16 +508,6 @@ pub struct AudioDynamicsUpdateRequest {
     pub makeup_db: Option<f64>,
 }
 
-#[derive(Debug, Clone)]
-pub struct AudioSendModeUpdateRequest {
-    pub channel_id: String,
-    pub mix_target_id: String,
-    pub pre_fader: Option<bool>,
-    pub mute: Option<bool>,
-    pub link_stereo: Option<bool>,
-    pub solo: Option<bool>,
-}
-
 pub fn default_audio_eq_snapshot() -> AudioEqSnapshot {
     AudioEqSnapshot {
         enabled: false,
@@ -600,15 +578,6 @@ pub fn default_audio_dynamics_snapshot() -> AudioDynamicsSnapshot {
     }
 }
 
-pub fn default_audio_send_mode_snapshot() -> AudioSendModeSnapshot {
-    AudioSendModeSnapshot {
-        pre_fader: false,
-        mute: false,
-        link_stereo: true,
-        solo: false,
-    }
-}
-
 impl Default for AudioEqSnapshot {
     fn default() -> Self {
         default_audio_eq_snapshot()
@@ -618,11 +587,5 @@ impl Default for AudioEqSnapshot {
 impl Default for AudioDynamicsSnapshot {
     fn default() -> Self {
         default_audio_dynamics_snapshot()
-    }
-}
-
-impl Default for AudioSendModeSnapshot {
-    fn default() -> Self {
-        default_audio_send_mode_snapshot()
     }
 }

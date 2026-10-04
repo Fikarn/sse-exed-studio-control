@@ -142,11 +142,6 @@ pub(super) fn apply_mix_target_metering(
                 continue;
             }
 
-            let send_mode = channel.send_modes.get(&mix_target.id);
-            if send_mode.is_some_and(|mode| mode.mute) {
-                continue;
-            }
-
             let send_level = channel
                 .mix_levels
                 .get(&mix_target.id)

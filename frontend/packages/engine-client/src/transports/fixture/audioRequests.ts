@@ -16,7 +16,6 @@ import {
   normalizeLowCutSlope,
   normalizeEqBandType,
   buildAudioDynamics,
-  buildAudioSendModes,
 } from "./audioConsole";
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
@@ -353,28 +352,6 @@ export function handleFixtureAudioRequest(
       state.audioSnapshot = audioSnapshot;
       synchronizeFixtureState(state);
       emit("audio.changed", { reason: "audio-channel-dynamics-updated" });
-      return cloneJson(channel);
-    }
-    case "audio.channel.send.update": {
-      const audioSnapshot = ensureAudioEditAllowed(state);
-      const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
-      const mixTargetId = asString(params.mixTargetId).trim();
-      const sendModes: JsonObject = asRecord(channel.sendModes) ?? buildAudioSendModes();
-      const sendMode = asRecord(sendModes[mixTargetId]) ?? {
-        preFader: false,
-        mute: false,
-        linkStereo: true,
-        solo: false,
-      };
-      if ("preFader" in params) sendMode.preFader = asBoolean(params.preFader, false);
-      if ("mute" in params) sendMode.mute = asBoolean(params.mute, false);
-      if ("linkStereo" in params) sendMode.linkStereo = asBoolean(params.linkStereo, true);
-      if ("solo" in params) sendMode.solo = asBoolean(params.solo, false);
-      sendModes[mixTargetId] = sendMode;
-      channel.sendModes = sendModes;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-channel-send-updated" });
       return cloneJson(channel);
     }
     case "audio.mixTarget.update": {

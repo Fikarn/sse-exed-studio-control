@@ -237,7 +237,6 @@ pub(crate) enum UiMethodClass {
 const RECORDED_UI_METHODS: &[&str] = &[
     "audio.channel.dynamics.update",
     "audio.channel.eq.update",
-    "audio.channel.send.update",
     "audio.channel.update",
     "audio.mixTarget.update",
     "audio.settings.update",
@@ -684,26 +683,6 @@ pub(crate) fn ui_actions(
                     )]
                 })
                 .unwrap_or_default()
-        }
-        "audio.channel.send.update" => {
-            let name = text(result, "/name").unwrap_or("Channel");
-            let output = text(params, "/mixTargetId").unwrap_or("output");
-            [
-                ("mute", "send-mute", "Send mute"),
-                ("solo", "send-solo", "Send solo"),
-                ("preFader", "send-pre-fader", "Send pre-fader"),
-                ("linkStereo", "send-link", "Send stereo link"),
-            ]
-            .iter()
-            .filter_map(|(key, action, label)| flag(params, key).map(|on| (*action, *label, on)))
-            .map(|(action, label, on)| {
-                audio(
-                    action,
-                    name,
-                    format!("{label} {}: {name} to {output}", on_off(on)),
-                )
-            })
-            .collect()
         }
         "audio.snapshot.load" => {
             // A slot TotalMix saved no name for is named by its number; the

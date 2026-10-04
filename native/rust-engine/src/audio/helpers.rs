@@ -61,21 +61,12 @@ pub(super) fn apply_channel_state(
                 }
                 channel.eq = normalize_audio_eq_snapshot(&state.eq);
                 channel.dynamics = state.dynamics.clone();
-                channel.send_modes =
-                    default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
-                for (mix_target_id, send_mode) in &state.send_modes {
-                    channel
-                        .send_modes
-                        .insert(mix_target_id.clone(), send_mode.clone());
-                }
                 for (mix_target_id, level) in &state.mix_levels {
                     channel
                         .mix_levels
                         .insert(mix_target_id.clone(), clamp_level(*level));
                 }
             }
-            channel.send_modes =
-                default_send_modes_for_mix_targets(channel.send_modes, &channel.mix_levels);
             channel
         })
         .collect()
@@ -679,7 +670,6 @@ pub(super) fn stored_channel_state_from_snapshot(
         auto_set: channel.auto_set,
         eq: channel.eq.clone(),
         dynamics: channel.dynamics.clone(),
-        send_modes: channel.send_modes.clone(),
     }
 }
 
@@ -693,19 +683,6 @@ pub(super) fn stored_mix_target_state_from_snapshot(
         dim: mix_target.dim,
         mono: mix_target.mono,
     }
-}
-
-pub(super) fn default_send_modes_for_mix_targets(
-    existing: HashMap<String, AudioSendModeSnapshot>,
-    mix_levels: &HashMap<String, f64>,
-) -> HashMap<String, AudioSendModeSnapshot> {
-    let mut send_modes = existing;
-    for mix_target_id in mix_levels.keys() {
-        send_modes
-            .entry(mix_target_id.clone())
-            .or_insert_with(default_audio_send_mode_snapshot);
-    }
-    send_modes
 }
 
 pub(super) fn channel_supports_instrument_from_role(
