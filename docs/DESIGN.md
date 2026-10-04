@@ -116,7 +116,7 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 - **Cluster**: `StateDisplay` (tone, word, sentence, code, meta, action keys, the page's ⋯ as `menu` at its top right; 180 px high; the armed row; an error draws a 2 px coral keyline round it), `LatchSlot` holding `Latch`es, on every page, `Section`, the take-time keys.
 - **Keys** (one primitive, modes as props): `command`, `primary` (Beige Light fill), `danger` (coral word and edge), `toggle` and `momentary` (lit when engaged or live), `arm` (armed: the Burgundy form, "press again", a countdown bar, the key keeps its place), `hazard` (a coral lamp and word), `locked` (dashed, 55 %, `aria-disabled`, the reason on hover), `selected` (the Beige keyline), `segmented`; heights 28, 36, 48 and 64 (take-time); `cap` (an Adelia word) and `label` (a PT Sans sentence-case label).
 - **Lamps**: `Lamp`, `LampChip` (header), `LampWord` (rows and tags), `StatusBadge` (a keyline word).
-- **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
+- **Wells**: `Readout` (doubt: the dashed yellow keyline), `Slider` (with the colour-temperature track, and a ▲ under the track for a value kept elsewhere, a scene's saved level, yellow while the value has left it), `Groove` (the vertical fader), `Meter` (with a 2 px peak tick), `Field`, `Screen`.
 - **Plate**: `PlateHead` (the Dark Green title plate: the selection's name in PT Sans Bold, keeping its case), `Section` (an Adelia head over the heavy rule, a quiet sub-word, its actions at the right), `Fields`, `Readouts`, `ControlRow`, and a `Danger` slot at the bottom. Every section is visible at once, so there is no tab row.
 - **Floating layer**: `Dialog`, `ConfirmDialog`, `Drawer`, `Toast`, `Menu` (opened by `MenuButton`, the ⋯, or at the pointer by `ContextMenu`), `Popover`, `ColorPicker`, `Tooltip` (section 9).
 - **Setup**: `StepKey`, `ProbeRow`, the Support sections.
@@ -125,13 +125,13 @@ Pages compose these and never re-implement them; `frontend/packages/design-syste
 
 Every state word is the hardware link's, in capitals with its lamp. Its sentence is printed as the link gives it. A raw code prints small under the sentence and is never the first thing read. Every state sentence says what happened and what to do, and the way out is a key in the same display.
 
-| Page         | Words                                                                                                    |
-| ------------ | -------------------------------------------------------------------------------------------------------- |
-| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED` |
-| Lighting     | `REACHABLE` · `HELD` · `UNSAVED` · `UNREACHABLE` · `PREVIEW`                                             |
-| Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                   |
-| Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`    |
-| Cameras      | `HELD` · `RELEASED`, `NOT SET UP`, `PICTURE MISSING`, `NO PICTURES` · `UNREACHABLE`                      |
+| Page         | Words                                                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Console      | `VERIFIED` · `NOT VERIFIED`, `ASSUMED`, `STALE`, `DISABLED` · `OFFLINE`, `DISCONNECTED`, `ACTION FAILED`                                    |
+| Lighting     | `REACHABLE` · `HELD`, `NOT ANSWERING`, `UNSAVED` · `UNREACHABLE` · `PREVIEW`; a scene: `ON RIG`, `UNSAVED`, `PREVIEW` (the deck's `RECALL`) |
+| Setup        | `READY` · `DEGRADED`, `SETUP REQUIRED`                                                                                                      |
+| Teleprompter | `ON SCREEN`, `READY` · `NOT UPDATED`, `DUPLICATED`, `LOW RESOLUTION`, `NOT SHOWING` · `NOT CONNECTED`                                       |
+| Cameras      | `HELD` · `RELEASED`, `NOT SET UP`, `PICTURE MISSING`, `NO PICTURES` · `UNREACHABLE`                                                         |
 
 ## 9. Copy and controls
 

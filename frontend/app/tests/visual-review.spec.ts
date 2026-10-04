@@ -149,35 +149,25 @@ async function assertLightingLayout(page: Page, size: Viewport) {
     };
   });
 
-  // Visual overhaul A, Slice 5. Old: seven toolbar primaries, "overflow" among
-  // them, each measured where it stood. New: the same ids on their new homes in
-  // the cluster, minus "overflow" — nothing folds into an overflow menu now.
-  // The cluster is one scrolling column, so a primary below the fold is
-  // reachable rather than clipped, and the clipping check is the helper's,
-  // which brings each one into view first.
+  // The visual overhaul's Lighting page (2026-10-04). Old: six primaries in a
+  // cluster that scrolled, Add fixture, Patch and Preview among them. New: the
+  // state display, the LIGHTING key, the search and the bar under the plot;
+  // Add fixture, Patch and Preview are the page ⋯'s items. Nothing scrolls, so
+  // each must stand inside the window as drawn (the helper's check).
   const primaryIds = details.primaryControls.map((entry) => entry.id).sort();
-  expect(primaryIds, `lighting primary controls @ ${size.label}`).toEqual([
-    "add",
-    "patch",
-    "preview",
-    "search",
-    "status",
-    "title",
-  ]);
+  expect(primaryIds, `lighting primary controls @ ${size.label}`).toEqual(["bar", "search", "status", "title"]);
   await expectToolbarPrimaryControlsFit(page);
 
   expect(details.stage, `lighting stage missing @ ${size.label}`).not.toBeNull();
   expect(details.stage!.width, `lighting stage width @ ${size.label}`).toBeGreaterThanOrEqual(560);
   expect(details.stage!.height, `lighting stage height @ ${size.label}`).toBeGreaterThanOrEqual(440);
 
-  // Visual overhaul A, Slice 5. Old: below the studio surface the selection's
-  // tools folded into a toolbar overflow menu, and this checked the menu held
-  // them. New: Highlight, Solo and Find are keys on the cluster at every size.
-  // Reason: there is no overflow menu — the cluster is the same at every size.
+  // The visual overhaul: Highlight, Solo and Find are take-time keys in the
+  // bar under the plot, one of each.
   for (const testId of ["lighting-highlight-toggle", "lighting-solo-toggle", "lighting-identify-find"]) {
     expect(
-      await page.locator(`[data-testid="${testId}"]`).count(),
-      `lighting cluster missing '${testId}' @ ${size.label}`
+      await page.locator(`[data-testid="lighting-plot-bar"] [data-testid="${testId}"]`).count(),
+      `lighting plot bar missing '${testId}' @ ${size.label}`
     ).toBe(1);
   }
 }
@@ -191,9 +181,6 @@ test.describe(`viewport ${STUDIO.label}`, () => {
 
       if (fixture === "lighting-populated") {
         await assertLightingLayout(page, STUDIO);
-        // The harness scrolls each primary control into view; re-navigate so
-        // the baseline screenshot captures the rest state.
-        await gotoFixture(page, fixture);
       }
 
       await assertViewportFit(page, STUDIO, fixture);

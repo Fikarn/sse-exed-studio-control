@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { openLightingPageMenu, openPlateMenu, openSceneMenu, pressTwice } from "./helpers/lighting";
 import { expectWorkspaceMounted, openFixture } from "./helpers/openFixture";
 import { pausePageClock } from "./helpers/pageClock";
 
@@ -16,7 +17,9 @@ import { pausePageClock } from "./helpers/pageClock";
 // The stage plot's markers name each light's level as the hardware link reports
 // it: "Fixture Key, 76 percent, 3200 kelvin, …", or "Fixture Back, off, …".
 // Identify and Find last a set time, so those cases stop the page's clock and
-// move it on by hand.
+// move it on by hand. The visual overhaul (2026-10-04): a "Delete …" arms in
+// its object's menu and deletes at the second press (`pressTwice`), so those
+// cases stop the clock too.
 
 function marker(page: Page, name: string) {
   return page.getByRole("button", { name: new RegExp(`^Fixture ${name}, `) });
@@ -54,7 +57,7 @@ async function clickMarker(page: Page, name: string) {
   const box = await target.boundingBox();
   if (!box) throw new Error(`the ${name} marker must be on screen`);
   const center = await target.evaluate((node) => {
-    const body = node.querySelector("g[filter]");
+    const body = node.querySelector("[data-marker-body]");
     if (!(body instanceof SVGGraphicsElement)) throw new Error("Fixture marker body not found");
     const matrix = body.getScreenCTM();
     if (!matrix) throw new Error("Fixture marker matrix not available");
@@ -148,15 +151,18 @@ test("In Preview the lit Solo key switches Solo off on the rig (lighting.fixture
   await expect(solo).toHaveAttribute("aria-pressed", "true");
   await expect(marker(page, "Fill")).toHaveAccessibleName(/^Fixture Fill, off, /);
 
+  // The visual overhaul: Preview is the page ⋯'s, a check item.
+  await openLightingPageMenu(page);
   await preview.click();
-  await expect(preview).toHaveAttribute("aria-pressed", "true");
-  await expect(solo).toBeEnabled();
+  await expect(page.getByTestId("lighting-state-display")).toContainText("PREVIEW");
+  await expect(solo).not.toHaveAttribute("aria-disabled", "true");
   await solo.click();
   await expect(solo).toHaveAttribute("aria-pressed", "false");
-  await expect(preview).toHaveAttribute("aria-pressed", "true");
+  await openLightingPageMenu(page);
+  await expect(preview).toHaveAttribute("aria-checked", "true");
 
   await preview.click();
-  await expect(preview).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("lighting-state-display")).not.toContainText("PREVIEW");
   await expect(marker(page, "Fill")).toHaveAccessibleName(/^Fixture Fill, 58 percent, /);
 });
 
@@ -243,23 +249,25 @@ test("The page shows each flash start and end by itself: Identify, then Find", a
 test("Delete fixture takes the light off the plot and out of every scene (lighting.fixture.delete)", async ({
   page,
 }) => {
-  await openPopulatedRig(page);
-  const warmWash = page.getByRole("button", { name: /^Recall scene Warm wash/ });
+  await openPopulatedRig(page, { stopClock: true });
   const interview = page.getByRole("button", { name: /^Recall scene Interview/ });
-  await expect(warmWash).toContainText("3 on");
   await expect(interview).toContainText("4 on");
+  // The scene on the rig shows its word in its row; what it holds is its menu's head.
+  await openSceneMenu(page, "scene-warm-wash");
+  await expect(page.getByRole("menu", { name: "Warm wash" })).toHaveAccessibleDescription("3 on · 3500 K");
+  await page.keyboard.press("Escape");
 
+  // The visual overhaul: Delete fixture… is the plate title's ⋯, last, and arms.
   await selectFixture(page, "Fill");
-  await page.getByRole("button", { name: "Delete fixture", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: "Delete fixture?" })
-    .getByRole("button", { name: "Delete fixture", exact: true })
-    .click();
+  await openPlateMenu(page);
+  await pressTwice(page, page.getByTestId("lighting-plate-menu-delete"));
+  await page.clock.resume();
 
   await expect(marker(page, "Fill")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Fixture .+, (off|\d+ percent), / })).toHaveCount(3);
-  await expect(warmWash).toContainText("2 on");
   await expect(interview).toContainText("3 on");
+  await openSceneMenu(page, "scene-warm-wash");
+  await expect(page.getByRole("menu", { name: "Warm wash" })).toHaveAccessibleDescription(/^2 on/);
 });
 
 test("Pinning a scene shows it first, and unpinning puts it back (lighting.scene.pin)", async ({ page }) => {
@@ -267,12 +275,17 @@ test("Pinning a scene shows it first, and unpinning puts it back (lighting.scene
   const tiles = page.getByLabel("Saved scenes").getByRole("button", { name: /^Recall scene / });
   await expect(tiles.first()).toHaveAccessibleName(/^Recall scene Warm wash/);
 
-  await page.getByRole("button", { name: "Pin scene Interview", exact: true }).click();
-  const unpin = page.getByRole("button", { name: "Unpin scene Interview", exact: true });
-  await expect(unpin).toHaveAttribute("aria-pressed", "true");
+  // The visual overhaul: Pinned is a check item of the row's ⋯ (the tile's
+  // hover pin went).
+  await openSceneMenu(page, "scene-interview");
+  const pin = page.getByTestId("lighting-scene-menu-scene-interview-pin");
+  await expect(pin).toHaveAttribute("aria-checked", "false");
+  await pin.click();
   await expect(tiles.first()).toHaveAccessibleName("Recall scene Interview, pinned");
 
-  await unpin.click();
+  await openSceneMenu(page, "scene-interview");
+  await expect(pin).toHaveAttribute("aria-checked", "true");
+  await pin.click();
   await expect(tiles.first()).toHaveAccessibleName(/^Recall scene Warm wash/);
   await expect(tiles.nth(1)).toHaveAccessibleName("Recall scene Interview");
 });
@@ -343,15 +356,15 @@ test("Dragging a group reorders the group rail (lighting.group.reorder)", async 
 test("The Undo key names the step it will undo and undoes it; with nothing to undo it cannot be pressed", async ({
   page,
 }) => {
-  await openPopulatedRig(page);
+  await openPopulatedRig(page, { stopClock: true });
   const undo = page.getByTestId("lighting-undo");
   await expect(undo).toBeDisabled();
   await expect(undo).toContainText("nothing to undo");
 
   const interview = page.getByRole("button", { name: /^Recall scene Interview/ });
   await interview.click({ button: "right" });
-  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
-  await page.getByRole("dialog", { name: "Delete scene?" }).getByRole("button", { name: "Delete scene" }).click();
+  await pressTwice(page, page.getByTestId("lighting-scene-menu-scene-interview-delete"));
+  await page.clock.resume();
   await expect(interview).toHaveCount(0);
   await expect(undo).toBeEnabled();
   await expect(undo).toContainText("Delete scene Interview");
@@ -370,22 +383,19 @@ test("The Undo key names the step it will undo and undoes it; with nothing to un
 // fixture-back, was refused on every press ("Undo failed for ‘Delete scene
 // Interview’. The step is still in place.") and the Undo key stuck on it.
 test("Undo brings back a fixture, then a scene that held it, under the fixture's new id", async ({ page }) => {
-  await openPopulatedRig(page);
+  await openPopulatedRig(page, { stopClock: true });
   const undo = page.getByTestId("lighting-undo");
   const interview = page.getByRole("button", { name: /^Recall scene Interview/ });
   await expect(interview).toContainText("4 on");
 
   await interview.click({ button: "right" });
-  await page.getByRole("menuitem", { name: /Delete scene/ }).click();
-  await page.getByRole("dialog", { name: "Delete scene?" }).getByRole("button", { name: "Delete scene" }).click();
+  await pressTwice(page, page.getByTestId("lighting-scene-menu-scene-interview-delete"));
   await expect(interview).toHaveCount(0);
 
   await selectFixture(page, "Back");
-  await page.getByRole("button", { name: "Delete fixture", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: "Delete fixture?" })
-    .getByRole("button", { name: "Delete fixture", exact: true })
-    .click();
+  await openPlateMenu(page);
+  await pressTwice(page, page.getByTestId("lighting-plate-menu-delete"));
+  await page.clock.resume();
   await expect(marker(page, "Back")).toHaveCount(0);
   await expect(undo).toHaveAccessibleName("Undo Delete fixture Back");
 
@@ -415,6 +425,7 @@ test("The message after Add fixture has an Undo that takes the fixture off again
   const markers = page.getByRole("button", { name: /^Fixture .+, (off|\d+ percent), / });
   await expect(markers).toHaveCount(4);
 
+  await openLightingPageMenu(page);
   await page.getByTestId("lighting-add-fixture").click();
   const dialog = page.getByRole("dialog", { name: "Add fixture" });
   await expect(dialog.getByLabel("Name")).toHaveValue("Fixture 1");

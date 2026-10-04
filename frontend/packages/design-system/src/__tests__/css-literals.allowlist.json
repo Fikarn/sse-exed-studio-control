@@ -1,34 +1,4 @@
 {
-  "app/src/app/lighting/LightingWorkspace.module.css": {
-    "colour": 0,
-    "fontSize": 2,
-    "radius": 0,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/LightingInspector.module.css": {
-    "colour": 1,
-    "fontSize": 15,
-    "radius": 3,
-    "shadow": 1
-  },
-  "app/src/app/lighting/components/LightingRail.module.css": {
-    "colour": 5,
-    "fontSize": 8,
-    "radius": 5,
-    "shadow": 6
-  },
-  "app/src/app/lighting/components/SelectionChipStrip.module.css": {
-    "colour": 0,
-    "fontSize": 0,
-    "radius": 1,
-    "shadow": 0
-  },
-  "app/src/app/lighting/components/StagePlotControls.module.css": {
-    "colour": 1,
-    "fontSize": 0,
-    "radius": 0,
-    "shadow": 1
-  },
   "app/src/app/setup/SetupSupportPilot.module.css": {
     "colour": 0,
     "fontSize": 0,

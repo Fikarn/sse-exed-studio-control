@@ -8,6 +8,11 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
+- The Lighting page is drawn anew: the plot stands at the fixtures' real places with metres on its edges and names beside the marks, and one bar under it (the selection, Highlight, Solo, Find, the zoom, views 1 to 3, the plot's `⋯`); the scenes are rows with their word (`ON RIG`, `UNSAVED`, `PREVIEW`), the plate fits without scrolling (#PR5).
+- A new scene is saved with the row under the scenes, `Save as a new scene`, pressed twice; the plate's `Save changes` writes into the scene the rig has left. `CUT ALL` arms at the first press and cuts at the second, within 3 s (#PR5).
+- Every fixture, scene, group and palette has a `⋯` (or a right-click) with the same items, and the plot's floor too; `Delete …` arms in the menu, press again, and can be undone. Patch, Preview, Add fixture and the DMX monitor are the page's `⋯` (#PR5).
+- `UNSAVED` comes from the hardware link and says what the deck's `RECALL` says: a Highlight, Solo or Identify no longer counts as a change to the scene (#PR5).
+- The INFINIMAT's `Strobe` and the LS 600d Pro's `FX` and `Speed` leave the plate: the lights never got them (D37, #PR5).
 - A change on the Console counts as confirmed only when TotalMix reports it, a send or solo turned off also when TotalMix's list of the mix leaves it out. A change TotalMix's answer about a channel leaves out, or that gets no answer, reads `ASSUMED` until `Sync from TotalMix`; before, it could count as confirmed though TotalMix had dropped it (the right side of a linked pair, an answer cut short) (#303).
 - After every start the Console reads `ASSUMED` until `Sync from TotalMix`, as TotalMix may have changed while the app was closed; it read `VERIFIED` from before (#284).
 - After TotalMix has been out of touch (its remote 4 switched off, or TotalMix closed), the Console reads `ASSUMED` once TotalMix answers again, says for how long, and asks for `Sync from TotalMix`; it read `VERIFIED` with values TotalMix no longer held (#284).

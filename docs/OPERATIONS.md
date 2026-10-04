@@ -38,19 +38,22 @@ The state display reads one of six words.
 - `REACHABLE`: the bridge passed its last probe.
 - `NOT ANSWERING`, amber: the bridge has stopped answering during the session (Studio Control looks every 5 s). Nothing is locked. Check the bridge's power and its network cable; the word clears by itself when the bridge answers again. Do not run the bridge probe during a session: a probe that fails locks the rig. When the light outputs are held as well, the sentence says so, and `Open Setup` goes to the `Light outputs` switch.
 - `HELD`: the light outputs are held, and nothing is sent to the rig. `Open Setup` goes to the `Light outputs` switch.
-- `UNSAVED`: the rig differs from the recalled scene. `Save changes` writes the rig into the scene. `Recall it again` puts the scene back.
-- `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits.
-- `UNREACHABLE`: the bridge has not passed its probe, and the rig's controls are locked. `Open Setup`, run the bridge probe, publish again.
+- `UNSAVED`: the rig differs from the scene on the rig, as the deck's `RECALL` says too (a `Highlight`, a `Solo`, an `Identify` and a running fade do not count). `Save changes` writes the rig into that scene. `Recall it again` puts the scene back.
+- `PREVIEW`: `Preview` is on. You edit offline and the rig stays as it is. `Save into the scene` writes the preview into the scene; the rig changes when the scene is recalled. `Discard` drops the edits. The `Grand master` waits while previewing: it acts on the rig itself.
+- `UNREACHABLE`: the bridge has not passed its probe (or its address changed since). A recall is refused, and `LIGHTING`, the `Grand master` and the Save row are locked; the rest still reaches the rig, `CUT ALL` first. `Open Setup`, run the bridge probe, publish again.
 
-Held is not a blackout: the rig keeps its last look. Scenes and fixtures still move on screen. `DMX monitor` shows every channel as it is sent, or as it would be while held.
+Held is not a blackout: the rig keeps its last look. Scenes and fixtures still move on screen. `DMX monitor` (the state display's `⋯`) shows every channel as it is sent, or as it would be while held.
 
-- **Recall** is one press on a scene. `Fade` sets the fade, 0 to 10 s.
-- **Save.** `Save · press twice` arms at the first press and saves the rig as a new scene at the second. `New scene` does the same at one press. `Save changes` saves over the recalled scene at one press. `Undo` takes back a scene saved.
-- **Scenes.** Right-click one to rename, pin or delete it. Deleting asks first.
-- **All lights.** `LIGHTING` switches every fixture on or off. `CUT ALL` takes them all to off and asks first. `Grand master` is one level over them all.
-- **Select** a fixture on the plot. While `Add to selection` is lit, a press adds or removes one and a dragged box adds several. Press a group to switch it on or off.
-- **Set** the selection in the plate: `Turn on`, `Turn off`, `Intensity`, `Colour temperature`, `Palettes`. Double-click a slider to type a value.
-- **Find a light.** `Identify` flashes one fixture, `Find` the selection in turn. `Highlight` holds the selection at full, `Solo` takes all others to off. Press the key again to end it.
+- **The page's `⋯`** on the state display holds `Add fixture…`, `Patch`, `Preview`, `DMX monitor…`, `DMX strip` and `Open Setup`.
+- **Recall** is one press on a scene's row. A scene on the rig says `ON RIG` or `UNSAVED`, the preview's `PREVIEW`, as the deck's `RECALL`. `Fade` sets the fade, 0 to 10 s, for every recall, here and on the deck.
+- **Save.** `Save as a new scene`, the row under the scenes, arms at the first press and saves the rig as a new scene (`Scene N`) at the second. `Save changes` saves over the scene on the rig at one press. `Undo` takes back a scene saved.
+- **Scenes.** A scene's `⋯`, or a right-click on its row, recalls it, saves the rig into it, renames, pins or colours it, and deletes it: `Delete scene…` arms in place and deletes at the second press. When there are more scenes than fit, they come in pages.
+- **All lights.** `LIGHTING` switches every fixture on or off. `CUT ALL` takes them all to off: press, and press again within 3 s, as the deck's `ALL OFF`. `Grand master` is one level over them all.
+- **The plot** is the room at its real metres, with a ruler on its top and left edge. Its `⋯` in the bar under it, or a right-click on its floor, frames the rig or fits the room, chooses what it shows, the symbol key, and saves or clears views `1`, `2`, `3`; a press on a saved view recalls it.
+- **Select** a fixture on the plot. While `Add to selection` is lit, a press adds or removes one and a dragged box adds several. The bar under the plot names the selection; `Clear` empties it. Press a group's key to switch it on or off; its `⋯` shows it on the plate, renames, colours or deletes it.
+- **Set** the selection in the plate: `Turn on`, `Turn off`, `Intensity`, `Colour temperature`, `Palettes`. A small mark under a slider is the level the scene on the rig keeps, yellow while the rig has left it. Double-click a slider to type a value. `Edit…` beside `Placement` opens the place on the plot, which the rig does not use. The plate's title `⋯` (or a right-click on the fixture on the plot) holds `Delete fixture…`, which arms in place.
+- **Palettes.** A press applies a palette to the selection; its `⋯` edits, moves, colours or deletes it.
+- **Find a light.** `Identify` flashes one fixture, `Find` the selection in turn. `Highlight` holds the selection at full, `Solo` takes all others to off; while either is on it stands under the state display with `Off`. Press the key again to end it.
 - **Undo** takes back the newest of 25 steps: a scene saved or deleted, a fixture added or deleted. It takes back no recall and no level. It keeps its steps when you leave the page and come back, and forgets them at a restore or a restart of the hardware link, when the saved data they name may have changed. A step whose scene or fixture was deleted since, on the deck or on screen, or whose scene was renamed, is refused and says why.
 
 ## Audio (the Console)
