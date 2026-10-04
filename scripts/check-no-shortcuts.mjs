@@ -67,8 +67,6 @@ export const KEY_LISTENERS = {
     "Esc cancels the armed key, and a held Enter's repeats never confirm it, registered only while a key is armed (D6)",
   "frontend/app/src/app/shared/ShellDialog.tsx":
     "Esc closes the shell's dialog (Close Studio Control?, Restart the hardware link?) wherever focus is, first in the capture phase so an armed key under it stays armed, and Tab stays inside it (D6)",
-  "frontend/app/src/app/cameras/CamerasValuesList.tsx":
-    "Esc closes the list of the values a camera allows, a popup beside the plate, without a change; registered only while the list is open (D6)",
 };
 
 // Where a JSX key handler is plain keyboard operation on the focused control.
@@ -91,6 +89,8 @@ export const KEY_HANDLERS = {
     "a focused segmented switch is a list: the arrows, Home and End choose a segment (D6)",
   "frontend/packages/design-system/src/components/Slider.tsx":
     "a focused slider or fader: the arrows, Home and End, and Enter for typed entry (decision 9)",
+  "frontend/app/src/app/cameras/CamerasValuesList.tsx":
+    "the list of the values a camera allows, a listbox in a popover beside the plate: the arrows, Home and End move over its options, Enter or Space picks one; Esc is the popover's (D6)",
   "frontend/app/src/app/audio/components/AudioKnob.tsx":
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/lighting/components/FixtureMarker.tsx":

@@ -1,0 +1,63 @@
+/* A level typed in: the label, the field in a well with its unit, the range,
+   and Set value. */
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label label"
+    "field set"
+    "range range";
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.label {
+  grid-area: label;
+  color: var(--text-text2);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.field {
+  grid-area: field;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
+  background: var(--material-well);
+}
+
+.field:focus-within {
+  border-color: var(--accent);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-text);
+  font: 700 var(--font-size-word) / 1 var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.unit {
+  color: var(--text-text3);
+  font: 400 var(--font-size-label) / 1 var(--font-family-ui);
+}
+
+.form > button {
+  grid-area: set;
+  min-height: 48px;
+}
+
+.range {
+  grid-area: range;
+  color: var(--text-text3);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}

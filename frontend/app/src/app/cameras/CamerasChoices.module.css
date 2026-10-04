@@ -1,0 +1,54 @@
+/* The format's and the look's rows in their popover: each a label, a row of
+   keys with the camera's value as the selection, and the reason a key is
+   locked under it. */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  color: var(--text-text2);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+.choices > * {
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 6px;
+}
+
+/* The display LUT's choices: the long ones take two lines. */
+.tall > * {
+  min-height: 48px;
+  white-space: normal;
+  text-align: center;
+  font: 700 var(--font-size-label) / 1.15 var(--font-family-ui);
+}
+
+/* Why a choice cannot be taken now: on screen, under its row. */
+.refused {
+  color: var(--text-text2);
+  font: 400 var(--font-size-label) / var(--font-line-height-tight) var(--font-family-ui);
+}
+
+/* An armed choice in its row: the armed key's fill and bar, in the room the
+   choice had. */
+.armedChoice {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px 8px;
+  white-space: normal;
+  text-align: center;
+}

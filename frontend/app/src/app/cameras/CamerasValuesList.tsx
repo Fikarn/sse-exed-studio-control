@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useRef, useState, type KeyboardEvent, type RefObject } from "react";
 
-import { Key } from "@sse/design-system";
+import { Popover } from "@sse/design-system";
 import type { CameraSnapshot } from "@sse/engine-client";
 
 import type { ChoiceRowView } from "./camerasModel";
@@ -8,78 +8,115 @@ import styles from "./CamerasValuesList.module.css";
 
 // The values a camera allows for one setting, opened from its readout (board
 // 2's ISO list): one press sets the value, the list closes and the camera
-// answers (D11). It floats beside the plate, at the drawer's level. Esc and
-// Close leave it without a change, and the focus goes back where it was.
+// answers (D11). The visual overhaul (2026-10-05): a popover beside the plate
+// holding a `listbox`, never a dialog, so the pictures stay drawn while it is
+// open (it is one hole in their layer). A press outside or Esc closes it
+// without a change, and the focus goes back to the readout. The value the
+// camera reports is the selected option.
+
+/** Options a row: the list is laid out as a grid, and the arrows move over it. */
+const COLUMNS = 5;
 
 export interface CamerasValuesListProps {
   camera: CameraSnapshot;
   row: ChoiceRowView;
+  /** The readout that opened it, which it stands beside and which toggles it. */
+  anchor: RefObject<HTMLElement | null>;
   onPick: (value: string) => void;
   onClose: () => void;
 }
 
-export function CamerasValuesList({ camera, row, onPick, onClose }: CamerasValuesListProps) {
-  const panel = useRef<HTMLElement>(null);
-  const close = useRef(onClose);
-  close.current = onClose;
+export function CamerasValuesList({ camera, row, anchor, onPick, onClose }: CamerasValuesListProps) {
+  const options = row.choice.options;
+  const list = useRef<HTMLDivElement>(null);
+  const current = row.choice.value !== null && options.includes(row.choice.value) ? row.choice.value : null;
+  // The option the arrows stand on; the one the camera reports to begin with.
+  const [active, setActive] = useState<string | null>(current ?? options[0] ?? null);
 
-  useEffect(() => {
-    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const current = panel.current?.querySelector<HTMLElement>("[aria-pressed='true']");
-    (current ?? panel.current)?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+  const focusOption = (option: string) => {
+    setActive(option);
+    list.current?.querySelector<HTMLElement>(`[data-option="${CSS.escape(option)}"]`)?.focus({ preventScroll: true });
+  };
+
+  // The arrows, Home and End move over the options; Enter or Space picks one.
+  // Esc is the popover's: it closes the list.
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (options.length === 0) return;
+    const at = active === null ? 0 : Math.max(0, options.indexOf(active));
+    const move = (to: number) => {
       event.preventDefault();
-      close.current();
+      event.stopPropagation();
+      focusOption(options[Math.min(options.length - 1, Math.max(0, to))]!);
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      before?.focus();
-    };
-  }, []);
+    switch (event.key) {
+      case "ArrowRight":
+        move(at + 1);
+        return;
+      case "ArrowLeft":
+        move(at - 1);
+        return;
+      case "ArrowDown":
+        move(at + COLUMNS);
+        return;
+      case "ArrowUp":
+        move(at - COLUMNS);
+        return;
+      case "Home":
+        move(0);
+        return;
+      case "End":
+        move(options.length - 1);
+        return;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        event.stopPropagation();
+        if (active !== null) onPick(active);
+        return;
+      default:
+    }
+  };
 
   return (
-    <aside
-      ref={panel}
-      className={styles.list}
-      data-level="float"
-      data-material="plate"
-      role="dialog"
-      aria-modal="false"
-      aria-label={`${row.label} values ${camera.tag} allows`}
-      tabIndex={-1}
-      data-testid="cameras-values-list"
+    <Popover
+      open
+      anchor={anchor.current}
+      onClose={onClose}
+      title={`${row.label} · ${camera.tag}`}
+      placement="left-start"
+      width={407}
+      ignoreOutside={[anchor]}
+      initialFocus="first"
+      testId="cameras-values-list"
     >
-      <header className={styles.head}>
-        <span className={styles.title}>
-          <b>{row.label}</b> · {camera.tag}
-        </span>
-        <span className={styles.detail}>the values {camera.tag} allows</span>
-      </header>
-      <div className={styles.grid} data-well="" role="group" aria-label={row.label}>
-        {row.choice.options.map((option) => {
-          const current = option === row.choice.value;
+      <div
+        ref={list}
+        role="listbox"
+        aria-label={`${row.label}: the values ${camera.tag} allows`}
+        className={styles.grid}
+        onKeyDown={onKeyDown}
+      >
+        {options.map((option) => {
+          const selected = option === current;
           return (
-            <Key
+            <div
               key={option}
-              mode="segmented"
-              cap={option}
-              take
-              engaged={current}
-              aria-pressed={current}
-              testId={`cameras-value-${option}`}
+              role="option"
+              aria-selected={selected}
+              tabIndex={option === active ? 0 : -1}
+              className={styles.option}
+              data-option={option}
+              data-autofocus={selected ? "" : undefined}
+              data-take=""
+              data-testid={`cameras-value-${option}`}
               onClick={() => onPick(option)}
-            />
+              onFocus={() => setActive(option)}
+            >
+              {option}
+            </div>
           );
         })}
       </div>
-      <footer className={styles.foot}>
-        <span className={styles.detail}>One press sets it; the list closes and {camera.tag} answers.</span>
-        <Key size="small" testId="cameras-values-close" onClick={onClose}>
-          Close
-        </Key>
-      </footer>
-    </aside>
+    </Popover>
   );
 }

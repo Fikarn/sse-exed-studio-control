@@ -1,20 +1,24 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ArmKey,
   ARM_TIMEOUT_MS,
   Key,
   LampWord,
-  NumberEntryDialog,
+  MenuButton,
   PlateHead,
+  Readout,
+  Readouts,
   Section,
-  Segmented,
   Slider,
+  Tooltip,
   type ArmedKey,
+  type UseArmResult,
 } from "@sse/design-system";
-import type { CameraChoice, CameraLevel, CameraNumber, CameraPressSetting, CameraSnapshot } from "@sse/engine-client";
+import type { CameraLevel, CameraNumber, CameraPressSetting, CameraSnapshot } from "@sse/engine-client";
 
-import { CamerasValuesList } from "./CamerasValuesList";
+import { CamerasChoices, ChoiceRow, OnOffRow } from "./CamerasChoices";
+import type { CamerasMenu } from "./camerasMenus";
 import {
   cameraNumber,
   choiceStepLock,
@@ -28,10 +32,12 @@ import {
   releasedTo,
   sectionDetail,
   shutterUnit,
-  unavailableReason,
   type ChoiceRowView,
   type LevelRowView,
 } from "./camerasModel";
+import { CamerasTypedEntry } from "./CamerasTypedEntry";
+import { CamerasValuesList } from "./CamerasValuesList";
+import { armedInGroup, camerasArmKey, releaseArmed } from "./useCamerasArming";
 import styles from "./CamerasPlate.module.css";
 
 // The Cameras page's plate (board 2's right column): the selected camera.
@@ -42,10 +48,24 @@ import styles from "./CamerasPlate.module.css";
 // profile and the display LUT are press twice (D11). A value the camera
 // does not report says so in the camera's own words, and an unreachable
 // camera's values are what it last reported, shown as doubt.
+//
+// The visual overhaul (2026-10-05): the values are the design system's
+// readouts, and every list, typed value, format and look opens in a popover
+// beside the plate, never a dialog, so the pictures stay drawn (each is one
+// hole in their layer). One popover at a time. The format's and the look's
+// keys arm inside their popover, which stays open while one is armed; any
+// close of it drops the arm, so nothing armed is ever out of sight. The
+// plate's title has the camera's ⋯, the same menu as its key and picture.
+// The helper sentences are the section heads' tooltips; the safety lines
+// (press twice, the lock, Release's warnings) stay on screen.
 
 export interface CamerasPlateProps {
   camera: CameraSnapshot;
   armed: ArmedKey | null;
+  /** The page's one arm: the popovers drop theirs when they close. */
+  arm: UseArmResult;
+  /** The selected camera's menu, as its key and its picture open it. */
+  menu: CamerasMenu;
   /** CAM 1 is held and reports recording: a release leaves the take running. */
   mainRecording: boolean;
   onStep: (setting: CameraPressSetting, steps: number) => void;
@@ -59,21 +79,27 @@ export interface CamerasPlateProps {
   onOpenSetup: () => void;
 }
 
-/** Which list of values is open: a choice of the selected camera's. */
-interface OpenList {
-  camera: number;
-  row: ChoiceRowView;
-}
+/** The plate's one popover, and the camera it was opened for. */
+type OpenPopover =
+  | { kind: "values"; camera: number; row: ChoiceRowView }
+  | { kind: "typed"; camera: number; row: LevelRowView }
+  | { kind: "format"; camera: number }
+  | { kind: "look"; camera: number };
 
-/** Which level is being typed. */
-interface TypedLevel {
-  camera: number;
-  row: LevelRowView;
+/** A section head's word with its helper sentence as the tooltip. */
+function Head({ word, tip }: { word: string; tip: string }) {
+  return (
+    <Tooltip content={tip} placement="left">
+      <span>{word}</span>
+    </Tooltip>
+  );
 }
 
 export function CamerasPlate({
   camera,
   armed,
+  arm,
+  menu,
   mainRecording,
   onStep,
   onSet,
@@ -85,18 +111,49 @@ export function CamerasPlate({
   onReadAgain,
   onOpenSetup,
 }: CamerasPlateProps) {
-  const [list, setList] = useState<OpenList | null>(null);
-  const [typed, setTyped] = useState<TypedLevel | null>(null);
+  const [popover, setPopover] = useState<OpenPopover | null>(null);
+  // What the open popover stands beside: the readout or the key that opened it.
+  const anchor = useRef<HTMLElement | null>(null);
+  const formatKey = useRef<HTMLSpanElement | null>(null);
+  const lookKey = useRef<HTMLSpanElement | null>(null);
   const number = cameraNumber(camera);
   const lock = controlsLock(camera);
   const held = lock === null;
   const doubt = camera.state === "unreachable";
   const shown = camera.state === "held" || doubt;
-  // A list or a typed value belongs to the camera it was opened for, while that camera is held.
-  const openList = list && list.camera === camera.camera && held ? list : null;
-  const openTyped = typed && typed.camera === camera.camera && held ? typed : null;
-  const releaseKey = `release:${number}`;
-  const releaseArmed = armed?.key === releaseKey;
+  // A popover belongs to the camera it was opened for, while that camera is held.
+  const open = popover && popover.camera === camera.camera && held ? popover : null;
+  useEffect(() => {
+    if (popover && !open) setPopover(null);
+  }, [popover, open]);
+
+  const releaseKey = camerasArmKey.release(number);
+  const releaseIsArmed = armed?.key === releaseKey;
+  // Release armed here or in the camera's menu: either way the warning shows.
+  const releaseAsked = releaseArmed(armed?.key, number);
+
+  /** Closes the popover; the format's or the look's arm goes with it. */
+  const close = () => {
+    const key = arm.armed?.key;
+    if (
+      (open?.kind === "format" && armedInGroup(key, "format")) ||
+      (open?.kind === "look" && armedInGroup(key, "look"))
+    ) {
+      arm.cancel();
+    }
+    setPopover(null);
+  };
+
+  /** Opens a popover beside `element`, or closes it when it is the one open. */
+  const toggle = (next: OpenPopover, element: HTMLElement | null) => {
+    if (open && open.kind === next.kind && anchor.current === element) {
+      close();
+      return;
+    }
+    if (open) close();
+    anchor.current = element;
+    setPopover(next);
+  };
 
   const stepKeys = (setting: CameraPressSetting, label: string, down: string | null, up: string | null) => (
     <>
@@ -125,45 +182,48 @@ export function CamerasPlate({
     </>
   );
 
-  /** A readout that is also a key: it opens the list, or the typed entry. */
-  const readout = (
+  /**
+   * A value: while the camera is held, a key that opens its list or its typed
+   * entry, with the readout drawn inside; otherwise the readout alone, as
+   * doubt or not read.
+   */
+  const value = (
     setting: CameraPressSetting,
     label: string,
-    value: string,
+    text: string,
     unit: string | null,
-    open: boolean,
-    onPress: () => void
+    isOpen: boolean,
+    onPress: (element: HTMLElement) => void
   ) =>
     held ? (
       <button
         type="button"
-        className={styles.readout}
-        data-well=""
-        data-open={open ? "" : undefined}
+        className={styles.value}
         data-take=""
-        aria-label={`${label} ${value}${unit ? `, as ${unit}` : ""}. Press for the values ${camera.tag} allows.`}
+        data-open={isOpen ? "" : undefined}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
+        aria-label={`${label} ${text}${unit ? `, as ${unit}` : ""}. Press for the values ${camera.tag} allows.`}
         data-testid={`cameras-${setting}-value`}
-        onClick={onPress}
+        // The popover stands beside the whole row, over the bay, so the plate stays in view.
+        onClick={(event) => onPress(event.currentTarget.parentElement ?? event.currentTarget)}
       >
-        <b>{value}</b>
-        {unit ? <span>{unit}</span> : null}
+        <Readout value={text} unit={unit ?? undefined} className={styles.readout} />
       </button>
     ) : (
-      <div
-        className={styles.readout}
-        data-well=""
-        data-doubt={doubt && shown ? "" : undefined}
-        data-testid={`cameras-${setting}-value`}
-      >
-        <b data-dim={shown ? undefined : ""}>{shown ? value : "—"}</b>
-        <span>{doubt ? "last read" : "not read"}</span>
-      </div>
+      <Readout
+        value={shown ? text : "—"}
+        unit={doubt ? "last read" : "not read"}
+        doubt={doubt && shown}
+        className={styles.valueWell}
+        testId={`cameras-${setting}-value`}
+      />
     );
 
   const notReported = (setting: string, label: string, sentence: string | null) => (
     <div key={setting} className={styles.set} data-testid={`cameras-${setting}`}>
       <span className={styles.setLabel}>{label}</span>
-      <div className={styles.none} data-well="" data-testid={`cameras-${setting}-not-reported`}>
+      <div className={styles.none} data-testid={`cameras-${setting}-not-reported`}>
         {sentence ?? `${camera.tag} does not report it.`}
       </div>
     </div>
@@ -175,13 +235,13 @@ export function CamerasPlate({
     return (
       <div key={setting} className={styles.set} data-testid={`cameras-${setting}`}>
         <span className={styles.setLabel}>{label}</span>
-        {readout(
+        {value(
           setting,
           label,
           choice.value ?? "—",
           setting === "shutter" ? shutterUnit(choice.value) : null,
-          openList?.row.setting === setting,
-          () => setList(openList?.row.setting === setting ? null : { camera: camera.camera, row })
+          open?.kind === "values" && open.row.setting === setting,
+          (element) => toggle({ kind: "values", camera: camera.camera, row }, element)
         )}
         {stepKeys(
           setting,
@@ -199,8 +259,13 @@ export function CamerasPlate({
     return (
       <div key={setting} className={styles.set} data-testid={`cameras-${setting}`}>
         <span className={styles.setLabel}>{label}</span>
-        {readout(setting, label, levelText(level, setting === "tint"), null, false, () =>
-          setTyped({ camera: camera.camera, row })
+        {value(
+          setting,
+          label,
+          levelText(level, setting === "tint"),
+          null,
+          open?.kind === "typed" && open.row.setting === setting,
+          (element) => toggle({ kind: "typed", camera: camera.camera, row }, element)
         )}
         {stepKeys(
           setting,
@@ -219,77 +284,35 @@ export function CamerasPlate({
       </Key>
     ) : null;
 
-  /** A press-twice choice: the lit key is what the camera reports, the armed one what the next press sets. */
-  const armedChoice = (
-    setting: "resolution" | "frameRate" | "dynamicRange" | "displayLut",
-    label: string,
-    choice: CameraChoice,
-    unit: string,
-    className?: string
-  ) => {
-    const group = setting === "resolution" || setting === "frameRate" ? "format" : "look";
-    return (
-      <Segmented
-        label={label}
-        className={[styles.choices, className].filter(Boolean).join(" ")}
-        testId={`cameras-${setting}`}
-      >
-        {choice.options.map((option) => {
-          const key = `${group}:${number}:${setting}:${option}`;
-          const unavailable = unavailableReason(choice, option);
-          const reason = lock ?? (unavailable ? `${option}${unit}: ${unavailable}` : null);
-          const current = shown && choice.value === option;
-          return armed?.key === key ? (
-            <ArmKey
-              key={option}
-              armed
-              timeoutMs={armed.timeoutMs}
-              countdownTestId={`cameras-${setting}-countdown`}
-              armedWord="ARMED"
-              className={styles.armedChoice}
-              testId={`cameras-${setting}-${option}`}
-              onClick={() =>
-                group === "format"
-                  ? onFormat(setting as "resolution" | "frameRate", option)
-                  : onLook(setting as "dynamicRange" | "displayLut", option)
-              }
-            >
-              {option}
-            </ArmKey>
-          ) : (
-            <Key
-              key={option}
-              mode="segmented"
-              engaged={current}
-              aria-pressed={current}
-              locked={reason !== null}
-              reason={reason ?? undefined}
-              testId={`cameras-${setting}-${option}`}
-              onClick={() =>
-                group === "format"
-                  ? onFormat(setting as "resolution" | "frameRate", option)
-                  : onLook(setting as "dynamicRange" | "displayLut", option)
-              }
-            >
-              {option}
-            </Key>
-          );
-        })}
-      </Segmented>
-    );
-  };
+  /** A section's quiet word: what locks it, or what its keys do. */
+  const detail = (whenHeld?: string) => (held ? whenHeld : sectionDetail(camera, ""));
 
-  const choiceLabel = (label: string, choice: CameraChoice, unit: string, extra?: ReactNode) => (
-    <div className={styles.choiceLabel}>
-      <span>{label}</span>
-      {extra}
-      <span className={styles.choiceValue}>
-        {shown && choice.value !== null ? `${choice.value}${unit}` : "not read"}
-        {shown && choice.unavailable.length > 0
-          ? ` · ${choice.unavailable.map((entry) => `${entry.value}${unit} ${entry.reason}`).join(", ")}`
-          : ""}
-      </span>
-    </div>
+  /** A press-twice section's value, as the camera reports it, or why there is none. */
+  const reported = (text: string | null, testId: string) => (
+    <span className={styles.reported} data-doubt={doubt && text !== null ? "" : undefined} data-testid={testId}>
+      {shown && text !== null ? text : "not read"}
+      {doubt && text !== null ? <span className={styles.reportedNote}> · last read</span> : null}
+    </span>
+  );
+
+  /** The key that opens a press-twice section's popover. */
+  const opener = (kind: "format" | "look", ref: { current: HTMLSpanElement | null }, label: string) => (
+    <span ref={ref} className={styles.opener}>
+      <Key
+        size="small"
+        locked={!held}
+        reason={lock ?? undefined}
+        aria-haspopup="true"
+        aria-expanded={open?.kind === kind}
+        data-open={open?.kind === kind ? "" : undefined}
+        aria-label={label}
+        testId={`cameras-${kind}-open`}
+        // The popover stands beside the whole section, over the bay, so the plate stays in view.
+        onClick={() => toggle({ kind, camera: camera.camera }, ref.current?.closest("section") ?? ref.current)}
+      >
+        Change…
+      </Key>
+    </span>
   );
 
   const connection = () => {
@@ -300,15 +323,15 @@ export function CamerasPlate({
           detail: linkLabel(camera),
           key: (
             <ArmKey
-              armed={releaseArmed}
+              armed={releaseIsArmed}
               timeoutMs={ARM_TIMEOUT_MS}
               countdownTestId="cameras-release-countdown"
               size="small"
-              cap={releaseArmed ? "Release?" : undefined}
+              cap={releaseIsArmed ? "Release?" : undefined}
               testId="cameras-release"
               onClick={onRelease}
             >
-              {releaseArmed ? undefined : `Release to ${releasedTo(camera)} · press twice`}
+              {releaseIsArmed ? undefined : `Release to ${releasedTo(camera)} · press twice`}
             </ArmKey>
           ),
         };
@@ -343,7 +366,7 @@ export function CamerasPlate({
   };
   const { detail: connectionDetail, key: connectionKey } = connection();
 
-  const note = releaseArmed
+  const note = releaseAsked
     ? camera.link === "bluetooth" && mainRecording
       ? { warn: true, text: "CAM 1 is recording: after Release, REC stops only on the camera or the iPad." }
       : { warn: false, text: `${releasedTo(camera)} can then reach ${camera.tag}. Connect takes it back.` }
@@ -358,20 +381,42 @@ export function CamerasPlate({
       : null;
 
   const focus = camera.values.focus;
+  const resolution = camera.values.resolution;
+  const frameRate = camera.values.frameRate;
   const lut = camera.values.displayLut;
   const lutOn = camera.values.displayLutOn;
   const range = camera.values.dynamicRange;
+  const lookShown = range.reported || lut.reported;
 
   return (
     <div className={styles.plate} data-testid="cameras-plate" data-camera={camera.camera}>
       <PlateHead
-        title={camera.tag}
-        sub={`${camera.model} · vMix Output ${camera.setup.vmixOutput}`}
+        title={
+          <Tooltip
+            content={
+              camera.recording.records
+                ? "Recording, timecode and card time are under REC. Not offered here: formatting a card, firmware, factory reset."
+                : `${camera.tag} does not record here; REC acts on CAM 1. Not offered here: formatting a card, firmware, factory reset.`
+            }
+            placement="left"
+          >
+            <span>{camera.tag}</span>
+          </Tooltip>
+        }
+        sub={
+          <>
+            <span className={styles.subLine}>{camera.model} </span>
+            <span className={styles.subLine}>vMix Output {camera.setup.vmixOutput}</span>
+          </>
+        }
+        action={
+          <MenuButton buttonLabel={`${camera.tag} menu`} buttonTestId="cameras-plate-menu" menu={{ ...menu, arm }} />
+        }
         testId="cameras-plate-head"
       />
 
       <div className={styles.connectionBlock}>
-        <div className={styles.connection} data-well="" data-testid="cameras-connection">
+        <div className={styles.connection} data-testid="cameras-connection">
           <div className={styles.connectionWords}>
             <LampWord tone={camera.tone} testId="cameras-connection-word">
               {camera.word}
@@ -388,8 +433,8 @@ export function CamerasPlate({
       </div>
 
       <Section
-        title="Exposure"
-        detail={sectionDetail(camera, "one press · press a value for the list")}
+        title={<Head word="Exposure" tip={`One press: a step, or a value from the list ${camera.tag} allows.`} />}
+        detail={detail()}
         testId="cameras-exposure"
       >
         {exposureRows(camera).map(choiceRow)}
@@ -397,8 +442,8 @@ export function CamerasPlate({
       </Section>
 
       <Section
-        title="Colour"
-        detail={sectionDetail(camera, "one press · press a value to type one")}
+        title={<Head word="Colour" tip="One press: a step, or press the value to type one." />}
+        detail={detail()}
         testId="cameras-colour"
       >
         {colourRows(camera).map(levelRow)}
@@ -406,12 +451,17 @@ export function CamerasPlate({
       </Section>
 
       <Section
-        title="Focus"
-        detail={sectionDetail(camera, focus.reported ? "one press · near 0, far 1" : "one press")}
+        title={
+          <Head
+            word="Focus"
+            tip={`One press. The focus is where ${camera.tag} reports its lens, from near 0 to far 1: a position, not a distance.`}
+          />
+        }
+        detail={detail()}
         testId="cameras-focus"
       >
         {focus.reported ? (
-          <FocusSlider doubt={doubt} level={focus} lock={lock} shown={shown} onSet={(value) => onSet("focus", value)} />
+          <FocusSlider doubt={doubt} level={focus} lock={lock} shown={shown} onSet={(next) => onSet("focus", next)} />
         ) : (
           notReported("focus", "Position", focus.notReported)
         )}
@@ -443,74 +493,58 @@ export function CamerasPlate({
       </Section>
 
       <Section
-        title="Format"
-        detail={sectionDetail(camera, "press twice · the picture drops while it changes")}
+        title={<Head word="Format" tip="Press twice: the picture drops while the format changes." />}
+        detail={detail("press twice")}
+        actions={opener("format", formatKey, `Change the format of ${camera.tag}`)}
         testId="cameras-format"
       >
-        {choiceLabel("Resolution", camera.values.resolution, "")}
-        {armedChoice("resolution", "Resolution", camera.values.resolution, "")}
-        {choiceLabel("Frame rate", camera.values.frameRate, "p")}
-        {armedChoice("frameRate", "Frame rate", camera.values.frameRate, "p")}
+        <Readouts
+          rows={[
+            {
+              id: "resolution",
+              label: "Resolution",
+              value: reported(resolution.value, "cameras-resolution-value"),
+            },
+            {
+              id: "frameRate",
+              label: "Frame rate",
+              value: reported(frameRate.value === null ? null : `${frameRate.value}p`, "cameras-frameRate-value"),
+            },
+          ]}
+        />
       </Section>
 
       <Section
-        title="Picture profile and LUT"
-        detail={range.reported || lut.reported ? sectionDetail(camera, "press twice") : undefined}
+        title={<Head word="Profile and LUT" tip="The picture profile and the display LUT. Press twice." />}
+        detail={lookShown ? detail("press twice") : undefined}
+        actions={lookShown ? opener("look", lookKey, `Change the look of ${camera.tag}`) : undefined}
         testId="cameras-look"
       >
         {range.reported ? (
-          <>
-            {choiceLabel("Dynamic range", range, "")}
-            {armedChoice("dynamicRange", "Dynamic range", range, "")}
-          </>
+          <Readouts
+            rows={[{ id: "range", label: "Dynamic range", value: reported(range.value, "cameras-dynamicRange-value") }]}
+          />
         ) : (
           notReported("dynamicRange", "Profile", range.notReported)
         )}
         {lut.reported ? (
           <>
-            {choiceLabel(
-              "Display LUT",
-              lut,
-              "",
-              lutOn.reported ? (
-                <Segmented label="Display LUT on or off" className={styles.onOff} testId="cameras-displayLutOn">
-                  {[true, false].map((on) => {
-                    const key = `look:${number}:displayLutOn:${String(on)}`;
-                    const current = shown && lutOn.value === on;
-                    return armed?.key === key ? (
-                      <ArmKey
-                        key={String(on)}
-                        armed
-                        timeoutMs={armed.timeoutMs}
-                        countdownTestId="cameras-displayLutOn-countdown"
-                        armedWord="ARMED"
-                        size="small"
-                        className={styles.armedChoice}
-                        testId={`cameras-displayLutOn-${on ? "on" : "off"}`}
-                        onClick={() => onLook("displayLutOn", on)}
-                      >
-                        {on ? "On" : "Off"}
-                      </ArmKey>
-                    ) : (
-                      <Key
-                        key={String(on)}
-                        mode="segmented"
-                        size="small"
-                        engaged={current}
-                        aria-pressed={current}
-                        locked={!held}
-                        reason={lock ?? undefined}
-                        testId={`cameras-displayLutOn-${on ? "on" : "off"}`}
-                        onClick={() => onLook("displayLutOn", on)}
-                      >
-                        {on ? "On" : "Off"}
-                      </Key>
-                    );
-                  })}
-                </Segmented>
-              ) : null
-            )}
-            {armedChoice("displayLut", "Display LUT", lut, "", styles.lut)}
+            <Readouts
+              rows={[
+                {
+                  id: "lut",
+                  label: "Display LUT",
+                  value: reported(
+                    lut.value === null
+                      ? null
+                      : lutOn.reported && lutOn.value !== null
+                        ? `${lutOn.value ? "On" : "Off"} · ${lut.value}`
+                        : lut.value,
+                    "cameras-displayLut-value"
+                  ),
+                },
+              ]}
+            />
             {shown && lut.value === "Custom" ? (
               <p className={styles.fine}>{camera.tag} does not report a custom LUT's name.</p>
             ) : null}
@@ -520,39 +554,113 @@ export function CamerasPlate({
         )}
       </Section>
 
-      <p className={[styles.fine, styles.foot].join(" ")} data-testid="cameras-plate-foot">
-        {camera.recording.records
-          ? "Recording, timecode and card time: under REC."
-          : `${camera.tag} does not record here; REC acts on CAM 1.`}{" "}
-        Not offered here: formatting a card, firmware, factory reset.
-      </p>
-
-      {openList ? (
+      {open?.kind === "values" ? (
         <CamerasValuesList
           camera={camera}
-          row={openList.row}
-          onClose={() => setList(null)}
-          onPick={(value) => {
-            setList(null);
-            onSet(openList.row.setting, value);
+          row={open.row}
+          anchor={anchor}
+          onClose={close}
+          onPick={(picked) => {
+            close();
+            onSet(open.row.setting, picked);
           }}
         />
       ) : null}
-      {openTyped ? (
-        <NumberEntryDialog
-          title={`Set ${openTyped.row.label.toLowerCase()} on ${camera.tag}`}
-          fieldLabel={openTyped.row.label}
-          initialValue={openTyped.row.level.value ?? openTyped.row.level.min}
-          min={openTyped.row.level.min}
-          max={openTyped.row.level.max}
-          step={openTyped.row.level.step}
-          suffix={openTyped.row.level.unit || undefined}
-          onCancel={() => setTyped(null)}
-          onConfirm={(value) => {
-            setTyped(null);
-            onSet(openTyped.row.setting, value);
+      {open?.kind === "typed" ? (
+        <CamerasTypedEntry
+          camera={camera}
+          row={open.row}
+          anchor={anchor}
+          onClose={close}
+          onSet={(typed) => {
+            close();
+            onSet(open.row.setting, typed);
           }}
         />
+      ) : null}
+      {open?.kind === "format" ? (
+        <CamerasChoices
+          title={`Format · ${camera.tag}`}
+          anchor={anchor}
+          onClose={close}
+          testId="cameras-format-popover"
+        >
+          <ChoiceRow
+            armed={armed}
+            group={{
+              setting: "resolution",
+              label: "Resolution",
+              choice: resolution,
+              unit: "",
+              lock,
+              armKey: (option) => camerasArmKey.format(number, "resolution", option),
+              onPress: (option) => onFormat("resolution", option),
+            }}
+          />
+          <ChoiceRow
+            armed={armed}
+            group={{
+              setting: "frameRate",
+              label: "Frame rate",
+              choice: frameRate,
+              unit: "p",
+              lock,
+              armKey: (option) => camerasArmKey.format(number, "frameRate", option),
+              onPress: (option) => onFormat("frameRate", option),
+            }}
+          />
+        </CamerasChoices>
+      ) : null}
+      {open?.kind === "look" ? (
+        <CamerasChoices
+          title={`Profile and LUT · ${camera.tag}`}
+          anchor={anchor}
+          onClose={close}
+          testId="cameras-look-popover"
+        >
+          {range.reported ? (
+            <ChoiceRow
+              armed={armed}
+              group={{
+                setting: "dynamicRange",
+                label: "Dynamic range",
+                choice: range,
+                unit: "",
+                lock,
+                armKey: (option) => camerasArmKey.look(number, "dynamicRange", option),
+                onPress: (option) => onLook("dynamicRange", option),
+              }}
+            />
+          ) : null}
+          {lut.reported && lutOn.reported ? (
+            <OnOffRow
+              armed={armed}
+              group={{
+                setting: "displayLutOn",
+                label: "Display LUT",
+                value: lutOn.value,
+                lock,
+                armKey: (on) => camerasArmKey.look(number, "displayLutOn", on),
+                onPress: (on) => onLook("displayLutOn", on),
+              }}
+            />
+          ) : null}
+          {lut.reported ? (
+            <ChoiceRow
+              armed={armed}
+              group={{
+                setting: "displayLut",
+                label: "LUT",
+                choice: lut,
+                unit: "",
+                lock,
+                tall: true,
+                armKey: (option) => camerasArmKey.look(number, "displayLut", option),
+                onPress: (option) => onLook("displayLut", option),
+              }}
+            />
+          ) : null}
+        </CamerasChoices>
       ) : null}
     </div>
   );
@@ -602,7 +710,6 @@ function FocusSlider({ level, lock, doubt, shown, onSet }: FocusSliderProps) {
       </div>
       <div className={styles.nearFar}>
         <span>near</span>
-        <span>a position, not a distance</span>
         <span>far</span>
       </div>
     </>

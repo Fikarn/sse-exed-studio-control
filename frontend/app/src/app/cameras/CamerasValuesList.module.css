@@ -1,81 +1,52 @@
-/* The values list: a plate that floats beside the Cameras page's plate, at
-   the drawer's level, left of it so the readout it was opened from stays in
-   view. */
-
-.list {
-  position: fixed;
-  top: calc(var(--chrome-studio-header) + 200px);
-  right: calc(var(--chrome-studio-plate) + 12px);
-  z-index: var(--z-overlay);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 400px;
-  padding: 16px;
-  border: 1px solid var(--material-line2);
-  border-radius: var(--radius-screen);
-  background: var(--elevation-plate-fill);
-  box-shadow: var(--elevation-float);
-  color: var(--text-text);
-  outline: none;
-}
-
-.list:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.head,
-.foot {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.foot {
-  align-items: center;
-}
-
-.title {
-  color: var(--text-text2);
-  font: 700 var(--font-size-value) / 1 var(--font-family-ui);
-}
-
-.title b {
-  color: var(--text-text);
-  font: 700 var(--font-size-value) / 1 var(--font-family-mono);
-  letter-spacing: var(--font-tracking-cap);
-}
-
-.detail {
-  color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
-}
+/* The values a camera allows for one setting: a grid of options in the
+   popover beside the plate. The value the camera reports is the selection,
+   the Beige keyline; nothing here is lit. */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid var(--material-line);
-  border-radius: var(--radius-screen);
-  background: var(--material-well);
-  box-shadow: var(--elevation-well);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  outline: none;
 }
 
-/* A value's key on the list's well: a segmented key without its own well. */
-.grid > * {
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
   min-height: 40px;
   padding: 0 4px;
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: var(--display-text);
+  border: 1px solid var(--material-line2);
+  border-radius: var(--radius-base);
+  background: var(--material-key);
+  color: var(--text-text2);
+  font: 400 var(--font-size-body) / var(--font-line-height-tight) var(--font-family-ui);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
 }
 
-.grid > *[data-engaged] {
-  background: var(--elevation-key-lit-yellow-fill);
-  color: var(--role-yellow-ink);
-  box-shadow: var(--elevation-key-lit-yellow);
+.option:hover:not([aria-selected="true"]) {
+  border-color: var(--text-text4);
+  color: var(--text-text);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The value the camera reports: the selection's 2 px Beige keyline. */
+.option[aria-selected="true"] {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+  color: var(--text-text);
+  font-weight: 700;
+}
+
+.option[aria-selected="true"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

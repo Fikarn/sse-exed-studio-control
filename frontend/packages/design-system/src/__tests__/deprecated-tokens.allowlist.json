@@ -1,10 +1,6 @@
 {
   "app/src/app/OperatorLayoutProvider.module.css": 4,
   "app/src/app/OperatorShell.module.css": 3,
-  "app/src/app/cameras/CamerasBay.module.css": 12,
-  "app/src/app/cameras/CamerasCluster.module.css": 13,
-  "app/src/app/cameras/CamerasPlate.module.css": 16,
-  "app/src/app/cameras/CamerasValuesList.module.css": 10,
   "app/src/app/setup/SetupSupportPilot.module.css": 68,
   "app/src/app/setup/components/RecentActions.module.css": 1,
   "app/src/app/setup/components/SetupCluster.module.css": 9,

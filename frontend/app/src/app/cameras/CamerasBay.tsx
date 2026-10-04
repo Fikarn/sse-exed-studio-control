@@ -1,8 +1,9 @@
 import { useRef, type MouseEvent } from "react";
 
-import { Key, LampWord, Segmented } from "@sse/design-system";
+import { Key, LampWord, MenuButton, Segmented, Tooltip, type UseArmResult } from "@sse/design-system";
 import type { CameraNumber, CameraSnapshot, CamerasSnapshot, PicturePlaces } from "@sse/engine-client";
 
+import type { CamerasMenu } from "./camerasMenus";
 import { cameraNumber, pictureLock, pictureShows, releasedTo } from "./camerasModel";
 import { CameraPicture, type PictureAids } from "./pictures/CameraPicture";
 import type { PictureFrames } from "./pictures/pictureFrames";
@@ -42,6 +43,12 @@ import styles from "./CamerasBay.module.css";
 // loupe looks, and what it draws over one, a small picture's chip
 // (`picturePlaces.ts`). The helper draws the aids and the marker with the
 // page's numbers (`pictureAids.ts`).
+//
+// The visual overhaul (2026-10-05): a small picture's chip holds its ⋯, the
+// camera's menu, and a right-click on the picture opens the same menu. The
+// chip is already a hole in the pictures' layer, so the ⋯ costs no other; a
+// ⋯ anywhere else on the picture would be drawn over in the app's window.
+// The current view and zoom are drawn as the selection, not lit.
 
 export interface CamerasBayProps {
   snapshot: CamerasSnapshot;
@@ -62,6 +69,10 @@ export interface CamerasBayProps {
   onZoom: (zoom: LoupeZoom) => void;
   onMoveLoupe: (point: Point) => void;
   onSelect: (camera: CameraNumber) => void;
+  /** The page's one arm, which every menu shares. */
+  arm: UseArmResult;
+  /** A camera's menu, as its key, its small picture and the plate's title open it. */
+  cameraMenu: (camera: CameraSnapshot, testIdPrefix: string) => CamerasMenu;
 }
 
 /**
@@ -95,11 +106,66 @@ function NoPicture({ camera, big }: { camera: CameraSnapshot; big: boolean }) {
 function RecTag({ camera }: { camera: CameraSnapshot }) {
   if (!camera.recording.records || camera.recording.recording !== true) return null;
   return camera.state === "unreachable" ? (
-    <LampWord tone="attention" cap={false}>
-      last known REC
-    </LampWord>
+    <LampWord tone="attention">LAST KNOWN REC</LampWord>
   ) : (
     <LampWord tone="error">REC</LampWord>
+  );
+}
+
+interface TileProps {
+  camera: CameraSnapshot;
+  drawnBy: "page" | "helper";
+  frames: PictureFrames;
+  menu: CamerasMenu;
+  arm: UseArmResult;
+  onSelect: (camera: CameraNumber) => void;
+}
+
+/**
+ * A small picture: a press selects its camera (D19: one selection). Its chip
+ * stands over it, a sibling of the picture's key since a key cannot hold the
+ * chip's ⋯.
+ */
+function Tile({ camera, drawnBy, frames, menu, arm, onSelect }: TileProps) {
+  const tile = useRef<HTMLDivElement>(null);
+  const number = cameraNumber(camera);
+  return (
+    <div ref={tile} className={styles.tileWrap}>
+      <button
+        type="button"
+        className={styles.tile}
+        data-well=""
+        aria-label={`Select ${camera.tag}`}
+        data-testid={`cameras-tile-${camera.camera}`}
+        onClick={() => onSelect(number)}
+      >
+        {pictureShows(camera) ? (
+          <CameraPicture
+            camera={number}
+            drawnBy={drawnBy}
+            frames={frames}
+            part={WHOLE}
+            width={TILE.width}
+            height={TILE.height}
+            label={`${camera.tag}, ${camera.picture.detail}`}
+          />
+        ) : (
+          <NoPicture camera={camera} big={false} />
+        )}
+      </button>
+      <span className={styles.chip} data-picture-hole="" data-testid={`cameras-tile-chip-${camera.camera}`}>
+        <b>{camera.tag}</b>
+        <LampWord tone={camera.tone}>{camera.word}</LampWord>
+        <RecTag camera={camera} />
+        <MenuButton
+          buttonLabel={`${camera.tag} menu`}
+          buttonTestId={`cameras-tile-menu-${camera.camera}`}
+          contextTarget={tile}
+          size="sm"
+          menu={{ ...menu, arm }}
+        />
+      </span>
+    </div>
   );
 }
 
@@ -118,6 +184,8 @@ export function CamerasBay({
   onZoom,
   onMoveLoupe,
   onSelect,
+  arm,
+  cameraMenu,
 }: CamerasBayProps) {
   const bay = useRef<HTMLDivElement>(null);
   usePicturePlaces(bay, onPlaces);
@@ -172,8 +240,8 @@ export function CamerasBay({
         <span className={styles.title}>
           <b>{selected.tag}</b> {selected.model}
         </span>
-        <LampWord tone={selected.tone} cap={false} testId="cameras-caption-state">
-          {selected.word.toLowerCase()}
+        <LampWord tone={selected.tone} testId="cameras-caption-state">
+          {selected.word}
         </LampWord>
         <RecTag camera={selected} />
         <span className={styles.detail} data-testid="cameras-caption-detail">
@@ -190,11 +258,17 @@ export function CamerasBay({
           </span>
         ) : null}
         <div className={styles.aids} role="group" aria-label="The big picture">
+          <Tooltip
+            content="The view and the aids are this screen's own: they reach neither the camera nor vMix."
+            placement="bottom"
+          >
+            <span className={styles.aidsWord}>This screen</span>
+          </Tooltip>
           <Segmented label="How the big picture is shown" className={styles.view} testId="cameras-view">
             <Key
               mode="segmented"
               size="small"
-              engaged={view === "whole"}
+              selected={view === "whole"}
               aria-pressed={view === "whole"}
               locked={!shows}
               reason={lock}
@@ -206,7 +280,7 @@ export function CamerasBay({
             <Key
               mode="segmented"
               size="small"
-              engaged={view === "one-to-one"}
+              selected={view === "one-to-one"}
               aria-pressed={view === "one-to-one"}
               locked={!shows}
               reason={lock}
@@ -216,7 +290,6 @@ export function CamerasBay({
               1:1
             </Key>
           </Segmented>
-          <span className={styles.aidsNote}>on this screen only</span>
           {aidKey("guides", "Guides")}
           {aidKey("peaking", "Peaking")}
           {aidKey("zebras", "Zebras 95 %")}
@@ -256,67 +329,54 @@ export function CamerasBay({
 
       <div className={styles.row}>
         {others.map((entry) => (
-          <button
+          <Tile
             key={entry.camera}
-            type="button"
-            className={styles.tile}
-            data-well=""
-            aria-label={`Select ${entry.tag}`}
-            data-testid={`cameras-tile-${entry.camera}`}
-            onClick={() => onSelect(cameraNumber(entry))}
-          >
-            {pictureShows(entry) ? (
-              <CameraPicture
-                camera={cameraNumber(entry)}
-                drawnBy={drawnBy}
-                frames={frames}
-                part={WHOLE}
-                width={TILE.width}
-                height={TILE.height}
-                label={`${entry.tag}, ${entry.picture.detail}`}
-              />
-            ) : (
-              <NoPicture camera={entry} big={false} />
-            )}
-            <span className={styles.chip} data-picture-hole="">
-              <b>{entry.tag}</b>
-              <LampWord tone={entry.tone} cap={false}>
-                {entry.word.toLowerCase()}
-              </LampWord>
-              <RecTag camera={entry} />
-            </span>
-          </button>
+            camera={entry}
+            drawnBy={drawnBy}
+            frames={frames}
+            menu={cameraMenu(entry, `cameras-tile-menu-${entry.camera}`)}
+            arm={arm}
+            onSelect={onSelect}
+          />
         ))}
 
         <section className={styles.loupe} aria-label="Loupe" data-testid="cameras-loupe">
           <div className={styles.loupeHead}>
-            <span className={styles.loupeTitle}>Loupe</span>
-            <span className={styles.loupeNote}>
-              {shows ? "press the big picture to move it" : "no picture to check"}
-            </span>
+            <Tooltip
+              content={
+                shows
+                  ? "Each of the picture's pixels as it is. Press the big picture to move where it looks."
+                  : "There is no picture to check."
+              }
+              placement="top"
+            >
+              <span className={styles.loupeTitle}>Loupe</span>
+            </Tooltip>
             <Segmented label="Loupe" className={styles.zoom} testId="cameras-zoom">
               <Key
                 mode="segmented"
                 size="small"
-                cap="2:1"
-                engaged={zoom === 2}
+                selected={zoom === 2}
                 aria-pressed={zoom === 2}
                 locked={!shows}
                 reason={lock}
                 testId="cameras-zoom-2"
                 onClick={() => onZoom(2)}
-              />
+              >
+                2:1
+              </Key>
               <Key
                 mode="segmented"
                 size="small"
-                cap="4:1"
-                engaged={zoom === 4}
+                selected={zoom === 4}
                 aria-pressed={zoom === 4}
                 locked={!shows}
                 reason={lock}
                 testId="cameras-zoom-4"
                 onClick={() => onZoom(4)}
-              />
+              >
+                4:1
+              </Key>
             </Segmented>
           </div>
           <div className={styles.loupeBody} data-well="">

@@ -1,11 +1,12 @@
 /* The Cameras page's plate: board 2's right column. The selected camera:
    who holds it, then every value it reports, section by section. Nothing
-   scrolls, and every section is in view at once. */
+   scrolls, and every section is in view at once. The visual overhaul
+   (2026-10-05): every colour and size is the design system's. */
 
 .plate {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   height: 100%;
   min-height: 0;
   padding: 16px 16px 20px;
@@ -19,17 +20,25 @@
   flex: none;
 }
 
+/* The title plate's sub-line: the camera's make, then its vMix output, one
+   line each. */
+.subLine {
+  display: block;
+  white-space: nowrap;
+}
+
+/* Who holds the camera: a well with the state's lamp and word, how it is
+   reached, and the one key that changes who holds it. */
 .connection {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 10px;
   min-height: 60px;
   padding: 8px 10px 8px 12px;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  box-shadow: var(--elevation-well);
 }
 
 .connectionWords {
@@ -41,8 +50,8 @@
 
 .connectionDetail {
   overflow: hidden;
-  color: var(--display-text2);
-  font: 400 var(--font-size-tick) / 1.25 var(--font-family-ui);
+  color: var(--text-text2);
+  font: 400 var(--font-size-label) / 1.25 var(--font-family-ui);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -50,21 +59,18 @@
 .fine {
   margin: 0;
   color: var(--text-text2);
-  font: 400 var(--font-size-tick) / 1.35 var(--font-family-ui);
+  font: 400 var(--font-size-label) / 1.35 var(--font-family-ui);
 }
 
+/* A warning about a press (Release while CAM 1 records): yellow, on screen. */
 .fine[data-warn] {
   color: var(--role-yellow-text);
 }
 
-.foot {
-  margin-top: auto;
-}
-
-/* A setting: its name, its readout, a step down and a step up. */
+/* A setting: its name, its value, a step down and a step up. */
 .set {
   display: grid;
-  grid-template-columns: 100px 1fr 40px 40px;
+  grid-template-columns: 100px minmax(0, 1fr) 40px 40px;
   align-items: center;
   gap: 8px;
 }
@@ -72,62 +78,56 @@
 .setLabel {
   color: var(--text-text);
   font: 400 var(--font-size-body) / 1.2 var(--font-family-ui);
+  white-space: nowrap;
 }
 
-.readout {
+/* A held camera's value: a key in the well's colours that opens its list or
+   its typed entry, with the readout drawn inside it. */
+.value {
   appearance: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
   min-width: 0;
   height: 40px;
-  padding: 0 12px;
+  padding: 0;
   border: 1px solid var(--material-line);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  box-shadow: var(--elevation-well);
-  color: var(--display-text);
-  text-align: left;
-}
-
-button.readout {
+  color: var(--text-text);
   cursor: pointer;
+  transition: border-color var(--motion-duration-press) var(--motion-easing-mech);
 }
 
-button.readout:hover {
+.value:hover {
   border-color: var(--material-line2);
 }
 
-button.readout:focus-visible,
-.readout[data-open] {
+.value:focus-visible,
+.value[data-open] {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.readout b {
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+/* The readout inside: the value at the start, its unit after it. */
+.readout {
+  flex: 1;
+  justify-content: flex-start;
+  height: 38px;
+  font-weight: 700;
 }
 
-.readout b[data-dim] {
-  color: var(--display-text2);
+/* A camera that is not held: the readout alone, in a well, as doubt (the
+   dashed yellow keyline) or not read. */
+.valueWell {
+  justify-content: flex-start;
+  border-color: var(--material-line);
+  background: var(--material-well);
+  font-weight: 700;
 }
 
-.readout span {
-  color: var(--display-text2);
-  font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
-  white-space: nowrap;
-}
-
-/* Doubt: what the camera last reported, not a fact now. */
-.readout[data-doubt] {
-  border: 1px dashed var(--display-yellow);
-}
-
-.readout[data-doubt] b {
-  color: var(--display-yellow);
+.valueWell[data-doubt] {
+  border: 1px dashed var(--role-yellow-line);
+  color: var(--role-yellow-text);
 }
 
 /* A value the camera does not report: its own sentence, across the row. */
@@ -138,9 +138,9 @@ button.readout:focus-visible,
   min-height: 40px;
   padding: 8px 12px;
   border: 1px dashed var(--material-line2);
-  border-radius: var(--radius-key);
+  border-radius: var(--radius-base);
   background: var(--material-well);
-  color: var(--display-text2);
+  color: var(--text-text2);
   font: 400 var(--font-size-label) / 1.3 var(--font-family-ui);
 }
 
@@ -165,14 +165,14 @@ button.readout:focus-visible,
 
 .focus {
   display: grid;
-  grid-template-columns: 1fr 72px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   align-items: center;
   gap: 12px;
 }
 
 .focusValue {
   color: var(--text-text);
-  font: 700 var(--font-size-word) / 1 var(--font-family-mono);
+  font: 700 var(--font-size-word) / 1 var(--font-family-ui);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -184,61 +184,28 @@ button.readout:focus-visible,
 .nearFar {
   display: flex;
   justify-content: space-between;
-  color: var(--text-text2);
+  margin-right: 84px;
+  color: var(--text-text3);
   font: 400 var(--font-size-tick) / 1 var(--font-family-ui);
 }
 
-.choiceLabel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 16px;
-  color: var(--text-text);
-  font: 400 var(--font-size-body) / 1 var(--font-family-ui);
+/* The key that opens the format's or the look's popover, in its section's head. */
+.opener {
+  display: inline-flex;
 }
 
-.choiceValue {
-  margin-left: auto;
+/* What a press-twice setting is, as the camera reports it. */
+.reported {
+  font-weight: 700;
+}
+
+.reported[data-doubt] {
+  color: var(--role-yellow-text);
+  outline: 1px dashed var(--role-yellow-line);
+  outline-offset: 2px;
+}
+
+.reportedNote {
+  font-weight: 400;
   color: var(--text-text2);
-  font: 400 var(--font-size-label) / 1 var(--font-family-mono);
-}
-
-.choices > * {
-  min-width: 0;
-  padding: 0 6px;
-}
-
-/* The display LUT's four choices: the long ones take two lines. */
-.lut > * {
-  min-height: 48px;
-  white-space: normal;
-  text-align: center;
-  font: 700 var(--font-size-label) / 1.15 var(--font-family-ui);
-}
-
-/* A small pair in a label's row: On and Off. */
-.onOff {
-  padding: 2px;
-  gap: 2px;
-  border-radius: var(--radius-key);
-}
-
-.onOff > * {
-  flex: none;
-  min-height: 28px;
-}
-
-/* An armed choice in a segmented well: the armed key's keyline and bar, in
-   the room the choice had. */
-.armedChoice {
-  flex: 1;
-  min-width: 0;
-  min-height: 40px;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 4px 6px 8px;
-  white-space: normal;
-  text-align: center;
 }
