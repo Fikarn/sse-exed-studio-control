@@ -32,11 +32,13 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
     // next action writes over it. The app's own snapshot recall went on
     // 2026-10-01 the same way: a last action it wrote ("Recalled Snapshot 5:
     // … unconfirmed") would describe a recall this build cannot make. The send
-    // modes and the dynamics went on 2026-10-04 the same way again.
+    // modes, the dynamics and the equaliser went on 2026-10-04 the same way.
     let saved_code = read_optional_setting(settings, AUDIO_LAST_ACTION_CODE_KEY);
     let retired_refusal = saved_code.as_deref() == Some(RETIRED_TALKBACK_REFUSED_CODE)
         || saved_code.as_deref().is_some_and(|code| {
-            RETIRED_SNAPSHOT_CODES.contains(&code) || RETIRED_APP_ONLY_CODES.contains(&code)
+            RETIRED_SNAPSHOT_CODES.contains(&code)
+                || RETIRED_APP_ONLY_CODES.contains(&code)
+                || RETIRED_EQ_CODES.contains(&code)
         });
     // A load's own failure begins with the slot's name, which TotalMix may
     // have named "Recalled …": that sentence says it was sent to TotalMix.
@@ -46,6 +48,7 @@ pub fn read_audio_snapshot(settings: &HashMap<String, String>) -> AudioSnapshot 
                 && !message.contains(" was sent to TotalMix; "))
                 || message.starts_with(RETIRED_SNAPSHOT_MESSAGE_PREFIX)
                 || RETIRED_APP_ONLY_MESSAGES.contains(&message.as_str())
+                || retired_eq_message(&message)
         });
     let last_action = |key: &str| {
         read_optional_setting(settings, key).filter(|_| !retired_refusal && !retired_recall)
@@ -258,4 +261,29 @@ pub fn build_audio_health_check(settings: &HashMap<String, String>) -> AudioHeal
         metering_source: snapshot.metering_source,
         metering_state: snapshot.metering_state,
     }
+}
+
+/// A last action only the equaliser's edit wrote (it went on 2026-10-04),
+/// matched whole: a message that remains carries a name TotalMix supplies, so
+/// a word inside it proves nothing ("Sent 1 change for 'Vox EQ changes' …").
+fn retired_eq_message(message: &str) -> bool {
+    let between = |prefix: &str, suffix: &str| {
+        message
+            .strip_prefix(prefix)
+            .and_then(|rest| rest.strip_suffix(suffix))
+            .is_some()
+    };
+    between("Simulated audio EQ state for '", "' was updated.")
+        || between(
+            "Saved the EQ change for '",
+            "' in the app only — TotalMix has no remote control for that field.",
+        )
+        || message
+            .strip_prefix("Sent ")
+            .and_then(|rest| rest.split_once(' '))
+            .is_some_and(|(count, rest)| {
+                count.parse::<u32>().is_ok()
+                    && (rest.starts_with("EQ change for '") || rest.starts_with("EQ changes for '"))
+                    && rest.ends_with("' to TotalMix — waiting for the console to confirm.")
+            })
 }

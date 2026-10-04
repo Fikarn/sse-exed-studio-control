@@ -11,10 +11,6 @@ import {
   CONSOLE_SNAPSHOT_SLOTS,
   forgetConsoleSnapshotStates,
   markConsoleSnapshotLoaded,
-  fixtureAudioChannel,
-  normalizeAudioEq,
-  normalizeLowCutSlope,
-  normalizeEqBandType,
 } from "./audioConsole";
 import { clampNumber } from "./lighting";
 import { synchronizeFixtureState } from "./state";
@@ -295,43 +291,6 @@ export function handleFixtureAudioRequest(
       state.audioSnapshot = audioSnapshot;
       synchronizeFixtureState(state);
       emit("audio.changed", { reason: "audio-channel-updated" });
-      return cloneJson(channel);
-    }
-    case "audio.channel.eq.update": {
-      const audioSnapshot = ensureAudioActionAllowed(state);
-      const channel = fixtureAudioChannel(audioSnapshot, params.channelId);
-      const eq = normalizeAudioEq(asRecord(channel.eq));
-      if ("enabled" in params) eq.enabled = asBoolean(params.enabled, false);
-      if ("lowCutEnabled" in params) eq.lowCut.enabled = asBoolean(params.lowCutEnabled, false);
-      if (typeof params.lowCutFrequencyHz === "number") {
-        eq.lowCut.frequencyHz = clampNumber(params.lowCutFrequencyHz, 20, 500);
-      }
-      if (typeof params.lowCutSlopeDbPerOctave === "number") {
-        eq.lowCut.slopeDbPerOctave = normalizeLowCutSlope(params.lowCutSlopeDbPerOctave);
-      }
-      if (typeof params.bandId === "string") {
-        const bands = asArray(eq.bands)
-          .map((entry) => asRecord(entry))
-          .filter((entry): entry is JsonObject => entry !== null);
-        const band = bands.find((entry) => asString(entry.id) === params.bandId);
-        if (!band) throw new Error(`Audio EQ band '${params.bandId}' is not exposed by the fixture transport.`);
-        if ("bandEnabled" in params) band.enabled = asBoolean(params.bandEnabled, false);
-        if (typeof params.bandType === "string") {
-          const nextType = normalizeEqBandType(params.bandId, params.bandType);
-          if (nextType !== params.bandType) {
-            throw new Error(`Audio EQ band '${params.bandId}' does not support type '${params.bandType}'.`);
-          }
-          band.bandType = nextType;
-        }
-        if (typeof params.frequencyHz === "number") band.frequencyHz = clampNumber(params.frequencyHz, 20, 20_000);
-        if (typeof params.gainDb === "number") band.gainDb = clampNumber(params.gainDb, -20, 20);
-        if (typeof params.q === "number") band.q = clampNumber(params.q, 0.4, 9.9);
-        eq.bands = bands as typeof eq.bands;
-      }
-      channel.eq = eq;
-      state.audioSnapshot = audioSnapshot;
-      synchronizeFixtureState(state);
-      emit("audio.changed", { reason: "audio-channel-eq-updated" });
       return cloneJson(channel);
     }
     case "audio.mixTarget.update": {

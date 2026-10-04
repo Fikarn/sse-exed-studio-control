@@ -5,19 +5,11 @@ import { MenuButton, PlateHead, Readouts, type UseArmResult } from "@sse/design-
 import styles from "./AudioInspector.module.css";
 import { buildChannelMenu } from "./audioChannelMenu";
 import { AudioGainEntryDialog, AudioLevelEntryDialog } from "./AudioEntryDialogs";
-import { AudioPlateEq } from "./inspector/AudioPlateEq";
 import { AudioPlateMeter } from "./inspector/AudioPlateMeter";
 import { AudioPlateMixes } from "./inspector/AudioPlateMixes";
 import { AudioPlatePreamp } from "./inspector/AudioPlatePreamp";
-import { usePlateValueEntry } from "./inspector/usePlateValueEntry";
-import {
-  channelOrdinalLabel,
-  channelTypeLabel,
-  type AudioChannelUpdate,
-  type AudioEqUpdate,
-} from "./inspector/audioInspectorHelpers";
+import { channelOrdinalLabel, channelTypeLabel, type AudioChannelUpdate } from "./inspector/audioInspectorHelpers";
 import { type AudioControlDraftStore, useAudioControlDraftValue } from "../audioControlDraftStore";
-import { useAudioInspectorEqState } from "../hooks/useAudioInspectorEqState";
 import {
   audioChannelSupportsGain,
   getAudioChannelGroup,
@@ -28,10 +20,11 @@ import {
 // The plate (visual overhaul, the Console): the selection whole on one plate
 // that never scrolls. A channel: its title plate (the name, one line of what it
 // is, the strip's own menu), then its preamp (an input's), the other mixes it
-// feeds, its equaliser and its meter. An output: its title plate and its
-// meter; its level's one home is the cluster. Editing that needs more room
-// than a row opens beside the row (a band's popover). The dynamics went on
-// 2026-10-04: they were kept in the app and never reached TotalMix.
+// feeds and its meter. An output: its title plate and its meter; its level's
+// one home is the cluster. The dynamics and the equaliser went on 2026-10-04
+// (the owner's decisions): the dynamics never reached TotalMix, and the
+// equaliser reached it over commands that only flipped its on/off, could land
+// on another strip and were never read back. Both are set in TotalMix.
 
 type AudioMixTargetUpdate = Parameters<ShellStore["updateAudioMixTarget"]>[0];
 
@@ -40,7 +33,6 @@ export interface AudioInspectorProps {
   armedActionKey: string | null;
   clearDraftValueLater: (key: string, delayMs?: number) => void;
   commitChannelContinuous: (request: AudioChannelUpdate) => void;
-  commitChannelEqContinuous: (request: AudioEqUpdate) => void;
   draftStore: AudioControlDraftStore;
   getDraftValue: (key: string, fallback: number) => number;
   onClearClip: (channelId: string) => void;
@@ -50,7 +42,6 @@ export interface AudioInspectorProps {
   onTogglePeakHold: () => void;
   onTogglePhantom: (request: { channelId: string; channelName: string; phantom: boolean }) => void;
   onUpdateChannel: (request: AudioChannelUpdate) => void;
-  onUpdateChannelEq: (request: AudioEqUpdate) => void;
   onUpdateMixTarget: (request: AudioMixTargetUpdate) => void;
   peakHoldEnabled: boolean;
   peakHoldResetToken: number;
@@ -87,7 +78,6 @@ function AudioChannelPlate({
   armedActionKey,
   clearDraftValueLater,
   commitChannelContinuous,
-  commitChannelEqContinuous,
   draftStore,
   getDraftValue,
   onClearClip,
@@ -97,7 +87,6 @@ function AudioChannelPlate({
   onTogglePeakHold,
   onTogglePhantom,
   onUpdateChannel,
-  onUpdateChannelEq,
   peakHoldEnabled,
   peakHoldResetToken,
   setDraftValue,
@@ -107,20 +96,8 @@ function AudioChannelPlate({
   const channel = viewModel.selectedChannel!;
   const selectedMixTarget = viewModel.selectedMixTarget;
   const [entry, setEntry] = useState<"level" | "gain" | null>(null);
-  const { ask, dialog } = usePlateValueEntry();
   const menuLock = viewModel.actionsAllowed ? null : `desk ${viewModel.status.label}`;
   const lockedReason = viewModel.actionsAllowed ? undefined : (viewModel.status.warningBody ?? undefined);
-  const canEdit = viewModel.capabilities.canEditProcessing;
-
-  const eqState = useAudioInspectorEqState({
-    clearDraftValueLater,
-    commitChannelEqContinuous,
-    getDraftValue,
-    onUpdateChannelEq,
-    selectedChannel: channel,
-    setDraftValue,
-    viewModel,
-  });
 
   const gainDraftKey = `channel:${channel.id}:gain`;
   const gain = useAudioControlDraftValue(draftStore, gainDraftKey, getDraftValue(gainDraftKey, channel.gain));
@@ -197,18 +174,6 @@ function AudioChannelPlate({
         setDraftValue={setDraftValue}
       />
 
-      <AudioPlateEq
-        arm={arm}
-        ask={ask}
-        canEdit={canEdit}
-        channel={channel}
-        clearDraftValueLater={clearDraftValueLater}
-        eqState={eqState}
-        menuLock={menuLock}
-        onUpdateChannelEq={onUpdateChannelEq}
-        setDraftValue={setDraftValue}
-      />
-
       <AudioPlateMeter
         arm={arm}
         extraItems={[
@@ -264,7 +229,6 @@ function AudioChannelPlate({
           }}
         />
       ) : null}
-      {dialog}
     </>
   );
 }

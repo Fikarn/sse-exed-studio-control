@@ -107,7 +107,6 @@ export interface AudioWorkspaceViewModel {
   totalBanks: number;
   unsupportedFeatures: {
     clipReset: boolean;
-    eq: boolean;
     masterView: boolean;
     pfl: boolean;
   };
@@ -362,7 +361,6 @@ function audioCapabilities(snapshot: AudioSnapshot): AudioSnapshot["capabilities
       canEditMixerState: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canSync: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canRecallConsoleSnapshot: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
-      canEditProcessing: snapshot.oscEnabled === true && String(snapshot.status ?? "not-verified") === "ready",
       canClearClips: snapshot.oscEnabled === true,
       canUseMasterView: snapshot.oscEnabled === true,
     }
@@ -574,7 +572,6 @@ export function buildAudioViewModel({
     totalBanks,
     unsupportedFeatures: {
       clipReset: !capabilities.canClearClips,
-      eq: !capabilities.canEditProcessing,
       masterView: !capabilities.canUseMasterView,
       pfl: true,
     },

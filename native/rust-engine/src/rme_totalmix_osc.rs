@@ -15,14 +15,13 @@ use std::sync::{mpsc::Sender, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-// The command paths, split by remote generation (2026-09 production readiness,
-// Slice 6): the classic page-2 EQ path on the first classic remote, and the
-// Global OSC remote's absolute channel / output-mix commands. The metering
-// paths of both generations stay here because they share the meter state.
-mod classic_eq;
+// The command path (2026-09 production readiness, Slice 6): the Global OSC
+// remote's absolute channel / output-mix commands. The classic page-2 EQ path
+// on the first classic remote went on 2026-10-04 with the Console's equaliser.
+// The metering paths of both generations stay here because they share the
+// meter state.
 mod global_commands;
 
-pub use classic_eq::send_totalmix_eq_update;
 pub(crate) use global_commands::{
     global_channel_surface, global_channel_target, global_output_channel, global_output_mix_target,
 };
@@ -1574,7 +1573,7 @@ pub(crate) fn bind_live_global_slot_for_test(
 // TotalMix OSC banks index the *visible mixer layout*, not hardware channel
 // numbers — hidden channels are skipped and the control-room strips sit at
 // the end of the output row. The fixed studio workstation runs the
-// commissioned "tidied" TotalMix layout (docs/OPERATIONS.md):
+// commissioned "tidied" TotalMix layout:
 //
 //   inputs   strip 1..4  = front preamps 9..12 (line inputs 1-8 hidden)
 //   playback strip 1..4  = pairs 1/2, 3/4, 5/6, 7/8 (pairs 9-12 hidden)
@@ -1585,8 +1584,7 @@ pub(crate) fn bind_live_global_slot_for_test(
 // remotes' `/1/trackname{N}` state dumps), NOT the mixer window's visual
 // order — TotalMix draws the control-room strips at the right edge, but the
 // OSC bank keeps Main first because Main is AN 1/2. If the operator changes
-// the TotalMix channel layout, this table and the command map in
-// `totalmix_strip_target` must be recommissioned together.
+// the TotalMix channel layout, this table must be recommissioned.
 fn surface_id_for_meter(bus: RmeTotalMixBus, channel_index: usize) -> Option<String> {
     match bus {
         RmeTotalMixBus::Input if channel_index < 4 => {

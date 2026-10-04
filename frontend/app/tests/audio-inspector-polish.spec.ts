@@ -84,27 +84,8 @@ test("a TotalMix snapshot slot shows its name and state, and a hover adds nothin
   await expect(page.getByTestId("audio-snapshot-deck").getByRole("button")).toHaveCount(8);
 });
 
-test("EQ Band 2 locks the band-type selector via the capability flag", async ({ page }) => {
-  await openFixture(page, "audio-selected-channel");
-  // Visual overhaul A, Slice 4c. Old: click the EQ tab. New: the equaliser is a
-  // section of the plate, always present; bring it into view. Reason: the plate
-  // has no tab row.
-  const eqSection = page.locator('[data-plate-section="eq"]');
-  await expect(eqSection).toBeAttached();
-  await eqSection.scrollIntoViewIfNeeded();
-
-  const band2 = page.getByTestId("audio-eq-point-2");
-  await band2.click();
-
-  // 2026-05-27 redesign: the EQ tab shows every band's card at once, so a
-  // global Bell button now matches multiple cards. Scope to band 2's card.
-  // Band 2 renders exactly one band-type option (Bell) and that option is
-  // disabled. The disabled state is sourced from `canChangeBandType` rather
-  // than an inline `=== "2"` string match.
-  const bellButton = page.getByTestId("audio-eq-band-card-2").getByRole("button", { name: /^Bell$/i });
-  await expect(bellButton).toBeVisible();
-  await expect(bellButton).toBeDisabled();
-});
+// 2026-10-04: "EQ Band 2 locks the band-type selector via the capability
+// flag" went with the plate's equaliser (the owner's decision).
 
 // Visual overhaul B (DESIGN.md §9): no tooltip covers a take-time control. The
 // strip's M and S are take-time keys between take-time keys (48 V and gain

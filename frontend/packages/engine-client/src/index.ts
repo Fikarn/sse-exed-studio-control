@@ -54,7 +54,6 @@ export type {
   AudioClipClearRequest,
   AudioMeterEntry,
   AudioMeterFrame,
-  AudioEqUpdateRequest,
   BackgroundFailure,
   CameraAutoRequest,
   CameraFormatRequest,
@@ -102,9 +101,6 @@ export type { AudioChannelSnapshot } from "./generated/snapshots/AudioChannelSna
 export type { AudioCapabilitySnapshot } from "./generated/snapshots/AudioCapabilitySnapshot";
 export type { AudioConsoleSnapshotSlot } from "./generated/snapshots/AudioConsoleSnapshotSlot";
 export type { AudioConsoleSnapshots } from "./generated/snapshots/AudioConsoleSnapshots";
-export type { AudioEqBandSnapshot } from "./generated/snapshots/AudioEqBandSnapshot";
-export type { AudioEqSnapshot } from "./generated/snapshots/AudioEqSnapshot";
-export type { AudioLowCutSnapshot } from "./generated/snapshots/AudioLowCutSnapshot";
 export type { AudioMixTargetSnapshot } from "./generated/snapshots/AudioMixTargetSnapshot";
 export type { AudioSnapshot } from "./generated/snapshots/AudioSnapshot";
 export type { CameraAutos } from "./generated/snapshots/CameraAutos";

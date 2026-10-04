@@ -27,6 +27,14 @@ const RETIRED_APP_ONLY_CODES: [&str; 2] =
     ["AUDIO_SEND_UNAVAILABLE", "AUDIO_PROCESSING_UNAVAILABLE"];
 const RETIRED_APP_ONLY_MESSAGES: [&str; 2] =
     ["Audio send mode updated.", "Audio dynamics updated."];
+/// The codes only the equaliser's edit wrote; it went on 2026-10-04 (the
+/// owner's decision). Its messages are matched whole in `snapshot.rs`.
+const RETIRED_EQ_CODES: [&str; 4] = [
+    "AUDIO_EQ_BAND_REQUIRED",
+    "AUDIO_EQ_BAND_NOT_FOUND",
+    "AUDIO_EQ_BAND_TYPE_UNSUPPORTED",
+    "AUDIO_EQ_UPDATE_FAILED",
+];
 const AUDIO_LAST_ACTION_MESSAGE_KEY: &str = "app.audio.last_action_message";
 const AUDIO_CHANNEL_STATE_KEY: &str = "app.audio.channels_state";
 const AUDIO_MIX_TARGET_STATE_KEY: &str = "app.audio.mix_targets_state";

@@ -69,8 +69,7 @@ export async function expectAudioInspectorPanelsFit(page: Page) {
 
   // The visual overhaul's Console pull request. Old: a plate taller than its
   // column passed when it could scroll. New: the plate fits its 1320 px and
-  // never scrolls. Reason: DESIGN.md §1, nothing scrolls; the plate's EQ is a
-  // table with its editing in popovers now.
+  // never scrolls. Reason: DESIGN.md §1, nothing scrolls.
   expect(
     metrics.scrollHeight <= metrics.clientHeight + 1,
     `the plate scrolls or clips (scrollHeight ${metrics.scrollHeight} > clientHeight ${metrics.clientHeight}, overflow-y ${metrics.overflowY})`
@@ -115,10 +114,7 @@ export async function expectAudioStudioSideRailsFilled(page: Page, _bottomGapPx 
 // visible at once — so what used to be "click the EQ tab" is "bring the EQ
 // section into view". Sections keep the ids the tabs' panels had, prefixed
 // `audio-plate-section-`.
-export async function revealPlateSection(
-  page: Page,
-  section: "preamp" | "send" | "eq" | "meter" | "channel" | "output"
-) {
+export async function revealPlateSection(page: Page, section: "preamp" | "send" | "meter" | "channel" | "output") {
   const target = page.locator(`[data-plate-section="${section}"]`);
   await expect(target).toBeAttached();
   await target.scrollIntoViewIfNeeded();
@@ -209,17 +205,17 @@ export async function expectAudioOverviewProcessingStack(page: Page, label: stri
   // and the mini-preview is gone (the equaliser itself is right there).
   // Reason: no tab row, so what the check is for — the sections stack in the
   // signal's order inside the plate and stay boxed in it — reads off the plate.
+  // 2026-10-04: the equaliser went (the owner's decision); the meter follows
+  // the sends.
   const plate = page.getByTestId("audio-inspector");
   const preamp = page.locator('[data-plate-section="preamp"]');
   const sends = page.locator('[data-plate-section="send"]');
-  const eq = page.locator('[data-plate-section="eq"]');
   const meter = page.locator('[data-plate-section="meter"]');
 
   await expect(plate, `${label} plate`).toBeVisible();
   for (const [locator, name] of [
     [preamp, "preamp section"],
     [sends, "sends section"],
-    [eq, "equaliser section"],
     [meter, "meter section"],
   ] as const) {
     await expect(locator, `${label} ${name}`).toBeAttached();
@@ -228,21 +224,18 @@ export async function expectAudioOverviewProcessingStack(page: Page, label: stri
   const plateBox = await readRequiredLocatorBox(plate, `${label} plate`);
   const preampBox = await readRequiredLocatorBox(preamp, `${label} preamp section`);
   const sendsBox = await readRequiredLocatorBox(sends, `${label} sends section`);
-  const eqBox = await readRequiredLocatorBox(eq, `${label} equaliser section`);
   const meterBox = await readRequiredLocatorBox(meter, `${label} meter section`);
 
-  // The signal's order down the plate: what the source is, where it goes, what
-  // is done to it, what is coming back.
+  // The signal's order down the plate: what the source is, where it goes,
+  // what is coming back.
   expect(sendsBox.top, `${label} sends below the preamp`).toBeGreaterThanOrEqual(preampBox.top - 1);
-  expect(eqBox.top, `${label} equaliser below the sends`).toBeGreaterThanOrEqual(sendsBox.top - 1);
-  expect(meterBox.top, `${label} meter below the equaliser`).toBeGreaterThanOrEqual(eqBox.top - 1);
+  expect(meterBox.top, `${label} meter below the sends`).toBeGreaterThanOrEqual(sendsBox.top - 1);
 
   // Every section is boxed inside the plate horizontally; the plate scrolls, so
   // a section below the fold is reachable rather than clipped.
   for (const [box, name] of [
     [preampBox, "preamp section"],
     [sendsBox, "sends section"],
-    [eqBox, "equaliser section"],
     [meterBox, "meter section"],
   ] as const) {
     expect(box.left, `${label} ${name} left inside the plate`).toBeGreaterThanOrEqual(plateBox.left - 1);
@@ -297,16 +290,6 @@ export async function loadAudioSnapshot(page: Page, slot: number) {
   await page.waitForTimeout(AUDIO_ARM_MIN_DWELL_MS + 50); // confirm after the arm dwell (Slice 7)
   await key.click();
   await expect(tile).toHaveAttribute("data-armed", "false");
-}
-
-export async function expectSliderValueChanges(page: Page, label: string) {
-  const slider = page.getByRole("slider", { name: label });
-  const before = await slider.getAttribute("aria-valuenow");
-  const max = Number(await slider.getAttribute("aria-valuemax"));
-  const direction = Number(before) >= max ? "ArrowLeft" : "ArrowRight";
-  await slider.focus();
-  await page.keyboard.press(direction);
-  await expect(slider).not.toHaveAttribute("aria-valuenow", before ?? "");
 }
 
 // Re-export Locator for callers that build their own assertions on top.

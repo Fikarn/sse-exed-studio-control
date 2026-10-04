@@ -8,7 +8,8 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 
 ### Changed
 
-- The plate's dynamics leave the Console: the compressor and the gate were only kept by the app and never reached TotalMix, whose dynamics are one compressor and expander per input. The plate keeps its preamp, other mixes, equaliser and meter (#301).
+- The plate's equaliser and Low Cut leave the Console: they went to TotalMix over its old page-2 commands, whose on/off only flipped TotalMix's switch, which could land on another mic, and which nothing read back. Set the EQ in TotalMix. The plate is now the preamp, the other mixes and the meter (#302).
+- The plate's dynamics leave the Console: the compressor and the gate were only kept by the app and never reached TotalMix, whose dynamics are one compressor and expander per input (#301).
 - The sends' modes leave the Console: Pre fader, Mute send, Link L+R and Solo send were only kept by the app and never reached TotalMix, which has none of them per send. A strip's `S` is unchanged (#300).
 - The Console is drawn anew: the outputs are rows in the left column under `DIM` and `MONO`; the strips have one-line names, bigger `M` and `S` and the gain shown; the plate fits without scrolling; every strip, output and section has a `⋯` (or a right-click), and the Console row is the page's `⋯`. Unity reads `+0.0 dB`, as on the deck (#299).
 - The frame is the new design's: an 80 px header with each page's lamp and word in its tab (the open page's in its own display), a `REC` slot that never moves, the clock and the SSE logotype; every page's plate on the right at the same width; `Nothing latched` under every state display, with a `⋯` for the page's commands. Start-up and recovery stand on the same frame (#298).
@@ -45,7 +46,7 @@ The long text of the entries written before 2026-09-28 is in git history, at the
 - A stopped hardware link restarts on its own, and a slow one no longer freezes the window. A page that fails says so (LIGHTING STOPPED, Reload this area) while the rest keeps working (#201).
 - Closing the window asks "Close Studio Control?" first, and a second copy of Studio Control hands over to the one already open, which comes to the front (#201).
 - Publish needs every probe green. With one that is not, the key reads Publish with override… and the override is recorded; Run all probes says how many of the three passed (#201).
-- The Console drives the desk: faders, mutes, solos, 48 V, gain, the equaliser, dim and mono reach TotalMix. Each change is read back, a change at TotalMix shows on screen, and the desk wins (#85, #201).
+- The Console drives the desk: faders, mutes, solos, 48 V, gain, dim and mono reach TotalMix. Each change is read back, a change at TotalMix shows on screen, and the desk wins (#85, #201).
 - Live meters come from TotalMix (its remote controller 4, Global OSC): the right channels whatever its layout, the outputs too, and back on their own after the app or TotalMix restarts (#85, #201).
 - The Stream Deck+ is the Console's control surface: the AUDIO page has seven keys, four touch strips (name, level, fader bar) and four dials. The screen follows the deck, and the deck the screen (#201).
 - Lighting drives the rig: the light output goes to the Apollo bridge over sACN as soon as lighting is on, the bridge has an address and a fixture is patched, unless the light outputs are held (#201).

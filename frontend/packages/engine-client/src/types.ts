@@ -195,20 +195,6 @@ export interface AudioClipClearRequest {
   channelId?: string;
 }
 
-export interface AudioEqUpdateRequest {
-  channelId: string;
-  enabled?: boolean;
-  lowCutEnabled?: boolean;
-  lowCutFrequencyHz?: number;
-  lowCutSlopeDbPerOctave?: 6 | 12 | 18 | 24;
-  bandId?: "1" | "2" | "3";
-  bandEnabled?: boolean;
-  bandType?: "bell" | "low-shelf" | "high-shelf" | "high-pass" | "low-pass";
-  frequencyHz?: number;
-  gainDb?: number;
-  q?: number;
-}
-
 export interface AudioMixTargetUpdateRequest {
   mixTargetId: string;
   volume?: number;
@@ -589,7 +575,6 @@ export interface ShellStore {
   clearAudioClips(request?: AudioClipClearRequest): Promise<JsonValue>;
   clearAllAudioSolo(): Promise<JsonValue>;
   updateAudioChannel(request: AudioChannelUpdateRequest): Promise<JsonValue>;
-  updateAudioChannelEq(request: AudioEqUpdateRequest): Promise<JsonValue>;
   updateAudioMixTarget(request: AudioMixTargetUpdateRequest): Promise<JsonValue>;
   updateAudioSettings(request: AudioSettingsUpdateRequest): Promise<JsonValue>;
   updateLightingSettings(request: LightingSettingsUpdateRequest): Promise<JsonValue>;

@@ -93,8 +93,6 @@ export const KEY_HANDLERS = {
     "a focused slider or fader: the arrows, Home and End, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/audio/components/AudioKnob.tsx":
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
-  "frontend/app/src/app/audio/components/inspector/AudioPlateEq.tsx":
-    "Esc on a band key in the equaliser's table closes the band's open popover, as Esc in the popover does (D6)",
   "frontend/app/src/app/lighting/components/FixtureMarker.tsx":
     "Enter or Space presses the focused fixture marker (D6)",
   "frontend/app/src/app/lighting/components/GroupChip.tsx":

@@ -32,7 +32,7 @@ In TotalMix FX, `Options › Settings › OSC`, four remote controllers are `In 
 - Remote 2: `7002`, `9002`. Software playback.
 - Remote 3: `7003`, `9003`. Hardware outputs.
 - Remote 4: `7004`, `9004`, in `Global OSC` mode. Control and metering.
-- Remotes 1 to 3 have `Send Peak Level Data` on. They are the meters' fallback, and remote 1 carries EQ and Low Cut.
+- Remotes 1 to 3 have `Send Peak Level Data` on. They are the meters' fallback. (Remote 1 also carried the Console's equaliser and Low Cut until 2026-10-04, D35.)
 - Remote 4 has `Send changes` on, `Follow Submix` off and re-sending off. The engine reads each value back itself.
 - In the Channel Layout, keep the channels in use visible, or turn on `Receive on hidden channels`. A hidden channel drops writes silently.
 

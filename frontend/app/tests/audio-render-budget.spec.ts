@@ -101,7 +101,7 @@ test("scrolling the plate between its sections does not re-render the audio insp
   const baseline = await getInspectorRenderCount(page);
   expect(baseline).not.toBeNull();
 
-  for (const section of ["send", "eq", "meter"] as const) {
+  for (const section of ["send", "meter"] as const) {
     const target = page.locator(`[data-plate-section="${section}"]`);
     await target.evaluate((element) => element.scrollIntoView({ block: "start", behavior: "auto" }));
     await expect(target).toBeInViewport({ ratio: 1 });

@@ -59,7 +59,6 @@ pub(super) fn apply_channel_state(
                 if channel_supports_auto_set(&channel) {
                     channel.auto_set = state.auto_set;
                 }
-                channel.eq = normalize_audio_eq_snapshot(&state.eq);
                 for (mix_target_id, level) in &state.mix_levels {
                     channel
                         .mix_levels
@@ -422,7 +421,6 @@ pub(super) fn audio_capabilities(status: &str, osc_enabled: bool) -> AudioCapabi
         can_edit_mixer_state: console_ready,
         can_sync: console_ready,
         can_recall_console_snapshot: console_ready,
-        can_edit_processing: console_ready,
         can_clear_clips: osc_enabled,
         can_use_master_view: osc_enabled,
     }
@@ -465,110 +463,6 @@ pub(super) fn clamp_level(value: f64) -> f64 {
 
 pub(super) fn clamp_gain(value: i64) -> i64 {
     value.clamp(0, 75)
-}
-
-pub(super) fn clamp_eq_frequency(value: f64) -> f64 {
-    value.clamp(20.0, 20_000.0)
-}
-
-pub(super) fn clamp_eq_gain(value: f64) -> f64 {
-    value.clamp(-20.0, 20.0)
-}
-
-pub(super) fn clamp_eq_q(value: f64) -> f64 {
-    value.clamp(0.4, 9.9)
-}
-
-pub(super) fn clamp_low_cut_frequency(value: f64) -> f64 {
-    value.clamp(20.0, 500.0)
-}
-
-pub(super) fn normalize_low_cut_slope(value: i64) -> i64 {
-    match value {
-        6 | 12 | 18 | 24 => value,
-        _ if value < 9 => 6,
-        _ if value < 15 => 12,
-        _ if value < 21 => 18,
-        _ => 24,
-    }
-}
-
-pub(super) fn normalize_audio_eq_snapshot(eq: &AudioEqSnapshot) -> AudioEqSnapshot {
-    let defaults = default_audio_eq_snapshot();
-    let old_low_cut = eq.bands.iter().find(|band| band.id == "lc");
-    let low_cut = AudioLowCutSnapshot {
-        enabled: old_low_cut
-            .map(|band| band.enabled)
-            .unwrap_or(eq.low_cut.enabled),
-        frequency_hz: clamp_low_cut_frequency(
-            old_low_cut
-                .map(|band| band.frequency_hz)
-                .unwrap_or(eq.low_cut.frequency_hz),
-        ),
-        slope_db_per_octave: normalize_low_cut_slope(eq.low_cut.slope_db_per_octave),
-    };
-
-    let mut bands = Vec::with_capacity(3);
-    for default_band in defaults.bands {
-        let legacy_id = match default_band.id.as_str() {
-            "1" => "lo",
-            "2" => "mid",
-            "3" => "hi",
-            _ => default_band.id.as_str(),
-        };
-        let source = eq
-            .bands
-            .iter()
-            .find(|band| band.id == default_band.id || band.id == legacy_id);
-        let source_enabled = source.map(|band| band.enabled).unwrap_or(true);
-        let mut band = source.cloned().unwrap_or(default_band.clone());
-        band.id = default_band.id;
-        band.label = default_band.label;
-        band.frequency_hz = clamp_eq_frequency(band.frequency_hz);
-        band.gain_db = clamp_eq_gain(band.gain_db);
-        if !source_enabled {
-            band.gain_db = 0.0;
-        }
-        band.q = clamp_eq_q(band.q);
-        band.band_type = normalize_eq_band_type(&band.id, &band.band_type);
-        band.enabled = true;
-        bands.push(band);
-    }
-
-    AudioEqSnapshot {
-        enabled: eq.enabled,
-        low_cut,
-        hardware_status: match eq.hardware_status.as_str() {
-            "pending" | "confirmed" => eq.hardware_status.clone(),
-            _ => String::from("local"),
-        },
-        bands,
-    }
-}
-
-pub(super) fn normalize_eq_band_type(band_id: &str, band_type: &str) -> String {
-    match band_id {
-        "1" => match band_type {
-            "low-shelf" | "high-pass" | "low-pass" => String::from(band_type),
-            _ => String::from("bell"),
-        },
-        "2" => String::from("bell"),
-        "3" => match band_type {
-            "high-shelf" | "low-pass" | "high-pass" => String::from(band_type),
-            "shelf" => String::from("high-shelf"),
-            _ => String::from("bell"),
-        },
-        _ => String::from("bell"),
-    }
-}
-
-pub(super) fn eq_band_type_supported(band_id: &str, band_type: &str) -> bool {
-    match band_id {
-        "1" => matches!(band_type, "bell" | "low-shelf" | "high-pass" | "low-pass"),
-        "2" => band_type == "bell",
-        "3" => matches!(band_type, "bell" | "high-shelf" | "low-pass" | "high-pass"),
-        _ => false,
-    }
 }
 
 pub(super) fn channel_supports_gain(channel: &AudioChannelSnapshot) -> bool {
@@ -651,7 +545,6 @@ pub(super) fn stored_channel_state_from_snapshot(
         pad: false,
         instrument: channel.instrument,
         auto_set: channel.auto_set,
-        eq: channel.eq.clone(),
     }
 }
 

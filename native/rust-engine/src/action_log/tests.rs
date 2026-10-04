@@ -202,11 +202,6 @@ fn ui_examples() -> Vec<(&'static str, Value, Value)> {
             json!({ "id": "audio-mix-main", "name": "Main Out" }),
         ),
         (
-            "audio.channel.eq.update",
-            json!({ "channelId": "audio-input-1", "enabled": true, "lowCutEnabled": true, "bandId": "band-2", "bandEnabled": false }),
-            json!({ "name": "Host mic" }),
-        ),
-        (
             "audio.snapshot.load",
             json!({ "slot": 2 }),
             json!({ "loaded": true, "slot": 2, "name": "Panel" }),

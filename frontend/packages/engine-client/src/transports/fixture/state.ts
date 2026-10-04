@@ -14,12 +14,7 @@ import {
   normalizePaletteValue,
   defaultLightingPalettes,
 } from "./lighting";
-import {
-  buildDefaultAudioSnapshot,
-  normalizeAudioEq,
-  normalizeConsoleSnapshots,
-  refreshAudioCapabilities,
-} from "./audioConsole";
+import { buildDefaultAudioSnapshot, normalizeConsoleSnapshots, refreshAudioCapabilities } from "./audioConsole";
 // The attribute is for Node, which loads this file as it is for the page tests.
 import deckPages from "./deckPages.json" with { type: "json" };
 import type { IdentifyBursts } from "./lightingOverlay";
@@ -743,7 +738,6 @@ export function synchronizeFixtureState(state: MutableFixtureState) {
         1
       ),
       pad: false,
-      eq: normalizeAudioEq(asRecord(channel.eq)),
     }));
   audioSnapshotRecord.mixTargets = asArray(audioSnapshotRecord.mixTargets)
     .map((entry) => asRecord(entry))
