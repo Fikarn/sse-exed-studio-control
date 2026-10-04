@@ -26,6 +26,11 @@ Walk everything for a build that changes saved data or devices. Otherwise walk t
 - [ ] A light selected in the list, then on the plot: the plate follows both, and the footer's values are complete.
 - [ ] Through the whole walk the Lighting lamp never reads `not answering` while the bridge is on, and the rig follows steadily: the bridge watch knocks on its web page every 5 s. `engine.log` has one line that the bridge answers (a connection taken, or refused) for each start of the hardware link, and none that it stopped.
 - [ ] The bridge's network cable pulled for 15 s: Lighting reads `NOT ANSWERING`, amber, nothing is locked, and there is no `Open Setup` key. Plugged back: it clears by itself within about 10 s.
+- [ ] `CUT ALL` arms at the first press ("press again", a 3 s bar) and takes every light off at the second, as the deck's `ALL OFF`; let the bar run out once and nothing changes.
+- [ ] A `Highlight` on a fixture: the rig shows it at full, the scene's row still reads `ON RIG` and the state display does not read `UNSAVED`; `Off` in the latch slot ends it.
+- [ ] The INFINIMAT (Backline Wash) has no `Strobe` on the plate and never strobes; its intensity, colour temperature and green/magenta still move it.
+- [ ] Two scenes saved with `Save as a new scene` (press twice) come back after a restart, named `Scene N`; a scene deleted from its `⋯` (press twice) can be undone.
+- [ ] The plot draws each fixture where it hangs in the room: Key, Fill, Back and the wash read their real places on the rulers.
 
 ## Audio console
 

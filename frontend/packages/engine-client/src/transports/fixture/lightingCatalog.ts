@@ -337,9 +337,8 @@ export function buildDefaultLightingFixtureCatalogSnapshot(): JsonObject {
             fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
             fixtureControl("cct", "CCT", 2000, 10000, 5600, "K"),
             fixtureControl("green-magenta", "Green/Magenta", -100, 100, 0),
-            fixtureControl("strobe", "Strobe", 0, 255, 0),
           ],
-          ["intensity", "cct", "green-magenta", "strobe"],
+          ["intensity", "cct", "green-magenta"],
           cctDefaults(2000, 10000, 5600)
         ),
         fixtureMode(
@@ -432,12 +431,8 @@ export function buildDefaultLightingFixtureCatalogSnapshot(): JsonObject {
             fixtureChannel(4, "FX Frequency", "speed", "range"),
             fixtureChannel(5, "FX Trigger", "trigger", "range"),
           ],
-          [
-            fixtureControl("intensity", "Intensity", 0, 100, 100, "%"),
-            fixtureControl("fx", "FX", 0, 255, 0),
-            fixtureControl("speed", "Speed", 0, 255, 0),
-          ],
-          ["intensity", "fx"],
+          [fixtureControl("intensity", "Intensity", 0, 100, 100, "%")],
+          ["intensity"],
           cctDefaults(5600, 5600, 5600)
         ),
       ],

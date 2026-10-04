@@ -14,9 +14,11 @@ const SNAP_METERS = 0.5;
 // have no position field. No key held with them changes the step.
 const KEY_NUDGE_METERS = 0.1;
 
-const TALENT_FILL = "var(--color-studio-talent-fill)";
-const TALENT_STROKE = "var(--color-studio-talent-ring)";
-const TALENT_DOT = "var(--color-studio-talent-dot)";
+// The visual overhaul (2026-10-04): a talent mark in the plot's neutral inks
+// (yellow is attention, DESIGN.md §4); its name is drawn by the plot's overlay.
+const TALENT_FILL = "var(--material-key)";
+const TALENT_STROKE = "var(--text-text3)";
+const TALENT_DOT = "var(--text-text2)";
 
 interface TalentMarkMarkerProps {
   depthCm: number;
@@ -57,7 +59,6 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
   const renderX = ghost?.x ?? centerX;
   const renderY = ghost?.y ?? centerY;
   const draggable = Boolean(onPositionCommit);
-  const displayLabel = mark.label.length > 16 ? `${mark.label.slice(0, 15)}…` : mark.label;
 
   const clientToInner = (clientX: number, clientY: number) => {
     const target = markerRef.current;
@@ -182,30 +183,6 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
         />
         <ellipse cx={-4.5} cy={9} rx={2.2} ry={4.4} transform="rotate(-13 -4.5 9)" style={{ fill: TALENT_DOT }} />
         <ellipse cx={4.5} cy={9} rx={2.2} ry={4.4} transform="rotate(13 4.5 9)" style={{ fill: TALENT_DOT }} />
-        <rect
-          x={-31}
-          y={20}
-          width={62}
-          height={16}
-          rx={3}
-          style={{ fill: "var(--color-bg-canvas)", stroke: TALENT_STROKE }}
-        />
-        <text
-          x={0}
-          y={31}
-          textAnchor="middle"
-          fontSize={12}
-          fontWeight={700}
-          letterSpacing={0}
-          pointerEvents="none"
-          style={{
-            fill: "var(--color-brand-text-primary)",
-            fontFamily: "var(--font-family-mono)",
-            textTransform: "uppercase",
-          }}
-        >
-          {displayLabel}
-        </text>
       </g>
       {ghost ? (
         <g pointerEvents="none">
@@ -215,7 +192,7 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
             width={70}
             height={18}
             rx={3}
-            style={{ fill: "var(--color-bg-canvas)", stroke: TALENT_STROKE, strokeWidth: 0.8 }}
+            style={{ fill: "var(--material-well)", stroke: TALENT_STROKE, strokeWidth: 0.8 }}
           />
           <text
             x={ghost.x + 47}
@@ -223,7 +200,7 @@ export function TalentMarkMarker({ depthCm, mark, onPositionCommit, widthCm }: T
             textAnchor="middle"
             fontSize={12}
             fontWeight={700}
-            style={{ fill: "var(--color-brand-text-primary)", fontFamily: "var(--font-family-mono)" }}
+            style={{ fill: "var(--text-text)", fontFamily: "var(--font-family-ui)" }}
           >
             {formatMeters(ghost.x)} m, {formatMeters(ghost.y)} m
           </text>

@@ -1,26 +1,40 @@
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { Plus, Sun } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 
-import { EmptyState, PlotMeta, PlotPill } from "@sse/design-system";
+import { Key } from "@sse/design-system";
 import type { LightingFixtureCatalogSnapshot, LightingFixtureSnapshot } from "@sse/engine-client";
 
 import { deriveMounting } from "../fixtureMounting";
 import { getFixtureVisualModel, type StagePlotRenderMode } from "../fixtureVisuals";
 import { STUDIO_LAYOUT, type StudioLayout } from "../studioLayout";
 import { useMarqueeSelection } from "../useMarqueeSelection";
-import { computeContentFitTransform, type ContentBBox, type StagePlotViewport } from "../useStagePlotViewport";
+import {
+  computeContentFitTransform,
+  type ContentBBox,
+  type StagePlotFitTransform,
+  type StagePlotViewport,
+} from "../useStagePlotViewport";
 
 import { FixtureOutputFootprint } from "./FixtureOutputFootprint";
 import { FixtureMarker } from "./FixtureMarker";
 import { FixtureSymbolKey } from "./FixtureSymbolKey";
-import { PatchAddressTag } from "./PatchAddressTag";
-import { PatchOverlay } from "./PatchOverlay";
-import { StagePlotControls } from "./StagePlotControls";
 import { StagePlotGrid } from "./StagePlotGrid";
+import { PlotRuler, StagePlotLabels, usePlotProjection, type PlotLabel } from "./StagePlotOverlay";
 import { StudioFloor } from "./StudioFloor";
 import { TalentMarkMarker } from "./TalentMarkMarker";
 
 import styles from "./StagePlot.module.css";
+
+// The visual overhaul's Lighting page (2026-10-04): the plot is the room at
+// its real metres, with a metre ruler along its top and its left edge, every
+// fixture where the saved data puts it, and every name at 13 px in an overlay
+// (with a leader where fixtures stand close). It never changes height: the
+// keys that act on it are the bar under it (`StagePlotBar`), and its framing,
+// its views, its render mode and its symbol key are in its menu (the bar's ⋯,
+// or a right-click on its floor). Nothing floats in its corners any more.
+
+/** The rulers' bands, in pixels. */
+const RULER_TOP = 24;
+const RULER_LEFT = 40;
 
 export interface StagePlotProps {
   fixtures: readonly LightingFixtureSnapshot[];
@@ -32,15 +46,9 @@ export interface StagePlotProps {
   patchMode: boolean;
   previewMode?: boolean;
   liveFixtures?: readonly LightingFixtureSnapshot[];
-  activeSceneName?: string;
-  isSceneModified?: boolean;
   renderMode: StagePlotRenderMode;
-  /**
-   * When false, the plot's "modified" treatment is downgraded to neutral —
-   * drift detection in degraded states compares live state to a preview-only
-   * recall, not a scene actually driving the rig.
-   */
-  bridgeReachable?: boolean;
+  /** The symbol key over the floor's corner (the plot menu's "Symbol key"). */
+  showSymbolKey?: boolean;
   searchQuery?: string;
   /** Fixture ids currently mid-identify-burst — markers animate a pulse ring. */
   identifyingFixtureIds?: ReadonlySet<string>;
@@ -54,25 +62,23 @@ export interface StagePlotProps {
    *  it adds the fixture to the selection or takes it out — and so is a box
    *  drag; a click on the empty plot clears the selection either way. */
   addToSelection?: boolean;
-  onAddToSelectionChange?: (next: boolean) => void;
   onSelectFixture: (id: string | null, options?: { additive?: boolean }) => void;
   onPositionCommit?: (fixtureId: string, xMeters: number, yMeters: number) => void;
   onRotationCommit?: (fixtureId: string, rotationDegrees: number) => void;
-  /** Right-click "Rename" — selects the fixture for inspection and triggers
-   *  the inspector's inline rename. */
-  onRequestRenameFixture?: (id: string) => void;
-  /** Right-click "Identify" — fires an identify burst on the fixture. */
-  onIdentifyFixture?: (id: string, name: string) => void;
-  /** Right-click "Delete" — parent shows the confirm dialog. */
-  onRequestDeleteFixture?: (id: string, name: string) => void;
+  /** A right-click on a fixture: its menu at the pointer. */
+  onOpenFixtureMenu?: (id: string, at: { x: number; y: number }) => void;
+  /** A right-click on the floor: the plot's menu at the pointer. */
+  onOpenPlotMenu?: (at: { x: number; y: number }) => void;
   /** Marquee result — fixture ids inside the released selection rectangle.
    *  When `additive` (Add to selection lit), the parent merges with the
    *  existing multi-select. */
   onMarqueeSelect?: (fixtureIds: readonly string[], options: { additive: boolean }) => void;
   onTalentMarkPositionCommit?: (id: string, xMeters: number, yMeters: number) => void;
-  /** F10 — empty-state CTA. When provided and `fixtures.length === 0`, the
-   *  empty state renders a primary "Add fixture" button that fires this. */
+  /** With no fixtures, the plot offers Add fixture. */
   onAddFixture?: () => void;
+  /** The framing the plot menu's "Frame the rig" asks for, handed up so the
+   *  menu and the double-click reach the same one. */
+  onFitTargetChange?: (target: StagePlotFitTransform) => void;
   /** Wave 31 — viewport hook lifted to the workspace; the toolbar's view slots
    *  reach the bookmark API through it. Required. */
   viewport: StagePlotViewport;
@@ -80,12 +86,10 @@ export interface StagePlotProps {
    *  renders a soft pulse so the chip ↔ marker pairing reads at a
    *  glance. Null when no chip is hovered. */
   chipHoverFixtureId?: string | null;
-  onRenderModeChange: (mode: StagePlotRenderMode) => void;
 }
 
 const FALLBACK_X_STEP = 1.5;
 const FALLBACK_Y = 4.0;
-const PLOT_TOP_GUTTER_CM = 56;
 // DENSITY-04 — half-extent pads (cm) so markers/glyphs aren't clipped at the
 // content-frame edge when fitContent computes the bounding box.
 const FIXTURE_PAD_CM = 22;
@@ -142,27 +146,23 @@ export function StagePlot({
   patchMode,
   previewMode = false,
   liveFixtures = [],
-  activeSceneName,
-  isSceneModified = false,
   renderMode,
-  bridgeReachable = true,
+  showSymbolKey = false,
   searchQuery = "",
   identifyingFixtureIds,
   highlightOverlayFixtureIds,
   addToSelection = false,
-  onAddToSelectionChange,
   onSelectFixture,
   onPositionCommit,
   onRotationCommit,
-  onRequestRenameFixture,
-  onIdentifyFixture,
-  onRequestDeleteFixture,
+  onOpenFixtureMenu,
+  onOpenPlotMenu,
   onMarqueeSelect,
   onTalentMarkPositionCommit,
   onAddFixture,
+  onFitTargetChange,
   viewport,
   chipHoverFixtureId,
-  onRenderModeChange,
 }: StagePlotProps) {
   const widthCm = layout.roomWidthMeters * 100;
   const depthCm = layout.roomDepthMeters * 100;
@@ -202,9 +202,12 @@ export function StagePlot({
   }, [fixtures, layout]);
 
   const fitTarget = useMemo(
-    () => computeContentFitTransform(contentBBox, { widthCm, depthCm, gutterCm: PLOT_TOP_GUTTER_CM }),
+    () => computeContentFitTransform(contentBBox, { widthCm, depthCm, gutterCm: 0 }),
     [contentBBox, widthCm, depthCm]
   );
+  useEffect(() => {
+    onFitTargetChange?.(fitTarget);
+  }, [fitTarget, onFitTargetChange]);
 
   // DENSITY-04 — apply the content frame on first paint when fitContent is the
   // resting mode, and whenever the operator re-selects Frame. Intentionally keyed
@@ -377,309 +380,317 @@ export function StagePlot({
     return visualMap;
   }, [catalog, fixtures]);
 
+  const projection = usePlotProjection(viewport.svgRef, viewport);
+  const labels = useMemo<PlotLabel[]>(() => {
+    const entries: PlotLabel[] = [];
+    for (const mark of layout.talentMarks) {
+      entries.push({
+        id: `talent-${mark.id}`,
+        xCm: mark.xMeters * 100,
+        yCm: mark.yMeters * 100,
+        radiusCm: 18,
+        name: mark.label,
+        kind: "fixed",
+      });
+    }
+    layout.setElements.forEach((element, index) => {
+      entries.push({
+        id: `set-${index}`,
+        xCm: element.xMeters * 100,
+        yCm: element.yMeters * 100,
+        radiusCm: (element.depthMeters * 100) / 2,
+        name: element.label,
+        kind: "fixed",
+      });
+    });
+    for (const camera of layout.cameras) {
+      entries.push({
+        id: `camera-${camera.id}`,
+        xCm: camera.xMeters * 100,
+        yCm: camera.yMeters * 100,
+        radiusCm: 12,
+        name: camera.label,
+        kind: "fixed",
+      });
+    }
+    fixtures.forEach((fixture, index) => {
+      const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
+      const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
+      const selected = selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId;
+      const detail = patchMode
+        ? fixture.dmxStartAddress > 0
+          ? `DMX ${String(fixture.dmxStartAddress).padStart(3, "0")}`
+          : "not patched"
+        : selected
+          ? fixture.on
+            ? `${Math.round(fixture.intensity)} % · ${Math.round(fixture.cct)} K`
+            : "off"
+          : null;
+      entries.push({
+        id: fixture.id,
+        xCm: xMeters * 100,
+        yCm: yMeters * 100,
+        radiusCm: Math.max(14, Math.min(40, Math.max(visual.body.width, visual.body.height) / 2 + 4)),
+        name: fixture.name,
+        detail,
+        strong: selected,
+        kind: "fixture",
+        dimmed: !fixtureMatches(fixture),
+      });
+    });
+    return entries;
+    // fixtureMatches reads the search, which is in its own deps through `needle`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    catalog,
+    displayedPositionFor,
+    fixtureVisuals,
+    fixtures,
+    layout,
+    needle,
+    patchMode,
+    selectedFixtureId,
+    selectedFixtureIds,
+  ]);
+
+  // A right-click on the floor opens the plot's menu; one on a fixture its own
+  // (the marker stops it), and one on a talent mark the plot's.
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!onOpenPlotMenu || event.defaultPrevented) return;
+    event.preventDefault();
+    onOpenPlotMenu({ x: event.clientX, y: event.clientY });
+  };
+
   return (
     <div
-      className={`${styles.plotShell} ${patchMode ? styles.plotShellPatch : ""} ${previewMode ? styles.plotShellPreview : ""}`}
+      className={styles.plotShell}
       data-render-mode={renderMode}
+      data-patch={patchMode ? "" : undefined}
       role="application"
       aria-label="Lighting stage plot"
+      onContextMenu={handleContextMenu}
     >
-      <div className={styles.plotToneOverlay} aria-hidden="true" />
-      {!patchMode && activeSceneName ? (
-        <div className={styles.plotPillSlot}>
-          <PlotPill
-            state={
-              previewMode
-                ? isSceneModified
-                  ? "modified"
-                  : "preview"
-                : isSceneModified && bridgeReachable
-                  ? "modified"
-                  : "default"
-            }
-          >
-            <span className={styles.plotPillLabel}>
-              {previewMode
-                ? isSceneModified
-                  ? "Preview · offline edits"
-                  : "Preview"
-                : isSceneModified && bridgeReachable
-                  ? "Active scene · modified"
-                  : "Active scene"}
-            </span>
-            <span className={styles.plotPillName}>{activeSceneName}</span>
-          </PlotPill>
-        </div>
-      ) : null}
-
-      <div className={styles.plotOverlaysSlot} role="region" aria-label="Stage plot context">
-        {selectedFixture ? <PlotMeta label="Selected" value={selectedFixture.name} tone="selected" /> : null}
-        <PlotMeta label="Floor" value={`${layout.roomWidthMeters} m × ${layout.roomDepthMeters} m`} />
-        <PlotMeta label="Grid" value="0.5 / 1 / 5 m" />
+      <div className={styles.rulerTop} style={{ height: RULER_TOP }}>
+        <PlotRuler projection={projection} axis="x" lengthMetres={layout.roomWidthMeters} thickness={RULER_TOP} />
       </div>
+      <div className={styles.rulerLeft} style={{ width: RULER_LEFT }}>
+        <PlotRuler projection={projection} axis="y" lengthMetres={layout.roomDepthMeters} thickness={RULER_LEFT} />
+      </div>
+      <div className={styles.plotArea}>
+        <svg
+          ref={viewport.svgRef}
+          className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
+          viewBox={`0 0 ${widthCm} ${depthCm}`}
+          preserveAspectRatio="xMidYMid meet"
+          xmlns="http://www.w3.org/2000/svg"
+          onPointerDown={(event) => {
+            // Route by mouse button: middle (1) drives pan, left (0) drives
+            // marquee selection. Both hooks no-op for the other button so
+            // co-binding is safe.
+            viewport.onPointerDown(event);
+            marquee.onPointerDown(event);
+          }}
+          onPointerMove={(event) => {
+            viewport.onPointerMove(event);
+            marquee.onPointerMove(event);
+          }}
+          onPointerUp={(event) => {
+            viewport.onPointerUp(event);
+            marquee.onPointerUp(event);
+          }}
+          onPointerCancel={(event) => {
+            viewport.onPointerUp(event);
+            marquee.onPointerUp(event);
+          }}
+          onWheel={viewport.onWheel}
+          onDoubleClick={handleResetView}
+        >
+          <g data-inner-content="true" transform={viewport.transform}>
+            <defs>
+              <clipPath id={floorClipId} clipPathUnits="userSpaceOnUse">
+                <rect x={0} y={0} width={widthCm} height={depthCm} />
+              </clipPath>
+            </defs>
+            <StudioFloor layout={layout} />
+            <StagePlotGrid layout={layout} />
 
-      <svg
-        ref={viewport.svgRef}
-        className={`${styles.plotSvg} ${viewport.isPanning ? styles.plotSvgPanning : ""} ${marquee.rect ? styles.plotSvgMarqueeing : ""}`}
-        viewBox={`0 -${PLOT_TOP_GUTTER_CM} ${widthCm} ${depthCm + PLOT_TOP_GUTTER_CM}`}
-        // Fill Desk preserves the current operator-familiar stretched plot.
-        // Fit Room / 100% use SVG meet scaling so spatial proportions remain accurate.
-        preserveAspectRatio={viewport.zoomMode === "fillDesk" ? "none" : "xMidYMid meet"}
-        xmlns="http://www.w3.org/2000/svg"
-        onPointerDown={(event) => {
-          // Route by mouse button: middle (1) drives pan, left (0) drives
-          // marquee selection. Both hooks no-op for the other button so
-          // co-binding is safe.
-          viewport.onPointerDown(event);
-          marquee.onPointerDown(event);
-        }}
-        onPointerMove={(event) => {
-          viewport.onPointerMove(event);
-          marquee.onPointerMove(event);
-        }}
-        onPointerUp={(event) => {
-          viewport.onPointerUp(event);
-          marquee.onPointerUp(event);
-        }}
-        onPointerCancel={(event) => {
-          viewport.onPointerUp(event);
-          marquee.onPointerUp(event);
-        }}
-        onWheel={viewport.onWheel}
-        onDoubleClick={handleResetView}
-      >
-        <g data-inner-content="true" transform={viewport.transform}>
-          <defs>
-            <clipPath id={floorClipId} clipPathUnits="userSpaceOnUse">
-              <rect x={0} y={0} width={widthCm} height={depthCm} />
-            </clipPath>
-            <filter id="sse-fixture-shadow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur in="SourceAlpha" stdDeviation="1.2" />
-              <feOffset dx="0" dy="1" result="offsetblur" />
-              <feComponentTransfer>
-                <feFuncA type="linear" slope="0.45" />
-              </feComponentTransfer>
-              <feMerge>
-                <feMergeNode />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <StudioFloor layout={layout} />
-          <StagePlotGrid layout={layout} />
-
-          {/* Output footprints sit under markers so marker identity and selection remain legible. */}
-          <g clipPath={`url(#${floorClipId})`} data-testid="fixture-output-layer">
-            {fixtures.map((fixture, index) => {
-              const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
-              const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
-              return (
-                <FixtureOutputFootprint
-                  key={`output-${fixture.id}`}
-                  fixtureId={fixture.id}
-                  centerX={xMeters * 100}
-                  centerY={yMeters * 100}
-                  rotationDegrees={displayedRotationFor(fixture, true)}
-                  rigHeightMeters={fixture.rigZ}
-                  beamAngle={visual.output.beamAngle}
-                  fieldAngle={visual.output.fieldAngle}
-                  intensity={fixture.intensity}
-                  cct={fixture.cct}
-                  on={fixture.on}
-                  visual={visual}
-                  renderMode={renderMode}
-                />
-              );
-            })}
-          </g>
-
-          <g aria-label="Talent marks" role="group">
-            {layout.talentMarks.map((mark) => (
-              <TalentMarkMarker
-                key={mark.id}
-                mark={mark}
-                widthCm={widthCm}
-                depthCm={depthCm}
-                onPositionCommit={onTalentMarkPositionCommit}
-              />
-            ))}
-          </g>
-
-          {previewMode ? (
-            <g className={styles.liveGhostLayer} pointerEvents="none" aria-hidden="true">
-              {liveFixtures.map((liveFixture, index) => {
-                const previewFixture = fixtures.find((fixture) => fixture.id === liveFixture.id) ?? null;
-                if (!previewFixture || !previewDiffersFromLive(previewFixture, liveFixture)) return null;
-                const { xMeters, yMeters } = meterPositionFor(liveFixture, index);
-                const mounting = deriveMounting(liveFixture, catalog);
-                if (mounting === "bar") {
-                  return (
-                    <rect
-                      key={`live-ghost-${liveFixture.id}`}
-                      x={xMeters * 100 - 18}
-                      y={yMeters * 100 - 5}
-                      width={36}
-                      height={10}
-                      rx={3}
-                      className={styles.liveGhostShape}
-                      transform={`rotate(${liveFixture.spatialRotation ?? 0} ${xMeters * 100} ${yMeters * 100})`}
-                    />
-                  );
-                }
+            {/* Output footprints sit under markers so marker identity and selection remain legible. */}
+            <g clipPath={`url(#${floorClipId})`} data-testid="fixture-output-layer">
+              {fixtures.map((fixture, index) => {
+                const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
+                const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
                 return (
-                  <circle
-                    key={`live-ghost-${liveFixture.id}`}
-                    cx={xMeters * 100}
-                    cy={yMeters * 100}
-                    r={mounting === "mat" ? 15 : 12}
-                    className={styles.liveGhostShape}
+                  <FixtureOutputFootprint
+                    key={`output-${fixture.id}`}
+                    fixtureId={fixture.id}
+                    centerX={xMeters * 100}
+                    centerY={yMeters * 100}
+                    rotationDegrees={displayedRotationFor(fixture, true)}
+                    rigHeightMeters={fixture.rigZ}
+                    beamAngle={visual.output.beamAngle}
+                    fieldAngle={visual.output.fieldAngle}
+                    intensity={fixture.intensity}
+                    cct={fixture.cct}
+                    on={fixture.on}
+                    visual={visual}
+                    renderMode={renderMode}
                   />
                 );
               })}
             </g>
-          ) : null}
 
-          {/* Fixture markers — reorder so the selected fixture paints last
-              (above its siblings), giving the in-flight drag a clear z-stack
-              without interfering with React reconciliation (key-stable). */}
-          {orderedFixtures.map((fixture) => {
-            const originalIndex = fixtures.indexOf(fixture);
-            const { xMeters, yMeters } = displayedPositionFor(fixture, originalIndex, false);
-            const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
-            return (
-              <FixtureMarker
-                key={fixture.id}
-                id={fixture.id}
-                name={fixture.name}
-                centerX={xMeters * 100}
-                centerY={yMeters * 100}
-                rotationDegrees={displayedRotationFor(fixture, false)}
-                mounting={visual.mounting}
-                renderMode={renderMode}
-                visual={visual}
-                intensity={fixture.intensity}
-                cct={fixture.cct}
-                on={fixture.on}
-                selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
-                dimmed={!fixtureMatches(fixture)}
-                identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
-                highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
-                chipHovered={chipHoverFixtureId === fixture.id}
-                onSelect={(id) => onSelectFixture(id, { additive: addToSelection })}
-                onPositionCommit={onPositionCommit}
-                onRotationCommit={onRotationCommit}
-                onRequestRename={onRequestRenameFixture}
-                onIdentify={onIdentifyFixture}
-                onRequestDelete={onRequestDeleteFixture}
-                onDragMove={handleFixtureDragMove}
-                onDragEnd={handleFixtureDragEnd}
-                onRotationMove={handleFixtureRotationMove}
-                onRotationEnd={handleFixtureRotationEnd}
-              />
-            );
-          })}
-
-          {/* F9 — smart-guide alignment lines. Only render when a fixture
-              drag is in progress. Stroke is non-scaling so the guides remain
-              crisp under any zoom level. */}
-          {dragState ? (
-            <g pointerEvents="none">
-              {alignmentGuides.vertical.map((xMeters) => (
-                <line
-                  key={`vguide-${xMeters}`}
-                  x1={xMeters * 100}
-                  y1={0}
-                  x2={xMeters * 100}
-                  y2={depthCm}
-                  style={{ stroke: "var(--color-plot-guide)", strokeDasharray: "3 3", opacity: 0.65 }}
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))}
-              {alignmentGuides.horizontal.map((yMeters) => (
-                <line
-                  key={`hguide-${yMeters}`}
-                  x1={0}
-                  y1={yMeters * 100}
-                  x2={widthCm}
-                  y2={yMeters * 100}
-                  style={{ stroke: "var(--color-plot-guide)", strokeDasharray: "3 3", opacity: 0.65 }}
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
+            <g aria-label="Talent marks" role="group">
+              {layout.talentMarks.map((mark) => (
+                <TalentMarkMarker
+                  key={mark.id}
+                  mark={mark}
+                  widthCm={widthCm}
+                  depthCm={depthCm}
+                  onPositionCommit={onTalentMarkPositionCommit}
                 />
               ))}
             </g>
-          ) : null}
 
-          {/* F2 — marquee selection rectangle. Rendered inside the inner
-              transformed group so the rect coordinates stay aligned with
-              the fixture markers under zoom/pan. */}
-          {marquee.rect ? (
-            <rect
-              pointerEvents="none"
-              x={marquee.rect.x}
-              y={marquee.rect.y}
-              width={marquee.rect.width}
-              height={marquee.rect.height}
-              rx={2}
-              style={{
-                fill: marquee.additive ? "var(--color-plot-marquee-fill-additive)" : "var(--color-plot-marquee-fill)",
-                stroke: "var(--color-plot-guide)",
-                strokeDasharray: "4 3",
-                opacity: 0.5,
-              }}
-              strokeWidth={1.5}
-              vectorEffect="non-scaling-stroke"
-            />
-          ) : null}
+            {previewMode ? (
+              <g className={styles.liveGhostLayer} pointerEvents="none" aria-hidden="true">
+                {liveFixtures.map((liveFixture, index) => {
+                  const previewFixture = fixtures.find((fixture) => fixture.id === liveFixture.id) ?? null;
+                  if (!previewFixture || !previewDiffersFromLive(previewFixture, liveFixture)) return null;
+                  const { xMeters, yMeters } = meterPositionFor(liveFixture, index);
+                  const mounting = deriveMounting(liveFixture, catalog);
+                  if (mounting === "bar") {
+                    return (
+                      <rect
+                        key={`live-ghost-${liveFixture.id}`}
+                        x={xMeters * 100 - 18}
+                        y={yMeters * 100 - 5}
+                        width={36}
+                        height={10}
+                        rx={3}
+                        className={styles.liveGhostShape}
+                        transform={`rotate(${liveFixture.spatialRotation ?? 0} ${xMeters * 100} ${yMeters * 100})`}
+                      />
+                    );
+                  }
+                  return (
+                    <circle
+                      key={`live-ghost-${liveFixture.id}`}
+                      cx={xMeters * 100}
+                      cy={yMeters * 100}
+                      r={mounting === "mat" ? 15 : 12}
+                      className={styles.liveGhostShape}
+                    />
+                  );
+                })}
+              </g>
+            ) : null}
 
-          {/* Patch overlay — DMX address tags above each fixture */}
-          <PatchOverlay active={patchMode}>
-            {fixtures.map((fixture, index) => {
-              const { xMeters, yMeters } = displayedPositionFor(fixture, index, true);
+            {/* Fixture markers — reorder so the selected fixture paints last
+              (above its siblings), giving the in-flight drag a clear z-stack
+              without interfering with React reconciliation (key-stable). */}
+            {orderedFixtures.map((fixture) => {
+              const originalIndex = fixtures.indexOf(fixture);
+              const { xMeters, yMeters } = displayedPositionFor(fixture, originalIndex, false);
+              const visual = fixtureVisuals.get(fixture.id) ?? getFixtureVisualModel(catalog, fixture);
               return (
-                <PatchAddressTag
-                  key={`addr-${fixture.id}`}
+                <FixtureMarker
+                  key={fixture.id}
+                  id={fixture.id}
+                  name={fixture.name}
                   centerX={xMeters * 100}
                   centerY={yMeters * 100}
-                  dmxStartAddress={fixture.dmxStartAddress}
+                  rotationDegrees={displayedRotationFor(fixture, false)}
+                  mounting={visual.mounting}
+                  renderMode={renderMode}
+                  visual={visual}
+                  intensity={fixture.intensity}
+                  cct={fixture.cct}
+                  on={fixture.on}
+                  selected={selectedFixtureIds ? selectedFixtureIds.has(fixture.id) : fixture.id === selectedFixtureId}
+                  dimmed={!fixtureMatches(fixture)}
+                  identifying={identifyingFixtureIds?.has(fixture.id) ?? false}
+                  highlightOverlay={highlightOverlayFixtureIds?.has(fixture.id) ?? false}
+                  chipHovered={chipHoverFixtureId === fixture.id}
+                  onSelect={(id) => onSelectFixture(id, { additive: addToSelection })}
+                  onPositionCommit={onPositionCommit}
+                  onRotationCommit={onRotationCommit}
+                  onOpenMenu={onOpenFixtureMenu}
+                  onDragMove={handleFixtureDragMove}
+                  onDragEnd={handleFixtureDragEnd}
+                  onRotationMove={handleFixtureRotationMove}
+                  onRotationEnd={handleFixtureRotationEnd}
                 />
               );
             })}
-          </PatchOverlay>
-        </g>
-      </svg>
 
-      <FixtureSymbolKey catalog={catalog} fixtures={fixtures} renderMode={renderMode} />
+            {/* F9 — smart-guide alignment lines. Only render when a fixture
+              drag is in progress. Stroke is non-scaling so the guides remain
+              crisp under any zoom level. */}
+            {dragState ? (
+              <g pointerEvents="none">
+                {alignmentGuides.vertical.map((xMeters) => (
+                  <line
+                    key={`vguide-${xMeters}`}
+                    x1={xMeters * 100}
+                    y1={0}
+                    x2={xMeters * 100}
+                    y2={depthCm}
+                    style={{ stroke: "var(--text-text2)", strokeDasharray: "3 3", opacity: 0.65 }}
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+                {alignmentGuides.horizontal.map((yMeters) => (
+                  <line
+                    key={`hguide-${yMeters}`}
+                    x1={0}
+                    y1={yMeters * 100}
+                    x2={widthCm}
+                    y2={yMeters * 100}
+                    style={{ stroke: "var(--text-text2)", strokeDasharray: "3 3", opacity: 0.65 }}
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+              </g>
+            ) : null}
 
-      <StagePlotControls
-        zoom={viewport.zoom}
-        zoomMode={viewport.zoomMode}
-        renderMode={renderMode}
-        onZoomIn={viewport.zoomIn}
-        onZoomOut={viewport.zoomOut}
-        onReset={handleResetView}
-        onFitRoom={viewport.fitRoom}
-        onFillDesk={viewport.fillDesk}
-        onActualSize={viewport.actualSize}
-        onFitContent={() => viewport.fitContent(fitTarget)}
-        onRenderModeChange={onRenderModeChange}
-        viewBookmarks={viewport.viewBookmarks}
-        onSaveViewBookmark={viewport.saveViewBookmark}
-        onRecallViewBookmark={viewport.recallViewBookmark}
-        onClearViewBookmark={viewport.clearViewBookmark}
-        addToSelection={addToSelection}
-        onAddToSelectionChange={onAddToSelectionChange}
-      />
+            {/* F2 — marquee selection rectangle. Rendered inside the inner
+              transformed group so the rect coordinates stay aligned with
+              the fixture markers under zoom/pan. */}
+            {marquee.rect ? (
+              <rect
+                pointerEvents="none"
+                x={marquee.rect.x}
+                y={marquee.rect.y}
+                width={marquee.rect.width}
+                height={marquee.rect.height}
+                style={{
+                  fill: "var(--accent)",
+                  fillOpacity: marquee.additive ? 0.14 : 0.08,
+                  stroke: "var(--accent)",
+                  strokeDasharray: "4 3",
+                }}
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null}
+          </g>
+        </svg>
+
+        <StagePlotLabels projection={projection} labels={labels} />
+        {showSymbolKey ? <FixtureSymbolKey catalog={catalog} fixtures={fixtures} renderMode={renderMode} /> : null}
+      </div>
 
       {fixtures.length === 0 ? (
-        <div className={styles.plotEmpty} data-material="plate" data-level="float">
-          <EmptyState
-            icon={Sun}
-            title="No fixtures on the rig yet"
-            message="Add your first fixture with Add fixture in the cluster to start patching DMX addresses and saving scenes."
-            action={onAddFixture ? { label: "Add fixture", onClick: onAddFixture, icon: Plus } : undefined}
-          />
+        <div className={styles.plotEmpty}>
+          <p className={styles.plotEmptyTitle}>No fixtures on the rig yet</p>
+          <p className={styles.plotEmptyText}>Add the first fixture, then place it where it hangs in the room.</p>
+          {onAddFixture ? (
+            <Key mode="primary" onClick={onAddFixture}>
+              Add fixture…
+            </Key>
+          ) : null}
         </div>
       ) : null}
     </div>

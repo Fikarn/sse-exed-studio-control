@@ -1,7 +1,6 @@
 import styles from "./LightingWorkspace.module.css";
 import { LightingClusterRegion } from "./regions/LightingClusterRegion";
 import { LightingBayRegion } from "./regions/LightingBayRegion";
-import { LightingBottomStrips } from "./regions/LightingBottomStrips";
 import { LightingPlatePanel } from "./regions/LightingPlatePanel";
 import { ShellRegion } from "@sse/design-system";
 import { LightingFooter } from "./components/LightingFooter";
@@ -14,8 +13,7 @@ import { useLightingEditor } from "./useLightingEditor";
 export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
   const editor = useLightingEditor(props);
   const { lightingSnapshot, lightingDmxMonitorSnapshot } = props;
-  const { dmxStripOn, setDmxStripOn } = editor.session;
-  const { bridgeReachable, bridgeUniverse, fixturesPatched, liveFixtureEntries, previewMode } = editor.rig;
+  const { bridgeUniverse, fixturesPatched, liveFixtureEntries, previewMode } = editor.rig;
   const { effectiveSceneModified, lastSavedLabel } = editor.sceneEditor;
   if (!lightingSnapshot) {
     return (
@@ -32,31 +30,23 @@ export function LightingWorkspaceSurface(props: LightingWorkspaceSurfaceProps) {
 
   return (
     <div className={styles.shell} data-testid="lighting-workspace">
-      {/* Visual overhaul A, Slice 5: the toolbar, the bridge banner and the
-          preview banner are gone. What they carried is the cluster's — the
-          rig's state and its way out at the top, the keys and the rig's
-          sections under it — and the cluster is the shell's region, so it is in
-          the same place in every workspace. */}
+      {/* The cluster and the plate are the shell's regions; the bay is the
+          plot's well and the bar under it. */}
       <LightingClusterRegion editor={editor} />
       <LightingBayRegion editor={editor} />
-      <LightingBottomStrips editor={editor} />
       {/* The shell (overhaul 3): one plate mechanism for every page. */}
       <ShellRegion region="plate">
         <LightingPlatePanel editor={editor} />
       </ShellRegion>
       <ShellRegion region="footer">
         <LightingFooter
-          bridgeReachable={bridgeReachable}
           bridgeUniverse={bridgeUniverse}
-          dmxStripOn={dmxStripOn}
           driftDetected={effectiveSceneModified}
           fixturesPatched={fixturesPatched}
           fixturesTotal={liveFixtureEntries.length}
           lastSavedLabel={lastSavedLabel}
           lightingDmxMonitorSnapshot={lightingDmxMonitorSnapshot}
-          lightingSnapshot={lightingSnapshot}
           previewMode={previewMode}
-          onToggleDmxStrip={() => setDmxStripOn((current) => !current)}
         />
       </ShellRegion>
       <LightingDialogs editor={editor} />

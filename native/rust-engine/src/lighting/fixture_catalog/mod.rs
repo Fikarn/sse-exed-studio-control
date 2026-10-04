@@ -528,7 +528,10 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     DEFAULT_MODE_ID,
                     "4 ch Dimmer + CCT + Green/Magenta + Strobe",
                     "8-bit",
-                    vec!["intensity", "cct", "green-magenta", "strobe"],
+                    vec!["intensity", "cct", "green-magenta"],
+                    // The strobe channel is always sent at 0: the studio does
+                    // not strobe, and the plate has no control for it (the
+                    // owner, 2026-10-04: a slider it never sent was removed).
                     vec![
                         ch(1, "Dimmer", "intensity", "percent", 0),
                         ch(2, "CCT", "cct", "kelvin", 102),
@@ -539,7 +542,6 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                         slider("intensity", "Intensity", 0, 100, 1, 100, Some("%")),
                         slider("cct", "CCT", 2000, 10000, 100, 5600, Some("K")),
                         slider("green-magenta", "Green/Magenta", -100, 100, 1, 0, None),
-                        slider("strobe", "Strobe", 0, 255, 1, 0, None),
                     ],
                     defaults(&[
                         ("intensity", 100),
@@ -547,7 +549,6 @@ fn compatibility_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                         ("cctMin", 2000),
                         ("cctMax", 10000),
                         ("green-magenta", 0),
-                        ("strobe", 0),
                     ]),
                 ),
                 mode(
@@ -687,7 +688,10 @@ fn aputure_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                 "5ch-fx",
                 "5 ch Dimmer + FX",
                 "8-bit",
-                vec!["intensity", "fx"],
+                vec!["intensity"],
+                // Only the dimmer is controlled: the mode selection stays at
+                // 0 (Manual), so the light ignores its effect channels, and
+                // the plate has no FX or Speed (the owner, 2026-10-04).
                 vec![
                     ch(1, "Dimmer", "intensity", "percent", 0),
                     ranged_ch(
@@ -714,11 +718,7 @@ fn aputure_verified_definitions() -> Vec<LightingFixtureDefinitionSnapshot> {
                     ch(4, "FX Frequency", "speed", "range", 0),
                     ch(5, "FX Trigger", "trigger", "range", 0),
                 ],
-                vec![
-                    slider("intensity", "Intensity", 0, 100, 1, 100, Some("%")),
-                    slider("fx", "FX", 0, 255, 1, 0, None),
-                    slider("speed", "Speed", 0, 255, 1, 0, None),
-                ],
+                vec![slider("intensity", "Intensity", 0, 100, 1, 100, Some("%"),)],
                 defaults(&[
                     ("intensity", 100),
                     ("cct", 5600),

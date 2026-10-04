@@ -499,7 +499,7 @@ test("Recent actions lists what was done on the Lighting page, newest first, fro
   await expect(page.getByText("Identify burst sent to 'Key'.")).toBeVisible();
   await page.clock.runFor(1_300);
   await page.getByRole("button", { name: "Recall scene Interview", exact: true }).click();
-  await expect(page.getByRole("button", { name: /^Recall scene Interview \(active/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Recall scene Interview \(on rig/ })).toBeVisible();
 
   await page
     .getByRole("navigation", { name: "Workspace navigation" })

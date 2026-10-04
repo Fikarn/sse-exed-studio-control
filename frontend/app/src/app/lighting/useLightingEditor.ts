@@ -4,6 +4,7 @@ import { useLightingSession } from "./editor/useLightingSession";
 import { useLightingSceneEditor } from "./editor/useLightingSceneEditor";
 import { useLightingFixtureEditor } from "./editor/useLightingFixtureEditor";
 import { useLightingRigControls } from "./editor/useLightingRigControls";
+import { useLightingArming } from "./editor/useLightingArming";
 
 /** Everything the Lighting workspace knows and can do, assembled in dependency
  *  order: what the snapshots say (rig), what this sitting has open (session),
@@ -17,7 +18,9 @@ export function useLightingEditor(props: LightingWorkspaceSurfaceProps) {
   const sceneEditor = useLightingSceneEditor({ props, rig, session });
   const fixtureEditor = useLightingFixtureEditor({ props, rig, session, sceneEditor });
   const rigControls = useLightingRigControls({ props, rig, session, sceneEditor });
-  return { props, rig, session, sceneEditor, fixtureEditor, rigControls };
+  // The page's one arm: the Save row, CUT ALL and every menu's "Delete …".
+  const arm = useLightingArming();
+  return { props, rig, session, sceneEditor, fixtureEditor, rigControls, arm };
 }
 
 export type LightingEditor = ReturnType<typeof useLightingEditor>;

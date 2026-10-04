@@ -262,7 +262,7 @@ fn describe(step: Option<&Step>, label: &str, interaction: &str) -> String {
         ("toggleLight", _) => String::from("Toggle the selected light."),
         ("allOn", _) => String::from("Turn all lights on."),
         ("allOff", _) => String::from("Turn all lights off: press, and press again within 3 s."),
-        ("saveScene", _) => String::from("Save the current lighting scene."),
+        ("saveScene", _) => String::from("Save the rig as a new scene, named Scene N."),
         ("recallScene", _) => {
             String::from("Recall the selected lighting scene, with the Lighting page's Fade.")
         }

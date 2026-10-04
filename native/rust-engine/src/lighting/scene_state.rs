@@ -12,7 +12,8 @@
 //! changes nothing that is saved.
 
 use super::helpers::{
-    effective_fixture_control_values, fixture_profile_for_state, read_optional_setting,
+    effective_fixture_control_values, fixture_profile_for_state, normalize_fixture_control_values,
+    read_optional_setting,
 };
 use super::types::{LightingEditorFixtureState, LightingEditorSceneState, LightingEditorState};
 use super::LIGHTING_LAST_RECALLED_SCENE_ID_KEY;
@@ -131,15 +132,17 @@ pub(crate) fn rig_holds_scene(
                 return false;
             }
         }
+        // Both sides are read through the fixture's controls, so a value a
+        // scene saved for a control the light no longer has (the INFINIMAT's
+        // strobe, until 2026-10-04) does not count.
         let current = effective_fixture_control_values(fixture);
+        let then = normalize_fixture_control_values(
+            &fixture_profile_for_state(fixture),
+            &saved.control_values,
+        );
         current
-            .keys()
-            .chain(saved.control_values.keys())
-            .filter(|key| key.as_str() != "intensity" && key.as_str() != "cct")
-            .all(|key| {
-                let now = current.get(key).copied().unwrap_or(0);
-                let then = saved.control_values.get(key).copied().unwrap_or(0);
-                (now - then).abs() == 0
-            })
+            .iter()
+            .filter(|(key, _)| key.as_str() != "intensity" && key.as_str() != "cct")
+            .all(|(key, now)| then.get(key).copied().unwrap_or(0) == *now)
     })
 }

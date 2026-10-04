@@ -143,7 +143,9 @@ test("operator UI scale reaches portaled overlays", async ({ page }) => {
   // Consumer: a portaled dialog's title reads the word step (20 px, docs/DESIGN.md
   // section 3), so it must render at 20px * 1.25 = 25px rather than the
   // unscaled 20px.
-  await page.getByRole("button", { name: "Add fixture" }).first().click();
+  // The visual overhaul: Add fixture… is the Lighting page ⋯'s.
+  await page.getByTestId("lighting-page-menu").click();
+  await page.getByTestId("lighting-add-fixture").click();
   const dialog = page.getByRole("dialog", { name: "Add fixture" });
   await expect(dialog).toBeVisible();
   const titleSize = await dialog

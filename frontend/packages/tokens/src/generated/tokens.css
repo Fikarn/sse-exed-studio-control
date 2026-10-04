@@ -44,7 +44,13 @@
   --signal-peak-bloom: transparent; /** deprecated: no glow */
   --signal-ramp-v: linear-gradient(to top, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%); /** on a 0..100 % well: green to 70 % (-18 dBFS), yellow to 95 % (-3), coral above */
   --signal-ramp-h: linear-gradient(to right, var(--signal-meter-low) 0%, var(--signal-meter-low) 70%, var(--signal-meter-mid) 70%, var(--signal-meter-mid) 95%, var(--signal-meter-over) 95%, var(--signal-meter-over) 100%);
-  --signal-cct-track: linear-gradient(to right, #EF8E5A, #F6C39A 30%, #EBE5D2 60%, #C9D4DA); /** warm (2700 K) to cool (6500 K), the light's own colour */
+  --signal-cct-track: linear-gradient(to right, var(--signal-cct-2700), var(--signal-cct-3800) 30%, var(--signal-cct-5000) 60%, var(--signal-cct-6500)); /** warm (2700 K) to cool (6500 K), the light's own colour */
+  --signal-cct-2700: #EF8E5A;
+  --signal-cct-3200: #F3A87A;
+  --signal-cct-3800: #F6C39A;
+  --signal-cct-4400: #F0DFB8;
+  --signal-cct-5000: #EBE5D2;
+  --signal-cct-5600: #D4DDE2;
   --prompter-glass-floor: #000000; /** the glass's background, black in every look */
   --prompter-glass-text: #ffffff; /** white text, the standard */
   --prompter-glass-text-yellow: #ffd84a; /** yellow text, the look's other colour */
@@ -164,12 +170,6 @@
   --color-shell-action-glass-hover-bottom: rgba(246, 245, 232, 0.018);
   --color-inset-hairline-bg: rgba(255, 255, 255, 0.03);
   --color-bg-hairline: rgba(246, 245, 232, 0.04);
-  --color-cct-2700: #EF8E5A;
-  --color-cct-3200: #F3A87A;
-  --color-cct-3800: #F6C39A;
-  --color-cct-4400: #F0DFB8;
-  --color-cct-5000: #EBE5D2;
-  --color-cct-5600: #D4DDE2;
   --color-fixture-shell-fill: rgba(4, 7, 6, 0.92);
   --color-fixture-shell-stroke: rgba(197, 199, 185, 0.4);
   --color-fixture-ghost-stroke: rgba(153, 186, 146, 0.45);
@@ -268,6 +268,7 @@
   --signal-meter-mid: var(--sse-yellow); /** -18 to -3 dBFS */
   --signal-meter-over: var(--sse-coral); /** above -3 dBFS */
   --signal-peak: var(--text-text2); /** the 2 px peak tick */
+  --signal-cct-6500: var(--sse-sky);
   --elevation-key-fill: var(--material-key); /** deprecated: the face of a key */
   --elevation-plate-fill: var(--material-bg); /** deprecated: plates are the one surface */
   --elevation-cap-fill: var(--role-cap-fill); /** deprecated: the cap's colour */
@@ -320,7 +321,12 @@
   --color-bg-stroke: var(--material-line);
   --color-bg-border: var(--material-line);
   --color-bg-border-strong: var(--material-line2);
-  --color-cct-6500: var(--sse-sky);
+  --color-cct-2700: var(--signal-cct-2700);
+  --color-cct-3200: var(--signal-cct-3200);
+  --color-cct-3800: var(--signal-cct-3800);
+  --color-cct-4400: var(--signal-cct-4400);
+  --color-cct-5000: var(--signal-cct-5000);
+  --color-cct-5600: var(--signal-cct-5600);
   --color-plot-marquee-fill: var(--color-brand-green-soft);
   --color-plot-marquee-fill-additive: var(--color-brand-green-glow);
   --audio-meter-low: var(--sse-green);
@@ -403,6 +409,7 @@
   --color-brand-text-primary: var(--text-text);
   --color-focus-ring: var(--accent);
   --color-shell-header-text-muted: var(--color-brand-text-muted);
+  --color-cct-6500: var(--signal-cct-6500);
   --color-studio-500: var(--color-border-strong);
   --color-studio-600: var(--color-border-default);
   --audio-warn-fill: var(--color-brand-yellow);

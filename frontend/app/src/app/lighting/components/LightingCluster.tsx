@@ -1,32 +1,36 @@
-import { useEffect, useState } from "react";
-import type { LightingSceneSnapshot } from "@sse/engine-client";
+import { useEffect, useRef, useState } from "react";
 import {
   ARM_TIMEOUT_MS,
   ArmKey,
   Key,
+  Latch,
   LatchSlot,
+  Menu,
   MenuButton,
   NumberEntryDialog,
-  Readout,
   Section,
   Slider,
   StateDisplay,
-  useArm,
+  Tooltip,
   type MenuEntry,
+  type UseArmResult,
 } from "@sse/design-system";
 
 import styles from "./LightingCluster.module.css";
-import { GroupRail, type GroupRailEntry } from "./GroupRail";
-import { SceneRail } from "./SceneRail";
+import { GroupRail, type GroupRailProps } from "./GroupRail";
+import { SceneRail, type SceneRailProps } from "./SceneRail";
 import { LightingSearchField, type LightingRecentScene } from "./LightingSearchField";
 import { deriveLightingState, type LightingState } from "../lightingState";
+import { CUT_ALL_ARM_KEY, CUT_ALL_WINDOW_MS, SAVE_SCENE_ARM_KEY } from "../editor/useLightingArming";
 
-// Visual overhaul A, Slice 5 (system §2, §7, plan Slice 5): Lighting's cluster.
-// The rig's state first and fixed — is the bridge answering, is the rig what
-// the scene says, are you editing offline — then the two keys a take reaches
-// for (Lighting on, Cut all), the grand master, the scenes, the groups, and the
-// standing actions at the foot. Nothing here is a banner: a state is a state
-// display, and it is in the same place every time.
+// The visual overhaul's Lighting page (2026-10-04): the cluster. The rig's
+// state first and fixed, with the page's ⋯ (the standing commands: Add
+// fixture, Patch, Preview, the DMX monitor and strip, Setup); the latch slot
+// under it (Patch, Highlight, Solo, each with the key that ends it); the two
+// take-time keys (LIGHTING, CUT ALL, which arms as the deck's ALL OFF does);
+// the grand master; the groups as keys; the search; the scenes as rows with
+// the Save row under them, filling the room left; Undo at the foot. Nothing
+// here scrolls, and nothing above a take-time key ever moves.
 
 export interface LightingClusterProps {
   bridgeIp: string;
@@ -42,8 +46,7 @@ export interface LightingClusterProps {
   fixtureOnCount: number;
   fixtureTotal: number;
   grandMaster: number;
-  groups: readonly GroupRailEntry[];
-  lastRecalledLabel: string | null;
+  lastSavedLabel: string | null;
   previewBusy?: boolean;
   previewDirty: boolean;
   previewMode: boolean;
@@ -51,33 +54,32 @@ export interface LightingClusterProps {
   recallFadeMs: number;
   sceneModified: boolean;
   sceneName: string | null;
-  scenes: readonly LightingSceneSnapshot[];
-  sceneRailProps: Omit<Parameters<typeof SceneRail>[0], "scenes" | "bridgeReachable">;
-  groupRailProps: Omit<Parameters<typeof GroupRail>[0], "groups">;
+  /** The page's one arm (`useLightingArming`), and what its armed row says. */
+  arm: UseArmResult;
+  armedWords: string | null;
+  sceneRailProps: Omit<SceneRailProps, "footer" | "arm" | "lockedReason">;
+  groupRailProps: Omit<GroupRailProps, "arm">;
+  /** The Highlight and Solo latched on the rig, with the fixtures they hold. */
+  highlightNames: readonly string[];
+  soloNames: readonly string[];
+  onToggleHighlight: () => void;
+  onToggleSolo: () => void;
   onAddFixture: () => void;
+  onCreateGroup: () => void;
   onDiscardPreview: () => void;
   onEmergencyCut: () => void;
   onGrandMasterChange: (value: number) => void;
-  hasSelection: boolean;
-  highlightActive: boolean;
-  soloActive: boolean;
-  /** A Find is running: its key reads "Stop" and stops it (new pages program,
-   *  Slice 3, decision 6). */
-  findRunning?: boolean;
-  /** The step the Undo key will undo, or null when there is nothing to undo
-   *  (decision 5). */
+  /** The step the Undo key will undo, or null when there is nothing to undo. */
   undoLabel?: string | null;
   undoBusy?: boolean;
   recentScenes: readonly LightingRecentScene[];
   searchQuery: string;
   onRecallRecentScene?: (sceneId: string) => void;
   onSearchChange: (value: string) => void;
-  onIdentifyFind: () => void;
-  onStopFind?: () => void;
   onUndo?: () => void;
-  onToggleHighlight: () => void;
-  onToggleSolo: () => void;
   onOpenDmxMonitor: () => void;
+  dmxStripOn: boolean;
+  onToggleDmxStrip: () => void;
   onRecallFadeMsChange: (value: number) => void;
   onResaveScene: () => void;
   onRevertScene?: () => void;
@@ -92,6 +94,8 @@ function fadeLabel(recallFadeMs: number) {
   return `${(recallFadeMs / 1000).toFixed(1)} s`;
 }
 
+const FADE_PRESETS_MS = [0, 500, 1000, 2000, 3000, 5000] as const;
+
 // The Undo key's small print names the step it will undo; a long scene or
 // fixture name is cut so the key stays inside the cluster (its full name is
 // the key's accessible name and title).
@@ -99,6 +103,11 @@ const UNDO_LABEL_MAX_CHARS = 40;
 
 function undoSmallPrint(label: string) {
   return label.length > UNDO_LABEL_MAX_CHARS ? `${label.slice(0, UNDO_LABEL_MAX_CHARS - 1)}…` : label;
+}
+
+function names(list: readonly string[]) {
+  if (list.length <= 2) return list.join(", ");
+  return `${list.slice(0, 2).join(", ")} and ${list.length - 2} more`;
 }
 
 export function LightingCluster(props: LightingClusterProps) {
@@ -113,8 +122,7 @@ export function LightingCluster(props: LightingClusterProps) {
     fixtureOnCount,
     fixtureTotal,
     grandMaster,
-    groups,
-    lastRecalledLabel,
+    lastSavedLabel,
     previewBusy = false,
     previewDirty,
     previewMode,
@@ -122,29 +130,29 @@ export function LightingCluster(props: LightingClusterProps) {
     recallFadeMs,
     sceneModified,
     sceneName,
-    scenes,
+    arm,
+    armedWords,
     sceneRailProps,
     groupRailProps,
+    highlightNames,
+    soloNames,
+    onToggleHighlight,
+    onToggleSolo,
     onAddFixture,
+    onCreateGroup,
     onDiscardPreview,
     onEmergencyCut,
     onGrandMasterChange,
-    hasSelection,
-    highlightActive,
-    soloActive,
-    findRunning = false,
     undoLabel = null,
     undoBusy = false,
     recentScenes,
     searchQuery,
     onRecallRecentScene,
     onSearchChange,
-    onIdentifyFind,
-    onStopFind,
     onUndo,
-    onToggleHighlight,
-    onToggleSolo,
     onOpenDmxMonitor,
+    dmxStripOn,
+    onToggleDmxStrip,
     onRecallFadeMsChange,
     onResaveScene,
     onRevertScene,
@@ -157,10 +165,10 @@ export function LightingCluster(props: LightingClusterProps) {
 
   const [masterDialogOpen, setMasterDialogOpen] = useState(false);
   const [fadeDialogOpen, setFadeDialogOpen] = useState(false);
-  // Found, to check (2026-09-28): `Save · press twice` saved at the first
-  // press. It arms now, as its label says, and saves at a second press.
-  const arm = useArm();
-  const saveArmed = arm.armed?.key === "save-scene";
+  const [fadeMenuOpen, setFadeMenuOpen] = useState(false);
+  const fadeKeyRef = useRef<HTMLSpanElement | null>(null);
+  const saveArmed = arm.armed?.key === SAVE_SCENE_ARM_KEY;
+  const cutArmed = arm.armed?.key === CUT_ALL_ARM_KEY;
 
   const state: LightingState = deriveLightingState({
     bridgeIp,
@@ -170,7 +178,7 @@ export function LightingCluster(props: LightingClusterProps) {
     channelCount,
     fixtureOnCount,
     fixtureTotal,
-    lastRecalledLabel,
+    lastSavedLabel,
     outputsHeld,
     previewDirty,
     previewMode,
@@ -181,25 +189,36 @@ export function LightingCluster(props: LightingClusterProps) {
 
   const anyOn = fixtureOnCount > 0;
   const rigLocked = state.locked || patchMode;
-  // A key that locks takes its arm with it.
+  // A key that locks takes its arm with it; CUT ALL keeps its own, since it
+  // never locks while there is a rig to cut.
   const clearArm = arm.clear;
+  const armedKey = arm.armed?.key ?? null;
   useEffect(() => {
-    if (rigLocked) clearArm();
-  }, [clearArm, rigLocked]);
+    if (rigLocked && armedKey === SAVE_SCENE_ARM_KEY) clearArm();
+  }, [armedKey, clearArm, rigLocked]);
   const lockedReason = state.locked
     ? state.sentence
     : patchMode
-      ? "Patch mode is on: the rig's levels are paused while you address fixtures. Press Patch to leave it."
+      ? "Patch mode is on: leave it to switch the rig and save scenes."
       : undefined;
+  // The grand master acts on the rig itself, never on the preview (the
+  // hardware link does not stage it), so in Preview it waits: until 2026-10-04
+  // it moved the live rig while the display said the rig was unchanged.
+  const masterLocked = rigLocked || previewMode;
+  const masterReason = previewMode
+    ? "The grand master acts on the rig itself, not on the preview. Leave Preview to set it."
+    : lockedReason;
+  // CUT ALL is never locked by the page: the hardware link takes it in every
+  // state the rig is in. Only a rig with no fixtures has nothing to cut.
+  const cutLockedReason = fixtureTotal === 0 ? "There are no fixtures on the rig to cut." : undefined;
 
   // The way out of the state the rig is in, as keys on the display itself.
   const stateActions = (
     <>
       {/* The bridge probe lives in Setup / Support, so the way out of an
           unreachable bridge is the key that takes the operator there, as it is
-          the way to the Light outputs switch. A bridge that is not answering
-          gets none of its own: a probe run mid-session that fails locks the
-          rig (the review of #260). Held as well, the key is the way to arm. */}
+          the way to the Light outputs switch. Held as well, the key is the way
+          to arm. */}
       {state.word === "UNREACHABLE" || state.word === "HELD" || (state.word === "NOT ANSWERING" && outputsHeld) ? (
         <Key size="small" testId="lighting-state-setup" onClick={onOpenSetup}>
           Open Setup
@@ -227,7 +246,7 @@ export function LightingCluster(props: LightingClusterProps) {
             onClick={onResaveScene}
           >
             {/* It saves the preview into the scene; the rig takes it when the
-                scene is recalled (it read `Save to the rig` until 2026-09-28). */}
+                scene is recalled. */}
             Save into the scene
           </Key>
           <Key size="small" disabled={previewBusy} testId="lighting-state-preview-discard" onClick={onDiscardPreview}>
@@ -238,24 +257,86 @@ export function LightingCluster(props: LightingClusterProps) {
     </>
   );
 
-  // The shell (overhaul 3): the page's ⋯ on the state display. Until the
-  // rig's own pull request it holds the Rig row's commands, with the same
-  // handlers and the same locks.
+  // The page's ⋯: the standing commands, keeping the test ids the standing
+  // keys had (the Console's pattern). Each refusal says why at the right.
   const pageMenu: MenuEntry[] = [
-    { id: "add-fixture", label: "Add fixture", onSelect: onAddFixture },
+    {
+      id: "add-fixture",
+      label: "Add fixture…",
+      onSelect: onAddFixture,
+      disabledReason: previewMode ? "leave preview to add fixtures" : null,
+      testId: "lighting-add-fixture",
+    },
     {
       kind: "check",
       id: "patch",
       label: "Patch",
       checked: patchMode,
       onCheckedChange: () => onTogglePatch(),
-      disabledReason: previewMode ? "leave preview to address fixtures" : undefined,
+      disabledReason: previewMode ? "leave preview to address fixtures" : null,
+      testId: "lighting-patch-toggle",
     },
-    { kind: "check", id: "preview", label: "Preview", checked: previewMode, onCheckedChange: () => onTogglePreview() },
-    { id: "dmx-monitor", label: "DMX monitor", onSelect: onOpenDmxMonitor },
-    { kind: "divider", id: "divider" },
-    { id: "setup", label: "Open Setup", onSelect: onOpenSetup },
+    {
+      kind: "check",
+      id: "preview",
+      label: "Preview",
+      checked: previewMode,
+      onCheckedChange: () => onTogglePreview(),
+      disabledReason: patchMode ? "leave Patch to edit offline" : null,
+      testId: "lighting-preview-toggle",
+    },
+    { kind: "divider", id: "dmx" },
+    { id: "dmx-monitor", label: "DMX monitor…", onSelect: onOpenDmxMonitor, testId: "lighting-open-dmx-monitor" },
+    {
+      kind: "check",
+      id: "dmx-strip",
+      label: "DMX strip",
+      checked: dmxStripOn,
+      onCheckedChange: () => onToggleDmxStrip(),
+      onWord: "shown",
+      offWord: "hidden",
+      testId: "lighting-dmx-strip-toggle",
+    },
+    { kind: "divider", id: "setup-divider" },
+    { id: "setup", label: "Open Setup", onSelect: onOpenSetup, testId: "lighting-page-setup" },
   ];
+
+  const fadeMenu: MenuEntry[] = [
+    { kind: "label", id: "fade-label", label: "Recall fade" },
+    ...FADE_PRESETS_MS.map((ms): MenuEntry => ({
+      kind: "radio",
+      id: `fade-${ms}`,
+      label: fadeLabel(ms),
+      checked: recallFadeMs === ms,
+      onSelect: () => onRecallFadeMsChange(ms),
+      testId: `lighting-fade-${ms}`,
+    })),
+    { kind: "divider", id: "fade-divider" },
+    {
+      id: "fade-type",
+      label: "Type a value…",
+      value: fadeLabel(recallFadeMs),
+      onSelect: () => setFadeDialogOpen(true),
+      testId: "lighting-fade-type",
+    },
+  ];
+
+  const saveRow = (
+    <ArmKey
+      armed={saveArmed}
+      timeoutMs={ARM_TIMEOUT_MS}
+      countdownTestId="lighting-save-scene-countdown"
+      size="large"
+      locked={rigLocked}
+      reason={lockedReason}
+      take
+      className={styles.saveRow}
+      testId="lighting-save-scene"
+      onClick={() => arm.armOrApply(SAVE_SCENE_ARM_KEY, "Save as a new scene", onSaveScene)}
+    >
+      {saveArmed ? "Save as a new scene" : "＋ Save as a new scene"}
+    </ArmKey>
+  );
 
   return (
     <div className={styles.cluster} data-lighting-cluster="" data-testid="lighting-cluster">
@@ -264,7 +345,9 @@ export function LightingCluster(props: LightingClusterProps) {
         word={state.word}
         sentence={state.sentence}
         meta={state.meta}
-        armed={arm.armed ? { text: `${arm.armed.label} · press again`, timeoutMs: arm.armed.timeoutMs } : null}
+        armed={
+          arm.armed ? { text: `${armedWords ?? arm.armed.label} · press again`, timeoutMs: arm.armed.timeoutMs } : null
+        }
         actions={stateActions}
         data-toolbar-primary="title"
         testId="lighting-state-display"
@@ -272,13 +355,55 @@ export function LightingCluster(props: LightingClusterProps) {
           <MenuButton
             buttonLabel="Lighting menu"
             buttonTestId="lighting-page-menu"
-            menu={{ head: { title: "Lighting" }, items: pageMenu }}
+            menu={{ head: { title: "Lighting" }, items: pageMenu, arm }}
           />
         }
       />
 
-      {/* The shell (overhaul 3): the latch slot, the same on every page. */}
-      <LatchSlot testId="lighting-latch-slot" />
+      {/* The latch slot, the same on every page: what holds the rig in a
+          state the operator must see, with the key that ends it. */}
+      <LatchSlot testId="lighting-latch-slot">
+        {patchMode ? (
+          <Latch
+            who="Patch"
+            tone="info"
+            testId="lighting-latch-patch"
+            action={
+              <Key size="small" testId="lighting-latch-patch-leave" onClick={onTogglePatch}>
+                Leave
+              </Key>
+            }
+          >
+            addressing fixtures
+          </Latch>
+        ) : null}
+        {highlightNames.length > 0 ? (
+          <Latch
+            who="Highlight"
+            testId="lighting-latch-highlight"
+            action={
+              <Key size="small" testId="lighting-latch-highlight-off" onClick={onToggleHighlight}>
+                Off
+              </Key>
+            }
+          >
+            {names(highlightNames)}
+          </Latch>
+        ) : null}
+        {soloNames.length > 0 ? (
+          <Latch
+            who="Solo"
+            testId="lighting-latch-solo"
+            action={
+              <Key size="small" testId="lighting-latch-solo-off" onClick={onToggleSolo}>
+                Off
+              </Key>
+            }
+          >
+            {names(soloNames)}
+          </Latch>
+        ) : null}
+      </LatchSlot>
 
       <div className={styles.keyRow}>
         <Key
@@ -286,7 +411,8 @@ export function LightingCluster(props: LightingClusterProps) {
           cap="Lighting"
           hint={anyOn ? `on · ${fixtureOnCount} of ${fixtureTotal} lit` : "off · nothing lit"}
           layout="stack"
-          engaged={anyOn}
+          size="tall"
+          live={anyOn}
           locked={rigLocked}
           reason={lockedReason}
           take
@@ -295,38 +421,86 @@ export function LightingCluster(props: LightingClusterProps) {
           aria-pressed={anyOn}
           onClick={() => onToggleAllPower(!anyOn)}
         />
-        <Key
-          mode="danger"
-          cap="Cut all"
+        <ArmKey
+          armed={cutArmed}
+          timeoutMs={CUT_ALL_WINDOW_MS}
+          countdownTestId="lighting-cut-all-countdown"
+          cap={cutArmed ? undefined : "Cut all"}
           hint="all to 0 %"
           layout="stack"
-          locked={rigLocked}
-          reason={lockedReason}
+          size="tall"
+          locked={Boolean(cutLockedReason)}
+          reason={cutLockedReason}
           take
+          className={styles.cutAll}
           testId="lighting-emergency-cut"
           aria-label="Cut all fixtures to 0 %"
-          onClick={onEmergencyCut}
-        />
+          onClick={() =>
+            arm.armOrApply(
+              CUT_ALL_ARM_KEY,
+              previewMode ? "Cut all in the preview" : "Cut all fixtures",
+              onEmergencyCut,
+              CUT_ALL_WINDOW_MS
+            )
+          }
+        >
+          {cutArmed ? "Cut all" : undefined}
+        </ArmKey>
       </div>
 
-      <section className={styles.master} aria-label="Grand master">
-        <div className={styles.masterHead}>
-          <span className={styles.masterLabel}>Grand master</span>
-          <span className={styles.masterHint}>every fixture</span>
+      <Section
+        className={styles.section}
+        title={
+          <Tooltip content="Scales every fixture's level on the rig.">
+            <span>Grand master</span>
+          </Tooltip>
+        }
+        actions={
+          <span className={styles.masterValue} data-testid="lighting-grand-master-readout">
+            {Math.round(grandMaster)} <span className={styles.unit}>%</span>
+          </span>
+        }
+        aria-label="Grand master"
+      >
+        {/* A locked slider says why on hover, as a locked key does. */}
+        <div title={masterLocked ? masterReason : undefined}>
+          <Slider
+            label="Grand master intensity"
+            value={grandMaster / 100}
+            valueText={`${Math.round(grandMaster)} %`}
+            locked={masterLocked}
+            take
+            testId="lighting-grand-master"
+            onChange={(value) => onGrandMasterChange(Math.round(value * 100))}
+            onCommit={(value) => onGrandMasterChange(Math.round(value * 100))}
+            onRequestTypedEntry={masterLocked ? undefined : () => setMasterDialogOpen(true)}
+          />
         </div>
-        <Readout value={`${Math.round(grandMaster)} %`} size="hero" testId="lighting-grand-master-readout" />
-        <Slider
-          label="Grand master intensity"
-          value={grandMaster / 100}
-          valueText={`${Math.round(grandMaster)} %`}
-          locked={rigLocked}
-          take
-          testId="lighting-grand-master"
-          onChange={(value) => onGrandMasterChange(Math.round(value * 100))}
-          onCommit={(value) => onGrandMasterChange(Math.round(value * 100))}
-          onRequestTypedEntry={rigLocked ? undefined : () => setMasterDialogOpen(true)}
-        />
-      </section>
+      </Section>
+
+      <Section
+        className={styles.section}
+        title="Groups"
+        detail={
+          groupRailProps.groups.length > 0
+            ? `${groupRailProps.groups.filter((group) => group.on).length} of ${groupRailProps.groups.length} on`
+            : undefined
+        }
+        testId="lighting-groups-section"
+        actions={
+          <Key
+            size="small"
+            aria-label="Create a new lighting group"
+            disabled={patchMode}
+            title={patchMode ? "Leave Patch to make a group." : undefined}
+            onClick={onCreateGroup}
+          >
+            ＋
+          </Key>
+        }
+      >
+        <GroupRail {...groupRailProps} arm={arm} />
+      </Section>
 
       {/* One field filters the scenes, the groups and the plot together, with
           the scenes most recently recalled under it. */}
@@ -338,165 +512,59 @@ export function LightingCluster(props: LightingClusterProps) {
       />
 
       <Section
-        className={styles.section}
+        className={styles.scenes}
         title="Scenes"
-        detail={patchMode ? "paused while patching" : `${scenes.length} saved · press to recall`}
+        detail={patchMode ? "Patch is on" : `${sceneRailProps.scenes.length} saved`}
         testId="lighting-scenes-section"
         actions={
-          <Key
-            size="small"
-            testId="lighting-fade-key"
-            aria-label="Recall fade time"
-            onClick={() => setFadeDialogOpen(true)}
-          >
-            Fade {fadeLabel(recallFadeMs)}
-          </Key>
-        }
-      >
-        <SceneRail {...sceneRailProps} scenes={scenes} bridgeReachable={bridgeReachable} />
-        <div className={styles.sectionKeys}>
-          <ArmKey
-            armed={saveArmed}
-            timeoutMs={ARM_TIMEOUT_MS}
-            countdownTestId="lighting-save-scene-countdown"
-            size="small"
-            locked={rigLocked}
-            reason={lockedReason}
-            take
-            testId="lighting-save-scene"
-            onClick={() => arm.armOrApply("save-scene", "Save as a new scene", onSaveScene)}
-          >
-            {saveArmed ? "Save" : "Save · press twice"}
-          </ArmKey>
-        </div>
-      </Section>
-
-      <Section
-        className={styles.section}
-        title="Groups"
-        detail={
-          groups.length > 0
-            ? `${groups.filter((group) => group.on).length} of ${groups.length} on`
-            : "one level for all their fixtures"
-        }
-        testId="lighting-groups-section"
-      >
-        <GroupRail {...groupRailProps} groups={groups} />
-      </Section>
-
-      <Section className={styles.actions} title="Rig" testId="lighting-standing-actions">
-        <div className={styles.actionRow}>
-          <Key
-            size="small"
-            mode="primary"
-            data-toolbar-primary="add"
-            testId="lighting-add-fixture"
-            onClick={onAddFixture}
-          >
-            Add fixture
-          </Key>
-          <Key
-            size="small"
-            mode="toggle"
-            engaged={patchMode}
-            aria-pressed={patchMode}
-            disabled={previewMode}
-            title={previewMode ? "Leave preview to address fixtures" : "Address fixtures on the rig"}
-            data-toolbar-primary="patch"
-            testId="lighting-patch-toggle"
-            onClick={onTogglePatch}
-          >
-            Patch
-          </Key>
-          <Key
-            size="small"
-            mode="toggle"
-            engaged={previewMode}
-            aria-pressed={previewMode}
-            data-toolbar-primary="preview"
-            testId="lighting-preview-toggle"
-            onClick={onTogglePreview}
-          >
-            Preview
-          </Key>
-          <Key size="small" testId="lighting-open-dmx-monitor" onClick={onOpenDmxMonitor}>
-            DMX monitor
-          </Key>
-        </div>
-        {/* What the selection can be asked to do: hold it lit, dim everything
-            else, or pulse it so the operator can find it in the room. A lit
-            Highlight or Solo key switches it off, in Preview too: with the
-            page-wide Esc gone it is the only way to end it on the page (Slice 3
-            review, finding 16). Only switching one on waits for the live rig. */}
-        <div className={styles.actionRow}>
-          <Key
-            size="small"
-            mode="toggle"
-            engaged={highlightActive}
-            aria-pressed={highlightActive}
-            disabled={!highlightActive && (previewMode || !hasSelection)}
-            title={
-              hasSelection ? "Hold the selection at full white at neutral CCT" : "Select fixtures to enable Highlight"
-            }
-            testId="lighting-highlight-toggle"
-            onClick={onToggleHighlight}
-          >
-            Highlight
-          </Key>
-          <Key
-            size="small"
-            mode="toggle"
-            engaged={soloActive}
-            aria-pressed={soloActive}
-            disabled={!soloActive && (previewMode || !hasSelection)}
-            title={hasSelection ? "Dim every fixture except the selection" : "Select fixtures to enable Solo"}
-            testId="lighting-solo-toggle"
-            onClick={onToggleSolo}
-          >
-            Solo
-          </Key>
-          {/* While a Find runs the key reads Stop, lit as a running timer is,
-              and pressing it stops the sequence, the flashes still waiting
-              included (new pages program, Slice 3, decision 6). */}
-          <Key
-            size="small"
-            live={findRunning}
-            disabled={!findRunning && (previewMode || !hasSelection)}
-            title={
-              findRunning
-                ? "Stop the Find sequence, the flashes still waiting included"
-                : hasSelection
-                  ? "Pulse the selection in turn so you can locate each fixture"
-                  : "Select fixtures to enable Find"
-            }
-            testId="lighting-identify-find"
-            onClick={findRunning ? onStopFind : onIdentifyFind}
-          >
-            {findRunning ? "Stop" : "Find"}
-          </Key>
-        </div>
-        {/* The Undo key undoes the newest of the last 25 steps — Save scene,
-            Delete scene, Add fixture, Delete fixture — and its small print
-            names that step (decision 5). With nothing to undo it takes the
-            system's locked form, dimmed and dashed, with its reason. */}
-        {onUndo ? (
-          <div className={styles.actionRow}>
+          <span ref={fadeKeyRef} className={styles.fadeAnchor}>
             <Key
               size="small"
-              hint={undoLabel ? undoSmallPrint(undoLabel) : "nothing to undo"}
-              locked={!undoLabel}
-              reason="Nothing to undo. Save scene, Delete scene, Add fixture and Delete fixture can be undone."
-              disabled={Boolean(undoLabel) && undoBusy}
-              title={undoLabel ? `Undo ${undoLabel}` : undefined}
-              aria-label={undoLabel ? `Undo ${undoLabel}` : undefined}
-              testId="lighting-undo"
-              onClick={onUndo}
+              testId="lighting-fade-key"
+              aria-haspopup="menu"
+              aria-expanded={fadeMenuOpen}
+              onClick={() => setFadeMenuOpen((open) => !open)}
             >
-              Undo
+              Fade {fadeLabel(recallFadeMs)}
             </Key>
-          </div>
-        ) : null}
+          </span>
+        }
+      >
+        <SceneRail {...sceneRailProps} lockedReason={patchMode ? lockedReason : null} arm={arm} footer={saveRow} />
       </Section>
+
+      {/* The Undo key undoes the newest of the last 25 steps — Save scene,
+          Delete scene, Add fixture, Delete fixture — and its small print
+          names that step. With nothing to undo it takes the system's locked
+          form, dimmed and dashed, with its reason. */}
+      {onUndo ? (
+        <div className={styles.foot}>
+          <Key
+            size="small"
+            hint={undoLabel ? undoSmallPrint(undoLabel) : "nothing to undo"}
+            locked={!undoLabel}
+            reason="Nothing to undo. Save scene, Delete scene, Add fixture and Delete fixture can be undone."
+            disabled={Boolean(undoLabel) && undoBusy}
+            title={undoLabel ? `Undo ${undoLabel}` : undefined}
+            aria-label={undoLabel ? `Undo ${undoLabel}` : undefined}
+            testId="lighting-undo"
+            onClick={onUndo}
+          >
+            Undo
+          </Key>
+        </div>
+      ) : null}
+
+      <Menu
+        open={fadeMenuOpen}
+        anchor={fadeKeyRef.current}
+        onClose={() => setFadeMenuOpen(false)}
+        head={{ title: "Fade", detail: "every recall, here and on the deck" }}
+        items={fadeMenu}
+        ignoreOutside={[fadeKeyRef]}
+        placement="bottom-end"
+        testId="lighting-fade-menu"
+      />
 
       {masterDialogOpen ? (
         <NumberEntryDialog

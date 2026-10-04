@@ -11,10 +11,10 @@ export interface FixtureSymbolProps {
   visual: FixtureVisualModel;
 }
 
-const SHELL_FILL = "var(--color-fixture-shell-fill)";
-const SHELL_STROKE = "var(--color-fixture-shell-stroke)";
+const SHELL_FILL = "var(--material-well)";
+const SHELL_STROKE = "var(--text-text4)";
 const EMITTER_FILL = "rgba(240, 230, 198, 0.1)";
-const PIXEL_STROKE = "var(--color-brand-green)";
+const PIXEL_STROKE = "var(--role-green-text)";
 
 function segmentCount(visual: FixtureVisualModel, max: number) {
   return Math.max(0, Math.min(max, Math.round(visual.emitterLayout?.segments ?? 0)));

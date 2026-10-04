@@ -5,43 +5,33 @@ import { nextLightingFixtureName } from "../lightingHelpers";
 import { RenameDialog } from "../../shared/RenameDialog";
 import type { LightingEditor } from "../useLightingEditor";
 
-/** Every dialog the workspace raises. Each opens from a flag in the session. */
+/** Every dialog the workspace raises. Each opens from a flag in the session.
+ *  Since the visual overhaul (2026-10-04) CUT ALL and the deletes arm in place,
+ *  and a new scene is saved by the Save row alone, so none of them is here. */
 export function LightingDialogs({ editor }: { editor: LightingEditor }) {
   const { lightingDmxMonitorSnapshot, lightingFixtureCatalogSnapshot } = editor.props;
   const {
     dmxMonitorOpen,
     setDmxMonitorOpen,
     busyActions,
-    confirmCutAllOpen,
-    setConfirmCutAllOpen,
-    confirmDeleteScene,
-    setConfirmDeleteScene,
-    confirmDeleteGroup,
-    setConfirmDeleteGroup,
-    confirmDeleteFixture,
-    setConfirmDeleteFixture,
     createFixtureOpen,
     setCreateFixtureOpen,
     createGroupOpen,
     setCreateGroupOpen,
-    saveSceneAsOpen,
-    setSaveSceneAsOpen,
   } = editor.session;
-  const { bridgeUniverse, bridgeReachable, previewMode, fixtures, scenes } = editor.rig;
+  const { bridgeUniverse, bridgeReachable, previewMode, fixtures } = editor.rig;
   const {
     showLeavePrompt,
-    activeScene,
+    stateScene: activeScene,
     setShowLeavePrompt,
     pendingLeaveResolveRef,
     showPreviewExitPrompt,
     setShowPreviewExitPrompt,
     handleDiscardPreview,
     handleResaveScene,
-    handleDeleteScene,
-    handleSaveScene,
   } = editor.sceneEditor;
-  const { handleEmergencyCut, handleDeleteGroup, handleCreateGroup } = editor.rigControls;
-  const { handleDeleteFixture, handleAddFixture } = editor.fixtureEditor;
+  const { handleCreateGroup } = editor.rigControls;
+  const { handleAddFixture } = editor.fixtureEditor;
   return (
     <>
       {dmxMonitorOpen ? (
@@ -64,8 +54,8 @@ export function LightingDialogs({ editor }: { editor: LightingEditor }) {
               </>
             ) : activeScene ? (
               <>
-                Scene <strong>{activeScene.name}</strong> has live changes that aren't saved. You can save them with{" "}
-                <strong>Save changes</strong> in the rail, or come back later — the live rig state stays as it is either
+                The rig no longer matches <strong>{activeScene.name}</strong>. You can save the changes into it with{" "}
+                <strong>Save changes</strong> on the state display, or come back later; the rig stays as it is either
                 way.
               </>
             ) : (
@@ -136,97 +126,6 @@ export function LightingDialogs({ editor }: { editor: LightingEditor }) {
         />
       ) : null}
 
-      {confirmCutAllOpen ? (
-        <ConfirmDialog
-          title={previewMode ? "Cut all fixtures in the preview?" : "Cut all fixtures?"}
-          body={
-            previewMode ? (
-              <>
-                This cuts the <strong>preview</strong> only — every previewed fixture goes to off. The live rig is
-                untouched until you apply the preview.
-              </>
-            ) : (
-              <>
-                This sends every fixture to <strong>off</strong> immediately. Saved scenes are unaffected — recall any
-                scene to restore the rig.
-              </>
-            )
-          }
-          confirmLabel={previewMode ? "Cut preview" : "Cut all"}
-          cancelLabel="Cancel"
-          danger
-          busy={busyActions.has("lighting-blackout")}
-          onConfirm={() => {
-            setConfirmCutAllOpen(false);
-            void handleEmergencyCut();
-          }}
-          onCancel={() => setConfirmCutAllOpen(false)}
-        />
-      ) : null}
-
-      {confirmDeleteScene ? (
-        <ConfirmDialog
-          title="Delete scene?"
-          body={
-            <>
-              This removes <strong>{confirmDeleteScene.name}</strong>. Other scenes are unaffected, the live rig state
-              stays as it is, and you can undo it from the message that confirms the deletion.
-            </>
-          }
-          confirmLabel="Delete scene"
-          danger
-          busy={busyActions.has("scene-delete")}
-          onConfirm={() => {
-            const target = confirmDeleteScene;
-            setConfirmDeleteScene(null);
-            void handleDeleteScene(target.id);
-          }}
-          onCancel={() => setConfirmDeleteScene(null)}
-        />
-      ) : null}
-
-      {confirmDeleteGroup ? (
-        <ConfirmDialog
-          title="Delete group?"
-          body={
-            <>
-              This removes <strong>{confirmDeleteGroup.name}</strong>. Member fixtures stay in the rig — only the group
-              is deleted.
-            </>
-          }
-          confirmLabel="Delete group"
-          danger
-          busy={busyActions.has(`group-delete:${confirmDeleteGroup.id}`)}
-          onConfirm={() => {
-            const target = confirmDeleteGroup;
-            setConfirmDeleteGroup(null);
-            void handleDeleteGroup(target.id, target.name);
-          }}
-          onCancel={() => setConfirmDeleteGroup(null)}
-        />
-      ) : null}
-
-      {confirmDeleteFixture ? (
-        <ConfirmDialog
-          title="Delete fixture?"
-          body={
-            <>
-              This permanently removes <strong>{confirmDeleteFixture.name}</strong> from the rig. Saved scenes that
-              referenced it lose this fixture's saved state.
-            </>
-          }
-          confirmLabel="Delete fixture"
-          danger
-          busy={busyActions.has(`fixture-delete:${confirmDeleteFixture.id}`)}
-          onConfirm={() => {
-            const target = confirmDeleteFixture;
-            setConfirmDeleteFixture(null);
-            void handleDeleteFixture(target.id);
-          }}
-          onCancel={() => setConfirmDeleteFixture(null)}
-        />
-      ) : null}
-
       {createFixtureOpen ? (
         <CreateFixtureDialog
           catalog={lightingFixtureCatalogSnapshot}
@@ -254,22 +153,6 @@ export function LightingDialogs({ editor }: { editor: LightingEditor }) {
             void handleCreateGroup(name);
           }}
           onCancel={() => setCreateGroupOpen(false)}
-        />
-      ) : null}
-
-      {saveSceneAsOpen ? (
-        <RenameDialog
-          title={previewMode ? "Save preview as new scene" : "Save as new scene"}
-          fieldLabel="Scene name"
-          initialValue={`Scene ${scenes.length + 1}`}
-          placeholder="e.g. Talking head, Wide, Backlit"
-          confirmLabel="Save scene"
-          busy={busyActions.has("scene-create")}
-          onConfirm={(name) => {
-            setSaveSceneAsOpen(false);
-            void handleSaveScene(name);
-          }}
-          onCancel={() => setSaveSceneAsOpen(false)}
         />
       ) : null}
     </>

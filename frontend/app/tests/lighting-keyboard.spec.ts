@@ -123,9 +123,9 @@ test("The rename a double-click opens takes a name with a space and keeps the ti
 test("Enter in the empty search field recalls nothing while the Recent list is closed", async ({ page }) => {
   // Interview, then Warm wash: the Recent list reads Warm wash, Interview.
   await page.getByRole("button", { name: "Recall scene Interview", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (on rig)" })).toBeVisible();
   await page.getByRole("button", { name: /^Recall scene Warm wash/ }).click();
-  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (on rig)" })).toBeVisible();
 
   const search = page.getByLabel("Search fixtures, scenes and groups");
   const recentScenes = page.getByRole("listbox", { name: "Recent scenes" });
@@ -139,8 +139,8 @@ test("Enter in the empty search field recalls nothing while the Recent list is c
   await page.keyboard.press("Enter");
   await expect(search).toBeFocused();
   await expect(recentScenes).toBeHidden();
-  await expect(page.getByRole("button", { name: "Recall scene Warm wash (active)" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Recall scene Warm wash (on rig)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (on rig)" })).toHaveCount(0);
 
   // With the list open again, Enter recalls the scene lit in it.
   await page.keyboard.press("ArrowDown");
@@ -149,7 +149,7 @@ test("Enter in the empty search field recalls nothing while the Recent list is c
   await page.keyboard.press("ArrowDown");
   await expect(recentScenes.getByRole("option", { name: /Interview/ })).toHaveAttribute("aria-selected", "true");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: "Recall scene Interview (active)" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recall scene Interview (on rig)" })).toBeVisible();
   await expect(recentScenes).toBeHidden();
   await expect(search).not.toBeFocused();
 });

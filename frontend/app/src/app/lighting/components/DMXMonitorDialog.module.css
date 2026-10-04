@@ -1,16 +1,20 @@
+/* The DMX monitor (the page ⋯'s "DMX monitor…"): every channel of the
+   universe in a grid, on the design system's tokens. A patched channel is the
+   raised face with the strong edge; an unpatched one the quiet face. */
+
 .shell {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-family: var(--font-family-mono);
+  font-family: var(--font-family-ui);
 }
 
 .legend {
   display: flex;
   gap: 16px;
   align-items: center;
-  font-size: var(--font-size-tick);
-  color: var(--color-brand-text-muted);
+  font-size: var(--font-size-label);
+  color: var(--text-text3);
 }
 
 .legendKey {
@@ -22,25 +26,22 @@
 .legendSwatch {
   width: 10px;
   height: 10px;
-  border-radius: var(--radius-ctl);
-  border: 1px solid var(--color-bg-stroke);
+  border-radius: var(--radius-base);
+  border: 1px solid var(--material-line);
+  background: var(--material-key);
 }
 
-/* LGS-02: "assigned/patched" was the retired multi-hue blue (and the 9px channel
-   header failed AA at 3.40:1). It now reads as a NEUTRAL elevated keyline —
-   distinct from the flat unassigned cell by elevation + a strong themed border +
-   readable text — so it clears AA in all three themes without an off-palette hue. */
 .legendSwatchAssigned {
-  background: var(--color-bg-elevated);
-  border-color: var(--color-border-strong);
+  background: var(--material-raise);
+  border-color: var(--text-text3);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(16, minmax(0, 1fr));
   gap: 2px;
-  border: 1px solid var(--color-bg-stroke);
-  border-radius: var(--radius-ctl);
+  border: 1px solid var(--material-line);
+  border-radius: var(--radius-base);
   padding: 4px;
   max-height: min(540px, 70vh);
   overflow-y: auto;
@@ -56,20 +57,20 @@
   flex-direction: column;
   gap: 2px;
   padding: 4px 5px 5px;
-  background: var(--color-bg-soft);
-  border: 1px solid transparent;
-  border-radius: var(--radius-ctl);
-  font-feature-settings: "tnum", "zero";
+  background: var(--material-key);
+  border: 1px solid var(--material-key);
+  border-radius: var(--radius-base);
+  font-variant-numeric: tabular-nums;
   cursor: default;
 }
 
 .cellAssigned {
-  background: var(--color-bg-elevated);
-  border-color: var(--color-border-strong);
+  background: var(--material-raise);
+  border-color: var(--text-text3);
 }
 
 .cell:focus-visible {
-  outline: 2px solid var(--color-brand-green);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -78,38 +79,33 @@
   justify-content: space-between;
   align-items: baseline;
   font-size: var(--font-size-tick);
-  letter-spacing: 0;
-  color: var(--color-brand-text-muted);
+  color: var(--text-text3);
 }
 
 .cellAssigned .cellHeader {
-  color: var(--color-brand-text-secondary);
+  color: var(--text-text2);
 }
 
 .cellValue {
-  font-size: var(--font-size-tick);
-  font-weight: 700;
-  color: var(--color-brand-text-primary);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-text);
   text-align: center;
-}
-
-.cellAssigned .cellValue {
-  color: var(--color-brand-text-primary);
 }
 
 .cellBar {
   height: 3px;
   border-radius: var(--radius-pill);
-  background: var(--color-bg-border);
+  background: var(--material-line2);
   overflow: hidden;
 }
 
 .cellBarFill {
   display: block;
   height: 100%;
-  background: var(--color-brand-text-secondary);
+  background: var(--text-text2);
 }
 
 .cellAssigned .cellBarFill {
-  background: var(--color-brand-text-primary);
+  background: var(--text-text);
 }

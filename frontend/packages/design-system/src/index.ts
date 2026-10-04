@@ -11,7 +11,7 @@ export type { LampWordProps, LatchProps, LatchSlotProps } from "./components/Lam
 export { Well, Readout, Field, Screen } from "./components/Well";
 export type { FieldProps, ReadoutProps, ScreenProps, WellProps } from "./components/Well";
 export { Slider, Groove } from "./components/Slider";
-export type { GrooveProps, SliderBaseProps, SliderProps } from "./components/Slider";
+export type { GrooveProps, SliderBaseProps, SliderMark, SliderProps } from "./components/Slider";
 export { Meter } from "./components/Meter";
 export type { MeterProps } from "./components/Meter";
 export { PlateHead, Section, Fields, Readouts, ControlRow, Danger } from "./components/Plate";

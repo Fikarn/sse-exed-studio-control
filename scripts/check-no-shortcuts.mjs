@@ -95,15 +95,15 @@ export const KEY_HANDLERS = {
     "a focused knob is a slider: the arrows, Home, End, Page Up and Page Down, and Enter for typed entry (decision 9)",
   "frontend/app/src/app/lighting/components/FixtureMarker.tsx":
     "Enter or Space presses the focused fixture marker (D6)",
-  "frontend/app/src/app/lighting/components/GroupChip.tsx":
-    "Enter or Space presses the focused group chip (D8), and the chips' keyboard reorder: Space picks one up, the arrows move it, Space or Enter drops it, Esc puts it back (decision 11)",
-  "frontend/app/src/app/lighting/components/InspectorFixture.tsx": "Enter confirms a typed Position field (D6)",
+  "frontend/app/src/app/lighting/components/GroupKey.tsx":
+    "Enter or Space presses the focused group key (D8), and the keys' keyboard reorder: Space picks one up, the arrows move it, Space or Enter drops it, Esc puts it back (decision 11)",
+  "frontend/app/src/app/lighting/components/InspectorFixture.tsx": "Enter confirms a typed placement field (D6)",
   "frontend/app/src/app/lighting/components/InspectorPatch.tsx":
     "the patch start-channel field: Enter confirms, Esc puts the old value back (decision 11)",
   "frontend/app/src/app/lighting/components/LightingSearchField.tsx":
     "the search field's Recent list: the arrows move over it, Enter recalls the scene it shows, Esc closes it (decision 11)",
-  "frontend/app/src/app/lighting/components/SceneTile.tsx":
-    "Enter or Space presses the focused scene tile or its pin (D8), and the tiles' keyboard reorder (decision 11)",
+  "frontend/app/src/app/lighting/components/SceneRow.tsx":
+    "Enter or Space presses the focused scene row (D8), and the rows' keyboard reorder (decision 11)",
   "frontend/app/src/app/lighting/components/TalentMarkMarker.tsx":
     "the arrows move a focused talent mark 0.1 m, the only keyboard way to move one (decision 9)",
 };

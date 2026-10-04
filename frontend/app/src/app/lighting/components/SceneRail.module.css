@@ -1,0 +1,168 @@
+/* The visual overhaul's Lighting page (2026-10-04): the scenes as calm rows
+   on hairlines, never cards (DESIGN.md §5). A row is 48 px, its name on one
+   line in PT Sans 20 (read during a take), its word on the rig or what it
+   holds at the right in the quiet ink, its ⋯ at its end on hover, while it is
+   the plate's and while its menu is open. */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-top: 1px solid var(--material-line);
+}
+
+.item {
+  border-bottom: 1px solid var(--material-line);
+}
+
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 47px;
+}
+
+.recall {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px 0 0;
+  border-radius: var(--radius-base);
+  color: var(--text-text);
+  cursor: pointer;
+  outline: none;
+}
+
+.row:hover .recall {
+  background: var(--material-hover);
+}
+
+.recall:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.recall[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.recall[aria-disabled="true"] .name {
+  color: var(--text-text3);
+}
+
+/* The scene the plate shows: the Beige keyline, as every selection. */
+.row[data-selected="true"] .recall {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.recall[data-dragging] {
+  cursor: grabbing;
+}
+
+/* The scene's own colour, a 4 px mark at the row's start; none, none. */
+.colour {
+  flex: none;
+  align-self: stretch;
+  width: 4px;
+  margin: 10px 0;
+  border-radius: var(--radius-base);
+  background: var(--scene-colour, var(--material-bg));
+}
+
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: var(--font-weight-regular) var(--font-size-word) / 1.2 var(--font-family-ui);
+}
+
+.facts {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text3);
+  white-space: nowrap;
+}
+
+.menu {
+  flex: none;
+  display: inline-flex;
+  margin-left: 4px;
+  opacity: 0;
+}
+
+.row:hover .menu,
+.row:focus-within .menu,
+.row[data-selected="true"] .menu,
+.row:has([aria-expanded="true"]) .menu {
+  opacity: 1;
+}
+
+/* A recall fading to the scene: its progress along the row's foot. */
+.fade {
+  position: absolute;
+  left: 16px;
+  right: 8px;
+  bottom: 3px;
+  height: 2px;
+  background: var(--material-line);
+  pointer-events: none;
+}
+
+.fadeBar {
+  display: block;
+  height: 100%;
+  background: var(--text-text2);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: none;
+  height: 36px;
+}
+
+.pageWord {
+  min-width: 56px;
+  text-align: center;
+  font: var(--font-weight-regular) var(--font-size-label) / 1 var(--font-family-ui);
+  color: var(--text-text2);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 0;
+  font: var(--font-weight-regular) var(--font-size-body) / var(--font-line-height-text) var(--font-family-ui);
+  color: var(--text-text3);
+}
+
+.emptyKey {
+  flex: none;
+}
+
+.footer {
+  flex: none;
+}

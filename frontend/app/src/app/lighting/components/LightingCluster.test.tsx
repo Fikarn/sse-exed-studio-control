@@ -1,27 +1,35 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { ARM_DWELL_MS, useArm } from "@sse/design-system";
 
 import { LightingCluster, type LightingClusterProps } from "./LightingCluster";
 
-// New pages program, Slice 3. Two keys took over what keyboard shortcuts did:
-// - decision 6: the page-wide Esc stopped a running Find, and nothing on screen
-//   did. While a Find runs, the Find key reads "Stop" and pressing it stops it.
-// - decision 5: Ctrl+Z undid the newest of the last 25 steps, and only a step's
-//   own message offered an Undo, for 3.5 s. The Rig section has an Undo key
-//   whose small print names the step it will undo; with nothing to undo it
-//   cannot be pressed.
+// The cluster of the visual overhaul's Lighting page (2026-10-04): Undo names
+// the step it will undo; CUT ALL arms as the deck's ALL OFF does and is never
+// locked while there is a rig; the grand master waits in Preview (it acts on
+// the rig itself); a Highlight or a Solo on the rig latches with its Off key.
 
 afterEach(() => {
   cleanup();
 });
 
-function renderCluster(overrides: Partial<LightingClusterProps> = {}) {
+let clock = 0;
+
+function Harness(props: Omit<LightingClusterProps, "arm" | "armedWords">) {
+  const arm = useArm({ now: () => clock });
+  return <LightingCluster {...props} arm={arm} armedWords={arm.armed?.label ?? null} />;
+}
+
+function renderCluster(overrides: Partial<Omit<LightingClusterProps, "arm" | "armedWords">> = {}) {
   const handlers = {
-    onIdentifyFind: vi.fn(),
-    onStopFind: vi.fn(),
     onUndo: vi.fn(),
+    onEmergencyCut: vi.fn(),
+    onToggleHighlight: vi.fn(),
+    onToggleSolo: vi.fn(),
+    onTogglePatch: vi.fn(),
   };
-  const props: LightingClusterProps = {
+  const props: Omit<LightingClusterProps, "arm" | "armedWords"> = {
     bridgeIp: "192.168.1.80",
     bridgeReachable: true,
     bridgeUniverse: 1,
@@ -29,69 +37,54 @@ function renderCluster(overrides: Partial<LightingClusterProps> = {}) {
     fixtureOnCount: 3,
     fixtureTotal: 4,
     grandMaster: 100,
-    groups: [],
-    lastRecalledLabel: null,
+    lastSavedLabel: null,
     previewDirty: false,
     previewMode: false,
     patchMode: false,
     recallFadeMs: 0,
     sceneModified: false,
     sceneName: "Warm wash",
-    scenes: [],
-    sceneRailProps: { activeSceneId: null, modifiedSceneId: null, sceneThumbs: {}, onRecall: () => {} },
-    groupRailProps: { onTogglePower: () => {} },
+    sceneRailProps: {
+      scenes: [],
+      liveSceneId: null,
+      liveWord: null,
+      onRecall: () => {},
+      buildMenu: (scene) => ({ head: { title: scene.name }, items: [] }),
+    },
+    groupRailProps: {
+      groups: [],
+      onTogglePower: () => {},
+      buildMenu: (group) => ({ head: { title: group.name }, items: [] }),
+    },
+    highlightNames: [],
+    soloNames: [],
     onAddFixture: () => {},
+    onCreateGroup: () => {},
     onDiscardPreview: () => {},
-    onEmergencyCut: () => {},
     onGrandMasterChange: () => {},
-    hasSelection: true,
-    highlightActive: false,
-    soloActive: false,
     recentScenes: [],
     searchQuery: "",
     onSearchChange: () => {},
-    onToggleHighlight: () => {},
-    onToggleSolo: () => {},
     onOpenDmxMonitor: () => {},
+    dmxStripOn: false,
+    onToggleDmxStrip: () => {},
     onRecallFadeMsChange: () => {},
     onResaveScene: () => {},
     onOpenSetup: () => {},
     onSaveScene: () => {},
     onToggleAllPower: () => {},
-    onTogglePatch: () => {},
     onTogglePreview: () => {},
     ...handlers,
     ...overrides,
   };
-  render(<LightingCluster {...props} />);
+  render(<Harness {...props} />);
   return handlers;
 }
 
 describe("LightingCluster", () => {
-  it("the Find key reads Stop while a Find runs, and stops it", () => {
-    const idle = renderCluster({ findRunning: false });
-    const find = screen.getByTestId("lighting-identify-find");
-    expect(find.textContent).toBe("Find");
-    fireEvent.click(find);
-    expect(idle.onIdentifyFind).toHaveBeenCalledTimes(1);
-    expect(idle.onStopFind).not.toHaveBeenCalled();
-    cleanup();
-
-    // Running, and still pressable after the selection was cleared mid-run.
-    const running = renderCluster({ findRunning: true, hasSelection: false });
-    const stop = screen.getByTestId("lighting-identify-find");
-    expect(stop.textContent).toBe("Stop");
-    expect((stop as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(stop);
-    expect(running.onStopFind).toHaveBeenCalledTimes(1);
-    expect(running.onIdentifyFind).not.toHaveBeenCalled();
-  });
-
   it("the Undo key names the step it will undo, and cannot be pressed with nothing to undo", () => {
     const nothing = renderCluster({ undoLabel: null });
     const empty = screen.getByTestId("lighting-undo") as HTMLButtonElement;
-    // Decision 5: dimmed with nothing to undo — the system's locked form, which
-    // keeps the key reachable so its reason can be read.
     expect(empty.getAttribute("aria-disabled")).toBe("true");
     expect(empty.hasAttribute("data-locked")).toBe(true);
     expect(empty.title).toMatch(/^Nothing to undo\./);
@@ -103,59 +96,85 @@ describe("LightingCluster", () => {
     const something = renderCluster({ undoLabel: "Delete scene Interview" });
     const undo = screen.getByRole("button", { name: "Undo Delete scene Interview" }) as HTMLButtonElement;
     expect(undo.dataset.testid).toBe("lighting-undo");
-    expect(undo.disabled).toBe(false);
     expect(undo.textContent).toBe("UndoDelete scene Interview");
     fireEvent.click(undo);
     expect(something.onUndo).toHaveBeenCalledTimes(1);
     cleanup();
 
-    // A long name is cut in the small print; the key's name keeps all of it.
     const longName = "Delete fixture Backlight over the interview table, stage left";
     renderCluster({ undoLabel: longName });
     const long = screen.getByRole("button", { name: `Undo ${longName}` });
     expect(long.textContent).toBe(`Undo${longName.slice(0, 39)}…`);
   });
 
-  // Slice 3 review, finding 16: the page-wide Esc cleared Highlight and Solo in
-  // any mode; its twin is the lit key. In Preview both keys were disabled, lit
-  // or not, so nothing on the page could switch a live Highlight or Solo off.
-  it("a lit Highlight or Solo key can be pressed in Preview, with or without a selection; unlit, both wait", () => {
-    for (const hasSelection of [true, false]) {
-      const onToggleHighlight = vi.fn();
-      renderCluster({ previewMode: true, highlightActive: true, hasSelection, onToggleHighlight });
-      const highlight = screen.getByTestId("lighting-highlight-toggle") as HTMLButtonElement;
-      expect(highlight.getAttribute("aria-pressed")).toBe("true");
-      expect(highlight.disabled).toBe(false);
-      fireEvent.click(highlight);
-      expect(onToggleHighlight).toHaveBeenCalledTimes(1);
-      cleanup();
-
-      const onToggleSolo = vi.fn();
-      renderCluster({ previewMode: true, soloActive: true, hasSelection, onToggleSolo });
-      const solo = screen.getByTestId("lighting-solo-toggle") as HTMLButtonElement;
-      expect(solo.getAttribute("aria-pressed")).toBe("true");
-      expect(solo.disabled).toBe(false);
-      fireEvent.click(solo);
-      expect(onToggleSolo).toHaveBeenCalledTimes(1);
-      cleanup();
-    }
-
-    const onToggleHighlight = vi.fn();
-    const onToggleSolo = vi.fn();
-    renderCluster({ previewMode: true, hasSelection: true, onToggleHighlight, onToggleSolo });
-    for (const testId of ["lighting-highlight-toggle", "lighting-solo-toggle"]) {
-      const key = screen.getByTestId(testId) as HTMLButtonElement;
-      expect(key.disabled).toBe(true);
-      fireEvent.click(key);
-    }
-    expect(onToggleHighlight).not.toHaveBeenCalled();
-    expect(onToggleSolo).not.toHaveBeenCalled();
+  it("CUT ALL arms at the first press and cuts at the second, as the deck's ALL OFF does", () => {
+    clock = 0;
+    const handlers = renderCluster();
+    const cut = screen.getByTestId("lighting-emergency-cut");
+    fireEvent.click(cut);
+    expect(cut.getAttribute("data-armed")).toBe("true");
+    expect(handlers.onEmergencyCut).not.toHaveBeenCalled();
+    expect(screen.getByTestId("lighting-state-display").textContent).toContain("Cut all fixtures · press again");
+    clock = ARM_DWELL_MS + 50;
+    fireEvent.click(cut);
+    expect(handlers.onEmergencyCut).toHaveBeenCalledTimes(1);
+    expect(cut.getAttribute("data-armed")).toBe("false");
   });
 
-  it("says Press Patch, not a key, while patch mode holds the rig", () => {
+  it("CUT ALL stays live while the bridge has not passed its probe; LIGHTING and the grand master lock", () => {
+    renderCluster({ bridgeReachable: false });
+    expect(screen.getByTestId("lighting-emergency-cut").getAttribute("aria-disabled")).toBeNull();
+    expect(screen.getByTestId("lighting-power-toggle").getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByTestId("lighting-grand-master").getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByTestId("lighting-state-display").textContent).toContain("has not passed its probe");
+  });
+
+  it("the grand master waits in Preview: it acts on the rig itself", () => {
+    renderCluster({ previewMode: true });
+    const master = screen.getByTestId("lighting-grand-master");
+    expect(master.getAttribute("aria-disabled")).toBe("true");
+    expect(master.parentElement?.getAttribute("title")).toMatch(/acts on the rig itself/);
+  });
+
+  it("a Highlight and a Solo on the rig latch with the key that ends them; Patch with Leave", () => {
+    const handlers = renderCluster({ highlightNames: ["Key", "Fill"], patchMode: true });
+    expect(screen.getByTestId("lighting-latch-highlight").textContent).toContain("Key, Fill");
+    act(() => fireEvent.click(screen.getByTestId("lighting-latch-highlight-off")));
+    expect(handlers.onToggleHighlight).toHaveBeenCalledTimes(1);
+    act(() => fireEvent.click(screen.getByTestId("lighting-latch-patch-leave")));
+    expect(handlers.onTogglePatch).toHaveBeenCalledTimes(1);
+    cleanup();
+
+    renderCluster({ soloNames: ["Key"] });
+    expect(screen.getByTestId("lighting-latch-solo").textContent).toContain("Key");
+    expect(screen.queryByTestId("lighting-latch-highlight")).toBeNull();
+  });
+
+  it("a group key is lit while all its fixtures are on; a partly lit group says how many, not off", () => {
+    renderCluster({
+      groupRailProps: {
+        groups: [
+          { id: "front", name: "Front", fixtureCount: 2, on: true, onCount: 2, level: 67, drifted: false },
+          { id: "back", name: "Back", fixtureCount: 2, on: false, onCount: 1, level: 64, drifted: false },
+          { id: "side", name: "Side", fixtureCount: 2, on: false, onCount: 0, level: 0, drifted: false },
+        ],
+        onTogglePower: () => {},
+        buildMenu: (group) => ({ head: { title: group.name }, items: [] }),
+      },
+    });
+    const front = screen.getByRole("button", { name: /^Front, / });
+    expect(front.textContent).toContain("67 %");
+    expect(front.getAttribute("aria-label")).toBe("Front, 2 fixtures at 67 %, on. Toggle off.");
+    const back = screen.getByRole("button", { name: /^Back, / });
+    expect(back.textContent).toContain("1 of 2");
+    expect(back.getAttribute("aria-label")).toBe("Back, 2 fixtures, 1 of 2 on. Toggle on.");
+    expect(screen.getByRole("button", { name: /^Side, / }).textContent).toContain("off");
+  });
+
+  it("says how to leave Patch, never a key, while patch mode holds the rig", () => {
     renderCluster({ patchMode: true });
     expect(screen.getByTestId("lighting-power-toggle").getAttribute("title")).toBe(
-      "Patch mode is on: the rig's levels are paused while you address fixtures. Press Patch to leave it."
+      "Patch mode is on: leave it to switch the rig and save scenes."
     );
   });
 });

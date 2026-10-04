@@ -155,6 +155,33 @@ fn colour_temperature_counts_within_25_k_and_only_where_a_fixture_has_it() {
     assert_eq!(state_of(&state), SCENE_STATE_LIVE);
 }
 
+// A value a scene saved for a control the light no longer has (the
+// INFINIMAT's strobe, removed on 2026-10-04) does not count: the light is
+// compared through the controls it has.
+#[test]
+fn a_saved_value_of_a_control_the_light_lost_does_not_count() {
+    let mut state = rig_holding_its_scene("scene-state-lost-control", |_| {});
+    let held = state
+        .scenes
+        .iter_mut()
+        .find(|scene| scene.id == HELD)
+        .expect("the scene");
+    let wash = held
+        .fixture_states
+        .iter_mut()
+        .find(|saved| saved.fixture_id == "fixture-backline-wash")
+        .expect("the wash");
+    wash.control_values.insert(String::from("strobe"), 120);
+    assert_eq!(state_of(&state), SCENE_STATE_LIVE);
+
+    let green_magenta = fixture(&mut state, "fixture-backline-wash")
+        .control_values
+        .entry(String::from("green-magenta"))
+        .or_insert(0);
+    *green_magenta += 5;
+    assert_eq!(state_of(&state), SCENE_STATE_UNSAVED, "a control it has");
+}
+
 // A fixture the scene does not hold drifts only while it is lit: on at 0 %
 // or off is still the scene.
 #[test]

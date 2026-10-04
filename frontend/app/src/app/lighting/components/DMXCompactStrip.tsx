@@ -263,7 +263,7 @@ export function DMXCompactStrip({
       <span className={styles.label}>
         DMX <strong>{universeLabel}</strong>
         <span className={styles.count}>· {cells.length} ch</span>
-        {!bridgeReachable ? <span className={styles.stale}> · stale</span> : null}
+        {!bridgeReachable ? <span className={styles.stale}> · probe not passed</span> : null}
       </span>
       {cells.length === 0 ? (
         <span className={styles.empty} role="status">

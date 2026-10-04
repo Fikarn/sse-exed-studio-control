@@ -8,7 +8,7 @@ const base: LightingStateInput = {
   channelCount: 12,
   fixtureOnCount: 3,
   fixtureTotal: 4,
-  lastRecalledLabel: null,
+  lastSavedLabel: null,
   outputsHeld: false,
   previewDirty: false,
   previewMode: false,
@@ -82,5 +82,27 @@ describe("deriveLightingState and held light outputs", () => {
     expect(deriveLightingState({ ...base, previewMode: true, previewDirty: true }).sentence).toContain(
       "Save puts the edits into Warm wash"
     );
+  });
+});
+
+// The visual overhaul (2026-10-04): UNREACHABLE is the probe's word. The
+// hardware link refuses a recall then, and nothing else; until then the
+// sentence said nothing pressed would reach the rig. The meta line names the
+// scene and when it was saved, and no count another control prints.
+describe("deriveLightingState's words", () => {
+  it("UNREACHABLE says the probe has not passed and that recalls are refused", () => {
+    const state = deriveLightingState({ ...base, bridgeReachable: false });
+    expect(state.sentence).toBe(
+      "The bridge at 10.1.0.1 · universe 1 has not passed its probe, so recalls are refused."
+    );
+    expect(state.sentence).not.toMatch(/nothing you press/);
+    expect(state.locked).toBe(true);
+    expect(state.lockNote).toBe("locked · the bridge has not passed its probe");
+  });
+
+  it("the meta line names the scene and when it was saved", () => {
+    expect(deriveLightingState(base).meta).toBe("Scene Warm wash");
+    expect(deriveLightingState({ ...base, lastSavedLabel: "17:20" }).meta).toBe("Scene Warm wash · saved 17:20");
+    expect(deriveLightingState({ ...base, sceneName: null }).meta).toBe("No scene recalled");
   });
 });

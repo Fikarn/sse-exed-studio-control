@@ -1022,11 +1022,12 @@ export function handleFixtureLightingRequest(
         const previewTarget = editableFixtures.find((fixture) => asString(fixture.id) === fixtureId) ?? targetFixture;
         const cctRange = lightingFixtureCctRange(targetFixture);
         const defaultCct = defaultLightingFixtureCct(targetFixture);
+        // The map is taken whole, as the hardware link takes it
+        // (`preview.rs`): a control it leaves out goes to its default. Until
+        // 2026-10-04 the double merged it, and hid that the plate sent one
+        // control at a time.
         const controlValues = hasControlValues
-          ? {
-              ...asNumberRecord(previewTarget.controlValues),
-              ...asNumberRecord(params.controlValues),
-            }
+          ? asNumberRecord(params.controlValues)
           : asNumberRecord(previewTarget.controlValues);
         const updatedFixture: JsonObject = {
           ...previewTarget,
@@ -1205,14 +1206,9 @@ export function handleFixtureLightingRequest(
                     ),
             }
           : {}),
-        ...(hasControlValues
-          ? {
-              controlValues: {
-                ...asNumberRecord(targetFixture.controlValues),
-                ...asNumberRecord(params.controlValues),
-              },
-            }
-          : {}),
+        // Whole, as `fixtures.rs` takes it: a control left out goes to its
+        // default (see the preview's above).
+        ...(hasControlValues ? { controlValues: asNumberRecord(params.controlValues) } : {}),
         ...(hasIntensity
           ? {
               intensity: Math.max(

@@ -47,18 +47,12 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     });
   }, []);
 
+  // The visual overhaul (2026-10-04): CUT ALL and every "Delete …" arm in
+  // place now (the page's one arm, `useLightingArming`), so no dialog waits
+  // for a yes here.
   const [dmxMonitorOpen, setDmxMonitorOpen] = useState(false);
-  const [confirmCutAllOpen, setConfirmCutAllOpen] = useState(false);
   const [createFixtureOpen, setCreateFixtureOpen] = useState(false);
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
-  const [saveSceneAsOpen, setSaveSceneAsOpen] = useState(false);
-  // Right-click "Delete" confirm dialogs raised from the SceneTile / GroupChip
-  // / FixtureMarker context menus. Each surface owns its own slot so opening
-  // a fixture confirm doesn't blow away an in-flight scene confirm. The
-  // Inspector "Danger zone" delete buttons keep their own local dialogs.
-  const [confirmDeleteScene, setConfirmDeleteScene] = useState<{ id: string; name: string } | null>(null);
-  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<{ id: string; name: string } | null>(null);
-  const [confirmDeleteFixture, setConfirmDeleteFixture] = useState<{ id: string; name: string } | null>(null);
   // One-shot signal: when a chip / marker context menu's "Rename" fires for
   // an entity whose InlineRename lives in the inspector (group, fixture), we
   // (a) select the entity for inspection and (b) bump this nonce so the
@@ -72,6 +66,17 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
   const requestInlineRename = useCallback((kind: "fixture" | "group", id: string) => {
     setPendingInlineRename((prev) => ({ kind, id, nonce: (prev?.nonce ?? 0) + 1 }));
   }, []);
+  // The fixture menu's "Edit placement…" asks the plate to open its placement
+  // fields for that fixture, the same way.
+  const [placementRequest, setPlacementRequest] = useState<{ id: string; nonce: number } | null>(null);
+  const requestPlacement = useCallback((id: string) => {
+    setPlacementRequest((prev) => ({ id, nonce: (prev?.nonce ?? 0) + 1 }));
+  }, []);
+  // The plate takes the request once; it is then forgotten, so a later
+  // render or a later selection of the fixture does not open it again.
+  const clearPlacementRequest = useCallback(() => setPlacementRequest(null), []);
+  // The plot menu's "Symbol key": shown over the floor's corner while on.
+  const [showSymbolKey, setShowSymbolKey] = useState(false);
 
   // The undo history and the scenes and fixtures its steps act on, followed
   // through the ids an undo gives them (Slice 3 review, finding 17). They
@@ -161,10 +166,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setCreateFixtureOpen(true);
   }, [previewMode, toast]);
 
-  const requestEmergencyCut = useCallback(() => {
-    setConfirmCutAllOpen(true);
-  }, []);
-
   const handleInspectGroup = useCallback((groupId: string) => {
     setSelectedGroupId(groupId);
     setActiveTabOverride("group");
@@ -185,22 +186,17 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     finishBusy,
     dmxMonitorOpen,
     setDmxMonitorOpen,
-    confirmCutAllOpen,
-    setConfirmCutAllOpen,
     createFixtureOpen,
     setCreateFixtureOpen,
     createGroupOpen,
     setCreateGroupOpen,
-    saveSceneAsOpen,
-    setSaveSceneAsOpen,
-    confirmDeleteScene,
-    setConfirmDeleteScene,
-    confirmDeleteGroup,
-    setConfirmDeleteGroup,
-    confirmDeleteFixture,
-    setConfirmDeleteFixture,
     pendingInlineRename,
     requestInlineRename,
+    placementRequest,
+    requestPlacement,
+    clearPlacementRequest,
+    showSymbolKey,
+    setShowSymbolKey,
     undoStack,
     undoTargets,
     activeTab,
@@ -210,7 +206,6 @@ export function useLightingSession({ props, rig }: { props: LightingWorkspaceSur
     setDmxStripOn,
     renderDmxStrip,
     requestAddFixture,
-    requestEmergencyCut,
     handleInspectGroup,
   };
 }

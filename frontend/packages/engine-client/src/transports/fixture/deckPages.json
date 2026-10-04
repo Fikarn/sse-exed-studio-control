@@ -30,7 +30,7 @@
           "body": {
             "action": "saveScene"
           },
-          "description": "Save the current lighting scene.",
+          "description": "Save the rig as a new scene, named Scene N.",
           "id": "lights-btn-3",
           "label": "SAVE",
           "method": "POST",
